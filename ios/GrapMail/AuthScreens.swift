@@ -198,8 +198,8 @@ struct SignInView: View {
                 let address = resp.account?.address ?? identifier
                 SessionStore.save(token: token, address: address, name: resp.account?.name ?? "")
                 onSignedIn(address)
-            } catch {
-                error = error.localizedDescription
+            } catch let apiError {
+                error = apiError.localizedDescription
             }
         }
     }
@@ -218,8 +218,8 @@ struct SignInView: View {
                 let address = resp.user?.address ?? identifier
                 SessionStore.save(token: token, address: address, name: resp.user?.name ?? "")
                 onSignedIn(address)
-            } catch {
-                error = error.localizedDescription
+            } catch let apiError {
+                error = apiError.localizedDescription
             }
         }
     }
