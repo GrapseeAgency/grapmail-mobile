@@ -9,7 +9,7 @@ on:
 jobs:
   build-test-screenshot:
     name: Build, live-test & screenshot (iPhone simulator)
-    runs-on: macos-14
+    runs-on: macos-15
     timeout-minutes: 45
     env:
       SCHEME: GrapMail
@@ -39,8 +39,7 @@ jobs:
             -scheme "$SCHEME" \
             -destination "platform=iOS Simulator,name=${{ steps.sim.outputs.name }}" \
             -resultBundlePath walk.xcresult \
-            | xcbeautify || true
-          test -d walk.xcresult
+            | xcbeautify
 
       - name: Export screenshots from the result bundle
         run: |
