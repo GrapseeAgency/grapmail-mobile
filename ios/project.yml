@@ -19,6 +19,7 @@ targets:
       - GrapMail
     settings:
       base:
+        GENERATE_INFOPLIST_FILE: YES
         INFOPLIST_KEY_UIApplicationSceneManifest_Generation: YES
         INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents: YES
         INFOPLIST_KEY_UIRequiresFullScreen: YES
@@ -37,6 +38,7 @@ targets:
       - target: GrapMail
     settings:
       base:
+        GENERATE_INFOPLIST_FILE: YES
         PRODUCT_BUNDLE_IDENTIFIER: com.grapsee.grapmail.uitests
         TEST_TARGET_NAME: GrapMail
 schemes:
