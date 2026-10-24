@@ -36,10 +36,10 @@ jobs:
       - name: Run the live signup walk on the emulator
         uses: reactivecircus/android-emulator-runner@v2
         with:
-          api-level: 34
+          api-level: 33
           arch: x86_64
           target: google_apis
-          profile: pixel_7
+          profile: pixel_6
           emulator-boot-timeout: 900
           emulator-options: -no-window -no-audio -no-boot-anim -gpu swiftshader_indirect -no-snapshot
           script: |
