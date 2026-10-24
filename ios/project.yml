@@ -44,5 +44,9 @@ schemes:
     build:
       targets:
         GrapMail: all
+        GrapMailUITests: [test]
+    test:
+      targets:
+        - GrapMailUITests
     run:
       config: Debug
