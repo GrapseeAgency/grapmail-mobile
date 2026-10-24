@@ -1,0 +1,25 @@
+# Android
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+*.apk
+*.aab
+
+# iOS
+ios/GrapMail.xcodeproj/
+ios/DerivedData/
+ios/**/xcuserdata/
+*.xcresult
+
+# Screenshots from local runs (CI uploads them as artifacts)
+screenshots/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Keep the founder's design references and measured tokens
+!raw-designs/
+!assets/
+!design/

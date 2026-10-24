@@ -1,0 +1,10 @@
+{
+  "images" : [
+    {
+      "filename" : "ill_step1_name.png",
+      "idiom" : "universal"
+    }
+  ],
+  "info" : { "author" : "xcode", "version" : 1 },
+  "properties" : { "single-scale" : true }
+}

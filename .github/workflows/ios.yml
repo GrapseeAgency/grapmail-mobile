@@ -1,0 +1,62 @@
+name: iOS
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  workflow_dispatch:
+
+jobs:
+  build-test-screenshot:
+    name: Build, live-test & screenshot (iPhone simulator)
+    runs-on: macos-14
+    timeout-minutes: 45
+    env:
+      SCHEME: GrapMail
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        working-directory: ios
+        run: xcodegen generate
+
+      - name: Resolve available simulator
+        id: sim
+        run: |
+          NAME=$(xcrun simctl list devices available | grep -m1 -o "iPhone 16 Pro\|iPhone 16\|iPhone 15")
+          echo "name=$NAME" >> "$GITHUB_OUTPUT"
+          echo "Using simulator: $NAME"
+
+      - name: Build & run the live signup walk (UI tests)
+        working-directory: ios
+        run: |
+          set -o pipefail
+          xcodebuild test \
+            -project GrapMail.xcodeproj \
+            -scheme "$SCHEME" \
+            -destination "platform=iOS Simulator,name=${{ steps.sim.outputs.name }}" \
+            -resultBundlePath walk.xcresult \
+            | xcbeautify || true
+          test -d walk.xcresult
+
+      - name: Export screenshots from the result bundle
+        run: |
+          mkdir -p screenshots
+          xcrun xcresulttool export attachments \
+            --path ios/walk.xcresult \
+            --output-path screenshots \
+            || xcrun xcresulttool export \
+                 --type directory --path ios/walk.xcresult --output-path screenshots_raw \
+                 && find screenshots_raw -name "*.png" -exec cp {} screenshots/ \; || true
+          ls -la screenshots/
+
+      - name: Upload screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-screenshots
+          path: screenshots/
+          if-no-files-found: warn
