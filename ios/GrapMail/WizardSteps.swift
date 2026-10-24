@@ -377,7 +377,8 @@ struct AddressStepView: View {
             Text("That address is taken. Try \(model.state.customHandle)1@grapsee.com")
                 .font(GMFont.caption).foregroundColor(GM.error)
         case .invalid(let reason):
-            Text(reason).font(GMFont.caption).foregroundColor(GM.error)
+            Text(reason ?? "That address cannot be used.")
+                .font(GMFont.caption).foregroundColor(GM.error)
         case .unknown:
             Text("Could not check right now — confirmed when the account is created.")
                 .font(GMFont.caption).foregroundColor(GM.textTertiary)
