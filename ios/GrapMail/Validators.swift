@@ -74,7 +74,7 @@ enum Validators {
     static func passwordMet(_ req: PasswordReq, _ pw: String) -> Bool {
         switch req {
         case .length: return pw.count >= 8
-        case .casing: return pw.contains(where: \.isUppercase) && pw.contains(where: \.isLowerCase)
+        case .casing: return pw.contains(where: \.isUppercase) && pw.contains(where: { $0.isLowercase })
         case .digit: return pw.contains(where: \.isNumber)
         case .special: return pw.contains(where: { !$0.isLetter && !$0.isNumber })
         }

@@ -31,7 +31,7 @@ struct NameStepView: View {
                          + Text(" *").foregroundColor(GM.error))
                             .font(.system(size: 14, weight: .semibold))
                         AppTextField(
-                            value: Binding(get: { model.state.firstName }, set: { model.update { $0.firstName = $0 } }),
+                            value: Binding(get: { model.state.firstName }, set: { newValue in model.update { $0.firstName = newValue } }),
                             hint: "Enter your first name",
                             leadingIcon: "person"
                         )
@@ -42,7 +42,7 @@ struct NameStepView: View {
                          + Text(" *").foregroundColor(GM.error))
                             .font(.system(size: 14, weight: .semibold))
                         AppTextField(
-                            value: Binding(get: { model.state.lastName }, set: { model.update { $0.lastName = $0 } }),
+                            value: Binding(get: { model.state.lastName }, set: { newValue in model.update { $0.lastName = newValue } }),
                             hint: "Enter your last name",
                             leadingIcon: "person"
                         )
@@ -153,7 +153,7 @@ struct BasicInfoView: View {
                 HStack(spacing: 10) {
                     Picker("Month", selection: Binding(
                         get: { model.state.bMonth.isEmpty ? "" : model.state.bMonth },
-                        set: { model.update { $0.bMonth = $0 } }
+                        set: { newValue in model.update { $0.bMonth = newValue } }
                     )) {
                         Text("Month").tag("")
                         ForEach(months, id: \.self) { Text($0).tag($0) }
@@ -162,7 +162,7 @@ struct BasicInfoView: View {
 
                     Picker("Day", selection: Binding(
                         get: { model.state.bDay },
-                        set: { model.update { $0.bDay = $0 } }
+                        set: { newValue in model.update { $0.bDay = newValue } }
                     )) {
                         Text("Day").tag("")
                         ForEach(days, id: \.self) { Text($0).tag($0) }
@@ -171,7 +171,7 @@ struct BasicInfoView: View {
 
                     Picker("Year", selection: Binding(
                         get: { model.state.bYear },
-                        set: { model.update { $0.bYear = $0 } }
+                        set: { newValue in model.update { $0.bYear = newValue } }
                     )) {
                         Text("Year").tag("")
                         ForEach(years, id: \.self) { Text($0).tag($0) }
@@ -384,7 +384,7 @@ struct AddressStepView: View {
         }
     }
 
-    private func radioRow(_ address: String, selected: Bool, action: @escaping () -> Unit) -> some View {
+    private func radioRow(_ address: String, selected: Bool, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             HStack(spacing: 12) {
                 Circle()
@@ -456,7 +456,7 @@ struct PasswordStepView: View {
                     .padding(.top, 20)
 
                 AppTextField(
-                    value: Binding(get: { model.state.password }, set: { model.update { $0.password = $0 } }),
+                    value: Binding(get: { model.state.password }, set: { newValue in model.update { $0.password = newValue } }),
                     isPassword: true
                 )
                 .padding(.top, 8)
@@ -481,7 +481,7 @@ struct PasswordStepView: View {
                     .padding(.top, 16)
 
                 AppTextField(
-                    value: Binding(get: { model.state.confirm }, set: { model.update { $0.confirm = $0 } }),
+                    value: Binding(get: { model.state.confirm }, set: { newValue in model.update { $0.confirm = newValue } }),
                     isPassword: true
                 )
                 .padding(.top, 8)
