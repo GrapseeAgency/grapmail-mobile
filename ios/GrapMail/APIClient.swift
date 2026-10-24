@@ -20,6 +20,13 @@ enum ApiError: Error, LocalizedError {
     }
 }
 
+/// Top-level shape of the API's error envelope, decoded on non-2xx responses.
+struct ErrorCarrier: Codable {
+    var code: String?
+    var message: String?
+    var error: String?
+}
+
 struct AccountDto: Codable {
     var id: String = ""
     var name: String = ""
@@ -131,9 +138,8 @@ struct ApiClient {
         guard let http = response as? HTTPURLResponse else {
             throw ApiError.http(status: -1, code: nil, message: "No response")
         }
-        struct ErrCarrier: Codable { var code: String?; var message: String?; var error: String? }
         if http.statusCode >= 400 {
-            let carrier = try? decoder.decode(ErrCarrier.self, from: data)
+            let carrier = try? decoder.decode(ErrorCarrier.self, from: data)
             throw ApiError.http(
                 status: http.statusCode,
                 code: carrier?.code,
