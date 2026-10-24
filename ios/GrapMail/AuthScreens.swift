@@ -1,78 +1,73 @@
 import SwiftUI
 
-/// The app's face: "Better Email. A Brighter You." — founder design verbatim,
-/// with the entrance motion the static PNG implies.
+/// Welcome — founder design verbatim: logo + "Your world. Your inbox.",
+/// "Welcome to / GrapMail", the 3D-envelope hero, arrowed CTAs, legal line.
 struct WelcomeView: View {
     let onCreateAccount: () -> Void
     let onSignIn: () -> Void
 
-    @State private var illustrationRisen = false
-    @State private var textShown = false
-
     var body: some View {
         VStack(spacing: 0) {
+            Spacer(minLength: 40)
             Wordmark()
-                .padding(.top, 28)
-            Spacer(minLength: 12)
+            Text("Your world. Your inbox.")
+                .font(.system(size: 13))
+                .foregroundColor(GM.textSecondary)
+                .padding(.top, 6)
 
-            Image("ill_welcome")
+            Spacer(minLength: 10)
+
+            VStack(spacing: 0) {
+                Text("Welcome to")
+                    .font(.system(size: 30, weight: .bold))
+                    .foregroundColor(GM.textPrimary)
+                Text("GrapMail")
+                    .font(.system(size: 30, weight: .bold))
+                    .foregroundColor(GM.primarySolid)
+            }
+            Text("A faster, safer and more private way\nto stay connected.")
+                .font(.system(size: 14))
+                .foregroundColor(GM.textSecondary)
+                .multilineTextAlignment(.center)
+                .padding(.top, 12)
+
+            Image("ill_hero")
                 .resizable()
                 .aspectRatio(contentMode: .fit)
                 .frame(maxWidth: .infinity)
-                .offset(y: illustrationRisen ? 0 : 22)
-                .opacity(illustrationRisen ? 1 : 0)
-                .animation(.easeOut(duration: 0.48), value: illustrationRisen)
+                .padding(.top, 18)
 
-            Spacer(minLength: 12)
+            Spacer(minLength: 10)
 
-            VStack(spacing: 10) {
-                Text.h1("Better Email.").foregroundColor(GM.textPrimary)
-                Text.h1("A Brighter You.").foregroundColor(GM.primarySolid)
-                Text("Secure · Private · Yours")
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundColor(GM.textSecondary)
-            }
-            .opacity(textShown ? 1 : 0)
-            .animation(.easeOut(duration: 0.42).delay(0.15), value: textShown)
+            GradientButton(title: "Create Account", trailing: AnyView(
+                Image(systemName: "arrow.right")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundColor(.white)
+            ), action: onCreateAccount)
+            OutlineActionButton(title: "Sign In", trailing: AnyView(
+                Image(systemName: "arrow.right")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundColor(GM.textPrimary)
+            ), action: onSignIn)
+            .padding(.top, 12)
 
-            Spacer(minLength: 16)
-
-            GradientButton(title: "Create Account", action: onCreateAccount)
-            OutlineActionButton(title: "Sign In", action: onSignIn)
-                .padding(.top, 12)
-
-            Text("Or")
-                .font(.system(size: 12, weight: .medium))
+            (Text("By continuing, you agree to our ")
                 .foregroundColor(GM.textTertiary)
-                .padding(.top, 20)
-
-            Text("By creating an account you agree to our Terms of Service and Privacy Policy")
+             + Text("Terms of Service").foregroundColor(GM.primarySolid)
+             + Text("\nand ").foregroundColor(GM.textTertiary)
+             + Text("Privacy Policy").foregroundColor(GM.primarySolid)
+             + Text(".").foregroundColor(GM.textTertiary))
                 .font(.system(size: 12))
-                .foregroundColor(GM.textTertiary)
                 .multilineTextAlignment(.center)
-                .padding(.top, 16)
-                .padding(.horizontal, 8)
-
-            HStack(spacing: 8) {
-                Circle().fill(GM.primarySolid).frame(width: 7, height: 7)
-                Circle().fill(GM.stepInactive).frame(width: 7, height: 7)
-                Circle().fill(GM.stepInactive).frame(width: 7, height: 7)
-            }
-            .padding(.top, 18)
-            .padding(.bottom, 24)
+                .padding(.top, 20)
+                .padding(.bottom, 24)
         }
         .padding(.horizontal, 24)
         .background(GM.bg.ignoresSafeArea())
-        .onAppear {
-            illustrationRisen = true
-            textShown = true
-        }
     }
 }
 
-/// Sign-in — founder design verbatim. Posts to the real /auth/account/signin;
-/// the 2-step branch is handled inline because real accounts may have the
-/// factor on and the app must never fake its way past it.
+/// Sign-in — the earlier design ("Welcome back 👋"), with the real 2-step branch.
 struct SignInView: View {
     let onSignedIn: (String) -> Void
     let onSignUp: () -> Void
@@ -103,7 +98,9 @@ struct SignInView: View {
 
     private var passwordSection: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Text.h2("Welcome back 👋").foregroundColor(GM.textPrimary)
+            Text("Welcome back 👋")
+                .font(.system(size: 22, weight: .bold))
+                .foregroundColor(GM.textPrimary)
                 .padding(.top, 28)
             Text("Sign in to continue to GrapMail")
                 .font(.system(size: 14))
@@ -111,32 +108,22 @@ struct SignInView: View {
                 .padding(.top, 6)
 
             VStack(spacing: 16) {
-                AppTextField(label: "Email or phone number", value: $identifier, keyboardType: .emailAddress)
-                AppTextField(label: "Password", value: $password, isPassword: true)
+                AppTextField(title: "Email or phone number", value: $identifier, keyboardType: .emailAddress)
+                AppTextField(title: "Password", value: $password, isPassword: true)
             }
             .padding(.top, 30)
 
-            Button {
-                // Recovery flow arrives with the account-recovery phase.
-            } label: {
-                Text("Forgot password?")
-                    .font(GMFont.captionMedium)
-                    .foregroundColor(GM.primarySolid)
-            }
-            .buttonStyle(.plain)
-            .padding(.top, 10)
+            Text("Forgot password?")
+                .font(GMFont.captionMedium)
+                .foregroundColor(GM.primarySolid)
+                .padding(.top, 10)
 
             if let error {
                 Text(error).font(GMFont.caption).foregroundColor(GM.error)
                     .padding(.top, 14)
-                    .transition(.opacity.combined(with: .move(edge: .top)))
             }
 
-            GradientButton(
-                title: "Sign In",
-                enabled: !identifier.trimmingCharacters(in: .whitespaces).isEmpty && !password.isEmpty,
-                busy: busy
-            ) {
+            GradientButton(title: "Sign In", enabled: !identifier.isEmpty && !password.isEmpty, busy: busy) {
                 submit()
             }
             .padding(.top, 26)
@@ -145,14 +132,10 @@ struct SignInView: View {
                 Text("Don't have an account?")
                     .font(GMFont.caption)
                     .foregroundColor(GM.textSecondary)
-                Button {
-                    onSignUp()
-                } label: {
-                    Text("Create one")
-                        .font(GMFont.captionMedium)
-                        .foregroundColor(GM.primarySolid)
-                }
-                .buttonStyle(.plain)
+                Text("Create one")
+                    .font(GMFont.captionMedium)
+                    .foregroundColor(GM.primarySolid)
+                    .onTapGesture { onSignUp() }
             }
             .frame(maxWidth: .infinity)
             .padding(.top, 24)
@@ -162,22 +145,21 @@ struct SignInView: View {
 
     private func otpSection(_ challenge: String) -> some View {
         VStack(alignment: .leading, spacing: 0) {
-            Text.h2("2-step verification").foregroundColor(GM.textPrimary)
+            Text("2-step verification")
+                .font(.system(size: 22, weight: .bold))
+                .foregroundColor(GM.textPrimary)
                 .padding(.top, 28)
             Text("Enter the 6-digit code sent to your verified number.")
                 .font(.system(size: 14))
                 .foregroundColor(GM.textSecondary)
                 .padding(.top, 6)
 
-            AppTextField(label: "6-digit code", value: $otpCode, keyboardType: .numberPad)
+            AppTextField(title: "6-digit code", value: $otpCode, keyboardType: .numberPad)
                 .padding(.top, 30)
-                .onChange(of: otpCode) { newValue in
-                    otpCode = String(newValue.filter(\.isNumber).prefix(6))
-                }
+                .onChange(of: otpCode) { otpCode = String($0.filter(\.isNumber).prefix(6)) }
 
             if let error {
-                Text(error).font(GMFont.caption).foregroundColor(GM.error)
-                    .padding(.top, 14)
+                Text(error).font(GMFont.caption).foregroundColor(GM.error).padding(.top, 14)
             }
 
             GradientButton(title: "Verify", enabled: otpCode.count == 6, busy: busy) {
@@ -185,17 +167,13 @@ struct SignInView: View {
             }
             .padding(.top, 26)
 
-            Button {
-                withAnimation { self.challengeId = nil }
-            } label: {
-                Text("Use a different account")
-                    .font(GMFont.captionMedium)
-                    .foregroundColor(GM.primarySolid)
-            }
-            .buttonStyle(.plain)
-            .frame(maxWidth: .infinity)
-            .padding(.top, 20)
-            .padding(.bottom, 30)
+            Text("Use a different account")
+                .font(GMFont.captionMedium)
+                .foregroundColor(GM.primarySolid)
+                .frame(maxWidth: .infinity)
+                .padding(.top, 20)
+                .padding(.bottom, 30)
+                .onTapGesture { withAnimation { self.challengeId = nil } }
         }
     }
 

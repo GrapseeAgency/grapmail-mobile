@@ -15,9 +15,12 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -45,6 +48,9 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -66,6 +72,7 @@ fun GradientButton(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
     busy: Boolean = false,
+    trailing: @Composable (() -> Unit)? = null,
 ) {
     val palette = LocalPalette.current
     val interaction = remember { MutableInteractionSource() }
@@ -110,7 +117,10 @@ fun GradientButton(
                     strokeWidth = 2.5.dp,
                 )
             } else {
-                Text(text, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(text, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                    trailing?.invoke()
+                }
             }
         }
     }
@@ -118,7 +128,12 @@ fun GradientButton(
 
 /** Secondary outline button from the welcome screen. */
 @Composable
-fun OutlineButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
+fun OutlineButton(
+    text: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    trailing: @Composable (() -> Unit)? = null,
+) {
     val palette = LocalPalette.current
     androidx.compose.material3.OutlinedButton(
         onClick = onClick,
@@ -126,7 +141,10 @@ fun OutlineButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifi
         shape = RoundedCornerShape(16.dp),
         border = androidx.compose.foundation.BorderStroke(1.5.dp, palette.border),
     ) {
-        Text(text, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = palette.textPrimary)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(text, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = palette.textPrimary)
+            trailing?.invoke()
+        }
     }
 }
 
@@ -166,7 +184,8 @@ fun AppTextField(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(56.dp)
-                .onFocusChanged { focused = it.isFocused },
+                .onFocusChanged { focused = it.isFocused }
+                .semantics { contentDescription = label },
             shape = RoundedCornerShape(14.dp),
             singleLine = true,
             visualTransformation = if (visible) VisualTransformation.None else PasswordVisualTransformation(),
@@ -207,54 +226,56 @@ fun AppTextField(
     }
 }
 
-/** The 5-segment step indicator, segments filling with an animated sweep. */
+/**
+ * The design's numbered-circle stepper: five circles with labels beneath
+ * (Name, Details, Address, Password, Terms), completed and current filled in
+ * the brand blue, connected by hairlines that fill as steps complete.
+ */
 @Composable
 fun StepProgress(step: Int, total: Int = 5, onBack: (() -> Unit)? = null) {
     val palette = LocalPalette.current
-    Column {
-        if (onBack != null) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                IconButton(onClick = onBack) {
-                    Icon(
-                        Icons.AutoMirrored.Rounded.ArrowBack,
-                        contentDescription = "Back",
-                        tint = palette.textSecondary,
+    val labels = listOf("Name", "Details", "Address", "Password", "Terms")
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.Top,
+    ) {
+        labels.forEachIndexed { i, label ->
+            val n = i + 1
+            val done = n < step
+            val current = n == step
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Box(
+                    Modifier
+                        .size(30.dp)
+                        .clip(CircleShape)
+                        .background(if (done || current) palette.primarySolid else palette.stepInactive),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        "$n",
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = if (done || current) palette.onPrimary else palette.textSecondary,
                     )
                 }
-                Eyebrow("Step $step of $total", color = palette.textTertiary)
-            }
-            Spacer(Modifier.height(14.dp))
-        } else {
-            Eyebrow("Step $step of $total", color = palette.textTertiary)
-            Spacer(Modifier.height(14.dp))
-        }
-        Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
-            repeat(total) { i ->
-                val active = i < step
-                val frac by animateFloatAsState(
-                    when {
-                        i < step - 1 -> 1f
-                        i == step - 1 -> 1f
-                        else -> 0f
-                    },
-                    animationSpec = spring(dampingRatio = 0.9f, stiffness = 300f),
-                    label = "seg$i",
+                Spacer(Modifier.height(5.dp))
+                Text(
+                    label,
+                    fontSize = 12.sp,
+                    fontWeight = if (current) FontWeight.SemiBold else FontWeight.Normal,
+                    color = if (current) palette.textPrimary else palette.textTertiary,
                 )
+            }
+            if (n < total) {
                 Box(
                     Modifier
                         .weight(1f)
-                        .height(4.dp)
-                        .clip(RoundedCornerShape(2.dp))
-                        .background(palette.stepInactive)
-                ) {
-                    Box(
-                        Modifier
-                            .fillMaxWidth(frac)
-                            .height(4.dp)
-                            .clip(RoundedCornerShape(2.dp))
-                            .background(Brush.horizontalGradient(listOf(palette.primaryTop, palette.primaryBottom)))
-                    )
-                }
+                        .padding(horizontal = 5.dp)
+                        .offset(y = 14.dp)
+                        .height(2.dp)
+                        .clip(RoundedCornerShape(1.dp))
+                        .background(if (n < step) palette.primarySolid else palette.stepInactive)
+                )
             }
         }
     }
@@ -293,18 +314,26 @@ fun InfoBanner(text: String, modifier: Modifier = Modifier, icon: (@Composable (
     }
 }
 
-/** Terms checkbox with a spring. */
+/** Terms checkbox with a spring — the whole row toggles (tapping the label
+ *  works too, the accessible pattern). */
 @Composable
 fun TermsCheckbox(checked: Boolean, onCheckedChange: (Boolean) -> Unit, label: @Composable () -> Unit) {
     val palette = LocalPalette.current
     Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp),
-        modifier = Modifier.padding(vertical = 4.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .toggleable(
+                value = checked,
+                role = Role.Checkbox,
+                onValueChange = onCheckedChange,
+            )
+            .padding(vertical = 4.dp),
     ) {
         androidx.compose.material3.Checkbox(
             checked = checked,
-            onCheckedChange = onCheckedChange,
+            onCheckedChange = null,
             colors = androidx.compose.material3.CheckboxDefaults.colors(
                 checkedColor = palette.primarySolid,
                 uncheckedColor = palette.textTertiary,

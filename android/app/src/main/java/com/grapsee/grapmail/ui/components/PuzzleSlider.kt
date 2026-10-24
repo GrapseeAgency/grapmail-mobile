@@ -102,7 +102,7 @@ fun PuzzleSlider(
                 .clip(RoundedCornerShape(14.dp))
         ) {
             Image(
-                painter = painterResource(R.drawable.puzzle_photo),
+                painter = painterResource(illRes("puzzle")),
                 contentDescription = null,
                 modifier = Modifier.fillMaxWidth().height(132.dp),
                 contentScale = ContentScale.Crop,

@@ -1,43 +1,49 @@
 package com.grapsee.grapmail.ui.screens
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.grapsee.grapmail.logic.SignUpViewModel
 import com.grapsee.grapmail.ui.components.GradientButton
-import com.grapsee.grapmail.ui.components.TermsCheckbox
 import com.grapsee.grapmail.ui.components.rememberScrolledToEnd
 import com.grapsee.grapmail.ui.theme.LocalPalette
 
-private val TERMS_BODY = listOf(
-    "A GrapMail address is your identity on Grapsee. It comes with a mailbox, and it is the name you sign in with.",
-    "What we keep — your name, birthday and gender. The birthday is used only to check you are old enough for the account. Nothing else is inferred from it.",
-    "How your mailbox is used — mail is stored for your account only. The contents of your messages are never read to build advertising profiles, and your address is never sold.",
-    "Your responsibilities — keep your password to yourself. Do not use the mailbox for spam, bulk unsolicited mail, fraud, or anything unlawful. Accounts that do may be suspended.",
-    "You can delete the account and its mailbox at any time from your account settings.",
-)
-
 /**
- * Step 5 — "Terms & Privacy": the design's scroll-gate — the checkbox only
- * unlocks after the document is scrolled to the end, and Create Account
- * stays disabled until it is checked. On agree, the real account is created.
+ * Step 5 — "Terms & Privacy" — founder design verbatim: the scrollable
+ * "GrapMail Terms of Service" card with sections 1. Your Account and
+ * 2. Privacy Policy (brand-blue inline links), the "Read our … ↗" links, the
+ * agree checkbox card with the must-scroll caption, and the disabled
+ * "Create Account" action until both conditions hold.
  */
 @Composable
 fun TermsStepScreen(vm: SignUpViewModel, onBack: () -> Unit, onCreated: (address: String, name: String) -> Unit) {
@@ -53,59 +59,108 @@ fun TermsStepScreen(vm: SignUpViewModel, onBack: () -> Unit, onCreated: (address
 
     WizardScaffold(
         step = 5,
-        title = "Review & agree",
-        subtitle = "One last step to create your account.",
+        title = "Terms & Privacy",
+        subtitle = AnnotatedSubtitle(rest = "Please read and agree to our Terms of Service and Privacy Policy to continue."),
         onBack = onBack,
         bottomBar = {
             GradientButton(
                 if (state.creating) "Creating…" else "Create Account",
-                enabled = state.termsAgreed && scrolledToEnd && !state.creating,
-                busy = state.creating,
                 onClick = {
                     vm.createAccount(
                         onCreated = { address, name -> onCreated(address, name) },
                         onError = { vm.update { copy(error = it) } },
                     )
                 },
+                enabled = state.termsAgreed && scrolledToEnd && !state.creating,
+                busy = state.creating,
             )
         },
     ) {
+        // ── The scrollable terms document ───────────────────────────────────
         Column(
             Modifier
                 .fillMaxWidth()
-                .height(250.dp)
-                .clip(RoundedCornerShape(14.dp))
-                .background(palette.softFill)
+                .height(300.dp)
+                .clip(RoundedCornerShape(16.dp))
+                .border(1.dp, palette.border, RoundedCornerShape(16.dp))
+                .background(palette.card)
                 .verticalScroll(scroll)
-                .padding(16.dp),
+                .padding(18.dp),
         ) {
-            Text("Terms of Service & Privacy Policy", fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = palette.textPrimary)
-            Spacer(Modifier.height(10.dp))
-            TERMS_BODY.forEach { para ->
-                Text(para, fontSize = 13.sp, lineHeight = 19.sp, color = palette.textSecondary)
-                Spacer(Modifier.height(10.dp))
-            }
+            Text("GrapMail Terms of Service", fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = palette.textPrimary)
+            Spacer(Modifier.height(14.dp))
+            Text("1.  Your Account", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = palette.textPrimary)
+            Spacer(Modifier.height(6.dp))
             Text(
-                "The binding documents are the full Terms of Service and Privacy Policy, published at grapsee.com/legal.",
-                fontSize = 13.sp, lineHeight = 19.sp, color = palette.textSecondary,
+                buildAnnotatedString {
+                    append("By creating an account, you agree to our ")
+                    withStyle(SpanStyle(color = palette.primarySolid)) { append("Terms of Service") }
+                    append(" and confirm that you are at least 13 years old. You are responsible for keeping your account secure and for all activity that happens under your account.")
+                },
+                fontSize = 13.sp, lineHeight = 20.sp, color = palette.textSecondary,
+            )
+            Spacer(Modifier.height(16.dp))
+            Text("2.  Privacy Policy", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = palette.textPrimary)
+            Spacer(Modifier.height(6.dp))
+            Text(
+                buildAnnotatedString {
+                    append("We collect and process your data to provide and improve GrapMail services. Your information will not be shared with third parties without your consent, except as required by law. You can read the full details in our ")
+                    withStyle(SpanStyle(color = palette.primarySolid)) { append("Privacy Policy") }
+                    append(".")
+                },
+                fontSize = 13.sp, lineHeight = 20.sp, color = palette.textSecondary,
             )
         }
 
-        Spacer(Modifier.height(14.dp))
-        Text(
-            if (scrolledToEnd) "Thanks — you can agree now." else "Scroll to the bottom to continue.",
-            fontSize = 12.sp, color = palette.textTertiary,
-        )
+        Spacer(Modifier.height(12.dp))
+        Text("Read our Terms of Service ↗", fontSize = 13.sp, fontWeight = FontWeight.Medium, color = palette.primarySolid)
         Spacer(Modifier.height(8.dp))
-        TermsCheckbox(
-            checked = state.termsAgreed,
-            onCheckedChange = { vm.update { copy(termsAgreed = it) } },
+        Text("Read our Privacy Policy ↗", fontSize = 13.sp, fontWeight = FontWeight.Medium, color = palette.primarySolid)
+
+        Spacer(Modifier.height(16.dp))
+
+        // ── The agree card ──────────────────────────────────────────────────
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(16.dp))
+                .border(1.dp, palette.border, RoundedCornerShape(16.dp))
+                .background(palette.card)
+                .clickable(enabled = scrolledToEnd) { vm.update { copy(termsAgreed = !termsAgreed) } }
+                .padding(14.dp),
+            verticalAlignment = Alignment.Top,
         ) {
-            Text(
-                "I have read and agree to the Terms of Service and the Privacy Policy",
-                fontSize = 13.sp, lineHeight = 18.sp, color = palette.textSecondary,
-            )
+            Box(
+                Modifier
+                    .size(22.dp)
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(if (state.termsAgreed) palette.primarySolid else palette.card)
+                    .border(1.5.dp, if (state.termsAgreed) palette.primarySolid else palette.textTertiary, RoundedCornerShape(6.dp)),
+                contentAlignment = Alignment.Center,
+            ) {
+                if (state.termsAgreed) {
+                    Icon(Icons.Rounded.Check, contentDescription = null, tint = palette.onPrimary, modifier = Modifier.size(15.dp))
+                }
+            }
+            Spacer(Modifier.width(12.dp))
+            Column {
+                Text(
+                    buildAnnotatedString {
+                        append("I agree to the ")
+                        withStyle(SpanStyle(color = palette.primarySolid, fontWeight = FontWeight.Medium)) { append("Terms of Service") }
+                        append(" and ")
+                        withStyle(SpanStyle(color = palette.primarySolid, fontWeight = FontWeight.Medium)) { append("Privacy Policy") }
+                    },
+                    fontSize = 13.sp, color = palette.textPrimary,
+                )
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    "You must scroll to the bottom of this document to enable the checkbox.",
+                    fontSize = 11.sp, color = palette.textTertiary,
+                )
+            }
         }
+
         if (state.error != null) {
             Spacer(Modifier.height(12.dp))
             Text(state.error ?: "", fontSize = 13.sp, color = palette.error)

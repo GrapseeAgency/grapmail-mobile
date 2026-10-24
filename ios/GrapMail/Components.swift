@@ -1,7 +1,6 @@
 import SwiftUI
 
-// The GrapMail mark — rounded square, brand gradient, white envelope glyph
-// with the flap. Drawn vector so it is crisp at every density.
+// The GrapMail mark — rounded square, brand gradient, white envelope glyph.
 struct GrapMailMark: View {
     var size: CGFloat = 44
 
@@ -50,32 +49,51 @@ struct Wordmark: View {
     }
 }
 
-struct Eyebrow: View {
-    let text: String
-    var color: Color?
+/// The design's numbered-circle stepper: five circles with labels beneath
+/// (Name, Details, Address, Password, Terms), completed and current filled.
+struct StepProgress: View {
+    let step: Int
 
-    init(_ text: String, color: Color? = nil) {
-        self.text = text
-        self.color = color
-    }
+    private let labels = ["Name", "Details", "Address", "Password", "Terms"]
 
     var body: some View {
-        Text(text.uppercased())
-            .font(GMFont.micro)
-            .kerning(1.4)
-            .foregroundColor(color ?? GM.primarySolid)
+        HStack(alignment: .top, spacing: 0) {
+            ForEach(0..<5, id: \.self) { i in
+                let n = i + 1
+                let active = n <= step
+                VStack(spacing: 5) {
+                    Circle()
+                        .fill(active ? GM.primarySolid : GM.stepInactive)
+                        .frame(width: 30, height: 30)
+                        .overlay(
+                            Text("\(n)")
+                                .font(.system(size: 13, weight: .semibold))
+                                .foregroundColor(active ? .white : GM.textSecondary)
+                        )
+                    Text(labels[i])
+                        .font(.system(size: 12, weight: n == step ? .semibold : .regular))
+                        .foregroundColor(n == step ? GM.textPrimary : GM.textTertiary)
+                }
+                if n < 5 {
+                    Rectangle()
+                        .fill(n < step ? GM.primarySolid : GM.stepInactive)
+                        .frame(height: 2)
+                        .padding(.horizontal, 5)
+                        .padding(.top, 14)
+                }
+            }
+        }
     }
 }
 
-/// Primary CTA: 54pt, radius 16, brand gradient, pressed scale,
-/// exact disabled tint from the terms screen.
+/// Primary CTA: 54pt, radius 16, brand gradient, pressed scale, exact
+/// disabled tint; optional trailing content (the design's arrows).
 struct GradientButton: View {
     let title: String
     var enabled: Bool = true
     var busy: Bool = false
+    var trailing: AnyView? = nil
     let action: () -> Void
-
-    @State private var pressed = false
 
     var body: some View {
         Button {
@@ -84,188 +102,196 @@ struct GradientButton: View {
         } label: {
             ZStack {
                 RoundedRectangle(cornerRadius: GMShape.button, style: .continuous)
-                    .fill(
-                        enabled
-                            ? AnyShapeStyle(Color.brandGradient)
-                            : AnyShapeStyle(GM.buttonDisabled)
-                    )
-                if busy {
-                    ProgressView().tint(.white)
-                } else {
-                    Text(title)
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundColor(.white)
+                    .fill(enabled ? AnyShapeStyle(Color.brandGradient) : AnyShapeStyle(GM.buttonDisabled))
+                HStack(spacing: 10) {
+                    if busy {
+                        ProgressView().tint(.white)
+                    } else {
+                        Text(title)
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundColor(.white)
+                        trailing
+                    }
                 }
             }
             .frame(height: 54)
             .frame(maxWidth: .infinity)
         }
-        .buttonStyle(PressScaleStyle(onChange: { pressed = $0 }))
-        .scaleEffect(pressed ? 0.97 : 1)
-        .animation(.easeOut(duration: 0.12), value: pressed)
+        .buttonStyle(PressScaleStyle())
         .disabled(!enabled || busy)
-        .opacity(enabled || busy ? 1 : 1)
     }
 }
 
 struct PressScaleStyle: ButtonStyle {
-    var onChange: (Bool) -> Void
-
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .onChange(of: configuration.isPressed) { newValue in
-                onChange(newValue)
-            }
+            .scaleEffect(configuration.isPressed ? 0.97 : 1)
+            .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
     }
 }
 
 struct OutlineActionButton: View {
     let title: String
+    var trailing: AnyView? = nil
     let action: () -> Void
 
     var body: some View {
         Button(action: action) {
-            Text(title)
-                .font(.system(size: 16, weight: .semibold))
-                .foregroundColor(GM.textPrimary)
-                .frame(height: 54)
-                .frame(maxWidth: .infinity)
-                .background(
-                    RoundedRectangle(cornerRadius: GMShape.button, style: .continuous)
-                        .strokeBorder(GM.border, lineWidth: 1.5)
-                )
+            HStack(spacing: 10) {
+                Text(title)
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundColor(GM.textPrimary)
+                trailing
+            }
+            .frame(height: 54)
+            .frame(maxWidth: .infinity)
+            .background(
+                RoundedRectangle(cornerRadius: GMShape.button, style: .continuous)
+                    .strokeBorder(GM.border, lineWidth: 1.5)
+            )
         }
     }
 }
 
-/// The design's filled text field: 54pt content height, radius 14, soft fill,
-/// label above, error state with red stroke + note, focus ring in brand blue.
+/// The design's field: "Label *" handled by callers; 54pt field, radius 14,
+/// soft fill, focus ring, error stroke, optional leading icon.
 struct AppTextField: View {
-    let label: String
+    var title: String? = nil
     @Binding var value: String
     var error: String? = nil
     var hint: String? = nil
     var isPassword: Bool = false
     var keyboardType: UIKeyboardType = .default
-    var trailing: String? = nil
+    var leadingIcon: String? = nil
 
     @State private var visible = true
     @FocusState private var focused: Bool
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text(label)
-                .font(GMFont.captionMedium)
-                .foregroundColor(GM.textSecondary)
-            HStack {
+        HStack(spacing: 10) {
+            if let leadingIcon {
+                Image(systemName: leadingIcon)
+                    .font(.system(size: 16))
+                    .foregroundColor(GM.textTertiary)
+            }
+            Group {
                 if isPassword && !visible {
-                    SecureField("", text: $value)
-                        .focused($focused)
-                        .submitLabel(.done)
+                    SecureField(hint ?? "", text: $value)
                 } else {
                     TextField(hint ?? "", text: $value)
-                        .focused($focused)
                         .keyboardType(keyboardType)
                         .autocorrectionDisabled()
                         .textInputAutocapitalization(.never)
                 }
-                if isPassword {
-                    Button {
-                        visible.toggle()
-                    } label: {
-                        Image(systemName: visible ? "eye.slash" : "eye")
-                            .font(.system(size: 15))
-                            .foregroundColor(GM.textTertiary)
-                    }
-                } else if let trailing {
-                    Text(trailing)
-                        .font(GMFont.caption)
+            }
+            if isPassword {
+                Button { visible.toggle() } label: {
+                    Image(systemName: visible ? "eye.slash" : "eye")
+                        .font(.system(size: 14))
                         .foregroundColor(GM.textTertiary)
                 }
             }
-            .padding(.horizontal, 14)
-            .frame(height: 54)
-            .background(
-                RoundedRectangle(cornerRadius: GMShape.input, style: .continuous)
-                    .fill(GM.inputFill)
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: GMShape.input, style: .continuous)
-                    .strokeBorder(
-                        error != nil ? GM.error : (focused ? GM.primarySolid : GM.border),
-                        lineWidth: error != nil || focused ? 1.5 : 1
-                    )
-            )
-            .animation(.easeOut(duration: 0.15), value: focused)
-            .animation(.easeOut(duration: 0.15), value: error == nil)
-            .accessibilityElement(children: .contain)
-            .accessibilityIdentifier(label)
-            .accessibilityLabel(label)
-
-            if let error {
-                Text(error).font(GMFont.caption).foregroundColor(GM.error)
-            } else if let hint, value.isEmpty {
-                Text(hint).font(GMFont.caption).foregroundColor(GM.textTertiary)
-            }
         }
+        .padding(.horizontal, 14)
+        .frame(height: 54)
+        .background(RoundedRectangle(cornerRadius: GMShape.input, style: .continuous).fill(GM.inputFill))
+        .overlay(
+            RoundedRectangle(cornerRadius: GMShape.input, style: .continuous)
+                .strokeBorder(
+                    error != nil ? GM.error : (focused ? GM.primarySolid : GM.border),
+                    lineWidth: error != nil || focused ? 1.5 : 1
+                )
+        )
+        .animation(.easeOut(duration: 0.15), value: focused)
     }
 }
 
-/// The 5-segment step indicator with animated fill.
-struct StepProgress: View {
-    let step: Int
-    let total: Int
-    var onBack: (() -> Void)? = nil
+/// The red alert row under a field: ⚠ + message, exactly as designed.
+struct FieldErrorRow: View {
+    let text: String
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack(spacing: 8) {
-                if let onBack {
-                    Button {
-                        onBack()
-                    } label: {
-                        Image(systemName: "chevron.left")
-                            .font(.system(size: 16, weight: .semibold))
-                            .foregroundColor(GM.textSecondary)
-                            .frame(width: 36, height: 36)
-                            .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                }
-                Eyebrow("Step \(step) of \(total)", color: GM.textTertiary)
-            }
-            HStack(spacing: 6) {
-                ForEach(0..<total, id: \.self) { i in
-                    GeometryReader { geo in
-                        ZStack(alignment: .leading) {
-                            Capsule().fill(GM.stepInactive)
-                            Capsule()
-                                .fill(Color.brandGradient)
-                                .frame(width: i < step ? geo.size.width : 0)
-                                .animation(.spring(response: 0.4, dampingFraction: 0.85), value: step)
-                        }
-                    }
-                    .frame(height: 4)
-                }
-            }
-        }
-    }
-}
-
-/// Password requirement row with animated check state.
-struct RequirementRow: View {
-    let label: String
-    let met: Bool
-
-    var body: some View {
-        HStack(spacing: 8) {
-            Image(systemName: met ? "checkmark.circle.fill" : "checkmark")
-                .font(.system(size: 15))
-                .foregroundColor(met ? GM.success : GM.textTertiary)
-            Text(label)
+        HStack(spacing: 6) {
+            Image(systemName: "exclamationmark.circle.fill")
+                .font(.system(size: 13))
+                .foregroundColor(GM.error)
+            Text(text)
                 .font(GMFont.caption)
-                .foregroundColor(met ? GM.success : GM.textSecondary)
+                .foregroundColor(GM.error)
         }
+    }
+}
+
+/// Wizard chrome — back + centered logo, CREATE ACCOUNT eyebrow, title,
+/// subtitle, stepper, scrollable body, action, "Already have an account?".
+struct WizardScaffold<Body: View, Bottom: View>: View {
+    let step: Int
+    let title: String
+    let subtitle: Text
+    var onBack: (() -> Void)? = nil
+    @ViewBuilder let bodyContent: () -> Body
+    @ViewBuilder let bottom: () -> Bottom
+
+    var body: some View {
+        VStack(spacing: 0) {
+            ZStack {
+                if let onBack {
+                    HStack {
+                        Button(action: onBack) {
+                            Image(systemName: "chevron.left")
+                                .font(.system(size: 17, weight: .semibold))
+                                .foregroundColor(GM.textPrimary)
+                        }
+                        .buttonStyle(.plain)
+                        Spacer()
+                    }
+                    .padding(.leading, 12)
+                }
+                Wordmark()
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
+
+            VStack(alignment: .leading, spacing: 0) {
+                Text("CREATE ACCOUNT")
+                    .font(.system(size: 12, weight: .bold))
+                    .kerning(1.6)
+                    .foregroundColor(GM.textTertiary)
+                    .padding(.top, 10)
+                Text(title)
+                    .font(.system(size: 22, weight: .bold))
+                    .foregroundColor(GM.textPrimary)
+                    .padding(.top, 8)
+                subtitle
+                    .font(.system(size: 14))
+                    .foregroundColor(GM.textSecondary)
+                    .padding(.top, 8)
+                StepProgress(step: step)
+                    .padding(.top, 22)
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 0) {
+                        bodyContent()
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .padding(.top, 22)
+                bottom()
+                    .padding(.top, 14)
+                HStack(spacing: 0) {
+                    Text("Already have an account?  ")
+                        .font(GMFont.caption)
+                        .foregroundColor(GM.textSecondary)
+                    Text("Sign In")
+                        .font(GMFont.captionMedium)
+                        .foregroundColor(GM.primarySolid)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.top, 10)
+                .padding(.bottom, 16)
+            }
+            .padding(.horizontal, 24)
+        }
+        .background(GM.bg.ignoresSafeArea())
     }
 }
 
@@ -274,75 +300,12 @@ struct InfoBanner: View {
     let text: String
 
     var body: some View {
-        HStack(alignment: .center, spacing: 10) {
-            Text(text)
-                .font(GMFont.caption)
-                .foregroundColor(GM.textSecondary)
-                .multilineTextAlignment(.leading)
-                .frame(maxWidth: .infinity, alignment: .leading)
-        }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 12)
-        .background(
-            RoundedRectangle(cornerRadius: GMShape.small + 2, style: .continuous)
-                .fill(GM.softFill)
-        )
-    }
-}
-
-/// Gender chip (pill) from step 2.
-struct GenderChip: View {
-    let label: String
-    let selected: Bool
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            Text(label)
-                .font(GMFont.captionMedium)
-                .foregroundColor(selected ? .white : GM.textSecondary)
-                .padding(.horizontal, 18)
-                .padding(.vertical, 10)
-                .background(
-                    Capsule().fill(selected ? GM.primarySolid : GM.softFill)
-                )
-        }
-        .buttonStyle(.plain)
-    }
-}
-
-/// Wizard scaffold: step chrome + title + body + bottom action.
-struct WizardScaffold<Body: View, Bottom: View>: View {
-    let step: Int
-    let title: String
-    let subtitle: String
-    var onBack: (() -> Void)? = nil
-    @ViewBuilder let body: () -> Body
-    @ViewBuilder let bottom: () -> Bottom
-
-    var body: some View {
-        VStack(spacing: 0) {
-            StepProgress(step: step, total: 5, onBack: onBack)
-                .padding(.top, 16)
-            ScrollView {
-                VStack(alignment: .leading, spacing: 0) {
-                    Text.h2(title).foregroundColor(GM.textPrimary)
-                        .padding(.top, 20)
-                    Text(subtitle)
-                        .font(.system(size: 14))
-                        .foregroundColor(GM.textSecondary)
-                        .padding(.top, 6)
-                    body()
-                        .padding(.top, 26)
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-            }
-            bottom()
-                .padding(.top, 16)
-                .padding(.bottom, 20)
-        }
-        .padding(.horizontal, 24)
-        .background(GM.bg.ignoresSafeArea())
-        .animation(.easeInOut(duration: 0.32), value: step)
+        Text(text)
+            .font(GMFont.caption)
+            .foregroundColor(GM.textSecondary)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 12)
+            .background(RoundedRectangle(cornerRadius: GMShape.small + 2, style: .continuous).fill(GM.softFill))
     }
 }
