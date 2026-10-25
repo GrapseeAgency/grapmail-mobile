@@ -72,6 +72,8 @@ shot 04-step3-address-light
 tap_text "Next"
 
 echo "· step 4 — password"
+adb shell input swipe 540 1800 540 900 400   # bring the password fields on screen
+sleep 1
 type_into "Password" "Grapmail%23e2e2026"
 type_into "Confirm password" "Grapmail%23e2e2026"
 sleep 1
@@ -79,6 +81,8 @@ shot 05-step4-password-light
 tap_text "Next"
 
 echo "· step 5 — terms → real account"
+adb shell input swipe 540 1800 540 900 400   # bring the terms card on screen
+sleep 1
 adb shell input swipe 540 1200 540 700 500   # scroll the terms document
 sleep 1
 adb shell input swipe 540 1200 540 700 500
