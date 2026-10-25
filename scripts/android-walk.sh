@@ -27,7 +27,8 @@ for _ in $(seq 1 150); do
   [ "$BOOT" = "1" ] && break
   sleep 2
 done
-echo "boot completed"
+echo "boot completed — settling system 80s (cold emulators ANR under early dump load)"
+sleep 80
 
 adb uninstall "$PKG" >/dev/null 2>&1
 adb install -r "$APK" >/dev/null
