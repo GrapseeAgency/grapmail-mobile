@@ -107,17 +107,22 @@ final class ScreenshotWalkUITests: XCTestCase {
         snap("10-signin-light")
     }
 
-    /// Inline picker: tap the collapsed row, then the option rendered in-window.
-    /// Coordinate taps bypass hittability checks (panel items can be clipped).
+    /// Inline picker: open the panel, let the expansion animation settle,
+    /// then swipe until the option is on screen AND hittable, and tap it.
     private func pickInline(_ placeholder: String, _ option: String) {
         let row = app.buttons[placeholder].firstMatch
         guard row.waitForExistence(timeout: 4) else { return }
         row.tap()
-        let opt = app.buttons[option].firstMatch
-        if opt.waitForExistence(timeout: 4) {
-            if opt.isHittable { opt.tap() } else {
-                opt.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+        sleep(1) // panel expansion animation
+        for _ in 0..<8 {
+            let opt = app.buttons[option].firstMatch
+            if opt.exists && opt.isHittable {
+                opt.tap()
+                sleep(1) // panel close animation
+                return
             }
+            app.swipeUp()
+            sleep(1)
         }
     }
 
