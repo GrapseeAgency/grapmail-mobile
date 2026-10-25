@@ -683,23 +683,26 @@ struct InlinePicker: View {
             .buttonStyle(.plain)
 
             if open {
-                VStack(spacing: 0) {
-                    ForEach(options, id: \.self) { opt in
-                        Button {
-                            onPick(opt)
-                            withAnimation { open = false }
-                        } label: {
-                            Text(opt)
-                                .font(.system(size: 13, weight: opt == value ? .semibold : .regular))
-                                .foregroundColor(opt == value ? GM.primarySolid : GM.textPrimary)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .padding(.horizontal, 14)
-                                .padding(.vertical, 9)
+                ScrollView {
+                    VStack(spacing: 0) {
+                        ForEach(options, id: \.self) { opt in
+                            Button {
+                                onPick(opt)
+                                withAnimation { open = false }
+                            } label: {
+                                Text(opt)
+                                    .font(.system(size: 13, weight: opt == value ? .semibold : .regular))
+                                    .foregroundColor(opt == value ? GM.primarySolid : GM.textPrimary)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .padding(.horizontal, 14)
+                                    .padding(.vertical, 9)
+                            }
+                            .buttonStyle(.plain)
                         }
-                        .buttonStyle(.plain)
                     }
                 }
                 .frame(maxHeight: 210)
+                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                 .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(GM.card))
                 .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(GM.border, lineWidth: 1))
             }
