@@ -49,7 +49,7 @@ final class ScreenshotWalkUITests: XCTestCase {
         // Step 2 — basic info: menu pickers + gender chip
         _ = app.staticTexts["Basic Info"].waitForExistence(timeout: 6)
         pickInline("Month", "April")
-        pickInline("Day", "3")
+        pickInline("Day", "1")   // top of the list — always hittable (Apr 1 2013 is 13+)
         pickInline("Year", "2013")
         let female = app.buttons["Female"].firstMatch
         if female.waitForExistence(timeout: 3) { female.tap() }
@@ -115,7 +115,9 @@ final class ScreenshotWalkUITests: XCTestCase {
         row.tap()
         let opt = app.buttons[option].firstMatch
         if opt.waitForExistence(timeout: 4) {
-            opt.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+            if opt.isHittable { opt.tap() } else {
+                opt.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+            }
         }
     }
 
