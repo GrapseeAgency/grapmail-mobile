@@ -150,37 +150,28 @@ struct BasicInfoView: View {
                 }
                 .padding(.top, 22)
 
-                HStack(spacing: 10) {
-                    Picker("Month", selection: Binding(
-                        get: { model.state.bMonth.isEmpty ? "" : model.state.bMonth },
-                        set: { newValue in model.update { $0.bMonth = newValue } }
-                    )) {
-                        Text("Month").tag("")
-                        ForEach(months, id: \.self) { Text($0).tag($0) }
-                    }
+                HStack(alignment: .top, spacing: 10) {
+                    InlinePicker(
+                        placeholder: "Month",
+                        value: model.state.bMonth,
+                        options: months
+                    ) { pick in model.update { $0.bMonth = pick } }
                     .frame(maxWidth: .infinity)
 
-                    Picker("Day", selection: Binding(
-                        get: { model.state.bDay },
-                        set: { newValue in model.update { $0.bDay = newValue } }
-                    )) {
-                        Text("Day").tag("")
-                        ForEach(days, id: \.self) { Text($0).tag($0) }
-                    }
+                    InlinePicker(
+                        placeholder: "Day",
+                        value: model.state.bDay,
+                        options: days
+                    ) { pick in model.update { $0.bDay = pick } }
                     .frame(maxWidth: .infinity)
 
-                    Picker("Year", selection: Binding(
-                        get: { model.state.bYear },
-                        set: { newValue in model.update { $0.bYear = newValue } }
-                    )) {
-                        Text("Year").tag("")
-                        ForEach(years, id: \.self) { Text($0).tag($0) }
-                    }
+                    InlinePicker(
+                        placeholder: "Year",
+                        value: model.state.bYear,
+                        options: years
+                    ) { pick in model.update { $0.bYear = pick } }
                     .frame(maxWidth: .infinity)
                 }
-                .pickerStyle(.menu)
-                .frame(height: 48)
-                .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(GM.border))
 
                 if let err = birthday.error {
                     Text(err).font(GMFont.caption).foregroundColor(GM.error).padding(.top, 8)
@@ -649,5 +640,69 @@ struct TermsStepView: View {
                 }
             }
         )
+    }
+}
+
+
+/// The design's dropdown, as an inline animated panel — the iOS twin of the
+/// Android inline picker: same look closed, and the options render in the
+/// main window (screen-reader and automation friendly).
+struct InlinePicker: View {
+    let placeholder: String
+    let value: String
+    let options: [String]
+    let onPick: (String) -> Void
+
+    @State private var open = false
+
+    var body: some View {
+        VStack(spacing: 4) {
+            Button {
+                withAnimation(.easeOut(duration: 0.2)) { open.toggle() }
+            } label: {
+                HStack {
+                    Text(value.isEmpty ? placeholder : value)
+                        .font(.system(size: 13))
+                        .foregroundColor(value.isEmpty ? GM.textTertiary : GM.textPrimary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    Image(systemName: open ? "chevron.up" : "chevron.down")
+                        .font(.system(size: 11))
+                        .foregroundColor(GM.textTertiary)
+                }
+                .padding(.horizontal, 12)
+                .frame(height: 46)
+                .background(
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .fill(GM.inputFill)
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .strokeBorder(open ? GM.primarySolid : GM.border, lineWidth: 1)
+                )
+            }
+            .buttonStyle(.plain)
+
+            if open {
+                VStack(spacing: 0) {
+                    ForEach(options, id: \.self) { opt in
+                        Button {
+                            onPick(opt)
+                            withAnimation { open = false }
+                        } label: {
+                            Text(opt)
+                                .font(.system(size: 13, weight: opt == value ? .semibold : .regular))
+                                .foregroundColor(opt == value ? GM.primarySolid : GM.textPrimary)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(.horizontal, 14)
+                                .padding(.vertical, 9)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .frame(maxHeight: 210)
+                .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(GM.card))
+                .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(GM.border, lineWidth: 1))
+            }
+        }
     }
 }

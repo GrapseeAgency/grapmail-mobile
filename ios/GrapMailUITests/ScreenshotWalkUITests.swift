@@ -48,11 +48,11 @@ final class ScreenshotWalkUITests: XCTestCase {
 
         // Step 2 — basic info: menu pickers + gender chip
         _ = app.staticTexts["Basic Info"].waitForExistence(timeout: 6)
-        pickFromMenu("Month", "April")
-        pickFromMenu("Day", "3")
-        pickFromMenu("Year", "2013")
+        pickInline("Month", "April")
+        pickInline("Day", "3")
+        pickInline("Year", "2013")
         let female = app.buttons["Female"].firstMatch
-        if !female.exists { female.tap() }
+        if female.waitForExistence(timeout: 3) { female.tap() }
         snap("03-step2-basicinfo-light")
         let next2 = app.buttons["Next"].firstMatch
         if next2.waitForExistence(timeout: 4) { next2.tap() }
@@ -107,13 +107,11 @@ final class ScreenshotWalkUITests: XCTestCase {
         snap("10-signin-light")
     }
 
-    /// Menu-style picker: tap the collapsed picker, then the option in the popup.
-    private func pickFromMenu(_ picker: String, _ option: String) {
-        let p = app.buttons[picker].firstMatch.exists
-            ? app.buttons[picker].firstMatch
-            : app.otherElements[picker].firstMatch
-        guard p.waitForExistence(timeout: 4) else { return }
-        p.tap()
+    /// Inline picker: tap the collapsed row, then the option rendered in-window.
+    private func pickInline(_ placeholder: String, _ option: String) {
+        let row = app.buttons[placeholder].firstMatch
+        guard row.waitForExistence(timeout: 4) else { return }
+        row.tap()
         let opt = app.buttons[option].firstMatch
         if opt.waitForExistence(timeout: 4) { opt.tap() }
     }

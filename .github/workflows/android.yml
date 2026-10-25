@@ -51,9 +51,9 @@ jobs:
           emulator-boot-timeout: 900
           emulator-options: -no-window -no-audio -no-boot-anim -gpu swiftshader_indirect -no-snapshot
           script: |
-            bash ../scripts/android-walk.sh \
-              app/build/outputs/apk/debug/app-debug.apk \
-              ../screenshots
+            bash scripts/android-walk.sh \
+              android/app/build/outputs/apk/debug/app-debug.apk \
+              screenshots
 
       - name: Upload screenshots
         if: always()
