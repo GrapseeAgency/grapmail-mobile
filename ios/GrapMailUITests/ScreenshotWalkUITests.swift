@@ -48,9 +48,12 @@ final class ScreenshotWalkUITests: XCTestCase {
 
         // Step 2 — basic info: menu pickers + gender chip
         _ = app.staticTexts["Basic Info"].waitForExistence(timeout: 6)
-        pickInline("Month", "April", itemIndex: 4)   // Jan Feb Mar Apr
-        pickInline("Day", "1", itemIndex: 1)          // first item (Apr 1 2013 is 13+)
-        pickInline("Year", "2013", itemIndex: 1)      // first item (youngest-first list)
+        // All three picks are index 1 — the panel's first item — at one shared
+        // offset: January 1, 2013 is a valid 13-year-old date. Missed taps are
+        // detected (the row label never changes) and retried once.
+        pickInline("Month", "January")
+        pickInline("Day", "1")
+        pickInline("Year", "2013")
         let female = app.buttons["Female"].firstMatch
         if female.waitForExistence(timeout: 3) { female.tap() }
         snap("03-step2-basicinfo-light")
@@ -111,18 +114,25 @@ final class ScreenshotWalkUITests: XCTestCase {
     /// deterministic offset from the row (item height 44pt, panel gap 4pt).
     /// Element queries inside the clipped animated panel are unreliable for
     /// XCUITest; geometry is not.
-    private func pickInline(_ placeholder: String, _ option: String, itemIndex: Int) {
-        let row = app.buttons[placeholder].firstMatch
-        guard row.waitForExistence(timeout: 4) else { return }
-        let frame = row.frame
-        row.tap()
-        sleep(1) // panel expansion
-        let itemY = frame.maxY + 4 + 44 * CGFloat(itemIndex - 1) + 22
-        let coord = app.coordinate(withNormalizedOffset: CGVector(dx: 0, dy: 0))
-            .withOffset(CGVector(dx: frame.midX, dy: itemY))
-        coord.tap()
-        sleep(1)
-        _ = option // kept for logging clarity in failures
+    private func pickInline(_ placeholder: String, _ option: String) {
+        for attempt in 0..<2 {
+            let row = app.buttons[placeholder].firstMatch
+            guard row.waitForExistence(timeout: 4) else { return }
+            // Already picked? The collapsed row now shows the chosen value.
+            if row.label == option { return }
+            let frame = row.frame
+            row.tap()
+            sleep(1) // panel expansion
+            // First item of the panel: gap 4pt + half of the 34pt item row.
+            let itemY = frame.maxY + 4 + 17
+            let coord = app.coordinate(withNormalizedOffset: CGVector(dx: 0, dy: 0))
+                .withOffset(CGVector(dx: frame.midX, dy: itemY))
+            coord.tap()
+            sleep(1)
+            // If the row still shows the placeholder, the tap missed — the
+            // panel is open now, so tap the row again to close it and retry.
+            if app.buttons[option].firstMatch.exists { return }
+        }
     }
 
     private func typeIntoSecureField(_ identifier: String, _ value: String) {
