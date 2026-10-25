@@ -108,12 +108,15 @@ final class ScreenshotWalkUITests: XCTestCase {
     }
 
     /// Inline picker: tap the collapsed row, then the option rendered in-window.
+    /// Coordinate taps bypass hittability checks (panel items can be clipped).
     private func pickInline(_ placeholder: String, _ option: String) {
         let row = app.buttons[placeholder].firstMatch
         guard row.waitForExistence(timeout: 4) else { return }
         row.tap()
         let opt = app.buttons[option].firstMatch
-        if opt.waitForExistence(timeout: 4) { opt.tap() }
+        if opt.waitForExistence(timeout: 4) {
+            opt.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+        }
     }
 
     private func typeIntoSecureField(_ identifier: String, _ value: String) {
