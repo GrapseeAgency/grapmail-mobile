@@ -10,7 +10,7 @@ jobs:
   build-test-screenshot:
     name: Build, live-test & screenshot (API 34 emulator)
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
 

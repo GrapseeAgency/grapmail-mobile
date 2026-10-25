@@ -53,11 +53,13 @@ tap_text "April"
 # No dumps between the taps: nothing can go stale.
 tap_text "Day"
 DY=$(find_nodes "n.get('text','').lower()=='day'" | head -1 | awk '{print $2}' | tr -d '\r')
-adb shell input tap 540 $((DY + 105))
+P1=$(MINY=$((DY+20)) find_nodes "n.get('text')=='1'" | head -1)
+if [ -n "$P1" ]; then adb shell input tap $P1; else adb shell input tap 540 $((DY + 140)); fi
 sleep 1.4
 tap_text "Year"
 YY=$(find_nodes "n.get('text','').lower()=='year'" | head -1 | awk '{print $2}' | tr -d '\r')
-adb shell input tap 540 $((YY + 105))
+P2=$(MINY=$((YY+20)) find_nodes "n.get('text')=='2013'" | head -1)
+if [ -n "$P2" ]; then adb shell input tap $P2; else adb shell input tap 540 $((YY + 140)); fi
 sleep 1.4
 tap_text "Female"
 shot 03-step2-basicinfo-light
