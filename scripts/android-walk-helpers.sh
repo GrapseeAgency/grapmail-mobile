@@ -37,11 +37,11 @@ shot() {
 
 dump_xml() {
   local i
-  for i in 1 2 3; do
+  for i in 1 2 3 4 5; do
     adb shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1
     adb pull /sdcard/ui.xml "$OUT/.ui.xml" >/dev/null 2>&1
     [ -s "$OUT/.ui.xml" ] && return 0
-    sleep 2   # known API-34 flake: dump times out under contention — retry
+    sleep 3   # ANR windows clear after a few seconds — keep the cadence gentle
   done
   return 1
 }
