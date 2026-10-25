@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
@@ -98,13 +99,13 @@ fun PuzzleSlider(
         Box(
             Modifier
                 .fillMaxWidth()
-                .height(132.dp)
+                .aspectRatio(2.9f)
                 .clip(RoundedCornerShape(14.dp))
         ) {
             Image(
                 painter = painterResource(illRes("puzzle")),
                 contentDescription = null,
-                modifier = Modifier.fillMaxWidth().height(132.dp),
+                modifier = Modifier.fillMaxWidth(),
                 contentScale = ContentScale.Crop,
             )
             Canvas(Modifier.matchParentSize()) {

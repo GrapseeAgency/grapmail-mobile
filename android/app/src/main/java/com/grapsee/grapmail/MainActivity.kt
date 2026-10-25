@@ -1,6 +1,17 @@
 package com.grapsee.grapmail
 
 import android.os.Bundle
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.wrapContentWidth
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -33,7 +44,22 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
-            GrapMailTheme { GrapMailNav() }
+            GrapMailTheme {
+                // Edge-to-edge with the design's background behind the system
+                // bars, and content inside the safe area: the status bar and
+                // gesture bar never collide with the UI, on every device size.
+                // Forms cap at 520dp and center on tablets.
+                val bg = com.grapsee.grapmail.ui.theme.LocalPalette.current.bg
+                Box(Modifier.fillMaxSize().background(bg)) {
+                    Box(
+                        Modifier
+                            .fillMaxSize()
+                            .windowInsetsPadding(WindowInsets.safeDrawing)
+                            .widthIn(max = 520.dp)
+                            .wrapContentWidth(Alignment.CenterHorizontally)
+                    ) { GrapMailNav() }
+                }
+            }
         }
     }
 }

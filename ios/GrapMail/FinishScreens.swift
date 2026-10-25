@@ -121,6 +121,8 @@ struct HumanVerifyView: View {
             }
             .padding(.horizontal, 24)
         }
+        .frame(maxWidth: 560)
+        .frame(maxWidth: .infinity)
         .background(GM.bg.ignoresSafeArea())
     }
 }
@@ -218,6 +220,8 @@ struct AccountCreatedView: View {
             .padding(.bottom, 20)
         }
         .padding(.horizontal, 24)
+        .frame(maxWidth: 560)
+        .frame(maxWidth: .infinity)
         .background(GM.bg.ignoresSafeArea())
     }
 
@@ -324,6 +328,8 @@ struct AccountCreatedAltView: View {
             .padding(.bottom, 28)
         }
         .padding(.horizontal, 24)
+        .frame(maxWidth: 560)
+        .frame(maxWidth: .infinity)
         .background(GM.bg.ignoresSafeArea())
     }
 

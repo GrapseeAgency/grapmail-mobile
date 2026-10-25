@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -72,7 +73,7 @@ fun NameStepScreen(vm: SignUpViewModel, onBack: () -> Unit, onNext: () -> Unit) 
         Image(
             painter = painterResource(illRes("step1_name")),
             contentDescription = null,
-            modifier = Modifier.fillMaxWidth().height(180.dp),
+            modifier = Modifier.fillMaxWidth().aspectRatio(2.45f),
         )
         Spacer(Modifier.height(24.dp))
 

@@ -63,6 +63,8 @@ struct WelcomeView: View {
                 .padding(.bottom, 24)
         }
         .padding(.horizontal, 24)
+        .frame(maxWidth: 560)
+        .frame(maxWidth: .infinity)
         .background(GM.bg.ignoresSafeArea())
     }
 }
@@ -92,6 +94,8 @@ struct SignInView: View {
                 }
             }
         }
+        .frame(maxWidth: 560)
+        .frame(maxWidth: .infinity)
         .background(GM.bgTinted.ignoresSafeArea())
         .scrollDismissesKeyboard(.interactively)
     }
