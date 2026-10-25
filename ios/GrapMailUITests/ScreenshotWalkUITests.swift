@@ -48,9 +48,9 @@ final class ScreenshotWalkUITests: XCTestCase {
 
         // Step 2 — basic info: menu pickers + gender chip
         _ = app.staticTexts["Basic Info"].waitForExistence(timeout: 6)
-        pickInline("Month", "April")
-        pickInline("Day", "1")   // top of the list — always hittable (Apr 1 2013 is 13+)
-        pickInline("Year", "2013")
+        pickInline("Month", "April", itemIndex: 4)   // Jan Feb Mar Apr
+        pickInline("Day", "1", itemIndex: 1)          // first item (Apr 1 2013 is 13+)
+        pickInline("Year", "2013", itemIndex: 1)      // first item (youngest-first list)
         let female = app.buttons["Female"].firstMatch
         if female.waitForExistence(timeout: 3) { female.tap() }
         snap("03-step2-basicinfo-light")
@@ -107,23 +107,22 @@ final class ScreenshotWalkUITests: XCTestCase {
         snap("10-signin-light")
     }
 
-    /// Inline picker: open the panel, let the expansion animation settle,
-    /// then swipe until the option is on screen AND hittable, and tap it.
-    private func pickInline(_ placeholder: String, _ option: String) {
+    /// Inline picker by geometry: open the panel, then tap the option at its
+    /// deterministic offset from the row (item height 44pt, panel gap 4pt).
+    /// Element queries inside the clipped animated panel are unreliable for
+    /// XCUITest; geometry is not.
+    private func pickInline(_ placeholder: String, _ option: String, itemIndex: Int) {
         let row = app.buttons[placeholder].firstMatch
         guard row.waitForExistence(timeout: 4) else { return }
+        let frame = row.frame
         row.tap()
-        sleep(1) // panel expansion animation
-        for _ in 0..<8 {
-            let opt = app.buttons[option].firstMatch
-            if opt.exists && opt.isHittable {
-                opt.tap()
-                sleep(1) // panel close animation
-                return
-            }
-            app.swipeUp()
-            sleep(1)
-        }
+        sleep(1) // panel expansion
+        let itemY = frame.maxY + 4 + 44 * CGFloat(itemIndex - 1) + 22
+        let coord = app.coordinate(withNormalizedOffset: CGVector(dx: 0, dy: 0))
+            .withOffset(CGVector(dx: frame.midX, dy: itemY))
+        coord.tap()
+        sleep(1)
+        _ = option // kept for logging clarity in failures
     }
 
     private func typeIntoSecureField(_ identifier: String, _ value: String) {
