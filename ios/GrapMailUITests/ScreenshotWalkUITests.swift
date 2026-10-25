@@ -115,23 +115,19 @@ final class ScreenshotWalkUITests: XCTestCase {
     /// Element queries inside the clipped animated panel are unreliable for
     /// XCUITest; geometry is not.
     private func pickInline(_ placeholder: String, _ option: String) {
-        for attempt in 0..<2 {
-            let row = app.buttons[placeholder].firstMatch
-            guard row.waitForExistence(timeout: 4) else { return }
-            // Already picked? The collapsed row now shows the chosen value.
-            if row.label == option { return }
-            let frame = row.frame
-            row.tap()
-            sleep(1) // panel expansion
-            // First item of the panel: gap 4pt + half of the 34pt item row.
-            let itemY = frame.maxY + 4 + 17
-            let coord = app.coordinate(withNormalizedOffset: CGVector(dx: 0, dy: 0))
-                .withOffset(CGVector(dx: frame.midX, dy: itemY))
-            coord.tap()
+        app.swipeDown() // page to top — stable frames, no drift between measure and tap
+        sleep(1)
+        let row = app.buttons[placeholder].firstMatch
+        guard row.waitForExistence(timeout: 4) else { return }
+        if row.label == option { return }
+        row.tap()
+        sleep(1) // panel expansion settles
+        let opt = app.buttons[option].firstMatch
+        if opt.waitForExistence(timeout: 3) {
+            let of = opt.frame
+            app.coordinate(withNormalizedOffset: .zero)
+                .withOffset(CGVector(dx: of.midX, dy: of.midY)).tap()
             sleep(1)
-            // If the row still shows the placeholder, the tap missed — the
-            // panel is open now, so tap the row again to close it and retry.
-            if app.buttons[option].firstMatch.exists { return }
         }
     }
 
