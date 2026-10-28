@@ -55,16 +55,21 @@ final class ScreenshotWalkUITests: XCTestCase {
         inertDismiss()
     }
 
-    /// Last-resort keyboard resignation that never touches a control: the
-    /// CREATE ACCOUNT header band is inert static text on every wizard step,
-    /// so tapping it can't advance the walk or toggle anything the way a
-    /// blind 'Next' tap under the keyboard did ('missing: field yourname').
+    /// Best-effort keyboard resignation that never fails the walk. On the
+    /// wizard the inert 'CREATE ACCOUNT' eyebrow band closes the keyboard; on
+    /// the sign-in fallback that band does not exist, so tap the inert
+    /// top-center header band instead. No assertion: if the keyboard lingers,
+    /// the next control tap (a ScrollView element) auto-scrolls into view
+    /// above the keyboard anyway. Asserting here is what broke the walk
+    /// ('missing: inert header band') the moment it reached the sign-in screen.
     private func inertDismiss() {
         guard app.keyboards.count > 0 else { return }
-        tap(app.staticTexts["CREATE ACCOUNT"].firstMatch, "inert header band (keyboard dismiss)", timeout: 3)
-        let deadline = Date().addingTimeInterval(2)
+        let eyebrow = app.staticTexts["CREATE ACCOUNT"].firstMatch
+        if eyebrow.exists { eyebrow.tap() }
+        let deadline = Date().addingTimeInterval(1.5)
         while app.keyboards.count > 0 && Date() < deadline {
-            usleep(100_000)
+            app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.06)).tap()
+            usleep(200_000)
         }
     }
 
