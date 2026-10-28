@@ -1,4 +1,5 @@
 import XCTest
+import Foundation
 
 /// The live signup walk on a real iOS simulator — the same walk the Android
 /// CI runs. Creates a real account against the live API and screenshots
@@ -137,6 +138,23 @@ final class ScreenshotWalkUITests: XCTestCase {
         tap(app.buttons["Go to Mailbox"].firstMatch, "Go to Mailbox")
         require(app.staticTexts["Signed in"].firstMatch, "Signed-in home", timeout: 8)
 
+        // Security sector — the reference screens photographed in the app's
+        // light theme. Read-only: the walk opens every hub row, snapshots it,
+        // and backs out. It never submits a password change, never revokes a
+        // session, never signs the fresh account out of everything — those
+        // flows have their own screens and their own confirmations, and this
+        // account has to survive to the session-restore leg below.
+        tap(app.buttons["Account security"].firstMatch, "Account security (home)")
+        require(app.staticTexts["Account Security"].firstMatch, "Security hub", timeout: 8)
+        snap("20-sec-hub-light")
+        openSecurityRow("Two-Step Verification", "21-sec-2fa-enable-light")
+        openSecurityRow("Change Password", "22-sec-change-password-light")
+        openSecurityRow("Backup Codes", "23-sec-backup-codes-light")
+        openSecurityRow("Active Sessions", "24-sec-sessions-light")
+        openSecurityRow("Recent Security Activity", "25-sec-activity-light")
+        openSecurityRow("Sign Out All Devices", "26-sec-signout-all-light")
+        backFromSecurityScreens()
+
         // Session restore: relaunch with the stored Keychain token must open
         // signed-in, not at Welcome. Then sign out returns to Welcome.
         app.terminate()
@@ -172,6 +190,33 @@ final class ScreenshotWalkUITests: XCTestCase {
         let picked = row.waitForExistence(timeout: 3) && row.label == option
         XCTAssertTrue(picked, "picker \(placeholder) still shows '\(row.label)' after tapping \(option)")
         sleep(1)
+    }
+
+    /// Open one Account Security hub row, snapshot the screen it lands on,
+    /// and return to the hub. Plain rows are buttons whose label carries the
+    /// title; the Two-Step row is a switch (app.switches, identified by the
+    /// row title) — a tap there fires onToggle, which routes into the enable
+    /// flow exactly like the reference.
+    private func openSecurityRow(_ title: String, _ shotName: String) {
+        let row = app.buttons.matching(NSPredicate(
+            format: "label CONTAINS %@", title)).firstMatch
+        if row.waitForExistence(timeout: 4) {
+            row.tap()
+        } else {
+            tap(app.switches[title].firstMatch, "security switch \(title)")
+        }
+        sleep(1) // the screen's own load (profile fetch) settles
+        snap(shotName)
+        tap(app.buttons["back"].firstMatch, "back from \(title)")
+        sleep(1)
+    }
+
+    /// The hub sits under a NavigationStack path the walk appended; back out
+    /// of it so the session-restore leg starts from the signed-in home.
+    private func backFromSecurityScreens() {
+        require(app.staticTexts["Account Security"].firstMatch, "Security hub (return)", timeout: 8)
+        tap(app.buttons["back"].firstMatch, "back (hub → home)")
+        require(app.buttons["Account security"].firstMatch, "Signed-in home (return)", timeout: 8)
     }
 
     private func typeIntoSecureField(_ identifier: String, _ value: String) {

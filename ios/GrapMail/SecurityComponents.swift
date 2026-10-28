@@ -111,11 +111,15 @@ struct SecurityToggleRowView: View {
                 }
             }
             Spacer(minLength: 0)
-            Toggle("",
+            Toggle(title,
                    isOn: Binding(get: { isOn }, set: { if enabled { onToggle($0) } }))
                 .labelsHidden()
                 .tint(GM.primarySolid)
                 .disabled(!enabled)
+                // The visual label is hidden but the a11y label carries the
+                // row title, so XCUITest's switches[title] finds this switch
+                // (the CI walk taps it to route into the enable flow).
+                .accessibilityIdentifier(title)
         }
         .padding(.vertical, 12)
     }

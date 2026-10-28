@@ -121,6 +121,9 @@ struct AccountHeader: View {
                             .foregroundColor(GM.textPrimary)
                     }
                     .buttonStyle(.plain)
+                    // The CI security walk navigates back by name; an
+                    // unlabeled image button is unqueryable in XCUITest.
+                    .accessibilityIdentifier("back")
                     Spacer()
                 }
                 .padding(.leading, 12)
