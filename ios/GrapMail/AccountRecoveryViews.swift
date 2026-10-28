@@ -382,7 +382,7 @@ struct RecoveryPendingView: View {
                     .padding(.top, 10)
                 InfoPanel(
                     title: "What's happening?",
-                    subtitle: "We're verifying your recovery request. This usually takes a few minutes, but can take up to 24 hours in some cases.",
+                    body: "We're verifying your recovery request. This usually takes a few minutes, but can take up to 24 hours in some cases.",
                     icon: {
                         Image(systemName: "clock")
                             .font(.system(size: 15, weight: .medium))
