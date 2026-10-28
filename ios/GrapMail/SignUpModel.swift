@@ -131,14 +131,24 @@ final class SignUpModel: ObservableObject {
                 let address = resp.account?.address ?? "\(s.chosenHandle)@grapsee.com"
                 update { $0.creating = false; $0.createdAddress = address; $0.createdName = resp.account?.name }
                 // Auto sign-in — the same call the website makes the moment the
-                // account exists.
-                if let session = try? await ApiClient.signIn(identifier: address, password: s.password),
-                   let token = session.sessionToken ?? session.accessToken ?? session.token {
-                    SessionStore.save(
-                        token: token, address: address,
-                        name: resp.account?.name ?? s.firstName,
-                        expiresAtRaw: session.expiresAt.map(Double.init)
-                    )
+                // account exists. The freshly-created credential can take a
+                // beat to become usable, so retry a few times before giving up
+                // and letting RootView fall back to the sign-in screen: without
+                // a session the wizard strands the new user on sign-in instead
+                // of the human-verify → created flow the design shows.
+                for attempt in 0..<4 {
+                    if attempt > 0 {
+                        try? await Task.sleep(nanoseconds: 1_200_000_000)
+                    }
+                    if let session = try? await ApiClient.signIn(identifier: address, password: s.password),
+                       let token = session.sessionToken ?? session.accessToken ?? session.token {
+                        SessionStore.save(
+                            token: token, address: address,
+                            name: resp.account?.name ?? s.firstName,
+                            expiresAtRaw: session.expiresAt.map(Double.init)
+                        )
+                        break
+                    }
                 }
                 onCreated(address, resp.account?.name ?? s.firstName)
             } catch let ApiError.http(_, code, message) {

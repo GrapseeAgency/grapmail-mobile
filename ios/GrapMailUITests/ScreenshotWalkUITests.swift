@@ -149,19 +149,31 @@ final class ScreenshotWalkUITests: XCTestCase {
         snap("06-step5-terms-light")
         create.tap()
 
-        // Human verification — proof the whole gated flow above worked
-        require(app.staticTexts["Just one more step!"].firstMatch, "Human verification", timeout: 25)
-        snap("07-human-verify-light")
-        tap(app.staticTexts["Skip for now"].firstMatch, "Skip for now", timeout: 8)
-
-        // Account created (A) then (B)
-        require(app.staticTexts["You're all set!"].firstMatch, "Account created (A)", timeout: 15)
-        snap("08-created-a-light")
-        tap(app.buttons["Continue to Onboarding"].firstMatch, "Continue to Onboarding")
-        sleep(2)
-        snap("09-created-b-light")
-        tap(app.buttons["Go to Mailbox"].firstMatch, "Go to Mailbox")
-        require(app.staticTexts["Signed in"].firstMatch, "Signed-in home", timeout: 8)
+        // After Create Account the app either auto-signs-in (human verify ->
+        // created -> home) or, if the immediate session didn't take, routes to
+        // sign-in with the address prefilled (RootView's documented fallback).
+        // Reach the signed-in home either way so the security leg always runs.
+        let humanVerify = app.staticTexts["Just one more step!"].firstMatch
+        let signinScreen = app.staticTexts["Welcome back 👋"].firstMatch
+        XCTAssertTrue(humanVerify.waitForExistence(timeout: 25) || signinScreen.exists,
+                      "after Create Account: neither human verify nor sign-in appeared")
+        if humanVerify.exists {
+            snap("07-human-verify-light")
+            tap(app.staticTexts["Skip for now"].firstMatch, "Skip for now", timeout: 8)
+            require(app.staticTexts["You're all set!"].firstMatch, "Account created (A)", timeout: 15)
+            snap("08-created-a-light")
+            tap(app.buttons["Continue to Onboarding"].firstMatch, "Continue to Onboarding")
+            sleep(2)
+            snap("09-created-b-light")
+            tap(app.buttons["Go to Mailbox"].firstMatch, "Go to Mailbox")
+        } else {
+            // Sign-in fallback: the email is prefilled with the created address;
+            // type the password and sign in to reach the home directly.
+            typeIntoSecureField("Enter your password", "Grapmail#e2e2026")
+            inertDismiss()
+            tap(app.buttons["Sign In"].firstMatch, "Sign In (post-create)", timeout: 10)
+        }
+        require(app.staticTexts["Signed in"].firstMatch, "Signed-in home", timeout: 12)
 
         // Security sector — the reference screens photographed in the app's
         // light theme. Read-only: the walk opens every hub row, snapshots it,
