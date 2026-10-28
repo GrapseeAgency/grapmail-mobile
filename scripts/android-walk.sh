@@ -164,27 +164,70 @@ echo "· security sector — every hub screen, read-only"
 must_tap "Account security"
 must "hub opens" wait_nodes "n.get('text','')=='Account Security'" >/dev/null
 shot 20-sec-hub-light
+# hub_present — 0 on the hub, 1 definitely NOT on the hub, 2 could not tell.
+# find_nodes prints nothing both when the node is absent AND when the
+# uiautomator dump failed, and the first security leg read that second case as
+# "the tap navigated", pressed BACK and popped the hub itself — derailing every
+# row after it. A caller presses back on 1 only.
+hub_present() {
+  local out
+  if out="$(find_nodes "n.get('text','')=='Account Security'")"; then
+    [ -n "$out" ] && return 0
+    return 1
+  fi
+  sleep 2   # one retry: a dump can fail while a transition animates
+  if out="$(find_nodes "n.get('text','')=='Account Security'")"; then
+    [ -n "$out" ] && return 0
+    return 1
+  fi
+  return 2
+}
 # sec_visit <hub row text> <shot name>: open a clickable hub row, photograph
-# the screen, and press back ONLY if the tap actually navigated (the hub
-# title is gone). A missed tap that leaves us on the hub must not back out of
-# the hub itself — that is what derailed the first security leg.
+# the screen, and press back ONLY when the tap truly navigated. A row that did
+# not open, or a screen that cannot be read, fails the walk instead of guessing
+# with a BACK that might pop the hub.
 sec_visit() {
   must_tap "$1"; sleep 2; shot "$2"
-  if [ -z "$(find_nodes "n.get('text','')=='Account Security'")" ]; then
-    adb shell input keyevent 4; sleep 1.5
-  fi
+  hub_present
+  case $? in
+    0) echo "FAIL: '$1' did not open — still on the hub" >&2; FAILURES=$((FAILURES + 1)) ;;
+    1) adb shell input keyevent 4; sleep 1.5 ;;
+    2) echo "FAIL: cannot read the screen after '$1'" >&2; FAILURES=$((FAILURES + 1)) ;;
+  esac
 }
-# The Two-Step row's only interactive element is the Switch (Compose exposes
-# it as a checkable node; the title text is NOT clickable), so tap the switch
-# directly — tapping the text no-ops and the next back would pop the hub.
-must "tap 2FA switch" tap_xy "$(wait_nodes "n.get('checkable','')=='true'" | head -1)"
+# The Two-Step row's only interactive element is the Switch (Compose exposes it
+# as a checkable node; the title text is NOT clickable), so tap the switch
+# itself. Its testTag is the precise handle — the first checkable node was a
+# guess that holds only while the hub has exactly one switch, and the hub is
+# expected to grow more. The checkable scan stays as the fallback.
+tap_2fa_switch() {
+  local pos
+  pos="$(wait_nodes "n.get('resource-id','')=='sec-2fa-switch'" | head -1)"
+  [ -n "$pos" ] || pos="$(wait_nodes "n.get('checkable','')=='true'" | head -1)"
+  tap_xy "$pos"
+}
+must "tap 2FA switch" tap_2fa_switch
 sleep 2; shot 21-sec-2fa-enable-light
-if [ -z "$(find_nodes "n.get('text','')=='Account Security'")" ]; then adb shell input keyevent 4; sleep 1.5; fi
-sec_visit "Change Password" 22-sec-change-password-light
-sec_visit "Backup Codes" 23-sec-backup-codes-light
-sec_visit "Active Sessions" 24-sec-sessions-light
-sec_visit "Recent Security Activity" 25-sec-activity-light
-sec_visit "Sign Out All Devices" 26-sec-signout-all-light
+adb shell input keyevent 4; sleep 1.5
+sec_visit "Phone Number" 22-sec-phone-light
+sec_visit "Change Password" 23-sec-change-password-light
+sec_visit "Backup Codes" 24-sec-backup-codes-light
+sec_visit "Active Sessions" 25-sec-sessions-light
+sec_visit "Recent Security Activity" 26-sec-activity-light
+sec_visit "Sign Out All Devices" 27-sec-signout-all-light
+# The enable flow's first gate, photographed on navigation alone: switch →
+# Continue → 'Confirm Your Password' → back out twice. Nothing is typed, so no
+# action proof is minted and the factor stays off. (The per-session Revoke
+# confirmation is NOT reachable: a fresh account has one session, it is this
+# device, and the current device deliberately has no revoke affordance.)
+must "tap 2FA switch (gate leg)" tap_2fa_switch
+sleep 2
+must_tap "Continue"
+must "confirm-password gate" wait_nodes "n.get('text','')=='Confirm Your Password'" >/dev/null
+shot 28-sec-confirm-password-light
+adb shell input keyevent 4; sleep 1
+adb shell input keyevent 4; sleep 1.5
+must "hub after gate leg" wait_nodes "n.get('text','')=='Account Security'" >/dev/null
 # back out of the hub to the signed-in home, where the restore leg starts
 must "hub back tap" tap_xy "$(wait_nodes "n.get('content-desc','')=='Back'" | head -1)"
 sleep 2
@@ -212,6 +255,18 @@ must_tap "Sign In"
 sleep 2
 shot 11-signin-light
 
+echo "· recovery arc — navigation only, nothing submitted"
+# 'Forgot password?' opens the reset form, whose own link opens the address
+# lookup. Both are reference screens the walk had never photographed, and
+# reaching them sends no code and changes no state — the forms are entered and
+# left empty. Each tap is failure-gated, so a missing link fails the run.
+must_tap "Forgot password?"
+must "reset form" wait_nodes "n.get('text','')=='Reset your password'" >/dev/null
+shot 30-recovery-start-light
+must_tap "Find your GrapMail address"
+sleep 2
+shot 31-recovery-find-address-light
+
 echo "· dark pass"
 adb shell "cmd uimode night yes"
 sleep 3
@@ -236,9 +291,11 @@ fi
 for want in 01-welcome-light 02-step1-name-light 03-step2-basicinfo-light \
             04-step3-address-light 05-step4-password-light 06-step5-terms-light \
             07-human-verify-light 08-created-a-light 09-created-b-light \
-            20-sec-hub-light 21-sec-2fa-enable-light 22-sec-change-password-light \
-            23-sec-backup-codes-light 24-sec-sessions-light 25-sec-activity-light \
-            26-sec-signout-all-light \
+            20-sec-hub-light 21-sec-2fa-enable-light 22-sec-phone-light \
+            23-sec-change-password-light 24-sec-backup-codes-light \
+            25-sec-sessions-light 26-sec-activity-light \
+            27-sec-signout-all-light 28-sec-confirm-password-light \
+            30-recovery-start-light 31-recovery-find-address-light \
             10-session-restored 11-signin-light 12-welcome-dark 13-step1-name-dark; do
   [ -s "$OUT/$want.png" ] || { echo "FAIL: missing $want.png" >&2; FAILURES=$((FAILURES + 1)); }
 done

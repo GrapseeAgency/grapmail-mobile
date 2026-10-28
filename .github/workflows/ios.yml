@@ -44,13 +44,26 @@ jobs:
         if: always()
         run: |
           mkdir -p screenshots
-          xcrun xcresulttool export attachments \
-            --path ios/walk.xcresult \
-            --output-path screenshots \
-            || xcrun xcresulttool export \
-                 --type directory --path ios/walk.xcresult --output-path screenshots_raw \
-                 && find screenshots_raw -name "*.png" -exec cp {} screenshots/ \; || true
+          if ! xcrun xcresulttool export attachments \
+                 --path ios/walk.xcresult \
+                 --output-path screenshots; then
+            echo "attachment export failed — falling back to the directory export"
+            xcrun xcresulttool export \
+              --type directory --path ios/walk.xcresult --output-path screenshots_raw || true
+            find screenshots_raw -name "*.png" -exec cp {} screenshots/ \; 2>/dev/null || true
+          fi
           ls -la screenshots/
+          # The export chain above never aborts (a failed test still has to
+          # upload what it captured), so without this check the job could go
+          # green on an empty artifact while claiming the sector was screened.
+          # The walk photographs 20+ screens; anything under 10 means it died
+          # early, and the run must not be read as a pass on screenshots.
+          COUNT="$(find screenshots -name '*.png' | wc -l | tr -d ' ')"
+          echo "exported $COUNT screenshot attachment(s)"
+          if [ "$COUNT" -lt 10 ]; then
+            echo "::error::only $COUNT screenshots exported — the walk did not produce its set"
+            exit 1
+          fi
 
       - name: Upload screenshots
         if: always()
@@ -58,4 +71,4 @@ jobs:
         with:
           name: ios-screenshots
           path: screenshots/
-          if-no-files-found: warn
+          if-no-files-found: error

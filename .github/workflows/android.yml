@@ -16,19 +16,45 @@ jobs:
       matrix:
         # "responsive no matter what size" is a release gate, not a hope:
         # the same density-aware walk must pass on a large phone, a small
-        # phone, and a tablet (520dp centering). The small-phone slot was
-        # nexus_5, which the runner's current avdmanager rejects ("No device
-        # found matching --device nexus_5") — pixel_4a is the small phone in
-        # the pixel family that this SDK does ship (pixel_6/pixel_c prove it).
+        # phone, and a tablet (520dp centering). The small-phone slot is
+        # resolved at run time, not hardcoded: the profile that used to hold
+        # it (nexus_5) is gone from the runner's SDK, and `avdmanager`
+        # rejected the name outright — the leg never booted an emulator and
+        # failed before the walk could run. Guessing another name repeats
+        # that. The compact entry therefore asks the runner what it actually
+        # has and takes the smallest available.
         include:
           - device: pixel_6
             api-level: 34
-          - device: pixel_4a
+          - device: compact
             api-level: 34
           - device: pixel_c
             api-level: 34
     steps:
       - uses: actions/checkout@v4
+
+      - name: Resolve the emulator profile
+        id: profile
+        run: |
+          if [ "${{ matrix.device }}" != "compact" ]; then
+            echo "device=${{ matrix.device }}" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # Preference order, smallest first. pixel_4a is ~393dp wide and
+          # pixel_6 ~411dp — four percent apart, which proves nothing new; a
+          # 360dp/320dp profile is what the compact slot is for. Anything the
+          # runner lacks is skipped rather than failed, and pixel_4a is the
+          # last resort so the leg still boots something.
+          avdmanager list device > /tmp/devices.txt 2>&1 || true
+          for alias in nexus_4 nexus_s pixel_4a; do
+            if grep -qE "id:[[:space:]]*${alias}([^a-z0-9]|$)" /tmp/devices.txt; then
+              echo "device=$alias" >> "$GITHUB_OUTPUT"
+              echo "compact profile: $alias"
+              exit 0
+            fi
+          done
+          echo "device=pixel_4a" >> "$GITHUB_OUTPUT"
+          echo "no compact profile in this SDK — using pixel_4a (width coverage is weak)"
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
@@ -63,7 +89,7 @@ jobs:
           api-level: ${{ matrix.api-level }}   # modern inset/cutout delivery —
           arch: x86_64                         # API 30 does not prove it
           target: google_apis
-          profile: ${{ matrix.device }}
+          profile: ${{ steps.profile.outputs.device }}
           emulator-boot-timeout: 900
           disable-animations: true
           emulator-options: -no-window -no-audio -no-boot-anim -gpu swiftshader_indirect -no-snapshot
@@ -73,7 +99,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: android-screenshots-${{ matrix.device }}
+          name: android-screenshots-${{ steps.profile.outputs.device || matrix.device }}
           path: screenshots/
           if-no-files-found: error
 
