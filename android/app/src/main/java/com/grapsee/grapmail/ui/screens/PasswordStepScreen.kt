@@ -2,6 +2,7 @@ package com.grapsee.grapmail.ui.screens
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -46,15 +47,18 @@ import com.grapsee.grapmail.ui.theme.LocalPalette
  * requirements" card with its three checks.
  */
 @Composable
-fun PasswordStepScreen(vm: SignUpViewModel, onBack: () -> Unit, onNext: () -> Unit) {
+fun PasswordStepScreen(vm: SignUpViewModel, onBack: () -> Unit, onSignIn: () -> Unit, onNext: () -> Unit) {
     val palette = LocalPalette.current
     val state by vm.state.collectAsState()
 
     val strength = Validators.passwordStrength(state.password)
     val matches = state.confirm.isNotEmpty() && state.confirm == state.password
-    val mixed = state.password.any { it.isLetterOrDigit() } &&
-        state.password.any { !it.isLetterOrDigit() } || (state.password.any { it.isUpperCase() } && state.password.any { it.isLowerCase() })
-    val requirementsMet = state.password.length >= 8 && mixed && matches
+    // One policy, in one place. `passwordAcceptable` is the four rules the server
+    // enforces (`passwordProblem`), in ASCII classes — so the gate cannot
+    // green-light a password the route would reject (a non-ASCII letter passes
+    // Kotlin's Unicode `isLetter()` but fails the server's `[A-Za-z]`).
+    val acceptable = Validators.passwordAcceptable(state.password)
+    val requirementsMet = acceptable && matches
     var confirmError by rememberSaveable { mutableStateOf<String?>(null) }
 
     WizardScaffold(
@@ -62,6 +66,7 @@ fun PasswordStepScreen(vm: SignUpViewModel, onBack: () -> Unit, onNext: () -> Un
         title = "Create a strong password",
         subtitle = AnnotatedSubtitle(rest = "Your password keeps your account safe. Make it unique, strong and easy for you to remember."),
         onBack = onBack,
+        onSignIn = onSignIn,
         bottomBar = {
             GradientButton(
                 "Next",
@@ -81,8 +86,8 @@ fun PasswordStepScreen(vm: SignUpViewModel, onBack: () -> Unit, onNext: () -> Un
         Row(
             Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(16.dp))
-                .border(1.dp, palette.border, RoundedCornerShape(16.dp))
+                .clip(RoundedCornerShape(20.dp))
+                .border(1.dp, palette.border, RoundedCornerShape(20.dp))
                 .padding(14.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -100,7 +105,16 @@ fun PasswordStepScreen(vm: SignUpViewModel, onBack: () -> Unit, onNext: () -> Un
                 Text("Your GrapMail address", fontSize = 13.sp, color = palette.textSecondary)
                 Text("${state.chosenHandle}@grapsee.com", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = palette.textPrimary)
             }
-            Text("Edit", fontSize = 13.sp, fontWeight = FontWeight.Medium, color = palette.primarySolid)
+            Text(
+                "Edit",
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Medium,
+                color = palette.primarySolid,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(8.dp))
+                    .clickable { onBack() } // back to the address step
+                    .padding(8.dp),
+            )
         }
 
         Spacer(Modifier.height(20.dp))
@@ -114,6 +128,8 @@ fun PasswordStepScreen(vm: SignUpViewModel, onBack: () -> Unit, onNext: () -> Un
             label = "Password",
             value = state.password,
             onValueChange = { vm.update { copy(password = it) } },
+            hint = "Create a strong password",
+            showLabel = false,
             password = true,
         )
         Spacer(Modifier.height(10.dp))
@@ -163,6 +179,8 @@ fun PasswordStepScreen(vm: SignUpViewModel, onBack: () -> Unit, onNext: () -> Un
                 vm.update { copy(confirm = it) }
                 confirmError = null
             },
+            hint = "Re-enter your password",
+            showLabel = false,
             password = true,
             error = confirmError,
         )
@@ -173,8 +191,8 @@ fun PasswordStepScreen(vm: SignUpViewModel, onBack: () -> Unit, onNext: () -> Un
         Column(
             Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(16.dp))
-                .border(1.dp, palette.border, RoundedCornerShape(16.dp))
+                .clip(RoundedCornerShape(20.dp))
+                .border(1.dp, palette.border, RoundedCornerShape(20.dp))
                 .padding(16.dp),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -184,7 +202,7 @@ fun PasswordStepScreen(vm: SignUpViewModel, onBack: () -> Unit, onNext: () -> Un
             }
             Spacer(Modifier.height(10.dp))
             RequirementLine("At least 8 characters", state.password.length >= 8)
-            RequirementLine("A mix of letters, numbers and symbols", mixed)
+            RequirementLine("A mix of letters, numbers and symbols", acceptable)
             RequirementLine("Both passwords must match", matches)
         }
     }

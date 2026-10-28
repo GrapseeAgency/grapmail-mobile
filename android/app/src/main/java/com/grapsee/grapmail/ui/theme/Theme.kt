@@ -35,6 +35,9 @@ data class Palette(
     val buttonDisabled: Color, val onPrimary: Color,
     val textPrimary: Color, val textSecondary: Color, val textTertiary: Color,
     val success: Color, val error: Color, val stepInactive: Color, val inputFill: Color,
+    val successChipBg: Color, val successInk: Color,
+    val warnChipBg: Color, val warnInk: Color,
+    val cardAlt: Color, val otpFill: Color,
 )
 
 val LocalPalette = staticCompositionLocalOf {
@@ -46,6 +49,9 @@ val LocalPalette = staticCompositionLocalOf {
         textPrimary = Color(0xFF0F172A), textSecondary = Color(0xFF5B6B84), textTertiary = Color(0xFF94A3B8),
         success = Color(0xFF10B981), error = Color(0xFFEF4444), stepInactive = Color(0xFFDCE6F5),
         inputFill = Color.White,
+        successChipBg = Color(0xFFDCF8F4), successInk = Color(0xFF0B8F64),
+        warnChipBg = Color(0xFFFDF0DE), warnInk = Color(0xFFC2620A),
+        cardAlt = Color(0xFFF5F9FE), otpFill = Color.White,
     )
 }
 
@@ -61,6 +67,9 @@ fun GrapMailTheme(content: @Composable () -> Unit) {
         textPrimary = base.textPrimaryDark, textSecondary = base.textSecondaryDark, textTertiary = base.textTertiaryDark,
         success = base.successDark, error = base.errorDark, stepInactive = base.stepInactiveDark,
         inputFill = base.inputFillDark,
+        successChipBg = base.successChipBgDark, successInk = base.successInkDark,
+        warnChipBg = base.warnChipBgDark, warnInk = base.warnInkDark,
+        cardAlt = base.cardAltDark, otpFill = base.otpFillDark,
     ) else Palette(
         bg = base.bg, bgTinted = base.bgTinted, card = base.card, softFill = base.softFill, infoFill = base.infoFill,
         border = base.border, borderSoft = base.borderSoft,
@@ -69,6 +78,9 @@ fun GrapMailTheme(content: @Composable () -> Unit) {
         textPrimary = base.textPrimary, textSecondary = base.textSecondary, textTertiary = base.textTertiary,
         success = base.success, error = base.error, stepInactive = base.stepInactive,
         inputFill = base.card,
+        successChipBg = base.successChipBg, successInk = base.successInk,
+        warnChipBg = base.warnChipBg, warnInk = base.warnInk,
+        cardAlt = base.cardAlt, otpFill = base.otpFill,
     )
     CompositionLocalProvider(LocalPalette provides palette) {
         MaterialTheme(

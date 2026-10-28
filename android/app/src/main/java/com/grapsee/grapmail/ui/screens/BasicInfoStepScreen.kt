@@ -30,11 +30,13 @@ import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -60,18 +62,48 @@ private val MONTHS = listOf(
  * 2×2 grid of outlined icon chips, "Next →".
  */
 @Composable
-fun BasicInfoStepScreen(vm: SignUpViewModel, onBack: () -> Unit, onNext: () -> Unit) {
+fun BasicInfoStepScreen(vm: SignUpViewModel, onBack: () -> Unit, onSignIn: () -> Unit, onNext: () -> Unit) {
     val palette = LocalPalette.current
     val state by vm.state.collectAsState()
+    val context = androidx.compose.ui.platform.LocalContext.current
     val (iso, birthError) = Validators.birthday(
         state.bYear.toIntOrNull(), state.bMonth.toIntOrNull(), state.bDay.toIntOrNull(),
     )
+
+    // The real photo picker (Android 13+ backed PickVisualMedia): the design
+    // ships this control, so it must open a picker, not swallow the tap.
+    var photoUri by androidx.compose.runtime.saveable.rememberSaveable {
+        androidx.compose.runtime.mutableStateOf(state.photoUri)
+    }
+    val picker = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia(),
+    ) { uri ->
+        photoUri = uri?.toString()
+        vm.update { copy(photoUri = photoUri) }
+    }
+    // Decode off the composition thread: a full-size photo must not stall
+    // a frame.
+    var bitmap by remember { mutableStateOf<androidx.compose.ui.graphics.ImageBitmap?>(null) }
+    LaunchedEffect(photoUri, context) {
+        bitmap = photoUri?.let {
+            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                runCatching {
+                    // openInputStream + decodeStream works from API 21 up;
+                    // loadThumbnail/getBitmap would need an API-29 gate.
+                    context.contentResolver.openInputStream(android.net.Uri.parse(it))?.use { stream ->
+                        android.graphics.BitmapFactory.decodeStream(stream)?.asImageBitmap()
+                    }
+                }.getOrNull()
+            }
+        }
+    }
 
     WizardScaffold(
         step = 2,
         title = "Basic Info",
         subtitle = AnnotatedSubtitle(rest = "Tell us a little more about yourself. This helps us make your experience more personal."),
         onBack = onBack,
+        onSignIn = onSignIn,
         bottomBar = {
             GradientButton(
                 "Next",
@@ -91,8 +123,8 @@ fun BasicInfoStepScreen(vm: SignUpViewModel, onBack: () -> Unit, onNext: () -> U
         Row(
             Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(16.dp))
-                .border(1.dp, palette.border, RoundedCornerShape(16.dp))
+                .clip(RoundedCornerShape(20.dp))
+                .border(1.dp, palette.border, RoundedCornerShape(20.dp))
                 .padding(16.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -104,12 +136,21 @@ fun BasicInfoStepScreen(vm: SignUpViewModel, onBack: () -> Unit, onNext: () -> U
                         .background(palette.softFill),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Icon(
-                        Icons.Rounded.Person,
-                        contentDescription = null,
-                        tint = Color(0xFF8FA8E8),
-                        modifier = Modifier.size(44.dp),
-                    )
+                    if (bitmap != null) {
+                        androidx.compose.foundation.Image(
+                            bitmap = bitmap!!,
+                            contentDescription = "Profile photo",
+                            modifier = Modifier.size(72.dp).clip(CircleShape),
+                            contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                        )
+                    } else {
+                        Icon(
+                            Icons.Rounded.Person,
+                            contentDescription = null,
+                            tint = Color(0xFF8FA8E8),
+                            modifier = Modifier.size(44.dp),
+                        )
+                    }
                 }
                 Box(
                     Modifier
@@ -143,13 +184,22 @@ fun BasicInfoStepScreen(vm: SignUpViewModel, onBack: () -> Unit, onNext: () -> U
                     Modifier
                         .clip(RoundedCornerShape(10.dp))
                         .border(1.dp, palette.border, RoundedCornerShape(10.dp))
-                        .clickable { /* photo picker arrives with onboarding */ }
+                        .clickable {
+                            picker.launch(
+                                androidx.activity.result.PickVisualMediaRequest(
+                                    androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia.ImageOnly,
+                                ),
+                            )
+                        }
                         .padding(horizontal = 14.dp, vertical = 8.dp),
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(Icons.Rounded.AddAPhoto, contentDescription = null, tint = palette.primarySolid, modifier = Modifier.size(15.dp))
                         Spacer(Modifier.width(6.dp))
-                        Text("Choose Photo", fontSize = 13.sp, fontWeight = FontWeight.Medium, color = palette.primarySolid)
+                        Text(
+                            if (photoUri != null) "Change Photo" else "Choose Photo",
+                            fontSize = 13.sp, fontWeight = FontWeight.Medium, color = palette.primarySolid,
+                        )
                     }
                 }
             }

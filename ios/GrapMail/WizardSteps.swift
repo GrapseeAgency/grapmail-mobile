@@ -1,10 +1,12 @@
 import SwiftUI
+import PhotosUI
 
 // MARK: - Step 1 · Name — founder design verbatim
 
 struct NameStepView: View {
     @ObservedObject var model: SignUpModel
     let onBack: () -> Void
+    var onSignIn: (() -> Void)? = nil
     let onNext: () -> Void
 
     @State private var showErrors = false
@@ -18,12 +20,14 @@ struct NameStepView: View {
             title: "What's your name?",
             subtitle: Text("Let's get started. This will be used for your GrapMail account and profile."),
             onBack: onBack,
+            onSignIn: onSignIn,
             bodyContent: {
                 Image("ill_step1_name")
                     .resizable()
                     .aspectRatio(contentMode: .fit)
                     .frame(maxWidth: .infinity)
-                    .frame(height: 180)
+                    // No fixed height: the artwork keeps its intrinsic ratio
+                    // and scales with the (centered, capped) form width.
 
                 VStack(alignment: .leading, spacing: 18) {
                     VStack(alignment: .leading, spacing: 8) {
@@ -35,7 +39,10 @@ struct NameStepView: View {
                             hint: "Enter your first name",
                             leadingIcon: "person"
                         )
-                        if let firstError { FieldErrorRow(text: firstError) }
+                        if let firstError {
+                            FieldErrorRow(text: firstError)
+                                .transition(.move(edge: .top).combined(with: .opacity))
+                        }
                     }
                     VStack(alignment: .leading, spacing: 8) {
                         (Text("Last name").foregroundColor(GM.textPrimary)
@@ -46,7 +53,10 @@ struct NameStepView: View {
                             hint: "Enter your last name",
                             leadingIcon: "person"
                         )
-                        if let lastError { FieldErrorRow(text: lastError) }
+                        if let lastError {
+                            FieldErrorRow(text: lastError)
+                                .transition(.move(edge: .top).combined(with: .opacity))
+                        }
                     }
                 }
                 .padding(.top, 24)
@@ -62,7 +72,7 @@ struct NameStepView: View {
                     )
                 ) {
                     if model.state.firstName.isEmpty || model.state.lastName.isEmpty {
-                        showErrors = true
+                        withAnimation(.easeOut(duration: 0.2)) { showErrors = true }
                     } else {
                         onNext()
                     }
@@ -77,13 +87,22 @@ struct NameStepView: View {
 struct BasicInfoView: View {
     @ObservedObject var model: SignUpModel
     let onBack: () -> Void
+    var onSignIn: (() -> Void)? = nil
     let onNext: () -> Void
+
+    // The real photo picker (the design ships the control; the old build
+    // had a dead label). Held locally — the account API takes no photo.
+    @State private var photoItem: PhotosPickerItem?
+    @State private var photoData: Data?
 
     private let months = ["January", "February", "March", "April", "May", "June",
                           "July", "August", "September", "October", "November", "December"]
     private let days = Array(1...31).map(String.init)
     private var years: [String] {
-        (1940...Calendar.current.component(.year, from: Date())).map(String.init).reversed()
+        // Same rule as Android: under-13 years are not offered at all, and
+        // the floor is 1936 — one shared contract, not two drifting lists.
+        let maxYear = Calendar.current.component(.year, from: Date()) - 13
+        return (1936...maxYear).map(String.init).reversed()
     }
 
     private var birthday: (iso: String?, error: String?) {
@@ -100,6 +119,7 @@ struct BasicInfoView: View {
             title: "Basic Info",
             subtitle: Text("Tell us a little more about yourself. This helps us make your experience more personal."),
             onBack: onBack,
+            onSignIn: onSignIn,
             bodyContent: {
                 // Profile Photo card
                 HStack(alignment: .top, spacing: 16) {
@@ -108,10 +128,19 @@ struct BasicInfoView: View {
                             .fill(GM.softFill)
                             .frame(width: 72, height: 72)
                             .overlay(
-                                Image(systemName: "person.fill")
-                                    .font(.system(size: 30))
-                                    .foregroundColor(Color(0x8FA8E8))
+                                Group {
+                                    if let photoData, let ui = UIImage(data: photoData) {
+                                        Image(uiImage: ui)
+                                            .resizable()
+                                            .aspectRatio(contentMode: .fill)
+                                    } else {
+                                        Image(systemName: "person.fill")
+                                            .font(.system(size: 30))
+                                            .foregroundColor(Color(0x8FA8E8))
+                                    }
+                                }
                             )
+                            .clipShape(Circle())
                         Circle()
                             .fill(GM.primarySolid)
                             .frame(width: 26, height: 26)
@@ -127,17 +156,25 @@ struct BasicInfoView: View {
                         Text("Add a photo to make your account more personal. You can change this later in settings.")
                             .font(GMFont.caption)
                             .foregroundColor(GM.textSecondary)
-                        Text("Choose Photo")
-                            .font(GMFont.captionMedium)
-                            .foregroundColor(GM.primarySolid)
-                            .padding(.horizontal, 14)
-                            .padding(.vertical, 8)
-                            .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(GM.border))
-                            .padding(.top, 8)
+                        PhotosPicker(selection: $photoItem, allowedContentTypes: .images) {
+                            Text(photoData == nil ? "Choose Photo" : "Change Photo")
+                                .font(GMFont.captionMedium)
+                                .foregroundColor(GM.primarySolid)
+                                .padding(.horizontal, 14)
+                                .padding(.vertical, 8)
+                                .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(GM.border))
+                        }
+                        .buttonStyle(.plain)
+                        .onChange(of: photoItem) { item in
+                            Task {
+                                if let item { photoData = try? await item.loadTransferable(type: Data.self) }
+                            }
+                        }
+                        .padding(.top, 8)
                     }
                 }
                 .padding(16)
-                .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(GM.border))
+                .overlay(RoundedRectangle(cornerRadius: GMShape.card).strokeBorder(GM.border))
                 .padding(.top, 4)
 
                 // Birthday
@@ -263,6 +300,7 @@ struct BasicInfoView: View {
 struct AddressStepView: View {
     @ObservedObject var model: SignUpModel
     let onBack: () -> Void
+    var onSignIn: (() -> Void)? = nil
     let onNext: () -> Void
 
     var body: some View {
@@ -271,6 +309,7 @@ struct AddressStepView: View {
             title: "Choose your GrapMail address",
             subtitle: Text("Pick an available address or create your own. You'll use this to sign in and receive emails."),
             onBack: onBack,
+            onSignIn: onSignIn,
             bodyContent: {
                 // Suggested for you
                 VStack(alignment: .leading, spacing: 12) {
@@ -299,7 +338,7 @@ struct AddressStepView: View {
                     }
                 }
                 .padding(16)
-                .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(GM.border))
+                .overlay(RoundedRectangle(cornerRadius: GMShape.card).strokeBorder(GM.border))
                 .padding(.top, 4)
 
                 // Create your own
@@ -319,9 +358,31 @@ struct AddressStepView: View {
                             value: Binding(get: { model.state.customHandle }, set: model.onCustomHandleChange),
                             hint: "yourname"
                         )
-                        Text("@grapsee.com")
-                            .font(.system(size: 14))
-                            .foregroundColor(GM.textSecondary)
+                        // The design's bordered domain chip with a chevron —
+                        // the backend serves one domain today, so the menu
+                        // lists one.
+                        Menu {
+                            Text("@grapsee.com")
+                        } label: {
+                            HStack(spacing: 6) {
+                                Text("@grapsee.com")
+                                    .font(.system(size: 14))
+                                    .foregroundColor(GM.textSecondary)
+                                Image(systemName: "chevron.down")
+                                    .font(.system(size: 11))
+                                    .foregroundColor(GM.textTertiary)
+                            }
+                            .padding(.horizontal, 12)
+                            .frame(height: 54)
+                            .background(
+                                RoundedRectangle(cornerRadius: GMShape.input, style: .continuous)
+                                    .fill(GM.inputFill)
+                            )
+                            .overlay(
+                                RoundedRectangle(cornerRadius: GMShape.input, style: .continuous)
+                                    .strokeBorder(GM.border)
+                            )
+                        }
                     }
                     statusText
                     Text("Use letters, numbers, dots (.), dashes (-) or underscores (_).\nAvoid reserved names like admin, support, postmaster, etc.")
@@ -330,7 +391,7 @@ struct AddressStepView: View {
                         .lineSpacing(3)
                 }
                 .padding(16)
-                .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(GM.border))
+                .overlay(RoundedRectangle(cornerRadius: GMShape.card).strokeBorder(GM.border))
                 .padding(.top, 14)
             },
             bottom: {
@@ -404,6 +465,7 @@ struct AddressStepView: View {
 struct PasswordStepView: View {
     @ObservedObject var model: SignUpModel
     let onBack: () -> Void
+    var onSignIn: (() -> Void)? = nil
     let onNext: () -> Void
 
     private var matches: Bool {
@@ -411,9 +473,16 @@ struct PasswordStepView: View {
     }
     private var mixed: Bool {
         let pw = model.state.password
-        let hasLetter = pw.contains(where: \.isLetter)
-        let hasDigitOrSymbol = pw.contains(where: { !$0.isLetter })
-        return hasLetter && hasDigitOrSymbol
+        // The same four rules the server enforces (`passwordProblem`), in ASCII
+        // classes. Swift's Unicode-aware isLetter/isNumber would green-light a
+        // non-ASCII letter the server's `[A-Za-z]` then rejects, so a valid-looking
+        // password would come back WEAK_PASSWORD after the round-trip.
+        let isLetter = { (c: Character) in (c >= "A" && c <= "Z") || (c >= "a" && c <= "z") }
+        let isDigit = { (c: Character) in c >= "0" && c <= "9" }
+        let hasLetter = pw.contains(where: isLetter)
+        let hasDigit = pw.contains(where: isDigit)
+        let hasSymbol = pw.contains { !isLetter($0) && !isDigit($0) }
+        return hasLetter && hasDigit && hasSymbol
     }
     private var strength: Double { Validators.passwordStrength(model.state.password) }
     private var allMet: Bool { model.state.password.count >= 8 && mixed && matches }
@@ -424,6 +493,7 @@ struct PasswordStepView: View {
             title: "Create a strong password",
             subtitle: Text("Your password keeps your account safe. Make it unique, strong and easy for you to remember."),
             onBack: onBack,
+            onSignIn: onSignIn,
             bodyContent: {
                 // Address summary card
                 HStack(spacing: 12) {
@@ -437,10 +507,13 @@ struct PasswordStepView: View {
                             .font(.system(size: 14, weight: .semibold)).foregroundColor(GM.textPrimary)
                     }
                     Spacer()
-                    Text("Edit").font(GMFont.captionMedium).foregroundColor(GM.primarySolid)
+                    Button(action: onBack) {
+                        Text("Edit").font(GMFont.captionMedium).foregroundColor(GM.primarySolid)
+                    }
+                    .buttonStyle(.plain)
                 }
                 .padding(14)
-                .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(GM.border))
+                .overlay(RoundedRectangle(cornerRadius: GMShape.card).strokeBorder(GM.border))
                 .padding(.top, 4)
 
                 (Text("Password ").font(.system(size: 14, weight: .semibold)).foregroundColor(GM.textPrimary)
@@ -449,6 +522,7 @@ struct PasswordStepView: View {
 
                 AppTextField(
                     value: Binding(get: { model.state.password }, set: { newValue in model.update { $0.password = newValue } }),
+                    hint: "Create a strong password",
                     isPassword: true
                 )
                 .padding(.top, 8)
@@ -474,6 +548,7 @@ struct PasswordStepView: View {
 
                 AppTextField(
                     value: Binding(get: { model.state.confirm }, set: { newValue in model.update { $0.confirm = newValue } }),
+                    hint: "Re-enter your password",
                     isPassword: true
                 )
                 .padding(.top, 8)
@@ -489,7 +564,7 @@ struct PasswordStepView: View {
                     req("Both passwords must match", matches)
                 }
                 .padding(16)
-                .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(GM.border))
+                .overlay(RoundedRectangle(cornerRadius: GMShape.card).strokeBorder(GM.border))
                 .padding(.top, 18)
             },
             bottom: {
@@ -532,9 +607,18 @@ struct PasswordStepView: View {
 struct TermsStepView: View {
     @ObservedObject var model: SignUpModel
     let onBack: () -> Void
+    var onSignIn: (() -> Void)? = nil
     let onCreated: (String, String) -> Void
 
     @State private var scrolledToEnd = false
+
+    // Real scroll detection: the content's bottom edge in the document's own
+    // coordinate space, compared against the viewport height. The old timer
+    // unlocked the gate 0.5s after appear — consent without reading.
+    private struct BottomKey: PreferenceKey {
+        static var defaultValue: CGFloat = .greatestFiniteMagnitude
+        static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = min(value, nextValue()) }
+    }
 
     var body: some View {
         WizardScaffold(
@@ -542,9 +626,11 @@ struct TermsStepView: View {
             title: "Terms & Privacy",
             subtitle: Text("Please read and agree to our Terms of Service and Privacy Policy to continue."),
             onBack: onBack,
+            onSignIn: onSignIn,
             bodyContent: {
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 14) {
+                GeometryReader { viewport in
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: 14) {
                         Text("GrapMail Terms of Service")
                             .font(.system(size: 15, weight: .semibold))
                             .foregroundColor(GM.textPrimary)
@@ -566,23 +652,32 @@ struct TermsStepView: View {
                             .font(GMFont.caption)
                             .foregroundColor(GM.textSecondary)
                             .lineSpacing(4)
+                        }
+                        .padding(18)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(GeometryReader { g in
+                            Color.clear.preference(
+                                key: BottomKey.self,
+                                value: g.frame(in: .named("termsDoc")).maxY
+                            )
+                        })
                     }
-                    .padding(18)
+                    .coordinateSpace(name: "termsDoc")
+                    .onPreferenceChange(BottomKey.self) { bottom in
+                        if bottom <= viewport.size.height + 24 {
+                            withAnimation { scrolledToEnd = true }
+                        }
+                    }
                 }
                 .frame(height: 300)
-                .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(GM.card))
-                .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(GM.border))
+                .background(RoundedRectangle(cornerRadius: GMShape.card, style: .continuous).fill(GM.card))
+                .overlay(RoundedRectangle(cornerRadius: GMShape.card, style: .continuous).strokeBorder(GM.border))
                 .padding(.top, 4)
-                .onAppear {
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                        withAnimation { scrolledToEnd = true }
-                    }
-                }
 
-                Text("Read our Terms of Service ↗")
+                Link("Read our Terms of Service ↗", destination: URL(string: "https://grapsee.com/legal/terms-of-service")!)
                     .font(GMFont.captionMedium).foregroundColor(GM.primarySolid)
                     .padding(.top, 12)
-                Text("Read our Privacy Policy ↗")
+                Link("Read our Privacy Policy ↗", destination: URL(string: "https://grapsee.com/legal/privacy-policy")!)
                     .font(GMFont.captionMedium).foregroundColor(GM.primarySolid)
                     .padding(.top, 8)
 
@@ -616,8 +711,8 @@ struct TermsStepView: View {
                 }
                 .padding(14)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(GM.card))
-                .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(GM.border))
+                .background(RoundedRectangle(cornerRadius: GMShape.card, style: .continuous).fill(GM.card))
+                .overlay(RoundedRectangle(cornerRadius: GMShape.card, style: .continuous).strokeBorder(GM.border))
                 .padding(.top, 16)
                 .onTapGesture {
                     guard scrolledToEnd else { return }

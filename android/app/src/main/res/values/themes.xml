@@ -4,6 +4,8 @@
     <style name="Theme.GrapMail" parent="android:Theme.Material.Light.NoActionBar">
         <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:navigationBarColor">@android:color/transparent</item>
-        <item name="android:windowLightStatusBar">true</item>
+        <!-- Icon appearance is owned by enableEdgeToEdge() at runtime so it
+             follows the resolved light/dark palette; a hardcoded true here
+             put dark icons on the dark background in night mode. -->
     </style>
 </resources>

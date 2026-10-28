@@ -25,6 +25,12 @@ truth for both native apps.
 | `success` | `#10B981` | success notes, verified check |
 | `error` | `#EF4444` | error notes, field error stroke |
 | `stepInactive` | `#DCE6F5` | inactive step segments |
+| `successChipBg` | `#DCF8F4` | "Password Reset Successful", "Email Found" chips |
+| `successInk` | `#0B8F64` | text and glyph inside those chips |
+| `warnChipBg` | `#FDF0DE` | "Account Recovery Pending" chip |
+| `warnInk` | `#C2620A` | text and glyph inside that chip |
+| `cardAlt` | `#F5F9FE` | "What's happening?" panel |
+| `otpFill` | `#FFFFFF` | code cells |
 
 ## Color — Dark theme
 
@@ -44,6 +50,12 @@ truth for both native apps.
 | `success` | `#34D399` | success notes |
 | `error` | `#F87171` | error notes |
 | `stepInactive` | `#1B2A44` | inactive segments |
+| `successChipBg` | `#0A2A23` | chips on the dark renders |
+| `successInk` | `#34D399` | text and glyph inside those chips |
+| `warnChipBg` | `#2B1F0B` | pending chip |
+| `warnInk` | `#F5A623` | text and glyph inside that chip |
+| `cardAlt` | `#0B1626` | "What's happening?" panel |
+| `otpFill` | `#0A1220` | code cells |
 
 ## Typography
 
@@ -51,6 +63,8 @@ truth for both native apps.
 |---|---|---|
 | H1 | 30 / 700 | "Better Email. A Brighter You.", "You're all set!" |
 | H2 | 22 / 700 | step titles ("What's your name?") |
+| Account title | 28 / 700 | recovery/security screens ("Enter your 6-digit code") |
+| Eyebrow | 11 / 700, tracking 1.6 | blue section label above a title |
 | Title | 17 / 600 | card titles, field section titles |
 | Body | 15 / 400-500 | inputs, descriptions |
 | Caption | 13 / 400-500 | helper text, links |
@@ -95,6 +109,32 @@ Roboto is the platform-correct equivalent.
 | `ill-created-a.png` | envelope checkmark + confetti | Account Created (A) |
 | `ill-created-b.png` | glowing envelope celebration | Account Created (B) |
 | `puzzle-photo.png` | mountain-lake photo strip | Human Verification slider |
+| `ill_account_2fa.png` | shield + padlock + check badge | Two-step verification |
+| `ill_account_backup.png` | shield + padlock + keypad badge | Backup code |
+| `ill_account_forgot.png` | envelope + padlock | Forgot password |
+| `ill_account_recovery_code.png` | shield + padlock + chat badge | Verify recovery code |
+| `ill_account_new_password.png` | shield + padlock | Set a new password |
+| `ill_account_reset_ok.png` | shield + check + confetti | Password reset successful |
+| `ill_account_pending.png` | document + clock + alert | Recovery pending |
+| `ill_account_find_address.png` | envelope + person badges | Find your address |
+| `ill_account_address_found.png` | envelope + green check | Address found |
+| `ill_account_phone.png` | phone + call / chat + shield | Phone verification |
+| `ill_account_phone_ok.png` | phone + green check | Phone verified |
+
+Every `_dark` companion is the same artwork from the dark phone panel, re-based
+onto the `#070F18` background token so a crop never shows a seam.
+
+## Recovery/security sector (measured from `raw-designs/account/`)
+
+| Element | Value |
+|---|---|
+| Code cell | radius 14, aspect 0.94, 8dp gaps, focused stroke 1.5 brand blue |
+| Code cell row | 6 cells for a 6-digit code; 10 cells in two groups of 5 for a backup code |
+| Status chip | capsule, 14×8 padding, 13/600, 16dp glyph |
+| Info panel | radius 16, 16dp padding, 1dp border, 36dp icon disc |
+| Footer note | 1dp hairline, shield 18dp, 12/18 body, inline brand link |
+| Step ribbon | 24dp circles, 1.5dp connector, done step becomes a check |
+| Illustration | 200dp wide, 1.45:1, always the theme's paired crop |
 
 The logo (rounded-square envelope mark + wordmark) is geometric and is
 recreated as native vector on both platforms — crisp at every density.

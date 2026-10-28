@@ -38,6 +38,7 @@ class SignUpViewModel : ViewModel() {
         val bYear: String = "",
         val birthdayIso: String? = null,
         val gender: String? = null,
+        val photoUri: String? = null,
         val chosenHandle: String = "",
         val customHandle: String = "",
         val customOpen: Boolean = false,
@@ -60,6 +61,10 @@ class SignUpViewModel : ViewModel() {
     val state: StateFlow<UiState> = _state
 
     private var checkJob: Job? = null
+    // Monotonic token for the debounced handle check: a result may only be
+    // applied while it still matches the latest typed handle, so a cancelled
+    // or superseded request can never write stale state.
+    private var checkToken = 0L
 
     fun update(transform: UiState.() -> UiState) { _state.value = _state.value.transform() }
 
@@ -76,6 +81,8 @@ class SignUpViewModel : ViewModel() {
                 if (available.size >= 2) break
                 try {
                     if (Api.checkHandle(c).available) available.add(c)
+                } catch (e: kotlinx.coroutines.CancellationException) {
+                    throw e
                 } catch (_: Exception) { unreachable = true }
             }
             update {
@@ -101,10 +108,12 @@ class SignUpViewModel : ViewModel() {
             return
         }
         update { copy(handleState = HandleState(HandleState.Status.Checking)) }
+        val token = ++checkToken
         checkJob = viewModelScope.launch {
             delay(450)
             try {
                 val resp = Api.checkHandle(cleaned)
+                if (token != checkToken) return@launch // superseded by newer typing
                 update {
                     copy(
                         handleState = when {
@@ -115,7 +124,10 @@ class SignUpViewModel : ViewModel() {
                         chosenHandle = if (resp.available) cleaned else "",
                     )
                 }
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e // cancellation is not a network failure — never write Unknown for it
             } catch (_: Exception) {
+                if (token != checkToken) return@launch
                 update { copy(handleState = HandleState(HandleState.Status.Unknown), chosenHandle = cleaned) }
             }
         }
@@ -153,7 +165,11 @@ class SignUpViewModel : ViewModel() {
                 onError(
                     when (e.code) {
                         "HANDLE_TAKEN" -> "That GrapMail address is already taken. Try another one."
-                        "WEAK_PASSWORD" -> "Password must be at least 8 characters."
+                        // The server names which rule failed; the gate above already
+                        // mirrors the full policy, so this is the rare fallback and
+                        // should say what the route actually said, not a hardcoded
+                        // length message that is wrong for a missing letter or symbol.
+                        "WEAK_PASSWORD" -> e.message ?: "Use at least 8 characters with a letter, a number and a symbol."
                         "INVALID_NAME" -> "Enter your full name (at least 2 characters)."
                         else -> e.message ?: "Could not create the account. Please try again."
                     }

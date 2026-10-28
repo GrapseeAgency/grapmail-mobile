@@ -23,7 +23,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -44,9 +46,15 @@ fun GrapMailLogo(size: Dp = 44.dp, wordmark: Boolean = false) {
     if (!wordmark) { Mark(size, palette); return }
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
         Mark(size, palette)
-        Column {
-            Text("GrapMail", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = palette.textPrimary)
-        }
+        // Two-tone logotype — every founder frame shows "Grap" in the text
+        // color and "Mail" in brand blue.
+        Text(
+            buildAnnotatedString {
+                withStyle(androidx.compose.ui.text.SpanStyle(color = palette.textPrimary)) { append("Grap") }
+                withStyle(androidx.compose.ui.text.SpanStyle(color = palette.primarySolid)) { append("Mail") }
+            },
+            fontSize = 20.sp, fontWeight = FontWeight.Bold,
+        )
     }
 }
 

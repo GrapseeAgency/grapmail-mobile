@@ -8,9 +8,22 @@ on:
 
 jobs:
   build-test-screenshot:
-    name: Build, live-test & screenshot (API 34 emulator)
+    name: Build, live-test & screenshot (${{ matrix.device }})
     runs-on: ubuntu-latest
     timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        # "responsive no matter what size" is a release gate, not a hope:
+        # the same density-aware walk must pass on a large phone, a small
+        # phone, and a tablet (520dp centering).
+        include:
+          - device: pixel_6
+            api-level: 34
+          - device: nexus_5
+            api-level: 34
+          - device: pixel_c
+            api-level: 34
     steps:
       - uses: actions/checkout@v4
 
@@ -44,11 +57,12 @@ jobs:
       - name: Run the live signup walk on the emulator
         uses: reactivecircus/android-emulator-runner@v2
         with:
-          api-level: 30
-          arch: x86_64
+          api-level: ${{ matrix.api-level }}   # modern inset/cutout delivery —
+          arch: x86_64                         # API 30 does not prove it
           target: google_apis
-          profile: pixel_6
+          profile: ${{ matrix.device }}
           emulator-boot-timeout: 900
+          disable animations: true
           emulator-options: -no-window -no-audio -no-boot-anim -gpu swiftshader_indirect -no-snapshot
           script: bash scripts/android-walk.sh android/app/build/outputs/apk/debug/app-debug.apk screenshots
 
@@ -56,7 +70,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: android-screenshots
+          name: android-screenshots-${{ matrix.device }}
           path: screenshots/
           if-no-files-found: error
 
@@ -85,7 +99,7 @@ jobs:
       - name: Download screenshots
         uses: actions/download-artifact@v4
         with:
-          name: android-screenshots
+          name: android-screenshots-pixel_6
           path: screenshots
 
       - name: Create release with APK + live screenshots
@@ -94,8 +108,9 @@ jobs:
           name: GrapMail ${{ github.ref_name }} — Android
           body: |
             Built and live-tested by CI: the full signup + sign-in flow was
-            walked on a real Android 34 emulator against the live account API,
-            and every screen was screenshotted. The screenshots are attached.
+            walked on real Android 34 emulators (phone, small phone, and
+            tablet) against the live account API, and every screen was
+            screenshotted. The screenshots are attached.
           files: |
             android/app/build/outputs/apk/debug/app-debug.apk
             screenshots/*.png

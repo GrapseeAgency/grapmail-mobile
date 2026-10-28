@@ -9,6 +9,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ArrowForward
 import androidx.compose.material3.Icon
@@ -40,10 +42,14 @@ import com.grapsee.grapmail.ui.theme.LocalPalette
 @Composable
 fun WelcomeScreen(onCreateAccount: () -> Unit, onSignIn: () -> Unit) {
     val palette = LocalPalette.current
+    // Scrollable first: on short phones and landscape the CTA pair and the
+    // legal line must stay reachable; fixed spacers replace the old weighted
+    // spacers, which collapse to zero and clip content off-screen.
     Column(
         Modifier
             .fillMaxSize()
             .background(palette.bg)
+            .verticalScroll(rememberScrollState())
             .padding(horizontal = 24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
@@ -52,7 +58,7 @@ fun WelcomeScreen(onCreateAccount: () -> Unit, onSignIn: () -> Unit) {
         Spacer(Modifier.height(6.dp))
         Text("Your world. Your inbox.", fontSize = 13.sp, color = palette.textSecondary)
 
-        Spacer(Modifier.weight(0.8f))
+        Spacer(Modifier.height(56.dp))
 
         Text("Welcome to", style = H1, color = palette.textPrimary, textAlign = TextAlign.Center)
         Text("GrapMail", style = H1, color = palette.primarySolid, textAlign = TextAlign.Center)
@@ -67,12 +73,12 @@ fun WelcomeScreen(onCreateAccount: () -> Unit, onSignIn: () -> Unit) {
 
         Spacer(Modifier.height(18.dp))
         Image(
-            painter = painterResource(illRes("hero")),
+            painter = painterResource(illRes("welcome")),
             contentDescription = null,
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth(0.86f),
         )
 
-        Spacer(Modifier.weight(1f))
+        Spacer(Modifier.height(48.dp))
 
         GradientButton("Create Account", onCreateAccount, trailing = {
             Spacer(Modifier.size(10.dp))

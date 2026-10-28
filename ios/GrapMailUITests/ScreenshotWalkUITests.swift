@@ -3,12 +3,13 @@ import XCTest
 /// The live signup walk on a real iOS simulator — the same walk the Android
 /// CI runs. Creates a real account against the live API and screenshots
 /// every screen into the result bundle (kept via XCTAttachment).
-/// Assertions are soft: whatever the screen shows at each stage gets
-/// captured, so the artifact set is complete even if a step stalls.
+/// Assertions are HARD (continueAfterFailure = false): a screen that fails
+/// to render or a control that never appears fails the run — the v1 test
+/// soft-skipped every step and would pass green on a dead build.
 final class ScreenshotWalkUITests: XCTestCase {
 
     override func setUp() {
-        continueAfterFailure = true
+        continueAfterFailure = false
     }
 
     private var app: XCUIApplication!
@@ -20,94 +21,100 @@ final class ScreenshotWalkUITests: XCTestCase {
         add(attachment)
     }
 
+    /// Wait for an element and fail with its name if it never appears.
+    @discardableResult
+    private func require(_ element: XCUIElement, _ what: String, timeout: TimeInterval = 6) -> XCUIElement {
+        XCTAssertTrue(element.waitForExistence(timeout: timeout), "missing: \(what)")
+        return element
+    }
+
+    private func tap(_ element: XCUIElement, _ what: String, timeout: TimeInterval = 6) {
+        require(element, what, timeout: timeout).tap()
+    }
+
     private func typeIntoTextField(_ identifier: String, _ value: String) {
         let field = app.textFields[identifier].firstMatch
-        if field.waitForExistence(timeout: 4) {
-            field.tap()
-            field.typeText(value)
-            if app.keyboards.buttons["return"].exists { app.keyboards.buttons["return"].tap() }
-        }
+        tap(field, "field \(identifier)")
+        field.typeText(value)
+        if app.keyboards.buttons["return"].exists { app.keyboards.buttons["return"].tap() }
     }
 
     func testSignupWalkScreenshots() {
+        // One linear test on purpose: XCTest runs methods alphabetically, so
+        // separate walk / restore / sign-in methods would execute out of
+        // order (restore before signup). This mirrors the Android walk script.
         app = XCUIApplication()
         app.launch()
 
         // Welcome
-        _ = app.staticTexts["Welcome to"].waitForExistence(timeout: 10)
-        snap("01-welcome-light")
-
-        // Step 1 — name
-        let create = app.buttons["Create Account"].firstMatch
-        if create.waitForExistence(timeout: 6) { create.tap() }
+        tap(app.buttons["Create Account"].firstMatch, "Create Account")
         typeIntoTextField("Enter your first name", "Arafat")
         typeIntoTextField("Enter your last name", "Hossain")
         snap("02-step1-name-light")
-        let next = app.buttons["Next"].firstMatch
-        if next.waitForExistence(timeout: 4) { next.tap() }
+        tap(app.buttons["Next"].firstMatch, "Next (step 1)")
 
         // Step 2 — basic info: menu pickers + gender chip
-        _ = app.staticTexts["Basic Info"].waitForExistence(timeout: 6)
+        require(app.staticTexts["Basic Info"].firstMatch, "Step 2 header")
         // All three picks are index 1 — the panel's first item — at one shared
-        // offset: January 1, 2013 is a valid 13-year-old date. Missed taps are
-        // detected (the row label never changes) and retried once.
+        // offset: January 1, 2013 is a valid 13-year-old date.
         pickInline("Month", "January")
         pickInline("Day", "1")
         pickInline("Year", "2013")
-        let female = app.buttons["Female"].firstMatch
-        if female.waitForExistence(timeout: 3) { female.tap() }
+        tap(app.buttons["Female"].firstMatch, "Female chip")
         snap("03-step2-basicinfo-light")
-        let next2 = app.buttons["Next"].firstMatch
-        if next2.waitForExistence(timeout: 4) { next2.tap() }
+        tap(app.buttons["Next"].firstMatch, "Next (step 2)")
 
         // Step 3 — address (custom unique handle)
         typeIntoTextField("yourname", "e2eios" + String(Int(Date().timeIntervalSince1970) % 1000000))
         sleep(3) // live availability check
         snap("04-step3-address-light")
-        let next3 = app.buttons["Next"].firstMatch
-        if next3.waitForExistence(timeout: 4) { next3.tap() }
+        tap(app.buttons["Next"].firstMatch, "Next (step 3)", timeout: 10)
 
         // Step 4 — password
-        typeIntoSecureField("Password", "Grapmail#e2e2026")
-        typeIntoSecureField("Confirm password", "Grapmail#e2e2026")
+        typeIntoSecureField("Create a strong password", "Grapmail#e2e2026")
+        typeIntoSecureField("Re-enter your password", "Grapmail#e2e2026")
         snap("05-step4-password-light")
-        let next4 = app.buttons["Next"].firstMatch
-        if next4.waitForExistence(timeout: 4) { next4.tap() }
+        tap(app.buttons["Next"].firstMatch, "Next (step 4)")
 
-        // Step 5 — terms: scroll the document, then agree
+        // Step 5 — terms: the gate is REAL scroll detection now — scroll the
+        // document to its bottom, then agree, then create.
         let termsCard = app.staticTexts["1.  Your Account"]
-        if termsCard.waitForExistence(timeout: 5) {
-            termsCard.swipeUp(velocity: .fast)
-            termsCard.swipeUp(velocity: .fast)
-        }
+        tap(termsCard, "Terms document", timeout: 8)
+        termsCard.swipeUp(velocity: .fast)
+        termsCard.swipeUp(velocity: .fast)
+        termsCard.swipeUp(velocity: .fast)
         let agree = app.staticTexts["I agree to the "].firstMatch
-        if agree.exists { agree.tap() }
+        tap(agree, "Agree card")
         snap("06-step5-terms-light")
-        let createAccount = app.buttons["Create Account"].firstMatch
-        if createAccount.waitForExistence(timeout: 4) { createAccount.tap() }
+        tap(app.buttons["Create Account"].firstMatch, "Create Account (terms)", timeout: 4)
 
-        // Human verification
-        _ = app.staticTexts["Just one more step!"].waitForExistence(timeout: 20)
+        // Human verification — proof the whole gated flow above worked
+        require(app.staticTexts["Just one more step!"].firstMatch, "Human verification", timeout: 25)
         snap("07-human-verify-light")
-        let skip = app.staticTexts["Skip for now"].firstMatch
-        if skip.waitForExistence(timeout: 5) { skip.tap() }
+        tap(app.staticTexts["Skip for now"].firstMatch, "Skip for now", timeout: 8)
 
         // Account created (A) then (B)
-        _ = app.staticTexts["You're all set!"].waitForExistence(timeout: 12)
+        require(app.staticTexts["You're all set!"].firstMatch, "Account created (A)", timeout: 15)
         snap("08-created-a-light")
-        let cont = app.buttons["Continue to Onboarding"].firstMatch
-        if cont.waitForExistence(timeout: 5) { cont.tap() }
+        tap(app.buttons["Continue to Onboarding"].firstMatch, "Continue to Onboarding")
         sleep(2)
         snap("09-created-b-light")
-    }
+        tap(app.buttons["Go to Mailbox"].firstMatch, "Go to Mailbox")
+        require(app.staticTexts["Signed in"].firstMatch, "Signed-in home", timeout: 8)
 
-    func testSignInScreenScreenshot() {
-        app = XCUIApplication()
+        // Session restore: relaunch with the stored Keychain token must open
+        // signed-in, not at Welcome. Then sign out returns to Welcome.
+        app.terminate()
         app.launch()
-        let signIn = app.buttons["Sign In"].firstMatch
-        if signIn.waitForExistence(timeout: 8) { signIn.tap() }
-        _ = app.staticTexts["Welcome back 👋"].waitForExistence(timeout: 6)
-        snap("10-signin-light")
+        require(app.staticTexts["Signed in"].firstMatch, "session restored on launch", timeout: 8)
+        snap("10-session-restored")
+        tap(app.buttons["Sign out"].firstMatch, "Sign out")
+        require(app.staticTexts["Welcome to"].firstMatch, "welcome after sign-out", timeout: 8)
+
+        // Sign-in screen
+        tap(app.buttons["Sign In"].firstMatch, "Sign In (welcome)")
+        require(app.staticTexts["Welcome back 👋"].firstMatch, "Sign-in header")
+        snap("11-signin-light")
     }
 
     /// Inline picker by geometry: open the panel, then tap the option at its
@@ -118,24 +125,20 @@ final class ScreenshotWalkUITests: XCTestCase {
         app.swipeDown() // page to top — stable frames, no drift between measure and tap
         sleep(1)
         let row = app.buttons[placeholder].firstMatch
-        guard row.waitForExistence(timeout: 4) else { return }
+        tap(row, "picker \(placeholder)")
         if row.label == option { return }
-        row.tap()
         sleep(1) // panel expansion settles
         let opt = app.buttons[option].firstMatch
-        if opt.waitForExistence(timeout: 3) {
-            let of = opt.frame
-            app.coordinate(withNormalizedOffset: .zero)
-                .withOffset(CGVector(dx: of.midX, dy: of.midY)).tap()
-            sleep(1)
-        }
+        require(opt, "option \(option) in \(placeholder) panel", timeout: 4)
+        let of = opt.frame
+        app.coordinate(withNormalizedOffset: .zero)
+            .withOffset(CGVector(dx: of.midX, dy: of.midY)).tap()
+        sleep(1)
     }
 
     private func typeIntoSecureField(_ identifier: String, _ value: String) {
         let sf = app.secureTextFields[identifier].firstMatch
-        if sf.waitForExistence(timeout: 4) {
-            sf.tap()
-            sf.typeText(value)
-        }
+        tap(sf, "secure field \(identifier)")
+        sf.typeText(value)
     }
 }

@@ -15,8 +15,10 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Refresh
@@ -49,7 +51,7 @@ import com.grapsee.grapmail.ui.theme.LocalPalette
  * its caption. GrapMail's own test — Telegram removed per the founder.
  */
 @Composable
-fun HumanVerifyScreen(vm: SignUpViewModel, onDone: () -> Unit) {
+fun HumanVerifyScreen(vm: SignUpViewModel, onBack: () -> Unit, onDone: () -> Unit) {
     val palette = LocalPalette.current
     val state by vm.state.collectAsState()
     var verified by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf(false) }
@@ -59,10 +61,12 @@ fun HumanVerifyScreen(vm: SignUpViewModel, onDone: () -> Unit) {
         Column(
             Modifier
                 .fillMaxSize()
+                .verticalScroll(rememberScrollState())
                 .padding(horizontal = 24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            // Header: back + centered logo
+            // Header: back + centered logo. The arrow goes back a step — it
+            // must never advance the flow (onDone is Skip's callback only).
             Box(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp)) {
                 Icon(
                     Icons.AutoMirrored.Rounded.ArrowBack,
@@ -70,7 +74,7 @@ fun HumanVerifyScreen(vm: SignUpViewModel, onDone: () -> Unit) {
                     tint = palette.textPrimary,
                     modifier = Modifier
                         .align(Alignment.CenterStart)
-                        .clickable { onDone() }
+                        .clickable { onBack() }
                         .padding(8.dp),
                 )
                 Row(Modifier.align(Alignment.Center), verticalAlignment = Alignment.CenterVertically) {
@@ -101,8 +105,8 @@ fun HumanVerifyScreen(vm: SignUpViewModel, onDone: () -> Unit) {
             Column(
                 Modifier
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(16.dp))
-                    .border(1.dp, palette.border, RoundedCornerShape(16.dp))
+                    .clip(RoundedCornerShape(20.dp))
+                    .border(1.dp, palette.border, RoundedCornerShape(20.dp))
                     .background(palette.card)
                     .padding(16.dp),
             ) {

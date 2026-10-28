@@ -1,8 +1,0 @@
-{
-  "images" : [
-    { "filename" : "ill_hero.png", "idiom" : "universal" },
-    { "filename" : "dark.png", "idiom" : "universal", "appearances" : [ { "appearance" : "luminosity", "value" : "dark" } ] }
-  ],
-  "info" : { "author" : "xcode", "version" : 1 },
-  "properties" : { "single-scale" : true }
-}

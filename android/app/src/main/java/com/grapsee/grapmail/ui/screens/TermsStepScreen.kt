@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -46,22 +47,28 @@ import com.grapsee.grapmail.ui.theme.LocalPalette
  * "Create Account" action until both conditions hold.
  */
 @Composable
-fun TermsStepScreen(vm: SignUpViewModel, onBack: () -> Unit, onCreated: (address: String, name: String) -> Unit) {
+fun TermsStepScreen(
+    vm: SignUpViewModel,
+    onBack: () -> Unit,
+    onSignIn: () -> Unit,
+    onCreated: (address: String, name: String) -> Unit,
+) {
     val palette = LocalPalette.current
+    val context = androidx.compose.ui.platform.LocalContext.current
     val state by vm.state.collectAsState()
     val scroll = rememberScrollState()
     val scrolledToEnd = rememberScrolledToEnd(scroll)
 
-    LaunchedEffect(state.createdAddress) {
-        val addr = state.createdAddress
-        if (addr != null) onCreated(addr, state.createdName ?: state.firstName)
-    }
+    // Navigation fires once, from the VM's onCreated callback (wired in the
+    // bottom bar). The old LaunchedEffect(createdAddress) fired on the same
+    // success too, pushing a duplicate verify screen onto the backstack.
 
     WizardScaffold(
         step = 5,
         title = "Terms & Privacy",
         subtitle = AnnotatedSubtitle(rest = "Please read and agree to our Terms of Service and Privacy Policy to continue."),
         onBack = onBack,
+        onSignIn = onSignIn,
         bottomBar = {
             GradientButton(
                 if (state.creating) "Creating…" else "Create Account",
@@ -80,9 +87,9 @@ fun TermsStepScreen(vm: SignUpViewModel, onBack: () -> Unit, onCreated: (address
         Column(
             Modifier
                 .fillMaxWidth()
-                .height(300.dp)
-                .clip(RoundedCornerShape(16.dp))
-                .border(1.dp, palette.border, RoundedCornerShape(16.dp))
+                .heightIn(max = 320.dp)
+                .clip(RoundedCornerShape(20.dp))
+                .border(1.dp, palette.border, RoundedCornerShape(20.dp))
                 .background(palette.card)
                 .verticalScroll(scroll)
                 .padding(18.dp),
@@ -113,9 +120,27 @@ fun TermsStepScreen(vm: SignUpViewModel, onBack: () -> Unit, onCreated: (address
         }
 
         Spacer(Modifier.height(12.dp))
-        Text("Read our Terms of Service ↗", fontSize = 13.sp, fontWeight = FontWeight.Medium, color = palette.primarySolid)
+        Text("Read our Terms of Service ↗", fontSize = 13.sp, fontWeight = FontWeight.Medium, color = palette.primarySolid,
+            modifier = Modifier
+                .clip(RoundedCornerShape(8.dp))
+                .clickable {
+                    context.startActivity(android.content.Intent(
+                        android.content.Intent.ACTION_VIEW,
+                        android.net.Uri.parse("https://grapsee.com/legal/terms-of-service"),
+                    ))
+                }
+                .padding(6.dp))
         Spacer(Modifier.height(8.dp))
-        Text("Read our Privacy Policy ↗", fontSize = 13.sp, fontWeight = FontWeight.Medium, color = palette.primarySolid)
+        Text("Read our Privacy Policy ↗", fontSize = 13.sp, fontWeight = FontWeight.Medium, color = palette.primarySolid,
+            modifier = Modifier
+                .clip(RoundedCornerShape(8.dp))
+                .clickable {
+                    context.startActivity(android.content.Intent(
+                        android.content.Intent.ACTION_VIEW,
+                        android.net.Uri.parse("https://grapsee.com/legal/privacy-policy"),
+                    ))
+                }
+                .padding(6.dp))
 
         Spacer(Modifier.height(16.dp))
 
@@ -123,8 +148,8 @@ fun TermsStepScreen(vm: SignUpViewModel, onBack: () -> Unit, onCreated: (address
         Row(
             Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(16.dp))
-                .border(1.dp, palette.border, RoundedCornerShape(16.dp))
+                .clip(RoundedCornerShape(20.dp))
+                .border(1.dp, palette.border, RoundedCornerShape(20.dp))
                 .background(palette.card)
                 .clickable(enabled = scrolledToEnd) { vm.update { copy(termsAgreed = !termsAgreed) } }
                 .padding(14.dp),

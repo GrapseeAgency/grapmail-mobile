@@ -42,10 +42,22 @@ struct Wordmark: View {
     var body: some View {
         HStack(spacing: 10) {
             GrapMailMark(size: 40)
-            Text("GrapMail")
+            // Two-tone logotype — "Grap" in text color, "Mail" in brand blue,
+            // exactly as every founder frame shows it.
+            (Text("Grap").foregroundColor(GM.textPrimary)
+                + Text("Mail").foregroundColor(GM.primarySolid))
                 .font(.system(size: 20, weight: .bold))
-                .foregroundColor(GM.textPrimary)
         }
+    }
+}
+
+/// One shared tablet/responsive contract: cap the form column and center it.
+/// Screens used to repeat `.frame(maxWidth: 560).frame(maxWidth: .infinity)`
+/// by hand — seven copies that could silently drift. 560 matches Android's
+/// 520dp cap plus its 2×24dp gutters.
+extension View {
+    func centeredForm() -> some View {
+        self.frame(maxWidth: 560).frame(maxWidth: .infinity)
     }
 }
 
@@ -114,7 +126,7 @@ struct GradientButton: View {
                     }
                 }
             }
-            .frame(height: 54)
+            .frame(minHeight: 54)
             .frame(maxWidth: .infinity)
         }
         .buttonStyle(PressScaleStyle())
@@ -143,7 +155,7 @@ struct OutlineActionButton: View {
                     .foregroundColor(GM.textPrimary)
                 trailing
             }
-            .frame(height: 54)
+            .frame(minHeight: 54)
             .frame(maxWidth: .infinity)
             .background(
                 RoundedRectangle(cornerRadius: GMShape.button, style: .continuous)
@@ -164,11 +176,19 @@ struct AppTextField: View {
     var keyboardType: UIKeyboardType = .default
     var leadingIcon: String? = nil
 
-    @State private var visible = true
+    @State private var visible = false // passwords start hidden, like the design's dots
     @FocusState private var focused: Bool
 
     var body: some View {
-        HStack(spacing: 10) {
+        VStack(alignment: .leading, spacing: 6) {
+            // The title was accepted and silently dropped — sign-in field
+            // labels rendered nowhere. Show it like Android does.
+            if let title {
+                Text(title)
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundColor(GM.textSecondary)
+            }
+            HStack(spacing: 10) {
             if let leadingIcon {
                 Image(systemName: leadingIcon)
                     .font(.system(size: 16))
@@ -177,8 +197,10 @@ struct AppTextField: View {
             Group {
                 if isPassword && !visible {
                     SecureField(hint ?? "", text: $value)
+                        .font(.system(size: 15))
                 } else {
                     TextField(hint ?? "", text: $value)
+                        .font(.system(size: 15))
                         .keyboardType(keyboardType)
                         .autocorrectionDisabled()
                         .textInputAutocapitalization(.never)
@@ -191,18 +213,24 @@ struct AppTextField: View {
                         .foregroundColor(GM.textTertiary)
                 }
             }
+            }
+            .padding(.horizontal, 14)
+            .frame(minHeight: 54)
+            .background(RoundedRectangle(cornerRadius: GMShape.input, style: .continuous).fill(GM.inputFill))
+            .overlay(
+                RoundedRectangle(cornerRadius: GMShape.input, style: .continuous)
+                    .strokeBorder(
+                        error != nil ? GM.error : (focused ? GM.primarySolid : GM.border),
+                        lineWidth: error != nil || focused ? 1.5 : 1
+                    )
+            )
+            .animation(.easeOut(duration: 0.15), value: focused)
+            if let error {
+                Text(error)
+                    .font(GMFont.caption)
+                    .foregroundColor(GM.error)
+            }
         }
-        .padding(.horizontal, 14)
-        .frame(height: 54)
-        .background(RoundedRectangle(cornerRadius: GMShape.input, style: .continuous).fill(GM.inputFill))
-        .overlay(
-            RoundedRectangle(cornerRadius: GMShape.input, style: .continuous)
-                .strokeBorder(
-                    error != nil ? GM.error : (focused ? GM.primarySolid : GM.border),
-                    lineWidth: error != nil || focused ? 1.5 : 1
-                )
-        )
-        .animation(.easeOut(duration: 0.15), value: focused)
     }
 }
 
@@ -229,6 +257,7 @@ struct WizardScaffold<Body: View, Bottom: View>: View {
     let title: String
     let subtitle: Text
     var onBack: (() -> Void)? = nil
+    var onSignIn: (() -> Void)? = nil
     @ViewBuilder let bodyContent: () -> Body
     @ViewBuilder let bottom: () -> Bottom
 
@@ -281,9 +310,12 @@ struct WizardScaffold<Body: View, Bottom: View>: View {
                     Text("Already have an account?  ")
                         .font(GMFont.caption)
                         .foregroundColor(GM.textSecondary)
-                    Text("Sign In")
-                        .font(GMFont.captionMedium)
-                        .foregroundColor(GM.primarySolid)
+                    Button(action: onSignIn ?? {}) {
+                        Text("Sign In")
+                            .font(GMFont.captionMedium)
+                            .foregroundColor(GM.primarySolid)
+                    }
+                    .buttonStyle(.plain)
                 }
                 .frame(maxWidth: .infinity)
                 .padding(.top, 10)
@@ -291,8 +323,7 @@ struct WizardScaffold<Body: View, Bottom: View>: View {
             }
             .padding(.horizontal, 24)
         }
-        .frame(maxWidth: 560)
-        .frame(maxWidth: .infinity)
+        .centeredForm()
         .background(GM.bg.ignoresSafeArea())
     }
 }

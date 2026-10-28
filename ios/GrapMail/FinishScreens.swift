@@ -5,6 +5,7 @@ import SwiftUI
 /// OR divider, Get a new challenge, Skip for now + caption.
 struct HumanVerifyView: View {
     @ObservedObject var model: SignUpModel
+    var onBack: (() -> Void)? = nil
     let onDone: () -> Void
 
     @State private var verified = false
@@ -14,10 +15,14 @@ struct HumanVerifyView: View {
         VStack(spacing: 0) {
             ZStack {
                 HStack {
-                    Image(systemName: "chevron.left")
-                        .font(.system(size: 17, weight: .semibold))
-                        .foregroundColor(GM.textPrimary)
-                        .onTapGesture { onDone() }
+                    if let onBack {
+                        Button(action: onBack) {
+                            Image(systemName: "chevron.left")
+                                .font(.system(size: 17, weight: .semibold))
+                                .foregroundColor(GM.textPrimary)
+                        }
+                        .buttonStyle(.plain)
+                    }
                     Spacer()
                 }
                 .padding(.leading, 12)
@@ -74,8 +79,8 @@ struct HumanVerifyView: View {
                     }
                     .padding(16)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(GM.card))
-                    .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(GM.border))
+                    .background(RoundedRectangle(cornerRadius: GMShape.card, style: .continuous).fill(GM.card))
+                    .overlay(RoundedRectangle(cornerRadius: GMShape.card, style: .continuous).strokeBorder(GM.border))
                     .padding(.top, 22)
 
                     // OR divider
@@ -121,8 +126,7 @@ struct HumanVerifyView: View {
             }
             .padding(.horizontal, 24)
         }
-        .frame(maxWidth: 560)
-        .frame(maxWidth: .infinity)
+        .centeredForm()
         .background(GM.bg.ignoresSafeArea())
     }
 }
@@ -135,7 +139,11 @@ struct AccountCreatedView: View {
     let onContinueOnboarding: () -> Void
 
     var body: some View {
-        VStack(spacing: 0) {
+        // Scrollable: on the smallest phones the card + three tiles + CTA
+        // exceed the viewport and the button used to clip off-screen.
+        GeometryReader { viewport in
+            ScrollView {
+                VStack(spacing: 0) {
             Spacer(minLength: 36)
             Wordmark()
 
@@ -183,8 +191,8 @@ struct AccountCreatedView: View {
                 .background(Capsule().fill(GM.success.opacity(0.12)))
             }
             .padding(14)
-            .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(GM.card))
-            .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(GM.border))
+            .background(RoundedRectangle(cornerRadius: GMShape.card, style: .continuous).fill(GM.card))
+            .overlay(RoundedRectangle(cornerRadius: GMShape.card, style: .continuous).strokeBorder(GM.border))
             .padding(.top, 20)
 
             Text("WHAT'S NEXT?")
@@ -218,10 +226,13 @@ struct AccountCreatedView: View {
             }
             .padding(.top, 16)
             .padding(.bottom, 20)
+                }
+                .padding(.horizontal, 24)
+                .frame(maxWidth: .infinity)
+                .frame(minHeight: viewport.size.height)
+            }
         }
-        .padding(.horizontal, 24)
-        .frame(maxWidth: 560)
-        .frame(maxWidth: .infinity)
+        .centeredForm()
         .background(GM.bg.ignoresSafeArea())
     }
 
@@ -253,7 +264,9 @@ struct AccountCreatedAltView: View {
     let onContinueOnboarding: () -> Void
 
     var body: some View {
-        VStack(spacing: 0) {
+        GeometryReader { viewport in
+            ScrollView {
+                VStack(spacing: 0) {
             Spacer(minLength: 32)
             HStack {
                 Wordmark()
@@ -304,8 +317,8 @@ struct AccountCreatedAltView: View {
                 }
             }
             .padding(14)
-            .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(GM.card))
-            .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(GM.border))
+            .background(RoundedRectangle(cornerRadius: GMShape.card, style: .continuous).fill(GM.card))
+            .overlay(RoundedRectangle(cornerRadius: GMShape.card, style: .continuous).strokeBorder(GM.border))
             .padding(.top, 20)
 
             simpleRow("envelope", "Your secure inbox", "Send, receive and manage your emails.")
@@ -326,10 +339,13 @@ struct AccountCreatedAltView: View {
             ), action: onContinueOnboarding)
             .padding(.top, 12)
             .padding(.bottom, 28)
+            }
+            .padding(.horizontal, 24)
+            .frame(maxWidth: .infinity)
+            .frame(minHeight: viewport.size.height)
         }
-        .padding(.horizontal, 24)
-        .frame(maxWidth: 560)
-        .frame(maxWidth: .infinity)
+        }
+        .centeredForm()
         .background(GM.bg.ignoresSafeArea())
     }
 

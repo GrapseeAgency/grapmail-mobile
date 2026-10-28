@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -87,7 +88,7 @@ fun GradientButton(
         enabled = enabled && !busy,
         modifier = modifier
             .fillMaxWidth()
-            .height(54.dp)
+            .heightIn(min = 54.dp)
             .scale(scale),
         shape = RoundedCornerShape(16.dp),
         interactionSource = interaction,
@@ -102,7 +103,7 @@ fun GradientButton(
         Box(
             Modifier
                 .fillMaxWidth()
-                .height(54.dp)
+                .heightIn(min = 54.dp)
                 .background(
                     if (enabled) Brush.verticalGradient(listOf(palette.primaryTop, palette.primaryBottom))
                     else Brush.verticalGradient(listOf(palette.buttonDisabled, palette.buttonDisabled)),
@@ -137,7 +138,7 @@ fun OutlineButton(
     val palette = LocalPalette.current
     androidx.compose.material3.OutlinedButton(
         onClick = onClick,
-        modifier = modifier.fillMaxWidth().height(54.dp),
+        modifier = modifier.fillMaxWidth().heightIn(min = 54.dp),
         shape = RoundedCornerShape(16.dp),
         border = androidx.compose.foundation.BorderStroke(1.5.dp, palette.border),
     ) {
@@ -162,6 +163,7 @@ fun AppTextField(
     hint: String? = null,
     password: Boolean = false,
     keyboard: KeyboardType = KeyboardType.Text,
+    showLabel: Boolean = true,
     trailing: @Composable (() -> Unit)? = null,
     leading: @Composable (() -> Unit)? = null,
 ) {
@@ -176,21 +178,23 @@ fun AppTextField(
         }, tween(150), label = "stroke"
     )
     Column(modifier.fillMaxWidth()) {
-        Text(label, fontSize = 13.sp, fontWeight = FontWeight.Medium, color = palette.textSecondary)
-        Spacer(Modifier.height(6.dp))
+        if (showLabel) {
+            Text(label, fontSize = 13.sp, fontWeight = FontWeight.Medium, color = palette.textSecondary)
+            Spacer(Modifier.height(6.dp))
+        }
         androidx.compose.material3.OutlinedTextField(
             value = value,
             onValueChange = onValueChange,
             modifier = Modifier
                 .fillMaxWidth()
-                .height(56.dp)
+                .heightIn(min = 56.dp)
                 .onFocusChanged { focused = it.isFocused }
                 .semantics { contentDescription = label },
             shape = RoundedCornerShape(14.dp),
             singleLine = true,
             visualTransformation = if (visible) VisualTransformation.None else PasswordVisualTransformation(),
             keyboardOptions = KeyboardOptions(keyboardType = keyboard),
-            placeholder = hint?.let { { Text(it, color = palette.textTertiary, fontSize = 15.sp) } },
+            placeholder = hint?.let { { Text(it, color = palette.textTertiary, fontSize = 14.sp) } },
             leadingIcon = leading,
             trailingIcon = {
                 if (password) {
@@ -219,9 +223,6 @@ fun AppTextField(
         if (error != null) {
             Spacer(Modifier.height(6.dp))
             Text(error, fontSize = 13.sp, color = palette.error)
-        } else if (hint != null && value.isEmpty()) {
-            Spacer(Modifier.height(6.dp))
-            Text(hint, fontSize = 13.sp, color = palette.textTertiary)
         }
     }
 }

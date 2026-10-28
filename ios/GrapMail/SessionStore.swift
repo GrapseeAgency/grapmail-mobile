@@ -18,21 +18,41 @@ enum SessionStore {
     private static let tokenKey = "grapmail.session.token"
     private static let addressKey = "grapmail.session.address"
     private static let nameKey = "grapmail.session.name"
+    private static let expiresKey = "grapmail.session.expires"
 
-    static func save(token: String, address: String, name: String) {
+    static func save(token: String, address: String, name: String, expiresAtRaw: Double? = nil) {
         Keychain.set(token, for: tokenKey)
         UserDefaults.standard.set(address, forKey: addressKey)
         UserDefaults.standard.set(name, forKey: nameKey)
+        UserDefaults.standard.set(expiresAtRaw, forKey: expiresKey)
     }
 
     static var token: String? { Keychain.get(tokenKey) }
     static var address: String? { UserDefaults.standard.string(forKey: addressKey) }
     static var name: String? { UserDefaults.standard.string(forKey: nameKey) }
 
+    /// A stored session counts as signed-in only while unexpired. 0/absent
+    /// means the server supplied no expiry — keep the session. Values below
+    /// the epoch-milliseconds threshold are seconds, not milliseconds
+    /// (same normalization as Android's SessionStore).
+    static var hasValidSession: Bool {
+        guard token != nil else { return false }
+        let raw = UserDefaults.standard.double(forKey: expiresKey)
+        if raw <= 0 { return true }
+        let millis = raw < 1e11 ? raw * 1000 : raw
+        return Date().timeIntervalSince1970 * 1000 < millis
+    }
+
     static func clear() {
         Keychain.delete(tokenKey)
         UserDefaults.standard.removeObject(forKey: addressKey)
         UserDefaults.standard.removeObject(forKey: nameKey)
+        UserDefaults.standard.removeObject(forKey: expiresKey)
+        // Signing out is the one moment the security sector's in-memory
+        // credentials must go with the token. Clearing here rather than at each
+        // call site means no future sign-out path can forget it and hand the next
+        // person a live action proof.
+        SecurityFlow.reset()
     }
 }
 

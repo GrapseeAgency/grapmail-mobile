@@ -1,4 +1,5 @@
 import Foundation
+import UIKit
 
 /// The real GrapMail account API — the same contract the website uses,
 /// served at https://grapsee.com/api. Verified live before this client was
@@ -108,12 +109,194 @@ struct TwoFactorResponse: Codable {
     var code: String?
 }
 
+// ── Recovery & security ─────────────────────────────────────────────────────
+
+struct ForgotPasswordRequest: Codable { var identifier: String }
+
+struct ForgotPasswordResponse: Codable {
+    var success: Bool = false
+    var sent: Bool = false
+    var challengeId: String?
+    var expiresAt: Int?
+    var maskedPhone: String?
+    var provider: String?
+    var message: String?
+    var error: String?
+    var code: String?
+}
+
+struct ResetPasswordRequest: Codable {
+    var challengeId: String
+    var code: String
+    var password: String
+}
+
+struct ResetPasswordResponse: Codable {
+    var success: Bool = false
+    var address: String?
+    var message: String?
+    var error: String?
+    var code: String?
+    var reason: String?
+    var attemptsLeft: Int?
+}
+
+struct FindAddressRequest: Codable { var phone: String }
+
+struct FindAddressResponse: Codable {
+    var success: Bool = false
+    /// Shown on screen: first character, stars, domain.
+    var maskedAddress: String?
+    /// The whole address, only for the design's Copy button.
+    var address: String?
+    var message: String?
+    var error: String?
+    var code: String?
+}
+
+struct PhoneStartRequest: Codable { var phone: String }
+
+struct PhoneStartResponse: Codable {
+    var success: Bool = false
+    var challengeId: String?
+    var expiresAt: Int?
+    var channel: String?
+    var delivered: Bool = false
+    var message: String?
+    var error: String?
+    var code: String?
+}
+
+struct PhoneVerifyRequest: Codable {
+    var challengeId: String
+    var code: String
+}
+
+struct PhoneVerifyResponse: Codable {
+    var success: Bool = false
+    var phone: String?
+    var phoneToken: String?
+    /// Proves this code was redeemed by a signed-in owner of that number, so the
+    /// 2FA enable call cannot be completed by a client that skipped the step.
+    var phoneProof: String?
+    var expiresAt: Int?
+    var message: String?
+    var error: String?
+    var code: String?
+    var reason: String?
+    var attemptsLeft: Int?
+}
+
+struct LinkPhoneRequest: Codable { var phoneToken: String }
+
+struct LinkPhoneResponse: Codable {
+    var success: Bool = false
+    var message: String?
+    var error: String?
+    var code: String?
+}
+
+// ── Security sector (the 24-screen batch) ───────────────────────────────────
+
+struct ProfileDto: Codable {
+    var id = ""
+    var name = ""
+    var address = ""
+    var handle = ""
+    var phone: String?
+    var twoFactor = "off"
+    /// The server's own answer to "is the second factor on", so no client re-derives it.
+    var twoFactorEnabled = false
+    var twoFactorEnabledAt: String?
+    var backupCodesRemaining = 0
+    var passwordChangedAt: String?
+    var createdAt: String?
+}
+
+struct ProfileResponse: Codable {
+    var success = false
+    var profile: ProfileDto?
+    /// Short-lived proof minted by verify-password for one dangerous action.
+    var proof: String?
+    /// Present only on the response that created them; never readable again.
+    var newBackupCodes: [String]?
+    /// Present only when the change revoked this device's own token too.
+    var accessToken: String?
+    /// When that replacement expires. Stored, or the app believes it is signed in forever.
+    var tokenExpiresAt: Double?
+    var message: String?
+    var error: String?
+    var code: String?
+}
+
+struct SessionDto: Codable, Identifiable {
+    var id = ""
+    var device = ""
+    /// The browser/app half of the label, shown beside the location on the row.
+    var browser = ""
+    /// The stable handle for "is this the device the alert is about?". Labels collide.
+    var deviceId = ""
+    var ip = ""
+    var createdAt = ""
+    var lastSeenAt = ""
+    var current = false
+}
+
+struct SessionsResponse: Codable {
+    var success = false
+    var sessions: [SessionDto] = []
+    var count = 0
+    /// True total active sessions, correct even when the list is one page.
+    var activeCount = 0
+    var error: String?
+}
+
+struct ActivityDto: Codable, Identifiable {
+    var id = ""
+    var type = ""
+    var at = ""
+    var device = ""
+    var browser = ""
+    var deviceId = ""
+    var ip = ""
+    var severity = "info"
+    var detail = ""
+}
+
+struct ActivityResponse: Codable {
+    var success = false
+    var events: [ActivityDto] = []
+    var suspicious = false
+    /// The exact sign-in the server flagged, so the alert screens read it rather than re-pick one.
+    var suspiciousEvent: ActivityDto?
+    var error: String?
+}
+
+private struct TwoFactorEnableRequest: Codable { var twoFactor: String; var proof: String; var phoneProof: String }
+private struct TwoFactorDisableRequest: Codable { var twoFactor: String; var currentPassword: String }
+private struct PasswordChangeRequest: Codable { var currentPassword: String; var newPassword: String }
+private struct BackupCodesRequest: Codable { var generateBackupCodes: Bool }
+private struct SignOutEverywhereRequest: Codable { var signOutEverywhere: Bool }
+private struct VerifyPasswordRequest: Codable { var password: String }
+
 struct ApiClient {
     static let base = "https://grapsee.com/api"
     private static let encoder = JSONEncoder()
     private static let decoder = JSONDecoder()
 
-    private static func request<T: Decodable>(_ path: String, method: String = "GET", body: Data? = nil) async throws -> T {
+    /// What the security screen shows as the device name.
+    ///
+    /// URLSession's default User-Agent is a CFNetwork string that matches no
+    /// platform rule, so every iPhone signed in as "Unknown device" and the
+    /// device list was unreadable. Naming the app and the OS is what makes the
+    /// row recognisable to the person looking at it.
+    static let userAgent: String = {
+        let name = UIDevice.current.systemName
+        let version = UIDevice.current.systemVersion
+        return "GrapMail/1.0 (iPhone; \(name) \(version))"
+    }()
+
+    private static func request<T: Decodable>(_ path: String, method: String = "GET", body: Data? = nil, bearer: String? = nil) async throws -> T {
         guard var components = URLComponents(string: "\(base)\(path)") else {
             throw ApiError.http(status: -1, code: nil, message: "Bad URL")
         }
@@ -126,6 +309,8 @@ struct ApiClient {
         req.timeoutInterval = 20
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
         req.setValue(DeviceId.value, forHTTPHeaderField: "x-device-id")
+        req.setValue(userAgent, forHTTPHeaderField: "User-Agent")
+        if let bearer { req.setValue("Bearer \(bearer)", forHTTPHeaderField: "Authorization") }
         req.httpBody = body
 
         let data: Data
@@ -146,7 +331,15 @@ struct ApiClient {
                 message: carrier?.message ?? carrier?.error ?? ""
             )
         }
-        return try decoder.decode(T.self, from: data)
+        // A 2xx with an unexpected shape (HTML error page, gateway stub)
+        // must surface as a clean ApiError, not raw DecodingError text —
+        // callers show localizedDescription directly to the user.
+        do {
+            return try decoder.decode(T.self, from: data)
+        } catch let e as DecodingError {
+            print("Api decode error: \(e)")
+            throw ApiError.http(status: http.statusCode, code: nil, message: "Unexpected server response. Please try again.")
+        }
     }
 
     // ── Endpoints ───────────────────────────────────────────────────────────
@@ -174,5 +367,100 @@ struct ApiClient {
     static func twoFactorBackup(identifier: String, password: String, backupCode: String) async throws -> TwoFactorResponse {
         let body = try encoder.encode(TwoFactorRequest(identifier: identifier, password: password, backupCode: backupCode))
         return try await request("/auth/account/twofactor", method: "POST", body: body)
+    }
+
+    /// Step 1 of a reset. `challengeId` is present only when a code went out;
+    /// absent means the account takes the slower manual route.
+    static func forgotPassword(identifier: String) async throws -> ForgotPasswordResponse {
+        let body = try encoder.encode(ForgotPasswordRequest(identifier: identifier))
+        return try await request("/auth/account/reset/start", method: "POST", body: body)
+    }
+
+    /// Step 2: the code and the new password are checked together, by design.
+    static func resetPassword(challengeId: String, code: String, password: String) async throws -> ResetPasswordResponse {
+        let body = try encoder.encode(ResetPasswordRequest(challengeId: challengeId, code: code, password: password))
+        return try await request("/auth/account/reset/confirm", method: "POST", body: body)
+    }
+
+    /// Phone -> partially hidden address. A full address only ever reaches the
+    /// clipboard, never the screen.
+    static func findAddress(phone: String) async throws -> FindAddressResponse {
+        let body = try encoder.encode(FindAddressRequest(phone: phone))
+        return try await request("/auth/account/find", method: "POST", body: body)
+    }
+
+    static func startPhoneVerification(phone: String) async throws -> PhoneStartResponse {
+        let body = try encoder.encode(PhoneStartRequest(phone: phone))
+        return try await request("/auth/phone/start", method: "POST", body: body)
+    }
+
+    static func verifyPhone(challengeId: String, code: String, token: String? = nil) async throws -> PhoneVerifyResponse {
+        let body = try encoder.encode(PhoneVerifyRequest(challengeId: challengeId, code: code))
+        // The bearer is optional: the sign-up wizard verifies with no session yet,
+        // while the 2FA flow verifies the account's own number from a signed-in
+        // device. Only the latter can mint the phone proof the enable call spends.
+        return try await request("/auth/phone/verify", method: "POST", body: body, bearer: token)
+    }
+
+    /// Saves the verified number to the signed-in account: the phone token is
+    /// the proof of possession, the bearer token is who it belongs to.
+    static func linkPhone(sessionToken: String, phoneToken: String) async throws -> LinkPhoneResponse {
+        let body = try encoder.encode(LinkPhoneRequest(phoneToken: phoneToken))
+        return try await request("/auth/account/profile", method: "PATCH", body: body, bearer: sessionToken)
+    }
+
+    // ── Security sector ─────────────────────────────────────────────────────
+
+    static func profile(token: String) async throws -> ProfileResponse {
+        try await request("/auth/account/profile", bearer: token)
+    }
+
+    static func enableTwoFactor(token: String, proof: String?, phoneProof: String?) async throws -> ProfileResponse {
+        let body = try encoder.encode(TwoFactorEnableRequest(twoFactor: "on", proof: proof ?? "", phoneProof: phoneProof ?? ""))
+        return try await request("/auth/account/profile", method: "PATCH", body: body, bearer: token)
+    }
+
+    static func disableTwoFactor(token: String, password: String) async throws -> ProfileResponse {
+        let body = try encoder.encode(TwoFactorDisableRequest(twoFactor: "off", currentPassword: password))
+        return try await request("/auth/account/profile", method: "PATCH", body: body, bearer: token)
+    }
+
+    static func changePassword(token: String, current: String, next: String) async throws -> ProfileResponse {
+        let body = try encoder.encode(PasswordChangeRequest(currentPassword: current, newPassword: next))
+        return try await request("/auth/account/profile", method: "PATCH", body: body, bearer: token)
+    }
+
+    static func generateBackupCodes(token: String) async throws -> ProfileResponse {
+        let body = try encoder.encode(BackupCodesRequest(generateBackupCodes: true))
+        return try await request("/auth/account/profile", method: "PATCH", body: body, bearer: token)
+    }
+
+    static func signOutEverywhere(token: String) async throws -> ProfileResponse {
+        let body = try encoder.encode(SignOutEverywhereRequest(signOutEverywhere: true))
+        return try await request("/auth/account/profile", method: "PATCH", body: body, bearer: token)
+    }
+
+    static func verifyPassword(token: String, password: String) async throws -> ProfileResponse {
+        let body = try encoder.encode(VerifyPasswordRequest(password: password))
+        return try await request("/auth/account/verify-password", method: "POST", body: body, bearer: token)
+    }
+
+    static func sessions(token: String) async throws -> SessionsResponse {
+        try await request("/auth/account/sessions", bearer: token)
+    }
+
+    static func revokeSession(token: String, id: String) async throws -> ProfileResponse {
+        let encoded = id.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? id
+        return try await request("/auth/account/sessions?id=\(encoded)", method: "DELETE", bearer: token)
+    }
+
+    static func activity(token: String) async throws -> ActivityResponse {
+        try await request("/auth/account/activity", bearer: token)
+    }
+
+    /// "This sign-in was me": recorded, not deleted, so the alert can clear
+    /// honestly and the original row stays in the history.
+    static func acknowledgeActivity(token: String) async throws -> ProfileResponse {
+        try await request("/auth/account/activity", method: "POST", body: Data("{}".utf8), bearer: token)
     }
 }

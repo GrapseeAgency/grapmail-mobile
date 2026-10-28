@@ -134,14 +134,21 @@ final class SignUpModel: ObservableObject {
                 // account exists.
                 if let session = try? await ApiClient.signIn(identifier: address, password: s.password),
                    let token = session.sessionToken ?? session.accessToken ?? session.token {
-                    SessionStore.save(token: token, address: address, name: resp.account?.name ?? s.firstName)
+                    SessionStore.save(
+                        token: token, address: address,
+                        name: resp.account?.name ?? s.firstName,
+                        expiresAtRaw: session.expiresAt.map(Double.init)
+                    )
                 }
                 onCreated(address, resp.account?.name ?? s.firstName)
             } catch let ApiError.http(_, code, message) {
                 update { $0.creating = false }
                 switch code {
                 case "HANDLE_TAKEN": onError("That GrapMail address is already taken. Try another one.")
-                case "WEAK_PASSWORD": onError("Password must be at least 8 characters.")
+                // The server names which rule failed and the message is already in
+                // hand; a hardcoded length string is wrong for a missing letter or
+                // symbol now that the whole policy is enforced.
+                case "WEAK_PASSWORD": onError(message.isEmpty ? "Use at least 8 characters with a letter, a number and a symbol." : message)
                 case "INVALID_NAME": onError("Enter your full name (at least 2 characters).")
                 default: onError(message.isEmpty ? "Could not create the account. Please try again." : message)
                 }

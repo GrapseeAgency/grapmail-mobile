@@ -24,6 +24,13 @@ data class GrapMailColors(
     val error: Color = Color(0xFFEF4444),
     val stepInactive: Color = Color(0xFFDCE6F5),
     val onPrimary: Color = Color(0xFFFFFFFF),
+    // Recovery/security sector (sampled from raw-designs/account/)
+    val successChipBg: Color = Color(0xFFDCF8F4),
+    val successInk: Color = Color(0xFF0B8F64),
+    val warnChipBg: Color = Color(0xFFFDF0DE),
+    val warnInk: Color = Color(0xFFC2620A),
+    val cardAlt: Color = Color(0xFFF5F9FE),
+    val otpFill: Color = Color(0xFFFFFFFF),
     // Dark theme
     val bgDark: Color = Color(0xFF070F18),
     val cardDark: Color = Color(0xFF0C182A),
@@ -37,6 +44,12 @@ data class GrapMailColors(
     val successDark: Color = Color(0xFF34D399),
     val errorDark: Color = Color(0xFFF87171),
     val stepInactiveDark: Color = Color(0xFF1B2A44),
+    val successChipBgDark: Color = Color(0xFF0A2A23),
+    val successInkDark: Color = Color(0xFF34D399),
+    val warnChipBgDark: Color = Color(0xFF2B1F0B),
+    val warnInkDark: Color = Color(0xFFF5A623),
+    val cardAltDark: Color = Color(0xFF0B1626),
+    val otpFillDark: Color = Color(0xFF0A1220),
 )
 
 val LocalGrapMailColors = staticCompositionLocalOf { GrapMailColors() }

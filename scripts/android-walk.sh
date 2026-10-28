@@ -4,9 +4,10 @@
 # same walk GitHub Actions runs. Requires: booted emulator (adb connected),
 # the built APK, python3.
 #
-# v2: targets text fields by class+index (EditText nodes) instead of label
-# text, retries flaky uiautomator dumps, dismisses the keyboard with BACK
-# only when shown, and recaptures blank screenshots.
+# v3: every tap/type is FAILURE-GATED (a miss fails the run — the v2 walk
+# stalled at screen 08 with five timeout dumps and still exited green),
+# the restart now proves session restore (signed-in home → sign out →
+# sign-in screen), and the final gate requires the full screenshot set.
 #
 # Usage: android-walk.sh <path-to-apk> <output-dir>
 set -uo pipefail
@@ -19,7 +20,24 @@ STAMP="$(date +%s)"
 HANDLE="e2e${STAMP: -6}"
 source "$(dirname "$0")/android-walk-helpers.sh"
 
-echo "── GrapMail emulator walk v2 ──────────────────────────"
+FAILURES=0
+must() { # must <description> <cmd...> — a failed interaction fails the walk
+  local desc="$1"; shift
+  if ! "$@"; then
+    echo "FAIL: $desc" >&2
+    FAILURES=$((FAILURES + 1))
+  fi
+}
+must_tap()  { must "tap '$1'"  tap_text "$1"; }
+must_type() { must "type into '$1'" type_into "$1" "$2"; }
+must_tap_low() { # tap the first node with this exact text below MINY px —
+                 # dodges same-text chrome above (the CREATE ACCOUNT eyebrow)
+  local pos
+  pos="$(MINY="$2" wait_nodes "n.get('text','')=='$1'" | head -1)"
+  must "tap low '$1'" tap_xy "$pos"
+}
+
+echo "── GrapMail emulator walk v3 ──────────────────────────"
 
 adb wait-for-device
 for _ in $(seq 1 150); do
@@ -30,7 +48,7 @@ done
 echo "boot completed — settling system 80s (cold emulators ANR under early dump load)"
 sleep 80
 
-adb uninstall "$PKG" >/dev/null 2>&1
+adb uninstall "$PKG" >/dev/null 2>&1 || true
 adb install -r "$APK" >/dev/null
 adb shell am start -W -n "$PKG/.MainActivity" >/dev/null
 sleep 6
@@ -39,82 +57,126 @@ echo "· welcome"
 shot 01-welcome-light
 
 echo "· step 1 — name"
-tap_text "Create Account"
-type_into "First name" "Arafat"
-type_into "Last name" "Hossain"
+must_tap "Create Account"
+must_type "First name" "Arafat"
+must_type "Last name" "Hossain"
 shot 02-step1-name-light
-tap_text "Next"
+must_tap "Next"
 
 echo "· step 2 — basic info (dropdowns + gender)"
-tap_text "Month"
-tap_text "April"
-# Day/Year: open the panel and tap the FIRST option by geometry — the item
-# sits ~105px below the row's center (row bottom + 4dp gap + half item).
-# No dumps between the taps: nothing can go stale.
-tap_text "Day"
-DY=$(find_nodes "n.get('text','').lower()=='day'" | head -1 | awk '{print $2}' | tr -d '\r')
-P1=$(MINY=$((DY+20)) find_nodes "n.get('text')=='1'" | head -1)
-if [ -n "$P1" ]; then adb shell input tap $P1; else adb shell input tap 540 $((DY + 140)); fi
+# All three picks take the panel's FIRST item by geometry (January 1, 2013 is
+# a valid 13-year-old date): the inline panel is clipped by the body viewport
+# when the row sits low on screen, so only item 1 is guaranteed visible.
+# Fallback taps sit one row-item below the measured row center — dp-aware.
+# Row/item lookups use wait_nodes so a below-the-fold panel scrolls into view.
+must_tap "Month"
+MROW=$(wait_nodes "n.get('text','').lower()=='month'" | head -1 | tr -d '\r') || MROW=""
+MY=${MROW#* }; MY=${MY:-0}
+P0=$(MINY=$((MY+20)) wait_nodes "n.get('text')=='January'" | head -1) || P0=""
+if [ -n "$P0" ]; then adb shell input tap $P0
+elif [ -n "$MROW" ]; then adb shell input tap ${MROW%% *} $((MY + $(dp 55)))
+else must "month row visible" false; fi
 sleep 1.4
-tap_text "Year"
-YY=$(find_nodes "n.get('text','').lower()=='year'" | head -1 | awk '{print $2}' | tr -d '\r')
-P2=$(MINY=$((YY+20)) find_nodes "n.get('text')=='2013'" | head -1)
-if [ -n "$P2" ]; then adb shell input tap $P2; else adb shell input tap 540 $((YY + 140)); fi
+must_tap "Day"
+DROW=$(wait_nodes "n.get('text','').lower()=='day'" | head -1 | tr -d '\r') || DROW=""
+DY=${DROW#* }; DY=${DY:-0}
+P1=$(MINY=$((DY+20)) wait_nodes "n.get('text')=='1'" | head -1) || P1=""
+if [ -n "$P1" ]; then adb shell input tap $P1
+elif [ -n "$DROW" ]; then adb shell input tap ${DROW%% *} $((DY + $(dp 55)))
+else must "day row visible" false; fi
 sleep 1.4
-tap_text "Female"
+must_tap "Year"
+YROW=$(wait_nodes "n.get('text','').lower()=='year'" | head -1 | tr -d '\r') || YROW=""
+YY=${YROW#* }; YY=${YY:-0}
+P2=$(MINY=$((YY+20)) wait_nodes "n.get('text')=='2013'" | head -1) || P2=""
+if [ -n "$P2" ]; then adb shell input tap $P2
+elif [ -n "$YROW" ]; then adb shell input tap ${YROW%% *} $((YY + $(dp 55)))
+else must "year row visible" false; fi
+sleep 1.4
+must_tap "Female"
 shot 03-step2-basicinfo-light
-tap_text "Next"
+must_tap "Next"
 
 echo "· step 3 — address (custom unique handle)"
-type_into "Address" "$HANDLE"
+must_type "Choose your own address" "$HANDLE"
 sleep 3   # live availability check
 shot 04-step3-address-light
-tap_text "Next"
+must_tap "Next"
 
 echo "· step 4 — password"
-adb shell input swipe 540 1800 540 900 400   # bring the password fields on screen
+scroll_up   # bring the fields on screen
 sleep 1
-type_into "Password" "Grapmail%23e2e2026"
-type_into "Confirm password" "Grapmail%23e2e2026"
+must_type "Password" "Grapmail%23e2e2026"
+must_type "Confirm password" "Grapmail%23e2e2026"
 sleep 1
 shot 05-step4-password-light
-tap_text "Next"
+must_tap "Next"
 
 echo "· step 5 — terms → real account"
-adb shell input swipe 540 1800 540 900 400   # bring the terms card on screen
+# Anchor on the document heading BEFORE any page scroll (an outer-body swipe
+# first pushes the heading out of the dump and the anchored scrolls then miss
+# the card entirely). The gate is real scroll detection: the agree card only
+# toggles after the document reached its bottom.
+TH=$(wait_nodes "n.get('text','')=='GrapMail Terms of Service'")
+read -r HX HY <<< "$TH"
+for _ in 1 2 3 4; do
+  adb shell input swipe $CX $((HY + $(dp 240))) $CX $((HY + $(dp 35))) 450
+  sleep 0.9
+done
+scroll_up  # reveal the agree card
 sleep 1
-adb shell input swipe 540 1200 540 700 500   # scroll the terms document
-sleep 1
-adb shell input swipe 540 1200 540 700 500
-sleep 1
-adb shell input swipe 540 1600 540 1000 400  # reveal the agree card
-sleep 1
-tap_text "I agree to the"
+must_tap "I agree to the"
 shot 06-step5-terms-light
-tap_text "Create Account"
+# The disabled Material button's child text node still reports enabled=true
+# in uiautomator, and the "CREATE ACCOUNT" eyebrow equals the button text
+# case-insensitively — so tap the button by position (bottom half) and prove
+# the gate opened by reaching the next screen.
+must_tap_low "Create Account" $((SH / 2))
+sleep 6
+if wait_nodes "n.get('text','')=='Just one more step!'" >/dev/null; then
+  echo "  ✓ terms gate opened on real scroll (account created for real)"
+else
+  echo "FAIL: human verification never reached — gate or creation broken" >&2
+  FAILURES=$((FAILURES + 1))
+fi
 
 echo "· human verification (account just created + auto-signed-in for real)"
 sleep 10
 shot 07-human-verify-light
-tap_text "Skip for now"
+must_tap "Skip for now"
 sleep 2
 
 echo "· account created (A)"
 shot 08-created-a-light
-tap_text "Continue to Onboarding"
+must_tap "Continue to Onboarding"
 sleep 3
 
 echo "· account created (B)"
 shot 09-created-b-light
+must_tap "Go to Mailbox"
+sleep 2
 
-echo "· sign-in screen"
+echo "· session restore: restart must open signed-in, not at welcome"
 adb shell am force-stop "$PKG"
 sleep 1
 adb shell am start -W -n "$PKG/.MainActivity" >/dev/null
 sleep 6
-tap_text "Sign In"
+shot 10-session-restored
+# assert, don't tap: the home screen must show the signed-in state
+if wait_nodes "n.get('text','')=='Signed in'" >/dev/null; then
+  echo "  ✓ session restored"
+else
+  echo "FAIL: restart did not open signed-in" >&2
+  FAILURES=$((FAILURES + 1))
+fi
+# sign out returns to welcome
+must_tap "Sign out"
 sleep 2
-shot 10-signin-light
+
+echo "· sign-in screen"
+must_tap "Sign In"
+sleep 2
+shot 11-signin-light
 
 echo "· dark pass"
 adb shell "cmd uimode night yes"
@@ -123,11 +185,28 @@ adb shell am force-stop "$PKG"
 sleep 1
 adb shell am start -W -n "$PKG/.MainActivity" >/dev/null
 sleep 8
-shot 11-welcome-dark
-tap_text "Create Account"
+shot 12-welcome-dark
+must_tap "Create Account"
 sleep 2
-shot 12-step1-name-dark
+shot 13-step1-name-dark
 adb shell am force-stop "$PKG"
 adb shell "cmd uimode night no"
 
 echo "── done: $(ls "$OUT"/*.png 2>/dev/null | wc -l) screenshots in $OUT ────"
+
+# ── hard gates: no timeout dumps, no failed interactions, full PNG set ──
+if compgen -G "$OUT/timeout-*.xml" > /dev/null; then
+  echo "FAIL: timeout dumps present — a node never appeared (see $OUT/timeout-*.xml)" >&2
+  FAILURES=$((FAILURES + 1))
+fi
+for want in 01-welcome-light 02-step1-name-light 03-step2-basicinfo-light \
+            04-step3-address-light 05-step4-password-light 06-step5-terms-light \
+            07-human-verify-light 08-created-a-light 09-created-b-light \
+            10-session-restored 11-signin-light 12-welcome-dark 13-step1-name-dark; do
+  [ -s "$OUT/$want.png" ] || { echo "FAIL: missing $want.png" >&2; FAILURES=$((FAILURES + 1)); }
+done
+if [ "$FAILURES" -gt 0 ]; then
+  echo "── walk FAILED: $FAILURES problem(s) ──" >&2
+  exit 1
+fi
+echo "── walk PASSED ──"

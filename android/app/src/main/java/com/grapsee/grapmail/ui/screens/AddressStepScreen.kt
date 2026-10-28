@@ -19,6 +19,7 @@ import androidx.compose.material.icons.automirrored.rounded.ArrowForward
 import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Edit
+import androidx.compose.material.icons.rounded.ExpandMore
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -26,6 +27,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -47,10 +49,11 @@ import com.grapsee.grapmail.ui.theme.LocalPalette
  * character/reserved-names rules caption.
  */
 @Composable
-fun AddressStepScreen(vm: SignUpViewModel, onBack: () -> Unit, onNext: () -> Unit) {
+fun AddressStepScreen(vm: SignUpViewModel, onBack: () -> Unit, onSignIn: () -> Unit, onNext: () -> Unit) {
     val palette = LocalPalette.current
     val state by vm.state.collectAsState()
     val loadedForKey = remember { mutableStateOf<String?>(null) }
+    var domainMenuOpen by rememberSaveable { mutableStateOf(false) }
 
     LaunchedEffect(state.firstName, state.lastName) {
         val key = "${state.firstName}|${state.lastName}"
@@ -65,6 +68,7 @@ fun AddressStepScreen(vm: SignUpViewModel, onBack: () -> Unit, onNext: () -> Uni
         title = "Choose your GrapMail address",
         subtitle = AnnotatedSubtitle(rest = "Pick an available address or create your own. You'll use this to sign in and receive emails."),
         onBack = onBack,
+        onSignIn = onSignIn,
         bottomBar = {
             GradientButton(
                 "Next",
@@ -81,8 +85,8 @@ fun AddressStepScreen(vm: SignUpViewModel, onBack: () -> Unit, onNext: () -> Uni
         Column(
             Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(16.dp))
-                .border(1.dp, palette.border, RoundedCornerShape(16.dp))
+                .clip(RoundedCornerShape(20.dp))
+                .border(1.dp, palette.border, RoundedCornerShape(20.dp))
                 .padding(16.dp),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -120,8 +124,8 @@ fun AddressStepScreen(vm: SignUpViewModel, onBack: () -> Unit, onNext: () -> Uni
         Column(
             Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(16.dp))
-                .border(1.dp, palette.border, RoundedCornerShape(16.dp))
+                .clip(RoundedCornerShape(20.dp))
+                .border(1.dp, palette.border, RoundedCornerShape(20.dp))
                 .padding(16.dp),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -136,13 +140,45 @@ fun AddressStepScreen(vm: SignUpViewModel, onBack: () -> Unit, onNext: () -> Uni
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Box(Modifier.weight(1f)) {
                     AppTextField(
-                        label = "Address",
+                        label = "Choose your own address",
                         value = state.customHandle,
                         onValueChange = vm::onCustomHandleChange,
+                        hint = "yourname",
+                        showLabel = false,
                     )
                 }
                 Spacer(Modifier.width(8.dp))
-                Text("@grapsee.com", fontSize = 14.sp, color = palette.textSecondary)
+                // The design's bordered domain chip with a chevron — the
+                // backend serves one domain today, so the menu lists one.
+                Box {
+                    Row(
+                        Modifier
+                            .clip(RoundedCornerShape(14.dp))
+                            .border(1.dp, palette.border, RoundedCornerShape(14.dp))
+                            .background(palette.inputFill)
+                            .clickable { domainMenuOpen = true }
+                            .padding(horizontal = 12.dp, vertical = 16.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text("@grapsee.com", fontSize = 14.sp, color = palette.textSecondary)
+                        Spacer(Modifier.width(6.dp))
+                        Icon(
+                            Icons.Rounded.ExpandMore,
+                            contentDescription = "Domain",
+                            tint = palette.textTertiary,
+                            modifier = Modifier.size(18.dp),
+                        )
+                    }
+                    androidx.compose.material3.DropdownMenu(
+                        expanded = domainMenuOpen,
+                        onDismissRequest = { domainMenuOpen = false },
+                    ) {
+                        androidx.compose.material3.DropdownMenuItem(
+                            text = { Text("@grapsee.com") },
+                            onClick = { domainMenuOpen = false },
+                        )
+                    }
+                }
             }
             Spacer(Modifier.height(10.dp))
             when (state.handleState.status) {

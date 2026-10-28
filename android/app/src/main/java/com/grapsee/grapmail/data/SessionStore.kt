@@ -6,10 +6,10 @@ import android.security.keystore.KeyProperties
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
 import java.security.KeyStore
-import java.security.SecureRandom
 import javax.crypto.Cipher
 import javax.crypto.KeyGenerator
 import javax.crypto.SecretKey
@@ -46,12 +46,17 @@ object SessionStore {
         return generator.generateKey()
     }
 
-    fun save(context: Context, token: String, address: String, name: String, expiresAt: Long) {
-        val iv = ByteArray(12).also { SecureRandom().nextBytes(it) }
-        val cipher = Cipher.getInstance("AES/GCM/NoPadding")
-        cipher.init(Cipher.ENCRYPT_MODE, key(), GCMParameterSpec(128, iv))
-        val encrypted = cipher.doFinal(token.toByteArray())
-        runBlocking {
+    // AndroidKeyStore AES-GCM keys are random-IV by default: the cipher must
+    // generate the IV itself (init without a spec) and it is read back with
+    // cipher.iv. Supplying a caller-generated IV to ENCRYPT_MODE throws
+    // InvalidAlgorithmParameterException on every save — the crash that took
+    // down sign-in.
+    suspend fun save(context: Context, token: String, address: String, name: String, expiresAt: Long) =
+        withContext(Dispatchers.IO) {
+            val cipher = Cipher.getInstance("AES/GCM/NoPadding")
+            cipher.init(Cipher.ENCRYPT_MODE, key())
+            val encrypted = cipher.doFinal(token.toByteArray())
+            val iv = cipher.iv
             context.sessionStore.edit { prefs ->
                 prefs[KEY_TOKEN] = android.util.Base64.encodeToString(encrypted, android.util.Base64.NO_WRAP)
                 prefs[KEY_IV] = android.util.Base64.encodeToString(iv, android.util.Base64.NO_WRAP)
@@ -60,13 +65,12 @@ object SessionStore {
                 prefs[KEY_EXPIRES] = expiresAt.toString()
             }
         }
-    }
 
-    fun token(context: Context): String? = runBlocking {
+    suspend fun token(context: Context): String? = withContext(Dispatchers.IO) {
         val prefs = context.sessionStore.data.first()
-        val enc = prefs[KEY_TOKEN] ?: return@runBlocking null
-        val ivB64 = prefs[KEY_IV] ?: return@runBlocking null
-        return@runBlocking try {
+        val enc = prefs[KEY_TOKEN] ?: return@withContext null
+        val ivB64 = prefs[KEY_IV] ?: return@withContext null
+        try {
             val encrypted = android.util.Base64.decode(enc, android.util.Base64.NO_WRAP)
             val iv = android.util.Base64.decode(ivB64, android.util.Base64.NO_WRAP)
             val cipher = Cipher.getInstance("AES/GCM/NoPadding")
@@ -75,9 +79,27 @@ object SessionStore {
         } catch (_: Exception) { null }
     }
 
-    fun address(context: Context): String? = runBlocking { context.sessionStore.data.first()[KEY_ADDRESS] }
+    suspend fun address(context: Context): String? =
+        withContext(Dispatchers.IO) { context.sessionStore.data.first()[KEY_ADDRESS] }
 
-    fun clear(context: Context) {
-        runBlocking { context.sessionStore.edit { it.clear() } }
+    /** The stored display name, so a token reissued after a password change can
+     *  be written back without blanking what the session already knows. */
+    suspend fun name(context: Context): String? =
+        withContext(Dispatchers.IO) { context.sessionStore.data.first()[KEY_NAME] }
+
+    /** A stored session counts as signed-in only while unexpired. 0 means
+     *  the server supplied no expiry — keep the session. Values below the
+     *  epoch-milliseconds threshold are seconds, not milliseconds. */
+    suspend fun hasValidSession(context: Context): Boolean = withContext(Dispatchers.IO) {
+        val prefs = context.sessionStore.data.first()
+        if (prefs[KEY_TOKEN] == null) return@withContext false
+        val raw = prefs[KEY_EXPIRES]?.toLongOrNull() ?: 0L
+        if (raw <= 0L) return@withContext true
+        val millis = if (raw < 100_000_000_000L) raw * 1000L else raw
+        millis > System.currentTimeMillis()
+    }
+
+    suspend fun clear(context: Context) = withContext(Dispatchers.IO) {
+        context.sessionStore.edit { it.clear() }
     }
 }

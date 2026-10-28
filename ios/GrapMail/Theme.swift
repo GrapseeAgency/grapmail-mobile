@@ -36,6 +36,14 @@ enum GM {
     static let error         = color(light: 0xEF4444, dark: 0xF87171)
     static let warning       = Color(0xF5A623)
     static let violet        = Color(0x9E8CFF)
+
+    // Recovery/security sector — sampled from raw-designs/account/
+    static let successChipBg = color(light: 0xDCF8F4, dark: 0x0A2A23)
+    static let successInk    = color(light: 0x0B8F64, dark: 0x34D399)
+    static let warnChipBg    = color(light: 0xFDF0DE, dark: 0x2B1F0B)
+    static let warnInk       = color(light: 0xC2620A, dark: 0xF5A623)
+    static let cardAlt       = color(light: 0xF5F9FE, dark: 0x0B1626)
+    static let otpFill       = color(light: 0xFFFFFF, dark: 0x0A1220)
 }
 
 extension UIColor {

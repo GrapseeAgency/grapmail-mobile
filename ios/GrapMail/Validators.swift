@@ -18,6 +18,16 @@ enum Validators {
               let date = Calendar.date(year: year, month: month, day: day) else {
             return (nil, "Enter a real birthday.")
         }
+        // Calendar.date(from:) rolls Feb 29 → Mar 1 on non-leap years instead
+        // of rejecting it: verify the components survive the round-trip.
+        // Same UTC calendar as Calendar.date — a local one would shift the
+        // day for users west of Greenwich and reject valid birthdays.
+        var utcCal = Calendar(identifier: .gregorian)
+        utcCal.timeZone = TimeZone(identifier: "UTC")!
+        let comps = utcCal.dateComponents([.year, .month, .day], from: date)
+        guard comps.year == year, comps.month == month, comps.day == day else {
+            return (nil, "Enter a real birthday.")
+        }
         guard date <= Date() else { return (nil, "Enter a real birthday.") }
         guard age(from: date) >= 13 else {
             return (nil, "You must be at least 13 years old to create a GrapMail account.")
@@ -63,20 +73,28 @@ enum Validators {
         return out
     }
 
+    // The four rules `passwordProblem` enforces on the server: length, a letter,
+    // a number, a symbol. There is deliberately no uppercase/lowercase rule — no
+    // route requires mixed case, so the strength meter must not hold a password
+    // back for a rule the API would accept. ASCII classes, matching the server
+    // exactly rather than Swift's Unicode-aware isLetter/isNumber.
     enum PasswordReq: String, CaseIterable, Identifiable {
         case length = "At least 8 characters"
-        case casing = "One uppercase & lowercase letter"
+        case letter = "One letter"
         case digit = "One number"
         case special = "One special character"
         var id: String { rawValue }
     }
 
+    private static func isAsciiLetter(_ c: Character) -> Bool { (c >= "A" && c <= "Z") || (c >= "a" && c <= "z") }
+    private static func isAsciiDigit(_ c: Character) -> Bool { c >= "0" && c <= "9" }
+
     static func passwordMet(_ req: PasswordReq, _ pw: String) -> Bool {
         switch req {
         case .length: return pw.count >= 8
-        case .casing: return pw.contains(where: \.isUppercase) && pw.contains(where: { $0.isLowercase })
-        case .digit: return pw.contains(where: \.isNumber)
-        case .special: return pw.contains(where: { !$0.isLetter && !$0.isNumber })
+        case .letter: return pw.contains(where: isAsciiLetter)
+        case .digit: return pw.contains(where: isAsciiDigit)
+        case .special: return pw.contains { !isAsciiLetter($0) && !isAsciiDigit($0) }
         }
     }
 

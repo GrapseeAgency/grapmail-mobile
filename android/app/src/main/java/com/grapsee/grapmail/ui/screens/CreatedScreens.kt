@@ -15,8 +15,10 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowForward
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
@@ -63,6 +65,7 @@ fun AccountCreatedScreen(
         Modifier
             .fillMaxSize()
             .background(palette.bg)
+            .verticalScroll(rememberScrollState())
             .padding(horizontal = 24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
@@ -92,8 +95,8 @@ fun AccountCreatedScreen(
         Row(
             Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(16.dp))
-                .border(1.dp, palette.border, RoundedCornerShape(16.dp))
+                .clip(RoundedCornerShape(20.dp))
+                .border(1.dp, palette.border, RoundedCornerShape(20.dp))
                 .background(palette.card)
                 .padding(14.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -136,7 +139,7 @@ fun AccountCreatedScreen(
         NextTile(Icons.Rounded.Contacts, Color(0xFFEDE7FD), Color(0xFF7C5CE0), "Add your contacts", "Stay connected with friends and colleagues.")
         NextTile(Icons.Rounded.Settings, Color(0xFFDFF5EA), Color(0xFF10B981), "Personalize your experience", "Set up your preferences and get the most out of GrapMail.")
 
-        Spacer(Modifier.weight(1f))
+        Spacer(Modifier.height(24.dp))
 
         GradientButton("Continue to Onboarding", onContinueOnboarding, trailing = {
             Spacer(Modifier.size(10.dp))
@@ -167,10 +170,12 @@ fun AccountCreatedAltScreen(
     onContinueOnboarding: () -> Unit,
 ) {
     val palette = LocalPalette.current
+    val clipboard = androidx.compose.ui.platform.LocalClipboardManager.current
     Column(
         Modifier
             .fillMaxSize()
             .background(palette.bg)
+            .verticalScroll(rememberScrollState())
             .padding(horizontal = 24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
@@ -199,8 +204,8 @@ fun AccountCreatedAltScreen(
         Row(
             Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(16.dp))
-                .border(1.dp, palette.border, RoundedCornerShape(16.dp))
+                .clip(RoundedCornerShape(20.dp))
+                .border(1.dp, palette.border, RoundedCornerShape(20.dp))
                 .background(palette.card)
                 .padding(14.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -226,7 +231,13 @@ fun AccountCreatedAltScreen(
                 Icons.Rounded.ContentCopy,
                 contentDescription = "Copy address",
                 tint = palette.textTertiary,
-                modifier = Modifier.size(18.dp),
+                modifier = Modifier
+                    .size(36.dp)
+                    .clip(CircleShape)
+                    .clickable {
+                        clipboard.setText(androidx.compose.ui.text.AnnotatedString(address))
+                    }
+                    .padding(9.dp),
             )
         }
 
@@ -236,7 +247,7 @@ fun AccountCreatedAltScreen(
         SimpleRow(Icons.Rounded.Lock, "Built for your privacy", "Your data stays yours.")
         SimpleRow(Icons.Rounded.Bolt, "Ready for what's next", "Let's get you set up and personalized.")
 
-        Spacer(Modifier.weight(1f))
+        Spacer(Modifier.height(24.dp))
 
         GradientButton("Go to Mailbox", onGoToMailbox, trailing = {
             Spacer(Modifier.size(10.dp))

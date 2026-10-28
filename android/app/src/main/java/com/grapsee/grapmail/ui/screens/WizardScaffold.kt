@@ -1,6 +1,7 @@
 package com.grapsee.grapmail.ui.screens
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -43,6 +44,7 @@ fun WizardScaffold(
     title: String,
     subtitle: AnnotatedSubtitle,
     onBack: (() -> Unit)?,
+    onSignIn: () -> Unit,
     bottomBar: @Composable () -> Unit,
     body: @Composable () -> Unit,
 ) {
@@ -88,7 +90,7 @@ fun WizardScaffold(
             Spacer(Modifier.height(14.dp))
             bottomBar()
             Spacer(Modifier.height(10.dp))
-            AlreadyHaveAccount()
+            AlreadyHaveAccount(onSignIn = onSignIn)
             Spacer(Modifier.height(20.dp))
         }
     }
@@ -96,9 +98,16 @@ fun WizardScaffold(
 
 /** "Already have an account? Sign In" — the wizard footer, exactly as designed. */
 @Composable
-fun AlreadyHaveAccount() {
+fun AlreadyHaveAccount(onSignIn: () -> Unit) {
     val palette = LocalPalette.current
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = androidx.compose.foundation.layout.Arrangement.Center) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onSignIn)
+            .padding(vertical = 8.dp),
+        horizontalArrangement = androidx.compose.foundation.layout.Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
         Text("Already have an account?  ", fontSize = 13.sp, color = palette.textSecondary)
         Text("Sign In", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = palette.primarySolid)
     }

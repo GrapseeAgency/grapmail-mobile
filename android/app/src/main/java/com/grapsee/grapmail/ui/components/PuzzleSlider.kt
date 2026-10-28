@@ -84,7 +84,9 @@ fun PuzzleSlider(
 
     fun maxX(): Float = (trackWidth.floatValue - pieceSizePx.floatValue - 12f).coerceAtLeast(1f)
     fun targetX(): Float = maxX() * targetFraction
-    val tolerance = 28f
+    // 28 dp, not 28 raw px: a pixel tolerance makes the challenge density-
+    // dependent — near-impossible on xxhdpi phones, trivial on mdpi.
+    val tolerance = with(androidx.compose.ui.platform.LocalDensity.current) { 28.dp.toPx() }
 
     LaunchedEffect(verified) {
         if (verified) drag.snapTo(targetX())

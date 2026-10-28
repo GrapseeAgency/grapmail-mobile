@@ -69,7 +69,6 @@ struct PuzzleSlider: View {
             }
         }
         .clipShape(RoundedRectangle(cornerRadius: GMShape.input, style: .continuous))
-        .onAppear { trackWidth = trackWidth } // measured by the track's GeometryReader
     }
 
     private var notchSide: CGFloat { 132 * 0.62 }
@@ -99,34 +98,40 @@ struct PuzzleSlider: View {
 
             PuzzlePieceShape()
                 .fill(verified ? AnyShapeStyle(GM.success) : AnyShapeStyle(Color.brandGradient))
-                .frame(width: 30, height: 30)
+                .frame(width: 44, height: 44)
                 .position(x: dragX + 6 + 22, y: 28)
-                .gesture(
-                    DragGesture(minimumDistance: 1)
-                        .onChanged { value in
-                            guard !verified else { return }
-                            failed = false
-                            dragX = min(max(value.location.x - 22, 0), maxX)
-                        }
-                        .onEnded { _ in
-                            guard !verified else { return }
-                            if abs(dragX - targetX) <= tolerance {
-                                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                                    dragX = targetX
-                                }
-                                UINotificationFeedbackGenerator().notificationOccurred(.success)
-                                verified = true
-                                onVerified()
-                            } else {
-                                failed = true
-                                UINotificationFeedbackGenerator().notificationOccurred(.error)
-                                withAnimation(.spring(response: 0.45, dampingFraction: 0.65)) {
-                                    dragX = 0
-                                }
-                            }
-                        }
-                )
+                .allowsHitTesting(false)
         }
+        // The whole 56pt track is the drag surface (Android parity): the
+        // piece alone was a 30pt target — under Apple's 44pt minimum — and
+        // the old gesture read the absolute location.x, so a finger that
+        // drifted off the piece made it jump.
+        .contentShape(Rectangle())
+        .gesture(
+            DragGesture(minimumDistance: 1)
+                .onChanged { value in
+                    guard !verified else { return }
+                    failed = false
+                    dragX = min(max(value.location.x - 28, 0), maxX)
+                }
+                .onEnded { _ in
+                    guard !verified else { return }
+                    if abs(dragX - targetX) <= tolerance {
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                            dragX = targetX
+                        }
+                        UINotificationFeedbackGenerator().notificationOccurred(.success)
+                        verified = true
+                        onVerified()
+                    } else {
+                        failed = true
+                        UINotificationFeedbackGenerator().notificationOccurred(.error)
+                        withAnimation(.spring(response: 0.45, dampingFraction: 0.65)) {
+                            dragX = 0
+                        }
+                    }
+                }
+        )
     }
 }
 
