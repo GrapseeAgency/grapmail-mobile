@@ -189,7 +189,7 @@ struct BasicInfoView: View {
             Text("Add a photo to make your account more personal. You can change this later in settings.")
                 .font(GMFont.caption)
                 .foregroundColor(GM.textSecondary)
-            PhotosPicker(selection: $photoItem, allowedContentTypes: [.image]) {
+            PhotosPicker(selection: $photoItem, allowedContentTypes: [UTType.image]) {
                 Text(photoData == nil ? "Choose Photo" : "Change Photo")
                     .font(GMFont.captionMedium)
                     .foregroundColor(GM.primarySolid)
