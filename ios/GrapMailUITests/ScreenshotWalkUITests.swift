@@ -22,9 +22,21 @@ final class ScreenshotWalkUITests: XCTestCase {
     }
 
     /// Wait for an element and fail with its name if it never appears.
+    /// On failure, dump the visible static texts and fields first — CI logs
+    /// are the only place to see WHICH screen the walk actually reached
+    /// (the 'missing: field yourname' failure was undiagnosable from the
+    /// bare assertion alone).
     @discardableResult
     private func require(_ element: XCUIElement, _ what: String, timeout: TimeInterval = 6) -> XCUIElement {
-        XCTAssertTrue(element.waitForExistence(timeout: timeout), "missing: \(what)")
+        if !element.waitForExistence(timeout: timeout) {
+            let texts = app.staticTexts.allElementsBoundByIndex.map { $0.label }
+            let fields = app.textFields.allElementsBoundByIndex.map { $0.label }
+            let secure = app.secureTextFields.allElementsBoundByIndex.count
+            let buttons = app.buttons.allElementsBoundByIndex.map { $0.label }
+            print("WALK-FAIL \(what) | texts: \(texts) | fields: \(fields) | secureCount: \(secure) | buttons: \(buttons)")
+            snap("fail-\(what.replacingOccurrences(of: " ", with: "-"))")
+        }
+        XCTAssertTrue(element.waitForExistence(timeout: 1), "missing: \(what)")
         return element
     }
 
@@ -37,6 +49,22 @@ final class ScreenshotWalkUITests: XCTestCase {
         tap(field, "field \(identifier)")
         field.typeText(value)
         if app.keyboards.buttons["return"].exists { app.keyboards.buttons["return"].tap() }
+        // Terminal fields close the keyboard on return themselves; if it
+        // somehow stays up, resign focus on an inert tap before returning.
+        inertDismiss()
+    }
+
+    /// Last-resort keyboard resignation that never touches a control: the
+    /// CREATE ACCOUNT header band is inert static text on every wizard step,
+    /// so tapping it can't advance the walk or toggle anything the way a
+    /// blind 'Next' tap under the keyboard did ('missing: field yourname').
+    private func inertDismiss() {
+        guard app.keyboards.count > 0 else { return }
+        tap(app.staticTexts["CREATE ACCOUNT"].firstMatch, "inert header band (keyboard dismiss)", timeout: 3)
+        let deadline = Date().addingTimeInterval(2)
+        while app.keyboards.count > 0 && Date() < deadline {
+            usleep(100_000)
+        }
     }
 
     func testSignupWalkScreenshots() {
@@ -56,7 +84,10 @@ final class ScreenshotWalkUITests: XCTestCase {
         // Step 2 — basic info: menu pickers + gender chip
         require(app.staticTexts["Basic Info"].firstMatch, "Step 2 header")
         // All three picks are index 1 — the panel's first item — at one shared
-        // offset: January 1, 2013 is a valid 13-year-old date.
+        // offset: January 1, 2013 is a valid 13-year-old date. pickInline
+        // asserts the row label changed: a missed geometry tap used to leave
+        // the birthday empty, Next silently disabled (GradientButton guards
+        // its action), and the walk died two steps later on 'yourname'.
         pickInline("Month", "January")
         pickInline("Day", "1")
         pickInline("Year", "2013")
@@ -65,14 +96,18 @@ final class ScreenshotWalkUITests: XCTestCase {
         tap(app.buttons["Next"].firstMatch, "Next (step 2)")
 
         // Step 3 — address (custom unique handle)
+        require(app.staticTexts["Choose your GrapMail address"].firstMatch, "Step 3 header", timeout: 10)
         typeIntoTextField("yourname", "e2eios" + String(Int(Date().timeIntervalSince1970) % 1000000))
         sleep(3) // live availability check
         snap("04-step3-address-light")
         tap(app.buttons["Next"].firstMatch, "Next (step 3)", timeout: 10)
 
-        // Step 4 — password
+        // Step 4 — password. SecureField has no onSubmit hook, so the
+        // keyboard can't be closed from the app side here; resign focus on
+        // the inert 'Password *' label before reaching for 'Next'.
         typeIntoSecureField("Create a strong password", "Grapmail#e2e2026")
         typeIntoSecureField("Re-enter your password", "Grapmail#e2e2026")
+        inertDismiss()
         snap("05-step4-password-light")
         tap(app.buttons["Next"].firstMatch, "Next (step 4)")
 
@@ -133,6 +168,9 @@ final class ScreenshotWalkUITests: XCTestCase {
         let of = opt.frame
         app.coordinate(withNormalizedOffset: .zero)
             .withOffset(CGVector(dx: of.midX, dy: of.midY)).tap()
+        // The pick must land: the closed row re-labels to the chosen option.
+        let picked = row.waitForExistence(timeout: 3) && row.label == option
+        XCTAssertTrue(picked, "picker \(placeholder) still shows '\(row.label)' after tapping \(option)")
         sleep(1)
     }
 

@@ -41,6 +41,7 @@ jobs:
             -resultBundlePath walk.xcresult
 
       - name: Export screenshots from the result bundle
+        if: always()
         run: |
           mkdir -p screenshots
           xcrun xcresulttool export attachments \

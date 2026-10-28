@@ -52,7 +52,8 @@ struct NameStepView: View {
                         AppTextField(
                             value: Binding(get: { model.state.lastName }, set: { newValue in model.update { $0.lastName = newValue } }),
                             hint: "Enter your last name",
-                            leadingIcon: "person"
+                            leadingIcon: "person",
+                            dismissOnReturn: true
                         )
                         if let lastError {
                             FieldErrorRow(text: lastError)
@@ -388,7 +389,8 @@ struct AddressStepView: View {
                     HStack(spacing: 8) {
                         AppTextField(
                             value: Binding(get: { model.state.customHandle }, set: model.onCustomHandleChange),
-                            hint: "yourname"
+                            hint: "yourname",
+                            dismissOnReturn: true
                         )
                         // The design's bordered domain chip with a chevron —
                         // the backend serves one domain today, so the menu

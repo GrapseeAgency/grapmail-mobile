@@ -175,6 +175,11 @@ struct AppTextField: View {
     var isPassword: Bool = false
     var keyboardType: UIKeyboardType = .default
     var leadingIcon: String? = nil
+    // Step-terminal fields pass true: return closes the keyboard instead of
+    // jumping focus. Without it return only cycles focus between the step's
+    // fields, the keyboard stays up, and the fixed wizard Next bar sits
+    // hidden underneath (CI walk: 'missing: field yourname').
+    var dismissOnReturn: Bool = false
 
     @State private var visible = false // passwords start hidden, like the design's dots
     @FocusState private var focused: Bool
@@ -204,6 +209,7 @@ struct AppTextField: View {
                         .keyboardType(keyboardType)
                         .autocorrectionDisabled()
                         .textInputAutocapitalization(.never)
+                        .onSubmit { if dismissOnReturn { focused = false } }
                 }
             }
             if isPassword {
