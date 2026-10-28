@@ -119,7 +119,13 @@ final class ScreenshotWalkUITests: XCTestCase {
         termsCard.swipeUp(velocity: .fast)
         termsCard.swipeUp(velocity: .fast)
         termsCard.swipeUp(velocity: .fast)
-        let agree = app.staticTexts["I agree to the "].firstMatch
+        // The agree line is a CONCATENATED Text ("I agree to the " +
+        // "Terms of Service" + " and " + "Privacy Policy"), which SwiftUI
+        // exposes as ONE static text whose label is the whole sentence - so
+        // an exact "I agree to the " query never matched (the 'missing: Agree
+        // card' failure). Match on the stable prefix.
+        let agree = app.staticTexts.matching(
+            NSPredicate(format: "label CONTAINS %@", "I agree to the")).firstMatch
         tap(agree, "Agree card")
         snap("06-step5-terms-light")
         tap(app.buttons["Create Account"].firstMatch, "Create Account (terms)", timeout: 4)
