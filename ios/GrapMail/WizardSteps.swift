@@ -120,7 +120,16 @@ struct BasicInfoView: View {
             subtitle: Text("Tell us a little more about yourself. This helps us make your experience more personal."),
             onBack: onBack,
             onSignIn: onSignIn,
-            bodyContent: {
+            bodyContent: { basicInfoContent },
+            bottom: { basicInfoBottom }
+        )
+    }
+
+    // Extracted from `body` into its own @ViewBuilder: the whole wizard body as
+    // one expression is past the point the Swift type-checker resolves in
+    // reasonable time. Splitting the content and the footer into separate units
+    // keeps the rendered output identical while making each inferable.
+    @ViewBuilder private var basicInfoContent: some View {
                 // Profile Photo card
                 HStack(alignment: .top, spacing: 16) {
                     ZStack(alignment: .bottomTrailing) {
@@ -247,8 +256,9 @@ struct BasicInfoView: View {
                     }
                 }
                 .padding(.top, 10)
-            },
-            bottom: {
+    }
+
+    private var basicInfoBottom: some View {
                 GradientButton(
                     title: "Next",
                     enabled: birthday.iso != nil && birthday.error == nil,
@@ -262,8 +272,6 @@ struct BasicInfoView: View {
                     model.update { $0.birthdayIso = b.iso }
                     if b.iso != nil && b.error == nil { onNext() }
                 }
-            }
-        )
     }
 
     private func genderCard(_ label: String, _ icon: String) -> some View {
