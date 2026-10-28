@@ -226,7 +226,15 @@ struct TwoFactorEnableView: View {
 private struct NeedRow: View {
     let icon: String
     let title: String
-    let body: String
+    let detail: String
+    // The stored line is named `detail`, not `body`: a `body` property would
+    // collide with SwiftUI's required `var body`. The initializer keeps the
+    // external `body:` label so every call site is unchanged.
+    init(icon: String, title: String, body: String) {
+        self.icon = icon
+        self.title = title
+        self.detail = body
+    }
 
     var body: some View {
         HStack(alignment: .top, spacing: 10) {
@@ -236,7 +244,7 @@ private struct NeedRow: View {
                 .padding(.top, 2)
             VStack(alignment: .leading, spacing: 1) {
                 Text(title).font(.system(size: 13, weight: .semibold)).foregroundColor(GM.textPrimary)
-                Text(body).font(.system(size: 12)).foregroundColor(GM.textSecondary)
+                Text(detail).font(.system(size: 12)).foregroundColor(GM.textSecondary)
             }
             Spacer(minLength: 0)
         }

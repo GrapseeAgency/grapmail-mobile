@@ -332,8 +332,16 @@ struct FooterNote: View {
 /// The "What's happening?" card.
 struct InfoPanel<Icon: View>: View {
     let title: String
-    let body: String
-    @ViewBuilder let icon: () -> Icon
+    let detail: String
+    let icon: () -> Icon
+    // The stored line is `detail`, not `body`: a `body` property collides with
+    // SwiftUI's required `var body`. The initializer keeps the external `body:`
+    // label (and the trailing-closure `icon:`) so every call site is unchanged.
+    init(title: String, body: String, @ViewBuilder icon: @escaping () -> Icon) {
+        self.title = title
+        self.detail = body
+        self.icon = icon
+    }
 
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
@@ -344,7 +352,7 @@ struct InfoPanel<Icon: View>: View {
                 Text(title)
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundColor(GM.textPrimary)
-                Text(body)
+                Text(detail)
                     .font(.system(size: 13))
                     .lineSpacing(3)
                     .foregroundColor(GM.textSecondary)
