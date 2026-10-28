@@ -1,5 +1,6 @@
 import SwiftUI
 import PhotosUI
+import UniformTypeIdentifiers
 
 // MARK: - Step 1 · Name — founder design verbatim
 
