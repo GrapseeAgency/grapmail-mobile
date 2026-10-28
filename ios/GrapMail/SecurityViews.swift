@@ -102,7 +102,7 @@ struct AccountSecurityView: View {
                 chipTone: twoFactorOn ? .success : .warning,
                 isOn: twoFactorOn && !loading && !failed,
                 enabled: !loading && !failed,
-                onToggle: { twoFactorOn ? onDisableTwoFactor() : onTwoFactor() }
+                onToggle: { _ in twoFactorOn ? onDisableTwoFactor() : onTwoFactor() }
             )
             SecurityDivider()
             SecurityRowView(
@@ -431,13 +431,15 @@ struct VerifyPhoneView: View {
                                 // it. Clearing only the proof the branch named left a
                                 // dead enable-2fa token that the next retry re-sent and
                                 // failed identically. Clear both and route back to the
-                                // step that mints a fresh one.
-                                if case let .http(_, code, _) = apiError, code == "PROOF_REQUIRED" {
+                                // step that mints a fresh one. The error-code binding is
+                                // named `errCode`, not `code`, so it does not shadow the
+                                // view's `code` state that the retry below clears.
+                                if case let .http(_, errCode, _) = apiError, errCode == "PROOF_REQUIRED" {
                                     needsProof = true
                                     SecurityFlow.enableProof = nil
                                     SecurityFlow.phoneProof = nil
                                 }
-                                if case let .http(_, code, _) = apiError, code == "PHONE_PROOF_REQUIRED" {
+                                if case let .http(_, errCode, _) = apiError, errCode == "PHONE_PROOF_REQUIRED" {
                                     needsProof = true
                                     challengeId = nil
                                     code = ""
