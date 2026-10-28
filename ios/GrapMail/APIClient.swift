@@ -15,7 +15,10 @@ import UIKit
 /// Android's lenient behavior.
 extension KeyedDecodingContainer {
     func lenient<T: Decodable>(_ key: K, _ def: T) -> T {
-        if let v = try? decodeIfPresent(T.self, forKey: key), let v { return v }
+        // `try?` of `decodeIfPresent` (which returns T? and throws) flattens to
+        // T?: nil covers both "key absent / null" and "threw", so one binding
+        // is enough — a second `let v` fails to compile (v is already T).
+        if let v = try? decodeIfPresent(T.self, forKey: key) { return v }
         return def
     }
     func lenientOpt<T: Decodable>(_ key: K) -> T? {
