@@ -1,6 +1,28 @@
 import Foundation
 import UIKit
 
+/// Lenient decoding helpers.
+///
+/// Swift's synthesized `Decodable` throws `keyNotFound` for a missing key even
+/// when the property has a `= default` — a default is NOT consulted during
+/// decoding. The GrapMail account backend (a different service than the web
+/// API) omits optional-in-practice fields per endpoint, which Android's
+/// kotlinx handles by applying the default but iOS turned into a hard decode
+/// failure: the sign-in and every security screen's fetch reported "Unexpected
+/// server response" / "couldn't load" and the 2FA toggle stayed disabled.
+/// These helpers decode each field with `decodeIfPresent` + the default, so a
+/// missing key yields the default instead of throwing — iOS parity with
+/// Android's lenient behavior.
+extension KeyedDecodingContainer {
+    func lenient<T: Decodable>(_ key: K, _ def: T) -> T {
+        if let v = try? decodeIfPresent(T.self, forKey: key), let v { return v }
+        return def
+    }
+    func lenientOpt<T: Decodable>(_ key: K) -> T? {
+        (try? decodeIfPresent(T.self, forKey: key)) ?? nil
+    }
+}
+
 /// The real GrapMail account API — the same contract the website uses,
 /// served at https://grapsee.com/api. Verified live before this client was
 /// written. No mocks anywhere in this file.
@@ -219,6 +241,25 @@ struct ProfileDto: Codable {
     var backupCodesRemaining = 0
     var passwordChangedAt: String?
     var createdAt: String?
+
+    private enum CodingKeys: String, CodingKey {
+        case id, name, address, handle, phone, twoFactor, twoFactorEnabled,
+             twoFactorEnabledAt, backupCodesRemaining, passwordChangedAt, createdAt
+    }
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = c.lenient(.id, "")
+        name = c.lenient(.name, "")
+        address = c.lenient(.address, "")
+        handle = c.lenient(.handle, "")
+        phone = c.lenientOpt(.phone)
+        twoFactor = c.lenient(.twoFactor, "off")
+        twoFactorEnabled = c.lenient(.twoFactorEnabled, false)
+        twoFactorEnabledAt = c.lenientOpt(.twoFactorEnabledAt)
+        backupCodesRemaining = c.lenient(.backupCodesRemaining, 0)
+        passwordChangedAt = c.lenientOpt(.passwordChangedAt)
+        createdAt = c.lenientOpt(.createdAt)
+    }
 }
 
 struct ProfileResponse: Codable {
@@ -235,6 +276,23 @@ struct ProfileResponse: Codable {
     var message: String?
     var error: String?
     var code: String?
+
+    private enum CodingKeys: String, CodingKey {
+        case success, profile, proof, newBackupCodes, accessToken, tokenExpiresAt,
+             message, error, code
+    }
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        success = c.lenient(.success, false)
+        profile = c.lenientOpt(.profile)
+        proof = c.lenientOpt(.proof)
+        newBackupCodes = c.lenientOpt(.newBackupCodes)
+        accessToken = c.lenientOpt(.accessToken)
+        tokenExpiresAt = c.lenientOpt(.tokenExpiresAt)
+        message = c.lenientOpt(.message)
+        error = c.lenientOpt(.error)
+        code = c.lenientOpt(.code)
+    }
 }
 
 struct SessionDto: Codable, Identifiable {
@@ -248,6 +306,21 @@ struct SessionDto: Codable, Identifiable {
     var createdAt = ""
     var lastSeenAt = ""
     var current = false
+
+    private enum CodingKeys: String, CodingKey {
+        case id, device, browser, deviceId, ip, createdAt, lastSeenAt, current
+    }
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = c.lenient(.id, "")
+        device = c.lenient(.device, "")
+        browser = c.lenient(.browser, "")
+        deviceId = c.lenient(.deviceId, "")
+        ip = c.lenient(.ip, "")
+        createdAt = c.lenient(.createdAt, "")
+        lastSeenAt = c.lenient(.lastSeenAt, "")
+        current = c.lenient(.current, false)
+    }
 }
 
 struct SessionsResponse: Codable {
@@ -257,6 +330,18 @@ struct SessionsResponse: Codable {
     /// True total active sessions, correct even when the list is one page.
     var activeCount = 0
     var error: String?
+
+    private enum CodingKeys: String, CodingKey {
+        case success, sessions, count, activeCount, error
+    }
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        success = c.lenient(.success, false)
+        sessions = c.lenient(.sessions, [])
+        count = c.lenient(.count, 0)
+        activeCount = c.lenient(.activeCount, 0)
+        error = c.lenientOpt(.error)
+    }
 }
 
 struct ActivityDto: Codable, Identifiable {
@@ -269,6 +354,22 @@ struct ActivityDto: Codable, Identifiable {
     var ip = ""
     var severity = "info"
     var detail = ""
+
+    private enum CodingKeys: String, CodingKey {
+        case id, type, at, device, browser, deviceId, ip, severity, detail
+    }
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = c.lenient(.id, "")
+        type = c.lenient(.type, "")
+        at = c.lenient(.at, "")
+        device = c.lenient(.device, "")
+        browser = c.lenient(.browser, "")
+        deviceId = c.lenient(.deviceId, "")
+        ip = c.lenient(.ip, "")
+        severity = c.lenient(.severity, "info")
+        detail = c.lenient(.detail, "")
+    }
 }
 
 struct ActivityResponse: Codable {
@@ -278,6 +379,18 @@ struct ActivityResponse: Codable {
     /// The exact sign-in the server flagged, so the alert screens read it rather than re-pick one.
     var suspiciousEvent: ActivityDto?
     var error: String?
+
+    private enum CodingKeys: String, CodingKey {
+        case success, events, suspicious, suspiciousEvent, error
+    }
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        success = c.lenient(.success, false)
+        events = c.lenient(.events, [])
+        suspicious = c.lenient(.suspicious, false)
+        suspiciousEvent = c.lenientOpt(.suspiciousEvent)
+        error = c.lenientOpt(.error)
+    }
 }
 
 private struct TwoFactorEnableRequest: Codable { var twoFactor: String; var proof: String; var phoneProof: String }
