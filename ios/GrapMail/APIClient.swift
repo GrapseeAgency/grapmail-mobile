@@ -81,9 +81,17 @@ struct SignInResponse: Codable {
     var token: String?
     var expiresAt: Int?
     var account: AccountDto?
-    var requireOtp: Bool = false
+    // The live /auth/account/signin envelope is
+    // { success, message, accessToken, refreshToken, expiresIn, suspicious, user }
+    // — it carries neither requireOtp nor delivered. Swift's synthesized
+    // Decodable throws keyNotFound for a missing NON-optional field (a `= false`
+    // default is not applied during decoding), so these must be Optional or the
+    // whole response fails to decode and sign-in reports 'Unexpected server
+    // response'. Android's kotlinx applies the default for a missing key, which
+    // is why only iOS broke. Optional + `?? false` at the call sites is parity.
+    var requireOtp: Bool?
     var challengeId: String?
-    var delivered: Bool = false
+    var delivered: Bool?
     var backupCodesRemaining: Int?
     var message: String?
     var error: String?

@@ -127,7 +127,7 @@ struct SignInView: View {
                     identifier: identifier.trimmingCharacters(in: .whitespaces),
                     password: password
                 )
-                if resp.requireOtp, let cid = resp.challengeId {
+                if resp.requireOtp == true, let cid = resp.challengeId {
                     model.identifier = identifier.trimmingCharacters(in: .whitespaces)
                     model.password = password
                     model.challengeId = cid
@@ -278,7 +278,7 @@ struct TwoFactorView: View {
             defer { resending = false }
             do {
                 let resp = try await ApiClient.signIn(identifier: model.identifier, password: model.password)
-                if resp.requireOtp, let cid = resp.challengeId {
+                if resp.requireOtp == true, let cid = resp.challengeId {
                     code = ""
                     model.challengeId = cid
                     model.expiresAt = resp.expiresAt.map { Date(timeIntervalSince1970: TimeInterval($0) / 1000) }
