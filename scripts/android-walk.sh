@@ -164,18 +164,28 @@ echo "· security sector — every hub screen, read-only"
 must_tap "Account security"
 must "hub opens" wait_nodes "n.get('text','')=='Account Security'" >/dev/null
 shot 20-sec-hub-light
-sec_visit() { # sec_visit <hub row text> <shot name>
-  must_tap "$1"; sleep 2; shot "$2"; adb shell input keyevent 4; sleep 1.5
+# sec_visit <hub row text> <shot name>: open a clickable hub row, photograph
+# the screen, and press back ONLY if the tap actually navigated (the hub
+# title is gone). A missed tap that leaves us on the hub must not back out of
+# the hub itself — that is what derailed the first security leg.
+sec_visit() {
+  must_tap "$1"; sleep 2; shot "$2"
+  if [ -z "$(find_nodes "n.get('text','')=='Account Security'")" ]; then
+    adb shell input keyevent 4; sleep 1.5
+  fi
 }
-sec_visit "Two-Step Verification" 21-sec-2fa-enable-light
+# The Two-Step row's only interactive element is the Switch (Compose exposes
+# it as a checkable node; the title text is NOT clickable), so tap the switch
+# directly — tapping the text no-ops and the next back would pop the hub.
+must "tap 2FA switch" tap_xy "$(wait_nodes "n.get('checkable','')=='true'" | head -1)"
+sleep 2; shot 21-sec-2fa-enable-light
+if [ -z "$(find_nodes "n.get('text','')=='Account Security'")" ]; then adb shell input keyevent 4; sleep 1.5; fi
 sec_visit "Change Password" 22-sec-change-password-light
 sec_visit "Backup Codes" 23-sec-backup-codes-light
 sec_visit "Active Sessions" 24-sec-sessions-light
 sec_visit "Recent Security Activity" 25-sec-activity-light
 sec_visit "Sign Out All Devices" 26-sec-signout-all-light
 # back out of the hub to the signed-in home, where the restore leg starts
-# (the pipe lives INSIDE the command substitution — `must cmd >/dev/null`
-# would run must in a subshell and lose the FAILURES counter)
 must "hub back tap" tap_xy "$(wait_nodes "n.get('content-desc','')=='Back'" | head -1)"
 sleep 2
 must "home after security" wait_nodes "n.get('text','')=='Signed in'" >/dev/null
