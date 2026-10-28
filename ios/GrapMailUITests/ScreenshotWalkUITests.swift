@@ -170,12 +170,17 @@ final class ScreenshotWalkUITests: XCTestCase {
         snap("11-signin-light")
     }
 
-    /// Inline picker by geometry: open the panel, then tap the option at its
-    /// deterministic offset from the row (item height 44pt, panel gap 4pt).
-    /// Element queries inside the clipped animated panel are unreliable for
-    /// XCUITest; geometry is not.
+    /// Open an inline picker and choose `option` (always the panel's first
+    /// item: January / 1 / 2013 = a valid 13-year-old date). Tap the option
+    /// ELEMENT, not a measured coordinate: the option lives in a clipped
+    /// animated ScrollView, and a coordinate tap taken from `opt.frame`
+    /// landed just outside the clip and never selected (the walk stalled at
+    /// step 2 with an empty birthday, disabling 'Next'). XCUITest's element
+    /// tap scrolls the option into the clip and hits its real center. A
+    /// coordinate tap is kept only as a fallback, and the pick is verified
+    /// by the row re-labelling to the chosen option.
     private func pickInline(_ placeholder: String, _ option: String) {
-        app.swipeDown() // page to top — stable frames, no drift between measure and tap
+        app.swipeDown() // page to top — stable frames, no drift between taps
         sleep(1)
         let row = app.buttons[placeholder].firstMatch
         tap(row, "picker \(placeholder)")
@@ -183,10 +188,13 @@ final class ScreenshotWalkUITests: XCTestCase {
         sleep(1) // panel expansion settles
         let opt = app.buttons[option].firstMatch
         require(opt, "option \(option) in \(placeholder) panel", timeout: 4)
+        opt.tap()
+        if row.waitForExistence(timeout: 3), row.label == option { sleep(1); return }
+        // Fallback: re-measure and tap by coordinate (the panel may have
+        // re-laid-out after the first tap attempt).
         let of = opt.frame
         app.coordinate(withNormalizedOffset: .zero)
             .withOffset(CGVector(dx: of.midX, dy: of.midY)).tap()
-        // The pick must land: the closed row re-labels to the chosen option.
         let picked = row.waitForExistence(timeout: 3) && row.label == option
         XCTAssertTrue(picked, "picker \(placeholder) still shows '\(row.label)' after tapping \(option)")
         sleep(1)
