@@ -113,22 +113,23 @@ final class ScreenshotWalkUITests: XCTestCase {
         tap(app.buttons["Next"].firstMatch, "Next (step 4)")
 
         // Step 5 — terms: the gate is REAL scroll detection. The document is
-        // a fixed 300pt card with an inner ScrollView. Swiping the TEXT
-        // element scrolls "1. Your Account" out of the clip, and the next
-        // element-swipe then re-scrolls the OUTER page to find it again
-        // (undoing the progress), so the bottom is never reached and the
-        // agree checkbox stays disabled. Drag a FIXED screen region inside
-        // the card instead — the card never moves, only its content does.
+        // a fixed 300pt card with its OWN inner ScrollView. Swiping the text
+        // element or dragging a coordinate inside the card scrolls the OUTER
+        // WizardScaffold page instead of the inner doc, so scrolledToEnd
+        // never fires and the agree checkbox stays disabled. The reliable
+        // primitive is XCUIElement.swipeUp() on the inner ScrollView itself —
+        // identified as the only scroll view about 300pt tall (the outer page
+        // fills the screen). Repeat until the gate opens.
         let docHeader = app.staticTexts["GrapMail Terms of Service"].firstMatch
-        tap(docHeader, "Terms document", timeout: 8)
-        let hf = docHeader.frame
-        let dragFrom = app.coordinate(withNormalizedOffset: .zero)
-            .withOffset(CGVector(dx: hf.midX, dy: hf.minY + 240))
-        let dragTo = app.coordinate(withNormalizedOffset: .zero)
-            .withOffset(CGVector(dx: hf.midX, dy: hf.minY + 40))
-        for _ in 1...6 {
-            dragFrom.press(forDuration: 0.1, thenDragTo: dragTo)
-            usleep(300_000)
+        require(docHeader, "Terms document", timeout: 8)
+        let docScroll = app.scrollViews.allElementsBoundByIndex.first { $0.frame.height < 340 }
+        XCTAssertNotNil(docScroll, "terms document inner ScrollView not found")
+        let create = app.buttons["Create Account"].firstMatch
+        require(create, "Create Account (terms)", timeout: 6)
+        for _ in 1..<8 {
+            if create.isEnabled { break }
+            docScroll?.swipeUp(velocity: .slow)
+            usleep(500_000)
         }
         sleep(1)
         // The agree line is a CONCATENATED Text ("I agree to the " +
@@ -143,9 +144,8 @@ final class ScreenshotWalkUITests: XCTestCase {
         // the gate opened by the Create Account button becoming enabled before
         // tapping it, so a stuck scroll fails HERE with a clear reason rather
         // than two steps later as 'missing: Human verification'.
-        let create = app.buttons["Create Account"].firstMatch
-        require(create, "Create Account (terms)", timeout: 4)
-        XCTAssertTrue(create.isEnabled, "Create Account still disabled — the agree gate never opened")
+        XCTAssertTrue(create.waitForExistence(timeout: 4) && create.isEnabled,
+                      "Create Account still disabled — the agree gate never opened (scrolledToEnd false)")
         snap("06-step5-terms-light")
         create.tap()
 
