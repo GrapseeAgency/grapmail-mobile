@@ -136,61 +136,74 @@ struct BasicInfoView: View {
     }
 
     @ViewBuilder private var photoCard: some View {
-                // Profile Photo card
                 HStack(alignment: .top, spacing: 16) {
-                    ZStack(alignment: .bottomTrailing) {
-                        Circle()
-                            .fill(GM.softFill)
-                            .frame(width: 72, height: 72)
-                            .overlay(
-                                Group {
-                                    if let photoData, let ui = UIImage(data: photoData) {
-                                        Image(uiImage: ui)
-                                            .resizable()
-                                            .aspectRatio(contentMode: .fill)
-                                    } else {
-                                        Image(systemName: "person.fill")
-                                            .font(.system(size: 30))
-                                            .foregroundColor(Color(0x8FA8E8))
-                                    }
-                                }
-                            )
-                            .clipShape(Circle())
-                        Circle()
-                            .fill(GM.primarySolid)
-                            .frame(width: 26, height: 26)
-                            .overlay(
-                                Image(systemName: "camera.fill")
-                                    .font(.system(size: 11))
-                                    .foregroundColor(.white)
-                            )
-                    }
-                    VStack(alignment: .leading, spacing: 4) {
-                        (Text("Profile Photo ").font(.system(size: 15, weight: .semibold)).foregroundColor(GM.textPrimary)
-                         + Text("(Optional)").font(.system(size: 13)).foregroundColor(GM.textTertiary))
-                        Text("Add a photo to make your account more personal. You can change this later in settings.")
-                            .font(GMFont.caption)
-                            .foregroundColor(GM.textSecondary)
-                        PhotosPicker(selection: $photoItem, allowedContentTypes: .images) {
-                            Text(photoData == nil ? "Choose Photo" : "Change Photo")
-                                .font(GMFont.captionMedium)
-                                .foregroundColor(GM.primarySolid)
-                                .padding(.horizontal, 14)
-                                .padding(.vertical, 8)
-                                .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(GM.border))
-                        }
-                        .buttonStyle(.plain)
-                        .onChange(of: photoItem) { item in
-                            Task {
-                                if let item { photoData = try? await item.loadTransferable(type: Data.self) }
-                            }
-                        }
-                        .padding(.top, 8)
-                    }
+                    photoAvatar
+                    photoCopy
                 }
                 .padding(16)
                 .overlay(RoundedRectangle(cornerRadius: GMShape.card).strokeBorder(GM.border))
                 .padding(.top, 4)
+    }
+
+    private var photoAvatar: some View {
+        ZStack(alignment: .bottomTrailing) {
+            Circle()
+                .fill(GM.softFill)
+                .frame(width: 72, height: 72)
+                .overlay(
+                    Group {
+                        if let photoData, let ui = UIImage(data: photoData) {
+                            Image(uiImage: ui)
+                                .resizable()
+                                .aspectRatio(contentMode: .fill)
+                        } else {
+                            Image(systemName: "person.fill")
+                                .font(.system(size: 30))
+                                .foregroundColor(Color(0x8FA8E8))
+                        }
+                    }
+                )
+                .clipShape(Circle())
+            Circle()
+                .fill(GM.primarySolid)
+                .frame(width: 26, height: 26)
+                .overlay(
+                    Image(systemName: "camera.fill")
+                        .font(.system(size: 11))
+                        .foregroundColor(.white)
+                )
+        }
+    }
+
+    // The `Text + Text` concatenation is its own typed property: inline in the
+    // VStack it is the expression the type-checker cannot resolve in time.
+    private var photoTitle: Text {
+        Text("Profile Photo ").font(.system(size: 15, weight: .semibold)).foregroundColor(GM.textPrimary)
+        + Text("(Optional)").font(.system(size: 13)).foregroundColor(GM.textTertiary)
+    }
+
+    @ViewBuilder private var photoCopy: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            photoTitle
+            Text("Add a photo to make your account more personal. You can change this later in settings.")
+                .font(GMFont.caption)
+                .foregroundColor(GM.textSecondary)
+            PhotosPicker(selection: $photoItem, allowedContentTypes: .images) {
+                Text(photoData == nil ? "Choose Photo" : "Change Photo")
+                    .font(GMFont.captionMedium)
+                    .foregroundColor(GM.primarySolid)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 8)
+                    .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(GM.border))
+            }
+            .buttonStyle(.plain)
+            .onChange(of: photoItem) { item in
+                Task {
+                    if let item { photoData = try? await item.loadTransferable(type: Data.self) }
+                }
+            }
+            .padding(.top, 8)
+        }
     }
 
     @ViewBuilder private var birthdaySection: some View {
