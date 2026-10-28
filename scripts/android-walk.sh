@@ -156,6 +156,30 @@ shot 09-created-b-light
 must_tap "Go to Mailbox"
 sleep 2
 
+echo "· security sector — every hub screen, read-only"
+# Mirrors the iOS walk's security leg: open each hub row, photograph the
+# screen, press system back. No destructive submits — no password change,
+# no revoke, no sign-out-all — the account must survive the walk.
+# (2FA on a fresh account: the hub's toggle routes into the ENABLE flow.)
+must_tap "Account security"
+must "hub opens" wait_nodes "n.get('text','')=='Account Security'" >/dev/null
+shot 20-sec-hub-light
+sec_visit() { # sec_visit <hub row text> <shot name>
+  must_tap "$1"; sleep 2; shot "$2"; adb shell input keyevent 4; sleep 1.5
+}
+sec_visit "Two-Step Verification" 21-sec-2fa-enable-light
+sec_visit "Change Password" 22-sec-change-password-light
+sec_visit "Backup Codes" 23-sec-backup-codes-light
+sec_visit "Active Sessions" 24-sec-sessions-light
+sec_visit "Recent Security Activity" 25-sec-activity-light
+sec_visit "Sign Out All Devices" 26-sec-signout-all-light
+# back out of the hub to the signed-in home, where the restore leg starts
+# (the pipe lives INSIDE the command substitution — `must cmd >/dev/null`
+# would run must in a subshell and lose the FAILURES counter)
+must "hub back tap" tap_xy "$(wait_nodes "n.get('content-desc','')=='Back'" | head -1)"
+sleep 2
+must "home after security" wait_nodes "n.get('text','')=='Signed in'" >/dev/null
+
 echo "· session restore: restart must open signed-in, not at welcome"
 adb shell am force-stop "$PKG"
 sleep 1
@@ -202,6 +226,9 @@ fi
 for want in 01-welcome-light 02-step1-name-light 03-step2-basicinfo-light \
             04-step3-address-light 05-step4-password-light 06-step5-terms-light \
             07-human-verify-light 08-created-a-light 09-created-b-light \
+            20-sec-hub-light 21-sec-2fa-enable-light 22-sec-change-password-light \
+            23-sec-backup-codes-light 24-sec-sessions-light 25-sec-activity-light \
+            26-sec-signout-all-light \
             10-session-restored 11-signin-light 12-welcome-dark 13-step1-name-dark; do
   [ -s "$OUT/$want.png" ] || { echo "FAIL: missing $want.png" >&2; FAILURES=$((FAILURES + 1)); }
 done
