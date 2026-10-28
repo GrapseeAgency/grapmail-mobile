@@ -176,28 +176,26 @@ final class ScreenshotWalkUITests: XCTestCase {
     /// animated ScrollView, and a coordinate tap taken from `opt.frame`
     /// landed just outside the clip and never selected (the walk stalled at
     /// step 2 with an empty birthday, disabling 'Next'). XCUITest's element
-    /// tap scrolls the option into the clip and hits its real center. A
-    /// coordinate tap is kept only as a fallback, and the pick is verified
-    /// by the row re-labelling to the chosen option.
+    /// tap hits the option's real center and closes the panel.
+    ///
+    /// The pick is NOT verified by re-reading the row: selecting an option
+    /// changes the row's label away from `placeholder`, which makes the
+    /// `buttons[placeholder]` query resolve to zero, and reading `.label` on
+    /// it throws 'No matches found for ... IN identifiers' (that throw, not a
+    /// real UI bug, failed the walk). Instead the whole birthday is proven
+    /// valid downstream: 'Next (step 2)' only enables when it is, and the
+    /// Step 3 header the walk requires right after is the pass/fail gate.
     private func pickInline(_ placeholder: String, _ option: String) {
         app.swipeDown() // page to top — stable frames, no drift between taps
         sleep(1)
         let row = app.buttons[placeholder].firstMatch
         tap(row, "picker \(placeholder)")
-        if row.label == option { return }
         sleep(1) // panel expansion settles
         let opt = app.buttons[option].firstMatch
-        require(opt, "option \(option) in \(placeholder) panel", timeout: 4)
-        opt.tap()
-        if row.waitForExistence(timeout: 3), row.label == option { sleep(1); return }
-        // Fallback: re-measure and tap by coordinate (the panel may have
-        // re-laid-out after the first tap attempt).
-        let of = opt.frame
-        app.coordinate(withNormalizedOffset: .zero)
-            .withOffset(CGVector(dx: of.midX, dy: of.midY)).tap()
-        let picked = row.waitForExistence(timeout: 3) && row.label == option
-        XCTAssertTrue(picked, "picker \(placeholder) still shows '\(row.label)' after tapping \(option)")
-        sleep(1)
+        // If the panel didn't open on the first row tap, tap once more.
+        if !opt.waitForExistence(timeout: 3) { tap(row, "re-open \(placeholder)") }
+        require(opt, "option \(option) in \(placeholder) panel", timeout: 4).tap()
+        sleep(1) // panel collapse settles before the next picker opens
     }
 
     /// Open one Account Security hub row, snapshot the screen it lands on,
