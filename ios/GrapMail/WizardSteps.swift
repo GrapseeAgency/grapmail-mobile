@@ -130,6 +130,12 @@ struct BasicInfoView: View {
     // reasonable time. Splitting the content and the footer into separate units
     // keeps the rendered output identical while making each inferable.
     @ViewBuilder private var basicInfoContent: some View {
+        photoCard
+        birthdaySection
+        genderSection
+    }
+
+    @ViewBuilder private var photoCard: some View {
                 // Profile Photo card
                 HStack(alignment: .top, spacing: 16) {
                     ZStack(alignment: .bottomTrailing) {
@@ -185,7 +191,9 @@ struct BasicInfoView: View {
                 .padding(16)
                 .overlay(RoundedRectangle(cornerRadius: GMShape.card).strokeBorder(GM.border))
                 .padding(.top, 4)
+    }
 
+    @ViewBuilder private var birthdaySection: some View {
                 // Birthday
                 HStack(spacing: 8) {
                     Image(systemName: "calendar")
@@ -232,7 +240,9 @@ struct BasicInfoView: View {
                     }
                     .padding(.top, 8)
                 }
+    }
 
+    @ViewBuilder private var genderSection: some View {
                 // Gender
                 HStack(spacing: 8) {
                     Image(systemName: "figure.dress.line.vertical.figure")
