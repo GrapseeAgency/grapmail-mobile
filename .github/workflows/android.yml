@@ -16,11 +16,14 @@ jobs:
       matrix:
         # "responsive no matter what size" is a release gate, not a hope:
         # the same density-aware walk must pass on a large phone, a small
-        # phone, and a tablet (520dp centering).
+        # phone, and a tablet (520dp centering). The small-phone slot was
+        # nexus_5, which the runner's current avdmanager rejects ("No device
+        # found matching --device nexus_5") — pixel_4a is the small phone in
+        # the pixel family that this SDK does ship (pixel_6/pixel_c prove it).
         include:
           - device: pixel_6
             api-level: 34
-          - device: nexus_5
+          - device: pixel_4a
             api-level: 34
           - device: pixel_c
             api-level: 34
@@ -62,7 +65,7 @@ jobs:
           target: google_apis
           profile: ${{ matrix.device }}
           emulator-boot-timeout: 900
-          disable animations: true
+          disable-animations: true
           emulator-options: -no-window -no-audio -no-boot-anim -gpu swiftshader_indirect -no-snapshot
           script: bash scripts/android-walk.sh android/app/build/outputs/apk/debug/app-debug.apk screenshots
 
