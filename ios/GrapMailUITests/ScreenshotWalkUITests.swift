@@ -112,13 +112,25 @@ final class ScreenshotWalkUITests: XCTestCase {
         snap("05-step4-password-light")
         tap(app.buttons["Next"].firstMatch, "Next (step 4)")
 
-        // Step 5 — terms: the gate is REAL scroll detection now — scroll the
-        // document to its bottom, then agree, then create.
-        let termsCard = app.staticTexts["1.  Your Account"]
-        tap(termsCard, "Terms document", timeout: 8)
-        termsCard.swipeUp(velocity: .fast)
-        termsCard.swipeUp(velocity: .fast)
-        termsCard.swipeUp(velocity: .fast)
+        // Step 5 — terms: the gate is REAL scroll detection. The document is
+        // a fixed 300pt card with an inner ScrollView. Swiping the TEXT
+        // element scrolls "1. Your Account" out of the clip, and the next
+        // element-swipe then re-scrolls the OUTER page to find it again
+        // (undoing the progress), so the bottom is never reached and the
+        // agree checkbox stays disabled. Drag a FIXED screen region inside
+        // the card instead — the card never moves, only its content does.
+        let docHeader = app.staticTexts["GrapMail Terms of Service"].firstMatch
+        tap(docHeader, "Terms document", timeout: 8)
+        let hf = docHeader.frame
+        let dragFrom = app.coordinate(withNormalizedOffset: .zero)
+            .withOffset(CGVector(dx: hf.midX, dy: hf.minY + 240))
+        let dragTo = app.coordinate(withNormalizedOffset: .zero)
+            .withOffset(CGVector(dx: hf.midX, dy: hf.minY + 40))
+        for _ in 1...6 {
+            dragFrom.press(forDuration: 0.1, thenDragTo: dragTo)
+            usleep(300_000)
+        }
+        sleep(1)
         // The agree line is a CONCATENATED Text ("I agree to the " +
         // "Terms of Service" + " and " + "Privacy Policy"), which SwiftUI
         // exposes as ONE static text whose label is the whole sentence - so
@@ -127,8 +139,15 @@ final class ScreenshotWalkUITests: XCTestCase {
         let agree = app.staticTexts.matching(
             NSPredicate(format: "label CONTAINS %@", "I agree to the")).firstMatch
         tap(agree, "Agree card")
+        // The tap only toggles once scrolledToEnd enabled the checkbox; prove
+        // the gate opened by the Create Account button becoming enabled before
+        // tapping it, so a stuck scroll fails HERE with a clear reason rather
+        // than two steps later as 'missing: Human verification'.
+        let create = app.buttons["Create Account"].firstMatch
+        require(create, "Create Account (terms)", timeout: 4)
+        XCTAssertTrue(create.isEnabled, "Create Account still disabled — the agree gate never opened")
         snap("06-step5-terms-light")
-        tap(app.buttons["Create Account"].firstMatch, "Create Account (terms)", timeout: 4)
+        create.tap()
 
         // Human verification — proof the whole gated flow above worked
         require(app.staticTexts["Just one more step!"].firstMatch, "Human verification", timeout: 25)
