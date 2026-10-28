@@ -164,7 +164,11 @@ struct SignInRequest: Codable {
     var password: String
 }
 
-struct SignInResponse: Codable {
+/// Decode-only. A response type never gets encoded, and it must not be
+/// `Codable` here: the synthesized `encode(to:)` walks every CodingKeys case
+/// and needs a stored property for each, so the alias keys below (`user`,
+/// `expiresIn`) break Encodable conformance for a type that only ever reads.
+struct SignInResponse: Decodable {
     var success: Bool = false
     var sessionToken: String?
     var accessToken: String?
@@ -242,7 +246,7 @@ struct TwoFactorRequest: Codable {
     var backupCode: String?
 }
 
-struct TwoFactorResponse: Codable {
+struct TwoFactorResponse: Decodable {
     var success: Bool = false
     var sessionToken: String?
     var accessToken: String?
@@ -467,7 +471,10 @@ struct ProfileDto: Codable {
     var address = ""
     var handle = ""
     var phone: String?
-    var twoFactor = "off"
+    /// The legacy form of the same answer, kept because it is what some
+    /// endpoints actually send. Optional: an absent string is no answer, and a
+    /// defaulted "off" would claim two-step is off when nothing was said.
+    var twoFactor: String?
     /// The server's own answer to "is the second factor on", so no client
     /// re-derives it. Optional on purpose: nil means the server did not answer,
     /// which the hub must show as "couldn't load" rather than as "Off" — a
@@ -480,6 +487,18 @@ struct ProfileDto: Codable {
     var passwordChangedAt: String?
     var createdAt: String?
 
+    /// The one verdict the hub acts on: the server's own flag when it sends
+    /// one, otherwise the legacy string read as a flag, otherwise nil — and
+    /// nil is the only case the hub is allowed to call unknown.
+    var twoFactorState: Bool? {
+        if let enabled = twoFactorEnabled { return enabled }
+        switch twoFactor?.lowercased() {
+        case "on", "true", "1", "enabled": return true
+        case "off", "false", "0", "disabled": return false
+        default: return nil
+        }
+    }
+
     private enum CodingKeys: String, CodingKey {
         case id, name, address, handle, phone, twoFactor, twoFactorEnabled,
              twoFactorEnabledAt, backupCodesRemaining, passwordChangedAt, createdAt
@@ -491,7 +510,7 @@ struct ProfileDto: Codable {
         address = c.lenient(.address, "")
         handle = c.lenient(.handle, "")
         phone = c.lenientOpt(.phone)
-        twoFactor = c.lenient(.twoFactor, "off")
+        twoFactor = c.lenientOpt(.twoFactor)
         twoFactorEnabled = c.lenientOpt(.twoFactorEnabled)
         twoFactorEnabledAt = c.lenientOpt(.twoFactorEnabledAt)
         backupCodesRemaining = c.lenientOpt(.backupCodesRemaining)
@@ -500,7 +519,7 @@ struct ProfileDto: Codable {
     }
 }
 
-struct ProfileResponse: Codable {
+struct ProfileResponse: Decodable {
     var success = false
     var profile: ProfileDto?
     /// Short-lived proof minted by verify-password for one dangerous action.

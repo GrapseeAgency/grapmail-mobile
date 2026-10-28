@@ -94,7 +94,7 @@ fun AccountSecurityScreen(
             // hub would claim "2FA off" for an account that may have it on — and
             // enable a toggle that routes into the ENABLE flow. The honest
             // "couldn't load" also leaves that toggle disabled.
-            if (loaded?.twoFactorEnabled == null) {
+            if (loaded?.twoFactorState == null) {
                 profile = null
                 failed = true
             } else {
@@ -107,7 +107,7 @@ fun AccountSecurityScreen(
         }
     }
 
-    val twoFactorOn = profile?.twoFactorEnabled == true
+    val twoFactorOn = profile?.twoFactorState == true
     val secure = twoFactorOn && !profile?.phone.isNullOrBlank()
 
     AccountScreen(

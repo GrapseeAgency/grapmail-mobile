@@ -56,11 +56,12 @@ jobs:
           # The export chain above never aborts (a failed test still has to
           # upload what it captured), so without this check the job could go
           # green on an empty artifact while claiming the sector was screened.
-          # The walk photographs 20+ screens; anything under 10 means it died
-          # early, and the run must not be read as a pass on screenshots.
+          # The walk photographs 30+ screens; anything under 20 means it died
+          # before the security sector, and the run must not be read as a pass
+          # on screenshots.
           COUNT="$(find screenshots -name '*.png' | wc -l | tr -d ' ')"
           echo "exported $COUNT screenshot attachment(s)"
-          if [ "$COUNT" -lt 10 ]; then
+          if [ "$COUNT" -lt 20 ]; then
             echo "::error::only $COUNT screenshots exported — the walk did not produce its set"
             exit 1
           fi

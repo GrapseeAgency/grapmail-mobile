@@ -41,7 +41,7 @@ struct AccountSecurityView: View {
             .padding(.bottom, 2)
     }
 
-    private var twoFactorOn: Bool { profile?.twoFactorEnabled ?? false }
+    private var twoFactorOn: Bool { profile?.twoFactorState ?? false }
     private var secure: Bool { twoFactorOn && !(profile?.phone ?? "").isEmpty }
 
     var body: some View {
@@ -175,13 +175,13 @@ struct AccountSecurityView: View {
             }
             do {
                 profile = try await ApiClient.profile(token: token).profile
-                // A profile that never answered the security verdict is not a
-                // loaded profile. Left alone, `twoFactorEnabled` would default
-                // to false and the hub would claim "2FA off" for an account that
-                // may have it on — and enable a toggle that routes into the
+                // A profile that never answered the security verdict — neither
+                // the flag nor the legacy string — is not a loaded profile.
+                // Left alone, the hub would claim "2FA off" for an account that
+                // may have it on, and enable a toggle that routes into the
                 // ENABLE flow. Show the honest "couldn't load" instead, which
                 // also leaves the toggle disabled rather than mis-informed.
-                if profile?.twoFactorEnabled == nil { profile = nil; failed = true }
+                if profile?.twoFactorState == nil { profile = nil; failed = true }
             } catch {
                 failed = true
             }

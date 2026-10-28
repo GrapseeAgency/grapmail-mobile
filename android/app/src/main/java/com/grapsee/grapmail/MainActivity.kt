@@ -33,6 +33,7 @@ import androidx.navigation.compose.rememberNavController
 import com.grapsee.grapmail.data.Api
 import com.grapsee.grapmail.data.SessionEvents
 import com.grapsee.grapmail.data.SessionStore
+import com.grapsee.grapmail.ui.screens.security.SecuritySnapshotScreen
 import com.grapsee.grapmail.logic.AccountFlowViewModel
 import com.grapsee.grapmail.logic.SignUpViewModel
 import com.grapsee.grapmail.signedInHome
@@ -258,6 +259,17 @@ fun GrapMailNav() {
             }
             then(signedIn)
         }
+    }
+
+    // Test-only entry for the screens that exist only AFTER a write the CI walk
+    // must not perform: signing out everywhere ends the session the restore leg
+    // proves, and a password change breaks the sign-in leg. The walk starts the
+    // activity with `--es gmSnapshot <name>` and this renders that one screen,
+    // offline, with closures that do nothing. No real launch carries the extra.
+    val snapshot = (nav.context as? android.app.Activity)?.intent?.getStringExtra("gmSnapshot")
+    if (snapshot != null) {
+        SecuritySnapshotScreen(snapshot)
+        return
     }
 
     NavHost(

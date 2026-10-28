@@ -213,9 +213,46 @@ final class ScreenshotWalkUITests: XCTestCase {
         tap(app.buttons["back"].firstMatch, "back (enable → hub)")
         backFromSecurityScreens()
 
+        // Screens that exist only AFTER a write this walk must not perform:
+        // signing out everywhere ends the session the restore leg proves, and
+        // changing the password breaks the sign-in leg. So the app carries a
+        // test-only hook (-gmSnapshot <name>) that renders one of them with
+        // no-op closures, and each is photographed and left. An out-of-process
+        // UI test cannot read the app's source, so keep this list in sync with
+        // the switch in SecuritySnapshotView.
+        let postWriteScreens: [(shot: String, name: String)] = [
+            ("40-sec-two-factor-on", "two-factor-on"),
+            ("41-sec-two-factor-off-form", "two-factor-off-form"),
+            ("42-sec-two-factor-off-done", "two-factor-off-done"),
+            ("43-sec-backup-codes-form", "backup-codes-form"),
+            ("44-sec-backup-codes-saved", "backup-codes-saved"),
+            ("45-sec-change-password", "change-password"),
+            ("46-sec-password-changed", "password-changed"),
+            ("47-sec-sign-out-all-form", "sign-out-all-form"),
+            ("48-sec-sign-out-all-done", "sign-out-all-done"),
+            ("49-sec-session-revoked", "session-revoked"),
+            ("50-sec-session-revoked-suspicious", "session-revoked-suspicious"),
+        ]
+        for screen in postWriteScreens {
+            app.terminate()
+            app.launchArguments = ["-gmSnapshot", screen.name]
+            app.launch()
+            sleep(2) // the view's own layout settles
+            // The proof is that the app recognised the name: an unknown one
+            // falls through to the switch's default label, which would hand
+            // the artifact a placeholder photographed as if it were the screen.
+            let unknown = app.staticTexts["Unknown snapshot: \(screen.name)"].firstMatch
+            XCTAssertFalse(unknown.waitForExistence(timeout: 2),
+                           "app did not recognise snapshot '\(screen.name)'")
+            snap(screen.shot)
+        }
+
         // Session restore: relaunch with the stored Keychain token must open
-        // signed-in, not at Welcome. Then sign out returns to Welcome.
+        // signed-in, not at Welcome. Then sign out returns to Welcome. The
+        // snapshot argument has to be cleared first, or the restore opens a
+        // stub screen instead of the flow.
         app.terminate()
+        app.launchArguments = []
         app.launch()
         require(app.staticTexts["Signed in"].firstMatch, "session restored on launch", timeout: 8)
         snap("10-session-restored")

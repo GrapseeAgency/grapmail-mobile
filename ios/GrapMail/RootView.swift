@@ -78,10 +78,21 @@ struct RootView: View {
 
     var body: some View {
         NavigationStack(path: $path) {
-            WelcomeView(
-                onCreateAccount: { path.append(.stepName) },
-                onSignIn: { path.append(.signIn) }
-            )
+            Group {
+                // Test-only hook: the UI test names one post-write confirmation
+                // screen at launch and the app renders it instead of the flow.
+                // Those screens only exist after a write the walk must not
+                // perform, so they are otherwise unreachable. No real launch
+                // ever carries the argument, and nothing here fetches or submits.
+                if let snapshot = SecuritySnapshot.requested() {
+                    SecuritySnapshotView(name: snapshot)
+                } else {
+                    WelcomeView(
+                        onCreateAccount: { path.append(.stepName) },
+                        onSignIn: { path.append(.signIn) }
+                    )
+                }
+            }
             .navigationDestination(for: Route.self) { route in
                 // Every screen draws its own header with its own back control.
                 // Without this the system bar added a second, unguarded back

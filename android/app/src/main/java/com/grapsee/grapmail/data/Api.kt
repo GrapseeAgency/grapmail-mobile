@@ -237,7 +237,11 @@ class ApiException(val status: Int, val code: String?, message: String) : Except
     val address: String = "",
     val handle: String = "",
     val phone: String? = null,
-    val twoFactor: String = "off",
+    /** The legacy form of the same answer, kept because it is what some
+     *  endpoints actually send. Nullable on purpose: an absent string is no
+     *  answer, and a defaulted "off" would claim two-step is off when nothing
+     *  was said. */
+    val twoFactor: String? = null,
     /** The server's own answer to "is the second factor on", so no client re-derives it from the string.
      *  Null means the server did not answer, which the hub must show as "couldn't load" rather than
      *  as "Off": a wrong Off invites the person to re-enable a factor that is already on and hides a
@@ -248,7 +252,17 @@ class ApiException(val status: Int, val code: String?, message: String) : Except
     val backupCodesRemaining: Int? = null,
     val passwordChangedAt: String? = null,
     val createdAt: String? = null,
-)
+) {
+    /** The one verdict the hub acts on: the server's own flag when it sends
+     *  one, otherwise the legacy string read as a flag, otherwise null — and
+     *  null is the only case the hub is allowed to call unknown. */
+    val twoFactorState: Boolean?
+        get() = twoFactorEnabled ?: when (twoFactor?.lowercase()) {
+            "on", "true", "1", "enabled" -> true
+            "off", "false", "0", "disabled" -> false
+            else -> null
+        }
+}
 
 @Serializable data class ProfileResponse(
     val success: Boolean = false,

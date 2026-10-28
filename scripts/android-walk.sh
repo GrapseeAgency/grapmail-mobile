@@ -233,6 +233,34 @@ must "hub back tap" tap_xy "$(wait_nodes "n.get('content-desc','')=='Back'" | he
 sleep 2
 must "home after security" wait_nodes "n.get('text','')=='Signed in'" >/dev/null
 
+echo "· post-write confirmations — via the app's test-only snapshot hook"
+# These screens exist only AFTER a write the walk must not perform: signing out
+# everywhere ends the session the restore leg proves, and a password change
+# breaks the sign-in leg. So the app renders one per launch, offline, with
+# closures that do nothing. The label check proves the name was recognised — a
+# typo must not ship a placeholder photographed as if it were the screen.
+# Keep this list in sync with the when-block in SecuritySnapshotScreen.kt.
+for spec in "two-factor-on:40-sec-two-factor-on" \
+            "two-factor-off-form:41-sec-two-factor-off-form" \
+            "two-factor-off-done:42-sec-two-factor-off-done" \
+            "backup-codes-form:43-sec-backup-codes-form" \
+            "backup-codes-saved:44-sec-backup-codes-saved" \
+            "change-password:45-sec-change-password" \
+            "password-changed:46-sec-password-changed" \
+            "sign-out-all-form:47-sec-sign-out-all-form" \
+            "sign-out-all-done:48-sec-sign-out-all-done" \
+            "session-revoked:49-sec-session-revoked" \
+            "session-revoked-suspicious:50-sec-session-revoked-suspicious"; do
+  nm="${spec%%:*}"; pic="${spec##*:}"
+  adb shell am force-stop "$PKG"
+  adb shell am start -W -n "$PKG/.MainActivity" --es gmSnapshot "$nm" >/dev/null
+  sleep 5
+  if [ -n "$(find_nodes "n.get('text','')=='Unknown snapshot: $nm'")" ]; then
+    echo "FAIL: app did not recognise snapshot '$nm'" >&2; FAILURES=$((FAILURES + 1))
+  fi
+  shot "$pic"
+done
+
 echo "· session restore: restart must open signed-in, not at welcome"
 adb shell am force-stop "$PKG"
 sleep 1
@@ -296,6 +324,12 @@ for want in 01-welcome-light 02-step1-name-light 03-step2-basicinfo-light \
             25-sec-sessions-light 26-sec-activity-light \
             27-sec-signout-all-light 28-sec-confirm-password-light \
             30-recovery-start-light 31-recovery-find-address-light \
+            40-sec-two-factor-on 41-sec-two-factor-off-form \
+            42-sec-two-factor-off-done 43-sec-backup-codes-form \
+            44-sec-backup-codes-saved 45-sec-change-password \
+            46-sec-password-changed 47-sec-sign-out-all-form \
+            48-sec-sign-out-all-done 49-sec-session-revoked \
+            50-sec-session-revoked-suspicious \
             10-session-restored 11-signin-light 12-welcome-dark 13-step1-name-dark; do
   [ -s "$OUT/$want.png" ] || { echo "FAIL: missing $want.png" >&2; FAILURES=$((FAILURES + 1)); }
 done
