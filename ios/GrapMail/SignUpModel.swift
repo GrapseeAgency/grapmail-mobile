@@ -145,7 +145,7 @@ final class SignUpModel: ObservableObject {
                         SessionStore.save(
                             token: token, address: address,
                             name: resp.account?.name ?? s.firstName,
-                            expiresAtRaw: session.expiresAt.map(Double.init)
+                            expiresAtRaw: session.expiresAtMillis
                         )
                         break
                     }

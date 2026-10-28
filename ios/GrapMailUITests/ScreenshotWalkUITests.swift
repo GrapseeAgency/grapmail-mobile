@@ -190,11 +190,27 @@ final class ScreenshotWalkUITests: XCTestCase {
         require(app.staticTexts["Account Security"].firstMatch, "Security hub", timeout: 8)
         snap("20-sec-hub-light")
         openSecurityRow("Two-Step Verification", "21-sec-2fa-enable-light")
-        openSecurityRow("Change Password", "22-sec-change-password-light")
-        openSecurityRow("Backup Codes", "23-sec-backup-codes-light")
-        openSecurityRow("Active Sessions", "24-sec-sessions-light")
-        openSecurityRow("Recent Security Activity", "25-sec-activity-light")
-        openSecurityRow("Sign Out All Devices", "26-sec-signout-all-light")
+        openSecurityRow("Phone Number", "22-sec-phone-light")
+        openSecurityRow("Change Password", "23-sec-change-password-light")
+        openSecurityRow("Backup Codes", "24-sec-backup-codes-light")
+        openSecurityRow("Active Sessions", "25-sec-sessions-light")
+        openSecurityRow("Recent Security Activity", "26-sec-activity-light")
+        openSecurityRow("Sign Out All Devices", "27-sec-signout-all-light")
+
+        // The enable flow's first gate is a real reference screen and it
+        // renders on navigation alone: tap the switch, tap Continue, photograph
+        // 'Confirm Your Password', back out twice. Nothing is typed, so no
+        // action proof is minted and the factor stays off — but the screen is
+        // no longer compile-only. (The per-session Revoke confirmation is NOT
+        // reachable here: a fresh account has exactly one session and it is the
+        // current device, which deliberately has no revoke affordance.)
+        tap(app.switches["Two-Step Verification"].firstMatch, "2FA switch (gate leg)")
+        require(app.staticTexts["Enable Two-Step Verification"].firstMatch, "2FA enable (gate leg)", timeout: 8)
+        tap(app.buttons["Continue"].firstMatch, "Continue (enable flow)")
+        require(app.staticTexts["Confirm Your Password"].firstMatch, "Confirm-password gate", timeout: 8)
+        snap("28-sec-confirm-password-light")
+        tap(app.buttons["back"].firstMatch, "back (gate → enable)")
+        tap(app.buttons["back"].firstMatch, "back (enable → hub)")
         backFromSecurityScreens()
 
         // Session restore: relaunch with the stored Keychain token must open
@@ -210,6 +226,17 @@ final class ScreenshotWalkUITests: XCTestCase {
         tap(app.buttons["Sign In"].firstMatch, "Sign In (welcome)")
         require(app.staticTexts["Welcome back 👋"].firstMatch, "Sign-in header")
         snap("11-signin-light")
+
+        // Recovery arc — navigation only, nothing submitted. 'Forgot password?'
+        // opens the reset form and that form's own link opens the address
+        // lookup; both are reference screens the walk had never photographed,
+        // and reaching them costs no code send and no state change.
+        tap(app.buttons["Forgot password?"].firstMatch, "Forgot password (sign-in)")
+        require(app.staticTexts["Reset your password"].firstMatch, "Recovery: reset form", timeout: 8)
+        snap("30-recovery-start-light")
+        tap(app.buttons["Find your GrapMail address"].firstMatch, "Find-address link (reset form)")
+        require(app.staticTexts["Find your GrapMail address"].firstMatch, "Recovery: find form", timeout: 8)
+        snap("31-recovery-find-address-light")
     }
 
     /// Open an inline picker and choose `option` (always the panel's first

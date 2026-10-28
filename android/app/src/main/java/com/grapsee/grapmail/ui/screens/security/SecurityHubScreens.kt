@@ -88,7 +88,18 @@ fun AccountSecurityScreen(
         loading = true; failed = false
         try {
             val token = SessionStore.token(context) ?: throw IllegalStateException("Sign in again.")
-            profile = Api.profile(token).profile
+            val loaded = Api.profile(token).profile
+            // A profile that never answered the security verdict is not a loaded
+            // profile. Left alone, twoFactorEnabled would read as false and the
+            // hub would claim "2FA off" for an account that may have it on — and
+            // enable a toggle that routes into the ENABLE flow. The honest
+            // "couldn't load" also leaves that toggle disabled.
+            if (loaded?.twoFactorEnabled == null) {
+                profile = null
+                failed = true
+            } else {
+                profile = loaded
+            }
         } catch (_: Exception) {
             failed = true
         } finally {
@@ -138,7 +149,9 @@ fun AccountSecurityScreen(
                     )
                     // Two-step on with no codes is one lost phone away from a
                     // lock-out, and the badge above would still call it secure.
-                    if (twoFactorOn && (profile?.backupCodesRemaining ?: 0) == 0) {
+                    // Only say so when the server actually answered with a
+                    // count: an absent field is unknown, not zero.
+                    if (twoFactorOn && profile?.backupCodesRemaining == 0) {
                         Spacer(Modifier.height(8.dp))
                         Text(
                             "Add backup codes so losing your phone does not lock you out.",

@@ -65,16 +65,45 @@ import java.util.concurrent.TimeUnit
     val sessionToken: String? = null,
     val accessToken: String? = null,
     val token: String? = null,
+    val refreshToken: String? = null,
     val expiresAt: Long? = null,
+    /** The live /auth/account/signin envelope answers with a RELATIVE lifetime
+     *  (seconds), not an absolute `expiresAt`. Only the absolute one was ever
+     *  read, so every stored session had expiry 0 — which SessionStore treats as
+     *  "never expires". A token revoked on the server kept the app on a home
+     *  screen whose every call 401s. */
+    val expiresIn: Long? = null,
     val account: AccountDto? = null,
+    /** The same object under the name the live envelope actually uses. */
+    val user: AccountDto? = null,
     val requireOtp: Boolean = false,
     val challengeId: String? = null,
-    val delivered: Boolean = false,
+    val suspicious: Boolean? = null,
     val backupCodesRemaining: Int? = null,
     val message: String? = null,
     val error: String? = null,
     val code: String? = null,
-)
+) {
+    /** Absolute epoch-milliseconds, from whichever shape the server sent. */
+    val expiresAtMillis: Long
+        get() {
+            val at = expiresAt
+            if (at != null && at > 0L) return if (at < 100_000_000_000L) at * 1000L else at
+            val seconds = expiresIn
+            if (seconds != null && seconds > 0L) return System.currentTimeMillis() + seconds * 1000L
+            return 0L
+        }
+
+    /** The account object under either key. */
+    val accountOrNull: AccountDto? get() = account ?: user
+
+    /** A challenge in the response means a code is required — presence is the
+     *  gate, not the `requireOtp` flag, which this backend omits on ordinary
+     *  sign-ins. Treating an absent flag as "no code needed" would sign a 2FA
+     *  account in on the password alone whenever a challenge is issued. */
+    val secondFactorRequired: Boolean
+        get() = challengeId != null || requireOtp
+}
 
 @Serializable data class TwoFactorRequest(
     val challengeId: String? = null,
@@ -89,11 +118,24 @@ import java.util.concurrent.TimeUnit
     val sessionToken: String? = null,
     val accessToken: String? = null,
     val token: String? = null,
+    val refreshToken: String? = null,
     val expiresAt: Long? = null,
+    val expiresIn: Long? = null,
     val user: AccountDto? = null,
     val error: String? = null,
     val code: String? = null,
-)
+) {
+    /** Redeeming a code opens the session, and a session written with no
+     *  expiry looks valid forever — same both-shapes rule as SignInResponse. */
+    val expiresAtMillis: Long
+        get() {
+            val at = expiresAt
+            if (at != null && at > 0L) return if (at < 100_000_000_000L) at * 1000L else at
+            val seconds = expiresIn
+            if (seconds != null && seconds > 0L) return System.currentTimeMillis() + seconds * 1000L
+            return 0L
+        }
+}
 
 class ApiException(val status: Int, val code: String?, message: String) : Exception(message)
 
@@ -196,10 +238,14 @@ class ApiException(val status: Int, val code: String?, message: String) : Except
     val handle: String = "",
     val phone: String? = null,
     val twoFactor: String = "off",
-    /** The server's own answer to "is the second factor on", so no client re-derives it from the string. */
-    val twoFactorEnabled: Boolean = false,
+    /** The server's own answer to "is the second factor on", so no client re-derives it from the string.
+     *  Null means the server did not answer, which the hub must show as "couldn't load" rather than
+     *  as "Off": a wrong Off invites the person to re-enable a factor that is already on and hides a
+     *  real lock-out. `backupCodesRemaining` is null and not 0 for the same reason — 0 would mean
+     *  "generate codes or you will be locked out". */
+    val twoFactorEnabled: Boolean? = null,
     val twoFactorEnabledAt: String? = null,
-    val backupCodesRemaining: Int = 0,
+    val backupCodesRemaining: Int? = null,
     val passwordChangedAt: String? = null,
     val createdAt: String? = null,
 )
@@ -215,10 +261,26 @@ class ApiException(val status: Int, val code: String?, message: String) : Except
     val accessToken: String? = null,
     /** When that replacement expires. Stored, or the app believes it is signed in forever. */
     val tokenExpiresAt: Long? = null,
+    /** The relative form the server may send instead. */
+    val tokenExpiresIn: Long? = null,
+    val expiresIn: Long? = null,
+    val refreshToken: String? = null,
     val message: String? = null,
     val error: String? = null,
     val code: String? = null,
-)
+) {
+    /** Absolute epoch-milliseconds for a token this response reissued, from
+     *  either shape. A replacement token written without an expiry is a
+     *  permanent session, which is exactly the bug the sign-in path had. */
+    val tokenExpiresAtMillis: Long
+        get() {
+            val at = tokenExpiresAt
+            if (at != null && at > 0L) return if (at < 100_000_000_000L) at * 1000L else at
+            val seconds = tokenExpiresIn ?: expiresIn
+            if (seconds != null && seconds > 0L) return System.currentTimeMillis() + seconds * 1000L
+            return 0L
+        }
+}
 
 @Serializable data class SessionDto(
     val id: String = "",
@@ -285,11 +347,20 @@ object Api {
         // ones: the label is captured at sign-in, and a request that arrives as
         // "okhttp/4.x" is recorded as "Unknown device" forever.
         .addInterceptor { chain ->
-            chain.proceed(
+            val response = chain.proceed(
                 chain.request().newBuilder()
                     .header("user-agent", userAgent)
                     .build(),
             )
+            // A 401 on a call that carried our bearer means the server no longer
+            // recognises the session (expired, or revoked from another device).
+            // Say so once, loudly, so the app can land the person on sign-in
+            // instead of leaving them on a signed-in screen that cannot load.
+            // Anonymous 401s — a wrong password at sign-in — must not do this.
+            if (response.code == 401 && chain.request().header("Authorization") != null) {
+                SessionEvents.signalExpired()
+            }
+            response
         }
         .connectTimeout(15, TimeUnit.SECONDS)
         .readTimeout(20, TimeUnit.SECONDS)

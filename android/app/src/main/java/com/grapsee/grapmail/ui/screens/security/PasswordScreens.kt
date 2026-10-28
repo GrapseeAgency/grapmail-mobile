@@ -127,7 +127,7 @@ fun ChangePasswordScreen(
                                         // The server says when this token dies. Storing 0
                                         // means "never expires", so the app kept booting
                                         // straight into a home screen whose every call 401s.
-                                        resp.tokenExpiresAt ?: 0L,
+                                        resp.tokenExpiresAtMillis,
                                     )
                                 }
                                 onChanged()

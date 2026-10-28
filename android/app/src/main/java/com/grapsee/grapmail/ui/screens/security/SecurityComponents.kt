@@ -33,6 +33,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -370,7 +371,17 @@ fun ToggleRow(
                 StatusChip(chip, chipTone)
             }
         }
-        Switch(checked = checked, onCheckedChange = onToggle, enabled = enabled)
+        // The tag is the CI walk's handle for this switch. The hub row's title
+        // text is not clickable, so the walk taps the switch itself — and
+        // "the first checkable node" only identifies it while the hub has
+        // exactly one switch. Name it, so the next toggle row cannot steal
+        // the tap.
+        Switch(
+            checked = checked,
+            onCheckedChange = onToggle,
+            enabled = enabled,
+            modifier = Modifier.testTag("sec-2fa-switch"),
+        )
     }
 }
 

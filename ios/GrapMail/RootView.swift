@@ -1,5 +1,9 @@
 import SwiftUI
 import UIKit
+// `NotificationCenter.publisher(for:)` — the session-expiry signal below — is a
+// Combine API. SwiftUI does not re-export it, so the publisher is invisible
+// without this.
+import Combine
 
 /// The root navigation for the account sector: welcome → wizard (5 steps) →
 /// human verification → account created, plus sign-in, two-step verification
@@ -394,6 +398,16 @@ struct RootView: View {
                 }
                 .toolbar(.hidden, for: .navigationBar)
                 .navigationBarBackButtonHidden(true)
+            }
+            // A dead token is discovered by the server, not by us: the first
+            // authenticated call that comes back 401 clears the Keychain and
+            // posts this. Without the handler the app stays on a signed-in
+            // screen whose every request fails, and the person has no way back
+            // in short of reinstalling. Anonymous 401s (wrong password at
+            // sign-in) never reach here — only a rejected bearer does.
+            .onReceive(NotificationCenter.default.publisher(for: .gmSessionExpired)) { _ in
+                guard path.last != .signIn else { return }
+                path = [.signIn]
             }
         }
     }

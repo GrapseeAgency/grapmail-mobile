@@ -82,7 +82,7 @@ fun TwoFactorScreen(
                     context, token,
                     resp.user?.address ?: state.identifier,
                     resp.user?.name ?: "",
-                    resp.expiresAt ?: 0L,
+                    resp.expiresAtMillis,
                 )
                 onSignedIn(resp.user?.address ?: state.identifier)
             } catch (e: ApiException) {
@@ -109,7 +109,7 @@ fun TwoFactorScreen(
             try {
                 val resp = Api.signIn(state.identifier, state.password)
                 resending = false
-                if (resp.requireOtp && resp.challengeId != null) {
+                if (resp.secondFactorRequired && resp.challengeId != null) {
                     code = ""
                     flow.update { copy(challengeId = resp.challengeId, expiresAt = resp.expiresAt ?: 0L) }
                     notice = "A new code is on its way."
@@ -230,7 +230,7 @@ fun BackupCodeScreen(
                     context, token,
                     resp.user?.address ?: state.identifier,
                     resp.user?.name ?: "",
-                    resp.expiresAt ?: 0L,
+                    resp.expiresAtMillis,
                 )
                 onSignedIn(resp.user?.address ?: state.identifier)
             } catch (e: ApiException) {

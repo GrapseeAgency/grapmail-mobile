@@ -79,7 +79,7 @@ fun SignOutAllDevicesScreen(onBack: () -> Unit, onDone: () -> Unit) {
                                         fresh,
                                         SessionStore.address(context) ?: "",
                                         SessionStore.name(context) ?: "",
-                                        resp.tokenExpiresAt ?: 0L,
+                                        resp.tokenExpiresAtMillis,
                                     )
                                 }
                                 onDone()

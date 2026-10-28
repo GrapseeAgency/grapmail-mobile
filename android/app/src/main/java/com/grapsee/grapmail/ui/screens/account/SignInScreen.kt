@@ -91,7 +91,7 @@ fun SignInScreen(
             try {
                 val resp = Api.signIn(identifier.trim(), password)
                 busy = false
-                if (resp.requireOtp && resp.challengeId != null) {
+                if (resp.secondFactorRequired && resp.challengeId != null) {
                     flow.update {
                         copy(
                             identifier = identifier.trim(),
@@ -110,11 +110,11 @@ fun SignInScreen(
                     }
                     SessionStore.save(
                         context, token,
-                        resp.account?.address ?: identifier.trim(),
-                        resp.account?.name ?: "",
-                        resp.expiresAt ?: 0L,
+                        resp.accountOrNull?.address ?: identifier.trim(),
+                        resp.accountOrNull?.name ?: "",
+                        resp.expiresAtMillis,
                     )
-                    onSignedIn(resp.account?.address ?: identifier.trim())
+                    onSignedIn(resp.accountOrNull?.address ?: identifier.trim())
                 }
             } catch (e: ApiException) {
                 busy = false

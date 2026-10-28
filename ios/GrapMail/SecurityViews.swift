@@ -78,7 +78,10 @@ struct AccountSecurityView: View {
                         .padding(.top, 10)
                     // Two-step on with no codes is one lost phone away from a
                     // lock-out, and the badge above would still call it secure.
-                    if twoFactorOn && (profile?.backupCodesRemaining ?? 0) == 0 {
+                    // Only say so when the server actually answered with a
+                    // count: an absent field is unknown, not zero, and a false
+                    // "you have no codes" is its own kind of wrong warning.
+                    if twoFactorOn, let remaining = profile?.backupCodesRemaining, remaining == 0 {
                         Text("Add backup codes so losing your phone does not lock you out.")
                             .font(.system(size: 12))
                             .foregroundColor(GM.warnInk)
@@ -172,6 +175,13 @@ struct AccountSecurityView: View {
             }
             do {
                 profile = try await ApiClient.profile(token: token).profile
+                // A profile that never answered the security verdict is not a
+                // loaded profile. Left alone, `twoFactorEnabled` would default
+                // to false and the hub would claim "2FA off" for an account that
+                // may have it on — and enable a toggle that routes into the
+                // ENABLE flow. Show the honest "couldn't load" instead, which
+                // also leaves the toggle disabled rather than mis-informed.
+                if profile?.twoFactorEnabled == nil { profile = nil; failed = true }
             } catch {
                 failed = true
             }
@@ -882,7 +892,7 @@ struct ChangePasswordView: View {
                                         // Without this the expiry key is removed, which
                                         // the store reads as "never expires" — the app then
                                         // cold-boots into a home screen whose every call 401s.
-                                        expiresAtRaw: resp.tokenExpiresAt
+                                        expiresAtRaw: resp.tokenExpiresAtMillis
                                     )
                                 }
                                 busy = false
@@ -1006,7 +1016,7 @@ struct SignOutAllDevicesView: View {
                                         // Without this the expiry key is removed, which
                                         // the store reads as "never expires" — the app then
                                         // cold-boots into a home screen whose every call 401s.
-                                        expiresAtRaw: resp.tokenExpiresAt
+                                        expiresAtRaw: resp.tokenExpiresAtMillis
                                     )
                                 }
                                 busy = false

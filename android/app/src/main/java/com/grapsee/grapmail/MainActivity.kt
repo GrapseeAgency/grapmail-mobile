@@ -31,6 +31,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.grapsee.grapmail.data.Api
+import com.grapsee.grapmail.data.SessionEvents
 import com.grapsee.grapmail.data.SessionStore
 import com.grapsee.grapmail.logic.AccountFlowViewModel
 import com.grapsee.grapmail.logic.SignUpViewModel
@@ -81,6 +82,7 @@ import com.grapsee.grapmail.ui.screens.security.VerifyPhoneScreen
 import com.grapsee.grapmail.ui.theme.GrapMailTheme
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
@@ -209,6 +211,18 @@ fun GrapMailNav() {
     }
     val dest = startDest ?: return
 
+    // A dead token is discovered by the server, never by us: the stored copy
+    // still looks valid, so hasValidSession keeps saying yes while every screen
+    // fails to load. The API interceptor raises this on an authenticated 401;
+    // dropping the session and landing on sign-in here is the only way back in
+    // that does not require reinstalling the app.
+    LaunchedEffect(Unit) {
+        SessionEvents.expired.collect {
+            SessionStore.clear(nav.context.applicationContext)
+            backToSignIn()
+        }
+    }
+
     // The real auto sign-in the website performs the moment the account
     // exists: same endpoint, same session storage. The result is reported to the
     // caller because a failure here must NOT walk the person into screens that
@@ -217,20 +231,30 @@ fun GrapMailNav() {
     fun autoSignIn(address: String, name: String, then: (Boolean) -> Unit) {
         scope.launch(Dispatchers.Main) {
             var signedIn = false
-            try {
-                val resp = Api.signIn(address, vm.state.value.password)
-                val token = resp.sessionToken ?: resp.accessToken ?: resp.token
-                if (token != null) {
-                    SessionStore.save(
-                        nav.context.applicationContext,
-                        token, address, name, resp.expiresAt ?: 0L,
-                    )
-                    signedIn = true
+            // The freshly-created credential can take a beat to become usable,
+            // so retry with a short backoff before giving up. iOS does the same
+            // (SignUpModel): without it the wizard strands a new user on the
+            // sign-in screen instead of the human-verify -> created flow the
+            // design shows, and the CI walk loses those screens.
+            for (attempt in 0 until 4) {
+                if (attempt > 0) { kotlinx.coroutines.delay(1_200) }
+                try {
+                    val resp = Api.signIn(address, vm.state.value.password)
+                    val token = resp.sessionToken ?: resp.accessToken ?: resp.token
+                    if (token != null) {
+                        SessionStore.save(
+                            nav.context.applicationContext,
+                            token, address, name, resp.expiresAtMillis,
+                        )
+                        signedIn = true
+                        break
+                    }
+                } catch (e: kotlinx.coroutines.CancellationException) {
+                    throw e
+                } catch (_: Exception) {
+                    // The account exists; the next attempt, or signing in by
+                    // hand, is the fallback.
                 }
-            } catch (e: kotlinx.coroutines.CancellationException) {
-                throw e
-            } catch (_: Exception) {
-                // The account exists; signing in by hand is the fallback.
             }
             then(signedIn)
         }

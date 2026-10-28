@@ -127,10 +127,18 @@ struct SignInView: View {
                     identifier: identifier.trimmingCharacters(in: .whitespaces),
                     password: password
                 )
-                if resp.requireOtp == true, let cid = resp.challengeId {
+                // A challenge in the response means a code is required — the
+                // presence is the gate, not the `requireOtp` flag, which this
+                // backend omits on ordinary sign-ins. Reading an absent flag as
+                // "no code needed" would sign a 2FA account in on the password.
+                if resp.secondFactorRequired, let cid = resp.challengeId {
                     model.identifier = identifier.trimmingCharacters(in: .whitespaces)
                     model.password = password
                     model.challengeId = cid
+                    // The CHALLENGE's expiry, for the code countdown — deliberately
+                    // `expiresAt` and not `expiresAtDate`: the latter falls back to
+                    // the session's `expiresIn`, and a countdown that claims the
+                    // code lives as long as the session would be a lie.
                     model.expiresAt = resp.expiresAt.map { Date(timeIntervalSince1970: TimeInterval($0) / 1000) }
                     model.prefillIdentifier = nil
                     onNeedSecondFactor()
@@ -145,7 +153,7 @@ struct SignInView: View {
                     token: token,
                     address: address,
                     name: resp.account?.name ?? "",
-                    expiresAtRaw: resp.expiresAt.map(Double.init)
+                    expiresAtRaw: resp.expiresAtMillis
                 )
                 onSignedIn(address)
             } catch {
@@ -247,7 +255,7 @@ struct TwoFactorView: View {
                     token: token,
                     address: address,
                     name: resp.user?.name ?? "",
-                    expiresAtRaw: resp.expiresAt.map(Double.init)
+                    expiresAtRaw: resp.expiresAtMillis
                 )
                 onSignedIn(address)
             } catch let apiError as ApiError {
@@ -278,9 +286,17 @@ struct TwoFactorView: View {
             defer { resending = false }
             do {
                 let resp = try await ApiClient.signIn(identifier: model.identifier, password: model.password)
-                if resp.requireOtp == true, let cid = resp.challengeId {
+                // A challenge in the response means a code is required — the
+                // presence is the gate, not the `requireOtp` flag, which this
+                // backend omits on ordinary sign-ins. Reading an absent flag as
+                // "no code needed" would sign a 2FA account in on the password.
+                if resp.secondFactorRequired, let cid = resp.challengeId {
                     code = ""
                     model.challengeId = cid
+                    // The CHALLENGE's expiry, for the code countdown — deliberately
+                    // `expiresAt` and not `expiresAtDate`: the latter falls back to
+                    // the session's `expiresIn`, and a countdown that claims the
+                    // code lives as long as the session would be a lie.
                     model.expiresAt = resp.expiresAt.map { Date(timeIntervalSince1970: TimeInterval($0) / 1000) }
                     notice = "A new code is on its way."
                 } else {
@@ -391,7 +407,7 @@ struct BackupCodeView: View {
                     token: token,
                     address: address,
                     name: resp.user?.name ?? "",
-                    expiresAtRaw: resp.expiresAt.map(Double.init)
+                    expiresAtRaw: resp.expiresAtMillis
                 )
                 onSignedIn(address)
             } catch let apiError as ApiError {

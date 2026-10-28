@@ -1,6 +1,13 @@
 import Foundation
 import UIKit
 
+/// Posted when a call that carried our bearer token comes back 401: the
+/// stored session is dead on the server, so the app must stop pretending to
+/// be signed in instead of showing a home screen whose every request fails.
+extension Notification.Name {
+    static let gmSessionExpired = Notification.Name("grapmail.session.expired")
+}
+
 /// Lenient decoding helpers.
 ///
 /// Swift's synthesized `Decodable` throws `keyNotFound` for a missing key even
@@ -10,19 +17,35 @@ import UIKit
 /// kotlinx handles by applying the default but iOS turned into a hard decode
 /// failure: the sign-in and every security screen's fetch reported "Unexpected
 /// server response" / "couldn't load" and the 2FA toggle stayed disabled.
-/// These helpers decode each field with `decodeIfPresent` + the default, so a
-/// missing key yields the default instead of throwing — iOS parity with
-/// Android's lenient behavior.
+/// Every response DTO therefore decodes field by field with these helpers, so
+/// a missing key yields the declared default instead of throwing — iOS parity
+/// with Android's lenient behavior.
 extension KeyedDecodingContainer {
+    /// Read a required field, falling back to `def` when the server did not
+    /// send it. Absent/null is normal for this backend; a key that is PRESENT
+    /// but not the expected type is contract drift, so it is logged rather
+    /// than silently defaulted — a renamed field must not become invisible.
     func lenient<T: Decodable>(_ key: K, _ def: T) -> T {
-        // `try?` of `decodeIfPresent` (which returns T? and throws) flattens to
-        // T?: nil covers both "key absent / null" and "threw", so one binding
-        // is enough — a second `let v` fails to compile (v is already T).
-        if let v = try? decodeIfPresent(T.self, forKey: key) { return v }
+        do {
+            if let v = try decodeIfPresent(T.self, forKey: key) { return v }
+        } catch {
+            #if DEBUG
+            print("Api decode drift: \(T.self) '\(key.stringValue)' → \(error)")
+            #endif
+            return def
+        }
         return def
     }
+    /// Read an optional field, tolerating both a missing key and a wrong type.
     func lenientOpt<T: Decodable>(_ key: K) -> T? {
-        (try? decodeIfPresent(T.self, forKey: key)) ?? nil
+        do {
+            return try decodeIfPresent(T.self, forKey: key)
+        } catch {
+            #if DEBUG
+            print("Api decode drift: \(T.self) '\(key.stringValue)' → \(error)")
+            #endif
+            return nil
+        }
     }
 }
 
@@ -62,6 +85,21 @@ struct AccountDto: Codable {
     var handle: String = ""
     var phone: String?
     var accountType: String = "USER"
+
+    private enum CodingKeys: String, CodingKey {
+        case id, name, firstName, lastName, address, handle, phone, accountType
+    }
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = c.lenient(.id, "")
+        name = c.lenient(.name, "")
+        firstName = c.lenientOpt(.firstName)
+        lastName = c.lenientOpt(.lastName)
+        address = c.lenient(.address, "")
+        handle = c.lenient(.handle, "")
+        phone = c.lenientOpt(.phone)
+        accountType = c.lenient(.accountType, "USER")
+    }
 }
 
 struct CreateRequest: Codable {
@@ -83,6 +121,20 @@ struct CreateResponse: Codable {
     var phoneVerified: Bool = false
     var error: String?
     var code: String?
+
+    private enum CodingKeys: String, CodingKey {
+        case success, account, mailboxDomain, message, phoneVerified, error, code
+    }
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        success = c.lenient(.success, false)
+        account = c.lenientOpt(.account)
+        mailboxDomain = c.lenientOpt(.mailboxDomain)
+        message = c.lenientOpt(.message)
+        phoneVerified = c.lenient(.phoneVerified, false)
+        error = c.lenientOpt(.error)
+        code = c.lenientOpt(.code)
+    }
 }
 
 struct CheckResponse: Codable {
@@ -92,6 +144,19 @@ struct CheckResponse: Codable {
     var address: String?
     var suggestion: String?
     var reason: String?
+
+    private enum CodingKeys: String, CodingKey {
+        case success, available, handle, address, suggestion, reason
+    }
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        success = c.lenient(.success, false)
+        available = c.lenient(.available, false)
+        handle = c.lenient(.handle, "")
+        address = c.lenientOpt(.address)
+        suggestion = c.lenientOpt(.suggestion)
+        reason = c.lenientOpt(.reason)
+    }
 }
 
 struct SignInRequest: Codable {
@@ -104,23 +169,69 @@ struct SignInResponse: Codable {
     var sessionToken: String?
     var accessToken: String?
     var token: String?
+    var refreshToken: String?
     var expiresAt: Int?
+    /// The live /auth/account/signin envelope answers with a RELATIVE lifetime
+    /// (`expiresIn`, seconds) rather than an absolute `expiresAt`. Only the
+    /// absolute one was ever read, so every stored session had no expiry and
+    /// `hasValidSession` treated it as valid forever — a token revoked on the
+    /// server kept the app on a home screen whose calls all 401.
+    var expiresIn: Int?
     var account: AccountDto?
-    // The live /auth/account/signin envelope is
-    // { success, message, accessToken, refreshToken, expiresIn, suspicious, user }
-    // — it carries neither requireOtp nor delivered. Swift's synthesized
+    // The live envelope is { success, message, accessToken, refreshToken,
+    // expiresIn, suspicious, user } — the account object arrives under `user`,
+    // and it carries neither requireOtp nor delivered. Swift's synthesized
     // Decodable throws keyNotFound for a missing NON-optional field (a `= false`
-    // default is not applied during decoding), so these must be Optional or the
-    // whole response fails to decode and sign-in reports 'Unexpected server
+    // default is not applied during decoding), so every field decodes leniently
+    // or the whole response fails and sign-in reports 'Unexpected server
     // response'. Android's kotlinx applies the default for a missing key, which
-    // is why only iOS broke. Optional + `?? false` at the call sites is parity.
+    // is why only iOS broke.
     var requireOtp: Bool?
     var challengeId: String?
-    var delivered: Bool?
+    var suspicious: Bool?
     var backupCodesRemaining: Int?
     var message: String?
     var error: String?
     var code: String?
+
+    private enum CodingKeys: String, CodingKey {
+        case success, sessionToken, accessToken, token, refreshToken, expiresAt,
+             expiresIn, account, user, requireOtp, challengeId, suspicious,
+             backupCodesRemaining, message, error, code
+    }
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        success = c.lenient(.success, false)
+        sessionToken = c.lenientOpt(.sessionToken)
+        accessToken = c.lenientOpt(.accessToken)
+        token = c.lenientOpt(.token)
+        refreshToken = c.lenientOpt(.refreshToken)
+        expiresAt = c.lenientOpt(.expiresAt)
+        expiresIn = c.lenientOpt(.expiresIn)
+        account = c.lenientOpt(.account) ?? c.lenientOpt(.user)
+        requireOtp = c.lenientOpt(.requireOtp)
+        challengeId = c.lenientOpt(.challengeId)
+        suspicious = c.lenientOpt(.suspicious)
+        backupCodesRemaining = c.lenientOpt(.backupCodesRemaining)
+        message = c.lenientOpt(.message)
+        error = c.lenientOpt(.error)
+        code = c.lenientOpt(.code)
+    }
+
+    /// Absolute expiry in epoch-milliseconds, from either shape the server
+    /// uses, or nil when it sent neither (SessionStore then keeps the session).
+    /// Note this is the SESSION lifetime; the code countdown still reads
+    /// `expiresAt`, because a challenge does not live as long as a session.
+    var expiresAtMillis: Double? {
+        if let at = expiresAt { return at < 100_000_000_000 ? Double(at) * 1000 : Double(at) }
+        guard let seconds = expiresIn else { return nil }
+        return Date().timeIntervalSince1970 * 1000 + Double(seconds) * 1000
+    }
+    /// A challenge was issued ⇒ a second factor is required. Presence is the
+    /// gate, not `requireOtp`: this backend omits that flag on ordinary
+    /// responses, and treating an absent flag as "no code needed" would sign a
+    /// 2FA account in on the password alone whenever a challenge is sent.
+    var secondFactorRequired: Bool { challengeId != nil || requireOtp == true }
 }
 
 struct TwoFactorRequest: Codable {
@@ -136,10 +247,38 @@ struct TwoFactorResponse: Codable {
     var sessionToken: String?
     var accessToken: String?
     var token: String?
+    var refreshToken: String?
     var expiresAt: Int?
+    var expiresIn: Int?
     var user: AccountDto?
     var error: String?
     var code: String?
+
+    private enum CodingKeys: String, CodingKey {
+        case success, sessionToken, accessToken, token, refreshToken, expiresAt,
+             expiresIn, user, account, error, code
+    }
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        success = c.lenient(.success, false)
+        sessionToken = c.lenientOpt(.sessionToken)
+        accessToken = c.lenientOpt(.accessToken)
+        token = c.lenientOpt(.token)
+        refreshToken = c.lenientOpt(.refreshToken)
+        expiresAt = c.lenientOpt(.expiresAt)
+        expiresIn = c.lenientOpt(.expiresIn)
+        user = c.lenientOpt(.user) ?? c.lenientOpt(.account)
+        error = c.lenientOpt(.error)
+        code = c.lenientOpt(.code)
+    }
+
+    /// Same both-shapes rule as SignInResponse: redeeming a code opens the
+    /// session, and a session with no recorded expiry looks valid forever.
+    var expiresAtMillis: Double? {
+        if let at = expiresAt { return at < 100_000_000_000 ? Double(at) * 1000 : Double(at) }
+        guard let seconds = expiresIn else { return nil }
+        return Date().timeIntervalSince1970 * 1000 + Double(seconds) * 1000
+    }
 }
 
 // ── Recovery & security ─────────────────────────────────────────────────────
@@ -156,6 +295,26 @@ struct ForgotPasswordResponse: Codable {
     var message: String?
     var error: String?
     var code: String?
+
+    private enum CodingKeys: String, CodingKey {
+        case success, sent, challengeId, expiresAt, maskedPhone, provider,
+             message, error, code
+    }
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        success = c.lenient(.success, false)
+        // `sent` is the server's own word for "a code went out". Absent does
+        // not mean false: the challengeId check below is what routes the flow,
+        // so keep the flag optional rather than inventing a negative answer.
+        sent = c.lenientOpt(.sent) ?? (c.lenientOpt(.challengeId) != nil)
+        challengeId = c.lenientOpt(.challengeId)
+        expiresAt = c.lenientOpt(.expiresAt)
+        maskedPhone = c.lenientOpt(.maskedPhone)
+        provider = c.lenientOpt(.provider)
+        message = c.lenientOpt(.message)
+        error = c.lenientOpt(.error)
+        code = c.lenientOpt(.code)
+    }
 }
 
 struct ResetPasswordRequest: Codable {
@@ -172,6 +331,20 @@ struct ResetPasswordResponse: Codable {
     var code: String?
     var reason: String?
     var attemptsLeft: Int?
+
+    private enum CodingKeys: String, CodingKey {
+        case success, address, message, error, code, reason, attemptsLeft
+    }
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        success = c.lenient(.success, false)
+        address = c.lenientOpt(.address)
+        message = c.lenientOpt(.message)
+        error = c.lenientOpt(.error)
+        code = c.lenientOpt(.code)
+        reason = c.lenientOpt(.reason)
+        attemptsLeft = c.lenientOpt(.attemptsLeft)
+    }
 }
 
 struct FindAddressRequest: Codable { var phone: String }
@@ -185,6 +358,19 @@ struct FindAddressResponse: Codable {
     var message: String?
     var error: String?
     var code: String?
+
+    private enum CodingKeys: String, CodingKey {
+        case success, maskedAddress, address, message, error, code
+    }
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        success = c.lenient(.success, false)
+        maskedAddress = c.lenientOpt(.maskedAddress)
+        address = c.lenientOpt(.address)
+        message = c.lenientOpt(.message)
+        error = c.lenientOpt(.error)
+        code = c.lenientOpt(.code)
+    }
 }
 
 struct PhoneStartRequest: Codable { var phone: String }
@@ -198,6 +384,21 @@ struct PhoneStartResponse: Codable {
     var message: String?
     var error: String?
     var code: String?
+
+    private enum CodingKeys: String, CodingKey {
+        case success, challengeId, expiresAt, channel, delivered, message, error, code
+    }
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        success = c.lenient(.success, false)
+        challengeId = c.lenientOpt(.challengeId)
+        expiresAt = c.lenientOpt(.expiresAt)
+        channel = c.lenientOpt(.channel)
+        delivered = c.lenient(.delivered, false)
+        message = c.lenientOpt(.message)
+        error = c.lenientOpt(.error)
+        code = c.lenientOpt(.code)
+    }
 }
 
 struct PhoneVerifyRequest: Codable {
@@ -218,6 +419,24 @@ struct PhoneVerifyResponse: Codable {
     var code: String?
     var reason: String?
     var attemptsLeft: Int?
+
+    private enum CodingKeys: String, CodingKey {
+        case success, phone, phoneToken, phoneProof, expiresAt, message, error,
+             code, reason, attemptsLeft
+    }
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        success = c.lenient(.success, false)
+        phone = c.lenientOpt(.phone)
+        phoneToken = c.lenientOpt(.phoneToken)
+        phoneProof = c.lenientOpt(.phoneProof)
+        expiresAt = c.lenientOpt(.expiresAt)
+        message = c.lenientOpt(.message)
+        error = c.lenientOpt(.error)
+        code = c.lenientOpt(.code)
+        reason = c.lenientOpt(.reason)
+        attemptsLeft = c.lenientOpt(.attemptsLeft)
+    }
 }
 
 struct LinkPhoneRequest: Codable { var phoneToken: String }
@@ -227,6 +446,17 @@ struct LinkPhoneResponse: Codable {
     var message: String?
     var error: String?
     var code: String?
+
+    private enum CodingKeys: String, CodingKey {
+        case success, message, error, code
+    }
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        success = c.lenient(.success, false)
+        message = c.lenientOpt(.message)
+        error = c.lenientOpt(.error)
+        code = c.lenientOpt(.code)
+    }
 }
 
 // ── Security sector (the 24-screen batch) ───────────────────────────────────
@@ -238,10 +468,15 @@ struct ProfileDto: Codable {
     var handle = ""
     var phone: String?
     var twoFactor = "off"
-    /// The server's own answer to "is the second factor on", so no client re-derives it.
-    var twoFactorEnabled = false
+    /// The server's own answer to "is the second factor on", so no client
+    /// re-derives it. Optional on purpose: nil means the server did not answer,
+    /// which the hub must show as "couldn't load" rather than as "Off" — a
+    /// wrong Off invites the person to re-enable a factor that is already on
+    /// and hides a real lock-out. Same reason `backupCodesRemaining` is nil and
+    /// not 0: 0 would mean "generate codes or you'll be locked out".
+    var twoFactorEnabled: Bool?
     var twoFactorEnabledAt: String?
-    var backupCodesRemaining = 0
+    var backupCodesRemaining: Int?
     var passwordChangedAt: String?
     var createdAt: String?
 
@@ -257,9 +492,9 @@ struct ProfileDto: Codable {
         handle = c.lenient(.handle, "")
         phone = c.lenientOpt(.phone)
         twoFactor = c.lenient(.twoFactor, "off")
-        twoFactorEnabled = c.lenient(.twoFactorEnabled, false)
+        twoFactorEnabled = c.lenientOpt(.twoFactorEnabled)
         twoFactorEnabledAt = c.lenientOpt(.twoFactorEnabledAt)
-        backupCodesRemaining = c.lenient(.backupCodesRemaining, 0)
+        backupCodesRemaining = c.lenientOpt(.backupCodesRemaining)
         passwordChangedAt = c.lenientOpt(.passwordChangedAt)
         createdAt = c.lenientOpt(.createdAt)
     }
@@ -276,13 +511,16 @@ struct ProfileResponse: Codable {
     var accessToken: String?
     /// When that replacement expires. Stored, or the app believes it is signed in forever.
     var tokenExpiresAt: Double?
+    /// The relative form the server may send instead.
+    var tokenExpiresIn: Int?
+    var refreshToken: String?
     var message: String?
     var error: String?
     var code: String?
 
     private enum CodingKeys: String, CodingKey {
         case success, profile, proof, newBackupCodes, accessToken, tokenExpiresAt,
-             message, error, code
+             tokenExpiresIn, expiresIn, refreshToken, message, error, code
     }
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -292,9 +530,20 @@ struct ProfileResponse: Codable {
         newBackupCodes = c.lenientOpt(.newBackupCodes)
         accessToken = c.lenientOpt(.accessToken)
         tokenExpiresAt = c.lenientOpt(.tokenExpiresAt)
+        tokenExpiresIn = c.lenientOpt(.tokenExpiresIn) ?? c.lenientOpt(.expiresIn)
+        refreshToken = c.lenientOpt(.refreshToken)
         message = c.lenientOpt(.message)
         error = c.lenientOpt(.error)
         code = c.lenientOpt(.code)
+    }
+
+    /// Absolute expiry in epoch-milliseconds for a token this response
+    /// reissued, from either shape. nil only when the server sent neither —
+    /// a replacement token written without an expiry is a permanent session.
+    var tokenExpiresAtMillis: Double? {
+        if let at = tokenExpiresAt { return at < 100_000_000_000 ? at * 1000 : at }
+        guard let seconds = tokenExpiresIn else { return nil }
+        return Date().timeIntervalSince1970 * 1000 + Double(seconds) * 1000
     }
 }
 
@@ -448,6 +697,19 @@ struct ApiClient {
             throw ApiError.http(status: -1, code: nil, message: "No response")
         }
         if http.statusCode >= 400 {
+            // A 401 on a call that carried our bearer means the server no
+            // longer recognises the session — the token may have expired or
+            // been revoked from another device. Clearing it here (rather than
+            // only on an explicit sign-out) is the difference between landing
+            // on sign-in and sitting on a home screen whose every request 401s.
+            // Anonymous calls (sign-in, create, reset) 401 for wrong
+            // credentials, so only an authenticated rejection kills the session.
+            if http.statusCode == 401, bearer != nil {
+                DispatchQueue.main.async {
+                    SessionStore.clear()
+                    NotificationCenter.default.post(name: .gmSessionExpired, object: nil)
+                }
+            }
             let carrier = try? decoder.decode(ErrorCarrier.self, from: data)
             throw ApiError.http(
                 status: http.statusCode,
