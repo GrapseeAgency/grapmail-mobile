@@ -105,6 +105,16 @@ Everything hits the **real account API** at `https://grapsee.com/api` — the
 same endpoints, token format (`st1`), and rules as the website. No mocks, no
 stubs, no fake data anywhere.
 
+> **Qualification, added while investigating the mailbox.** "The same … as the
+> website" is true of the account and security surface and is *not* true of
+> mail. The website's mail traffic goes to the gateway (`api.iqracsc.com`,
+> Postgres + MTA) and its login issues the token that API accepts; this app's
+> account traffic goes to the Next.js handlers backed by a JSONL file store,
+> whose tokens the gateway rejects. The two stores do not share users — see
+> "Mailbox sector" below. So "no fake data" still holds, but it holds because
+> the app talks to a real store, not because that store is the one the mail
+> service reads.
+
 ## Mailbox sector — not built, and why
 
 The mailbox is the next batch. Before any of it is written, one fact has to be
