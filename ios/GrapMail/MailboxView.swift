@@ -59,7 +59,11 @@ struct MailboxView: View {
                 .zIndex(2)
             }
         }
-        .ignoresSafeArea(edges: .bottom)
+        // No ignoresSafeArea on the screen. It was applied to the whole ZStack,
+        // which pushed the tab bar and the drawer's pinned footer under the home
+        // indicator: the rows rendered, reported a frame, and could not be hit —
+        // and a bottom bar drawn under the indicator is a defect for a person,
+        // not only for the test. The background may still bleed past it.
         .sheet(item: $sheet) { which in sheetContent(which) }
         .task {
             // Ask for the box only when it has never been asked for, and read
@@ -79,7 +83,7 @@ struct MailboxView: View {
 
     private var content: some View {
         ZStack(alignment: .bottomTrailing) {
-            GM.bg
+            GM.bg.ignoresSafeArea()
             VStack(spacing: 0) {
                 header
                 staleBanner
