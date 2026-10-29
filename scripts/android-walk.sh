@@ -262,7 +262,9 @@ for spec in "two-factor-on:40-sec-two-factor-on" \
             "session-revoked:49-sec-session-revoked" \
             "session-revoked-suspicious:50-sec-session-revoked-suspicious" \
             "revoke-session-form:51-sec-revoke-session-form" \
-            "revoke-session-confirm:52-sec-revoke-session-confirm"; do
+            "revoke-session-confirm:52-sec-revoke-session-confirm" \
+            "suspicious-alert:53-sec-alert-no-open-alert" \
+            "secure-account:54-sec-secure-no-open-alert"; do
   nm="${spec%%:*}"; pic="${spec##*:}"
   adb shell am force-stop "$PKG"
   adb shell am start -W -n "$PKG/.MainActivity" --es gmSnapshot "$nm" >/dev/null
@@ -273,6 +275,20 @@ for spec in "two-factor-on:40-sec-two-factor-on" \
   # with content-desc 'gm-snapshot'; without it the shot proves nothing.
   if [ -z "$(find_nodes "n.get('content-desc','')=='gm-snapshot'")" ]; then
     echo "FAIL: snapshot '$nm' is not the visible screen" >&2; FAILURES=$((FAILURES + 1))
+  fi
+  # The suspicious pair fetch on appear, so wait for the loaded branch or the
+  # photograph catches "Checking your account…" and proves nothing. Each marker
+  # is a label that exists ONLY once the fetch has settled.
+  case "$nm" in
+    suspicious-alert) settled="Address" ;;
+    secure-account) settled="Suspicious Sign-In Details" ;;
+    *) settled="" ;;
+  esac
+  if [ -n "$settled" ] && [ -z "$(find_nodes "n.get('text','')=='$settled'")" ]; then
+    sleep 4   # one retry: the fetch may still be in flight
+    if [ -z "$(find_nodes "n.get('text','')=='$settled'")" ]; then
+      echo "FAIL: snapshot '$nm' never finished loading" >&2; FAILURES=$((FAILURES + 1))
+    fi
   fi
   if [ -n "$(find_nodes "n.get('text','')=='Unknown snapshot: $nm'")" ]; then
     echo "FAIL: app did not recognise snapshot '$nm'" >&2; FAILURES=$((FAILURES + 1))
@@ -350,6 +366,7 @@ for want in 01-welcome-light 02-step1-name-light 03-step2-basicinfo-light \
             48-sec-sign-out-all-done 49-sec-session-revoked \
             50-sec-session-revoked-suspicious \
             51-sec-revoke-session-form 52-sec-revoke-session-confirm \
+            53-sec-alert-no-open-alert 54-sec-secure-no-open-alert \
             10-session-restored 11-signin-light 12-welcome-dark 13-step1-name-dark; do
   [ -s "$OUT/$want.png" ] || { echo "FAIL: missing $want.png" >&2; FAILURES=$((FAILURES + 1)); }
 done

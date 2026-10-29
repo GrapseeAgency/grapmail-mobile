@@ -273,6 +273,20 @@ final class ScreenshotWalkUITests: XCTestCase {
             // by design, so navigation can never reach them either.
             ("51-sec-revoke-session-form", "revoke-session-form"),
             ("52-sec-revoke-session-confirm", "revoke-session-confirm"),
+            // The suspicious sign-in pair, photographed in the only state a
+            // clean CI account can honestly be in: no open alert. Their names
+            // say so, because the same screens with a real intruder on them
+            // need a server-seeded event no test can ask for.
+            ("53-sec-alert-no-open-alert", "suspicious-alert"),
+            ("54-sec-secure-no-open-alert", "secure-account"),
+        ]
+        // These two fetch on appear, so the shutter has to wait for the loaded
+        // branch — otherwise the photograph catches "Checking your account…"
+        // and proves nothing. Each marker is a label that exists ONLY once the
+        // fetch has settled.
+        let settledLabels: [String: String] = [
+            "suspicious-alert": "Address",
+            "secure-account": "Suspicious Sign-In Details",
         ]
         for screen in postWriteScreens {
             app.terminate()
@@ -292,6 +306,10 @@ final class ScreenshotWalkUITests: XCTestCase {
             // a placeholder photographed as if it were the screen.
             let unknown = app.staticTexts["Unknown snapshot: \(screen.name)"].firstMatch
             XCTAssertFalse(unknown.exists, "app did not recognise snapshot '\(screen.name)'")
+            if let settled = settledLabels[screen.name] {
+                XCTAssertTrue(app.staticTexts[settled].waitForExistence(timeout: 12),
+                              "snapshot '\(screen.name)' never finished loading")
+            }
             snap(screen.shot)
         }
 

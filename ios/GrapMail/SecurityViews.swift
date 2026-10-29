@@ -1585,8 +1585,13 @@ struct SecureMyAccountView: View {
         guard let token = SessionStore.token else { return }
         if let list = try? await ApiClient.sessions(token: token) {
             sessions = list.sessions
-            sessionsLoaded = true
         }
+        // Settled either way. Inside the `if let`, a failed call left the flag
+        // false forever and the screen sat on "Checking your account…" with no
+        // retry and no error — the rows below already answer a missing value
+        // honestly ("Not recorded" / "Not available"), so a failed fetch must
+        // land there, not on a spinner that never ends.
+        sessionsLoaded = true
         if let activity = try? await ApiClient.activity(token: token) {
             // The server names the open alert; re-filtering would flag a dismissed
             // or stale sign-in as a break-in.
@@ -1595,8 +1600,8 @@ struct SecureMyAccountView: View {
             alertDevice = alert?.device ?? ""
             alertIp = alert?.ip ?? ""
             flaggedDeviceId = alert?.deviceId ?? ""
-            alertKnown = true
         }
+        alertKnown = true
     }
 
     private func revokeFlagged() {

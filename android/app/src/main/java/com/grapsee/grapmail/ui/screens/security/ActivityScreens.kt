@@ -258,7 +258,12 @@ fun SecureMyAccountScreen(
 
     suspend fun reload() {
         val token = SessionStore.token(context) ?: return
-        runCatching { sessions = Api.sessions(token).sessions }.onSuccess { sessionsLoaded = true }
+        runCatching { sessions = Api.sessions(token).sessions }
+        // Settled either way. Gating the flag on success left a failed call
+        // meaning "Checking your account…" forever, with no retry and no error,
+        // while the rows below already answer a missing value honestly ("Not
+        // recorded" / "Not available"). A failed fetch must land there.
+        sessionsLoaded = true
         runCatching {
             val activity = Api.activity(token)
             // The server names the suspicious sign-in; re-picking the newest
@@ -268,8 +273,8 @@ fun SecureMyAccountScreen(
             alertDevice = alert?.device ?: ""
             alertIp = alert?.ip ?: ""
             flaggedDeviceId = alert?.deviceId ?: ""
-            alertKnown = true
         }
+        alertKnown = true
     }
 
     LaunchedEffect(Unit) { reload() }

@@ -22,13 +22,13 @@ import androidx.compose.ui.semantics.semantics
  * renders that one screen with closures that do nothing, exactly like a
  * navigation stub: no fetch, no submit.
  *
- * Nothing in the real flow ever passes the extra. The screens that fetch on
- * appear (the suspicious-sign-in alert and the flow behind it) are deliberately
- * absent — rendering them needs a server-seeded event, and a half-populated
- * screen photographed as if it were the real thing is worse than no screenshot
- * at all. The per-session revoke confirmations used to be excluded on the same
- * grounds: they refetched the session list to print one device label, until
- * that label began travelling with the route that already had it.
+ * Nothing in the real flow ever passes the extra. The per-session revoke
+ * confirmations used to be excluded on the same grounds as the suspicious
+ * sign-in pair below: they refetched the session list to print one device
+ * label, until that label began travelling with the route that already had it.
+ * The suspicious pair fetch too and are included anyway, because both already
+ * render a truthful empty state when no alert is open — see the note at their
+ * cases.
  *
  * The case list below IS the vocabulary; keep scripts/android-walk.sh in sync
  * with it.
@@ -66,6 +66,15 @@ fun SecuritySnapshotScreen(name: String) {
             "revoke-session-confirm" ->
                 ConfirmSessionRevocationScreen(sessionId = "snapshot-session",
                     device = "Firefox on Linux · Lagos, Nigeria", onBack = {}, onRevoke = {})
+            // These two fetch on appear, and that is deliberate: with no open
+            // alert the server reports, each renders its honest empty state
+            // ("Not recorded" / "Not available" / "That device is already signed
+            // out"), which IS the state of a clean CI account. The walk waits for
+            // that loaded state and the file name records which branch it is.
+            "suspicious-alert" ->
+                SuspiciousSignInAlertScreen(onBack = {}, onSecure = {}, onThisWasMe = {})
+            "secure-account" ->
+                SecureMyAccountScreen(onBack = {}, onChangePassword = {}, onBackToActivity = {})
             // The walk asserts this label is ABSENT, so an unrecognised name cannot
             // hand the artifact a placeholder photographed as if it were the screen.
             else -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {

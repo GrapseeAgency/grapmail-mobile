@@ -12,13 +12,18 @@ import SwiftUI
 /// nothing, exactly like a navigation stub.
 ///
 /// Nothing in the real flow ever passes the argument, and no screen here is
-/// reachable without it. The screens that DO fetch on appear (the
-/// suspicious-sign-in alert and the "secure my account" flow behind it) are
-/// deliberately absent: they need a server-seeded event, and a half-populated
-/// screen photographed as if it were the real thing is worse than no screenshot
-/// at all. The per-session revoke confirmations used to be excluded for the
-/// same reason — they refetched the whole session list to print one device
-/// label — until that fetch moved to the caller that already had the answer.
+/// reachable without it. The per-session revoke confirmations used to be
+/// excluded for the same reason as the two below — they refetched the whole
+/// session list to print one device label — until that fetch moved to the
+/// caller that already had the answer.
+///
+/// The suspicious-sign-in pair DOES fetch on appear, and is included anyway:
+/// each already renders an honest state when the server reports no open alert
+/// ("Not recorded" / "Not available" / "That device is already signed out"),
+/// which is the true state of a clean CI account. The walk waits for that
+/// loaded state before shooting and the file name says which branch it is, so
+/// the photograph documents the empty branch instead of pretending to be a live
+/// break-in.
 enum SecuritySnapshot {
     /// The launch argument the UI tests pass: `-gmSnapshot <name>`.
     static func requested() -> String? {
@@ -69,6 +74,10 @@ struct SecuritySnapshotView: View {
             case "revoke-session-confirm":
                 ConfirmSessionRevocationView(sessionId: "snapshot-session", device: "Firefox on Linux · Lagos, Nigeria",
                                              onBack: {}, onRevoked: { _ in })
+            case "suspicious-alert":
+                SuspiciousSignInAlertView(onBack: {}, onSecure: {}, onThisWasMe: {})
+            case "secure-account":
+                SecureMyAccountView(onBack: {}, onChangePassword: {}, onBackToActivity: {})
             default:
                 Text("Unknown snapshot: \(name)")
                     .font(.system(size: 15, weight: .semibold))
