@@ -139,6 +139,24 @@ final class MailboxModel: ObservableObject {
         thread = ThreadState(messages: messages)
     }
 
+    /// Labels live in `labelState` for the labels screen and in `state.labels`
+    /// for the inbox's chip strip. The snapshot host has to fill both: seeding
+    /// one and reading the other is how `mail-labels` photographs "No labels
+    /// yet" while the sample data sits unused in the other store.
+    func seedLabelsForSnapshot(_ labels: [MailLabel]) {
+        state.labels = labels
+        labelState.labels = labels
+    }
+
+    /// The screener switch. Android's host seeds this too; without it the two
+    /// platforms photograph the same screen in different states.
+    func seedScreenerForSnapshot(enabled: Bool, pending: Int) {
+        screener.loaded = true
+        screener.enabled = enabled
+        screener.pending = pending
+        screener.error = nil
+    }
+
     private var token: String? { SessionStore.token }
 
     // ── list ─────────────────────────────────────────────────────────────────

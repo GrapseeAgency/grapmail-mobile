@@ -740,7 +740,11 @@ class MailboxViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun seedLabelsForSnapshot(labels: List<MailLabelDto>) {
+        // Both stores. The labels screen reads `MailboxUiState.labels` and the
+        // inbox's chip strip reads this one; filling only the second is how the
+        // labels frame photographs "No labels yet" with the sample data set.
         _labels.update { it.copy(labels = labels, loading = false, error = null) }
+        _state.update { it.copy(labels = labels) }
     }
 
     fun seedScreenerForSnapshot(enabled: Boolean, pending: Int) {

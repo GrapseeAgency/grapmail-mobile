@@ -23,6 +23,18 @@ enum MailSnapshot {
 struct MailSnapshotView: View {
     let name: String
 
+    /// The derived screens read the same cache the live list writes, and that
+    /// cache is an actor, so their content arrives one hop after the screen asks
+    /// for it. The host draws nothing until the seed has landed — otherwise the
+    /// photograph catches the empty branch of a screen it means to show full.
+    @State private var cached = false
+
+    /// One model for the frame, built once. These screens take it as an
+    /// `@ObservedObject`, and constructing it inside `body` gives a new instance
+    /// on every render — the observation re-subscribes each time and any update
+    /// the screen makes lands on an object nobody is showing.
+    @State private var model = MailboxModel()
+
     // ── the sample mailbox ───────────────────────────────────────────────────
     // Senders and subjects are invented for the photograph. They never appear
     // in a live path, so a populated screen can be reviewed without anyone
@@ -62,6 +74,23 @@ struct MailSnapshotView: View {
         row("m5", "Tomas Varga", "tomas@fieldkit.example", "Re: Winter delivery windows",
             "Agreed — we will hold the Thursday slot for both routes."),
     ]
+
+    /// The sample page, in the cache the derived screens read. Contacts come from
+    /// loaded mail and Files from opened bodies — the API has no contacts index
+    /// and no list-all attachments — so a populated photograph means putting the
+    /// sample mail where a fetch would have put it.
+    private static func page() -> MailInboxResponse {
+        var r = MailInboxResponse()
+        r.success = true
+        r.box = "inbox"
+        r.total = rows.count
+        r.messages = rows
+        return r
+    }
+
+    private static func attachmentBody() -> MailMessageFull {
+        Self.full("m1", body: "Attached is the invoice for the quarter, payable on receipt.")
+    }
 
     private static func labels() -> [MailLabel] {
         var work = MailLabel()
@@ -132,17 +161,17 @@ struct MailSnapshotView: View {
             case "mail-snooze-sheet":
                 sheetFrame(SnoozeSheet { _ in })
             case "mail-labels":
-                secondary(LabelsView(vm: modelWithLabels(), onBack: {}, onCreate: {}))
+                secondary(LabelsView(vm: model, onBack: {}, onCreate: {}))
             case "mail-label-create":
-                secondary(LabelCreateView(vm: MailboxModel(), onDone: {}))
+                secondary(LabelCreateView(vm: model, onDone: {}))
             case "mail-thread":
-                secondary(ThreadView(vm: modelWithThread(encrypted: false), id: "t-m1",
+                secondary(ThreadView(vm: model, id: "t-m1",
                                      isThread: true, onBack: {}, onReply: { _ in }))
             case "mail-thread-encrypted":
-                secondary(ThreadView(vm: modelWithThread(encrypted: true), id: "t-m9",
+                secondary(ThreadView(vm: model, id: "t-m9",
                                      isThread: true, onBack: {}, onReply: { _ in }))
             case "mail-compose":
-                secondary(ComposeView(vm: MailboxModel(), onBack: {}))
+                secondary(ComposeView(vm: model, onBack: {}))
             case "mail-send-receipt":
                 sheetFrame(VStack(alignment: .leading, spacing: 12) {
                     SendReceiptView(status: "queued",
@@ -151,28 +180,71 @@ struct MailSnapshotView: View {
                                     detail: nil, error: "Recipient domain not reachable.")
                 })
             case "mail-contacts":
-                secondary(ContactsView(vm: modelWithPeople(), onBack: {}, onOpen: { _ in }))
+                derived(ContactsView(vm: model, onBack: {}, onOpen: { _ in }))
             case "mail-contact-detail":
-                secondary(ContactDetailView(vm: modelWithPeople(), address: "amira@northwind.example",
-                                           onBack: {}, onWrite: {}))
+                derived(ContactDetailView(vm: model, address: "amira@northwind.example",
+                                         onBack: {}, onWrite: {}))
             case "mail-files":
-                secondary(FilesView(vm: MailboxModel(), onBack: {}, onOpen: { _ in }))
+                derived(FilesView(vm: model, onBack: {}, onOpen: { _ in }))
             case "mail-attachment-preview":
-                secondary(AttachmentPreviewView(vm: MailboxModel(), attachmentId: "a1",
-                                                onBack: {}))
+                derived(AttachmentPreviewView(vm: model, attachmentId: "a1",
+                                              onBack: {}))
             case "mail-settings":
-                secondary(MailSettingsView(vm: modelWithAccount(), onBack: {},
+                secondary(MailSettingsView(vm: model, onBack: {},
                                            onSecurity: {}, onScreener: {}, onLabels: {},
                                            onHelp: {}, onSignOut: {}))
             case "mail-screener":
-                secondary(ScreenerView(vm: MailboxModel(), onBack: {}, onOpenQueue: {}))
+                secondary(ScreenerView(vm: model, onBack: {}, onOpenQueue: {}))
             default:
                 Text("Unknown mail snapshot: \(name)")
                     .foregroundColor(GM.textSecondary)
                     .accessibilityIdentifier("gm-snapshot-unknown")
             }
         }
+        .task(id: name) {
+            // Seed the one model this frame shows. Every name gets its own pass,
+            // because the screens read different stores and a screen left
+            // unseeded photographs its empty branch as if it were the design.
+            model.seedForSnapshot { s in
+                s.accountName = "Amira Rahman"
+                s.accountAddress = "amira@grapmail.com"
+                s.accountStatus = "active"
+                s.memberSince = "March 2026"
+            }
+            model.seedLabelsForSnapshot(Self.labels())
+            switch name {
+            case "mail-thread":
+                model.seedThreadForSnapshot([Self.full("m1",
+                    body: "Attached is the invoice for the quarter, payable on receipt. "
+                          + "The facilities line item moved again — see page two.")])
+            case "mail-thread-encrypted":
+                model.seedThreadForSnapshot([Self.full("m9", body: nil, encrypted: true)])
+            case "mail-screener":
+                model.seedScreenerForSnapshot(enabled: true, pending: 3)
+            default:
+                break
+            }
+            if Self.derivedNames.contains(name) {
+                await MailStore.shared.putPage(.inbox, nil, Self.page(), replace: true)
+                await MailStore.shared.putBody(Self.attachmentBody())
+                cached = true
+            }
+        }
         .accessibilityIdentifier("gm-snapshot")
+    }
+
+    /// The names whose screens compute content from the cache rather than from
+    /// the state the host seeds directly.
+    static let derivedNames: Set<String> = [
+        "mail-contacts", "mail-contact-detail", "mail-files", "mail-attachment-preview",
+    ]
+
+    @ViewBuilder private func derived<V: View>(_ content: V) -> some View {
+        if cached {
+            secondary(content)
+        } else {
+            CenteredState(title: "Preparing snapshot…")
+        }
     }
 
     // ── frames ───────────────────────────────────────────────────────────────
@@ -267,44 +339,7 @@ struct MailSnapshotView: View {
 
     // ── models seeded for the photograph only ────────────────────────────────
 
-    /// A model whose published state carries sample content. Only the snapshot
-    /// host can build one, and the state it writes is the model's own shape —
-    /// so the screen under the photograph is the real screen, not a copy.
-    private static func seed(_ mutate: @escaping (inout MailboxModel.State) -> Void) -> MailboxModel {
-        let m = MailboxModel()
-        m.seedForSnapshot(mutate)
-        return m
-    }
 
-    private func modelWithLabels() -> MailboxModel {
-        Self.seed { s in
-            s.labels = Self.labels()
-            s.accountName = "Amira Rahman"
-            s.accountAddress = "amira@grapmail.com"
-        }
-    }
-
-    private func modelWithAccount() -> MailboxModel {
-        Self.seed { s in
-            s.accountName = "Amira Rahman"
-            s.accountAddress = "amira@grapmail.com"
-            s.accountStatus = "active"
-            s.memberSince = "March 2026"
-        }
-    }
-
-    private func modelWithPeople() -> MailboxModel {
-        Self.seed { s in s.accountAddress = "amira@grapmail.com" }
-    }
-
-    private func modelWithThread(encrypted: Bool) -> MailboxModel {
-        let m = MailboxModel()
-        m.seedThreadForSnapshot([Self.full("m1", body: encrypted ? nil
-            : "Attached is the invoice for the quarter, payable on receipt. "
-              + "The facilities line item moved again — see page two.",
-            encrypted: encrypted)])
-        return m
-    }
 }
 
 /// The receipt view, exposed for the snapshot host. `SendReceipt` in

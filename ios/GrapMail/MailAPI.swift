@@ -209,6 +209,10 @@ struct MailAttachment: Decodable, Identifiable {
 
 /// `GET /inbox` — `grapmail.ts:729-737`.
 struct MailInboxResponse: Decodable {
+    /// See `MailMessage.init()` — a hand-decoded type has no memberwise init, and
+    /// the snapshot host builds a page to load into the cache.
+    init() {}
+
     var success = false
     var box: String?
     var page = 1

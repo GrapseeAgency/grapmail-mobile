@@ -85,6 +85,7 @@ fun MailSnapshotScreen(name: String) {
                 seedCache()
                 vm.seedForSnapshot { it.copy(accountAddress = "amira@grapmail.com") }
             }
+            "mail-labels" -> vm.seedLabelsForSnapshot(sampleLabels)
             "mail-settings" -> vm.seedForSnapshot {
                 it.copy(
                     accountAddress = "amira@grapmail.com",

@@ -411,7 +411,10 @@ final class ScreenshotWalkUITests: XCTestCase {
             "mail-attachment-preview": "Save to this device",
             "mail-settings": "GrapMail address",
             "mail-screener": "Waiting now",
-            "mail-labels": "Manage labels",
+            // A seeded label's NAME, so it appears only once the labels arrive.
+            // "Manage labels" is a drawer row: the previous marker waited on text
+            // this screen never draws.
+            "mail-labels": "Bills",
             "mail-selection": "Delete",
         ]
         for screen in postWriteScreens {

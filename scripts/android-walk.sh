@@ -343,7 +343,10 @@ for spec in "two-factor-on:40-sec-two-factor-on" \
     mail-files|mail-attachment-preview) settled="invoice-q3.pdf" ;;
     mail-settings) settled="GrapMail address" ;;
     mail-screener) settled="Waiting now" ;;
-    mail-labels) settled="Manage labels" ;;
+    # "Bills" is a seeded label NAME: it exists only once the labels have landed,
+    # which is what makes it a marker. "Manage labels" is a drawer row and never
+    # appears on this screen, so the wait would have been on nothing.
+    mail-labels) settled="Bills" ;;
     mail-selection) settled="Delete" ;;
     *) settled="" ;;
   esac
