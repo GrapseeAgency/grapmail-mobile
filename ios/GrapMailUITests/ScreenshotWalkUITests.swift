@@ -212,6 +212,21 @@ final class ScreenshotWalkUITests: XCTestCase {
         // copy change breaks silently, and six of them went red at once in the
         // plan for exactly that reason.
         let mailHome = app.descendants(matching: .any)["mail-home"].firstMatch
+        /// Tap the element's own frame centre through a coordinate, the way the
+        /// Android walk taps uiautomator node bounds. The drawer's lower rows are
+        /// found, correctly placed and NOT clipped by anything visible, yet their
+        /// hit test is refused (`not hittable`) — a SwiftUI/AX layering artefact,
+        /// not an app bug. The coordinate path drives the same on-screen control,
+        /// and the frame is printed so the choice can be audited rather than
+        /// taken on trust.
+        func tapFrame(_ element: XCUIElement, _ what: String) {
+            XCTAssertTrue(element.waitForExistence(timeout: 20), "missing: \(what)")
+            let f = element.frame
+            print("WALK-TAP \(what) frame: \(f)")
+            let dx = (f.midX) / max(app.frame.width, 1)
+            let dy = (f.midY) / max(app.frame.height, 1)
+            app.coordinate(withNormalizedOffset: CGVector(dx: dx, dy: dy)).tap()
+        }
         /// The mailbox home is on screen when either its container name or the
         /// one control it always draws is reachable. The container is asked
         /// first; the text field is the proof, because a container identifier on
@@ -285,7 +300,8 @@ final class ScreenshotWalkUITests: XCTestCase {
         // tap throws on hittability rather than on the app being wrong.
         app.swipeUp()
         sleep(1)
-        tap(app.descendants(matching: .any)["mail-drawer-Security"].firstMatch, "Security (drawer)", timeout: 20)
+        tapFrame(app.descendants(matching: .any)["mail-drawer-Security"].firstMatch,
+                 "Security (drawer)")
         require(app.staticTexts["Account Security"].firstMatch, "Security hub", timeout: 8)
         snap("20-sec-hub-light")
         openSecurityRow("Two-Step Verification", "21-sec-2fa-enable-light")
@@ -449,7 +465,7 @@ final class ScreenshotWalkUITests: XCTestCase {
                       "drawer did not open (to sign out)")
         app.swipeUp() // same lower group, same clip
         sleep(1)
-        tap(app.descendants(matching: .any)["sign-out"].firstMatch, "Sign out (drawer)", timeout: 20)
+        tapFrame(app.descendants(matching: .any)["sign-out"].firstMatch, "Sign out (drawer)")
         require(app.staticTexts["Welcome to"].firstMatch, "welcome after sign-out", timeout: 8)
 
         // Sign-in screen
