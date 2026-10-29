@@ -368,7 +368,15 @@ object Api {
             // Say so once, loudly, so the app can land the person on sign-in
             // instead of leaving them on a signed-in screen that cannot load.
             // Anonymous 401s — a wrong password at sign-in — must not do this.
-            if (response.code == 401 && chain.request().header("Authorization") != null) {
+            // Scoped by URL on purpose. The mail service is served by a different
+            // backend than the account endpoints, and today it refuses a bearer
+            // the account API still accepts. Clearing the session for that would
+            // log a person out of a working sign-in because a second service
+            // disagreed — and it would take the security screens down with it.
+            // The rule stays exactly as strong for every account call.
+            val isMailCall = chain.request().url.encodedPath.contains("/grapsee/grapmail")
+            if (response.code == 401 && chain.request().header("Authorization") != null
+                && !isMailCall) {
                 SessionEvents.signalExpired()
             }
             response

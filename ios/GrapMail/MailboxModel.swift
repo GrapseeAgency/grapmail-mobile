@@ -758,7 +758,18 @@ final class MailboxModel: ObservableObject {
 
     /// The server's own words when it has them, and a plain sentence when it does
     /// not. Never a status code presented to the user as the explanation.
+    /// The sentence a mail screen shows for a failed call. A 401 here is the mail
+    /// service declining this credential, not the session dying — the account
+    /// endpoints still accept it, which is why the 401 handler is scoped by path.
+    /// "Sign in again" would be a wrong diagnosis; silence would hide a real one.
     private static func describe(_ error: Error) -> String {
+        // Two steps, not one: `error as? ApiError` is an Optional, and a
+        // `.http` pattern does not match through it implicitly.
+        if let api = error as? ApiError, case let .http(status, _, _) = api,
+           status == 401 {
+            return "The mail service did not accept this session. " +
+                   "You are still signed in to your account."
+        }
         if let api = error as? ApiError { return api.userMessage }
         return error.localizedDescription
     }

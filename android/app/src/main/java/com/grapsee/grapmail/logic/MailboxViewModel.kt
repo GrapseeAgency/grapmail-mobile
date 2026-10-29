@@ -227,7 +227,7 @@ class MailboxViewModel(app: Application) : AndroidViewModel(app) {
                 }
                 .onFailure { e ->
                     val noBox = (e as? ApiException)?.code == "NO_MAILBOX"
-                    val msg = e.message ?: "Couldn't reach your mailbox."
+                    val msg = mailReason(e)
                     _state.update { cur ->
                         cur.copy(
                             loading = false, loadingMore = false,
@@ -706,6 +706,22 @@ class MailboxViewModel(app: Application) : AndroidViewModel(app) {
 
     private val _screener = MutableStateFlow(ScreenerState())
     val screener: StateFlow<ScreenerState> = _screener.asStateFlow()
+
+    /**
+     * The sentence a mail screen shows for a failed call.
+     *
+     * A 401 from the mail service is its own fact: that service does not accept
+     * this credential. It does not follow that the person's session died — the
+     * account endpoints accept it, which is why the interceptor is scoped by URL
+     * — so "sign in again" would be a wrong diagnosis and silence would hide a
+     * real one. Both get said instead.
+     */
+    private fun mailReason(e: Throwable): String = when {
+        e is com.grapsee.grapmail.data.ApiException && e.status == 401 ->
+            "The mail service did not accept this session. " +
+                "You are still signed in to your account."
+        else -> e.message ?: "Couldn't reach your mailbox."
+    }
 
     // ── snapshot host only ───────────────────────────────────────────────────
     //

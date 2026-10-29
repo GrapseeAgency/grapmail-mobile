@@ -771,7 +771,12 @@ struct ApiClient {
             // on sign-in and sitting on a home screen whose every request 401s.
             // Anonymous calls (sign-in, create, reset) 401 for wrong
             // credentials, so only an authenticated rejection kills the session.
-            if http.statusCode == 401, bearer != nil {
+            // Scoped by path on purpose, and identically to Android. The mail
+            // service is a different backend from the account endpoints and it
+            // refuses a bearer those endpoints accept; killing the session for
+            // that would sign a person out of a working sign-in and take the
+            // security screens with it. Every account call keeps the rule whole.
+            if http.statusCode == 401, bearer != nil, !path.hasPrefix(mailBase) {
                 Self.signalUnauthorized()
             }
             let carrier = try? decoder.decode(ErrorCarrier.self, from: data)
