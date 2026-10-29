@@ -145,7 +145,7 @@ struct LabelCreateView: View {
     @State private var colour = GM.primarySolid
     @State private var notice: String?
 
-    private struct Swatch {
+    private struct Swatch: Identifiable {
         let name: String
         let color: Color
         var id: String { name }

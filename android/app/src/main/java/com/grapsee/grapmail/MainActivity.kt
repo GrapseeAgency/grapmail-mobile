@@ -47,6 +47,7 @@ import com.grapsee.grapmail.ui.screens.mail.LabelCreateScreen
 import com.grapsee.grapmail.ui.screens.mail.LabelsScreen
 import com.grapsee.grapmail.ui.screens.mail.MailSettingsScreen
 import com.grapsee.grapmail.ui.screens.mail.MailboxScreen
+import com.grapsee.grapmail.ui.screens.mail.MailSnapshotScreen
 import com.grapsee.grapmail.ui.screens.mail.ScreenerScreen
 import com.grapsee.grapmail.ui.screens.mail.ThreadScreen
 import com.grapsee.grapmail.ui.screens.AccountCreatedAltScreen
@@ -731,7 +732,7 @@ fun GrapMailNav() {
                 onCompose = { nav.navigate(Routes.MAIL_COMPOSE) },
                 onSettings = { nav.navigate(Routes.MAIL_SETTINGS) },
                 onSecurity = { nav.navigate(Routes.SECURITY) },
-                onHelp = openSupport,
+                onHelp = { openSupport() },
                 onLabels = { nav.navigate(Routes.MAIL_LABELS) },
                 onContacts = { nav.navigate(Routes.MAIL_CONTACTS) },
                 onFiles = { nav.navigate(Routes.MAIL_FILES) },
@@ -810,7 +811,7 @@ fun GrapMailNav() {
                 onSecurity = { nav.navigate(Routes.SECURITY) },
                 onScreener = { nav.navigate(Routes.MAIL_SCREENER) },
                 onLabels = { nav.navigate(Routes.MAIL_LABELS) },
-                onHelp = openSupport,
+                onHelp = { openSupport() },
                 onSignOut = {
                     com.grapsee.grapmail.ui.screens.security.SecurityFlow.reset()
                     scope.launch { SessionStore.clear(nav.context.applicationContext) }

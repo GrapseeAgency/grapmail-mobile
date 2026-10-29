@@ -229,7 +229,7 @@ fun MailboxScreen(
                                     onSelect = { vm.toggleSelect(row.id) },
                                     onOpen = {
                                     val tid = row.threadId
-                                    onOpenThread(tid ?: row.id, tid != nil)
+                                    onOpenThread(tid ?: row.id, tid != null)
                                 },
                                     onStar = {
                                         vm.actOn(row.id,

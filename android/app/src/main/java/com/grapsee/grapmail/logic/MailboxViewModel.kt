@@ -699,7 +699,7 @@ class MailboxViewModel(app: Application) : AndroidViewModel(app) {
         _state.update { transform(it) }
     }
 
-    fun seedThreadForSnapshot(messages: List<MailMessageFullDto>) {
+    fun seedThreadForSnapshot(messages: List<com.grapsee.grapmail.data.MailMessageFullDto>) {
         _thread.update { it.copy(messages = messages, loading = false, error = null) }
     }
 
