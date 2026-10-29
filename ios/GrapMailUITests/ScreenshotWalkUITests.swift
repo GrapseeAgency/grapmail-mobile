@@ -212,14 +212,22 @@ final class ScreenshotWalkUITests: XCTestCase {
         // copy change breaks silently, and six of them went red at once in the
         // plan for exactly that reason.
         let mailHome = app.descendants(matching: .any)["mail-home"].firstMatch
+        /// The mailbox home is on screen when either its container name or the
+        /// one control it always draws is reachable. The container is asked
+        /// first; the text field is the proof, because a container identifier on
+        /// a ZStack that also holds an overlay is exactly the case where
+        /// XCUITest cannot resolve the node. This box is slow enough that one
+        /// short wait would read as an absent screen, so both get their time.
+        func homeOnScreen(_ timeout: TimeInterval = 40) -> Bool {
+            mailHome.waitForExistence(timeout: timeout / 2)
+                || app.textFields["mail-search"].waitForExistence(timeout: timeout / 2)
+        }
         // The runner's cold start is slow enough that one wait on the identifier
         // would read as an absent screen: this box took 27 s to draw its first
         // button in the previous run. Wait for the identifier, then for the one
         // label the home always draws, and fail only if neither arrives — a real
         // absence still fails, slowness does not.
-        XCTAssertTrue(mailHome.waitForExistence(timeout: 40)
-                      || app.textFields["mail-search"].waitForExistence(timeout: 20),
-                      "missing: Mailbox home")
+        XCTAssertTrue(homeOnScreen(), "missing: Mailbox home")
         snap("60-mail-home")
 
         // Mailbox leg — read-only. The drawer and the search field are reachable
@@ -228,18 +236,15 @@ final class ScreenshotWalkUITests: XCTestCase {
         // leg: one is irreversible, one destroys, one feeds the suppression list
         // that would stop future CI mail. They live in the snapshot band.
         tap(app.descendants(matching: .any)["mail-menu"].firstMatch, "Open folders (drawer)")
-        XCTAssertTrue(app.staticTexts["Pending approval"].waitForExistence(timeout: 15),
+        XCTAssertTrue(app.staticTexts["Pending approval"].waitForExistence(timeout: 20),
                       "drawer did not open")
         snap("62-mail-drawer")
         // The drawer closes on a row tap; choosing the box already on screen is
         // the one gesture that dismisses it without leaving the home.
         tap(app.descendants(matching: .any)["mail-drawer-Inbox"].firstMatch, "Close drawer (Inbox)")
-        XCTAssertTrue(mailHome.waitForExistence(timeout: 20)
-                      || app.textFields["mail-search"]
-                          .waitForExistence(timeout: 10),
-                      "home after drawer")
+        XCTAssertTrue(homeOnScreen(20), "home after drawer")
 
-        tap(app.descendants(matching: .any)["mail-search"].firstMatch, "Search field")
+        tap(app.textFields["mail-search"].firstMatch, "Search field", timeout: 20)
         sleep(1)
         snap("67-mail-search")
         app.swipeDown() // the keyboard is not part of the frame being reviewed
@@ -416,9 +421,8 @@ final class ScreenshotWalkUITests: XCTestCase {
         app.launchArguments = []
         app.launch()
         XCTAssertTrue(app.descendants(matching: .any)["mail-home"].firstMatch
-                        .waitForExistence(timeout: 40)
-                      || app.textFields["mail-search"]
-                          .waitForExistence(timeout: 20),
+                        .waitForExistence(timeout: 20)
+                      || app.textFields["mail-search"].waitForExistence(timeout: 20),
                       "session restored on launch (the mailbox is the signed-in home)")
         snap("10-session-restored")
         // Sign out lives in the mailbox drawer. This is the leg that ends the
@@ -539,9 +543,8 @@ final class ScreenshotWalkUITests: XCTestCase {
         require(app.staticTexts["Account Security"].firstMatch, "Security hub (return)", timeout: 8)
         tap(app.buttons["back"].firstMatch, "back (hub → home)")
         XCTAssertTrue(app.descendants(matching: .any)["mail-home"].firstMatch
-                        .waitForExistence(timeout: 40)
-                      || app.textFields["mail-search"]
-                          .waitForExistence(timeout: 20),
+                        .waitForExistence(timeout: 20)
+                      || app.textFields["mail-search"].waitForExistence(timeout: 20),
                       "Mailbox home (return)")
     }
 

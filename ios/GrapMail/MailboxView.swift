@@ -67,12 +67,12 @@ struct MailboxView: View {
             vm.ensureLoaded()
             vm.loadAccount()
         }
-        // `children: .contain` first, identifier second: a ZStack is not an
-        // accessibility element on its own, so an identifier applied to it lands
-        // on an ignored node and no query can ever resolve it. Declaring the
-        // container keeps its children visible and makes the name findable.
-        .accessibilityElement(children: .contain)
-        .accessibilityIdentifier("mail-home")
+        // No `.accessibilityElement(children: .contain)` here. It makes the
+        // identifier resolvable, and it broke every tap on the screen: with the
+        // drawer overlay as a sibling inside this ZStack, XCUITest's
+        // scroll-to-visible action on any descendant returned
+        // kAXErrorCannotComplete. The home is anchored on a real leaf instead —
+        // see `homeOnScreen` in the walk.
     }
 
     // ── the column ───────────────────────────────────────────────────────────
