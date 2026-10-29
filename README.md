@@ -105,6 +105,107 @@ Everything hits the **real account API** at `https://grapsee.com/api` — the
 same endpoints, token format (`st1`), and rules as the website. No mocks, no
 stubs, no fake data anywhere.
 
+## Mailbox sector — not built, and why
+
+The mailbox is the next batch. Before any of it is written, one fact has to be
+true and currently is not: **the backend that owns mailboxes cannot authenticate
+a user.**
+
+`https://api.iqracsc.com/auth/register` answers `500` on the `SELECT` that runs
+before any insert, because it asks for `account_type`, `grapmail_handle` and
+`grapmail_status` and the production `users` table does not have them.
+`POST /auth/login` fails the same way. Applying the migrations that add them
+(`0012_grapmail_mailbox.sql`, `0022_users_columns.sql`) is the fix, and it is
+currently blocked one level further out: the Neon project has exceeded its quota,
+so the database refuses writes outright —
+
+```
+PostgresError: Your account or project has exceeded the quota.
+code 53000 · failed on: CREATE SCHEMA IF NOT EXISTS "drizzle"
+```
+
+Nothing in the migration chain has been applied. Until the quota is cleared and
+`/auth/register` returns `200`, a mailbox screen would compile, render and
+screenshot while every live call returned `401`. That is the failure mode
+`src/app/lib/localAuthFallback.ts:63-67` was written to prevent, so it is not
+reproduced here on purpose.
+
+### Which backend, and the two halves of it
+
+| Surface | Where it actually lives | State |
+| --- | --- | --- |
+| `auth/account/*` (profile, sessions, activity, twofactor, verify-password) | Next.js handlers, JSONL file store | working — what the security sector uses today |
+| `grapmail/*` (the mail API) | gateway `api.iqracsc.com`, Postgres + MTA | routes live (`401`, not `404`) — unreachable without a gateway token |
+
+They do not share users: an account created through the app's path is rejected by
+the gateway. Mail therefore requires the app to hold a gateway identity, which is
+what the quota fix unblocks.
+
+The mail base path for the app is `$BASE/grapsee/grapmail` — the same same-origin
+proxy the website uses (`src/app/api/grapsee/grapmail/[...path]/route.ts:130`
+forwards to `<upstream>/grapmail/*` and passes the bearer through unchanged).
+
+### The contract the screens will be built against
+
+Verified by reading the handlers, not inferred:
+
+- `GET /me` → `{success, address, handle, status, name, memberSince}`;
+  `404 {code:"NO_MAILBOX"}` when the account has no mailbox
+- `GET /stats` → `{success, inbox:{total,unread}, sent, drafts, spam, trash}`
+- `GET /inbox?box=&q=&page=&pageSize=` → `{success, box, page, pageSize, total,
+  messages[]}`; default page size 25, floor 5
+- `GET /message/:id` → `{success, message}` where `message` is `fullRow` plus
+  `attachments[]`, and reading it sets `\Seen` server-side
+- `GET /thread/:threadId` → `{success, messages[fullRow]}`
+- `GET /labels` → `{success, labels[{…, unread}]}`
+- `PATCH /message/:id/:action` — **the action is in the path, never the body.**
+  `read|unread|star|unstar|trash|restore` (`grapmail-boxes.ts:265-270`) plus
+  `archive|unarchive|spam|unspam|snooze|unsnooze` (`grapmail-archive.ts:146-173`)
+- `DELETE /message/:id` — permanent, and only valid from Trash. Trash itself is
+  reversible; these two must never be conflated in the UI.
+
+`publicRow` (`grapmail.ts:579`) is the list shape and deliberately carries no
+body: `id, threadId, direction, status, from{address,name}, to[], cc[], subject,
+snippet, isRead, isStarred, hasAttachments, unsubscribe, isE2eEncrypted,
+createdAt`. `fullRow` adds `bodyText, bodyHtml, inReplyTo, sizeBytes,
+e2eEnvelope`.
+
+### What the reference PNGs show that the server cannot answer
+
+The design is the visual contract; these five elements are the agreed exceptions,
+each with the proof. They are omitted rather than invented.
+
+| Reference element | Reality |
+| --- | --- |
+| Tabs `Primary / Social / Promotions / Updates` | No `category` column on `grapmail_messages`, and the web client's own tab list has no categories — it is exactly `inbox, starred, sent, drafts, archive, spam, trash, others` (`src/app/(mail)/mail/page.tsx:199-208`). Replaced by that same real box list. |
+| Chips `All / Personal / Work / +2` | Same unbacked axis. Replaced by one strip from `GET /labels`. |
+| Drawer row `Important` | No column, no heuristic. Omitted. |
+| Drawer row `Snoozed` | `snooze` writes `snoozedUntil` and the inbox hides future-snoozed mail, but `BOXES` has no `snoozed` entry — so a snoozed message is currently unreachable. The **action** ships; the row does not, until the backend adds the box. Filed as a real product bug, not a UI gap. |
+| Bottom tab `Calendar` | No calendar backend exists. Omitted rather than rendered dead. |
+| Account switcher | One session per device. Rendered as the current account plus its `GET /aliases`, which is a real same-account feature. |
+| Sort by sender / subject | The server orders by UID descending only (`grapmail-boxes.ts:34-39`). Sort is client-side over the **loaded** set, and the sheet states that scope. |
+
+**Badge rule.** A count renders nothing when the server did not answer it, never
+`0`. `/stats` reports only inbox/sent/drafts/spam/trash, so Starred, Archive and
+All Mail carry no badge — the same call the web client already makes
+(`page.tsx:2306`).
+
+### Screen set, identical on both platforms
+
+`60-mail-home`, `61-mail-home-dark`, `62-mail-drawer`, `63-mail-empty`,
+`64-mail-loading`, `65-mail-load-failed`, `66-mail-no-mailbox`, `67-mail-search`,
+`68-mail-selection`, `69-mail-sort-filter`, `70-mail-move-sheet`,
+`71-mail-delete-sheet`, `72-mail-labels`, `73-mail-label-create`,
+`74-mail-thread`, `75-mail-thread-encrypted`, `76-mail-compose`,
+`77-mail-contacts`, `78-mail-files`, `79-mail-attachment-preview`,
+`80-mail-settings`, `81-mail-screener`, `82-mail-send-receipt`,
+`83-mail-assign-label-sheet`, `84-mail-snooze-sheet`, `85-mail-contact-detail`.
+
+Contacts is derived from `?box=inbox` + `?box=sent` (there is no contacts
+endpoint), and Files is aggregated from message pages (`GET /attachments/:id`
+exists; a list-all route does not). Both limitations are stated in code where
+they are implemented.
+
 ## Sessions
 
 - Android: token encrypted with an Android Keystore AES-GCM key before disk
