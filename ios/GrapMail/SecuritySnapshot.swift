@@ -12,11 +12,13 @@ import SwiftUI
 /// nothing, exactly like a navigation stub.
 ///
 /// Nothing in the real flow ever passes the argument, and no screen here is
-/// reachable without it. The screens that DO fetch on appear (the per-session
-/// revoke confirmations, the suspicious-sign-in alert) are deliberately absent:
-/// rendering them needs a second session or a server-seeded event, and a
-/// half-populated screen photographed as if it were the real thing is worse
-/// than no screenshot at all.
+/// reachable without it. The screens that DO fetch on appear (the
+/// suspicious-sign-in alert and the "secure my account" flow behind it) are
+/// deliberately absent: they need a server-seeded event, and a half-populated
+/// screen photographed as if it were the real thing is worse than no screenshot
+/// at all. The per-session revoke confirmations used to be excluded for the
+/// same reason — they refetched the whole session list to print one device
+/// label — until that fetch moved to the caller that already had the answer.
 enum SecuritySnapshot {
     /// The launch argument the UI tests pass: `-gmSnapshot <name>`.
     static func requested() -> String? {
@@ -61,6 +63,12 @@ struct SecuritySnapshotView: View {
                 SessionRevokedView(device: "Chrome on Windows · Dhaka, Bangladesh", onDone: {})
             case "session-revoked-suspicious":
                 SessionRevokedSuspiciousView(device: "Firefox on Linux · Lagos, Nigeria", onDone: {})
+            case "revoke-session-form":
+                RevokeSessionView(sessionId: "snapshot-session", device: "Chrome on Windows · Dhaka, Bangladesh",
+                                  onBack: {}, onRevoked: { _ in })
+            case "revoke-session-confirm":
+                ConfirmSessionRevocationView(sessionId: "snapshot-session", device: "Firefox on Linux · Lagos, Nigeria",
+                                             onBack: {}, onRevoked: { _ in })
             default:
                 Text("Unknown snapshot: \(name)")
                     .font(.system(size: 15, weight: .semibold))

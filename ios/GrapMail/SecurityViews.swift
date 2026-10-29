@@ -1187,10 +1187,15 @@ struct ManageSessionsView: View {
 /// 16 — a plain confirmation for a session the person picked themselves.
 struct RevokeSessionView: View {
     let sessionId: String
+    /// The device label the caller already holds: it rendered the row this was
+    /// opened from. The screen used to refetch the entire session list to look
+    /// this one string up, so a slow or failed list call left the card saying
+    /// "That device" about a device whose name was on screen a moment before —
+    /// and made the confirmation impossible to render without the network.
+    let device: String
     let onBack: () -> Void
     let onRevoked: (String) -> Void
 
-    @State private var label = ""
     @State private var busy = false
     @State private var error: String?
 
@@ -1207,7 +1212,7 @@ struct RevokeSessionView: View {
                     Image(systemName: "laptopcomputer.and.iphone").font(.system(size: 15)).foregroundColor(GM.primarySolid)
                     VStack(alignment: .leading, spacing: 2) {
                         Text("Device").font(.system(size: 12)).foregroundColor(GM.textSecondary)
-                        Text(label.isEmpty ? "That device" : label)
+                        Text(device.isEmpty ? "That device" : device)
                             .font(.system(size: 14, weight: .semibold))
                             .foregroundColor(GM.textPrimary)
                     }
@@ -1229,10 +1234,6 @@ struct RevokeSessionView: View {
                 AccountLink(title: "Cancel", action: onBack)
             }
         }
-        .task {
-            guard let token = SessionStore.token else { return }
-            label = (try? await ApiClient.sessions(token: token))?.sessions.first { $0.id == sessionId }?.device ?? ""
-        }
     }
 
     private func revoke() {
@@ -1242,7 +1243,7 @@ struct RevokeSessionView: View {
             do {
                 _ = try await ApiClient.revokeSession(token: token, id: sessionId)
                 busy = false
-                onRevoked(label)
+                onRevoked(device)
             } catch {
                 busy = false
                 self.error = error.localizedDescription
@@ -1254,10 +1255,12 @@ struct RevokeSessionView: View {
 /// 21 — the same revoke, entered from the alert, so the danger is named.
 struct ConfirmSessionRevocationView: View {
     let sessionId: String
+    /// See `RevokeSessionView.device`: the caller already has the label, so the
+    /// screen must not refetch the session list to print one line of it.
+    let device: String
     let onBack: () -> Void
     let onRevoked: (String) -> Void
 
-    @State private var label = ""
     @State private var busy = false
     @State private var error: String?
 
@@ -1277,7 +1280,7 @@ struct ConfirmSessionRevocationView: View {
                         Text("Unverified activity")
                             .font(.system(size: 13, weight: .semibold))
                             .foregroundColor(GM.textPrimary)
-                        Text((label.isEmpty ? "" : label + " · ") + "This session showed activity that did not match your usual sign-in pattern.")
+                        Text((device.isEmpty ? "" : device + " · ") + "This session showed activity that did not match your usual sign-in pattern.")
                             .font(.system(size: 12))
                             .foregroundColor(GM.textSecondary)
                             .fixedSize(horizontal: false, vertical: true)
@@ -1302,7 +1305,7 @@ struct ConfirmSessionRevocationView: View {
                             do {
                                 _ = try await ApiClient.revokeSession(token: token, id: sessionId)
                                 busy = false
-                                onRevoked(label)
+                                onRevoked(device)
                             } catch {
                                 busy = false
                                 self.error = error.localizedDescription
@@ -1312,10 +1315,6 @@ struct ConfirmSessionRevocationView: View {
                 )
                 AccountLink(title: "Cancel", action: onBack)
             }
-        }
-        .task {
-            guard let token = SessionStore.token else { return }
-            label = (try? await ApiClient.sessions(token: token))?.sessions.first { $0.id == sessionId }?.device ?? ""
         }
     }
 }

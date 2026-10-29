@@ -260,7 +260,9 @@ for spec in "two-factor-on:40-sec-two-factor-on" \
             "sign-out-all-form:47-sec-sign-out-all-form" \
             "sign-out-all-done:48-sec-sign-out-all-done" \
             "session-revoked:49-sec-session-revoked" \
-            "session-revoked-suspicious:50-sec-session-revoked-suspicious"; do
+            "session-revoked-suspicious:50-sec-session-revoked-suspicious" \
+            "revoke-session-form:51-sec-revoke-session-form" \
+            "revoke-session-confirm:52-sec-revoke-session-confirm"; do
   nm="${spec%%:*}"; pic="${spec##*:}"
   adb shell am force-stop "$PKG"
   adb shell am start -W -n "$PKG/.MainActivity" --es gmSnapshot "$nm" >/dev/null
@@ -340,6 +342,7 @@ for want in 01-welcome-light 02-step1-name-light 03-step2-basicinfo-light \
             46-sec-password-changed 47-sec-sign-out-all-form \
             48-sec-sign-out-all-done 49-sec-session-revoked \
             50-sec-session-revoked-suspicious \
+            51-sec-revoke-session-form 52-sec-revoke-session-confirm \
             10-session-restored 11-signin-light 12-welcome-dark 13-step1-name-dark; do
   [ -s "$OUT/$want.png" ] || { echo "FAIL: missing $want.png" >&2; FAILURES=$((FAILURES + 1)); }
 done

@@ -21,10 +21,12 @@ import androidx.compose.ui.Modifier
  * navigation stub: no fetch, no submit.
  *
  * Nothing in the real flow ever passes the extra. The screens that fetch on
- * appear (the per-session revoke confirmations, the suspicious-sign-in alert)
- * are deliberately absent — rendering them needs a second session or a
- * server-seeded event, and a half-populated screen photographed as if it were
- * the real thing is worse than no screenshot at all.
+ * appear (the suspicious-sign-in alert and the flow behind it) are deliberately
+ * absent — rendering them needs a server-seeded event, and a half-populated
+ * screen photographed as if it were the real thing is worse than no screenshot
+ * at all. The per-session revoke confirmations used to be excluded on the same
+ * grounds: they refetched the session list to print one device label, until
+ * that label began travelling with the route that already had it.
  *
  * The case list below IS the vocabulary; keep scripts/android-walk.sh in sync
  * with it.
@@ -46,6 +48,12 @@ fun SecuritySnapshotScreen(name: String) {
             SessionRevokedScreen(device = "Chrome on Windows · Dhaka, Bangladesh", onDone = {})
         "session-revoked-suspicious" ->
             SessionRevokedSuspiciousScreen(device = "Firefox on Linux · Lagos, Nigeria", onDone = {})
+        "revoke-session-form" ->
+            RevokeSessionScreen(sessionId = "snapshot-session",
+                device = "Chrome on Windows · Dhaka, Bangladesh", onBack = {}, onRevoke = {})
+        "revoke-session-confirm" ->
+            ConfirmSessionRevocationScreen(sessionId = "snapshot-session",
+                device = "Firefox on Linux · Lagos, Nigeria", onBack = {}, onRevoke = {})
         // The walk asserts this label is ABSENT, so an unrecognised name cannot
         // hand the artifact a placeholder photographed as if it were the screen.
         else -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {

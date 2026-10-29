@@ -30,9 +30,9 @@ struct RootView: View {
         case secPassword, secPasswordDone, secPasswordAfter, secPasswordUpdated
         case secSignOutAll, secSignOutAllDone
         case secSessions
-        case secRevoke(id: String)
+        case secRevoke(id: String, device: String)
         case secRevoked(device: String)
-        case secRevokeAlert(id: String)
+        case secRevokeAlert(id: String, device: String)
         case secRevokedAlert(device: String)
         case secActivity, secAlert, secSecure
         case created(address: String, name: String)
@@ -287,13 +287,14 @@ struct RootView: View {
                 case .secSessions:
                     ManageSessionsView(
                         onBack: { path.removeLast() },
-                        onRevoke: { session in path.append(.secRevoke(id: session.id)) },
-                        onRevokeAlert: { session in path.append(.secRevokeAlert(id: session.id)) },
+                        onRevoke: { session in path.append(.secRevoke(id: session.id, device: session.device)) },
+                        onRevokeAlert: { session in path.append(.secRevokeAlert(id: session.id, device: session.device)) },
                         onSignOutAll: { path.append(.secSignOutAll) }
                     )
-                case let .secRevoke(id):
+                case let .secRevoke(id, device):
                     RevokeSessionView(
                         sessionId: id,
+                        device: device,
                         onBack: { path.removeLast() },
                         onRevoked: { label in
                             path.removeLast()
@@ -302,9 +303,10 @@ struct RootView: View {
                     )
                 case let .secRevoked(device):
                     SessionRevokedView(device: device, onDone: { backToSecurity() })
-                case let .secRevokeAlert(id):
+                case let .secRevokeAlert(id, device):
                     ConfirmSessionRevocationView(
                         sessionId: id,
+                        device: device,
                         onBack: { path.removeLast() },
                         onRevoked: { label in
                             path.removeLast()

@@ -240,6 +240,11 @@ final class ScreenshotWalkUITests: XCTestCase {
             ("48-sec-sign-out-all-done", "sign-out-all-done"),
             ("49-sec-session-revoked", "session-revoked"),
             ("50-sec-session-revoked-suspicious", "session-revoked-suspicious"),
+            // The per-session revoke confirmations: a fresh account has exactly
+            // one session and it is this device, which has no revoke affordance
+            // by design, so navigation can never reach them either.
+            ("51-sec-revoke-session-form", "revoke-session-form"),
+            ("52-sec-revoke-session-confirm", "revoke-session-confirm"),
         ]
         for screen in postWriteScreens {
             app.terminate()

@@ -162,8 +162,10 @@ fun SignedOutAllDevicesScreen(onDone: () -> Unit) {
 @Composable
 fun ManageSessionsScreen(
     onBack: () -> Unit,
-    onRevoke: (String) -> Unit,
-    onRevokeAlert: (String) -> Unit,
+    /** (session id, device label) — the id is what revokes, the label is what
+     *  the confirmation has to name, and this list already holds both. */
+    onRevoke: (String, String) -> Unit,
+    onRevokeAlert: (String, String) -> Unit,
     onSignOutAll: () -> Unit,
 ) {
     val context = LocalContext.current
@@ -239,8 +241,8 @@ fun ManageSessionsScreen(
                             // "Windows · Chrome", and matching on the string picked the
                             // alert variant by chance.
                             val flagged = flaggedDeviceId.isNotEmpty() && session.deviceId == flaggedDeviceId
-                            if (flagged) onRevokeAlert(session.id)
-                            else onRevoke(session.id)
+                            if (flagged) onRevokeAlert(session.id, session.device)
+                            else onRevoke(session.id, session.device)
                         }),
                     )
                 }
@@ -258,22 +260,17 @@ fun ManageSessionsScreen(
 
 /** 16 — a plain confirmation for a session the person picked themselves. */
 @Composable
-fun RevokeSessionScreen(sessionId: String, onBack: () -> Unit, onRevoke: (String) -> Unit) {
+fun RevokeSessionScreen(sessionId: String, device: String, onBack: () -> Unit, onRevoke: (String) -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val palette = LocalPalette.current
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
-    // The route carries the id, because that is what revokes. The label is read
-    // back from the same list the person picked from, so the confirmation names
-    // the device instead of saying "that one".
-    var label by remember { mutableStateOf("") }
-    LaunchedEffect(sessionId) {
-        runCatching {
-            val token = SessionStore.token(context) ?: return@runCatching
-            label = Api.sessions(token).sessions.firstOrNull { it.id == sessionId }?.device ?: ""
-        }
-    }
+    // The route carries the id, because that is what revokes, and the device
+    // label because the list the person tapped in already had it. Reading the
+    // label back from a second sessions call meant the confirmation could only
+    // ever say "That device" if that request was slow or failed — and made the
+    // screen impossible to render without the network.
 
     AccountScreen(
         onBack = onBack,
@@ -291,7 +288,7 @@ fun RevokeSessionScreen(sessionId: String, onBack: () -> Unit, onRevoke: (String
                             try {
                                 val token = SessionStore.token(context) ?: throw IllegalStateException("Sign in again.")
                                 Api.revokeSession(token, sessionId)
-                                onRevoke(label)
+                                onRevoke(device)
                             } catch (e: Exception) {
                                 error = e.message
                             } finally {
@@ -313,7 +310,7 @@ fun RevokeSessionScreen(sessionId: String, onBack: () -> Unit, onRevoke: (String
                 Icon(Icons.Rounded.Devices, contentDescription = null, tint = palette.primarySolid, modifier = Modifier.size(18.dp))
                 Column {
                     Text("Device", fontSize = 12.sp, color = palette.textSecondary)
-                    Text(label.ifBlank { "That device" }, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = palette.textPrimary)
+                    Text(device.ifBlank { "That device" }, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = palette.textPrimary)
                 }
             }
         }
@@ -328,19 +325,15 @@ fun RevokeSessionScreen(sessionId: String, onBack: () -> Unit, onRevoke: (String
 
 /** 21 — the same revoke, entered from the alert, so the danger is named. */
 @Composable
-fun ConfirmSessionRevocationScreen(sessionId: String, onBack: () -> Unit, onRevoke: (String) -> Unit) {
+fun ConfirmSessionRevocationScreen(sessionId: String, device: String, onBack: () -> Unit, onRevoke: (String) -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val palette = LocalPalette.current
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
-    var label by remember { mutableStateOf("") }
-    LaunchedEffect(sessionId) {
-        runCatching {
-            val token = SessionStore.token(context) ?: return@runCatching
-            label = Api.sessions(token).sessions.firstOrNull { it.id == sessionId }?.device ?: ""
-        }
-    }
+    // `device` arrives with the route for the reason spelled out on
+    // RevokeSessionScreen: the caller has the label, a second list call does not
+    // add information, it only adds a way for the screen to come up empty.
 
     AccountScreen(
         onBack = onBack,
@@ -359,7 +352,7 @@ fun ConfirmSessionRevocationScreen(sessionId: String, onBack: () -> Unit, onRevo
                             try {
                                 val token = SessionStore.token(context) ?: throw IllegalStateException("Sign in again.")
                                 Api.revokeSession(token, sessionId)
-                                onRevoke(label)
+                                onRevoke(device)
                             } catch (e: Exception) {
                                 error = e.message
                             } finally {
@@ -383,7 +376,7 @@ fun ConfirmSessionRevocationScreen(sessionId: String, onBack: () -> Unit, onRevo
                     Text("Unverified activity", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = palette.textPrimary)
                     Spacer(Modifier.height(3.dp))
                     Text(
-                        (if (label.isNotBlank()) label + " · " else "") + "This session showed activity that did not match your usual sign-in pattern.",
+                        (if (device.isNotBlank()) device + " · " else "") + "This session showed activity that did not match your usual sign-in pattern.",
                         fontSize = 12.sp,
                         lineHeight = 17.sp,
                         color = palette.textSecondary,

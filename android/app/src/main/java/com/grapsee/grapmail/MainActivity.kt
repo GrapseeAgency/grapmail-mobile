@@ -149,9 +149,9 @@ object Routes {
     const val SEC_SIGNOUT_ALL = "security/signout-all"
     const val SEC_SIGNOUT_ALL_DONE = "security/signout-all/done"
     const val SEC_SESSIONS = "security/sessions"
-    const val SEC_REVOKE = "security/sessions/revoke/{id}"
+    const val SEC_REVOKE = "security/sessions/revoke/{id}/{device}"
     const val SEC_REVOKED = "security/sessions/revoked/{device}"
-    const val SEC_REVOKE_ALERT = "security/alert/revoke/{id}"
+    const val SEC_REVOKE_ALERT = "security/alert/revoke/{id}/{device}"
     const val SEC_REVOKED_ALERT = "security/alert/revoked/{device}"
     const val SEC_ACTIVITY = "security/activity"
     const val SEC_ALERT = "security/alert"
@@ -168,9 +168,13 @@ object Routes {
 
     fun created(address: String, name: String) = "signup/created/${encode(address)}/${encode(name)}"
     fun createdAlt(address: String, name: String) = "signup/created-alt/${encode(address)}/${encode(name)}"
-    fun revoke(id: String) = "security/sessions/revoke/${encode(id)}"
+    /** The device label rides the route beside the id: the confirmation names
+     *  the session it is about, and the list the person tapped already knew it.
+     *  Fetching the label a second time only added a way for the screen to open
+     *  with nothing to show. */
+    fun revoke(id: String, device: String) = "security/sessions/revoke/${encode(id)}/${encode(device)}"
     fun revoked(device: String) = "security/sessions/revoked/${encode(device)}"
-    fun revokeFromAlert(id: String) = "security/alert/revoke/${encode(id)}"
+    fun revokeFromAlert(id: String, device: String) = "security/alert/revoke/${encode(id)}/${encode(device)}"
     fun revokedFromAlert(device: String) = "security/alert/revoked/${encode(device)}"
 
     /** The help link the footer notes carry. Opens the real support page. */
@@ -522,15 +526,17 @@ fun GrapMailNav() {
         composable(Routes.SEC_SESSIONS) {
             ManageSessionsScreen(
                 onBack = { nav.popBackStack() },
-                onRevoke = { id -> nav.navigate(Routes.revoke(id)) },
-                onRevokeAlert = { id -> nav.navigate(Routes.revokeFromAlert(id)) },
+                onRevoke = { id, device -> nav.navigate(Routes.revoke(id, device)) },
+                onRevokeAlert = { id, device -> nav.navigate(Routes.revokeFromAlert(id, device)) },
                 onSignOutAll = { nav.navigate(Routes.SEC_SIGNOUT_ALL) },
             )
         }
         composable(Routes.SEC_REVOKE) { entry ->
             val id = entry.arguments?.getString("id")?.let(android.net.Uri::decode) ?: ""
+            val device = entry.arguments?.getString("device")?.let(android.net.Uri::decode) ?: ""
             RevokeSessionScreen(
                 sessionId = id,
+                device = device,
                 onBack = { nav.popBackStack() },
                 onRevoke = { label ->
                     nav.navigate(Routes.revoked(label)) { popUpTo(Routes.SEC_SESSIONS) }
@@ -546,8 +552,10 @@ fun GrapMailNav() {
         }
         composable(Routes.SEC_REVOKE_ALERT) { entry ->
             val id = entry.arguments?.getString("id")?.let(android.net.Uri::decode) ?: ""
+            val device = entry.arguments?.getString("device")?.let(android.net.Uri::decode) ?: ""
             ConfirmSessionRevocationScreen(
                 sessionId = id,
+                device = device,
                 onBack = { nav.popBackStack() },
                 onRevoke = { label ->
                     nav.navigate(Routes.revokedFromAlert(label)) { popUpTo(Routes.SEC_SESSIONS) }
