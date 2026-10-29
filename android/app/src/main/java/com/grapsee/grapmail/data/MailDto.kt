@@ -312,6 +312,36 @@ enum class MailBox(val apiValue: String) {
      * the call sites.
      */
     None("");
+
+    /** The label the drawer and tab row show. `Screener` is named for what it
+     *  is — a queue the sender has no standing in — not "Updates". */
+    val title: String get() = when (this) {
+        Inbox -> "Inbox"
+        Starred -> "Starred"
+        Sent -> "Sent"
+        Drafts -> "Drafts"
+        Archive -> "Archive"
+        Spam -> "Spam"
+        Trash -> "Trash"
+        Screener -> "Pending approval"
+        All -> "All Mail"
+        None -> "Inbox"
+    }
+
+    companion object {
+        /** The drawer's order — the boxes the reference lists, minus the ones the
+         *  server cannot answer (see the README's honest-UI contract). */
+        val drawerOrder: List<MailBox> = listOf(Inbox, Starred, Sent, Drafts, Archive, Spam, Trash, All)
+
+        /**
+         * The tab row. The reference draws Gmail's category tabs
+         * (`Primary / Social / Promotions / Updates`); no `category` column
+         * exists on `grapmail_messages`, and the website's own tab list is
+         * exactly this one (`src/app/(mail)/mail/page.tsx:199-208`). The app
+         * shows the boxes that are real rather than four counts nobody produced.
+         */
+        val tabOrder: List<MailBox> = listOf(Inbox, Starred, Sent, Drafts, Archive)
+    }
 }
 
 /**
@@ -345,5 +375,27 @@ enum class MailAction(val apiValue: String) {
  *  sheet has to say out loud rather than imply. */
 enum class MailSort { Newest, Oldest, SenderAsc, SenderDesc, SubjectAsc, SubjectDesc }
 
+/** Labels for the sort sheet, in the wording the reference uses. */
+val MailSort.title: String get() = when (this) {
+    MailSort.Newest -> "Newest first"
+    MailSort.Oldest -> "Oldest first"
+    MailSort.SenderAsc -> "Sender (A → Z)"
+    MailSort.SenderDesc -> "Sender (Z → A)"
+    MailSort.SubjectAsc -> "Subject (A → Z)"
+    MailSort.SubjectDesc -> "Subject (Z → A)"
+}
+
+/**
+ * True only for the server's own ordering. Everything else is applied by the
+ * client to the pages already fetched, and the sheet says so — see
+ * `MailboxViewModel.reproject`.
+ */
+val MailSort.isServerSide: Boolean get() = this == MailSort.Newest
+
 /** The two filters `/stats` and `/inbox` can actually answer. */
 enum class MailFilter { All, Unread }
+
+val MailFilter.title: String get() = when (this) {
+    MailFilter.All -> "All"
+    MailFilter.Unread -> "Unread"
+}

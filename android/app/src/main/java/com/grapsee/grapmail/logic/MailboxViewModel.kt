@@ -68,6 +68,24 @@ class MailboxViewModel(app: Application) : AndroidViewModel(app) {
         val selection: Set<String> = emptySet(),
         val labels: List<MailLabelDto> = emptyList(),
         val unreadCount: Int? = null,
+        /**
+         * The mailbox's own identity from `GET /me`. The greeting is built from
+         * these, not from the sign-in account: `/me` answers with the name the
+         * mailbox carries, and null means it never said so — in which case the
+         * screen shows no name rather than a plausible one.
+         */
+        val accountName: String? = null,
+        val accountAddress: String? = null,
+        /**
+         * The four extra counts `/stats` answers for. Each is null until the
+         * server says it, and a null draws no badge — `0` would claim the folder
+         * is empty when nobody was asked. Starred, Archive and All Mail are
+         * never in this response, so they have no field here at all.
+         */
+        val statsSent: Int? = null,
+        val statsDrafts: Int? = null,
+        val statsSpam: Int? = null,
+        val statsTrash: Int? = null,
         val busy: Boolean = false,
     ) {
         val selecting: Boolean get() = selection.isNotEmpty()
@@ -95,15 +113,22 @@ class MailboxViewModel(app: Application) : AndroidViewModel(app) {
 
     init {
         viewModelScope.launch {
+            val t = token() ?: return@launch
             // The label strip is the reference's only backed substitute for the
             // personal/work chips, so it loads with the list rather than waiting
             // for the labels screen.
-            val t = token() ?: return@launch
             runCatching { Api.mailLabels(t) }
                 .onSuccess {
                     MailStore.putLabels(it.labels)
                     _state.update { s -> s.copy(labels = it.labels) }
                 }
+            // `/me` answers with the mailbox's own name and address. A failure
+            // here is not an error screen: the greeting falls back to no name,
+            // which is honest, and the list is what matters.
+            runCatching { Api.mailMe(t) }.onSuccess { me ->
+                MailStore.putMe(me)
+                _state.update { it.copy(accountName = me.name, accountAddress = me.address) }
+            }
         }
     }
 
@@ -215,9 +240,20 @@ class MailboxViewModel(app: Application) : AndroidViewModel(app) {
             MailSort.SubjectDesc -> rows.sortedByDescending { (it.subject ?: "").lowercase() }
         }
 
-        val unread = runCatching { MailStore.stats()?.inbox?.unread }.getOrNull()
-        _state.update { it.copy(rows = rows, total = total, loaded = cache?.messages?.size ?: it.loaded,
-            pages = cache?.pages ?: it.pages, unreadCount = unread) }
+        val stats = runCatching { MailStore.stats() }.getOrNull()
+        _state.update { it.copy(
+            rows = rows,
+            total = total,
+            loaded = cache?.messages?.size ?: it.loaded,
+            pages = cache?.pages ?: it.pages,
+            // Each stays null when the server did not answer it. A null draws no
+            // badge; a 0 would claim an empty folder.
+            unreadCount = stats?.inbox?.unread,
+            statsSent = stats?.sent,
+            statsDrafts = stats?.drafts,
+            statsSpam = stats?.spam,
+            statsTrash = stats?.trash,
+        ) }
     }
 
     // ── selection ────────────────────────────────────────────────────────────
