@@ -6,6 +6,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -485,7 +486,12 @@ internal fun MailDrawer(
 ) {
     val palette = LocalPalette.current
     Column(
+        // verticalScroll, not a fixed Column: with nine boxes, the queue, the
+        // labels and the bottom group, the last rows fall below the fold on a
+        // short screen and nothing can bring them up. The drawer must reach its
+        // own Sign out row on every device the walk runs on.
         Modifier.width(300.dp).fillMaxSize().background(palette.card)
+            .verticalScroll(rememberScrollState())
             .padding(top = 28.dp, bottom = 16.dp),
     ) {
         Row(Modifier.padding(horizontal = 20.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -505,7 +511,7 @@ internal fun MailDrawer(
         DrawerSection("Labels")
         DrawerRow("Manage labels", Icons.Rounded.Label, null, selected = false) { onLabels() }
 
-        Spacer(Modifier.weight(1f))
+        Spacer(Modifier.height(14.dp))
         DrawerRow("Settings", Icons.Rounded.Settings, null, selected = false) { onSettings() }
         DrawerRow("Security", Icons.Rounded.Star, null, selected = false) { onSecurity() }
         DrawerRow("Help & Support", Icons.Rounded.HelpOutline, null, selected = false) { onHelp() }

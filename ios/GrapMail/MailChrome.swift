@@ -23,7 +23,8 @@ struct MailDrawer: View {
 
     var body: some View {
         HStack(spacing: 0) {
-            VStack(alignment: .leading, spacing: 0) {
+            ScrollView(showsIndicators: false) {
+              VStack(alignment: .leading, spacing: 0) {
                 Wordmark()
                     .padding(.horizontal, 20)
                     .padding(.top, 34)
@@ -44,7 +45,12 @@ struct MailDrawer: View {
                 DrawerRow(label: "Manage labels", icon: "tag", count: nil,
                           selected: false, onClick: onLabels)
 
-                Spacer(minLength: 12)
+                // The bottom group is part of the list rather than pinned under an
+                // expanding Spacer: pinned is what put Security and Sign out below
+                // the fold on a short screen, where no gesture could reach them.
+                // Inside a ScrollView a Spacer has no room to expand, so the gap is
+                // stated as a height instead.
+                Spacer().frame(height: 14)
 
                 DrawerRow(label: "Settings", icon: "gearshape", count: nil,
                           selected: false, onClick: onSettings)
@@ -60,6 +66,7 @@ struct MailDrawer: View {
                         .padding(.vertical, 12)
                 }
                 .accessibilityIdentifier("sign-out")
+              }
             }
             .frame(width: 300)
             .frame(maxHeight: .infinity)

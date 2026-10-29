@@ -185,7 +185,15 @@ echo "· security sector — every hub screen, read-only"
 # screen, press system back. No destructive submits — no password change,
 # no revoke, no sign-out-all — the account must survive the walk.
 # (2FA on a fresh account: the hub's toggle routes into the ENABLE flow.)
-must_tap "Account security"
+# Account security is a drawer row now — the placeholder home's button is gone.
+# The row sits in the lower group, which scrolls, so the drawer is opened and
+# given one swipe before the tap: on the short profile that group is below the
+# fold, and uiautomator cannot tap a node it cannot see.
+must "drawer for security" tap_xy "$(wait_nodes "n.get('content-desc','')=='Open folders'" | head -1)"
+must "drawer open (security)" wait_nodes "n.get('text','')=='Pending approval'" >/dev/null
+adb shell input swipe 150 900 150 500 400
+sleep 1
+must_tap "Security"
 must "hub opens" wait_nodes "n.get('text','')=='Account Security'" >/dev/null
 shot 20-sec-hub-light
 # hub_present — 0 on the hub, 1 definitely NOT on the hub, 2 could not tell.
@@ -373,6 +381,10 @@ fi
 # taps it there. This is the leg that ends the session, which is why it runs
 # after the restore proof.
 must "drawer for sign-out" tap_xy "$(wait_nodes "n.get('content-desc','')=='Open folders'" | head -1)"
+must "drawer open (sign-out)" wait_nodes "n.get('text','')=='Pending approval'" >/dev/null
+# Same reason as the security leg: Sign out is the last row of a scrolling group.
+adb shell input swipe 150 900 150 500 400
+sleep 1
 must "sign-out row" wait_nodes "n.get('text','')=='Sign out'" >/dev/null
 must_tap "Sign out"
 sleep 2
