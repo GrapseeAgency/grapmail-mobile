@@ -153,8 +153,13 @@ private struct ThreadMessageCard: View {
                     .font(.system(size: 12)).foregroundColor(GM.textSecondary)
             }
             if expanded {
-                Text(MailTime.full(message.createdAt))
-                    .font(.system(size: 12)).foregroundColor(GM.textTertiary)
+                // The date is shown only when one could be read. `MailTime.full`
+                // answers nil for an instant the app cannot parse, and an opened
+                // message must not print a substitute date.
+                if let when = MailTime.full(message.createdAt) {
+                    Text(when)
+                        .font(.system(size: 12)).foregroundColor(GM.textTertiary)
+                }
                 attachmentRows
                 GradientButton(title: "Reply", action: onReply)
             }
@@ -349,7 +354,7 @@ struct ComposeView: View {
     }
 
     private func field(
-        label: String, key: ReferenceWritableKeyPath<MailboxModel.ComposeState, String>,
+        label: String, key: WritableKeyPath<MailboxModel.ComposeState, String>,
         placeholder: String, tag: String,
     ) -> some View {
         HStack(spacing: 12) {
