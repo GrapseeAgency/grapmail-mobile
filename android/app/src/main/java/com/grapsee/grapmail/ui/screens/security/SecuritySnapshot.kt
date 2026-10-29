@@ -6,6 +6,8 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 
 /**
  * Test-only entry into the screens a read-only CI walk can never reach — the
@@ -33,31 +35,42 @@ import androidx.compose.ui.Modifier
  */
 @Composable
 fun SecuritySnapshotScreen(name: String) {
-    when (name) {
-        "two-factor-on" -> TwoFactorEnabledScreen(onContinue = {}, onBackHome = {})
-        "two-factor-off-form" -> DisableTwoFactorScreen(onBack = {}, onDisabled = {})
-        "two-factor-off-done" -> TwoFactorDisabledScreen(onDone = {}, onSecureNow = {})
-        "backup-codes-form" -> GenerateBackupCodesScreen(onBack = {}, onGenerated = {})
-        "backup-codes-saved" -> BackupCodesSavedScreen(codes = sampleCodes, onDone = {})
-        "change-password" ->
-            ChangePasswordScreen(afterSuspicious = false, onBack = {}, onForgot = {}, onChanged = {})
-        "password-changed" -> PasswordChangedScreen(updated = false, onDone = {}, onSupport = {})
-        "sign-out-all-form" -> SignOutAllDevicesScreen(onBack = {}, onDone = {})
-        "sign-out-all-done" -> SignedOutAllDevicesScreen(onDone = {})
-        "session-revoked" ->
-            SessionRevokedScreen(device = "Chrome on Windows · Dhaka, Bangladesh", onDone = {})
-        "session-revoked-suspicious" ->
-            SessionRevokedSuspiciousScreen(device = "Firefox on Linux · Lagos, Nigeria", onDone = {})
-        "revoke-session-form" ->
-            RevokeSessionScreen(sessionId = "snapshot-session",
-                device = "Chrome on Windows · Dhaka, Bangladesh", onBack = {}, onRevoke = {})
-        "revoke-session-confirm" ->
-            ConfirmSessionRevocationScreen(sessionId = "snapshot-session",
-                device = "Firefox on Linux · Lagos, Nigeria", onBack = {}, onRevoke = {})
-        // The walk asserts this label is ABSENT, so an unrecognised name cannot
-        // hand the artifact a placeholder photographed as if it were the screen.
-        else -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Text("Unknown snapshot: $name")
+    // The marker the walk looks for to prove THIS screen is the one on screen.
+    // iOS shipped that bug: a stored session pushed the signed-in home over the
+    // stub, and an assertion that only checked for the absence of "Unknown
+    // snapshot" passed eleven photographs of the wrong screen. Absence of a
+    // failure message is not evidence; this node is.
+    Box(
+        Modifier
+            .fillMaxSize()
+            .semantics { contentDescription = "gm-snapshot" }
+    ) {
+        when (name) {
+            "two-factor-on" -> TwoFactorEnabledScreen(onContinue = {}, onBackHome = {})
+            "two-factor-off-form" -> DisableTwoFactorScreen(onBack = {}, onDisabled = {})
+            "two-factor-off-done" -> TwoFactorDisabledScreen(onDone = {}, onSecureNow = {})
+            "backup-codes-form" -> GenerateBackupCodesScreen(onBack = {}, onGenerated = {})
+            "backup-codes-saved" -> BackupCodesSavedScreen(codes = sampleCodes, onDone = {})
+            "change-password" ->
+                ChangePasswordScreen(afterSuspicious = false, onBack = {}, onForgot = {}, onChanged = {})
+            "password-changed" -> PasswordChangedScreen(updated = false, onDone = {}, onSupport = {})
+            "sign-out-all-form" -> SignOutAllDevicesScreen(onBack = {}, onDone = {})
+            "sign-out-all-done" -> SignedOutAllDevicesScreen(onDone = {})
+            "session-revoked" ->
+                SessionRevokedScreen(device = "Chrome on Windows · Dhaka, Bangladesh", onDone = {})
+            "session-revoked-suspicious" ->
+                SessionRevokedSuspiciousScreen(device = "Firefox on Linux · Lagos, Nigeria", onDone = {})
+            "revoke-session-form" ->
+                RevokeSessionScreen(sessionId = "snapshot-session",
+                    device = "Chrome on Windows · Dhaka, Bangladesh", onBack = {}, onRevoke = {})
+            "revoke-session-confirm" ->
+                ConfirmSessionRevocationScreen(sessionId = "snapshot-session",
+                    device = "Firefox on Linux · Lagos, Nigeria", onBack = {}, onRevoke = {})
+            // The walk asserts this label is ABSENT, so an unrecognised name cannot
+            // hand the artifact a placeholder photographed as if it were the screen.
+            else -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Text("Unknown snapshot: $name")
+            }
         }
     }
 }

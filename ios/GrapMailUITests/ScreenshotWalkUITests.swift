@@ -251,12 +251,19 @@ final class ScreenshotWalkUITests: XCTestCase {
             app.launchArguments = ["-gmSnapshot", screen.name]
             app.launch()
             sleep(2) // the view's own layout settles
-            // The proof is that the app recognised the name: an unknown one
-            // falls through to the switch's default label, which would hand
-            // the artifact a placeholder photographed as if it were the screen.
+            // The snapshot host must be the screen actually on screen. Checking
+            // only that the switch's "Unknown snapshot" label is ABSENT let
+            // eleven home-screen photographs pass as eleven confirmation
+            // screens: a stored session pushed .home over the stub, and nothing
+            // in the old assertion could tell. The marker is on the host itself.
+            let host = app.descendants(matching: .any)["gm-snapshot"].firstMatch
+            XCTAssertTrue(host.waitForExistence(timeout: 6),
+                          "snapshot '\(screen.name)' is not the visible screen")
+            // And the name has to be one the app knows: an unrecognised one
+            // falls through to the default label, which would hand the artifact
+            // a placeholder photographed as if it were the screen.
             let unknown = app.staticTexts["Unknown snapshot: \(screen.name)"].firstMatch
-            XCTAssertFalse(unknown.waitForExistence(timeout: 2),
-                           "app did not recognise snapshot '\(screen.name)'")
+            XCTAssertFalse(unknown.exists, "app did not recognise snapshot '\(screen.name)'")
             snap(screen.shot)
         }
 

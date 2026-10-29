@@ -267,6 +267,13 @@ for spec in "two-factor-on:40-sec-two-factor-on" \
   adb shell am force-stop "$PKG"
   adb shell am start -W -n "$PKG/.MainActivity" --es gmSnapshot "$nm" >/dev/null
   sleep 5
+  # The snapshot host must BE the screen on screen, not merely not have failed:
+  # iOS shipped exactly that hole (a stored session pushed the signed-in home
+  # over the stub and eleven wrong photographs passed). The host names itself
+  # with content-desc 'gm-snapshot'; without it the shot proves nothing.
+  if [ -z "$(find_nodes "n.get('content-desc','')=='gm-snapshot'")" ]; then
+    echo "FAIL: snapshot '$nm' is not the visible screen" >&2; FAILURES=$((FAILURES + 1))
+  fi
   if [ -n "$(find_nodes "n.get('text','')=='Unknown snapshot: $nm'")" ]; then
     echo "FAIL: app did not recognise snapshot '$nm'" >&2; FAILURES=$((FAILURES + 1))
   fi

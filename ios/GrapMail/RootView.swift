@@ -42,7 +42,13 @@ struct RootView: View {
 
     // A stored, unexpired session opens the app signed-in — the Keychain
     // token has to be read at launch, not just written.
-    @State private var path: [Route] = SessionStore.hasValidSession ? [.home] : []
+    /// A stored session opens signed-in. The test-only snapshot host is the one
+    /// launch that must NOT do that: the walk signs up first, so by the time it
+    /// relaunches per screen a live session exists, and pushing `.home` on top
+    /// of the stub left every post-write screenshot a photograph of the home
+    /// screen. The hook outranks the restore because no real launch carries it.
+    @State private var path: [Route] =
+        (SecuritySnapshot.requested() == nil && SessionStore.hasValidSession) ? [.home] : []
     /// The ten codes live in SecurityFlow.backupCodes, not a view @State, so
     /// SessionStore.clear() → SecurityFlow.reset() wipes them on sign-out. A
     /// plaintext recovery code left in the root view's memory after the account

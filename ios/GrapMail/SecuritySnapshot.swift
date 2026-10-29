@@ -78,5 +78,13 @@ struct SecuritySnapshotView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(GM.bg.ignoresSafeArea())
+        // Named so the walk can prove THIS view is the screen on screen. The
+        // first version of the hook was inert — a stored session pushed the
+        // signed-in home over it, and because the assertion only checked that
+        // the "Unknown snapshot" label was absent, eleven home-screen
+        // photographs passed as eleven confirmation screens. Absence of a
+        // failure message is not evidence; the marker is.
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("gm-snapshot")
     }
 }
