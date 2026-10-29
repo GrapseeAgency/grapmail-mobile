@@ -594,4 +594,122 @@ class MailboxViewModel(app: Application) : AndroidViewModel(app) {
                 }
         }
     }
+
+    // ── labels ─────────────────────────────────────────────────────────────
+
+    data class LabelState(
+        val labels: List<MailLabelDto> = emptyList(),
+        val loading: Boolean = false,
+        val error: String? = null,
+        val saved: String? = null,
+    )
+
+    private val _labels = MutableStateFlow(LabelState())
+    val labelState: StateFlow<LabelState> = _labels.asStateFlow()
+
+    fun refreshLabels() {
+        viewModelScope.launch {
+            val t = token() ?: return@launch
+            _labels.update { it.copy(loading = true, error = null) }
+            runCatching { Api.mailLabels(t) }
+                .onSuccess {
+                    MailStore.putLabels(it.labels)
+                    _labels.update { s -> s.copy(labels = it.labels, loading = false) }
+                    _state.update { s -> s.copy(labels = it.labels) }
+                }
+                .onFailure { e ->
+                    _labels.update { it.copy(loading = false,
+                        error = e.message ?: "Labels could not be loaded.") }
+                }
+        }
+    }
+
+    /**
+     * Create a label. The colour key the route reads is `colour`
+     * (`grapmail-labels.ts:105`); sending `color` creates an uncoloured label and
+     * still returns 200, so the mistake would be invisible.
+     */
+    fun createLabel(name: String, colour: String?, then: (String) -> Unit) {
+        viewModelScope.launch {
+            val t = token() ?: run { then("Sign in again."); return@launch }
+            runCatching { Api.mailCreateLabel(t, name, colour) }
+                .onSuccess {
+                    refreshLabels()
+                    then("Created ${it.label?.name ?: name}.")
+                }
+                .onFailure { e ->
+                    then((e as? ApiException)?.message ?: "The label could not be created.")
+                }
+        }
+    }
+
+    fun deleteLabel(id: String, then: (String) -> Unit) {
+        viewModelScope.launch {
+            val t = token() ?: run { then("Sign in again."); return@launch }
+            runCatching { Api.mailDeleteLabel(t, id) }
+                .onSuccess { refreshLabels(); then("Label removed. Its messages keep their other labels.") }
+                .onFailure { e -> then((e as? ApiException)?.message ?: "The label could not be removed.") }
+        }
+    }
+
+    // ── screener ─────────────────────────────────────────────────────────────
+
+    data class ScreenerState(
+        val loaded: Boolean = false,
+        val enabled: Boolean? = null,
+        val pending: Int? = null,
+        val busy: Boolean = false,
+        val error: String? = null,
+    )
+
+    private val _screener = MutableStateFlow(ScreenerState())
+    val screener: StateFlow<ScreenerState> = _screener.asStateFlow()
+
+    /**
+     * Read the screener switch and its queue size.
+     *
+     * `enabled` stays null until the server answers. A switch drawn as "off"
+     * because the read failed would tell the person their inbound mail is
+     * unfiltered when nothing was said either way — the same rule the security
+     * hub learned the hard way.
+     */
+    fun loadScreener() {
+        viewModelScope.launch {
+            val t = token() ?: return@launch
+            runCatching { Api.mailScreener(t) }.onSuccess {
+                _screener.update { s -> s.copy(loaded = true, enabled = it.enabled, error = it.error) }
+            }
+            // The queue is a box like any other, so its count comes from the
+            // listing rather than a number the settings route never promised.
+            runCatching { Api.mailInbox(t, MailBox.Screener, pageSize = 5) }.onSuccess { r ->
+                _screener.update { it.copy(pending = r.total) }
+            }
+        }
+    }
+
+    fun setScreener(enabled: Boolean) {
+        viewModelScope.launch {
+            val t = token() ?: return@launch
+            _screener.update { it.copy(busy = true) }
+            runCatching { Api.mailScreenerSet(t, enabled) }
+                .onSuccess { _screener.update { s -> s.copy(busy = false, enabled = it.enabled ?: enabled) } }
+                .onFailure { e ->
+                    _screener.update { s -> s.copy(busy = false,
+                        error = e.message ?: "That change was not saved.") }
+                }
+        }
+    }
+
+    // ── files ────────────────────────────────────────────────────────────────
+
+    data class FileEntry(val attachment: MailAttachmentDto, val fromMessage: String?)
+
+    /**
+     * Attachments the app has actually seen. Partial by construction — see
+     * [MailStore.allBodies] for why the screen has to say so.
+     */
+    suspend fun files(): List<FileEntry> =
+        MailStore.allBodies().flatMap { m ->
+            m.attachments.map { FileEntry(it, m.subject?.takeIf { s -> s.isNotBlank() }) }
+        }
 }

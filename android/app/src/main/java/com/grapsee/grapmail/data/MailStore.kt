@@ -95,6 +95,17 @@ object MailStore {
      *  shape was designed to avoid. */
     suspend fun body(id: String): MailMessageFullDto? = mutex.withLock { bodies[id] }
 
+    /**
+     * Every body the app has opened, newest unknown order.
+     *
+     * This is what the Files screen is built from, and it is honest only because
+     * the screen says so: `GET /attachments/:id` exists but there is no list-all
+     * route, so a file the user has never opened is not in this list. The screen
+     * states that limit rather than presenting a partial index as the mailbox's
+     * full set of files.
+     */
+    suspend fun allBodies(): List<MailMessageFullDto> = mutex.withLock { bodies.values.toList() }
+
     suspend fun putBody(v: MailMessageFullDto) = mutex.withLock {
         bodies = bodies + (v.id to v)
     }
