@@ -56,7 +56,11 @@ enum ApiError: Error, LocalizedError {
     case http(status: Int, code: String?, message: String)
     case network(Error)
 
-    var errorDescription: String? {
+    /// The sentence a screen shows. Named rather than reaching for
+    /// `localizedDescription` at each call site so the mailbox sector's loaders
+    /// and the account flows cannot drift into two different phrasings of the
+    /// same rejection.
+    var userMessage: String {
         switch self {
         case let .http(status, code, message):
             if code == "TOO_MANY_ATTEMPTS" {
@@ -67,6 +71,8 @@ enum ApiError: Error, LocalizedError {
             return "Network error. Please try again."
         }
     }
+
+    var errorDescription: String? { userMessage }
 }
 
 /// Top-level shape of the API's error envelope, decoded on non-2xx responses.
@@ -690,7 +696,10 @@ struct ApiClient {
     /// `<upstream>/grapmail/*` and passes the bearer through unchanged. The
     /// shorter `/grapmail` is a Next.js page, so it answers 404 with **HTML**;
     /// decoding that as JSON is what would make a live mailbox look empty.
-    static let mailBase = "\(base)/grapsee/grapmail"
+    /// A PATH, not a URL: `request` prefixes `base`, so a base here that already
+    /// carried the scheme would produce `…/apihttps://…` and every mail call
+    /// would fail on a URL that can compile.
+    static let mailBase = "/grapsee/grapmail"
 
     /// What the security screen shows as the device name.
     ///
@@ -703,6 +712,29 @@ struct ApiClient {
         let version = UIDevice.current.systemVersion
         return "GrapMail/1.0 (iPhone; \(name) \(version))"
     }()
+
+    /// One definition of "the server no longer knows us", shared by the JSON
+    /// path and the binary attachment path. A second copy of this block is how a
+    /// download could silently keep a revoked session alive.
+    static func signalUnauthorized() {
+        DispatchQueue.main.async {
+            SessionStore.clear()
+            NotificationCenter.default.post(name: .gmSessionExpired, object: nil)
+        }
+    }
+
+    /// Headers every GrapMail call carries. The mail routes read the same
+    /// device-id and user-agent rules as the account routes, so an attachment
+    /// request built from anything else would show up as an unknown device.
+    static func mailRequest(url: URL, method: String, bearer: String?) -> URLRequest {
+        var req = URLRequest(url: url)
+        req.httpMethod = method
+        req.timeoutInterval = 30
+        req.setValue(DeviceId.value, forHTTPHeaderField: "x-device-id")
+        req.setValue(userAgent, forHTTPHeaderField: "User-Agent")
+        if let bearer { req.setValue("Bearer \(bearer)", forHTTPHeaderField: "Authorization") }
+        return req
+    }
 
     static func request<T: Decodable>(_ path: String, method: String = "GET", body: Data? = nil, bearer: String? = nil) async throws -> T {
         guard var components = URLComponents(string: "\(base)\(path)") else {
@@ -740,10 +772,7 @@ struct ApiClient {
             // Anonymous calls (sign-in, create, reset) 401 for wrong
             // credentials, so only an authenticated rejection kills the session.
             if http.statusCode == 401, bearer != nil {
-                DispatchQueue.main.async {
-                    SessionStore.clear()
-                    NotificationCenter.default.post(name: .gmSessionExpired, object: nil)
-                }
+                Self.signalUnauthorized()
             }
             let carrier = try? decoder.decode(ErrorCarrier.self, from: data)
             throw ApiError.http(

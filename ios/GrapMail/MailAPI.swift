@@ -73,6 +73,11 @@ struct MailMessage: Decodable, Identifiable {
     /// ISO instant. nil means there is no trustworthy time to display.
     var createdAt: String?
 
+    /// A blank row. Swift gives no memberwise init to a type with a
+    /// hand-written `init(from:)`, and the cache needs to build a patched copy of
+    /// a row it already holds.
+    init() {}
+
     private enum CodingKeys: String, CodingKey {
         case id, threadId, direction, status, from, to, cc, subject, snippet,
              isRead, isStarred, hasAttachments, unsubscribe, isE2eEncrypted, createdAt
@@ -478,6 +483,25 @@ struct MailScreenerResponse: Decodable {
     }
 }
 
+/// `POST /attachments` answers with the row it wrote. The id inside it is what a
+/// later send must carry — an attachment the server never stored is a filename
+/// the recipient cannot open, so the upload is only real once this comes back.
+struct MailAttachmentResponse: Decodable {
+    var success = false
+    var attachment: MailAttachment?
+    var error: String?
+    var code: String?
+
+    private enum CodingKeys: String, CodingKey { case success, attachment, error, code }
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        success = c.lenient(.success, false)
+        attachment = c.lenientOpt(.attachment)
+        error = c.lenientOpt(.error)
+        code = c.lenientOpt(.code)
+    }
+}
+
 // ── vocabularies ─────────────────────────────────────────────────────────────
 
 /// The boxes the mail API accepts, from `grapmail-boxes.ts:43-68` plus
@@ -513,6 +537,13 @@ enum MailBox: String, CaseIterable, Identifiable {
     /// The drawer's order — the boxes the reference lists, minus the ones the
     /// server cannot answer (see the README's honest-UI contract).
     static let drawerOrder: [MailBox] = [.inbox, .starred, .sent, .drafts, .archive, .spam, .trash, .others]
+
+    /// The tab row. The reference draws Gmail's category tabs
+    /// (`Primary / Social / Promotions / Updates`); no `category` column exists
+    /// on the messages table, so the row carries the boxes that do. Starred
+    /// leads the derived-people read because a starred message is the one the
+    /// user chose to keep naming someone for.
+    static let tabOrder: [MailBox] = [.inbox, .starred, .sent, .drafts, .archive]
 }
 
 /// The actions a message accepts. The action travels in the **path**
@@ -574,7 +605,11 @@ struct MailSendRequest: Encodable {
     var bcc: [String] = []
     var subject: String = ""
     var bodyText: String = ""
-    var bodyHtml: String?
+    /// Explicit `= nil`, not a bare `String?`: compose builds this request by
+    /// label and leaves the HTML and threading fields out. A memberwise
+    /// parameter without a usable default turns that into a compile error the
+    /// day the call site is written.
+    var bodyHtml: String? = nil
     /**
      * Sent for reply threading. `grapmail.ts:851-900` is confirmed to read
      * to/cc/bcc/subject/bodyText/bodyHtml; this is the one key compose needs
@@ -582,7 +617,7 @@ struct MailSendRequest: Encodable {
      * the gateway is back — if the route ignores it, replies lose their
      * In-Reply-To and the thread view shows them as new messages.
      */
-    var inReplyTo: String?
+    var inReplyTo: String? = nil
 }
 
 struct MailDraftRequest: Encodable {
@@ -590,7 +625,7 @@ struct MailDraftRequest: Encodable {
     var cc: [String] = []
     var subject: String = ""
     var bodyText: String = ""
-    var inReplyTo: String?
+    var inReplyTo: String? = nil
 }
 
 struct MailSnoozeRequest: Encodable { var until: String }
@@ -700,6 +735,99 @@ extension ApiClient {
 
     static func mailAliases(_ token: String) async throws -> MailAliasesResponse {
         try await mailGet("/aliases", bearer: token)
+    }
+
+    /// `GET /attachments/:id` — the bytes, not JSON. Separate from `request`,
+    /// which decodes and would corrupt binary by round-tripping it as text.
+    /// A 401 still kills the session through the shared signal, so a download
+    /// cannot keep a revoked token alive.
+    static func mailAttachmentBytes(token: String, id: String) async throws -> Data {
+        let (data, http) = try await mailBinary(
+            url: URL(string: "\(base)\(mailBase)/attachments/\(id.percentEncodedPath())"),
+            method: "GET", bearer: token, body: nil, contentType: nil)
+        guard http.statusCode < 400 else {
+            throw mailFailure(data: data, http: http)
+        }
+        return data
+    }
+
+    /// `POST /attachments` — multipart, with the field names the route reads:
+    /// `file` and `messageId` (`grapmail-attachments.ts:225,236`). `messageId`
+    /// is sent empty for an unsent draft rather than omitted, because the route
+    /// coerces an absent field to null and stores the bytes with no row to
+    /// attach them to.
+    static func mailAttachmentUpload(
+        token: String, bytes: Data, filename: String, mimeType: String,
+        messageId: String? = nil,
+    ) async throws -> MailAttachment {
+        let boundary = "----GrapMail\(UUID().uuidString)"
+        let safeName = filename
+            .replacingOccurrences(of: "\"", with: "")
+            .replacingOccurrences(of: "\r", with: "")
+            .replacingOccurrences(of: "\n", with: "")
+        var body = Data()
+        func text(_ s: String) { body.append(Data(s.utf8)) }
+        text("--\(boundary)\r\n")
+        text("Content-Disposition: form-data; name=\"file\"; filename=\"\(safeName)\"\r\n")
+        text("Content-Type: \(mimeType.isEmpty ? "application/octet-stream" : mimeType)\r\n\r\n")
+        body.append(bytes)
+        text("\r\n")
+        text("--\(boundary)\r\n")
+        text("Content-Disposition: form-data; name=\"messageId\"\r\n\r\n")
+        text("\(messageId ?? "")\r\n")
+        text("--\(boundary)--\r\n")
+
+        let (data, http) = try await mailBinary(
+            url: URL(string: "\(base)\(mailBase)/attachments"),
+            method: "POST", bearer: token, body: body,
+            contentType: "multipart/form-data; boundary=\(boundary)")
+        guard http.statusCode < 400 else {
+            throw mailFailure(data: data, http: http)
+        }
+        let r = try decoder.decode(MailAttachmentResponse.self, from: data)
+        guard let a = r.attachment else {
+            throw ApiError.http(status: http.statusCode, code: r.code,
+                                message: r.error ?? "The server stored no attachment.")
+        }
+        return a
+    }
+
+    /// The transport the two attachment calls share. Kept private and tiny: it
+    /// returns the bytes and the status, and leaves the interpretation to the
+    /// caller, because one wants the body and the other wants JSON.
+    private static func mailBinary(
+        url: URL?, method: String, bearer: String, body: Data?, contentType: String?,
+    ) async throws -> (Data, HTTPURLResponse) {
+        guard let url else {
+            throw ApiError.http(status: -1, code: nil, message: "Bad URL")
+        }
+        var req = mailRequest(url: url, method: method, bearer: bearer)
+        if let contentType { req.setValue(contentType, forHTTPHeaderField: "Content-Type") }
+        req.httpBody = body
+        let data: Data
+        let response: URLResponse
+        do {
+            (data, response) = try await URLSession.shared.data(for: req)
+        } catch { throw ApiError.network(error) }
+        guard let http = response as? HTTPURLResponse else {
+            throw ApiError.http(status: -1, code: nil, message: "No response")
+        }
+        return (data, http)
+    }
+
+    /// The same error envelope `request` builds, so a failed download reports the
+    /// server's reason rather than a status number, and the session dies on a 401
+    /// exactly as it does on a JSON call.
+    private static func mailFailure(
+        data: Data, http: HTTPURLResponse,
+    ) -> ApiError {
+        if http.statusCode == 401 { signalUnauthorized() }
+        let carrier = try? decoder.decode(ErrorCarrier.self, from: data)
+        return ApiError.http(
+            status: http.statusCode,
+            code: carrier?.code,
+            message: carrier?.message ?? carrier?.error ?? ""
+        )
     }
 
     static func mailScreener(_ token: String) async throws -> MailScreenerResponse {
