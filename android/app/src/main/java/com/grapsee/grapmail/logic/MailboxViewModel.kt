@@ -77,6 +77,10 @@ class MailboxViewModel(app: Application) : AndroidViewModel(app) {
          */
         val accountName: String? = null,
         val accountAddress: String? = null,
+        /** The mailbox's own state, which is not the account's state. Shown
+         *  separately so the two are never confused on screen. */
+        val accountStatus: String? = null,
+        val memberSince: String? = null,
         /**
          * The four extra counts `/stats` answers for. Each is null until the
          * server says it, and a null draws no badge — `0` would claim the folder
@@ -128,7 +132,12 @@ class MailboxViewModel(app: Application) : AndroidViewModel(app) {
             // which is honest, and the list is what matters.
             runCatching { Api.mailMe(t) }.onSuccess { me ->
                 MailStore.putMe(me)
-                _state.update { it.copy(accountName = me.name, accountAddress = me.address) }
+                _state.update { it.copy(
+                    accountName = me.name,
+                    accountAddress = me.address,
+                    accountStatus = me.status,
+                    memberSince = me.memberSince,
+                ) }
             }
         }
     }
@@ -517,7 +526,20 @@ class MailboxViewModel(app: Application) : AndroidViewModel(app) {
             .sortedWith(compareByDescending<Person> { it.seen }.thenBy { it.address.lowercase() })
     }
 
-    // ── attachments ──────────────────────────────────────────────────────────
+    // ── attachments ─────────────────────────────────────────────────────────
+    /**
+     * The addresses this mailbox also receives as. This is what the reference's
+     * account chip can honestly show: one signed-in account and its aliases, not
+     * a switcher between accounts the app cannot hold — `SessionStore` stores
+     * exactly one session.
+     */
+    suspend fun aliases(): List<com.grapsee.grapmail.data.MailAliasDto> {
+        MailStore.aliases()?.let { return it }
+        val t = token() ?: return emptyList()
+        val fetched = runCatching { Api.mailAliases(t) }.getOrNull() ?: return emptyList()
+        MailStore.putAliases(fetched.aliases)
+        return fetched.aliases
+    }
 
     /**
      * Upload bytes picked by the compose screen. The route answers with the row
