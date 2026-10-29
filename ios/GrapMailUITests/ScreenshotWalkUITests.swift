@@ -301,8 +301,7 @@ final class ScreenshotWalkUITests: XCTestCase {
         // tap throws on hittability rather than on the app being wrong.
         app.swipeUp()
         sleep(1)
-        tapFrame(app.descendants(matching: .any)["mail-drawer-Security"].firstMatch,
-                 "Security (drawer)")
+        tapFrame(app.buttons["Security"].firstMatch, "Security (drawer)")
         require(app.staticTexts["Account Security"].firstMatch, "Security hub", timeout: 8)
         snap("20-sec-hub-light")
         openSecurityRow("Two-Step Verification", "21-sec-2fa-enable-light")
@@ -466,7 +465,7 @@ final class ScreenshotWalkUITests: XCTestCase {
                       "drawer did not open (to sign out)")
         app.swipeUp() // same lower group, same clip
         sleep(1)
-        tapFrame(app.descendants(matching: .any)["sign-out"].firstMatch, "Sign out (drawer)")
+        tapFrame(app.buttons["Sign out"].firstMatch, "Sign out (drawer)")
         require(app.staticTexts["Welcome to"].firstMatch, "welcome after sign-out", timeout: 8)
 
         // Sign-in screen
