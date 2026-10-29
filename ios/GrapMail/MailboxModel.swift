@@ -117,6 +117,16 @@ final class MailboxModel: ObservableObject {
     private var loadTask: Task<Void, Never>?
     private var searchTask: Task<Void, Never>?
 
+    /// The boxes this session has already asked the server about, and whether
+    /// `/me` has been read. A mailbox that re-reads page 1 every time the screen
+    /// reappears pays for a full page on every return from a thread, and a failed
+    /// one of those reads looks like a load failure on a list that is already on
+    /// screen — the hub's defect wearing a different hat. So entering the home
+    /// asks only for a box that has never been fetched, choosing a box fetches,
+    /// and pull-to-refresh is the one other way page 1 is requested.
+    private var loadedBoxes: Set<MailBox> = []
+    private var accountLoaded = false
+
     /// Test-only seam for the snapshot host. The mailbox's state is written by
     /// its loaders and nothing else; this exists so a screen that needs content
     /// the CI account cannot have can still be photographed. The values come
@@ -134,8 +144,17 @@ final class MailboxModel: ObservableObject {
     // ── list ─────────────────────────────────────────────────────────────────
 
     func open(_ box: MailBox) {
+        loadedBoxes.insert(box)
         state.box = box
         state.selection = []
+        load(replace: true)
+    }
+
+    /// Fetch the current box when it has never been fetched. The home screen's
+    /// entry point.
+    func ensureLoaded() {
+        if loadedBoxes.contains(state.box) { return }
+        loadedBoxes.insert(state.box)
         load(replace: true)
     }
 
@@ -191,6 +210,7 @@ final class MailboxModel: ObservableObject {
                         await MailStore.shared.putStats(s)
                     }
                 }
+                self.loadedBoxes.insert(box)
                 self.state.loading = false
                 self.state.loadingMore = false
                 self.state.fatal = nil
@@ -273,8 +293,12 @@ final class MailboxModel: ObservableObject {
 
     // ── identity ─────────────────────────────────────────────────────────────
 
+    /// The mailbox's own identity and its label strip. Idempotent: the home
+    /// screen calls it on entry, and a screen that re-enters on every return from
+    /// a thread must not re-read the same two documents each time.
     func loadAccount() {
-        guard let token else { return }
+        guard let token, !accountLoaded else { return }
+        accountLoaded = true
         Task { [weak self] in
             guard let self else { return }
             if let me = try? await ApiClient.mailMe(token) {

@@ -141,6 +141,17 @@ fun MailboxScreen(
     }
     LaunchedEffect(nearEnd) { if (nearEnd && state.canLoadMore) vm.loadMore() }
 
+    // The screen's first ask: the box that has never been fetched. Nothing here
+    // fetched the list at all before this line existed, which is how a mailbox
+    // renders "Inbox is empty" having never asked the server anything.
+    LaunchedEffect(Unit) { vm.ensureLoaded() }
+
+    var refreshing by remember { mutableStateOf(false) }
+    // The spinner is the server's answer, not the gesture: it clears when the
+    // load finishes, whether that lands rows or an error, so a failed refresh
+    // cannot leave the indicator running forever over a stale list.
+    LaunchedEffect(state.loading) { if (!state.loading) refreshing = false }
+
     ModalNavigationDrawer(
         drawerState = drawer,
         drawerContent = {
@@ -212,7 +223,11 @@ fun MailboxScreen(
                     }
                 }
 
-                Box(Modifier.weight(1f)) {
+                androidx.compose.material3.PullToRefreshBox(
+                    isRefreshing = refreshing,
+                    onRefresh = { refreshing = true; vm.load() },
+                    modifier = Modifier.weight(1f),
+                ) {
                     MailStateBlock(
                         loading = state.loading,
                         failed = state.fatal != null,

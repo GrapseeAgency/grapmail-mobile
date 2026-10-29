@@ -107,6 +107,18 @@ class MailboxViewModel(app: Application) : AndroidViewModel(app) {
     private var searchJob: Job? = null
 
     /**
+     * The boxes this session has already asked the server about.
+     *
+     * A mailbox that re-reads page 1 every time the screen reappears is the hub's
+     * defect wearing a different hat: it pays for a full page on every return
+     * from a thread, and when one of those reads fails it looks like a load
+     * failure on a list that is already on screen. So entering the home asks only
+     * for a box that has never been fetched; choosing a box fetches, and
+     * pull-to-refresh is the one other way page 1 is requested.
+     */
+    private val loadedBoxes = mutableSetOf<MailBox>()
+
+    /**
      * The stored bearer, or null when there is none. Every loader treats null as
      * "sign in again" rather than calling the API anonymously: an unauthenticated
      * mail request answers 401, which the interceptor would read as a dead
@@ -145,7 +157,15 @@ class MailboxViewModel(app: Application) : AndroidViewModel(app) {
     // ── list ─────────────────────────────────────────────────────────────────
 
     fun open(box: MailBox) {
+        loadedBoxes.add(box)
         _state.update { it.copy(box = box, selection = emptySet()) }
+        load(replace = true)
+    }
+
+    /// Fetch the current box when it has never been fetched. Called on entry to
+    /// the home screen — see `loadedBoxes` for why this is not just `load()`.
+    fun ensureLoaded() {
+        if (loadedBoxes.contains(_state.value.box)) return
         load(replace = true)
     }
 

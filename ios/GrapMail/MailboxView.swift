@@ -62,7 +62,9 @@ struct MailboxView: View {
         .ignoresSafeArea(edges: .bottom)
         .sheet(item: $sheet) { which in sheetContent(which) }
         .task {
-            vm.open(vm.state.box)
+            // Ask for the box only when it has never been asked for, and read
+            // `/me` once. Returning from a thread re-enters this task.
+            vm.ensureLoaded()
             vm.loadAccount()
         }
         .accessibilityIdentifier("mail-home")
