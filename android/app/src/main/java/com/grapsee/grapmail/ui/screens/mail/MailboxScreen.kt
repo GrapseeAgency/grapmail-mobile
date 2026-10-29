@@ -42,6 +42,7 @@ import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.Star
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.ModalNavigationDrawer
@@ -223,7 +224,7 @@ fun MailboxScreen(
                     }
                 }
 
-                androidx.compose.material3.PullToRefreshBox(
+                PullToRefreshBox(
                     isRefreshing = refreshing,
                     onRefresh = { refreshing = true; vm.load() },
                     modifier = Modifier.weight(1f),

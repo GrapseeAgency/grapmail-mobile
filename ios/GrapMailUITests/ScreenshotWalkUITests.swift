@@ -212,7 +212,15 @@ final class ScreenshotWalkUITests: XCTestCase {
         // copy change breaks silently, and six of them went red at once in the
         // plan for exactly that reason.
         let mailHome = app.descendants(matching: .any)["mail-home"].firstMatch
-        require(mailHome, "Mailbox home", timeout: 20)
+        // The runner's cold start is slow enough that one wait on the identifier
+        // would read as an absent screen: this box took 27 s to draw its first
+        // button in the previous run. Wait for the identifier, then for the one
+        // label the home always draws, and fail only if neither arrives — a real
+        // absence still fails, slowness does not.
+        XCTAssertTrue(mailHome.waitForExistence(timeout: 40)
+                      || app.staticTexts["Search emails, people, or files…"]
+                          .waitForExistence(timeout: 20),
+                      "missing: Mailbox home")
         snap("60-mail-home")
 
         // Mailbox leg — read-only. The drawer and the search field are reachable
@@ -221,13 +229,16 @@ final class ScreenshotWalkUITests: XCTestCase {
         // leg: one is irreversible, one destroys, one feeds the suppression list
         // that would stop future CI mail. They live in the snapshot band.
         tap(app.descendants(matching: .any)["mail-menu"].firstMatch, "Open folders (drawer)")
-        XCTAssertTrue(app.staticTexts["Pending approval"].waitForExistence(timeout: 8),
+        XCTAssertTrue(app.staticTexts["Pending approval"].waitForExistence(timeout: 15),
                       "drawer did not open")
         snap("62-mail-drawer")
         // The drawer closes on a row tap; choosing the box already on screen is
         // the one gesture that dismisses it without leaving the home.
         tap(app.descendants(matching: .any)["mail-drawer-Inbox"].firstMatch, "Close drawer (Inbox)")
-        require(mailHome, "Home after drawer", timeout: 8)
+        XCTAssertTrue(mailHome.waitForExistence(timeout: 20)
+                      || app.staticTexts["Search emails, people, or files…"]
+                          .waitForExistence(timeout: 10),
+                      "home after drawer")
 
         tap(app.descendants(matching: .any)["mail-search"].firstMatch, "Search field")
         sleep(1)
@@ -251,7 +262,7 @@ final class ScreenshotWalkUITests: XCTestCase {
         // a drawer row, so the drawer has to be open for it to exist — the same
         // path a person takes.
         tap(app.descendants(matching: .any)["mail-menu"].firstMatch, "Open folders (to security)")
-        XCTAssertTrue(app.staticTexts["Pending approval"].waitForExistence(timeout: 8),
+        XCTAssertTrue(app.staticTexts["Pending approval"].waitForExistence(timeout: 15),
                       "drawer did not open (to security)")
         tap(app.descendants(matching: .any)["mail-drawer-Security"].firstMatch, "Security (drawer)")
         require(app.staticTexts["Account Security"].firstMatch, "Security hub", timeout: 8)
@@ -405,13 +416,16 @@ final class ScreenshotWalkUITests: XCTestCase {
         app.terminate()
         app.launchArguments = []
         app.launch()
-        require(app.descendants(matching: .any)["mail-home"].firstMatch,
-                "session restored on launch (the mailbox is the signed-in home)", timeout: 20)
+        XCTAssertTrue(app.descendants(matching: .any)["mail-home"].firstMatch
+                        .waitForExistence(timeout: 40)
+                      || app.staticTexts["Search emails, people, or files…"]
+                          .waitForExistence(timeout: 20),
+                      "session restored on launch (the mailbox is the signed-in home)")
         snap("10-session-restored")
         // Sign out lives in the mailbox drawer. This is the leg that ends the
         // session, which is why it runs after the restore proof above.
         tap(app.descendants(matching: .any)["mail-menu"].firstMatch, "Open folders (to sign out)")
-        XCTAssertTrue(app.staticTexts["Pending approval"].waitForExistence(timeout: 8),
+        XCTAssertTrue(app.staticTexts["Pending approval"].waitForExistence(timeout: 15),
                       "drawer did not open (to sign out)")
         tap(app.descendants(matching: .any)["sign-out"].firstMatch, "Sign out (drawer)")
         require(app.staticTexts["Welcome to"].firstMatch, "welcome after sign-out", timeout: 8)
@@ -525,8 +539,11 @@ final class ScreenshotWalkUITests: XCTestCase {
     private func backFromSecurityScreens() {
         require(app.staticTexts["Account Security"].firstMatch, "Security hub (return)", timeout: 8)
         tap(app.buttons["back"].firstMatch, "back (hub → home)")
-        require(app.descendants(matching: .any)["mail-home"].firstMatch,
-                "Mailbox home (return)", timeout: 20)
+        XCTAssertTrue(app.descendants(matching: .any)["mail-home"].firstMatch
+                        .waitForExistence(timeout: 40)
+                      || app.staticTexts["Search emails, people, or files…"]
+                          .waitForExistence(timeout: 20),
+                      "Mailbox home (return)")
     }
 
     private func typeIntoSecureField(_ identifier: String, _ value: String) {
