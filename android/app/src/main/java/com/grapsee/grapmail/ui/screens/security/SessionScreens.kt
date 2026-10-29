@@ -178,7 +178,6 @@ fun ManageSessionsScreen(
     // than the ordinary one (16): it is the device the person came here to deal
     // with, and the copy names the activity.
     var flaggedDeviceId by remember { mutableStateOf("") }
-    var activityLoaded by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         loading = true
@@ -188,7 +187,6 @@ fun ManageSessionsScreen(
             sessions = resp.sessions
             activeCount = if (resp.activeCount > 0) resp.activeCount else resp.sessions.size
             runCatching { Api.activity(token) }.getOrNull()?.let { activity ->
-                activityLoaded = true
                 // Only an alert the server still considers open marks a device.
                 // Re-filtering the whole trail here flagged a dismissed or stale
                 // sign-in, so revoking an unrelated device opened the break-in
