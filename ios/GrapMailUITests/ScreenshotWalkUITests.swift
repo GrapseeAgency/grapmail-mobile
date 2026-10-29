@@ -204,7 +204,15 @@ final class ScreenshotWalkUITests: XCTestCase {
         // no longer compile-only. (The per-session Revoke confirmation is NOT
         // reachable here: a fresh account has exactly one session and it is the
         // current device, which deliberately has no revoke affordance.)
-        tap(app.switches["Two-Step Verification"].firstMatch, "2FA switch (gate leg)")
+        // The hub re-fetches on every reappear (`.onAppear { reload += 1 }`), and
+        // while that is in flight the 2FA switch is disabled: the tap lands on
+        // nothing and the enable screen never arrives (this is exactly where the
+        // run died — 'missing: 2FA enable (gate leg)'). Wait for the switch to
+        // actually be enabled before tapping it.
+        let gateSwitch = app.switches["Two-Step Verification"].firstMatch
+        require(gateSwitch, "2FA switch (gate leg)", timeout: 12)
+        waitEnabled(gateSwitch, "2FA switch (gate leg)")
+        gateSwitch.tap()
         require(app.staticTexts["Enable Two-Step Verification"].firstMatch, "2FA enable (gate leg)", timeout: 8)
         tap(app.buttons["Continue"].firstMatch, "Continue (enable flow)")
         require(app.staticTexts["Confirm Your Password"].firstMatch, "Confirm-password gate", timeout: 8)
@@ -315,12 +323,31 @@ final class ScreenshotWalkUITests: XCTestCase {
         if row.waitForExistence(timeout: 4) {
             row.tap()
         } else {
-            tap(app.switches[title].firstMatch, "security switch \(title)")
+            // The Two-Step row's only interactive element is the switch, and the
+            // hub disables it while it re-fetches on reappear: a tap on a
+            // disabled switch lands on nothing and the walk photographs the hub
+            // twice. Wait for it to go live before tapping.
+            let toggle = app.switches[title].firstMatch
+            require(toggle, "switch \(title)", timeout: 8)
+            waitEnabled(toggle, "switch \(title)")
+            toggle.tap()
         }
         sleep(1) // the screen's own load (profile fetch) settles
         snap(shotName)
         tap(app.buttons["back"].firstMatch, "back from \(title)")
         sleep(1)
+    }
+
+    /// Poll until the element reports enabled, then assert it got there. Fails
+    /// with the element's name, so a control stuck disabled is not mistaken for
+    /// a screen that failed to open.
+    private func waitEnabled(_ element: XCUIElement, _ what: String, attempts: Int = 30) {
+        var waited = 0
+        while !element.isEnabled && waited < attempts {
+            usleep(500_000)
+            waited += 1
+        }
+        XCTAssertTrue(element.isEnabled, "\(what) never became enabled — still loading")
     }
 
     /// The hub sits under a NavigationStack path the walk appended; back out

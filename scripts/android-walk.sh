@@ -197,17 +197,28 @@ sec_visit() {
 }
 # The Two-Step row's only interactive element is the Switch (Compose exposes it
 # as a checkable node; the title text is NOT clickable), so tap the switch
-# itself. Its testTag is the precise handle — the first checkable node was a
-# guess that holds only while the hub has exactly one switch, and the hub is
-# expected to grow more. The checkable scan stays as the fallback.
-tap_2fa_switch() {
-  local pos
-  pos="$(wait_nodes "n.get('resource-id','')=='sec-2fa-switch'" | head -1)"
-  [ -n "$pos" ] || pos="$(wait_nodes "n.get('checkable','')=='true'" | head -1)"
-  tap_xy "$pos"
+# itself. Its content-desc is the precise handle — 'first checkable node' held
+# only while the hub has exactly one switch, and testTag turned out NOT to reach
+# the uiautomator dump as resource-id. Both stay as fallbacks.
+#
+# The hub re-fetches every time it reappears, and while that is in flight the
+# switch is DISABLED, so a tap lands on nothing: verify the enable screen
+# actually arrived and retry, rather than marching on blind.
+open_2fa_flow() {
+  local attempt pos
+  for attempt in 1 2 3; do
+    pos="$(find_nodes "n.get('content-desc','')=='two-step switch'" | head -1)"
+    [ -n "$pos" ] || pos="$(find_nodes "n.get('resource-id','')=='sec-2fa-switch'" | head -1)"
+    [ -n "$pos" ] || pos="$(find_nodes "n.get('checkable','')=='true'" | head -1)"
+    [ -n "$pos" ] && tap_xy "$pos"
+    sleep 2
+    [ -n "$(find_nodes "n.get('text','')=='Enable Two-Step Verification'")" ] && return 0
+    sleep 2   # the hub's fetch lands and re-enables the switch
+  done
+  return 1
 }
-must "tap 2FA switch" tap_2fa_switch
-sleep 2; shot 21-sec-2fa-enable-light
+must "open 2FA enable flow" open_2fa_flow
+shot 21-sec-2fa-enable-light
 adb shell input keyevent 4; sleep 1.5
 sec_visit "Phone Number" 22-sec-phone-light
 sec_visit "Change Password" 23-sec-change-password-light
@@ -220,8 +231,7 @@ sec_visit "Sign Out All Devices" 27-sec-signout-all-light
 # action proof is minted and the factor stays off. (The per-session Revoke
 # confirmation is NOT reachable: a fresh account has one session, it is this
 # device, and the current device deliberately has no revoke affordance.)
-must "tap 2FA switch (gate leg)" tap_2fa_switch
-sleep 2
+must "reopen 2FA flow (gate leg)" open_2fa_flow
 must_tap "Continue"
 must "confirm-password gate" wait_nodes "n.get('text','')=='Confirm Your Password'" >/dev/null
 shot 28-sec-confirm-password-light

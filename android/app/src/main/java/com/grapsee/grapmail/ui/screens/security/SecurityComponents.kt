@@ -34,6 +34,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -376,11 +378,19 @@ fun ToggleRow(
         // "the first checkable node" only identifies it while the hub has
         // exactly one switch. Name it, so the next toggle row cannot steal
         // the tap.
+        //
+        // testTag alone is not enough: a uiautomator dump does not export it as
+        // resource-id (measured — the walk timed out on the tag and fell back),
+        // while contentDescription is exported as content-desc, the same channel
+        // the 'Back' chevron is found through. Both are set: the tag for Compose
+        // tests, the description for the emulator walk.
         Switch(
             checked = checked,
             onCheckedChange = onToggle,
             enabled = enabled,
-            modifier = Modifier.testTag("sec-2fa-switch"),
+            modifier = Modifier
+                .testTag("sec-2fa-switch")
+                .semantics { contentDescription = "two-step switch" },
         )
     }
 }
