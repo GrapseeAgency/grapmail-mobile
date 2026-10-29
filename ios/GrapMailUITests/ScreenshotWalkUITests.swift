@@ -218,8 +218,7 @@ final class ScreenshotWalkUITests: XCTestCase {
         // label the home always draws, and fail only if neither arrives — a real
         // absence still fails, slowness does not.
         XCTAssertTrue(mailHome.waitForExistence(timeout: 40)
-                      || app.staticTexts["Search emails, people, or files…"]
-                          .waitForExistence(timeout: 20),
+                      || app.textFields["mail-search"].waitForExistence(timeout: 20),
                       "missing: Mailbox home")
         snap("60-mail-home")
 
@@ -236,7 +235,7 @@ final class ScreenshotWalkUITests: XCTestCase {
         // the one gesture that dismisses it without leaving the home.
         tap(app.descendants(matching: .any)["mail-drawer-Inbox"].firstMatch, "Close drawer (Inbox)")
         XCTAssertTrue(mailHome.waitForExistence(timeout: 20)
-                      || app.staticTexts["Search emails, people, or files…"]
+                      || app.textFields["mail-search"]
                           .waitForExistence(timeout: 10),
                       "home after drawer")
 
@@ -418,7 +417,7 @@ final class ScreenshotWalkUITests: XCTestCase {
         app.launch()
         XCTAssertTrue(app.descendants(matching: .any)["mail-home"].firstMatch
                         .waitForExistence(timeout: 40)
-                      || app.staticTexts["Search emails, people, or files…"]
+                      || app.textFields["mail-search"]
                           .waitForExistence(timeout: 20),
                       "session restored on launch (the mailbox is the signed-in home)")
         snap("10-session-restored")
@@ -541,7 +540,7 @@ final class ScreenshotWalkUITests: XCTestCase {
         tap(app.buttons["back"].firstMatch, "back (hub → home)")
         XCTAssertTrue(app.descendants(matching: .any)["mail-home"].firstMatch
                         .waitForExistence(timeout: 40)
-                      || app.staticTexts["Search emails, people, or files…"]
+                      || app.textFields["mail-search"]
                           .waitForExistence(timeout: 20),
                       "Mailbox home (return)")
     }

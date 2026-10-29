@@ -67,6 +67,11 @@ struct MailboxView: View {
             vm.ensureLoaded()
             vm.loadAccount()
         }
+        // `children: .contain` first, identifier second: a ZStack is not an
+        // accessibility element on its own, so an identifier applied to it lands
+        // on an ignored node and no query can ever resolve it. Declaring the
+        // container keeps its children visible and makes the name findable.
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("mail-home")
     }
 
