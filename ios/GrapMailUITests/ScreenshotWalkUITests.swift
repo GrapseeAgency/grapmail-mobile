@@ -1,4 +1,5 @@
 import XCTest
+import CoreGraphics
 import Foundation
 
 /// The live signup walk on a real iOS simulator — the same walk the Android
