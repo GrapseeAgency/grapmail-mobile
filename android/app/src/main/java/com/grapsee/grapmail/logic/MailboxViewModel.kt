@@ -687,6 +687,30 @@ class MailboxViewModel(app: Application) : AndroidViewModel(app) {
     private val _screener = MutableStateFlow(ScreenerState())
     val screener: StateFlow<ScreenerState> = _screener.asStateFlow()
 
+    // ── snapshot host only ───────────────────────────────────────────────────
+    //
+    // The mailbox's state is written by its loaders and nothing else. These four
+    // exist so the test-only host can photograph a screen that needs content a
+    // throwaway CI account cannot have: the sample values come from
+    // MailSnapshotScreen, never from here, and no live path calls them. The
+    // seeded shape is the real one, so what is photographed is the screen, not a
+    // stand-in for it.
+    fun seedForSnapshot(transform: (MailboxUiState) -> MailboxUiState) {
+        _state.update { transform(it) }
+    }
+
+    fun seedThreadForSnapshot(messages: List<MailMessageFullDto>) {
+        _thread.update { it.copy(messages = messages, loading = false, error = null) }
+    }
+
+    fun seedLabelsForSnapshot(labels: List<MailLabelDto>) {
+        _labels.update { it.copy(labels = labels, loading = false, error = null) }
+    }
+
+    fun seedScreenerForSnapshot(enabled: Boolean, pending: Int) {
+        _screener.update { it.copy(loaded = true, enabled = enabled, pending = pending, error = null) }
+    }
+
     /**
      * Read the screener switch and its queue size.
      *

@@ -78,6 +78,11 @@ import com.grapsee.grapmail.ui.theme.LocalPalette
 fun ThreadScreen(
     vm: MailboxViewModel,
     threadId: String,
+    /// A row without a `threadId` falls back to its own id, and the thread route
+    /// answers that with a 404. The list knows which one it handed over, so the
+    /// screen opens the right resource instead of showing an error for a message
+    /// that exists.
+    isThread: Boolean,
     onBack: () -> Unit,
     onReply: (MailMessageFullDto) -> Unit,
 ) {
@@ -89,7 +94,7 @@ fun ThreadScreen(
     // earlier success on screen.
     val notices = remember { mutableStateMapOf<String, String>() }
 
-    LaunchedEffect(threadId) { vm.openThread(threadId) }
+    LaunchedEffect(threadId) { if (isThread) vm.openThread(threadId) else vm.openMessage(threadId) }
 
     Column(Modifier.fillMaxSize().background(palette.bg).statusBarsPadding()) {
         Row(
@@ -122,7 +127,9 @@ fun ThreadScreen(
                 Spacer(Modifier.height(8.dp))
                 Text(thread.error!!, fontSize = 14.sp, color = palette.textSecondary)
                 Spacer(Modifier.height(16.dp))
-                com.grapsee.grapmail.ui.components.GradientButton("Try again", onClick = { vm.openThread(threadId) })
+                com.grapsee.grapmail.ui.components.GradientButton("Try again", onClick = {
+                    if (isThread) vm.openThread(threadId) else vm.openMessage(threadId)
+                })
             }
             return@Column
         }

@@ -36,6 +36,19 @@ import com.grapsee.grapmail.data.SessionStore
 import com.grapsee.grapmail.ui.screens.security.SecuritySnapshotScreen
 import com.grapsee.grapmail.logic.AccountFlowViewModel
 import com.grapsee.grapmail.logic.SignUpViewModel
+import com.grapsee.grapmail.data.MailBox
+import com.grapsee.grapmail.logic.MailboxViewModel
+import com.grapsee.grapmail.ui.screens.mail.AttachmentPreviewScreen
+import com.grapsee.grapmail.ui.screens.mail.ComposeScreen
+import com.grapsee.grapmail.ui.screens.mail.ContactDetailScreen
+import com.grapsee.grapmail.ui.screens.mail.ContactsScreen
+import com.grapsee.grapmail.ui.screens.mail.FilesScreen
+import com.grapsee.grapmail.ui.screens.mail.LabelCreateScreen
+import com.grapsee.grapmail.ui.screens.mail.LabelsScreen
+import com.grapsee.grapmail.ui.screens.mail.MailSettingsScreen
+import com.grapsee.grapmail.ui.screens.mail.MailboxScreen
+import com.grapsee.grapmail.ui.screens.mail.ScreenerScreen
+import com.grapsee.grapmail.ui.screens.mail.ThreadScreen
 import com.grapsee.grapmail.signedInHome
 import com.grapsee.grapmail.ui.screens.AccountCreatedAltScreen
 import com.grapsee.grapmail.ui.screens.AccountCreatedScreen
@@ -166,6 +179,26 @@ object Routes {
     const val CREATED_ALT = "signup/created-alt/{address}/{name}"
     const val HOME = "home"
 
+    // ── mailbox sector ───────────────────────────────────────────────────────
+    // The ids ride the route the way the session ids do — encoded, then decoded
+    // at the destination — so a thread opened from a list survives a recreate
+    // with the conversation it was opened for.
+    const val MAIL_THREAD = "mail/thread/{id}/{thread}"
+    const val MAIL_COMPOSE = "mail/compose"
+    const val MAIL_LABELS = "mail/labels"
+    const val MAIL_LABEL_CREATE = "mail/labels/create"
+    const val MAIL_CONTACTS = "mail/contacts"
+    const val MAIL_CONTACT = "mail/contact/{address}"
+    const val MAIL_FILES = "mail/files"
+    const val MAIL_ATTACHMENT = "mail/attachment/{id}"
+    const val MAIL_SETTINGS = "mail/settings"
+    const val MAIL_SCREENER = "mail/screener"
+
+    fun mailThread(id: String, isThread: Boolean) =
+        "mail/thread/${encode(id)}/${if (isThread) "1" else "0"}"
+    fun mailContact(address: String) = "mail/contact/${encode(address)}"
+    fun mailAttachment(id: String) = "mail/attachment/${encode(id)}"
+
     fun created(address: String, name: String) = "signup/created/${encode(address)}/${encode(name)}"
     fun createdAlt(address: String, name: String) = "signup/created-alt/${encode(address)}/${encode(name)}"
     /** The device label rides the route beside the id: the confirmation names
@@ -188,6 +221,10 @@ fun GrapMailNav() {
     val nav = rememberNavController()
     val vm: SignUpViewModel = viewModel()
     val flow: AccountFlowViewModel = viewModel()
+    /// One mailbox for the whole signed-in stack, held at the activity scope so
+    /// the list, the thread and the secondary screens read and write the same
+    /// pages rather than each fetching its own copy of the same mailbox.
+    val mail: MailboxViewModel = viewModel()
     val scope = androidx.compose.runtime.rememberCoroutineScope()
 
     fun openSupport() {
@@ -272,7 +309,8 @@ fun GrapMailNav() {
     // offline, with closures that do nothing. No real launch carries the extra.
     val snapshot = (nav.context as? android.app.Activity)?.intent?.getStringExtra("gmSnapshot")
     if (snapshot != null) {
-        SecuritySnapshotScreen(snapshot)
+        if (snapshot.startsWith("mail-")) MailSnapshotScreen(snapshot)
+        else SecuritySnapshotScreen(snapshot)
         return
     }
 
@@ -686,16 +724,109 @@ fun GrapMailNav() {
             )
         }
         composable(Routes.HOME) {
-            signedInHome(
+            MailboxScreen(
+                vm = mail,
+                onOpenThread = { id, isThread ->
+                    nav.navigate(Routes.mailThread(id, isThread))
+                },
+                onCompose = { nav.navigate(Routes.MAIL_COMPOSE) },
+                onSettings = { nav.navigate(Routes.MAIL_SETTINGS) },
+                onSecurity = { nav.navigate(Routes.SECURITY) },
+                onHelp = openSupport,
+                onLabels = { nav.navigate(Routes.MAIL_LABELS) },
+                onContacts = { nav.navigate(Routes.MAIL_CONTACTS) },
+                onFiles = { nav.navigate(Routes.MAIL_FILES) },
+                onScreener = { nav.navigate(Routes.MAIL_SCREENER) },
                 onSignOut = {
                     // The token leaves, and so does everything the security sector
                     // was holding in memory: ten plaintext recovery codes and a live
                     // action proof must not outlive the person they belong to.
+                    // Signing out clears the mailbox cache the same way, so the next
+                    // account on this device never opens a list of somebody else's
+                    // messages.
                     com.grapsee.grapmail.ui.screens.security.SecurityFlow.reset()
                     scope.launch { SessionStore.clear(nav.context.applicationContext) }
                     nav.navigate(Routes.WELCOME) { popUpTo(0) { inclusive = true } }
                 },
-                onAccountSecurity = { nav.navigate(Routes.SECURITY) },
+            )
+        }
+        composable(Routes.MAIL_THREAD) { entry ->
+            val id = entry.arguments?.getString("id")?.let(android.net.Uri::decode) ?: ""
+            // A row that has no thread id is opened through the message route;
+            // the thread route answers a message id with a 404, and a tap that
+            // opens nothing is the bug the flag exists to prevent.
+            val isThread = entry.arguments?.getString("thread") != "0"
+            ThreadScreen(
+                vm = mail,
+                threadId = id,
+                isThread = isThread,
+                onBack = { nav.popBackStack() },
+                onReply = { nav.navigate(Routes.MAIL_COMPOSE) },
+            )
+        }
+        composable(Routes.MAIL_COMPOSE) {
+            ComposeScreen(vm = mail, onBack = { nav.popBackStack() })
+        }
+        composable(Routes.MAIL_LABELS) {
+            LabelsScreen(
+                vm = mail,
+                onBack = { nav.popBackStack() },
+                onCreate = { nav.navigate(Routes.MAIL_LABEL_CREATE) },
+            )
+        }
+        composable(Routes.MAIL_LABEL_CREATE) {
+            LabelCreateScreen(vm = mail, onDone = { nav.popBackStack() })
+        }
+        composable(Routes.MAIL_CONTACTS) {
+            ContactsScreen(
+                vm = mail,
+                onBack = { nav.popBackStack() },
+                onOpen = { nav.navigate(Routes.mailContact(it)) },
+            )
+        }
+        composable(Routes.MAIL_CONTACT) { entry ->
+            val address = entry.arguments?.getString("address")?.let(android.net.Uri::decode) ?: ""
+            ContactDetailScreen(
+                vm = mail,
+                address = address,
+                onBack = { nav.popBackStack() },
+                onWrite = { nav.navigate(Routes.MAIL_COMPOSE) },
+            )
+        }
+        composable(Routes.MAIL_FILES) {
+            FilesScreen(
+                vm = mail,
+                onBack = { nav.popBackStack() },
+                onOpen = { nav.navigate(Routes.mailAttachment(it)) },
+            )
+        }
+        composable(Routes.MAIL_ATTACHMENT) { entry ->
+            val id = entry.arguments?.getString("id")?.let(android.net.Uri::decode) ?: ""
+            AttachmentPreviewScreen(vm = mail, attachmentId = id, onBack = { nav.popBackStack() })
+        }
+        composable(Routes.MAIL_SETTINGS) {
+            MailSettingsScreen(
+                vm = mail,
+                onBack = { nav.popBackStack() },
+                onSecurity = { nav.navigate(Routes.SECURITY) },
+                onScreener = { nav.navigate(Routes.MAIL_SCREENER) },
+                onLabels = { nav.navigate(Routes.MAIL_LABELS) },
+                onHelp = openSupport,
+                onSignOut = {
+                    com.grapsee.grapmail.ui.screens.security.SecurityFlow.reset()
+                    scope.launch { SessionStore.clear(nav.context.applicationContext) }
+                    nav.navigate(Routes.WELCOME) { popUpTo(0) { inclusive = true } }
+                },
+            )
+        }
+        composable(Routes.MAIL_SCREENER) {
+            ScreenerScreen(
+                vm = mail,
+                onBack = { nav.popBackStack() },
+                onOpenQueue = {
+                    mail.open(MailBox.Screener)
+                    nav.navigate(Routes.HOME) { popUpTo(Routes.HOME) }
+                },
             )
         }
     }

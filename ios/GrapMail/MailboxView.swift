@@ -17,8 +17,10 @@ struct MailboxView: View {
     /// list that forgets what a thread just read.
     @ObservedObject var vm: MailboxModel
     /// The thread route carries either a thread id or, when a message has none,
-    /// its own id — the same fallback the Android screen uses.
-    let onThread: (String) -> Void
+    /// its own id — and says which it is. Asking the thread route for a message
+    /// id answers 404, so a row without a thread must open through the message
+    /// route or the tap does nothing useful.
+    let onThread: (String, Bool) -> Void
     let onCompose: () -> Void
     let onLabels: () -> Void
     let onScreener: () -> Void
@@ -209,7 +211,7 @@ struct MailboxView: View {
                     selecting: !vm.state.selection.isEmpty,
                     selected: vm.state.selection.contains(row.id),
                     onSelect: { vm.toggleSelect(row.id) },
-                    onOpen: { onThread(row.threadId ?? row.id) },
+                    onOpen: { onThread(row.threadId ?? row.id, row.threadId != nil) },
                     onStar: { vm.actOn(row.id, row.isStarred ? .unstar : .star) }
                 )
                 .listRowInsets(EdgeInsets())

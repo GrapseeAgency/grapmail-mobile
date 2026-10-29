@@ -424,7 +424,9 @@ struct RootView: View {
                 case .home:
                     MailboxView(
                         vm: mail,
-                        onThread: { path.append(.mailThread(id: $0, isThread: true)) },
+                        onThread: { id, isThread in
+                            path.append(.mailThread(id: id, isThread: isThread))
+                        },
                         onCompose: { path.append(.mailCompose) },
                         onLabels: { path.append(.mailLabels) },
                         onScreener: { path.append(.mailScreener) },

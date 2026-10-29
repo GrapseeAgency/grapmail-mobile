@@ -107,7 +107,7 @@ import kotlinx.coroutines.launch
 @Composable
 fun MailboxScreen(
     vm: MailboxViewModel,
-    onOpenThread: (String) -> Unit,
+    onOpenThread: (id: String, isThread: Boolean) -> Unit,
     onCompose: () -> Unit,
     onSettings: () -> Unit,
     onSecurity: () -> Unit,
@@ -227,7 +227,10 @@ fun MailboxScreen(
                                     message = row,
                                     selected = state.selection.contains(row.id),
                                     onSelect = { vm.toggleSelect(row.id) },
-                                    onOpen = { onOpenThread(row.threadId ?: row.id) },
+                                    onOpen = {
+                                    val tid = row.threadId
+                                    onOpenThread(tid ?: row.id, tid != nil)
+                                },
                                     onStar = {
                                         vm.actOn(row.id,
                                             if (row.isStarred) com.grapsee.grapmail.data.MailAction.Unstar
@@ -300,8 +303,10 @@ fun MailboxScreen(
     }
 }
 
-/** Counts the drawer can honestly show: only the five boxes `/stats` answers. */
-private fun drawerCounts(s: MailboxViewModel.MailboxUiState): Map<MailBox, Int?> = mapOf(
+/** Counts the drawer can honestly show: only the five boxes `/stats` answers.
+ *  `internal`, not `private`: the snapshot host draws the drawer, and a second
+ *  copy of this mapping is how a badge would drift from the list's own. */
+internal fun drawerCounts(s: MailboxViewModel.MailboxUiState): Map<MailBox, Int?> = mapOf(
     MailBox.Inbox to s.total.takeIf { s.box == MailBox.Inbox },
     MailBox.Sent to s.statsSent,
     MailBox.Drafts to s.statsDrafts,
@@ -450,7 +455,7 @@ private fun TabItem(icon: ImageVector, label: String, active: Boolean, badge: In
  * reason is in the README with the file:line that proves it.
  */
 @Composable
-private fun MailDrawer(
+internal fun MailDrawer(
     box: MailBox,
     unread: Int?,
     counts: Map<MailBox, Int?>,
@@ -542,7 +547,7 @@ private fun iconFor(b: MailBox): ImageVector = when (b) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun MailSheet(onDismiss: () -> Unit, content: @Composable () -> Unit) {
+internal fun MailSheet(onDismiss: () -> Unit, content: @Composable () -> Unit) {
     val sheetState: SheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
         Column(Modifier.fillMaxWidth().padding(bottom = 24.dp)) { content() }
@@ -563,7 +568,7 @@ private fun SheetTitle(text: String) {
  * claim.
  */
 @Composable
-private fun SortFilterContent(
+internal fun SortFilterContent(
     sort: MailSort,
     filter: MailFilter,
     sortedCount: Int,
@@ -598,7 +603,7 @@ private fun SortFilterContent(
  * nothing else, so no option can silently do something other than its label.
  */
 @Composable
-private fun MoveContent(onPick: (com.grapsee.grapmail.data.MailAction) -> Unit) {
+internal fun MoveContent(onPick: (com.grapsee.grapmail.data.MailAction) -> Unit) {
     SheetTitle("Move to")
     val palette = LocalPalette.current
     SheetOption("Archive", false) { onPick(com.grapsee.grapmail.data.MailAction.Archive) }
@@ -613,7 +618,7 @@ private fun MoveContent(onPick: (com.grapsee.grapmail.data.MailAction) -> Unit) 
 }
 
 @Composable
-private fun AssignLabelContent(
+internal fun AssignLabelContent(
     labels: List<com.grapsee.grapmail.data.MailLabelDto>,
     onPick: (String) -> Unit,
 ) {
@@ -635,7 +640,7 @@ private fun AssignLabelContent(
  * from, so a snoozed message leaves the visible set until it comes round.
  */
 @Composable
-private fun SnoozeContent(onPick: (String) -> Unit) {
+internal fun SnoozeContent(onPick: (String) -> Unit) {
     val palette = LocalPalette.current
     SheetTitle("Snooze until")
     val options = listOf(
@@ -659,7 +664,7 @@ private fun SnoozeContent(onPick: (String) -> Unit) {
 }
 
 @Composable
-private fun PermanentDeleteContent(count: Int, cancel: () -> Unit, confirm: () -> Unit) {
+internal fun PermanentDeleteContent(count: Int, cancel: () -> Unit, confirm: () -> Unit) {
     val palette = LocalPalette.current
     SheetTitle(if (count == 1) "Delete this message permanently?" else "Delete $count messages permanently?")
     Text(
