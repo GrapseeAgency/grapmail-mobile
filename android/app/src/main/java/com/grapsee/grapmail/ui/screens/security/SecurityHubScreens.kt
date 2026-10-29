@@ -40,6 +40,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.grapsee.grapmail.data.Api
 import com.grapsee.grapmail.data.ProfileDto
+import com.grapsee.grapmail.data.SecurityProfileCache
 import com.grapsee.grapmail.data.SessionStore
 import com.grapsee.grapmail.ui.components.AccountLink
 import com.grapsee.grapmail.ui.components.AccountScreen
@@ -75,7 +76,11 @@ fun AccountSecurityScreen(
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    var profile by remember { mutableStateOf<ProfileDto?>(null) }
+    // Seeded from the cache rather than null: this screen is a fresh
+    // composition every time it is opened, so with nothing to hold it the hub
+    // re-fetched from zero on every return and showed a spinner — or, if that
+    // one request failed, an error — over data the app already had.
+    var profile by remember { mutableStateOf(SecurityProfileCache.last) }
     // Without these three the hub printed a confident "Off" and "No number on
     // this account yet" for the half second before the profile arrived — and
     // again for ever if the request failed. A security screen may never show a
@@ -85,23 +90,30 @@ fun AccountSecurityScreen(
     var reload by remember { mutableStateOf(0) }
 
     LaunchedEffect(reload) {
-        loading = true; failed = false
+        // A refresh is a refresh: whatever is already on screen stays on screen
+        // and the controls stay live. Only a hub with nothing to show may go to
+        // the error state — the old unconditional `failed = true` disabled the
+        // two-step switch on the first rate-limited request, which is what
+        // stalled the CI walk's second pass through the hub.
+        val held = profile
+        failed = false
+        loading = held == null
         try {
             val token = SessionStore.token(context) ?: throw IllegalStateException("Sign in again.")
             val loaded = Api.profile(token).profile
-            // A profile that never answered the security verdict is not a loaded
-            // profile. Left alone, twoFactorEnabled would read as false and the
-            // hub would claim "2FA off" for an account that may have it on — and
-            // enable a toggle that routes into the ENABLE flow. The honest
-            // "couldn't load" also leaves that toggle disabled.
+            // A profile that never answered the security verdict is no answer:
+            // it may not replace a verdict already on screen, because
+            // twoFactorEnabled would then read as false and the hub would claim
+            // "2FA off" for an account that may have it on — and enable a
+            // toggle that routes into the ENABLE flow.
             if (loaded?.twoFactorState == null) {
-                profile = null
-                failed = true
+                failed = held == null
             } else {
                 profile = loaded
+                SecurityProfileCache.publish(loaded)
             }
         } catch (_: Exception) {
-            failed = true
+            failed = held == null
         } finally {
             loading = false
         }

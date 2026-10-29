@@ -101,5 +101,9 @@ object SessionStore {
 
     suspend fun clear(context: Context) = withContext(Dispatchers.IO) {
         context.sessionStore.edit { it.clear() }
+        // The cached security verdict belongs to the account being signed out
+        // of. Left in memory it would be the first thing the next account's
+        // hub renders.
+        SecurityProfileCache.clear()
     }
 }

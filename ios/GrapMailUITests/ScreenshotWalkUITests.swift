@@ -340,12 +340,19 @@ final class ScreenshotWalkUITests: XCTestCase {
 
     /// Poll until the element reports enabled, then assert it got there. Fails
     /// with the element's name, so a control stuck disabled is not mistaken for
-    /// a screen that failed to open.
+    /// a screen that failed to open. On giving up it prints the screen's texts:
+    /// "never enabled" has two causes — the load is still in flight, or it came
+    /// back and the hub is showing its error state — and only the first is a
+    /// timing problem.
     private func waitEnabled(_ element: XCUIElement, _ what: String, attempts: Int = 30) {
         var waited = 0
         while !element.isEnabled && waited < attempts {
             usleep(500_000)
             waited += 1
+        }
+        if !element.isEnabled {
+            let texts = app.staticTexts.allElementsBoundByIndex.map { $0.label }
+            print("WALK-STUCK \(what) | texts: \(texts)")
         }
         XCTAssertTrue(element.isEnabled, "\(what) never became enabled — still loading")
     }

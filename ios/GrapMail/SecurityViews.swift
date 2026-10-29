@@ -169,21 +169,36 @@ struct AccountSecurityView: View {
             FooterNote(text: "Your security matters. We're here to help.")
         }
         .task(id: reload) {
-            loading = true; failed = false
+            // The hub re-fetches on every reappear, so one visit to each row
+            // means eight round-trips — and a rate limit or a dropped request
+            // on any of them used to blank a screen that was already showing
+            // good data: `failed = true` disabled the 2FA switch and the walk
+            // could never reopen the enable flow it had just used. A refresh is
+            // a refresh: keep the profile already on screen and only let the
+            // screen go to the error state when there is nothing to show.
+            let loaded = profile
+            failed = false
+            loading = loaded == nil
             guard let token = SessionStore.token else {
-                loading = false; failed = true; return
+                loading = false
+                failed = loaded == nil
+                return
             }
             do {
-                profile = try await ApiClient.profile(token: token).profile
+                let fresh = try await ApiClient.profile(token: token).profile
                 // A profile that never answered the security verdict — neither
-                // the flag nor the legacy string — is not a loaded profile.
-                // Left alone, the hub would claim "2FA off" for an account that
-                // may have it on, and enable a toggle that routes into the
-                // ENABLE flow. Show the honest "couldn't load" instead, which
-                // also leaves the toggle disabled rather than mis-informed.
-                if profile?.twoFactorState == nil { profile = nil; failed = true }
+                // the flag nor the legacy string — is no answer at all, so it
+                // must not replace a verdict already on screen: a defaulted
+                // "off" invites re-enabling a factor that is already on and
+                // hides a real lock-out. Keep the older answer; fall back to
+                // the error state only when there was none.
+                if fresh?.twoFactorState == nil {
+                    failed = loaded == nil
+                } else {
+                    profile = fresh
+                }
             } catch {
-                failed = true
+                failed = loaded == nil
             }
             loading = false
         }
