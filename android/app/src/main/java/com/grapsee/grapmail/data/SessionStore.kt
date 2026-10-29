@@ -105,5 +105,8 @@ object SessionStore {
         // of. Left in memory it would be the first thing the next account's
         // hub renders.
         SecurityProfileCache.clear()
+        // Same reason, larger blast radius: a cached mailbox would hand the next
+        // account on this device another person's subjects, senders and bodies.
+        MailStore.clear()
     }
 }

@@ -29,7 +29,11 @@ import kotlinx.serialization.Serializable
 data class MailPersonDto(
     val address: String? = null,
     val name: String? = null,
-)
+) {
+    /** What a row shows as its sender: the name if there is one, the address if
+     *  there is not, and nothing invented when there is neither. */
+    val display: String get() = name?.takeIf { it.isNotBlank() } ?: address ?: ""
+}
 
 /**
  * `publicRow` — `grapmail.ts:579-607`. The list shape. It deliberately carries
