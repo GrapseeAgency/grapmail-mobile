@@ -196,8 +196,10 @@ struct MessageRow: View {
 
             VStack(alignment: .leading, spacing: 2) {
                 HStack(alignment: .firstTextBaseline) {
-                    Text(message.from?.display?.isEmpty == false
-                         ? message.from!.display! : "Unknown sender")
+                    // `display` is non-optional on MailPerson — the type already
+                    // folds name-over-address — so the question is whether it
+                    // said anything at all, not whether the field exists.
+                    Text(message.from.flatMap { $0.display.nilIfBlank() } ?? "Unknown sender")
                         .font(.system(size: 15, weight: unread ? .semibold : .regular))
                         .foregroundColor(GM.textPrimary)
                         .lineLimit(1)

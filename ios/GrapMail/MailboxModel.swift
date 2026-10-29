@@ -222,17 +222,22 @@ final class MailboxModel: ObservableObject {
 
             if self.state.filter == .unread { rows = rows.filter { !$0.isRead } }
 
+            // The keys are computed through locals on purpose. Written inline as
+            // `$0.from?.display.lowercased() < $1.from?.display.lowercased()`,
+            // the optional chain makes both sides `String?`, `<` has no such
+            // overload, and the compiler then resolves `sort` to the
+            // `Comparator` API and reports an error that names nothing useful.
             switch self.state.sort {
             case .newest: break                                  // the server's own order
             case .oldest: rows = rows.reversed()
-            case .senderAsc: rows.sort { $0.from?.display.orEmpty().lowercased()
-                < $1.from?.display.orEmpty().lowercased() }
-            case .senderDesc: rows.sort { $0.from?.display.orEmpty().lowercased()
-                > $1.from?.display.orEmpty().lowercased() }
-            case .subjectAsc: rows.sort { ($0.subject ?? "").lowercased()
-                < ($1.subject ?? "").lowercased() }
-            case .subjectDesc: rows.sort { ($0.subject ?? "").lowercased()
-                > ($1.subject ?? "").lowercased() }
+            case .senderAsc:
+                rows.sort { a, b in Self.senderKey(a) < Self.senderKey(b) }
+            case .senderDesc:
+                rows.sort { a, b in Self.senderKey(a) > Self.senderKey(b) }
+            case .subjectAsc:
+                rows.sort { a, b in Self.subjectKey(a) < Self.subjectKey(b) }
+            case .subjectDesc:
+                rows.sort { a, b in Self.subjectKey(a) > Self.subjectKey(b) }
             }
 
             let stats = await MailStore.shared.stats()
@@ -437,11 +442,17 @@ final class MailboxModel: ObservableObject {
             guard let self else { return }
             do {
                 let bytes = try await ApiClient.mailAttachmentBytes(token: token, id: a.id)
-                let name = (a.name ?? "attachment").replacingCharacters(
-                    in: CharacterSet(charactersIn: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789._-").inverted,
-                    with: "_")
+                // The name arrives from a remote message, so it is not trusted to
+                // be a filename. Only the characters a path segment can hold are
+                // kept; anything else becomes an underscore. Written with
+                // CharacterSet this way would need Foundation's NSString-only
+                // masking call, so the allowed set is stated literally.
+                let raw = a.name ?? "attachment"
+                let name = String(raw.map { ch in
+                    (ch.isLetter || ch.isNumber || ch == "." || ch == "_" || ch == "-") ? ch : "_"
+                })
                 let url = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-                    .appendingPathComponent(name)
+                    .appendingPathComponent(name.isEmpty ? "attachment" : name)
                 do {
                     try bytes.write(to: url)
                     then("Saved as \(name) in the Files app.")
@@ -694,6 +705,12 @@ final class MailboxModel: ObservableObject {
     }
 
     // ── errors ───────────────────────────────────────────────────────────────
+
+    /// Sort keys. Blank stays blank and case folds away: a message whose sender
+    /// the server never named belongs at one end of the list, not scattered
+    /// through it, and it must not sort differently on two runs.
+    static func senderKey(_ m: MailMessage) -> String { (m.from?.display ?? "").lowercased() }
+    static func subjectKey(_ m: MailMessage) -> String { (m.subject ?? "").lowercased() }
 
     private static func isNoMailbox(_ e: ApiError) -> Bool {
         if case .http(_, let code, _) = e, code == "NO_MAILBOX" { return true }

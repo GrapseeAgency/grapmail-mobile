@@ -66,7 +66,7 @@ struct MailboxView: View {
 
     private var content: some View {
         ZStack(alignment: .bottomTrailing) {
-            Color(GM.bg)
+            GM.bg
             VStack(spacing: 0) {
                 header
                 staleBanner
@@ -113,7 +113,7 @@ struct MailboxView: View {
                     }
                     .accessibilityLabel("Open folders")
                     .accessibilityIdentifier("mail-menu")
-                    Wordmark(size: 30)
+                    Wordmark()
                     Spacer()
                 }
                 .padding(.horizontal, 12)
@@ -126,7 +126,7 @@ struct MailboxView: View {
                 }
                 .padding(.horizontal, 16)
 
-                BoxTabRowRow(state: vm.state, onSelect: { open($0) })
+                BoxTabRow(state: vm.state, onSelect: { open($0) })
             }
         }
     }

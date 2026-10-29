@@ -120,7 +120,7 @@ private struct ThreadMessageCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 10) {
-                SenderAvatar(display: message.from?.display.orEmpty() ?? "",
+                SenderAvatar(display: message.from?.display ?? "",
                              address: message.from?.address ?? "", size: 38)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(message.from?.display ?? message.from?.address ?? "Unknown sender")
