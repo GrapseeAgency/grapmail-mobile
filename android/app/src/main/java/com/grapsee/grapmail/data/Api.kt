@@ -65,7 +65,6 @@ import java.util.concurrent.TimeUnit
     val sessionToken: String? = null,
     val accessToken: String? = null,
     val token: String? = null,
-    val refreshToken: String? = null,
     val expiresAt: Long? = null,
     /** The live /auth/account/signin envelope answers with a RELATIVE lifetime
      *  (seconds), not an absolute `expiresAt`. Only the absolute one was ever
@@ -78,7 +77,6 @@ import java.util.concurrent.TimeUnit
     val user: AccountDto? = null,
     val requireOtp: Boolean = false,
     val challengeId: String? = null,
-    val suspicious: Boolean? = null,
     val backupCodesRemaining: Int? = null,
     val message: String? = null,
     val error: String? = null,
@@ -118,7 +116,6 @@ import java.util.concurrent.TimeUnit
     val sessionToken: String? = null,
     val accessToken: String? = null,
     val token: String? = null,
-    val refreshToken: String? = null,
     val expiresAt: Long? = null,
     val expiresIn: Long? = null,
     val user: AccountDto? = null,
@@ -278,7 +275,6 @@ class ApiException(val status: Int, val code: String?, message: String) : Except
     /** The relative form the server may send instead. */
     val tokenExpiresIn: Long? = null,
     val expiresIn: Long? = null,
-    val refreshToken: String? = null,
     val message: String? = null,
     val error: String? = null,
     val code: String? = null,

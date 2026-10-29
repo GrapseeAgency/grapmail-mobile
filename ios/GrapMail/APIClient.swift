@@ -173,7 +173,6 @@ struct SignInResponse: Decodable {
     var sessionToken: String?
     var accessToken: String?
     var token: String?
-    var refreshToken: String?
     var expiresAt: Int?
     /// The live /auth/account/signin envelope answers with a RELATIVE lifetime
     /// (`expiresIn`, seconds) rather than an absolute `expiresAt`. Only the
@@ -192,15 +191,14 @@ struct SignInResponse: Decodable {
     // is why only iOS broke.
     var requireOtp: Bool?
     var challengeId: String?
-    var suspicious: Bool?
     var backupCodesRemaining: Int?
     var message: String?
     var error: String?
     var code: String?
 
     private enum CodingKeys: String, CodingKey {
-        case success, sessionToken, accessToken, token, refreshToken, expiresAt,
-             expiresIn, account, user, requireOtp, challengeId, suspicious,
+        case success, sessionToken, accessToken, token, expiresAt,
+             expiresIn, account, user, requireOtp, challengeId,
              backupCodesRemaining, message, error, code
     }
     init(from decoder: Decoder) throws {
@@ -209,13 +207,16 @@ struct SignInResponse: Decodable {
         sessionToken = c.lenientOpt(.sessionToken)
         accessToken = c.lenientOpt(.accessToken)
         token = c.lenientOpt(.token)
-        refreshToken = c.lenientOpt(.refreshToken)
         expiresAt = c.lenientOpt(.expiresAt)
         expiresIn = c.lenientOpt(.expiresIn)
-        account = c.lenientOpt(.account) ?? c.lenientOpt(.user)
+        // The account object arrives under `account` on the documented shape
+        // and under `user` on the live one. Bound through locals: two generic
+        // calls constrained only by each other defeat inference inside a `??`.
+        let accountField: AccountDto? = c.lenientOpt(.account)
+        let userField: AccountDto? = c.lenientOpt(.user)
+        account = accountField ?? userField
         requireOtp = c.lenientOpt(.requireOtp)
         challengeId = c.lenientOpt(.challengeId)
-        suspicious = c.lenientOpt(.suspicious)
         backupCodesRemaining = c.lenientOpt(.backupCodesRemaining)
         message = c.lenientOpt(.message)
         error = c.lenientOpt(.error)
@@ -251,7 +252,6 @@ struct TwoFactorResponse: Decodable {
     var sessionToken: String?
     var accessToken: String?
     var token: String?
-    var refreshToken: String?
     var expiresAt: Int?
     var expiresIn: Int?
     var user: AccountDto?
@@ -259,7 +259,7 @@ struct TwoFactorResponse: Decodable {
     var code: String?
 
     private enum CodingKeys: String, CodingKey {
-        case success, sessionToken, accessToken, token, refreshToken, expiresAt,
+        case success, sessionToken, accessToken, token, expiresAt,
              expiresIn, user, account, error, code
     }
     init(from decoder: Decoder) throws {
@@ -268,10 +268,11 @@ struct TwoFactorResponse: Decodable {
         sessionToken = c.lenientOpt(.sessionToken)
         accessToken = c.lenientOpt(.accessToken)
         token = c.lenientOpt(.token)
-        refreshToken = c.lenientOpt(.refreshToken)
         expiresAt = c.lenientOpt(.expiresAt)
         expiresIn = c.lenientOpt(.expiresIn)
-        user = c.lenientOpt(.user) ?? c.lenientOpt(.account)
+        let userField: AccountDto? = c.lenientOpt(.user)
+        let accountField: AccountDto? = c.lenientOpt(.account)
+        user = userField ?? accountField
         error = c.lenientOpt(.error)
         code = c.lenientOpt(.code)
     }
@@ -308,10 +309,14 @@ struct ForgotPasswordResponse: Codable {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         success = c.lenient(.success, false)
         // `sent` is the server's own word for "a code went out". Absent does
-        // not mean false: the challengeId check below is what routes the flow,
-        // so keep the flag optional rather than inventing a negative answer.
-        sent = c.lenientOpt(.sent) ?? (c.lenientOpt(.challengeId) != nil)
-        challengeId = c.lenientOpt(.challengeId)
+        // not mean false — the challenge is what routes the flow — so the flag
+        // falls back to "a challenge exists". Bound through locals because the
+        // generic helper cannot infer its type inside a `??` chain whose right
+        // side is a plain Bool ('any Any.Type cannot conform to Decodable').
+        let challenge: String? = c.lenientOpt(.challengeId)
+        let sentFlag: Bool? = c.lenientOpt(.sent)
+        sent = sentFlag ?? (challenge != nil)
+        challengeId = challenge
         expiresAt = c.lenientOpt(.expiresAt)
         maskedPhone = c.lenientOpt(.maskedPhone)
         provider = c.lenientOpt(.provider)
@@ -532,14 +537,13 @@ struct ProfileResponse: Decodable {
     var tokenExpiresAt: Double?
     /// The relative form the server may send instead.
     var tokenExpiresIn: Int?
-    var refreshToken: String?
     var message: String?
     var error: String?
     var code: String?
 
     private enum CodingKeys: String, CodingKey {
         case success, profile, proof, newBackupCodes, accessToken, tokenExpiresAt,
-             tokenExpiresIn, expiresIn, refreshToken, message, error, code
+             tokenExpiresIn, expiresIn, message, error, code
     }
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -549,8 +553,9 @@ struct ProfileResponse: Decodable {
         newBackupCodes = c.lenientOpt(.newBackupCodes)
         accessToken = c.lenientOpt(.accessToken)
         tokenExpiresAt = c.lenientOpt(.tokenExpiresAt)
-        tokenExpiresIn = c.lenientOpt(.tokenExpiresIn) ?? c.lenientOpt(.expiresIn)
-        refreshToken = c.lenientOpt(.refreshToken)
+        let relativeA: Int? = c.lenientOpt(.tokenExpiresIn)
+        let relativeB: Int? = c.lenientOpt(.expiresIn)
+        tokenExpiresIn = relativeA ?? relativeB
         message = c.lenientOpt(.message)
         error = c.lenientOpt(.error)
         code = c.lenientOpt(.code)
