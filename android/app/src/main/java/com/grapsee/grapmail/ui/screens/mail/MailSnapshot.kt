@@ -73,8 +73,11 @@ fun MailSnapshotScreen(name: String) {
     // and the walk waits for that settled state before it photographs.
     LaunchedEffect(name) {
         when (name) {
-            "mail-thread" -> seedThread(vm, encrypted = false)
-            "mail-thread-encrypted" -> seedThread(vm, encrypted = true)
+            // The id goes with the body: the thread screen asks the model for its
+            // conversation on appear, and the model has to know this one is already
+            // here rather than fetching over it and landing on an error state.
+            "mail-thread" -> seedThread(vm, id = "t-m1", encrypted = false)
+            "mail-thread-encrypted" -> seedThread(vm, id = "t-m9", encrypted = true)
             "mail-files", "mail-attachment-preview" -> seedCache()
             "mail-contacts", "mail-contact-detail" -> {
                 // Contacts are derived from the mail the app has loaded, with no
@@ -220,11 +223,11 @@ private suspend fun seedCache() {
     )
 }
 
-private fun seedThread(vm: MailboxViewModel, encrypted: Boolean) {
-    vm.seedThreadForSnapshot(listOf(
+private fun seedThread(vm: MailboxViewModel, id: String, encrypted: Boolean) {
+    vm.seedThreadForSnapshot(forId = id, messages = listOf(
         MailMessageFullDto(
             id = if (encrypted) "m9" else "m1",
-            threadId = if (encrypted) "t-m9" else "t-m1",
+            threadId = id,
             direction = "inbound",
             status = "delivered",
             from = MailPersonDto(address = "amira@northwind.example", name = "Amira Rahman"),

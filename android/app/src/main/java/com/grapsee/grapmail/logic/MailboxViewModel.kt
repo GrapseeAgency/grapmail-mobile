@@ -118,6 +118,11 @@ class MailboxViewModel(app: Application) : AndroidViewModel(app) {
      */
     private val loadedBoxes = mutableSetOf<MailBox>()
 
+    /// The conversation `thread` currently holds. Returning to a thread the app
+    /// already has must not cost another payload read, and a snapshot that seeded
+    /// a body must not have it fetched away on appear.
+    private var threadLoadedFor: String? = null
+
     /**
      * The stored bearer, or null when there is none. Every loader treats null as
      * "sign in again" rather than calling the API anonymously: an unauthenticated
@@ -593,6 +598,7 @@ class MailboxViewModel(app: Application) : AndroidViewModel(app) {
      * read here and memoised — a row re-rendering must not re-read a payload.
      */
     fun openThread(threadId: String) {
+        if (threadLoadedFor == threadId) return
         viewModelScope.launch {
             val t = token() ?: return@launch
             _thread.update { it.copy(loading = true, error = null) }
@@ -613,6 +619,7 @@ class MailboxViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun openMessage(id: String) {
+        if (threadLoadedFor == id) return
         viewModelScope.launch {
             val t = token() ?: return@launch
             _thread.update { it.copy(loading = true, error = null) }
@@ -735,7 +742,10 @@ class MailboxViewModel(app: Application) : AndroidViewModel(app) {
         _state.update { transform(it) }
     }
 
-    fun seedThreadForSnapshot(messages: List<com.grapsee.grapmail.data.MailMessageFullDto>) {
+    fun seedThreadForSnapshot(
+        messages: List<com.grapsee.grapmail.data.MailMessageFullDto>, forId: String,
+    ) {
+        threadLoadedFor = forId
         _thread.update { it.copy(messages = messages, loading = false, error = null) }
     }
 

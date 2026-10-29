@@ -213,12 +213,17 @@ struct MailSnapshotView: View {
             }
             model.seedLabelsForSnapshot(Self.labels())
             switch name {
+            // The id is passed with the body: the thread screen asks the model for
+            // its conversation on appear, and the model must know this one is
+            // already here rather than fetching over it.
             case "mail-thread":
                 model.seedThreadForSnapshot([Self.full("m1",
                     body: "Attached is the invoice for the quarter, payable on receipt. "
-                          + "The facilities line item moved again — see page two.")])
+                          + "The facilities line item moved again — see page two.")],
+                    for: "t-m1")
             case "mail-thread-encrypted":
-                model.seedThreadForSnapshot([Self.full("m9", body: nil, encrypted: true)])
+                model.seedThreadForSnapshot([Self.full("m9", body: nil, encrypted: true)],
+                                            for: "t-m9")
             case "mail-screener":
                 model.seedScreenerForSnapshot(enabled: true, pending: 3)
             default:

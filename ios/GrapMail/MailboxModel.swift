@@ -125,6 +125,12 @@ final class MailboxModel: ObservableObject {
     /// asks only for a box that has never been fetched, choosing a box fetches,
     /// and pull-to-refresh is the one other way page 1 is requested.
     private var loadedBoxes: Set<MailBox> = []
+
+    /// The conversation the thread state currently holds. Returning to a thread
+    /// the app already has must not cost another full payload read — the same
+    /// egress discipline the list keeps — and a snapshot that seeded a body must
+    /// not have it fetched away on appear.
+    private var threadLoadedFor: String?
     private var accountLoaded = false
 
     /// Test-only seam for the snapshot host. The mailbox's state is written by
@@ -135,8 +141,9 @@ final class MailboxModel: ObservableObject {
 
     /// The same seam for the thread, which is a separate published value because
     /// a thread is one message's body rather than the box's listing.
-    func seedThreadForSnapshot(_ messages: [MailMessageFull]) {
+    func seedThreadForSnapshot(_ messages: [MailMessageFull], for id: String) {
         thread = ThreadState(messages: messages)
+        threadLoadedFor = id
     }
 
     /// Labels live in `labelState` for the labels screen and in `state.labels`
@@ -547,7 +554,7 @@ final class MailboxModel: ObservableObject {
     /// Opening marks the message read server-side (`grapmail.ts:750-757`), so no
     /// second `read` action is sent: it would be redundant and would race the GET.
     func openThread(_ threadId: String) {
-        guard let token else { return }
+        guard let token, threadLoadedFor != threadId else { return }
         thread = ThreadState(loading: true)
         Task { [weak self] in
             guard let self else { return }
@@ -555,6 +562,7 @@ final class MailboxModel: ObservableObject {
                 let resp = try await ApiClient.mailThread(token: token, threadId: threadId)
                 for m in resp.messages { await MailStore.shared.putBody(m) }
                 self.thread = ThreadState(messages: resp.messages)
+                self.threadLoadedFor = threadId
                 if let first = resp.messages.first {
                     await MailStore.shared.patchFlags(id: first.id, read: true)
                 }
@@ -566,7 +574,7 @@ final class MailboxModel: ObservableObject {
     }
 
     func openMessage(_ id: String) {
-        guard let token else { return }
+        guard let token, threadLoadedFor != id else { return }
         thread = ThreadState(loading: true)
         Task { [weak self] in
             guard let self else { return }
@@ -578,6 +586,7 @@ final class MailboxModel: ObservableObject {
                 let resp = try await ApiClient.mailMessage(token: token, id: id)
                 if let m = resp.message {
                     await MailStore.shared.putBody(m)
+                    self.threadLoadedFor = id
                     self.thread = ThreadState(messages: [m])
                     await MailStore.shared.patchFlags(id: m.id, read: true)
                 }
