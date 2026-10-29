@@ -62,7 +62,13 @@ data class MailMessageDto(
     val isE2eEncrypted: Boolean = false,
     /** ISO instant. Null means the row has no trustworthy time to show. */
     val createdAt: String? = null,
-)
+) {
+    /**
+     * The line the row shows where a subject is absent. Not a guess about the
+     * message — a statement that it has no subject.
+     */
+    val subjectOrNone: String get() = subject?.takeIf { it.isNotBlank() } ?: "(no subject)"
+}
 
 /**
  * `fullRow` — `grapmail.ts:609-623`, plus the attachment rows the single-message
