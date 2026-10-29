@@ -23,34 +23,39 @@ struct MailDrawer: View {
 
     var body: some View {
         HStack(spacing: 0) {
-            ScrollView(showsIndicators: false) {
-              VStack(alignment: .leading, spacing: 0) {
-                Wordmark()
-                    .padding(.horizontal, 20)
-                    .padding(.top, 34)
-                    .padding(.bottom, 20)
+            // The folders scroll; the account actions do not. Putting the lower
+            // group in the same scroller as the boxes is what made Security and
+            // Sign out unreachable — they laid out below the scroll view's own
+            // interactive bounds, where a thumb could not hit them and the
+            // tester could not either. A pinned footer is the drawer's standard
+            // shape and it is inside the column's bounds on every screen size.
+            VStack(alignment: .leading, spacing: 0) {
+                ScrollView(showsIndicators: false) {
+                    VStack(alignment: .leading, spacing: 0) {
+                        Wordmark()
+                            .padding(.horizontal, 20)
+                            .padding(.top, 34)
+                            .padding(.bottom, 20)
 
-                ForEach(MailBox.drawerOrder) { b in
-                    DrawerRow(label: b.title, icon: drawerIcon(b),
-                              count: counts[b] ?? nil, selected: b == box) {
-                        onSelect(b)
+                        ForEach(MailBox.drawerOrder) { b in
+                            DrawerRow(label: b.title, icon: drawerIcon(b),
+                                      count: counts[b] ?? nil, selected: b == box) {
+                                onSelect(b)
+                            }
+                        }
+
+                        section("Queue")
+                        DrawerRow(label: "Pending approval", icon: "lock", count: nil,
+                                  selected: false, onClick: onScreener)
+
+                        section("Labels")
+                        DrawerRow(label: "Manage labels", icon: "tag", count: nil,
+                                  selected: false, onClick: onLabels)
                     }
                 }
 
-                section("Queue")
-                DrawerRow(label: "Pending approval", icon: "lock", count: nil,
-                          selected: false, onClick: onScreener)
-
-                section("Labels")
-                DrawerRow(label: "Manage labels", icon: "tag", count: nil,
-                          selected: false, onClick: onLabels)
-
-                // The bottom group is part of the list rather than pinned under an
-                // expanding Spacer: pinned is what put Security and Sign out below
-                // the fold on a short screen, where no gesture could reach them.
-                // Inside a ScrollView a Spacer has no room to expand, so the gap is
-                // stated as a height instead.
-                Spacer().frame(height: 14)
+                Rectangle().fill(GM.border).frame(height: 1)
+                    .padding(.horizontal, 16).padding(.top, 6)
 
                 DrawerRow(label: "Settings", icon: "gearshape", count: nil,
                           selected: false, onClick: onSettings)
@@ -66,7 +71,7 @@ struct MailDrawer: View {
                         .padding(.vertical, 12)
                 }
                 .accessibilityIdentifier("sign-out")
-              }
+                Spacer(minLength: 0)
             }
             .frame(width: 300)
             .frame(maxHeight: .infinity)

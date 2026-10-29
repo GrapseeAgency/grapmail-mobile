@@ -487,12 +487,11 @@ internal fun MailDrawer(
 ) {
     val palette = LocalPalette.current
     Column(
-        // verticalScroll, not a fixed Column: with nine boxes, the queue, the
-        // labels and the bottom group, the last rows fall below the fold on a
-        // short screen and nothing can bring them up. The drawer must reach its
-        // own Sign out row on every device the walk runs on.
+        // The folders scroll, the account actions are pinned. The lower group
+        // lived in the same scroller as the boxes, which laid Security and Sign
+        // out below the scroller's own interactive bounds — unreachable for a
+        // thumb, and untappable for the walk. Same shape as iOS.
         Modifier.width(300.dp).fillMaxSize().background(palette.card)
-            .verticalScroll(rememberScrollState())
             .padding(top = 28.dp, bottom = 16.dp),
     ) {
         Row(Modifier.padding(horizontal = 20.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -500,6 +499,9 @@ internal fun MailDrawer(
         }
         Spacer(Modifier.height(20.dp))
 
+        Column(
+            Modifier.fillMaxWidth().weight(1f).verticalScroll(rememberScrollState()),
+        ) {
         MailBox.drawerOrder.forEach { b ->
             DrawerRow(b.title, iconFor(b), counts[b], selected = b == box) { onBox(b) }
         }
@@ -511,10 +513,17 @@ internal fun MailDrawer(
         Spacer(Modifier.height(14.dp))
         DrawerSection("Labels")
         DrawerRow("Manage labels", Icons.Rounded.Label, null, selected = false) { onLabels() }
+        }
 
-        Spacer(Modifier.height(14.dp))
+        Spacer(Modifier.weight(1f))
+
+        Box(Modifier.fillMaxWidth().padding(horizontal = 16.dp).height(1.dp)
+            .background(palette.border))
         DrawerRow("Settings", Icons.Rounded.Settings, null, selected = false) { onSettings() }
-        DrawerRow("Security", Icons.Rounded.Star, null, selected = false) { onSecurity() }
+        // Shield, not Star: the drawer's Security row means protection, and iOS
+        // draws the same meaning. Star is the Starred box's own icon, and one
+        // glyph carrying two unrelated ideas is how a drawer becomes unreadable.
+        DrawerRow("Security", Icons.Rounded.Shield, null, selected = false) { onSecurity() }
         DrawerRow("Help & Support", Icons.Rounded.HelpOutline, null, selected = false) { onHelp() }
         Spacer(Modifier.height(10.dp))
         Text("Sign out", fontSize = 14.sp, color = palette.error,
