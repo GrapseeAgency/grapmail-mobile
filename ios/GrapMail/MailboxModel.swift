@@ -450,8 +450,11 @@ final class MailboxModel: ObservableObject {
     /// actually happened. A failure never receives a path.
     func downloadAttachment(_ a: MailAttachment, then: @escaping (String) -> Void) {
         guard let token else { then("Sign in again to save this."); return }
-        Task { [weak self] in
-            guard let self else { return }
+        // No `self` captured: this task reads the network, writes to disk and
+        // reports back through the caller's closure. Holding the model until the
+        // download finished would keep a mailbox alive for a file the user may
+        // have already navigated away from.
+        Task {
             do {
                 let bytes = try await ApiClient.mailAttachmentBytes(token: token, id: a.id)
                 // The name arrives from a remote message, so it is not trusted to

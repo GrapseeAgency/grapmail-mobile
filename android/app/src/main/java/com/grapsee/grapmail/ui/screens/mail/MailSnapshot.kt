@@ -75,6 +75,7 @@ fun MailSnapshotScreen(name: String) {
         when (name) {
             "mail-thread" -> seedThread(vm, encrypted = false)
             "mail-thread-encrypted" -> seedThread(vm, encrypted = true)
+            "mail-files", "mail-attachment-preview" -> seedCache()
             "mail-contacts", "mail-contact-detail" -> {
                 // Contacts are derived from the mail the app has loaded, with no
                 // contacts endpoint behind them, so the only way this screen can
@@ -142,15 +143,8 @@ fun MailSnapshotScreen(name: String) {
             "mail-contacts" -> ContactsScreen(vm, onBack = {}, onOpen = { })
             "mail-contact-detail" -> ContactDetailScreen(
                 vm, address = "amira@northwind.example", onBack = {}, onWrite = { })
-            "mail-files" -> {
-                seedCache()
-                vm.seedForSnapshot { it.copy(accountAddress = "amira@grapmail.com") }
-                FilesScreen(vm, onBack = {}, onOpen = { })
-            }
-            "mail-attachment-preview" -> {
-                seedCache()
-                AttachmentPreviewScreen(vm, attachmentId = "a1", onBack = {})
-            }
+            "mail-files" -> FilesScreen(vm, onBack = {}, onOpen = { })
+            "mail-attachment-preview" -> AttachmentPreviewScreen(vm, attachmentId = "a1", onBack = {})
             "mail-settings" -> MailSettingsScreen(vm, onBack = {}, onSecurity = {},
                 onScreener = {}, onLabels = {}, onHelp = {}, onSignOut = {})
             "mail-screener" -> ScreenerScreen(vm, onBack = {}, onOpenQueue = {})

@@ -103,11 +103,21 @@ struct RootView: View {
                 // perform, so they are otherwise unreachable. No real launch
                 // ever carries the argument, and nothing here fetches or submits.
                 if let snapshot = SecuritySnapshot.requested() {
-                    if snapshot.hasPrefix("mail-") {
-                        MailSnapshotView(name: snapshot)
-                    } else {
-                        SecuritySnapshotView(name: snapshot)
+                    Group {
+                        if snapshot.hasPrefix("mail-") {
+                            MailSnapshotView(name: snapshot)
+                        } else {
+                            SecuritySnapshotView(name: snapshot)
+                        }
                     }
+                    // The dark frame the design review needs. XCUITest on this
+                    // runner has no appearance override, so the app applies it
+                    // from a launch argument no real launch carries — and only
+                    // inside the test-only branch, where it cannot affect a live
+                    // screen. The colours still resolve through GM's trait
+                    // lookup; this only changes which trait the system reports.
+                    .preferredColorScheme(
+                        ProcessInfo.processInfo.arguments.contains("-gmDark") ? .dark : nil)
                 } else {
                     WelcomeView(
                         onCreateAccount: { path.append(.stepName) },

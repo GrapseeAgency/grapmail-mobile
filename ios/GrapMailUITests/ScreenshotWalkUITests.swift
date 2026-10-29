@@ -437,15 +437,13 @@ final class ScreenshotWalkUITests: XCTestCase {
         // no app-code branch — the photograph goes through the same lookup a
         // real dark-mode user does.
         app.terminate()
-        app.launchArguments = ["-gmSnapshot", "mail-home"]
+        app.launchArguments = ["-gmSnapshot", "mail-home", "-gmDark"]
         app.launch()
         XCTAssertTrue(app.descendants(matching: .any)["gm-snapshot"].firstMatch
                         .waitForExistence(timeout: 8),
                       "snapshot 'mail-home' (dark) is not the visible screen")
-        XCUIDevice.shared.forceDarkMode = true
-        sleep(2) // the trait change propagates through the environment
+        sleep(2) // the scheme change propagates through the environment
         snap("61-mail-home-dark")
-        XCUIDevice.shared.forceDarkMode = false
         app.terminate()
     }
 
