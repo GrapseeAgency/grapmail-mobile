@@ -164,6 +164,11 @@ struct MailMessageFull: Decodable, Identifiable {
         e2eEnvelope = c.lenientOpt(.e2eEnvelope)
         attachments = c.lenient(.attachments, [])
     }
+
+    /// The thread view needs the same rule as the list: a message with no
+    /// subject is labelled, not shown as a blank line a reader cannot tell apart
+    /// from a rendering fault.
+    var subjectOrNone: String { subject?.nilIfBlank() ?? "(no subject)" }
 }
 
 /// `grapmail_attachments` rows — metadata only. `storageKey` is deliberately
