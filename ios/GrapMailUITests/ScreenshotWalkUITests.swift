@@ -46,13 +46,41 @@ final class ScreenshotWalkUITests: XCTestCase {
     }
 
     private func typeIntoTextField(_ identifier: String, _ value: String) {
-        let field = app.textFields[identifier].firstMatch
-        tap(field, "field \(identifier)")
-        field.typeText(value)
+        focusAndType(app.textFields[identifier].firstMatch, "field \(identifier)", value)
         if app.keyboards.buttons["return"].exists { app.keyboards.buttons["return"].tap() }
         // Terminal fields close the keyboard on return themselves; if it
         // somehow stays up, resign focus on an inert tap before returning.
         inertDismiss()
+    }
+
+    /// Tap a field until it actually has the keyboard, then type.
+    ///
+    /// `typeText` synthesises its key events into whatever holds focus, so on a
+    /// tap that landed a fraction before the keyboard attached it fails the run
+    /// with "Neither element nor any descendant has keyboard focus" — which is
+    /// what killed a whole green-capable run at its very first field. The
+    /// keyboard appearing IS the proof of focus, so wait for it and retry the
+    /// tap rather than typing blind and losing the run to a race.
+    private func focusAndType(_ field: XCUIElement, _ what: String, _ value: String) {
+        for attempt in 1...4 {
+            tap(field, what)
+            if waitForKeyboard(timeout: 3) {
+                field.typeText(value)
+                return
+            }
+            print("WALK-KEYBOARD \(what): no keyboard after tap \(attempt)")
+            usleep(300_000)
+        }
+        XCTFail("tapping \(what) never raised the keyboard")
+    }
+
+    private func waitForKeyboard(timeout: TimeInterval) -> Bool {
+        let deadline = Date().addingTimeInterval(timeout)
+        while Date() < deadline {
+            if app.keyboards.count > 0 { return true }
+            usleep(150_000)
+        }
+        return app.keyboards.count > 0
     }
 
     /// Best-effort keyboard resignation that never fails the walk. On the
@@ -378,8 +406,6 @@ final class ScreenshotWalkUITests: XCTestCase {
     }
 
     private func typeIntoSecureField(_ identifier: String, _ value: String) {
-        let sf = app.secureTextFields[identifier].firstMatch
-        tap(sf, "secure field \(identifier)")
-        sf.typeText(value)
+        focusAndType(app.secureTextFields[identifier].firstMatch, "secure field \(identifier)", value)
     }
 }
