@@ -640,4 +640,201 @@ object Api {
             .build()
         return read(req) { json.decodeFromString<ProfileResponse>(it) }
     }
+
+    // ── Mailbox sector ───────────────────────────────────────────────────────
+    //
+    // Mail is served by the gateway, reached through the same same-origin proxy
+    // the website uses: `src/app/api/grapsee/grapmail/[...path]/route.ts:130`
+    // forwards to `<upstream>/grapmail/*` and passes the bearer through
+    // unchanged. So the app's mail base is `$BASE/grapsee/grapmail`, not
+    // `$BASE/grapmail` — the latter is a Next.js 404 page, and an HTML body
+    // where JSON was expected is precisely the failure that would otherwise be
+    // read as "the mailbox is empty".
+    //
+    // These calls reuse `authed`, `read`, `postBody` and `fail` as they are, so
+    // the bearer-401 → SessionEvents.signalExpired() interceptor applies to
+    // every mail request without repeating itself.
+
+    private val MAIL: String get() = "$BASE/grapsee/grapmail"
+
+    private fun enc(v: String) = URLEncoder.encode(v, "UTF-8")
+
+    suspend fun mailMe(token: String): MailMeResponse =
+        read(authed("$MAIL/me", token).get().build()) { json.decodeFromString(it) }
+
+    /**
+     * `GET /stats`. Only five boxes are reported; a null on this type means the
+     * server did not answer, and the caller must draw no badge rather than a
+     * zero — see `MailStatsResponse`.
+     */
+    suspend fun mailStats(token: String): MailStatsResponse =
+        read(authed("$MAIL/stats", token).get().build()) { json.decodeFromString(it) }
+
+    /**
+     * `GET /inbox`. `box` is the API value from [MailBox]; `q` is only sent when
+     * the term is at least 3 characters, because a one-character term scans the
+     * whole mailbox server-side (`grapmail.ts:688`) and the screen would pay for
+     * every keystroke.
+     */
+    suspend fun mailInbox(
+        token: String, box: MailBox, page: Int = 1, pageSize: Int = 25, q: String? = null,
+    ): MailInboxResponse {
+        val term = q?.trim()?.takeIf { it.length >= 3 }
+        val url = buildString {
+            append("$MAIL/inbox?box=").append(enc(box.apiValue))
+            append("&page=").append(page).append("&pageSize=").append(pageSize)
+            if (term != null) append("&q=").append(enc(term))
+        }
+        return read(authed(url, token).get().build()) { json.decodeFromString(it) }
+    }
+
+    /**
+     * `GET /message/:id` — marks the message read as a side effect
+     * (`grapmail.ts:750-757`), so callers must NOT also send `MailAction.Read`:
+     * the second write is redundant and races the first.
+     */
+    suspend fun mailMessage(token: String, id: String): MailMessageResponse =
+        read(authed("$MAIL/message/${enc(id)}", token).get().build()) { json.decodeFromString(it) }
+
+    suspend fun mailThread(token: String, threadId: String): MailThreadResponse =
+        read(authed("$MAIL/thread/${enc(threadId)}", token).get().build()) { json.decodeFromString(it) }
+
+    /**
+     * `PATCH /message/:id/:action` — the action is in the **path**, never the
+     * body (`grapmail.ts:1253`). The two halves of [MailAction] come from
+     * `grapmail-boxes.ts:265-270` and `grapmail-archive.ts:146-173`; only
+     * `snooze` reads a body, and the key it reads is `until`.
+     */
+    suspend fun mailAction(
+        token: String, id: String, action: MailAction, until: String? = null,
+    ): MailMessageResponse {
+        val body = if (action == MailAction.Snooze && until != null)
+            json.encodeToString(MailSnoozeRequest.serializer(), MailSnoozeRequest(until))
+        else "{}"
+        val req = authed("$MAIL/message/${enc(id)}/${action.apiValue}", token)
+            .method("PATCH", body.toRequestBody(JSON_MEDIA))
+            .build()
+        return read(req) { json.decodeFromString(it) }
+    }
+
+    /** Permanent destruction. Valid only from Trash — see [MailAction]. */
+    suspend fun mailDeletePermanent(token: String, id: String) {
+        val (status, body) = execute(authed("$MAIL/message/${enc(id)}", token).delete().build())
+        if (status >= 400) fail(status, body)
+    }
+
+    suspend fun mailSend(token: String, req: MailSendRequest): MailSendResponse {
+        val r = authed("$MAIL/send", token).post(postBody(
+            json.encodeToString(MailSendRequest.serializer(), req))).build()
+        return read(r) { json.decodeFromString(it) }
+    }
+
+    suspend fun mailDraft(token: String, req: MailDraftRequest): MailDraftResponse {
+        val r = authed("$MAIL/draft", token).post(postBody(
+            json.encodeToString(MailDraftRequest.serializer(), req))).build()
+        return read(r) { json.decodeFromString(it) }
+    }
+
+    suspend fun mailLabels(token: String): MailLabelsResponse =
+        read(authed("$MAIL/labels", token).get().build()) { json.decodeFromString(it) }
+
+    /**
+     * Create a label. The body key is **`colour`**, not `color`
+     * (`grapmail-labels.ts:105`) — sending the American spelling creates the
+     * label with no colour and returns 200, so the mistake is invisible.
+     */
+    suspend fun mailCreateLabel(token: String, name: String, colour: String?): MailLabelResponse {
+        val r = authed("$MAIL/labels", token).post(postBody(
+            json.encodeToString(MailLabelCreateRequest.serializer(),
+                MailLabelCreateRequest(name, colour)))).build()
+        return read(r) { json.decodeFromString(it) }
+    }
+
+    suspend fun mailRenameLabel(token: String, id: String, name: String, colour: String?) {
+        val r = authed("$MAIL/labels/${enc(id)}", token)
+            .method("PATCH", postBody(json.encodeToString(
+                MailLabelCreateRequest.serializer(), MailLabelCreateRequest(name, colour))))
+            .build()
+        execute(r)
+    }
+
+    suspend fun mailDeleteLabel(token: String, id: String) {
+        execute(authed("$MAIL/labels/${enc(id)}", token).delete().build())
+    }
+
+    /** Attach / detach a label from a message. */
+    suspend fun mailLabelAssign(token: String, messageId: String, labelId: String) {
+        val r = authed("$MAIL/labels/message/${enc(messageId)}", token)
+            .post(postBody(json.encodeToString(
+                MailLabelAssignRequest.serializer(), MailLabelAssignRequest(labelId))))
+            .build()
+        execute(r)
+    }
+
+    suspend fun mailLabelDetach(token: String, messageId: String, labelId: String) {
+        execute(authed("$MAIL/labels/message/${enc(messageId)}/${enc(labelId)}", token).delete().build())
+    }
+
+    suspend fun mailAliases(token: String): MailAliasesResponse =
+        read(authed("$MAIL/aliases", token).get().build()) { json.decodeFromString(it) }
+
+    /**
+     * The screener queue's own settings. Note `?box=screener` is the queue
+     * itself (`grapmail-boxes.ts:57-66`) — this route only reads and writes the
+     * switch, so the list comes from [mailInbox] like every other box.
+     */
+    suspend fun mailScreener(token: String): MailScreenerResponse =
+        read(authed("$MAIL/screener", token).get().build()) { json.decodeFromString(it) }
+
+    suspend fun mailScreenerSet(token: String, enabled: Boolean): MailScreenerResponse {
+        val r = authed("$MAIL/screener/enabled", token)
+            .method("PUT", postBody(json.encodeToString(
+                MailScreenerEnableRequest.serializer(), MailScreenerEnableRequest(enabled))))
+            .build()
+        return read(r) { json.decodeFromString(it) }
+    }
 }
+
+// ── Mailbox request bodies ───────────────────────────────────────────────────
+// Field names are the keys the handlers destructure, not the app's vocabulary.
+// `MailLabelCreateRequest.colour` is spelled the way `grapmail-labels.ts:105`
+// reads it for exactly that reason.
+
+@Serializable
+data class MailSendRequest(
+    val to: List<String> = emptyList(),
+    val cc: List<String> = emptyList(),
+    val bcc: List<String> = emptyList(),
+    val subject: String = "",
+    val bodyText: String = "",
+    val bodyHtml: String? = null,
+    /**
+     * Sent for reply threading. `grapmail.ts:851-900` is confirmed to read
+     * to/cc/bcc/subject/bodyText/bodyHtml; this key is the one field the compose
+     * screen needs that was not in that window, so it is re-checked against the
+     * handler when the gateway is back — if the route ignores it, replies lose
+     * their In-Reply-To and the thread view shows them as new messages.
+     */
+    val inReplyTo: String? = null,
+)
+
+@Serializable
+data class MailDraftRequest(
+    val to: List<String> = emptyList(),
+    val cc: List<String> = emptyList(),
+    val subject: String = "",
+    val bodyText: String = "",
+    val inReplyTo: String? = null,
+)
+
+@Serializable
+data class MailSnoozeRequest(val until: String)
+
+@Serializable
+data class MailLabelCreateRequest(val name: String, val colour: String? = null)
+
+@Serializable
+data class MailLabelAssignRequest(val labelId: String)
+
+@Serializable
+data class MailScreenerEnableRequest(val enabled: Boolean)

@@ -678,8 +678,19 @@ private struct VerifyPasswordRequest: Codable { var password: String }
 
 struct ApiClient {
     static let base = "https://grapsee.com/api"
-    private static let encoder = JSONEncoder()
-    private static let decoder = JSONDecoder()
+    // Internal, not private: the mailbox sector lives in MailAPI.swift and
+    // encodes through the same encoder and bearer path rather than standing up
+    // a second one that could drift from the 401 handling below.
+    static let encoder = JSONEncoder()
+    static let decoder = JSONDecoder()
+
+    /// The app's mail base — the same same-origin proxy the website uses.
+    ///
+    /// `src/app/api/grapsee/grapmail/[...path]/route.ts:130` forwards to
+    /// `<upstream>/grapmail/*` and passes the bearer through unchanged. The
+    /// shorter `/grapmail` is a Next.js page, so it answers 404 with **HTML**;
+    /// decoding that as JSON is what would make a live mailbox look empty.
+    static let mailBase = "\(base)/grapsee/grapmail"
 
     /// What the security screen shows as the device name.
     ///
@@ -693,7 +704,7 @@ struct ApiClient {
         return "GrapMail/1.0 (iPhone; \(name) \(version))"
     }()
 
-    private static func request<T: Decodable>(_ path: String, method: String = "GET", body: Data? = nil, bearer: String? = nil) async throws -> T {
+    static func request<T: Decodable>(_ path: String, method: String = "GET", body: Data? = nil, bearer: String? = nil) async throws -> T {
         guard var components = URLComponents(string: "\(base)\(path)") else {
             throw ApiError.http(status: -1, code: nil, message: "Bad URL")
         }
