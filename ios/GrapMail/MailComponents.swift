@@ -171,9 +171,9 @@ struct MessageRow: View {
     let message: MailMessage
     let selecting: Bool
     let selected: Bool
-    let onSelect: () -> Unit
-    let onOpen: () -> Unit
-    let onStar: () -> Unit
+    let onSelect: () -> Void
+    let onOpen: () -> Void
+    let onStar: () -> Void
 
     private var unread: Bool { !message.isRead }
 
@@ -284,7 +284,7 @@ struct LabelChip: View {
     let count: Int?
     let color: Color
     let selected: Bool
-    let onClick: () -> Unit
+    let onClick: () -> Void
 
     var body: some View {
         Button(action: onClick) {
@@ -310,7 +310,7 @@ struct BoxTab: View {
     let title: String
     let count: Int?
     let active: Bool
-    let onClick: () -> Unit
+    let onClick: () -> Void
 
     var body: some View {
         Button(action: onClick) {
@@ -335,7 +335,7 @@ struct BoxTab: View {
 /// floating button found by coordinates is a walk that breaks whenever the list
 /// scrolls.
 struct MailFab: View {
-    let onClick: () -> Unit
+    let onClick: () -> Void
 
     var body: some View {
         Button(action: onClick) {
@@ -358,7 +358,7 @@ struct MailFab: View {
 struct ToolAction: View {
     let icon: String
     let label: String
-    let onClick: () -> Unit
+    let onClick: () -> Void
 
     var body: some View {
         Button(action: onClick) {
@@ -376,12 +376,12 @@ struct ToolAction: View {
 /// The bar that replaces the header while messages are picked.
 struct SelectionToolbar: View {
     let count: Int
-    let onClose: () -> Unit
-    let onArchive: () -> Unit
-    let onDelete: () -> Unit
-    let onMove: () -> Unit
-    let onLabel: () -> Unit
-    let onMore: () -> Unit
+    let onClose: () -> Void
+    let onArchive: () -> Void
+    let onDelete: () -> Void
+    let onMove: () -> Void
+    let onLabel: () -> Void
+    let onMore: () -> Void
 
     var body: some View {
         VStack(spacing: 0) {
@@ -427,7 +427,7 @@ struct MailStateBlock<Content: View>: View {
     let noMailbox: Bool
     let empty: Bool
     let boxTitle: String
-    let onRetry: () -> Unit
+    let onRetry: () -> Void
     @ViewBuilder let content: Content
 
     var body: some View {
@@ -435,35 +435,39 @@ struct MailStateBlock<Content: View>: View {
             if !failed && !noMailbox && !empty {
                 content
             } else if loading {
-                CenteredState(title: "Checking your mailbox…", body: nil)
+                CenteredState(title: "Checking your mailbox…")
             } else if noMailbox {
                 CenteredState(
                     title: "No GrapMail mailbox on this account",
-                    body: "The account you signed in with has no mailbox provisioned, so there is " +
-                          "nothing to list. This is not a connection problem.")
+                    detail: "The account you signed in with has no mailbox provisioned, so there is " +
+                            "nothing to list. This is not a connection problem.")
             } else if failed {
                 CenteredState(
                     title: "Couldn't load \(boxTitle)",
-                    body: "Your mailbox could not be reached. Nothing has been deleted.",
+                    detail: "Your mailbox could not be reached. Nothing has been deleted.",
                     action: ("Try again", onRetry))
             } else {
-                CenteredState(title: "\(boxTitle) is empty", body: "No messages here yet.")
+                CenteredState(title: "\(boxTitle) is empty",
+                              detail: "No messages here yet.")
             }
         }
     }
 }
 
+/// `detail`, never `body`: a stored property called `body` in a `View` shadows
+/// the protocol's own requirement, and the compiler reports the conformance
+/// against the String instead of the view. This bit the security sector once.
 struct CenteredState: View {
     let title: String
-    let body: String?
-    var action: (String, () -> Unit)? = nil
+    var detail: String? = nil
+    var action: (String, () -> Void)? = nil
 
     var body: some View {
         VStack(spacing: 8) {
             Text(title).font(.system(size: 17, weight: .semibold))
                 .foregroundColor(GM.textPrimary).multilineTextAlignment(.center)
-            if let body {
-                Text(body).font(.system(size: 14)).foregroundColor(GM.textSecondary)
+            if let detail {
+                Text(detail).font(.system(size: 14)).foregroundColor(GM.textSecondary)
                     .multilineTextAlignment(.center)
             }
             if let action {
