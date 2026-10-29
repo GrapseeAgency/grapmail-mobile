@@ -95,6 +95,22 @@ jobs:
           emulator-options: -no-window -no-audio -no-boot-anim -gpu swiftshader_indirect -no-snapshot
           script: bash scripts/android-walk.sh android/app/build/outputs/apk/debug/app-debug.apk screenshots
 
+      - name: Mailbox screen set matches iOS
+        # The band is defined once, in the walk scripts. If either side renames,
+        # drops or invents a mail screen, "the same screens on both platforms"
+        # stops being true and nothing else in CI would notice: Android's gate is
+        # a fixed list and iOS's is a count, and two different sets can satisfy
+        # both. Kept in both workflows so the failure names the platform that
+        # drifted rather than the one that happened to run second.
+        run: |
+          grep -oE '"[0-9]{2}-mail-[a-z-]+"' ios/GrapMailUITests/ScreenshotWalkUITests.swift | tr -d '"' | sort -u > ios-mail.txt
+          grep -oE '[0-9]{2}-mail-[a-z-]+' scripts/android-walk.sh | sort -u > and-mail.txt
+          echo "iOS: $(wc -l < ios-mail.txt)  Android: $(wc -l < and-mail.txt)"
+          if ! diff -u and-mail.txt ios-mail.txt; then
+            echo "::error::the two walks photograph different mailbox screens"
+            exit 1
+          fi
+
       - name: Upload screenshots
         if: always()
         uses: actions/upload-artifact@v4

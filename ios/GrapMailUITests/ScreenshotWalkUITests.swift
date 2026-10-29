@@ -206,7 +206,40 @@ final class ScreenshotWalkUITests: XCTestCase {
             inertDismiss()
             tap(app.buttons["Sign In"].firstMatch, "Sign In (post-create)", timeout: 10)
         }
-        require(app.staticTexts["Signed in"].firstMatch, "Signed-in home", timeout: 12)
+        // The signed-in home IS the mailbox. Every anchor below is an identifier
+        // the screen sets on itself rather than a sentence it happens to print —
+        // the placeholder home's literal "Signed in" was the kind of anchor a
+        // copy change breaks silently, and six of them went red at once in the
+        // plan for exactly that reason.
+        let mailHome = app.descendants(matching: .any)["mail-home"].firstMatch
+        require(mailHome, "Mailbox home", timeout: 20)
+        snap("60-mail-home")
+
+        // Mailbox leg — read-only. The drawer and the search field are reachable
+        // without filing, deleting or sending, so they are photographed from the
+        // live screen. Send, permanent delete and Report spam are not in this
+        // leg: one is irreversible, one destroys, one feeds the suppression list
+        // that would stop future CI mail. They live in the snapshot band.
+        tap(app.descendants(matching: .any)["mail-menu"].firstMatch, "Open folders (drawer)")
+        XCTAssertTrue(app.staticTexts["Pending approval"].waitForExistence(timeout: 8),
+                      "drawer did not open")
+        snap("62-mail-drawer")
+        // The drawer closes on a row tap; choosing the box already on screen is
+        // the one gesture that dismisses it without leaving the home.
+        tap(app.descendants(matching: .any)["mail-drawer-Inbox"].firstMatch, "Close drawer (Inbox)")
+        require(mailHome, "Home after drawer", timeout: 8)
+
+        tap(app.descendants(matching: .any)["mail-search"].firstMatch, "Search field")
+        sleep(1)
+        snap("67-mail-search")
+        app.swipeDown() // the keyboard is not part of the frame being reviewed
+
+        tap(app.buttons["Sort and filter"].firstMatch, "Sort and filter (search row)")
+        XCTAssertTrue(app.staticTexts["Sort & filter"].waitForExistence(timeout: 8),
+                      "sort sheet did not open")
+        snap("69-mail-sort-filter")
+        app.swipeDown()
+        require(mailHome, "Home after sort sheet", timeout: 8)
 
         // Security sector — the reference screens photographed in the app's
         // light theme. Read-only: the walk opens every hub row, snapshots it,
@@ -214,7 +247,13 @@ final class ScreenshotWalkUITests: XCTestCase {
         // session, never signs the fresh account out of everything — those
         // flows have their own screens and their own confirmations, and this
         // account has to survive to the session-restore leg below.
-        tap(app.buttons["Account security"].firstMatch, "Account security (home)")
+        // Account security is reached through the mailbox drawer now. The row is
+        // a drawer row, so the drawer has to be open for it to exist — the same
+        // path a person takes.
+        tap(app.descendants(matching: .any)["mail-menu"].firstMatch, "Open folders (to security)")
+        XCTAssertTrue(app.staticTexts["Pending approval"].waitForExistence(timeout: 8),
+                      "drawer did not open (to security)")
+        tap(app.descendants(matching: .any)["mail-drawer-Security"].firstMatch, "Security (drawer)")
         require(app.staticTexts["Account Security"].firstMatch, "Security hub", timeout: 8)
         snap("20-sec-hub-light")
         openSecurityRow("Two-Step Verification", "21-sec-2fa-enable-light")
@@ -279,6 +318,33 @@ final class ScreenshotWalkUITests: XCTestCase {
             // need a server-seeded event no test can ask for.
             ("53-sec-alert-no-open-alert", "suspicious-alert"),
             ("54-sec-secure-no-open-alert", "secure-account"),
+            // Mailbox band. 60/62/67/69 are shot from the live screen above;
+            // 61 is the dark frame below. Everything here needs a message to
+            // exist, and the account CI creates may have no provisioned mailbox
+            // at all — so the populated, loading, empty, failed and no-mailbox
+            // frames come from the test-only host rather than from a guess about
+            // what the server will say.
+            ("63-mail-empty", "mail-empty"),
+            ("64-mail-loading", "mail-loading"),
+            ("65-mail-load-failed", "mail-load-failed"),
+            ("66-mail-no-mailbox", "mail-no-mailbox"),
+            ("68-mail-selection", "mail-selection"),
+            ("70-mail-move-sheet", "mail-move-sheet"),
+            ("71-mail-delete-sheet", "mail-delete-sheet"),
+            ("72-mail-labels", "mail-labels"),
+            ("73-mail-label-create", "mail-label-create"),
+            ("74-mail-thread", "mail-thread"),
+            ("75-mail-thread-encrypted", "mail-thread-encrypted"),
+            ("76-mail-compose", "mail-compose"),
+            ("77-mail-contacts", "mail-contacts"),
+            ("78-mail-files", "mail-files"),
+            ("79-mail-attachment-preview", "mail-attachment-preview"),
+            ("80-mail-settings", "mail-settings"),
+            ("81-mail-screener", "mail-screener"),
+            ("82-mail-send-receipt", "mail-send-receipt"),
+            ("83-mail-assign-label-sheet", "mail-assign-label-sheet"),
+            ("84-mail-snooze-sheet", "mail-snooze-sheet"),
+            ("85-mail-contact-detail", "mail-contact-detail"),
         ]
         // These two fetch on appear, so the shutter has to wait for the loaded
         // branch — otherwise the photograph catches "Checking your account…"
@@ -287,6 +353,20 @@ final class ScreenshotWalkUITests: XCTestCase {
         let settledLabels: [String: String] = [
             "suspicious-alert": "Address",
             "secure-account": "Suspicious Sign-In Details",
+            // The seeded mail screens read their sample content through an
+            // effect, so the shutter has to wait for it. Photographed a frame
+            // early, a populated screen looks exactly like its empty branch and
+            // the artifact would document the wrong state.
+            "mail-thread": "Q3 facilities invoice",
+            "mail-thread-encrypted": "End-to-end encrypted",
+            "mail-contacts": "amira@northwind.example",
+            "mail-contact-detail": "Messages seen",
+            "mail-files": "invoice-q3.pdf",
+            "mail-attachment-preview": "Save to this device",
+            "mail-settings": "GrapMail address",
+            "mail-screener": "Waiting now",
+            "mail-labels": "Manage labels",
+            "mail-selection": "Delete",
         ]
         for screen in postWriteScreens {
             app.terminate()
@@ -306,6 +386,11 @@ final class ScreenshotWalkUITests: XCTestCase {
             // a placeholder photographed as if it were the screen.
             let unknown = app.staticTexts["Unknown snapshot: \(screen.name)"].firstMatch
             XCTAssertFalse(unknown.exists, "app did not recognise snapshot '\(screen.name)'")
+            // The mail host names its own miss. Without this check a typo in a
+            // mail-* name would photograph the fallthrough label and still fill
+            // the artifact's expected set.
+            let unknownMail = app.staticTexts["Unknown mail snapshot: \(screen.name)"].firstMatch
+            XCTAssertFalse(unknownMail.exists, "app did not recognise mail snapshot '\(screen.name)'")
             if let settled = settledLabels[screen.name] {
                 XCTAssertTrue(app.staticTexts[settled].waitForExistence(timeout: 12),
                               "snapshot '\(screen.name)' never finished loading")
@@ -320,9 +405,15 @@ final class ScreenshotWalkUITests: XCTestCase {
         app.terminate()
         app.launchArguments = []
         app.launch()
-        require(app.staticTexts["Signed in"].firstMatch, "session restored on launch", timeout: 8)
+        require(app.descendants(matching: .any)["mail-home"].firstMatch,
+                "session restored on launch (the mailbox is the signed-in home)", timeout: 20)
         snap("10-session-restored")
-        tap(app.buttons["Sign out"].firstMatch, "Sign out")
+        // Sign out lives in the mailbox drawer. This is the leg that ends the
+        // session, which is why it runs after the restore proof above.
+        tap(app.descendants(matching: .any)["mail-menu"].firstMatch, "Open folders (to sign out)")
+        XCTAssertTrue(app.staticTexts["Pending approval"].waitForExistence(timeout: 8),
+                      "drawer did not open (to sign out)")
+        tap(app.descendants(matching: .any)["sign-out"].firstMatch, "Sign out (drawer)")
         require(app.staticTexts["Welcome to"].firstMatch, "welcome after sign-out", timeout: 8)
 
         // Sign-in screen
@@ -340,6 +431,22 @@ final class ScreenshotWalkUITests: XCTestCase {
         tap(app.buttons["Find your GrapMail address"].firstMatch, "Find-address link (reset form)")
         require(app.staticTexts["Find your GrapMail address"].firstMatch, "Recovery: find form", timeout: 8)
         snap("31-recovery-find-address-light")
+
+        // The mailbox in dark. GM resolves its colours through the trait
+        // environment, so overriding the trait here needs no launch argument and
+        // no app-code branch — the photograph goes through the same lookup a
+        // real dark-mode user does.
+        app.terminate()
+        app.launchArguments = ["-gmSnapshot", "mail-home"]
+        app.launch()
+        XCTAssertTrue(app.descendants(matching: .any)["gm-snapshot"].firstMatch
+                        .waitForExistence(timeout: 8),
+                      "snapshot 'mail-home' (dark) is not the visible screen")
+        XCUIDevice.shared.forceDarkMode = true
+        sleep(2) // the trait change propagates through the environment
+        snap("61-mail-home-dark")
+        XCUIDevice.shared.forceDarkMode = false
+        app.terminate()
     }
 
     /// Open an inline picker and choose `option` (always the panel's first
@@ -420,7 +527,8 @@ final class ScreenshotWalkUITests: XCTestCase {
     private func backFromSecurityScreens() {
         require(app.staticTexts["Account Security"].firstMatch, "Security hub (return)", timeout: 8)
         tap(app.buttons["back"].firstMatch, "back (hub → home)")
-        require(app.buttons["Account security"].firstMatch, "Signed-in home (return)", timeout: 8)
+        require(app.descendants(matching: .any)["mail-home"].firstMatch,
+                "Mailbox home (return)", timeout: 20)
     }
 
     private func typeIntoSecureField(_ identifier: String, _ value: String) {

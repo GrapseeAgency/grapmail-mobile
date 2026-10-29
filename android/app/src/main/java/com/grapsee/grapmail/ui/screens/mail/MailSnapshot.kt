@@ -27,7 +27,9 @@ import com.grapsee.grapmail.data.MailAttachmentDto
 import com.grapsee.grapmail.data.MailBox
 import com.grapsee.grapmail.data.MailFilter
 import com.grapsee.grapmail.data.MailLabelDto
+import com.grapsee.grapmail.data.MailInboxResponse
 import com.grapsee.grapmail.data.MailMessageDto
+import com.grapsee.grapmail.data.MailStore
 import com.grapsee.grapmail.data.MailMessageFullDto
 import com.grapsee.grapmail.data.MailPersonDto
 import com.grapsee.grapmail.data.MailSort
@@ -73,8 +75,15 @@ fun MailSnapshotScreen(name: String) {
         when (name) {
             "mail-thread" -> seedThread(vm, encrypted = false)
             "mail-thread-encrypted" -> seedThread(vm, encrypted = true)
-            "mail-contacts", "mail-contact-detail" ->
+            "mail-contacts", "mail-contact-detail" -> {
+                // Contacts are derived from the mail the app has loaded, with no
+                // contacts endpoint behind them, so the only way this screen can
+                // be photographed populated is by loading the sample pages into
+                // the same cache the live list writes. That is what the snapshot
+                // host is for: the data stays here, and the derivation stays real.
+                seedCache()
                 vm.seedForSnapshot { it.copy(accountAddress = "amira@grapmail.com") }
+            }
             "mail-settings" -> vm.seedForSnapshot {
                 it.copy(
                     accountAddress = "amira@grapmail.com",
@@ -133,8 +142,15 @@ fun MailSnapshotScreen(name: String) {
             "mail-contacts" -> ContactsScreen(vm, onBack = {}, onOpen = { })
             "mail-contact-detail" -> ContactDetailScreen(
                 vm, address = "amira@northwind.example", onBack = {}, onWrite = { })
-            "mail-files" -> FilesScreen(vm, onBack = {}, onOpen = { })
-            "mail-attachment-preview" -> AttachmentPreviewScreen(vm, attachmentId = "a1", onBack = {})
+            "mail-files" -> {
+                seedCache()
+                vm.seedForSnapshot { it.copy(accountAddress = "amira@grapmail.com") }
+                FilesScreen(vm, onBack = {}, onOpen = { })
+            }
+            "mail-attachment-preview" -> {
+                seedCache()
+                AttachmentPreviewScreen(vm, attachmentId = "a1", onBack = {})
+            }
             "mail-settings" -> MailSettingsScreen(vm, onBack = {}, onSecurity = {},
                 onScreener = {}, onLabels = {}, onHelp = {}, onSignOut = {})
             "mail-screener" -> ScreenerScreen(vm, onBack = {}, onOpenQueue = {})
@@ -188,6 +204,26 @@ private val sampleLabels = listOf(
     MailLabelDto(id = "l1", name = "Work", color = "#2F6FED", unread = 2),
     MailLabelDto(id = "l2", name = "Bills", color = "#1E9E6A"),
 )
+
+/// The sample pages, in the same cache the live list reads. Without them the
+/// Contacts and Files screens can only ever photograph their empty branch, and
+/// the screen under review is the populated one.
+private suspend fun seedCache() {
+    MailStore.putPage(MailBox.Inbox, null,
+        MailInboxResponse(success = true, box = "inbox", total = rows.size, messages = rows),
+        replace = true)
+    MailStore.putBody(
+        MailMessageFullDto(
+            id = "m1", threadId = "t-m1", direction = "inbound", status = "delivered",
+            from = MailPersonDto(address = "amira@northwind.example", name = "Amira Rahman"),
+            to = listOf("you@grapmail.com"), subject = "Q3 facilities invoice",
+            isRead = true, hasAttachments = true, createdAt = "2026-10-29T09:12:00Z",
+            bodyText = "Attached is the invoice for the quarter, payable on receipt.",
+            attachments = listOf(MailAttachmentDto(id = "a1", name = "invoice-q3.pdf",
+                mimeType = "application/pdf", sizeBytes = 1_415_732)),
+        ),
+    )
+}
 
 private fun seedThread(vm: MailboxViewModel, encrypted: Boolean) {
     vm.seedThreadForSnapshot(listOf(

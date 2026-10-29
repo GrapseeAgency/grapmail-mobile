@@ -154,7 +154,31 @@ sleep 3
 echo "· account created (B)"
 shot 09-created-b-light
 must_tap "Go to Mailbox"
+sleep 3
+
+echo "· mailbox — the live home, read-only"
+# The signed-in home IS the mailbox now, so the walk's anchors are the mail
+# chrome rather than the words the placeholder screen used to print. The account
+# CI creates may or may not have a provisioned mailbox; whichever state the app
+# shows is the state that gets photographed, and the frame is named for the
+# screen, not for an outcome the run cannot control.
+must "mailbox home" wait_nodes "n.get('content-desc','')=='Open folders'" >/dev/null
+shot 60-mail-home
+must "drawer tap" tap_xy "$(wait_nodes "n.get('content-desc','')=='Open folders'" | head -1)"
+must "drawer open" wait_nodes "n.get('text','')=='Pending approval'" >/dev/null
+shot 62-mail-drawer
+adb shell input keyevent KEYCODE_BACK
+sleep 1
+must "sort sheet tap" tap_xy "$(wait_nodes "n.get('content-desc','')=='Sort and filter'" | head -1)"
+must "sort sheet open" wait_nodes "n.get('text','')=='Sort & filter'" >/dev/null
+shot 69-mail-sort-filter
+adb shell input keyevent KEYCODE_BACK
+sleep 1
+must_tap "Search emails, people, or files…"
 sleep 2
+shot 67-mail-search
+adb shell input keyevent KEYCODE_BACK
+sleep 1
 
 echo "· security sector — every hub screen, read-only"
 # Mirrors the iOS walk's security leg: open each hub row, photograph the
@@ -241,7 +265,7 @@ must "hub after gate leg" wait_nodes "n.get('text','')=='Account Security'" >/de
 # back out of the hub to the signed-in home, where the restore leg starts
 must "hub back tap" tap_xy "$(wait_nodes "n.get('content-desc','')=='Back'" | head -1)"
 sleep 2
-must "home after security" wait_nodes "n.get('text','')=='Signed in'" >/dev/null
+must "home after security" wait_nodes "n.get('content-desc','')=='Open folders'" >/dev/null
 
 echo "· post-write confirmations — via the app's test-only snapshot hook"
 # These screens exist only AFTER a write the walk must not perform: signing out
@@ -264,7 +288,28 @@ for spec in "two-factor-on:40-sec-two-factor-on" \
             "revoke-session-form:51-sec-revoke-session-form" \
             "revoke-session-confirm:52-sec-revoke-session-confirm" \
             "suspicious-alert:53-sec-alert-no-open-alert" \
-            "secure-account:54-sec-secure-no-open-alert"; do
+            "secure-account:54-sec-secure-no-open-alert" \
+            "mail-empty:63-mail-empty" \
+            "mail-loading:64-mail-loading" \
+            "mail-load-failed:65-mail-load-failed" \
+            "mail-no-mailbox:66-mail-no-mailbox" \
+            "mail-selection:68-mail-selection" \
+            "mail-move-sheet:70-mail-move-sheet" \
+            "mail-delete-sheet:71-mail-delete-sheet" \
+            "mail-labels:72-mail-labels" \
+            "mail-label-create:73-mail-label-create" \
+            "mail-thread:74-mail-thread" \
+            "mail-thread-encrypted:75-mail-thread-encrypted" \
+            "mail-compose:76-mail-compose" \
+            "mail-contacts:77-mail-contacts" \
+            "mail-files:78-mail-files" \
+            "mail-attachment-preview:79-mail-attachment-preview" \
+            "mail-settings:80-mail-settings" \
+            "mail-screener:81-mail-screener" \
+            "mail-send-receipt:82-mail-send-receipt" \
+            "mail-assign-label-sheet:83-mail-assign-label-sheet" \
+            "mail-snooze-sheet:84-mail-snooze-sheet" \
+            "mail-contact-detail:85-mail-contact-detail"; do
   nm="${spec%%:*}"; pic="${spec##*:}"
   adb shell am force-stop "$PKG"
   adb shell am start -W -n "$PKG/.MainActivity" --es gmSnapshot "$nm" >/dev/null
@@ -282,6 +327,16 @@ for spec in "two-factor-on:40-sec-two-factor-on" \
   case "$nm" in
     suspicious-alert) settled="Address" ;;
     secure-account) settled="Suspicious Sign-In Details" ;;
+    # The seeded screens read the cache and the view model through an effect, so
+    # the photograph must wait for the content to land or it catches the empty
+    # branch of a screen that has data one frame later.
+    mail-thread|mail-thread-encrypted) settled="Q3 facilities invoice" ;;
+    mail-contacts|mail-contact-detail) settled="amira@northwind.example" ;;
+    mail-files|mail-attachment-preview) settled="invoice-q3.pdf" ;;
+    mail-settings) settled="GrapMail address" ;;
+    mail-screener) settled="Waiting now" ;;
+    mail-labels) settled="Manage labels" ;;
+    mail-selection) settled="Delete" ;;
     *) settled="" ;;
   esac
   if [ -n "$settled" ] && [ -z "$(find_nodes "n.get('text','')=='$settled'")" ]; then
@@ -289,6 +344,11 @@ for spec in "two-factor-on:40-sec-two-factor-on" \
     if [ -z "$(find_nodes "n.get('text','')=='$settled'")" ]; then
       echo "FAIL: snapshot '$nm' never finished loading" >&2; FAILURES=$((FAILURES + 1))
     fi
+  fi
+  # The mail host names its own miss. Without this a typo in a mail-* name
+  # would photograph the fallthrough label and still fill the PNG gate.
+  if [ -n "$(find_nodes "n.get('text','')=='Unknown mail snapshot: $nm'")" ]; then
+    echo "FAIL: app did not recognise mail snapshot '$nm'" >&2; FAILURES=$((FAILURES + 1))
   fi
   if [ -n "$(find_nodes "n.get('text','')=='Unknown snapshot: $nm'")" ]; then
     echo "FAIL: app did not recognise snapshot '$nm'" >&2; FAILURES=$((FAILURES + 1))
@@ -303,13 +363,17 @@ adb shell am start -W -n "$PKG/.MainActivity" >/dev/null
 sleep 6
 shot 10-session-restored
 # assert, don't tap: the home screen must show the signed-in state
-if wait_nodes "n.get('text','')=='Signed in'" >/dev/null; then
-  echo "  ✓ session restored"
+if wait_nodes "n.get('content-desc','')=='Open folders'" >/dev/null; then
+  echo "  ✓ session restored (the mailbox is the signed-in home)"
 else
   echo "FAIL: restart did not open signed-in" >&2
   FAILURES=$((FAILURES + 1))
 fi
-# sign out returns to welcome
+# Sign out lives in the mailbox drawer now, so the walk opens the drawer and
+# taps it there. This is the leg that ends the session, which is why it runs
+# after the restore proof.
+must "drawer for sign-out" tap_xy "$(wait_nodes "n.get('content-desc','')=='Open folders'" | head -1)"
+must "sign-out row" wait_nodes "n.get('text','')=='Sign out'" >/dev/null
 must_tap "Sign out"
 sleep 2
 
@@ -341,6 +405,20 @@ shot 12-welcome-dark
 must_tap "Create Account"
 sleep 2
 shot 13-step1-name-dark
+
+# The mailbox in dark, from the snapshot host: the night flip is already on, so
+# this is the same frame the sector's light photograph with the palette resolved
+# through the dark branch — the design review needs both, and neither depends on
+# a provisioned mailbox.
+adb shell am force-stop "$PKG"
+adb shell am start -W -n "$PKG/.MainActivity" --es gmSnapshot "mail-home" >/dev/null
+sleep 5
+if [ -z "$(find_nodes "n.get('content-desc','')=='gm-snapshot'")" ]; then
+  echo "FAIL: snapshot 'mail-home' (dark) is not the visible screen" >&2
+  FAILURES=$((FAILURES + 1))
+fi
+shot 61-mail-home-dark
+adb shell am force-stop "$PKG"
 adb shell am force-stop "$PKG"
 adb shell "cmd uimode night no"
 
@@ -367,7 +445,16 @@ for want in 01-welcome-light 02-step1-name-light 03-step2-basicinfo-light \
             50-sec-session-revoked-suspicious \
             51-sec-revoke-session-form 52-sec-revoke-session-confirm \
             53-sec-alert-no-open-alert 54-sec-secure-no-open-alert \
-            10-session-restored 11-signin-light 12-welcome-dark 13-step1-name-dark; do
+            10-session-restored 11-signin-light 12-welcome-dark 13-step1-name-dark \
+            60-mail-home 61-mail-home-dark 62-mail-drawer 63-mail-empty \
+            64-mail-loading 65-mail-load-failed 66-mail-no-mailbox \
+            67-mail-search 68-mail-selection 69-mail-sort-filter \
+            70-mail-move-sheet 71-mail-delete-sheet 72-mail-labels \
+            73-mail-label-create 74-mail-thread 75-mail-thread-encrypted \
+            76-mail-compose 77-mail-contacts 78-mail-files \
+            79-mail-attachment-preview 80-mail-settings 81-mail-screener \
+            82-mail-send-receipt 83-mail-assign-label-sheet \
+            84-mail-snooze-sheet 85-mail-contact-detail; do
   [ -s "$OUT/$want.png" ] || { echo "FAIL: missing $want.png" >&2; FAILURES=$((FAILURES + 1)); }
 done
 if [ "$FAILURES" -gt 0 ]; then

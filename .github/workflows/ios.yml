@@ -56,13 +56,21 @@ jobs:
           # The export chain above never aborts (a failed test still has to
           # upload what it captured), so without this check the job could go
           # green on an empty artifact while claiming the sector was screened.
-          # The walk photographs 36 screens (8 signup, 9 hub + gate leg, 7 hub
-          # rows, 15 post-write + no-open-alert confirmations, 2 recovery, 2
-          # restore/sign-in); anything under 30 means it died part way, and the
-          # run must not be read as a pass on screenshots.
+          # The walk photographs 62 screens: 8 signup, 9 hub + gate leg, 7 hub
+          # rows, 15 post-write + no-open-alert security confirmations, 2
+          # recovery, 1 session restore, 1 sign-in, 2 dark (welcome + step 1),
+          # and the mailbox band of 26 — 4 live (60 home, 62 drawer, 67 search,
+          # 69 sort sheet), 21 snapshot names, and 61 shot in dark. Anything
+          # under 60 means it died part way through, and the run must not be
+          # read as a pass on screenshots.
+          #
+          # The floor is a count, not a set: XCUITest attachments are exported
+          # under hashed names, so this artifact cannot be diffed by screen. The
+          # parity step below is what proves the two platforms photographed the
+          # same screen LIST; this number only proves the walk ran to the end.
           COUNT="$(find screenshots -name '*.png' | wc -l | tr -d ' ')"
           echo "exported $COUNT screenshot attachment(s)"
-          if [ "$COUNT" -lt 30 ]; then
+          if [ "$COUNT" -lt 60 ]; then
             echo "::error::only $COUNT screenshots exported — the walk did not produce its set"
             exit 1
           fi
@@ -74,3 +82,19 @@ jobs:
           name: ios-screenshots
           path: screenshots/
           if-no-files-found: error
+
+      - name: Mailbox screen set matches Android
+        # The band is defined once, in the walk scripts. If either side renames,
+        # drops or invents a mail screen, "the same screens on both platforms"
+        # stops being true and nothing else in CI would notice — the iOS gate is
+        # a count and the Android gate is a fixed list, and both can be satisfied
+        # by two different sets.
+        run: |
+          grep -oE '"[0-9]{2}-mail-[a-z-]+"' ios/GrapMailUITests/ScreenshotWalkUITests.swift \
+            | tr -d '"' | sort -u > ios-mail.txt
+          grep -oE '[0-9]{2}-mail-[a-z-]+' scripts/android-walk.sh | sort -u > and-mail.txt
+          echo "iOS: $(wc -l < ios-mail.txt)  Android: $(wc -l < and-mail.txt)"
+          if ! diff -u and-mail.txt ios-mail.txt; then
+            echo "::error::the two walks photograph different mailbox screens"
+            exit 1
+          fi

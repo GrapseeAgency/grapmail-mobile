@@ -115,11 +115,16 @@ stubs, no fake data anywhere.
 > the app talks to a real store, not because that store is the one the mail
 > service reads.
 
-## Mailbox sector — not built, and why
+## Mailbox sector — built, and what still gates it
 
-The mailbox is the next batch. Before any of it is written, one fact has to be
-true and currently is not: **the backend that owns mailboxes cannot authenticate
-a user.**
+The mailbox is built on both platforms and is the signed-in home: the placeholder
+screen that used to print *"The mailbox arrives in the next build phase."* is
+deleted from both apps, and `.home` / `Routes.HOME` open the list, the drawer, the
+thread, compose, labels, contacts, files, settings and the screener.
+
+What has not changed is the server. One fact still gates every **live** mail call,
+and it was true before this batch was written and is true now: **the backend that
+owns mailboxes cannot authenticate a user.**
 
 `https://api.iqracsc.com/auth/register` answers `500` on the `SELECT` that runs
 before any insert, because it asks for `account_type`, `grapmail_handle` and
@@ -134,11 +139,44 @@ PostgresError: Your account or project has exceeded the quota.
 code 53000 · failed on: CREATE SCHEMA IF NOT EXISTS "drizzle"
 ```
 
-Nothing in the migration chain has been applied. Until the quota is cleared and
-`/auth/register` returns `200`, a mailbox screen would compile, render and
-screenshot while every live call returned `401`. That is the failure mode
-`src/app/lib/localAuthFallback.ts:63-67` was written to prevent, so it is not
-reproduced here on purpose.
+Nothing in the migration chain has been applied. The consequence for this build is
+precise, and it is the reason the sector was not deferred: the client is complete
+against the verified contract, so the day the gateway returns it lights up with no
+code change — and until then, the live walk leg photographs whatever the app
+actually says. With a dead gateway that is the load-failed frame, with a live
+gateway and an unprovisioned account it is `66-mail-no-mailbox`. Neither is
+presented as the other, and no seeded row exists outside the test-only snapshot
+host, so a broken network layer cannot read as a working mailbox.
+
+### What shipped, and how CI proves it
+
+- **Data layer.** `MailDto.kt` / `MailAPI.swift` mirror the route's own row
+  shapes (`publicRow`, `fullRow`), every DTO hand-decoded with the lenient
+  helpers so an omitted key keeps its null instead of throwing. Response types
+  are `Decodable`, never `Codable`.
+- **State.** `MailStore` (per-box pages, memoised bodies, stats, labels,
+  aliases) plus `MailboxViewModel` / `MailboxModel`. A failed refresh never
+  blanks a list that is already on screen — the hub's defect, designed out here
+  rather than rediscovered. The cache clears wherever the session does.
+- **Screens.** Mailbox home, thread, compose, sort/filter, move, delete,
+  assign-label and snooze sheets, labels, label create, contacts, contact
+  detail, files, attachment preview, settings, screener, send receipt, and the
+  no-mailbox state. Same screen set on both platforms.
+- **The band is 26 frames, `60`–`85`.** The plan called it 25; the list it
+  printed runs 60 to 85 inclusive, which is 26. The number in the list is what
+  CI enforces, and the discrepancy is recorded rather than quietly closed.
+- **Snapshot hosts** (`MailSnapshot.kt` / `MailSnapshot.swift`) render every
+  frame that needs a message to exist, from literals, unreachable without the
+  launch argument. The view models expose seed seams that only that host calls.
+- **Gates.** The Android walk's fixed PNG list carries all 26 names; the iOS
+  floor is 60 of 62. Both workflows diff the two name lists and fail on
+  asymmetry, because a count and a fixed list can each be satisfied by two
+  different screen sets — which is exactly how drift would arrive.
+- **The walk never** taps Send, permanent delete, or Report spam: one is
+  irreversible, one destroys mail, and one feeds the suppression list that would
+  stop future CI mail. Those three are photographed from the snapshot host.
+- **Anchors** are identifiers the screens set on themselves (`mail-home`,
+  `mail-menu`, `mail-search`, `sign-out`), not sentences they happen to print.
 
 ### Which backend, and the two halves of it
 
