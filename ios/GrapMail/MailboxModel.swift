@@ -117,6 +117,18 @@ final class MailboxModel: ObservableObject {
     private var loadTask: Task<Void, Never>?
     private var searchTask: Task<Void, Never>?
 
+    /// Test-only seam for the snapshot host. The mailbox's state is written by
+    /// its loaders and nothing else; this exists so a screen that needs content
+    /// the CI account cannot have can still be photographed. The values come
+    /// from `MailSnapshot`, never from here, and no live path calls it.
+    func seedForSnapshot(_ mutate: (inout State) -> Void) { mutate(&state) }
+
+    /// The same seam for the thread, which is a separate published value because
+    /// a thread is one message's body rather than the box's listing.
+    func seedThreadForSnapshot(_ messages: [MailMessageFull]) {
+        thread = ThreadState(messages: messages)
+    }
+
     private var token: String? { SessionStore.token }
 
     // ── list ─────────────────────────────────────────────────────────────────

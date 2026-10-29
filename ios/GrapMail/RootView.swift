@@ -38,7 +38,19 @@ struct RootView: View {
         case created(address: String, name: String)
         case createdAlt(address: String, name: String)
         case home
+        case mailThread(id: String, isThread: Bool)
+        case mailCompose
+        case mailLabels, mailLabelCreate
+        case mailContacts, mailContactDetail(address: String)
+        case mailFiles, mailAttachment(id: String)
+        case mailSettings, mailScreener
     }
+
+    /// One mailbox for the whole signed-in stack. The list, the thread, compose
+    /// and the secondary screens all read and write this, so starring a message
+    /// in the list is visible in the thread that opens next, and a body read in
+    /// the thread is not fetched again by the Files screen.
+    @StateObject private var mail = MailboxModel()
 
     // A stored, unexpired session opens the app signed-in — the Keychain
     // token has to be read at launch, not just written.
@@ -91,7 +103,11 @@ struct RootView: View {
                 // perform, so they are otherwise unreachable. No real launch
                 // ever carries the argument, and nothing here fetches or submits.
                 if let snapshot = SecuritySnapshot.requested() {
-                    SecuritySnapshotView(name: snapshot)
+                    if snapshot.hasPrefix("mail-") {
+                        MailSnapshotView(name: snapshot)
+                    } else {
+                        SecuritySnapshotView(name: snapshot)
+                    }
                 } else {
                     WelcomeView(
                         onCreateAccount: { path.append(.stepName) },
@@ -406,12 +422,69 @@ struct RootView: View {
                         }
                     )
                 case .home:
-                    SignedInHome(
+                    MailboxView(
+                        vm: mail,
+                        onThread: { path.append(.mailThread(id: $0, isThread: true)) },
+                        onCompose: { path.append(.mailCompose) },
+                        onLabels: { path.append(.mailLabels) },
+                        onScreener: { path.append(.mailScreener) },
+                        onSettings: { path.append(.mailSettings) },
+                        onSecurity: { path.append(.security) },
+                        onHelp: openSupport,
+                        onContacts: { path.append(.mailContacts) },
+                        onFiles: { path.append(.mailFiles) },
                         onSignOut: {
                             SessionStore.clear()
                             path.removeAll()
-                        },
-                        onAccountSecurity: { path.append(.security) }
+                        }
+                    )
+                case let .mailThread(id, isThread):
+                    ThreadView(
+                        vm: mail, id: id, isThread: isThread,
+                        onBack: { path.removeLast() },
+                        onReply: { _ in path.append(.mailCompose) }
+                    )
+                case .mailCompose:
+                    ComposeView(vm: mail, onBack: { path.removeLast() })
+                case .mailLabels:
+                    LabelsView(vm: mail,
+                               onBack: { path.removeLast() },
+                               onCreate: { path.append(.mailLabelCreate) })
+                case .mailLabelCreate:
+                    LabelCreateView(vm: mail, onDone: { path.removeLast() })
+                case .mailContacts:
+                    ContactsView(vm: mail,
+                                 onBack: { path.removeLast() },
+                                 onOpen: { path.append(.mailContactDetail(address: $0)) })
+                case let .mailContactDetail(address):
+                    ContactDetailView(vm: mail, address: address,
+                                      onBack: { path.removeLast() },
+                                      onWrite: { path.append(.mailCompose) })
+                case .mailFiles:
+                    FilesView(vm: mail,
+                              onBack: { path.removeLast() },
+                              onOpen: { path.append(.mailAttachment(id: $0)) })
+                case let .mailAttachment(id):
+                    AttachmentPreviewView(vm: mail, attachmentId: id,
+                                          onBack: { path.removeLast() })
+                case .mailSettings:
+                    MailSettingsView(
+                        vm: mail,
+                        onBack: { path.removeLast() },
+                        onSecurity: { path.append(.security) },
+                        onScreener: { path.append(.mailScreener) },
+                        onLabels: { path.append(.mailLabels) },
+                        onHelp: openSupport,
+                        onSignOut: {
+                            SessionStore.clear()
+                            path.removeAll()
+                        }
+                    )
+                case .mailScreener:
+                    ScreenerView(
+                        vm: mail,
+                        onBack: { path.removeLast() },
+                        onOpenQueue: { mail.open(.screener); backToHome() }
                     )
                 }
                 }
@@ -432,39 +505,3 @@ struct RootView: View {
     }
 }
 
-/// Temporary authenticated home — real session, real sign-out. The mailbox and
-/// onboarding replace this in the next build phases.
-struct SignedInHome: View {
-    let onSignOut: () -> Void
-    let onAccountSecurity: () -> Void
-
-    var body: some View {
-        VStack(spacing: 0) {
-            Spacer(minLength: 56)
-            Wordmark()
-            Text("Signed in")
-                .font(.system(size: 22, weight: .bold))
-                .foregroundColor(GM.textPrimary)
-                .padding(.top, 28)
-            Text(SessionStore.address ?? "—")
-                .font(.system(size: 15))
-                .foregroundColor(GM.textSecondary)
-                .padding(.top, 8)
-            Spacer()
-            Text("The mailbox arrives in the next build phase.")
-                .font(GMFont.caption)
-                .foregroundColor(GM.textTertiary)
-            // Account security is built: the phone screens live here until the
-            // real settings hub exists, rather than being unreachable.
-            OutlineActionButton(title: "Account security", action: onAccountSecurity)
-                .padding(.top, 18)
-            OutlineActionButton(title: "Sign out", action: onSignOut)
-                .padding(.top, 12)
-                .padding(.bottom, 32)
-        }
-        .padding(.horizontal, 24)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .centeredForm()
-        .background(GM.bg.ignoresSafeArea())
-    }
-}

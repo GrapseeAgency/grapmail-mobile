@@ -37,6 +37,11 @@ struct MailPerson: Decodable {
     var address: String?
     var name: String?
 
+    /// A blank person. Swift gives no memberwise init to a type with a
+    /// hand-written `init(from:)`, and the snapshot host and the cache both need
+    /// to build one rather than reach for a decoding they do not have.
+    init() {}
+
     private enum CodingKeys: String, CodingKey { case address, name }
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -110,6 +115,10 @@ struct MailMessage: Decodable, Identifiable {
 /// message route bolts on (`grapmail.ts:769-774`).
 struct MailMessageFull: Decodable, Identifiable {
     var id = ""
+
+    /// See `MailMessage.init()` — a hand-decoded type has no memberwise init,
+    /// and a caller that must produce a value on decode failure needs one.
+    init() {}
     var threadId: String?
     var direction: String?
     var status: String?
@@ -334,6 +343,9 @@ struct MailInboxStats: Decodable {
 struct MailLabel: Decodable, Identifiable {
     var id = ""
     var name = ""
+
+    /// See `MailPerson.init()` — the same reason, the same consequence.
+    init() {}
     /// Server-chosen colour, carried as a hex string and never re-derived.
     /// Decoded from `colour` because that is the key the route writes.
     var color: String?

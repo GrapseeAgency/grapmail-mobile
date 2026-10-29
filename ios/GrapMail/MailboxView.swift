@@ -11,7 +11,11 @@ import SwiftUI
 /// `GET /grapmail/labels`. The bottom bar carries no Calendar tab for the same
 /// reason. Each omission is recorded with its proof in the README.
 struct MailboxView: View {
-    @StateObject private var vm = MailboxModel()
+    /// Owned by `RootView`, not by this screen: the thread, compose and the
+    /// secondary screens are separate destinations on the stack and must show
+    /// the same mailbox the list is showing. A model per screen would mean a
+    /// list that forgets what a thread just read.
+    @ObservedObject var vm: MailboxModel
     /// The thread route carries either a thread id or, when a message has none,
     /// its own id — the same fallback the Android screen uses.
     let onThread: (String) -> Void

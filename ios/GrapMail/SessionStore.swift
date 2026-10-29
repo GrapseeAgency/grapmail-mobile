@@ -53,6 +53,11 @@ enum SessionStore {
         // call site means no future sign-out path can forget it and hand the next
         // person a live action proof.
         SecurityFlow.reset()
+        // The mailbox's cached pages, bodies, labels and stats belong to the
+        // account that just signed out. Leaving them behind would make the first
+        // thing the next person on this device sees somebody else's mail — the
+        // same leak SecurityProfileCache closes for the security verdicts.
+        MailStore.shared.clearNow()
     }
 }
 
