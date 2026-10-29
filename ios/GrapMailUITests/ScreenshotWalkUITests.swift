@@ -219,8 +219,8 @@ final class ScreenshotWalkUITests: XCTestCase {
         /// XCUITest cannot resolve the node. This box is slow enough that one
         /// short wait would read as an absent screen, so both get their time.
         func homeOnScreen(_ timeout: TimeInterval = 40) -> Bool {
-            mailHome.waitForExistence(timeout: timeout / 2)
-                || app.textFields["mail-search"].waitForExistence(timeout: timeout / 2)
+            app.textFields["mail-search"].waitForExistence(timeout: timeout / 2)
+                || mailHome.waitForExistence(timeout: timeout / 2)
         }
         // The runner's cold start is slow enough that one wait on the identifier
         // would read as an absent screen: this box took 27 s to draw its first
@@ -253,8 +253,18 @@ final class ScreenshotWalkUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Sort & filter"].waitForExistence(timeout: 8),
                       "sort sheet did not open")
         snap("69-mail-sort-filter")
-        app.swipeDown()
-        require(mailHome, "Home after sort sheet", timeout: 8)
+        // Close the sheet the way the app does. A swipe-down over a sheet can
+        // scroll the list behind it instead, leaving the walk waiting for a home
+        // that is still covered. Choosing an option is the screen's own dismissal
+        // path, it changes only client-side sort state, and 'Newest first' is the
+        // server's own order, so the box is left exactly as it was found.
+        let newest = app.buttons["Newest first"].firstMatch
+        if newest.waitForExistence(timeout: 10) {
+            newest.tap()
+        } else {
+            tap(app.staticTexts["Newest first"].firstMatch, "Newest first (sheet)", timeout: 10)
+        }
+        XCTAssertTrue(homeOnScreen(20), "home after sort sheet")
 
         // Security sector — the reference screens photographed in the app's
         // light theme. Read-only: the walk opens every hub row, snapshots it,
