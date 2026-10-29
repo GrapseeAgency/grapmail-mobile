@@ -5,6 +5,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.MultipartBody
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
@@ -779,6 +780,47 @@ object Api {
         read(authed("$MAIL/aliases", token).get().build()) { json.decodeFromString(it) }
 
     /**
+     * `GET /attachments/:id` — the bytes, not JSON.
+     *
+     * Separate from `read`, which assumes a String body and would corrupt binary
+     * by decoding it as text. Returns null only when the server answered 200 with
+     * nothing; a 404 or a 401 still throws through the same path so the caller
+     * sees the real reason and the 401 interceptor still fires.
+     */
+    suspend fun mailAttachmentBytes(token: String, id: String): ByteArray {
+        val request = authed("$MAIL/attachments/${enc(id)}", token).get().build()
+        val bytes = withContext(Dispatchers.IO) {
+            client.newCall(request).execute().use { resp ->
+                if (resp.code >= 400) {
+                    fail(resp.code, resp.body?.string() ?: "")
+                }
+                resp.body?.bytes() ?: ByteArray(0)
+            }
+        }
+        return bytes
+    }
+
+    /**
+     * `POST /attachments` — multipart, with the field names the route reads:
+     * `file` and `messageId` (`grapmail-attachments.ts:225,236`).
+     *
+     * `messageId` is sent empty for an unsent draft rather than omitted, because
+     * the route coerces an absent field to null and stores the bytes with no row
+     * to attach them to.
+     */
+    suspend fun mailAttachmentUpload(
+        token: String, bytes: ByteArray, filename: String, mimeType: String, messageId: String?,
+    ): MailAttachmentDto {
+        val body = MultipartBody.Builder().setType(MultipartBody.FORM)
+            .addFormDataPart("file", filename, bytes.toRequestBody(mimeType.toMediaType()))
+            .addFormDataPart("messageId", messageId ?: "")
+            .build()
+        val req = authed("$MAIL/attachments", token).post(body).build()
+        return read(req) {
+            json.decodeFromString(MailAttachmentResponseJson.serializer(), it).attachment
+        }
+    }
+    /**
      * The screener queue's own settings. Note `?box=screener` is the queue
      * itself (`grapmail-boxes.ts:57-66`) — this route only reads and writes the
      * switch, so the list comes from [mailInbox] like every other box.
@@ -838,3 +880,7 @@ data class MailLabelAssignRequest(val labelId: String)
 
 @Serializable
 data class MailScreenerEnableRequest(val enabled: Boolean)
+
+/** The upload route answers with the row it wrote; this unwraps it. */
+@Serializable
+private data class MailAttachmentResponseJson(val attachment: MailAttachmentDto)

@@ -7,6 +7,7 @@ import androidx.lifecycle.viewModelScope
 import com.grapsee.grapmail.data.Api
 import com.grapsee.grapmail.data.ApiException
 import com.grapsee.grapmail.data.MailAction
+import com.grapsee.grapmail.data.MailAttachmentDto
 import com.grapsee.grapmail.data.MailBox
 import com.grapsee.grapmail.data.MailDraftRequest
 import com.grapsee.grapmail.data.MailFilter
@@ -450,7 +451,92 @@ class MailboxViewModel(app: Application) : AndroidViewModel(app) {
     private fun splitAddresses(raw: String): List<String> =
         raw.split(',', ';', '\n').map { it.trim() }.filter { it.isNotEmpty() }
 
-    // ── thread ───────────────────────────────────────────────────────────────
+    /**
+     * Save an attachment into the app's own files directory and report what
+     * actually happened.
+     *
+     * The callback receives the exact text the row shows, and a failure never
+     * receives a path. The file lands in `getExternalFilesDir`, which the app
+     * owns and which the system removes with the app — not shared storage,
+     * because a downloaded email attachment has no business being readable by
+     * every other app on the device.
+     *
+     * Opening it is deliberately not attempted here: that needs a FileProvider
+     * authority and a MIME-typed intent, and a half-wired "open" that throws on
+     * some devices is worse than a saved file with a clear message about where it
+     * went. Recorded as the sector's one unfinished affordance rather than left
+     * implicit.
+     */
+    fun downloadAttachment(a: MailAttachmentDto, then: (String) -> Unit) {
+        viewModelScope.launch {
+            val t = token() ?: run { then("Sign in again to save this."); return@launch }
+            runCatching { Api.mailAttachmentBytes(t, a.id) }
+                .onSuccess { bytes ->
+                    val outcome = runCatching {
+                        val dir = getApplication<android.app.Application>()
+                            .getExternalFilesDir(null) ?: return@runCatching "No app storage available."
+                        val safe = (a.name ?: "attachment").replace(Regex("[^A-Za-z0-9._-]"), "_")
+                        val file = java.io.File(dir, safe)
+                        file.writeBytes(bytes)
+                        "Saved to ${file.absolutePath}"
+                    }.getOrElse { "Saved, but the file could not be written." }
+                    then(outcome)
+                }
+                .onFailure { e ->
+                    then((e as? ApiException)?.message ?: "This attachment could not be downloaded.")
+                }
+        }
+    }
+
+    // ── people ───────────────────────────────────────────────────────────────
+
+    /**
+     * The contacts the app can actually name: everyone who appears in the mail
+     * it has loaded.
+     *
+     * There is no contacts endpoint on the GrapMail API — the web client derives
+     * people the same way, from `?box=inbox` plus `?box=sent`
+     * (`src/app/(mail)/mail/contacts/page.tsx:26-28`). Saying "contacts" while
+     * reading the mailbox is honest; showing a list that looks like an address
+     * book the user never filled in would not be.
+     */
+    data class Person(val address: String, val name: String?, val seen: Int)
+
+    suspend fun people(): List<Person> {
+        val counts = LinkedHashMap<String, Pair<String?, Int>>()
+        MailBox.tabOrder.forEach { box ->
+            MailStore.page(box, null)?.messages?.forEach { m ->
+                m.from?.address?.takeIf { it.isNotBlank() }?.let { a ->
+                    val prior = counts[a]
+                    counts[a] = (m.from?.name ?: prior?.first) to ((prior?.second ?: 0) + 1)
+                }
+                m.to.forEach { a -> if (a.isNotBlank()) counts.putIfAbsent(a, null to 0) }
+            }
+        }
+        return counts.map { (addr, v) -> Person(addr, v.first, v.second) }
+            .sortedWith(compareByDescending<Person> { it.seen }.thenBy { it.address.lowercase() })
+    }
+
+    // ── attachments ──────────────────────────────────────────────────────────
+
+    /**
+     * Upload bytes picked by the compose screen. The route answers with the row
+     * it wrote, and the returned id is what a send carries — an attachment that
+     * was never uploaded is a filename the recipient cannot open.
+     */
+    fun uploadAttachment(bytes: ByteArray, filename: String, mimeType: String, then: (MailAttachmentDto?, String) -> Unit) {
+        viewModelScope.launch {
+            val t = token() ?: run { then(null, "Sign in again to attach a file."); return@launch }
+            runCatching { Api.mailAttachmentUpload(t, bytes, filename, mimeType, null) }
+                .onSuccess { then(it, "Attached ${it.name ?: filename}.") }
+                .onFailure { e ->
+                    then(null, (e as? ApiException)?.message
+                        ?: "This file could not be attached.")
+                }
+        }
+    }
+
+    // ── thread ──────────────────────────────────────────────────────────────
 
     data class ThreadState(
         val messages: List<com.grapsee.grapmail.data.MailMessageFullDto> = emptyList(),

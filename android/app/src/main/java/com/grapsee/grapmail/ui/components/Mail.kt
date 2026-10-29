@@ -194,6 +194,19 @@ private fun parseMailIso(iso: String?): Long? {
     return null
 }
 
+/**
+ * The full date and time a message body needs, falling back to the raw string
+ * rather than a fabricated one.
+ *
+ * The fallback matters: showing "Jan 1, 1970" for an unparseable instant would
+ * present a wrong date as a fact about someone's mail. Showing the server's own
+ * string is uglier and true.
+ */
+fun absoluteDateTimeOrRaw(iso: String): String {
+    val millis = parseMailIso(iso) ?: return iso
+    return SimpleDateFormat("EEEE, MMMM d, yyyy · h:mm a", Locale.US).format(Date(millis))
+}
+
 // ── the row ──────────────────────────────────────────────────────────────────
 
 /**
