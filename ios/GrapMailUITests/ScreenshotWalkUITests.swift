@@ -294,14 +294,12 @@ final class ScreenshotWalkUITests: XCTestCase {
         tap(app.descendants(matching: .any)["mail-menu"].firstMatch, "Open folders (to security)")
         XCTAssertTrue(app.staticTexts["Pending approval"].waitForExistence(timeout: 15),
                       "drawer did not open (to security)")
-        // The lower group sits at the very bottom of the drawer, where the row is
-        // reported found but not hittable — it is clipped by the drawer's own
-        // viewport. One swipe up inside the drawer (the screen centre, x ≈ 201,
-        // is inside its 300 pt width) brings it fully on screen. Without this the
-        // tap throws on hittability rather than on the app being wrong.
-        app.swipeUp()
-        sleep(1)
-        tapFrame(app.buttons["Security"].firstMatch, "Security (drawer)")
+        // The plain element tap, once the row is inside the drawer's own bounds.
+        // It failed while the row was clipped by a scroller it did not belong to
+        // — and the coordinate tap that followed closed the drawer without
+        // navigating, which is the reason not to keep that workaround: a tap that
+        // lands next to a control is worse than a tap that throws.
+        tap(app.buttons["Security"].firstMatch, "Security (drawer)", timeout: 20)
         require(app.staticTexts["Account Security"].firstMatch, "Security hub", timeout: 8)
         snap("20-sec-hub-light")
         openSecurityRow("Two-Step Verification", "21-sec-2fa-enable-light")
@@ -463,9 +461,7 @@ final class ScreenshotWalkUITests: XCTestCase {
         tap(app.descendants(matching: .any)["mail-menu"].firstMatch, "Open folders (to sign out)")
         XCTAssertTrue(app.staticTexts["Pending approval"].waitForExistence(timeout: 15),
                       "drawer did not open (to sign out)")
-        app.swipeUp() // same lower group, same clip
-        sleep(1)
-        tapFrame(app.buttons["Sign out"].firstMatch, "Sign out (drawer)")
+        tap(app.buttons["Sign out"].firstMatch, "Sign out (drawer)", timeout: 20)
         require(app.staticTexts["Welcome to"].firstMatch, "welcome after sign-out", timeout: 8)
 
         // Sign-in screen
