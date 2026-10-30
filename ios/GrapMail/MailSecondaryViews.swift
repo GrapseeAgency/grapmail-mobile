@@ -76,6 +76,9 @@ struct LabelsView: View {
     @ObservedObject var vm: MailboxModel
     let onBack: () -> Void
     let onCreate: () -> Void
+    /// Tapping a label's row edits it. The row already looked tappable and did
+    /// nothing, which is the one thing this sector was told not to ship.
+    let onEdit: (MailLabel) -> Void
     @State private var notice: String?
 
     var body: some View {
@@ -126,6 +129,12 @@ struct LabelsView: View {
                                 .accessibilityLabel("Remove label \(label.name)")
                             }
                             .padding(.vertical, 4)
+                            // The row itself is the edit handle, and the delete
+                            // button keeps its own tap because it sits inside this
+                            // shape rather than being wrapped in a second Button —
+                            // a Button inside a Button swallows one of them.
+                            .contentShape(Rectangle())
+                            .onTapGesture { onEdit(label) }
                             .listRowInsets(EdgeInsets(top: 6, leading: 20, bottom: 6, trailing: 16))
                         }
                     }
@@ -141,9 +150,22 @@ struct LabelsView: View {
 struct LabelCreateView: View {
     @ObservedObject var vm: MailboxModel
     let onDone: () -> Void
-    @State private var name = ""
-    @State private var colour = GM.primarySolid
+    /// nil means "create". One screen for both, because the fields, the ramp and
+    /// the name rule are the same control, and a second copy of them is a second
+    /// place for the two to disagree.
+    var editing: MailLabel? = nil
+    @State private var name: String
+    @State private var colour: Color
     @State private var notice: String?
+
+    init(vm: MailboxModel, onDone: @escaping () -> Void, editing: MailLabel? = nil) {
+        self.vm = vm
+        self.onDone = onDone
+        self.editing = editing
+        _name = State(initialValue: editing?.name ?? "")
+        _colour = State(initialValue: editing.flatMap { $0.color?.hexColor }
+            ?? GM.primarySolid)
+    }
 
     private struct Swatch: Identifiable {
         let name: String
@@ -162,7 +184,7 @@ struct LabelCreateView: View {
     }
 
     var body: some View {
-        MailScaffold(title: "New label", onBack: onDone) {
+        MailScaffold(title: editing == nil ? "New label" : "Edit label", onBack: onDone) {
             VStack(alignment: .leading, spacing: 16) {
                 VStack(alignment: .leading, spacing: 6) {
                     Text("Name").font(.system(size: 12, weight: .bold))
@@ -191,14 +213,26 @@ struct LabelCreateView: View {
                 if let notice {
                     Text(notice).font(.system(size: 13)).foregroundColor(GM.error)
                 }
-                GradientButton(title: "Create label",
+                GradientButton(title: editing == nil ? "Create label" : "Save changes",
                                enabled: !name.trimmingCharacters(in: .whitespaces).isEmpty) {
                     let trimmed = name.trimmingCharacters(in: .whitespaces)
                     guard !trimmed.isEmpty else { notice = "A label needs a name."; return }
-                    vm.createLabel(name: trimmed, colour: Self.hex(colour)) { result in
-                        notice = result
-                        vm.refreshLabels()
-                        onDone()
+                    // The server's own words either way: a create that hit the
+                    // label cap and a rename the route refused both say why, and
+                    // that text is what the person sees.
+                    let hex = Self.hex(colour)
+                    if let label = editing {
+                        vm.renameLabel(id: label.id, name: trimmed, colour: hex) { result in
+                            notice = result
+                            vm.refreshLabels()
+                            if result == "Saved." { onDone() }
+                        }
+                    } else {
+                        vm.createLabel(name: trimmed, colour: hex) { result in
+                            notice = result
+                            vm.refreshLabels()
+                            onDone()
+                        }
                     }
                 }
                 Spacer()

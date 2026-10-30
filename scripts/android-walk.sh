@@ -162,23 +162,23 @@ echo "· mailbox — the live home, read-only"
 # CI creates may or may not have a provisioned mailbox; whichever state the app
 # shows is the state that gets photographed, and the frame is named for the
 # screen, not for an outcome the run cannot control.
-must "mailbox home" wait_nodes "n.get('content-desc','')=='Open folders'" >/dev/null
+must "mailbox home" wait_nodes "n.get('resource-id','')=='mail-menu'" >/dev/null
 shot 60-mail-home
-must "drawer tap" tap_xy "$(wait_nodes "n.get('content-desc','')=='Open folders'" | head -1)"
-must "drawer open" wait_nodes "n.get('text','')=='Pending approval'" >/dev/null
+must "drawer tap" tap_xy "$(wait_nodes "n.get('resource-id','')=='mail-menu'" | head -1)"
+must "drawer open" wait_nodes "n.get('resource-id','')=='mail-drawer-Pending approval'" >/dev/null
 shot 62-mail-drawer
 # Close the drawer by tapping the box already on screen. A system BACK does NOT
 # dismiss a Material3 ModalNavigationDrawer — it pops the home route, and the
 # walk then looked for chrome on a screen the app had already left, which is
 # what the 'sort sheet tap' and search failures were reading.
-must "close drawer (Inbox)" tap_xy "$(wait_nodes "n.get('text','')=='Inbox'" | head -1)"
+must "close drawer (Inbox)" tap_xy "$(wait_nodes "n.get('resource-id','')=='mail-drawer-Inbox'" | head -1)"
 sleep 2
 must "sort sheet tap" tap_xy "$(wait_nodes "n.get('content-desc','')=='Sort and filter'" | head -1)"
 must "sort sheet open" wait_nodes "n.get('text','')=='Sort & filter'" >/dev/null
 shot 69-mail-sort-filter
 adb shell input keyevent KEYCODE_BACK
 sleep 1
-must_tap "Search emails, people, or files…"
+must "search field" tap_xy "$(wait_nodes "n.get('resource-id','')=='mail-search'" | head -1)"
 sleep 2
 shot 67-mail-search
 adb shell input keyevent KEYCODE_BACK
@@ -193,11 +193,11 @@ echo "· security sector — every hub screen, read-only"
 # The row sits in the lower group, which scrolls, so the drawer is opened and
 # given one swipe before the tap: on the short profile that group is below the
 # fold, and uiautomator cannot tap a node it cannot see.
-must "drawer for security" tap_xy "$(wait_nodes "n.get('content-desc','')=='Open folders'" | head -1)"
-must "drawer open (security)" wait_nodes "n.get('text','')=='Pending approval'" >/dev/null
+must "drawer for security" tap_xy "$(wait_nodes "n.get('resource-id','')=='mail-menu'" | head -1)"
+must "drawer open (security)" wait_nodes "n.get('resource-id','')=='mail-drawer-Pending approval'" >/dev/null
 adb shell input swipe 150 900 150 500 400
 sleep 1
-must_tap "Security"
+must "security row" tap_xy "$(wait_nodes "n.get('resource-id','')=='mail-drawer-Security'" | head -1)" 
 must "hub opens" wait_nodes "n.get('text','')=='Account Security'" >/dev/null
 shot 20-sec-hub-light
 # hub_present — 0 on the hub, 1 definitely NOT on the hub, 2 could not tell.
@@ -277,7 +277,7 @@ must "hub after gate leg" wait_nodes "n.get('text','')=='Account Security'" >/de
 # back out of the hub to the signed-in home, where the restore leg starts
 must "hub back tap" tap_xy "$(wait_nodes "n.get('content-desc','')=='Back'" | head -1)"
 sleep 2
-must "home after security" wait_nodes "n.get('content-desc','')=='Open folders'" >/dev/null
+must "home after security" wait_nodes "n.get('resource-id','')=='mail-menu'" >/dev/null
 
 echo "· post-write confirmations — via the app's test-only snapshot hook"
 # These screens exist only AFTER a write the walk must not perform: signing out
@@ -378,7 +378,7 @@ adb shell am start -W -n "$PKG/.MainActivity" >/dev/null
 sleep 6
 shot 10-session-restored
 # assert, don't tap: the home screen must show the signed-in state
-if wait_nodes "n.get('content-desc','')=='Open folders'" >/dev/null; then
+if wait_nodes "n.get('resource-id','')=='mail-menu'" >/dev/null; then
   echo "  ✓ session restored (the mailbox is the signed-in home)"
 else
   echo "FAIL: restart did not open signed-in" >&2
@@ -387,13 +387,13 @@ fi
 # Sign out lives in the mailbox drawer now, so the walk opens the drawer and
 # taps it there. This is the leg that ends the session, which is why it runs
 # after the restore proof.
-must "drawer for sign-out" tap_xy "$(wait_nodes "n.get('content-desc','')=='Open folders'" | head -1)"
-must "drawer open (sign-out)" wait_nodes "n.get('text','')=='Pending approval'" >/dev/null
+must "drawer for sign-out" tap_xy "$(wait_nodes "n.get('resource-id','')=='mail-menu'" | head -1)"
+must "drawer open (sign-out)" wait_nodes "n.get('resource-id','')=='mail-drawer-Pending approval'" >/dev/null
 # Same reason as the security leg: Sign out is the last row of a scrolling group.
 adb shell input swipe 150 900 150 500 400
 sleep 1
-must "sign-out row" wait_nodes "n.get('text','')=='Sign out'" >/dev/null
-must_tap "Sign out"
+must "sign-out row" wait_nodes "n.get('resource-id','')=='sign-out'" >/dev/null
+must "sign-out tap" tap_xy "$(wait_nodes "n.get('resource-id','')=='sign-out'" | head -1)"
 sleep 2
 
 echo "· sign-in screen"

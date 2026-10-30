@@ -692,6 +692,23 @@ class MailboxViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /// Rename or recolour a label. The route is `PATCH /labels/:id` and it
+    /// answers with the row it wrote, so the list is re-read rather than
+    /// patched in place — the same rule the filing actions follow.
+    fun renameLabel(id: String, name: String, colour: String?, then: (String) -> Unit) {
+        viewModelScope.launch {
+            val t = token() ?: run { then("Sign in again."); return@launch }
+            runCatching { Api.mailRenameLabel(t, id, name, colour) }
+                .onSuccess {
+                    refreshLabels()
+                    then("Saved.")
+                }
+                .onFailure { e ->
+                    then((e as? ApiException)?.message ?: "The label could not be saved.")
+                }
+        }
+    }
+
     fun deleteLabel(id: String, then: (String) -> Unit) {
         viewModelScope.launch {
             val t = token() ?: run { then("Sign in again."); return@launch }

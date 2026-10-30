@@ -20,6 +20,7 @@ import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.ui.platform.testTagsAsResourceId
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -114,7 +115,13 @@ class MainActivity : ComponentActivity() {
                 // SignInScreen.imePadding) so it is never counted twice.
                 val bg = com.grapsee.grapmail.ui.theme.LocalPalette.current.bg
                 Box(
-                    Modifier.fillMaxSize().background(bg),
+                    Modifier.fillMaxSize().background(bg)
+                        // Compose testTags do not reach a uiautomator dump
+                        // otherwise, so the walk had to anchor on whatever
+                        // sentence each screen happened to print — and a copy
+                        // change broke the walk. Surfacing them as resource-id
+                        // gives every handle a name that copy cannot move.
+                        .testTagsAsResourceId(true),
                     contentAlignment = Alignment.TopCenter,
                 ) {
                     Box(
@@ -186,7 +193,12 @@ object Routes {
     const val MAIL_THREAD = "mail/thread/{id}/{thread}"
     const val MAIL_COMPOSE = "mail/compose"
     const val MAIL_LABELS = "mail/labels"
-    const val MAIL_LABEL_CREATE = "mail/labels/create"
+    const val MAIL_LABEL_CREATE = "mail/labels/create/{id}"
+
+    /** "" means a new label — one screen for creating and editing, because the
+     *  fields, the ramp and the validation are the same control, and a second
+     *  copy of them is a second place for the two to disagree. */
+    fun labelCreate(id: String) = "mail/labels/create/${encode(id)}"
     const val MAIL_CONTACTS = "mail/contacts"
     const val MAIL_CONTACT = "mail/contact/{address}"
     const val MAIL_FILES = "mail/files"
@@ -771,11 +783,18 @@ fun GrapMailNav() {
             LabelsScreen(
                 vm = mail,
                 onBack = { nav.popBackStack() },
-                onCreate = { nav.navigate(Routes.MAIL_LABEL_CREATE) },
+                onCreate = { nav.navigate(Routes.labelCreate("")) },
+                onEdit = { nav.navigate(Routes.labelCreate(it.id)) },
             )
         }
-        composable(Routes.MAIL_LABEL_CREATE) {
-            LabelCreateScreen(vm = mail, onDone = { nav.popBackStack() })
+        composable(Routes.MAIL_LABEL_CREATE) { entry ->
+            val id = entry.arguments?.getString("id")?.let(android.net.Uri::decode) ?: ""
+            // The row that opened this screen owns the label. If the list has not
+            // loaded it, the screen opens as a new one rather than inventing a
+            // name or a colour to show.
+            val editing = if (id.isEmpty()) null
+                else mail.state.value.labels.firstOrNull { it.id == id }
+            LabelCreateScreen(vm = mail, onDone = { nav.popBackStack() }, editing = editing)
         }
         composable(Routes.MAIL_CONTACTS) {
             ContactsScreen(

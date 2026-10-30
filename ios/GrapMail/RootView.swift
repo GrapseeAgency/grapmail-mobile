@@ -40,7 +40,7 @@ struct RootView: View {
         case home
         case mailThread(id: String, isThread: Bool)
         case mailCompose
-        case mailLabels, mailLabelCreate
+        case mailLabels, mailLabelCreate(id: String)
         case mailContacts, mailContactDetail(address: String)
         case mailFiles, mailAttachment(id: String)
         case mailSettings, mailScreener
@@ -461,9 +461,16 @@ struct RootView: View {
                 case .mailLabels:
                     LabelsView(vm: mail,
                                onBack: { path.removeLast() },
-                               onCreate: { path.append(.mailLabelCreate) })
-                case .mailLabelCreate:
-                    LabelCreateView(vm: mail, onDone: { path.removeLast() })
+                               onCreate: { path.append(.mailLabelCreate(id: "")) },
+                               onEdit: { path.append(.mailLabelCreate(id: $0.id)) })
+                case let .mailLabelCreate(id):
+                    // "" is a new label; anything else is the row that opened
+                    // this screen. If the list has not loaded that label, the
+                    // screen opens as a create rather than inventing a name or a
+                    // colour to show for it.
+                    LabelCreateView(vm: mail, onDone: { path.removeLast() },
+                                    editing: id.isEmpty ? nil
+                                        : mail.labelState.labels.first { $0.id == id })
                 case .mailContacts:
                     ContactsView(vm: mail,
                                  onBack: { path.removeLast() },

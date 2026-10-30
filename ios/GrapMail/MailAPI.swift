@@ -736,6 +736,18 @@ extension ApiClient {
                           bearer: token)
     }
 
+    /// `PATCH /labels/:id` — rename and recolour. The body keys are the create
+    /// route's, which the handler shares: `name` and the British `colour`, for
+    /// the same reason as create — sending `color` saves nothing and says nothing.
+    static func mailRenameLabel(token: String, id: String, name: String,
+                                colour: String?) async throws {
+        _ = try await request("\(mailBase)/labels/\(id.percentEncodedPath())",
+                              method: "PATCH",
+                              body: try encoder.encode(MailLabelCreateRequest(name: name,
+                                                                              colour: colour)),
+                              bearer: token) as MailLabelResponse
+    }
+
     static func mailDeleteLabel(token: String, id: String) async throws {
         _ = try await request("\(mailBase)/labels/\(id.percentEncodedPath())",
                               method: "DELETE", bearer: token) as MailLabelsResponse

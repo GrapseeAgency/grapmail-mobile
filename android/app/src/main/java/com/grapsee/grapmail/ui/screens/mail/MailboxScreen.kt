@@ -348,7 +348,8 @@ private fun MailTopBar(onMenu: () -> Unit, onSearch: () -> Unit) {
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(Icons.Rounded.Menu, "Open folders", tint = palette.textPrimary,
-            modifier = Modifier.size(24.dp).clip(CircleShape).clickable(onClick = onMenu).padding(2.dp))
+            modifier = Modifier.size(24.dp).clip(CircleShape).clickable(onClick = onMenu)
+                .padding(2.dp).testTag("mail-menu"))
         Spacer(Modifier.width(10.dp))
         GrapMailLogo(size = 30.dp, wordmark = true)
         Spacer(Modifier.weight(1f))
@@ -374,7 +375,7 @@ private fun SearchField(query: String, onQuery: (String) -> Unit, onFilter: () -
             onValueChange = onQuery,
             maxLines = 1,
             textStyle = androidx.compose.ui.text.TextStyle(fontSize = 14.sp, color = palette.textPrimary),
-            modifier = Modifier.weight(1f).testTag("mail-search"),
+            modifier = Modifier.weight(1f).testTag("mail-search")
             decorationBox = { inner ->
                 Box {
                     if (query.isEmpty()) {
@@ -411,7 +412,8 @@ private fun LabelStrip(s: MailboxViewModel.MailboxUiState) {
 @Composable
 private fun BoxTabRow(s: MailboxViewModel.MailboxUiState) {
     val counts = drawerCounts(s)
-    Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp), horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+    Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp).testTag("mail-box-tabs"),
+        horizontalArrangement = Arrangement.spacedBy(2.dp)) {
         MailBox.tabOrder.forEach { box ->
             BoxTab(box.title, counts[box], box == s.box, onClick = { })
         }
@@ -435,7 +437,7 @@ private fun MailBottomBar(
     val palette = LocalPalette.current
     Row(
         Modifier.fillMaxWidth().background(palette.card).border(1.dp, palette.border)
-            .padding(vertical = 8.dp),
+            .padding(vertical = 8.dp).testTag("mail-tabs"),
         horizontalArrangement = Arrangement.SpaceAround,
     ) {
         TabItem(Icons.Rounded.Inbox, "Mail", selected == 0, unread) { onMail() }
@@ -529,7 +531,8 @@ internal fun MailDrawer(
         Spacer(Modifier.height(10.dp))
         Text("Sign out", fontSize = 14.sp, color = palette.error,
             fontWeight = FontWeight.Medium,
-            modifier = Modifier.padding(horizontal = 20.dp).clickable(onClick = onSignOut))
+            modifier = Modifier.padding(horizontal = 20.dp).clickable(onClick = onSignOut)
+                .testTag("sign-out"))
     }
 }
 
@@ -545,6 +548,7 @@ private fun DrawerRow(label: String, icon: ImageVector, count: Int?, selected: B
     val palette = LocalPalette.current
     Row(
         Modifier.fillMaxWidth()
+            .testTag("mail-drawer-$label")
             .padding(horizontal = 12.dp, vertical = 2.dp)
             .clip(RoundedCornerShape(12.dp))
             .background(if (selected) palette.softFill else palette.card)

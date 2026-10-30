@@ -130,7 +130,10 @@ fun MailSnapshotScreen(name: String) {
             "mail-delete-sheet" -> sheetHost { PermanentDeleteContent(3, cancel = {}, confirm = {}) }
             "mail-assign-label-sheet" -> sheetHost { AssignLabelContent(sampleLabels) { } }
             "mail-snooze-sheet" -> sheetHost { SnoozeContent { } }
-            "mail-labels" -> LabelsScreen(vm, onBack = {}, onCreate = {})
+            // The snapshot host never edits: this screen is photographed as the
+            // list of labels the account has, and the row action is a no-op here
+            // exactly as every other control in this host is.
+            "mail-labels" -> LabelsScreen(vm, onBack = {}, onCreate = {}, onEdit = { })
             "mail-label-create" -> LabelCreateScreen(vm, onDone = {})
             "mail-thread" -> ThreadScreen(vm, threadId = "t-m1", isThread = true,
                 onBack = {}, onReply = { })

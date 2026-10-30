@@ -709,6 +709,26 @@ final class MailboxModel: ObservableObject {
         }
     }
 
+    /// Rename or recolour a label, then re-read the list. The response is not
+    /// patched into the store: the route returns the row it wrote, and the list
+    /// showing what the server holds beats the list showing what was typed.
+    func renameLabel(id: String, name: String, colour: String?,
+                     then: @escaping (String) -> Void) {
+        guard let token else { then("Sign in again."); return }
+        Task {
+            do {
+                _ = try await ApiClient.mailRenameLabel(token: token, id: id,
+                                                         name: name, colour: colour)
+                if let r = try? await ApiClient.mailLabels(token) {
+                    await MailStore.shared.putLabels(r.labels)
+                    state.labels = r.labels
+                    labelState.labels = r.labels
+                }
+                then("Saved.")
+            } catch { then(Self.describe(error)) }
+        }
+    }
+
     func deleteLabel(id: String, then: @escaping (String) -> Void) {
         guard let token else { then("Sign in again."); return }
         Task {

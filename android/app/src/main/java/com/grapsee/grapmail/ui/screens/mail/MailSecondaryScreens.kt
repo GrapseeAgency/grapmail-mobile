@@ -124,7 +124,8 @@ private fun NoteBar(text: String) {
 // ── 72 labels ────────────────────────────────────────────────────────────────
 
 @Composable
-fun LabelsScreen(vm: MailboxViewModel, onBack: () -> Unit, onCreate: () -> Unit) {
+fun LabelsScreen(vm: MailboxViewModel, onBack: () -> Unit, onCreate: () -> Unit,
+                 onEdit: (MailLabelDto) -> Unit) {
     val palette = LocalPalette.current
     val state by vm.labelState.collectAsState()
     var notice by remember { mutableStateOf<String?>(null) }
@@ -158,8 +159,13 @@ fun LabelsScreen(vm: MailboxViewModel, onBack: () -> Unit, onCreate: () -> Unit)
             } else {
                 LazyColumn(Modifier.fillMaxSize()) {
                     items(state.labels, key = { it.id }) { label ->
+                        // The row is the edit affordance. It already looked
+                        // tappable and did nothing, which is the one thing this
+                        // sector was told not to ship — renaming is what tapping
+                        // a label's own row should mean, and now it is.
                         Row(
-                            Modifier.fillMaxWidth().clickable { }.padding(horizontal = 16.dp, vertical = 12.dp),
+                            Modifier.fillMaxWidth().clickable { onEdit(label) }
+                                .padding(horizontal = 16.dp, vertical = 12.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             Box(Modifier.size(12.dp).clip(CircleShape)
@@ -188,13 +194,18 @@ fun LabelsScreen(vm: MailboxViewModel, onBack: () -> Unit, onCreate: () -> Unit)
 // ── 73 create label ──────────────────────────────────────────────────────────
 
 @Composable
-fun LabelCreateScreen(vm: MailboxViewModel, onDone: () -> Unit) {
+fun LabelCreateScreen(vm: MailboxViewModel, onDone: () -> Unit,
+                      editing: MailLabelDto? = null) {
     val palette = LocalPalette.current
-    var name by remember { mutableStateOf("") }
-    var chosen by remember { mutableStateOf(Ramp[0]) }
+    // Prefilled when a row opened this screen for editing, empty for a new one.
+    // One screen for both, because the fields, the ramp and the validation are
+    // the same control and a second copy of them would drift.
+    var name by remember { mutableStateOf(editing?.name ?: "") }
+    var chosen by remember { mutableStateOf(com.grapsee.grapmail.ui.components.parseHex(editing?.color)
+            ?: Ramp[0]) }
     var result by remember { mutableStateOf<String?>(null) }
 
-    MailScaffold("New label", onDone) {
+    MailScaffold(if (editing == null) "New label" else "Edit label", onDone) {
         Column(Modifier.fillMaxSize().padding(horizontal = 20.dp).verticalScroll(rememberScrollState())) {
             Text("Name", fontSize = 13.sp, color = palette.textSecondary)
             Spacer(Modifier.height(8.dp))
@@ -239,14 +250,17 @@ fun LabelCreateScreen(vm: MailboxViewModel, onDone: () -> Unit) {
             }
 
             Spacer(Modifier.height(24.dp))
-            GradientButton("Create label", onClick = {
+            GradientButton(if (editing == null) "Create label" else "Save changes", onClick = {
                 if (name.isBlank()) { result = "A label needs a name."; return@GradientButton }
-                vm.createLabel(name.trim(), hexString(chosen)) { outcome ->
+                val done: (String) -> Unit = { outcome ->
                     result = null
                     // The route caps labels and rejects duplicates; either way it
                     // says why, and that text is what the user sees.
-                    if (outcome.startsWith("Created")) onDone() else result = outcome
+                    if (outcome.startsWith("Created") || outcome == "Saved.") onDone()
+                    else result = outcome
                 }
+                if (editing == null) vm.createLabel(name.trim(), hexString(chosen), done)
+                else vm.renameLabel(editing.id, name.trim(), hexString(chosen), done)
             }, enabled = name.isNotBlank())
         }
     }

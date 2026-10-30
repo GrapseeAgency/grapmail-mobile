@@ -83,6 +83,15 @@ jobs:
           path: screenshots/
           if-no-files-found: error
 
+      - name: Mailbox API surface matches the other platform
+        # The sector was written on one platform and translated to the other, and
+        # three real mismatches were found by a human reading both files: a helper
+        # only one side had, and two attachment calls the model made that only one
+        # client declared. This diff makes that check repeatable. It compares the
+        # mail call names and the decoded DTO fields; private transport helpers are
+        # the platform's own plumbing and are not compared.
+        run: python3 scripts/api-parity.py
+
       - name: Mailbox screen set matches Android
         # The band is defined once, in the walk scripts. If either side renames,
         # drops or invents a mail screen, "the same screens on both platforms"

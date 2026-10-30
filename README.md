@@ -159,9 +159,15 @@ host, so a broken network layer cannot read as a working mailbox.
   blanks a list that is already on screen — the hub's defect, designed out here
   rather than rediscovered. The cache clears wherever the session does.
 - **Screens.** Mailbox home, thread, compose, sort/filter, move, delete,
-  assign-label and snooze sheets, labels, label create, contacts, contact
-  detail, files, attachment preview, settings, screener, send receipt, and the
-  no-mailbox state. Same screen set on both platforms.
+  assign-label and snooze sheets, labels, label create (the same screen edits an
+  existing label — a label's row is the rename affordance, so the row is not a
+  control that goes nowhere), contacts, contact detail, files, attachment
+  preview, settings, screener, send receipt, and the no-mailbox state. Same
+  screen set on both platforms.
+- **API parity is a gate, not a review habit.** `scripts/api-parity.py` diffs
+  the two mail client surfaces — every `mail*` call name and every decoded DTO
+  field — and both workflows run it. Three mismatches were caught by hand while
+  this sector was built; a reviewer cannot re-derive them from one file.
 - **The band is 26 frames, `60`–`85`.** The plan called it 25; the list it
   printed runs 60 to 85 inclusive, which is 26. The number in the list is what
   CI enforces, and the discrepancy is recorded rather than quietly closed.
