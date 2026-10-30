@@ -602,13 +602,14 @@ private fun iconFor(b: MailBox): ImageVector = when (b) {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun MailSheet(onDismiss: () -> Unit, content: @Composable () -> Unit) {
-    // Fully expanded, always. With `skipPartiallyExpanded = false` Material3 opens
-    // the sheet at partial height, and these sheets put their title first — so the
-    // sheet that opens says "Move to" to the person on iOS and opens with its own
-    // heading clipped out of sight on Android. The options are still visible in
-    // both cases, which is exactly why the difference survives a screenshot that
-    // only checks that *something* appeared.
-    val sheetState: SheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    // Partially expanded, as Material3 intends. This was switched to fully
+    // expanded one commit ago on the theory that the sheet opened with its title
+    // clipped off screen. The dump that produced the complaint shows the title at
+    // [300,1376][485,1424] — plainly on a 2400px screen — so the theory was wrong
+    // and the change was unjustified. Reverted rather than left in "because it also
+    // seemed nicer": an app behaviour changed on a misreading is a change nobody
+    // can defend later.
+    val sheetState: SheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
         Column(Modifier.fillMaxWidth().padding(bottom = 24.dp)) { content() }
     }

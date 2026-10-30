@@ -112,12 +112,19 @@ find_nodes() {
   dump_xml || return 1
   python3 - "$OUT/.ui.xml" "$1" <<'PY' | tr -d '\r'
 import re, sys, os
+import html
 xml = open(sys.argv[1], encoding="utf-8", errors="ignore").read()
 filt = sys.argv[2]
 miny = int(os.environ.get("MINY", "0"))
 for m in re.finditer(r'<node[^>]*/?>', xml):
     tag = m.group(0)
-    attrs = dict(re.findall(r'(\w[\w-]*)="([^"]*)"', tag))
+    # Unescape, or every label containing an ampersand is invisible to the walk.
+    # uiautomator writes `text="Sort &amp; filter"`; the attribute is pulled out by
+    # regex rather than an XML parser, so the raw entity lands in the dict and a
+    # predicate written as 'Sort & filter' can never match — not on a broken screen,
+    # ever. Every run of this walk has reported the sort sheet as failing to open
+    # while its own dump shows the sheet on screen with its title drawn.
+    attrs = {k: html.unescape(v) for k, v in re.findall(r'(\w[\w-]*)="([^"]*)"', tag)}
     try:
         if eval(filt, {}, {"n": attrs}):
             b = attrs.get("bounds", "")
