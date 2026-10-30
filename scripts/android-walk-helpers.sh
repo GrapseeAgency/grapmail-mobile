@@ -55,7 +55,7 @@ scroll_to_top() { # fling back to the page start — searches that scrolled
 # and counted. Collapse it before every frame, and say so when it was in the way.
 collapse_shade() {
   if adb shell dumpsys statusbar 2>/dev/null | grep -q "mShadeOpen=true\|shadeOpen=true"; then
-    echo "  [shade] notification shade was down — collapsing before the frame"
+    echo "  [shade] notification shade was down — collapsing before the frame" >&2
     adb shell cmd statusbar collapse >/dev/null 2>&1 || true
     sleep 1
   fi
@@ -87,7 +87,14 @@ anr_in_view() {
 dismiss_anr() {
   W="$(find_nodes "n.get('text')=='Wait'" | head -1)"
   if [ -n "$W" ]; then
-    echo "  [anr] dismissing system dialog"
+    # Diagnostics go to stderr, not stdout. `wait_nodes` and `wait_overlay` print
+    # the coordinates a caller captures with `$( )`, and `dismiss_anr` is now
+    # called from inside them — so a progress line written to stdout becomes the
+    # returned value. That is how one run fed "[anr] dismissing system dialog" to
+    # `adb shell input tap` nine times and then tried to add "dismissing" to a
+    # pixel coordinate. Anything a helper says for the human's benefit must not
+    # share a stream with what it says for the caller.
+    echo "  [anr] dismissing system dialog" >&2
     adb shell input tap $W
     sleep 3
   fi
