@@ -118,11 +118,12 @@ struct MailboxView: View {
                 onDelete: { sheet = .permanent },
                 onMove: { sheet = .move },
                 onLabel: { sheet = .label },
+                onMore: { sheet = .snooze },
                 // Only the queue offers this. Deciding a sender is a rule about
                 // their next message, which means nothing for a box whose mail
-                // already arrived.
-                onSender: vm.state.box == .screener ? { sheet = .sender } : nil,
-                onMore: { sheet = .snooze }
+                // already arrived. Last because Swift orders arguments the way the
+                // struct declares them, and `onSender` is the defaulted one.
+                onSender: vm.state.box == .screener ? { sheet = .sender } : nil
             )
         } else {
             VStack(spacing: 0) {

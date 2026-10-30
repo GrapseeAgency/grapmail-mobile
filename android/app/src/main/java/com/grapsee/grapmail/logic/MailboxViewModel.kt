@@ -9,11 +9,13 @@ import com.grapsee.grapmail.data.ApiException
 import com.grapsee.grapmail.data.MailAction
 import com.grapsee.grapmail.data.MailAttachmentDto
 import com.grapsee.grapmail.data.MailBox
+import com.grapsee.grapmail.data.MailDecision
 import com.grapsee.grapmail.data.MailDraftRequest
 import com.grapsee.grapmail.data.MailFilter
 import com.grapsee.grapmail.data.MailLabelDto
 import com.grapsee.grapmail.data.MailMessageDto
 import com.grapsee.grapmail.data.MailSendRequest
+import com.grapsee.grapmail.data.MailSenderScope
 import com.grapsee.grapmail.data.MailSort
 import com.grapsee.grapmail.data.MailStore
 import com.grapsee.grapmail.data.SessionStore
