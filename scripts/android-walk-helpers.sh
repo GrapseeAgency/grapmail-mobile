@@ -71,7 +71,14 @@ collapse_shade() {
 # the screen, and every dump it saved proved the dialog was there. A wait loop is
 # the only place that can notice and recover.
 anr_in_view() {
-  [ -f "${1:-$OUT/.ui.xml}" ] && grep -q "isn't responding" "$1"
+  # Resolve the path ONCE. Writing the default in the test and then referring to
+  # `$1` again for the grep means the no-argument call — the only way the wait
+  # loops actually call it — expands an unbound parameter, and this script runs
+  # under `set -u`, so the reference is fatal. Passing a path in a test is not the
+  # same as exercising the call site: this exact mistake took every device down at
+  # the first tap of the walk.
+  local f="${1:-$OUT/.ui.xml}"
+  [ -f "$f" ] && grep -q "isn't responding" "$f"
 }
 
 
