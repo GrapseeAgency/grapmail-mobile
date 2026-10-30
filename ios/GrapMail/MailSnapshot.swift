@@ -228,7 +228,7 @@ struct MailSnapshotView: View {
                 )
             case "mail-labels":
                 return AnyView(
-                secondary(LabelsView(vm: model, onBack: {}, onCreate: {}))
+                secondary(LabelsView(vm: model, onBack: {}, onCreate: {}, onEdit: { _ in }))
                 )
             case "mail-label-create":
                 return AnyView(

@@ -114,7 +114,7 @@ class MainActivity : ComponentActivity() {
                 // SignInScreen.imePadding) so it is never counted twice.
                 val bg = com.grapsee.grapmail.ui.theme.LocalPalette.current.bg
                 Box(
-                    Modifier.fillMaxSize().background(bg)
+                    Modifier.fillMaxSize().background(bg),
                     contentAlignment = Alignment.TopCenter,
                 ) {
                     Box(
