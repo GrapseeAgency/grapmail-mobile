@@ -408,7 +408,11 @@ final class ScreenshotWalkUITests: XCTestCase {
             "mail-contacts": "amira@northwind.example",
             "mail-contact-detail": "Messages seen",
             "mail-files": "invoice-q3.pdf",
-            "mail-attachment-preview": "Save to this device",
+            // The attachment's own NAME, as on Android. "Save to this device" is
+            // a button's title, and this check reads static text only — a marker
+            // can be wrong without the screen being wrong, and this one waited on
+            // text the view never draws.
+            "mail-attachment-preview": "invoice-q3.pdf",
             "mail-settings": "GrapMail address",
             "mail-screener": "Waiting now",
             // A seeded label's NAME, so it appears only once the labels arrive.
