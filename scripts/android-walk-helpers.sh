@@ -168,9 +168,10 @@ wait_nodes() { # wait_nodes <filter> [count] → prints first match.
   for _ in $(seq 1 25); do
     pos="$(find_nodes "$1" | head -"$want" | tail -1)"
     [ -n "$pos" ] && { echo "$pos"; return 0; }
-    # A system dialog over the app makes every predicate false at once; dismiss it
-    # and keep waiting rather than failing the run for something the OS caused.
-    if anr_in_view; then dismiss_anr; continue; fi
+    # A system dialog over the app makes every predicate false at once; dismiss it,
+    # bring our own activity back to the front, and keep waiting rather than
+    # failing the run for something the OS caused.
+    if anr_in_view; then dismiss_anr; ensure_foreground; continue; fi
     n=$((n + 1))
     # scroll down while searching; once pinned at the bottom, rewind to the
     # top so the next sweep re-scans from the start
@@ -200,7 +201,7 @@ wait_overlay() {
   for _ in $(seq 1 20); do
     pos="$(find_nodes "$1" | head -"$want" | tail -1)"
     [ -n "$pos" ] && { echo "$pos"; return 0; }
-    anr_in_view && dismiss_anr
+    anr_in_view && { dismiss_anr; ensure_foreground; }
     sleep 1
   done
   echo "TIMEOUT (overlay): $1" >&2
@@ -279,6 +280,11 @@ PY
     [ -n "$pos" ] || { if [ $((i % 8)) -eq 0 ]; then scroll_to_top; elif [ $((i % 2)) -eq 0 ]; then scroll_up; fi; sleep 1.5; continue; }
     adb shell input tap $pos
     sleep 1
+    # A dialog from the system steals the tap: the field is found, the tap is
+    # delivered, and nothing takes focus — which reads as a broken form field on
+    # one device and as a passing run on the other two. Recover and retry the same
+    # iteration rather than spending the whole loop on a screen we cannot see.
+    if ! keyboard_shown && anr_in_view; then dismiss_anr; ensure_foreground; continue; fi
     # Focus proof: the IME coming up IS the focus event. The dump-based check
     # alone fails on short screens where the focused field scrolls behind
     # the keyboard and vanishes from the visible-node dump.
