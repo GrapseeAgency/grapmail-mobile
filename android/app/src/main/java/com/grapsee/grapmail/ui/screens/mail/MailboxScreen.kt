@@ -64,6 +64,9 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.ExperimentalComposeUiApi
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.testTagsAsResourceId
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
@@ -642,7 +645,7 @@ private fun iconFor(b: MailBox): ImageVector = when (b) {
 
 // ── sheets ───────────────────────────────────────────────────────────────────
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalComposeUiApi::class)
 @Composable
 internal fun MailSheet(onDismiss: () -> Unit, content: @Composable () -> Unit) {
     // Partially expanded, as Material3 intends. This was switched to fully
@@ -654,7 +657,15 @@ internal fun MailSheet(onDismiss: () -> Unit, content: @Composable () -> Unit) {
     // can defend later.
     val sheetState: SheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
-        Column(Modifier.fillMaxWidth().padding(bottom = 24.dp)) { content() }
+        // The root sets `testTagsAsResourceId` for the app's own tree, but a
+        // ModalBottomSheet composes into its OWN window, and the property does not
+        // cross that boundary — so every `gm-sheets-*` tag inside a sheet is
+        // invisible to a uiautomator dump unless it is set again here. Proven the
+        // slow way: the drawer, menu and search anchors all resolved on the first
+        // run and only the sheet's title timed out, which is what separated
+        // "the mechanism is broken" from "the mechanism stops at a window edge".
+        Column(Modifier.fillMaxWidth().padding(bottom = 24.dp)
+            .semantics { testTagsAsResourceId = true }) { content() }
     }
 }
 
