@@ -137,6 +137,31 @@ wait_nodes() { # wait_nodes <filter> [count] → prints first match.
   return 1
 }
 
+# wait_overlay <filter> → prints first match, WITHOUT ever touching the screen.
+#
+# `wait_nodes` scrolls while it searches, which is right for a list row that may
+# be below the fold and wrong for anything that a swipe can dismiss. A bottom
+# sheet is exactly that: the sheet opened, the first dump caught it mid-animation
+# and did not see its title, the retry swiped, and the sheet closed. The walk then
+# reported "the sheet never opened" about a sheet it had just shut itself — and on
+# the mailbox home the BACK that follows pops the root, so the run ended up
+# measuring a screen the walk had destroyed. iOS never had this failure because
+# `waitForExistence` does not gesture.
+#
+# Use this for sheets, dialogs and the drawer. It still retries, so a slow
+# transition is not a failure.
+wait_overlay() {
+  local want="${2:-1}" pos=""
+  for _ in $(seq 1 20); do
+    pos="$(find_nodes "$1" | head -"$want" | tail -1)"
+    [ -n "$pos" ] && { echo "$pos"; return 0; }
+    sleep 1
+  done
+  echo "TIMEOUT (overlay): $1" >&2
+  [ -f "$OUT/.ui.xml" ] && cp "$OUT/.ui.xml" "$OUT/timeout-$(date +%s%3N).xml"
+  return 1
+}
+
 
 keyboard_shown() {
   adb shell dumpsys input_method 2>/dev/null | grep -q "mInputShown=true"

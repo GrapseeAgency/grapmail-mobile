@@ -18,6 +18,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.Composable
@@ -29,6 +30,7 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.grapsee.grapmail.data.Api
 import com.grapsee.grapmail.data.SessionEvents
@@ -318,6 +320,20 @@ fun GrapMailNav() {
         else SecuritySnapshotScreen(snapshot)
         return
     }
+
+    // System Back on the mailbox home must not pop it. The home is the whole
+    // stack while a session is alive, so popping it leaves an empty back stack and
+    // the welcome screen renders underneath — telling a person who is still signed
+    // in, with their mail one tap away, to create an account. The CI walk found
+    // this by pressing Back to close a sheet that was already shut; anyone finds
+    // it by pressing Back once from the inbox. It now does what it does in every
+    // other mail app on Android: sends the app to the background, leaving the
+    // session and the stack exactly as they were.
+    val backStack by nav.currentBackStackEntryAsState()
+    val onHome = backStack?.destination?.route == Routes.HOME ||
+        (backStack == null && dest == Routes.HOME)
+    val hostActivity = nav.context as? android.app.Activity
+    BackHandler(enabled = onHome) { hostActivity?.moveTaskToBack(true) }
 
     NavHost(
         navController = nav,

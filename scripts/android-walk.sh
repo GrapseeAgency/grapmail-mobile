@@ -58,6 +58,19 @@ must_shot() {
   fi
 }
 
+# must_shot_overlay <name> <predicate> — the same proof, for a sheet or the
+# drawer: waits without ever gesturing, because the thing being waited on is a
+# thing a gesture can dismiss.
+must_shot_overlay() {
+  local name="$1" pred="$2"
+  if wait_overlay "$pred" >/dev/null; then
+    shot "$name"
+  else
+    echo "FAIL: $name not photographed — the overlay is not on display" >&2
+    FAILURES=$((FAILURES + 1))
+  fi
+}
+
 # must_shot_ime <name> — gate on the keyboard instead of on a node.
 #
 # The search field is not a destination: tapping it focuses the field on the home
@@ -221,7 +234,7 @@ must_shot 60-mail-home "n.get('content-desc','')=='Open folders'"
 # top, the tap landed on the scrim, and the drawer stayed open. Everything after
 # it then timed out against a covered screen: nineteen failures from one gesture.
 must "sort sheet tap" tap_xy "$(wait_nodes "n.get('content-desc','')=='Sort and filter'" | head -1)"
-must_shot 69-mail-sort-filter "n.get('text','')=='Sort & filter'"
+must_shot_overlay 69-mail-sort-filter "n.get('text','')=='Sort & filter'"
 adb shell input keyevent KEYCODE_BACK
 sleep 1
 must "search field" tap_xy "$(wait_nodes "n.get('text','')=='Search emails, people, or files…'" | head -1)"
@@ -230,7 +243,7 @@ must_shot_ime 67-mail-search
 adb shell input keyevent KEYCODE_BACK
 sleep 1
 must "drawer tap" tap_xy "$(wait_nodes "n.get('content-desc','')=='Open folders'" | head -1)"
-must_shot 62-mail-drawer "n.get('text','')=='Pending approval'"
+must_shot_overlay 62-mail-drawer "n.get('text','')=='Pending approval'"
 
 echo "· security sector — every hub screen, read-only"
 # Mirrors the iOS walk's security leg: open each hub row, photograph the
@@ -243,7 +256,7 @@ echo "· security sector — every hub screen, read-only"
 # drawer's pinned footer, which is why there is no swipe here any more: the
 # account actions were taken out of the scrolling folder list precisely because
 # on a short screen the last of them fell below the fold, unreachable by thumb.
-must "security row" tap_xy "$(wait_nodes "n.get('text','')=='Security'" | head -1)" 
+must "security row" tap_xy "$(wait_overlay "n.get('text','')=='Security'" | head -1)" 
 must_shot 20-sec-hub-light "n.get('text','')=='Account Security'"
 # hub_present — 0 on the hub, 1 definitely NOT on the hub, 2 could not tell.
 # find_nodes prints nothing both when the node is absent AND when the
@@ -433,13 +446,13 @@ fi
 # taps it there. This is the leg that ends the session, which is why it runs
 # after the restore proof.
 must "drawer for sign-out" tap_xy "$(wait_nodes "n.get('content-desc','')=='Open folders'" | head -1)"
-must "drawer open (sign-out)" wait_nodes "n.get('text','')=='Pending approval'" >/dev/null
+must "drawer open (sign-out)" wait_overlay "n.get('text','')=='Pending approval'" >/dev/null
 # No swipe: Sign out is in the drawer's pinned footer, inside the drawer's own
 # bounds on every screen profile. The walk still waits for the row before
 # tapping it, so if it ever stops being reachable this fails as one line naming
 # the row rather than as a timeout on whatever comes next.
-must "sign-out row" wait_nodes "n.get('text','')=='Sign out'" >/dev/null
-must "sign-out tap" tap_xy "$(wait_nodes "n.get('text','')=='Sign out'" | head -1)"
+must "sign-out row" wait_overlay "n.get('text','')=='Sign out'" >/dev/null
+must "sign-out tap" tap_xy "$(wait_overlay "n.get('text','')=='Sign out'" | head -1)"
 sleep 2
 
 echo "· sign-in screen"
