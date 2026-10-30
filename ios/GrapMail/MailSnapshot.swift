@@ -29,11 +29,26 @@ struct MailSnapshotView: View {
     /// photograph catches the empty branch of a screen it means to show full.
     @State private var cached = false
 
-    /// One model for the frame, built once. These screens take it as an
-    /// `@ObservedObject`, and constructing it inside `body` gives a new instance
-    /// on every render — the observation re-subscribes each time and any update
-    /// the screen makes lands on an object nobody is showing.
-    @State private var model = MailboxModel()
+    /// One model for the frame, built and seeded BEFORE the first render.
+    ///
+    /// Seeding in a `.task` lost a race: the thread screen asks its model for the
+    /// conversation on appear, that ask goes out before the task lands, and the
+    /// failure that comes back replaces a body the host had just seeded. Initial
+    ///ising in `init` means the screen's first look at its model is already the
+    /// seeded one. The actor cache is async and still seeds in the task — the
+    /// derived screens gate on that flag for the same reason.
+    @State private var model: MailboxModel
+
+    init(name: String) {
+        self.name = name
+        _model = State(initialValue: MailSnapshotView.seededModel(name))
+    }
+
+    private static func seededModel(_ name: String) -> MailboxModel {
+        let m = MailboxModel()
+        m.applySnapshotSeeds(name)
+        return m
+    }
 
     // ── the sample mailbox ───────────────────────────────────────────────────
     // Senders and subjects are invented for the photograph. They never appear
@@ -79,7 +94,7 @@ struct MailSnapshotView: View {
     /// loaded mail and Files from opened bodies — the API has no contacts index
     /// and no list-all attachments — so a populated photograph means putting the
     /// sample mail where a fetch would have put it.
-    private static func page() -> MailInboxResponse {
+    fileprivate static func page() -> MailInboxResponse {
         var r = MailInboxResponse()
         r.success = true
         r.box = "inbox"
@@ -88,11 +103,11 @@ struct MailSnapshotView: View {
         return r
     }
 
-    private static func attachmentBody() -> MailMessageFull {
+    fileprivate static func attachmentBody() -> MailMessageFull {
         Self.full("m1", body: "Attached is the invoice for the quarter, payable on receipt.")
     }
 
-    private static func labels() -> [MailLabel] {
+    fileprivate static func labels() -> [MailLabel] {
         var work = MailLabel()
         work.id = "l1"; work.name = "Work"; work.color = "#2F6FED"; work.unread = 2
         var bills = MailLabel()
@@ -100,7 +115,7 @@ struct MailSnapshotView: View {
         return [work, bills]
     }
 
-    private static func full(
+    fileprivate static func full(
         _ id: String, body: String?, encrypted: Bool = false,
     ) -> MailMessageFull {
         let dec = JSONDecoder()
@@ -202,33 +217,16 @@ struct MailSnapshotView: View {
             }
         }
         .task(id: name) {
-            // Seed the one model this frame shows. Every name gets its own pass,
-            // because the screens read different stores and a screen left
-            // unseeded photographs its empty branch as if it were the design.
-            model.seedForSnapshot { s in
-                s.accountName = "Amira Rahman"
-                s.accountAddress = "amira@grapmail.com"
-                s.accountStatus = "active"
-                s.memberSince = "March 2026"
-            }
-            model.seedLabelsForSnapshot(Self.labels())
-            switch name {
-            // The id is passed with the body: the thread screen asks the model for
-            // its conversation on appear, and the model must know this one is
-            // already here rather than fetching over it.
-            case "mail-thread":
-                model.seedThreadForSnapshot([Self.full("m1",
-                    body: "Attached is the invoice for the quarter, payable on receipt. "
-                          + "The facilities line item moved again — see page two.")],
-                    for: "t-m1")
-            case "mail-thread-encrypted":
-                model.seedThreadForSnapshot([Self.full("m9", body: nil, encrypted: true)],
-                                            for: "t-m9")
-            case "mail-screener":
-                model.seedScreenerForSnapshot(enabled: true, pending: 3)
-            default:
-                break
-            }
+            // Re-assert the seeds, then fill the cache.
+            //
+            // The re-assert is not redundant: the thread screen's own appear-time
+            // ask is still in flight when this lands, and when it fails it writes
+            // an error state over the seeded conversation. Seeding in `init` puts
+            // the content there for the first render; seeding again here puts it
+            // back after that late failure arrives. The cache is an actor, so its
+            // writes cannot happen in `init` at all — the derived screens gate on
+            // `cached` for exactly that reason.
+            model.applySnapshotSeeds(name)
             if Self.derivedNames.contains(name) {
                 await MailStore.shared.putPage(.inbox, nil, Self.page(), replace: true)
                 await MailStore.shared.putBody(Self.attachmentBody())
@@ -378,5 +376,37 @@ private struct SendReceiptView: View {
 
     private var headline: String {
         status == "queued" ? "Queued for delivery" : "Not delivered"
+    }
+}
+
+// MARK: - Snapshot seeds on the model
+
+extension MailboxModel {
+    func applySnapshotSeeds(_ name: String) {
+        seedForSnapshot { s in
+            s.accountName = "Amira Rahman"
+            s.accountAddress = "amira@grapmail.com"
+            s.accountStatus = "active"
+            s.memberSince = "March 2026"
+        }
+        // Both stores: the labels screen reads `labelState`, the inbox chip strip
+        // reads `state.labels`. Filling one and not the other is how `mail-labels`
+        // photographed its empty branch with the sample data set.
+        seedLabelsForSnapshot(MailSnapshotView.labels())
+        switch name {
+        case "mail-thread":
+            seedThreadForSnapshot([MailSnapshotView.full("m1",
+                body: "Attached is the invoice for the quarter, payable on receipt. "
+                      + "The facilities line item moved again — see page two.")],
+                for: "t-m1")
+        case "mail-thread-encrypted":
+            seedThreadForSnapshot([MailSnapshotView.full("m9", body: nil,
+                                                            encrypted: true)],
+                                  for: "t-m9")
+        case "mail-screener":
+            seedScreenerForSnapshot(enabled: true, pending: 3)
+        default:
+            break
+        }
     }
 }
