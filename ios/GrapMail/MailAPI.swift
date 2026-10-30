@@ -654,6 +654,108 @@ struct MailLabelCreateRequest: Encodable { var name: String; var colour: String?
 struct MailLabelAssignRequest: Encodable { var labelId: String }
 struct MailScreenerEnableRequest: Encodable { var enabled: Bool }
 
+/// What the screener does with one sender once the user has decided. The four
+/// values are the server's own set — `DECISIONS` in
+/// `mail-service/src/routes/screener.ts:60` — and `done` is a word this type
+/// carries rather than a suffix a call site appends, because "Approve" + "d" and
+/// "Keep waiting" + "d" are not both English.
+enum MailDecision: String, CaseIterable, Identifiable {
+    case approved, muted, later, blocked
+
+    var apiValue: String { rawValue }
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .approved: return "Approve"
+        case .muted: return "Mute"
+        case .later: return "Keep waiting"
+        case .blocked: return "Block"
+        }
+    }
+
+    var done: String {
+        switch self {
+        case .approved: return "Approved"
+        case .muted: return "Muted"
+        case .later: return "Kept waiting"
+        case .blocked: return "Blocked"
+        }
+    }
+
+    var note: String {
+        switch self {
+        case .approved: return "Their future mail goes straight to the inbox."
+        case .muted: return "It arrives, but quietly — held out of the unread count."
+        case .later: return "Nothing is decided. It stays in this queue."
+        case .blocked: return "Future mail from them is refused at the door."
+        }
+    }
+}
+
+/// How far a decision reaches. `SCOPES` in the same file. Domain is the one that
+/// can go wrong quietly, so its `warning` is shown before the choice is made.
+enum MailSenderScope: String, CaseIterable, Identifiable {
+    case address, domain
+
+    var apiValue: String { rawValue }
+    var id: String { rawValue }
+
+    var title: String {
+        self == .address ? "Just this address" : "The whole domain"
+    }
+
+    var warning: String {
+        self == .domain
+            ? "Applies to every address at this domain, including ones created later."
+            : ""
+    }
+}
+
+/// `PUT /screener/decision` body: three strings, validated upstream, not here.
+struct MailScreenerDecisionRequest: Encodable {
+    var sender: String
+    var scope: String
+    var decision: String
+}
+
+struct MailScreenerDecisionRecord: Decodable {
+    var sender = ""
+    var scope = ""
+    var decision = ""
+    var decidedAt: String?
+
+    private enum CodingKeys: String, CodingKey { case sender, scope, decision, decidedAt }
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        sender = c.lenient(.sender, "")
+        scope = c.lenient(.scope, "")
+        decision = c.lenient(.decision, "")
+        decidedAt = c.lenientOpt(.decidedAt)
+    }
+}
+
+/// `PUT` answers `{ success, decision: {…} }`; `DELETE` answers
+/// `{ success, removed }`. `removed: false` is a 200 by design — the caller's
+/// intent, "no decision for this sender", holds either way — so the app must not
+/// read a false there as a failure. `removed` is therefore optional: nil means
+/// the server never said, which is not the same as it saying no.
+struct MailScreenerDecisionResponse: Decodable {
+    var success = false
+    var decision: MailScreenerDecisionRecord?
+    var removed: Bool?
+    var error: String?
+
+    private enum CodingKeys: String, CodingKey { case success, decision, removed, error }
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        success = c.lenient(.success, false)
+        decision = c.lenientOpt(.decision)
+        removed = c.lenientOpt(.removed)
+        error = c.lenientOpt(.error)
+    }
+}
+
 // ── calls ────────────────────────────────────────────────────────────────────
 
 extension ApiClient {
@@ -872,6 +974,38 @@ extension ApiClient {
                           body: try encoder.encode(MailScreenerEnableRequest(enabled: enabled)),
                           bearer: token)
     }
+
+    /// Record a standing decision about one sender: `PUT /screener/decision`.
+    ///
+    /// Not a message action. The message actions file what is already in the
+    /// mailbox; a decision is a rule the delivery path reads when the NEXT
+    /// message arrives, so approving a sender here does not move the message in
+    /// front of the user. The proxy validates nothing on purpose — mail-service
+    /// owns the four decisions and the two scopes, and a second validator would
+    /// be a second opinion about what is legal that could drift from the store's
+    /// own. The app sends the server's spellings verbatim and relays its refusal
+    /// word for word.
+    static func mailScreenerDecision(
+        token: String, sender: String,
+        scope: MailSenderScope, decision: MailDecision,
+    ) async throws -> MailScreenerDecisionResponse {
+        try await request("\(mailBase)/screener/decision", method: "PUT",
+                          body: try encoder.encode(MailScreenerDecisionRequest(
+                            sender: sender, scope: scope.apiValue, decision: decision.apiValue)),
+                          bearer: token)
+    }
+
+    /// Forget a decision, so the sender is undecided again and their mail returns
+    /// to the queue. Parameters ride in the query string because that is what the
+    /// route reads (`grapmail-screener.ts:127-133`): a DELETE with a body is not
+    /// something every client and proxy carries.
+    static func mailScreenerDecisionRemove(
+        token: String, sender: String, scope: MailSenderScope,
+    ) async throws -> MailScreenerDecisionResponse {
+        let url = "\(mailBase)/screener/decision?scope=\(scope.apiValue.percentEncodedQuery())"
+            + "&sender=\(sender.percentEncodedQuery())"
+        return try await request(url, method: "DELETE", bearer: token)
+    }
 }
 
 // ── small helpers used across the sector ─────────────────────────────────────
@@ -891,6 +1025,18 @@ extension String {
     /// anything unexpected in it must arrive encoded or be rejected as a
     /// traversal attempt rather than as an id.
     func percentEncodedPath() -> String {
+        addingPercentEncoding(withAllowedCharacters: .alphanumerics) ?? self
+    }
+
+    /// Percent-encodes a value that goes into a **query parameter**.
+    ///
+    /// Separate from the path encoder because the characters that must not leak
+    /// are different: a sender address dropped into `&sender=` unencoded can
+    /// inject a `&` of its own and become a second parameter, which is exactly
+    /// how a value stops being one value. Encoding every non-alphanumeric is
+    /// over-broad but never wrong, and it is the same set the path encoder uses,
+    /// so the two cannot drift.
+    func percentEncodedQuery() -> String {
         addingPercentEncoding(withAllowedCharacters: .alphanumerics) ?? self
     }
 }

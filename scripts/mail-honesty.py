@@ -200,6 +200,98 @@ if drawer_kt and drawer_sw:
     pin("iOS's drawer does not advertise a Snoozed box",
         "snoozed" not in drawer_sw.group(1))
 
+# ── 6. the screener's four decisions are the server's four decisions ─────────
+#
+# `PUT /screener/decision` is validated by mail-service alone and the proxy
+# relays its refusal verbatim, so the client carries a copy of a set it cannot
+# enumerate at runtime. Offer a fifth word, or rename one, and every write using
+# it fails at the store while the sheet still looks like it offered a reasonable
+# choice.
+#
+# The expected set is stated literally here rather than read out of the backend
+# repo, because the two are separate checkouts: a pin that depends on a sibling
+# directory silently skips on the runner that is supposed to enforce it, and a
+# gate that skips passes. The source of truth is named in the comment and in both
+# enums' own docs so a reader can re-derive it.
+SERVER_DECISIONS = {"approved", "muted", "later", "blocked"}   # screener.ts:60
+SERVER_SCOPES = {"address", "domain"}                          # screener.ts:61
+
+
+def swift_cases(block: str) -> set:
+    r"""The member names declared by a Swift enum's `case` line.
+
+    Two traps, both hit while writing this. `case approved, muted, later, blocked`
+    is ONE declaration, so a `case (\w+)` match reads it as a single member and
+    reports a set of one — a check that fails against correct code, which is the
+    worst outcome for a gate because it teaches the reader to ignore it. And these
+    enums also contain `switch` bodies whose `case .approved: return "Approve"`
+    lines are not members at all, so dotted names are skipped and anything after a
+    colon is dropped.
+    """
+    out = set()
+    for m in re.finditer(r"^\s*case ([^\n{]+)$", block, re.M):
+        for part in m.group(1).split(","):
+            name = part.split(":")[0].strip()
+            if name and not name.startswith(".") and name.isidentifier():
+                out.add(name)
+    return out
+
+
+kt_decision_block = re.search(r"enum class MailDecision\((.*?)\n\}", KT_DTO, re.S)
+pin("Android declares a MailDecision enum", kt_decision_block is not None)
+kt_decisions = set(re.findall(r'\("([a-z]+)"', kt_decision_block.group(1))) \
+    if kt_decision_block else set()
+pin("Android's decisions are exactly the server's four", kt_decisions == SERVER_DECISIONS)
+
+sw_decision_block = re.search(r"enum MailDecision[^{]*\{(.*?)\n\}", SW_API, re.S)
+pin("iOS declares a MailDecision enum", sw_decision_block is not None)
+pin("iOS's decisions are exactly the server's four",
+    swift_cases(sw_decision_block.group(1)) == SERVER_DECISIONS if sw_decision_block else False)
+
+pin("Android declares both server scopes",
+    set(re.findall(r'\("(address|domain)"', KT_DTO)) == SERVER_SCOPES)
+sw_scope_block = re.search(r"enum MailSenderScope[^{]*\{(.*?)\n\}", SW_API, re.S)
+pin("iOS declares both server scopes",
+    swift_cases(sw_scope_block.group(1)) == SERVER_SCOPES if sw_scope_block else False)
+
+# Both calls must send the server's spelling, not the enum's name — a `rawValue`
+# on a differently-cased case would silently 400.
+pin("Android's decision call sends the api value",
+    re.search(r"MailScreenerDecisionRequest\(sender, scope\.apiValue, decision\.apiValue\)",
+              KT_API) is not None)
+pin("iOS's decision call sends the api value",
+    re.search(r"scope: scope\.apiValue, decision: decision\.apiValue", SW_API) is not None)
+
+# A decision is a rule for the NEXT delivery, not an action on the message in
+# hand, so the queue must be re-read rather than edited locally.
+KT_VM = android("logic/MailboxViewModel.kt")
+pin("Android re-reads the queue after a decision instead of splicing it",
+    "MailStore.invalidate(MailBox.Screener)" in KT_VM)
+pin("iOS re-reads the queue after a decision instead of splicing it",
+    "invalidate(.screener)" in ios("MailboxModel.swift"))
+
+# The surface writes decisions and cannot read them back, so no option may be
+# drawn as the one already in force — that would be an invented fact.
+pin("Android's decision sheet marks no option as current",
+    re.search(r"SheetOption\(d\.title,\s*false\)", android("ui/screens/mail/MailboxScreen.kt")) is not None)
+pin("iOS's decision sheet marks no option as current",
+    re.search(r"SheetOption\(label: d\.title,\s*active: false\)", ios("MailSheets.swift")) is not None)
+
+# The receipt must say what happened, which for a DELETE means honouring
+# `removed: false` as "there was nothing to forget" rather than as a failure or
+# as a confident "forgotten".
+pin("Android distinguishes a removed decision from an absent one",
+    "removed == true" in KT_VM or "r.removed" in KT_VM)
+pin("iOS distinguishes a removed decision from an absent one",
+    "removed == true" in ios("MailboxModel.swift"))
+
+# A sender address goes into a query parameter on the delete path. Unencoded, a
+# value containing `&` would become a second parameter — so both sides encode.
+pin("Android encodes the query values on the remove call",
+    re.search(r"\?scope=\$\{enc\(scope\.apiValue\)\}&sender=\$\{enc\(sender\)\}", KT_API) is not None)
+pin("iOS encodes the query values on the remove call",
+    "percentEncodedQuery()" in SW_API)
+
 print()
 if failures:
     print(f"mail-honesty: {len(failures)} pin(s) broken")

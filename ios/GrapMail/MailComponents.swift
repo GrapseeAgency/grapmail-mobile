@@ -401,6 +401,12 @@ struct SelectionToolbar: View {
     let onMove: () -> Void
     let onLabel: () -> Void
     let onMore: () -> Void
+    /// The "Sender" action, offered only while the screener queue is open — the
+    /// same rule Android applies in `Mail.kt`. Every other box's mail has already
+    /// been delivered, so deciding its sender would be a rule about a message that
+    /// needs none, and a toolbar item that opens a sheet of inapplicable actions is
+    /// a control aimed at nothing.
+    var onSender: (() -> Void)? = nil
 
     var body: some View {
         VStack(spacing: 0) {
@@ -420,6 +426,9 @@ struct SelectionToolbar: View {
                 ToolAction(icon: "trash", label: "Delete", onClick: onDelete)
                 ToolAction(icon: "arrow.right.doc.on.clipboard", label: "Move", onClick: onMove)
                 ToolAction(icon: "tag", label: "Label", onClick: onLabel)
+                if let onSender {
+                    ToolAction(icon: "person.badge.plus", label: "Sender", onClick: onSender)
+                }
                 ToolAction(icon: "ellipsis", label: "More", onClick: onMore)
             }
         }

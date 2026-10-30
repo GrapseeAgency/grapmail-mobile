@@ -179,6 +179,72 @@ struct SheetTitle: View {
     }
 }
 
+/// Deciding a sender, from the screener queue. The same three refusals Android
+/// makes in `SenderDecisionContent`:
+///
+///  - no option is marked as the decision currently in force, because the
+///    screener surface writes decisions and cannot read them back, so that fact
+///    is genuinely unknown and an invented default would be a lie with a tick
+///    beside it;
+///  - it never claims these messages will move — a decision governs the next
+///    delivery, and the queue is re-read afterwards;
+///  - the reach of "the whole domain" is stated before it is chosen, because
+///    approving a domain admits every mailbox at it, including ones that do not
+///    exist yet.
+struct SenderDecisionSheet: View {
+    let senders: [String]
+    let busy: Bool
+    let result: String?
+    let onPick: (MailSenderScope, MailDecision) -> Void
+
+    @State private var scope: MailSenderScope = .address
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            SheetTitle(text: "Decide the sender")
+            Text(senders.count == 1 ? "Sender: \(senders[0])"
+                                    : "\(senders.count) senders in the selected messages")
+                .font(.system(size: 13)).foregroundColor(GM.textSecondary)
+                .padding(.horizontal, 20).padding(.vertical, 6)
+
+            groupLabel("APPLIES TO")
+            ForEach(MailSenderScope.allCases) { s in
+                SheetOption(label: s.title, active: scope == s) { scope = s }
+            }
+            if scope == .domain {
+                Text(MailSenderScope.domain.warning)
+                    .font(.system(size: 12)).foregroundColor(GM.warnInk)
+                    .padding(.horizontal, 20).padding(.vertical, 4)
+            }
+
+            groupLabel("DECISION")
+            ForEach(MailDecision.allCases) { d in
+                SheetOption(label: d.title, active: false) {
+                    if !busy { onPick(scope, d) }
+                }
+                Text(d.note)
+                    .font(.system(size: 12)).foregroundColor(GM.textTertiary)
+                    .padding(.horizontal, 20).padding(.vertical, 2)
+            }
+
+            if let result {
+                Text(result)
+                    .font(.system(size: 12)).foregroundColor(GM.textPrimary)
+                    .padding(.horizontal, 20).padding(.vertical, 8)
+                    .accessibilityIdentifier("mail-decision-receipt")
+            }
+        }
+        .padding(.bottom, 24)
+        .accessibilityIdentifier("gm-sheets-sender")
+    }
+
+    @ViewBuilder private func groupLabel(_ text: String) -> some View {
+        Text(text)
+            .font(.system(size: 11, weight: .bold)).foregroundColor(GM.textTertiary)
+            .padding(.horizontal, 20).padding(.vertical, 8)
+    }
+}
+
 struct SheetOption: View {
     let label: String
     let active: Bool

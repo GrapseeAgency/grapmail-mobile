@@ -281,6 +281,68 @@ data class MailScreenerResponse(
 )
 
 /**
+ * What the screener does with one sender, once the user has decided.
+ *
+ * The four values are the server's own set — `DECISIONS` in
+ * `mail-service/src/routes/screener.ts:60` — not a client invention, and they
+ * are not the same axis as a message action: this writes a standing rule the
+ * delivery path reads on the NEXT message, so it cannot file the one in front of
+ * you. `later` is a decision too: it keeps the mail in the queue deliberately,
+ * which is why the set has four entries and not three verbs.
+ */
+enum class MailDecision(
+    val apiValue: String, val title: String, val done: String, val note: String,
+) {
+    Approved("approved", "Approve", "Approved", "Their future mail goes straight to the inbox."),
+    Muted("muted", "Mute", "Muted", "It arrives, but quietly — held out of the unread count."),
+    Later("later", "Keep waiting", "Kept waiting", "Nothing is decided. It stays in this queue."),
+    Blocked("blocked", "Block", "Blocked", "Future mail from them is refused at the door."),
+}
+
+/**
+ * How far a decision reaches. `SCOPES` in the same file: `address` or `domain`.
+ *
+ * Domain is the one that can go wrong quietly — approving `example.com` admits
+ * every mailbox at it, now and later, including addresses a stranger registers
+ * next year. The sheet says so on the option rather than leaving the choice to
+ * be inferred from a radio button.
+ */
+enum class MailSenderScope(val apiValue: String, val title: String, val warning: String) {
+    Address("address", "Just this address", ""),
+    Domain("domain", "The whole domain", "Applies to every address at this domain, including ones created later."),
+}
+
+/** `PUT /screener/decision` body: three strings, validated upstream, not here. */
+@Serializable
+data class MailScreenerDecisionRequest(
+    val sender: String,
+    val scope: String,
+    val decision: String,
+)
+
+/**
+ * `PUT /screener/decision` answers `{ success, decision: {…} }`; the DELETE
+ * answers `{ success, removed }`. `removed: false` is a 200 by design — the
+ * caller's intent, "there should be no decision for this sender", is satisfied
+ * either way — so the app must not read a false there as a failure.
+ */
+@Serializable
+data class MailScreenerDecisionRecord(
+    val sender: String = "",
+    val scope: String = "",
+    val decision: String = "",
+    val decidedAt: String? = null,
+)
+
+@Serializable
+data class MailScreenerDecisionResponse(
+    val success: Boolean = false,
+    val decision: MailScreenerDecisionRecord? = null,
+    val removed: Boolean? = null,
+    val error: String? = null,
+)
+
+/**
  * The boxes the mail API accepts.
  *
  * `grapmail-boxes.ts:43-68` is the source: `inbox, sent, drafts, spam, trash,

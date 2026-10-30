@@ -33,9 +33,10 @@ struct MailboxView: View {
 
     @State private var drawerOpen = false
     @State private var sheet: MailSheet?
+    @State private var decisionResult: String?
 
     enum MailSheet: String, Identifiable {
-        case sortFilter, move, label, snooze, permanent
+        case sortFilter, move, label, snooze, permanent, sender
         var id: String { rawValue }
     }
 
@@ -117,6 +118,10 @@ struct MailboxView: View {
                 onDelete: { sheet = .permanent },
                 onMove: { sheet = .move },
                 onLabel: { sheet = .label },
+                // Only the queue offers this. Deciding a sender is a rule about
+                // their next message, which means nothing for a box whose mail
+                // already arrived.
+                onSender: vm.state.box == .screener ? { sheet = .sender } : nil,
                 onMore: { sheet = .snooze }
             )
         } else {
@@ -259,6 +264,21 @@ struct MailboxView: View {
             }
         case .snooze:
             SnoozeSheet { until in vm.act(.snooze, until: until); sheet = nil }
+        case .sender:
+            // Not dismissed on pick, unlike the others. A filing action shows
+            // whether it worked by changing the list under you; a decision changes
+            // nothing on this screen because it governs the NEXT delivery, so the
+            // receipt line is the only feedback there is and the sheet has to stay
+            // open long enough to be read.
+            SenderDecisionSheet(
+                senders: selectedSenders,
+                busy: vm.screener.busy,
+                result: decisionResult,
+            ) { scope, decision in
+                vm.decideSenders(selectedSenders, scope: scope, decision: decision) {
+                    decisionResult = $0
+                }
+            }
         case .permanent:
             PermanentDeleteSheet(
                 count: vm.state.selection.count,
@@ -269,6 +289,13 @@ struct MailboxView: View {
     }
 
     private func open(_ box: MailBox) { vm.open(box) }
+
+    /// The senders named by the selected rows, deduplicated by the model so one
+    /// person with five messages in the queue is decided once, not five times.
+    private var selectedSenders: [String] {
+        vm.state.rows.filter { vm.state.selection.contains($0.id) }
+            .compactMap { $0.from?.address }
+    }
 
     private func toggleDrawer() {
         withAnimation(.spring(response: 0.32, dampingFraction: 0.86)) {

@@ -813,6 +813,98 @@ class MailboxViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /**
+     * Decide the senders behind the selected queue entries.
+     *
+     * Two things make this different from a message action, and the code follows
+     * both. It writes a rule about a SENDER, not about the message, so several
+     * rows from one person collapse to one decision — and the effect is on the
+     * NEXT delivery, which means the message on screen does not move because the
+     * server accepted the rule. So the queue is re-read rather than spliced: the
+     * folder is the queue's only definition, and pretending a row left would show
+     * mail the server still lists there.
+     *
+     * Nothing here claims to know a sender's current decision. The screener
+     * surface is `PUT` and `DELETE /decision` with no read, so the sheet offers
+     * the four choices and never marks one as already in force — an unknown read
+     * is shown as unknown, the rule this whole sector is built on.
+     */
+    fun decideSenders(
+        addresses: List<String>,
+        scope: MailSenderScope,
+        decision: MailDecision,
+        then: (String) -> Unit,
+    ) {
+        viewModelScope.launch {
+            val t = token() ?: run { then("Sign in again to decide on this sender."); return@launch }
+            val senders = addresses.asSequence()
+                .map { it.trim() }.filter { it.isNotEmpty() }
+                .map { if (scope == MailSenderScope.Domain) it.substringAfter('@', "") else it }
+                .filter { it.isNotEmpty() }
+                .distinct().toList()
+            if (senders.isEmpty()) { then("Those messages name no sender to decide on."); return@launch }
+
+            _screener.update { it.copy(busy = true, error = null) }
+            var failure: String? = null
+            var saved = 0
+            for (s in senders) {
+                runCatching { Api.mailScreenerDecision(t, s, scope, decision) }
+                    .onSuccess { r ->
+                        // `success` is the store's own word for the write landing.
+                        // A 200 that did not say so is not counted as saved.
+                        if (r.success) saved++ else failure = r.error ?: "The server refused that decision."
+                    }
+                    .onFailure { e -> failure = mailReason(e) }
+            }
+            MailStore.invalidate(MailBox.Screener)
+            loadScreener()
+            _screener.update { it.copy(busy = false, error = failure) }
+            then(
+                when {
+                    failure != null && saved == 0 -> failure!!
+                    failure != null -> "$saved of ${senders.size} saved. $failure"
+                    // `done` is a word the enum carries, not a suffix appended
+                    // here: "Approve" + "d" and "Keep waiting" + "d" are not both
+                    // English, and a receipt that mis-spells what happened is the
+                    // same defect as one that mis-states it.
+                    saved == 1 -> "${decision.done}: ${senders[0]}"
+                    else -> "${decision.done}: $saved senders"
+                }
+            )
+        }
+    }
+
+    /**
+     * Forget a decision so the sender is undecided again.
+     *
+     * `removed: false` arrives as a 200 and means the same thing to the user as
+     * `removed: true` did — there is no rule for this sender now — so it is not
+     * reported as a failure. Saying "forgotten" when the server said it had
+     * nothing to forget would be a small lie with a real cost: the person would
+     * think a rule was still in force somewhere.
+     */
+    fun undoDecision(address: String, scope: MailSenderScope, then: (String) -> Unit) {
+        viewModelScope.launch {
+            val t = token() ?: run { then("Sign in again to change this."); return@launch }
+            val sender = if (scope == MailSenderScope.Domain)
+                address.trim().substringAfter('@', "") else address.trim()
+            if (sender.isEmpty()) { then("That message names no sender to change."); return@launch }
+            _screener.update { it.copy(busy = true, error = null) }
+            runCatching { Api.mailScreenerDecisionRemove(t, sender, scope) }
+                .onSuccess { r ->
+                    MailStore.invalidate(MailBox.Screener)
+                    loadScreener()
+                    _screener.update { it.copy(busy = false) }
+                    then(if (r.removed == true) "Forgotten — their next message waits in the queue again."
+                    else "No decision was recorded for them, so there was nothing to forget.")
+                }
+                .onFailure { e ->
+                    _screener.update { it.copy(busy = false, error = mailReason(e)) }
+                    then(mailReason(e))
+                }
+        }
+    }
+
     // ── files ────────────────────────────────────────────────────────────────
 
     data class FileEntry(val attachment: MailAttachmentDto, val fromMessage: String?)

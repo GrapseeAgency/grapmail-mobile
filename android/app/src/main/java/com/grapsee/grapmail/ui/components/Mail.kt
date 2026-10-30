@@ -487,6 +487,13 @@ fun SelectionToolbar(
     onMove: () -> Unit,
     onLabel: () -> Unit,
     onMore: () -> Unit,
+    /**
+     * The "Sender" action, offered only while the screener queue is open. Left
+     * null everywhere else because deciding a sender means nothing for a box
+     * whose mail already reached you — and a toolbar item that opens a sheet of
+     * actions the current box cannot use is a control aimed at nothing.
+     */
+    onSender: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     val palette = LocalPalette.current
@@ -506,6 +513,7 @@ fun SelectionToolbar(
             ToolAction(Icons.Rounded.Delete, "Delete", onDelete)
             ToolAction(Icons.Rounded.MoveToInbox, "Move", onMove)
             ToolAction(Icons.Rounded.Label, "Label", onLabel)
+            onSender?.let { ToolAction(Icons.Rounded.PersonAddAlt1, "Sender", it) }
             ToolAction(Icons.Rounded.MoreVert, "More", onMore)
         }
     }

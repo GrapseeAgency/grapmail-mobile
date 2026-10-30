@@ -133,6 +133,13 @@ fun MailboxScreen(
     var showLabelSheet by remember { mutableStateOf(false) }
     var showSnoozeSheet by remember { mutableStateOf(false) }
     var showPermanentConfirm by remember { mutableStateOf(false) }
+    var showSenderSheet by remember { mutableStateOf(false) }
+    // The last decision receipt, kept here rather than in the view model: it is
+    // one line of text about one interaction, and the sheet that shows it is the
+    // only thing that can dismiss it. The view model's own `error` stays on the
+    // screener screen, where it belongs.
+    var decisionResult by remember { mutableStateOf<String?>(null) }
+    val screener by vm.screener.collectAsState()
 
     // Ask for more once the list is nearly at the end. Not "on the last item",
     // which fires one screen late and makes the wait visible.
@@ -188,6 +195,13 @@ fun MailboxScreen(
                         onMove = { showMoveSheet = true },
                         onLabel = { showLabelSheet = true },
                         onMore = { showSnoozeSheet = true },
+                        // Only the queue can decide a sender. Every other box's
+                        // mail has already been delivered, so the sheet's four
+                        // options would be rules about a message that needs no
+                        // rule — which is why this is null rather than a button
+                        // that opens an empty sheet.
+                        onSender = if (state.box == com.grapsee.grapmail.data.MailBox.Screener)
+                            ({ showSenderSheet = true }) else null,
                     )
                 } else {
                     MailTopBar(
@@ -308,6 +322,29 @@ fun MailboxScreen(
             SnoozeContent { until ->
                 vm.act(com.grapsee.grapmail.data.MailAction.Snooze, until)
                 showSnoozeSheet = false
+            }
+        }
+    }
+    if (showSenderSheet) {
+        // Deliberately not dismissed on pick, unlike every other sheet here. A
+        // filing action either worked or it did not and the list changes under
+        // you, so the sheet closing is the feedback. A decision is a standing
+        // rule about someone else's FUTURE mail, invisible in this list, so the
+        // only feedback there is the receipt line — and a sheet that closed
+        // before it could be read would have taken the answer with it.
+        MailSheet(onDismiss = { showSenderSheet = false; decisionResult = null }) {
+            SenderDecisionContent(
+                senders = state.rows.filter { it.id in state.selection }
+                    .mapNotNull { it.from?.address?.takeIf { a -> a.isNotBlank() } }
+                    .distinct(),
+                busy = screener.busy,
+                result = decisionResult,
+            ) { scope, decision ->
+                vm.decideSenders(
+                    state.rows.filter { it.id in state.selection }
+                        .mapNotNull { it.from?.address }.distinct(),
+                    scope, decision,
+                ) { decisionResult = it }
             }
         }
     }
@@ -696,6 +733,73 @@ internal fun AssignLabelContent(
             color = palette.textSecondary, modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp))
     }
     labels.forEach { l -> SheetOption(l.name, false) { onPick(l.id) } }
+}
+
+/**
+ * Deciding a sender, from the screener queue.
+ *
+ * Three things this sheet refuses to pretend about:
+ *
+ *  - It does not show which decision, if any, is already in force for these
+ *    senders. The screener surface writes decisions and cannot read them back, so
+ *    no option is marked as current — a pre-selected radio would be an invented
+ *    fact, and the wrong one is worse than none.
+ *  - It does not claim the messages on screen will move. A decision is a rule for
+ *    the NEXT delivery; the queue is re-read afterwards and the rows that remain
+ *    stay visible, because that is what the server says.
+ *  - It states what "the whole domain" reaches before it is chosen, not after.
+ *    Approving a domain admits every mailbox at it including ones that do not
+ *    exist yet, and that is not something to discover from a receipt line.
+ */
+@Composable
+internal fun SenderDecisionContent(
+    senders: List<String>,
+    busy: Boolean,
+    result: String?,
+    onPick: (com.grapsee.grapmail.data.MailSenderScope, com.grapsee.grapmail.data.MailDecision) -> Unit,
+) {
+    val palette = LocalPalette.current
+    var scope by remember { mutableStateOf(com.grapsee.grapmail.data.MailSenderScope.Address) }
+
+    SheetTitle("Decide the sender")
+    Text(
+        if (senders.size == 1) "Sender: ${senders[0]}"
+        else "${senders.size} senders in the selected messages",
+        fontSize = 13.sp, color = palette.textSecondary,
+        modifier = Modifier.padding(horizontal = 20.dp, vertical = 6.dp),
+    )
+
+    Text("APPLIES TO", fontSize = 11.sp, fontWeight = FontWeight.Bold,
+        color = palette.textTertiary, modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp))
+    com.grapsee.grapmail.data.MailSenderScope.entries.forEach { s ->
+        SheetOption(s.title, scope == s) { scope = s }
+    }
+    if (scope == com.grapsee.grapmail.data.MailSenderScope.Domain) {
+        Text(
+            com.grapsee.grapmail.data.MailSenderScope.Domain.warning,
+            fontSize = 12.sp, color = palette.warnInk,
+            modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp),
+        )
+    }
+
+    Text("DECISION", fontSize = 11.sp, fontWeight = FontWeight.Bold,
+        color = palette.textTertiary, modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp))
+    com.grapsee.grapmail.data.MailDecision.entries.forEach { d ->
+        // No `enabled` while a write is in flight: the row still looks tappable
+        // and simply declines, which is what the other sheets do, and the guard
+        // is in the handler rather than in the widget so the rule cannot be
+        // bypassed by a caller that draws the same option differently.
+        SheetOption(d.title, false) {
+            if (!busy) onPick(scope, d)
+        }
+        Text(d.note, fontSize = 12.sp, color = palette.textTertiary,
+            modifier = Modifier.padding(horizontal = 20.dp, vertical = 2.dp))
+    }
+
+    result?.let {
+        Text(it, fontSize = 12.sp, color = palette.textPrimary,
+            modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp))
+    }
 }
 
 /**

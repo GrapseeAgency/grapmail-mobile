@@ -168,6 +168,20 @@ host, so a broken network layer cannot read as a working mailbox.
   the two mail client surfaces — every `mail*` call name and every decoded DTO
   field — and both workflows run it. Three mismatches were caught by hand while
   this sector was built; a reviewer cannot re-derive them from one file.
+- **The screener decides senders, and says what it cannot know.** `PUT
+  /screener/decision` and `DELETE /screener/decision` are implemented on both
+  platforms (`mailScreenerDecision`, `mailScreenerDecisionRemove`), reached from a
+  "Sender" action that appears only while the queue is open — deciding a sender
+  means nothing for a box whose mail already arrived. Three limits are encoded
+  rather than papered over. No option is marked as the decision currently in
+  force, because the surface writes decisions and has no read, so that fact is
+  unknown. The queue is re-read after a decision instead of edited locally,
+  because a decision governs the *next* delivery and the message in hand does not
+  move. And `removed: false` from the DELETE is reported as "there was nothing to
+  forget", not as a failure and not as a confident "forgotten". The four decision
+  values and two scopes are pinned against the server's set (`screener.ts:60-61`)
+  by `scripts/mail-honesty.py`, so a client that renames one fails CI rather than
+  400ing at the store behind a sheet that looked reasonable.
 - **The contract is pinned separately from parity.** `scripts/mail-honesty.py`
   asserts both platforms against the *design*, not against each other — two
   platforms can agree on the same wrong thing. It pins that a queued send is

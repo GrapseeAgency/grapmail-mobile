@@ -790,6 +790,119 @@ final class MailboxModel: ObservableObject {
         }
     }
 
+    // ── sender decisions ─────────────────────────────────────────────────────
+
+    /// Decide the senders behind the selected queue entries.
+    ///
+    /// Different from a message action in two ways the code has to respect. It
+    /// writes a rule about a SENDER, so several rows from one person collapse to
+    /// one decision; and the effect lands on the NEXT delivery, so the message on
+    /// screen does not move because the server said yes. The queue is therefore
+    /// re-read rather than spliced — the folder is the queue's only definition, and
+    /// removing a row locally would show fewer messages than the server lists.
+    ///
+    /// Nothing here reports which decision is already in force. The screener
+    /// surface writes decisions and cannot read them back, so the sheet offers the
+    /// four and marks none as current: an unknown read stays unknown rather than
+    /// being filled in with the plausible-looking default.
+    func decideSenders(
+        _ addresses: [String], scope: MailSenderScope, decision: MailDecision,
+        then: @escaping (String) -> Void,
+    ) {
+        guard let token else { then("Sign in again to decide on this sender."); return }
+        let senders = Self.senders(from: addresses, scope: scope)
+        guard !senders.isEmpty else {
+            then("Those messages name no sender to decide on."); return
+        }
+        screener.busy = true
+        screener.error = nil
+        Task { [weak self] in
+            guard let self else { return }
+            var failure: String?
+            var saved = 0
+            for s in senders {
+                do {
+                    let r = try await ApiClient.mailScreenerDecision(
+                        token: token, sender: s, scope: scope, decision: decision)
+                    // `success` is the store's own word for the write landing. A
+                    // 200 that did not say so is not counted as saved.
+                    if r.success { saved += 1 }
+                    else { failure = r.error ?? "The server refused that decision." }
+                } catch { failure = Self.describe(error) }
+            }
+            await MailStore.shared.invalidate(.screener)
+            self.loadScreener()
+            self.screener.busy = false
+            self.screener.error = failure
+            let message: String
+            if let failure, saved == 0 { message = failure }
+            else if let failure { message = "\(saved) of \(senders.count) saved. \(failure)" }
+            else if saved == 1 { message = "\(decision.done): \(senders[0])" }
+            else { message = "\(decision.done): \(saved) senders" }
+            then(message)
+        }
+    }
+
+    /// Forget a decision so the sender is undecided again.
+    ///
+    /// `removed == false` arrives as a 200 and means the same thing to the user as
+    /// `true` did — there is no rule for this sender now — so it is reported as
+    /// what happened rather than as a failure. Saying "forgotten" when the server
+    /// said it had nothing to forget would leave the person believing a rule is
+    /// still in force somewhere.
+    func undoDecision(_ address: String, scope: MailSenderScope, then: @escaping (String) -> Void) {
+        guard let token else { then("Sign in again to change this."); return }
+        let sender = Self.senders(from: [address], scope: scope).first
+        guard let sender else {
+            then("That message names no sender to change."); return
+        }
+        screener.busy = true
+        Task { [weak self] in
+            guard let self else { return }
+            do {
+                let r = try await ApiClient.mailScreenerDecisionRemove(
+                    token: token, sender: sender, scope: scope)
+                await MailStore.shared.invalidate(.screener)
+                self.loadScreener()
+                self.screener.busy = false
+                then(r.removed == true
+                     ? "Forgotten — their next message waits in the queue again."
+                     : "No decision was recorded for them, so there was nothing to forget.")
+            } catch {
+                self.screener.busy = false
+                self.screener.error = Self.describe(error)
+                then(Self.describe(error))
+            }
+        }
+    }
+
+    /// The distinct senders a set of message addresses names, at the chosen scope.
+    ///
+    /// A domain is the text after the `@`, and an address with no `@` yields no
+    /// domain — so a malformed sender is dropped rather than decided as a blank
+    /// string, which the store would reject while the receipt said it was saved.
+    static func senders(from addresses: [String], scope: MailSenderScope) -> [String] {
+        var seen = Set<String>()
+        var out: [String] = []
+        for raw in addresses {
+            let address = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !address.isEmpty else { continue }
+            let value: String
+            if scope == .domain {
+                guard let at = address.lastIndex(of: "@"),
+                      address.index(after: at) < address.endIndex else { continue }
+                value = String(address[address.index(after: at)...])
+            } else {
+                value = address
+            }
+            if !value.isEmpty && !seen.contains(value) {
+                seen.insert(value)
+                out.append(value)
+            }
+        }
+        return out
+    }
+
     // ── errors ───────────────────────────────────────────────────────────────
 
     /// Sort keys. Blank stays blank and case folds away: a message whose sender

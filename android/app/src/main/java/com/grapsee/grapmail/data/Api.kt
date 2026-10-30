@@ -843,6 +843,47 @@ object Api {
             .build()
         return read(r) { json.decodeFromString(it) }
     }
+
+    /**
+     * Record a standing decision about one sender: `PUT /screener/decision`.
+     *
+     * This is not a message action and must not be confused with one. The
+     * message actions file what is already in the mailbox; a decision is a rule
+     * the delivery path reads when the NEXT message arrives
+     * (`mail-service/src/routes/screener.ts`), which is why approving a sender
+     * here does not move the message sitting in front of the user — the queue
+     * entry is re-read, not rewritten. The proxy validates nothing on purpose:
+     * mail-service owns the four decisions and the two scopes, and a second
+     * validator would be a second opinion about what is legal that could drift
+     * from the store's own. So the app sends the server's spellings verbatim and
+     * relays its refusal word for word.
+     */
+    suspend fun mailScreenerDecision(
+        token: String, sender: String, scope: MailSenderScope, decision: MailDecision,
+    ): MailScreenerDecisionResponse {
+        val body = MailScreenerDecisionRequest(sender, scope.apiValue, decision.apiValue)
+        val r = authed("$MAIL/screener/decision", token)
+            .method("PUT", postBody(json.encodeToString(MailScreenerDecisionRequest.serializer(), body)))
+            .build()
+        return read(r) { json.decodeFromString(it) }
+    }
+
+    /**
+     * Forget a decision, so the sender is undecided again and their mail returns
+     * to the queue.
+     *
+     * Parameters ride in the query string because that is what the route reads
+     * (`grapmail-screener.ts:127-133`), and the upstream comment says why: a
+     * DELETE with a body is not something every client and proxy carries. A
+     * `removed: false` comes back as a 200 and is NOT a failure — the intent, "no
+     * decision for this sender", holds either way.
+     */
+    suspend fun mailScreenerDecisionRemove(
+        token: String, sender: String, scope: MailSenderScope,
+    ): MailScreenerDecisionResponse {
+        val url = "$MAIL/screener/decision?scope=${enc(scope.apiValue)}&sender=${enc(sender)}"
+        return read(authed(url, token).delete().build()) { json.decodeFromString(it) }
+    }
 }
 
 // ── Mailbox request bodies ───────────────────────────────────────────────────
