@@ -420,6 +420,16 @@ final class ScreenshotWalkUITests: XCTestCase {
             // this screen never draws.
             "mail-labels": "Bills",
             "mail-selection": "Delete",
+            // The four sheets present with an animation. Photographed early the
+            // frame is a dimmed home behind a scrim, which looks like a sheet in
+            // a thumbnail and satisfies a gate that only counts files. Each
+            // marker is the sheet's own title: text that exists only once its
+            // content has drawn. Android waits on the same four strings, so the
+            // two artifacts prove the same thing about the same screens.
+            "mail-move-sheet": "Move to",
+            "mail-delete-sheet": "Delete 3 messages permanently?",
+            "mail-assign-label-sheet": "Label",
+            "mail-snooze-sheet": "Snooze until",
         ]
         for screen in postWriteScreens {
             app.terminate()

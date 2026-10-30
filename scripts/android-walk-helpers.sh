@@ -48,6 +48,20 @@ scroll_to_top() { # fling back to the page start — searches that scrolled
 }
 
 
+# The notification shade is not an activity, so `ensure_foreground` cannot see it
+# and a screenshot taken while it is down shows quick settings over the app — and
+# still passes a gate that only asks whether a file exists. One walk frame named
+# for the move sheet was exactly that: a pull-down from a scroll retry, captured
+# and counted. Collapse it before every frame, and say so when it was in the way.
+collapse_shade() {
+  if adb shell dumpsys statusbar 2>/dev/null | grep -q "mShadeOpen=true\|shadeOpen=true"; then
+    echo "  [shade] notification shade was down — collapsing before the frame"
+    adb shell cmd statusbar collapse >/dev/null 2>&1 || true
+    sleep 1
+  fi
+}
+
+
 # Cold swiftshader boots occasionally ANR system_server; the dialog covers
 # everything. Dismiss with "Wait" whenever present.
 dismiss_anr() {
@@ -69,6 +83,7 @@ ensure_foreground() {
 shot() {
   local i
   dismiss_anr
+  collapse_shade
   ensure_foreground
   for i in 1 2 3; do
     adb exec-out screencap -p > "$OUT/$1.png"

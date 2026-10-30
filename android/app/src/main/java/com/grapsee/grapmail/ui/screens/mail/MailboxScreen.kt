@@ -602,7 +602,13 @@ private fun iconFor(b: MailBox): ImageVector = when (b) {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun MailSheet(onDismiss: () -> Unit, content: @Composable () -> Unit) {
-    val sheetState: SheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
+    // Fully expanded, always. With `skipPartiallyExpanded = false` Material3 opens
+    // the sheet at partial height, and these sheets put their title first — so the
+    // sheet that opens says "Move to" to the person on iOS and opens with its own
+    // heading clipped out of sight on Android. The options are still visible in
+    // both cases, which is exactly why the difference survives a screenshot that
+    // only checks that *something* appeared.
+    val sheetState: SheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
         Column(Modifier.fillMaxWidth().padding(bottom = 24.dp)) { content() }
     }

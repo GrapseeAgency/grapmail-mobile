@@ -243,7 +243,14 @@ must_shot_ime 67-mail-search
 adb shell input keyevent KEYCODE_BACK
 sleep 1
 must "drawer tap" tap_xy "$(wait_nodes "n.get('content-desc','')=='Open folders'" | head -1)"
-must_shot_overlay 62-mail-drawer "n.get('text','')=='Pending approval'"
+# Proof the drawer is open, taken from its pinned footer rather than from a folder
+# row. 'Pending approval' sits in the scrolling half, and with the account actions
+# pinned below it that half is shorter than the list — on a 1080x2400 profile the
+# row is genuinely off-screen, and uiautomator only reports what is visible.
+# iOS can still assert on it because XCUITest resolves elements inside a scroller
+# whether or not they are on screen; the two harnesses see different things, and
+# the marker has to be one both can see.
+must_shot_overlay 62-mail-drawer "n.get('text','')=='Help & Support'"
 
 echo "· security sector — every hub screen, read-only"
 # Mirrors the iOS walk's security leg: open each hub row, photograph the
@@ -410,6 +417,13 @@ for spec in "two-factor-on:40-sec-two-factor-on" \
     # appears on this screen, so the wait would have been on nothing.
     mail-labels) settled="Bills" ;;
     mail-selection) settled="Delete" ;;
+    # The four sheets render inside a ModalBottomSheet, which animates in. Without
+    # a marker the frame can catch the scrim alone — and a scrim is not a sheet.
+    # Each title is text that exists only once that sheet's content has composed.
+    mail-move-sheet) settled="Move to" ;;
+    mail-delete-sheet) settled="Delete 3 messages permanently?" ;;
+    mail-assign-label-sheet) settled="Label" ;;
+    mail-snooze-sheet) settled="Snooze until" ;;
     *) settled="" ;;
   esac
   if [ -n "$settled" ] && [ -z "$(find_nodes "n.get('text','')=='$settled'")" ]; then
@@ -446,7 +460,7 @@ fi
 # taps it there. This is the leg that ends the session, which is why it runs
 # after the restore proof.
 must "drawer for sign-out" tap_xy "$(wait_nodes "n.get('content-desc','')=='Open folders'" | head -1)"
-must "drawer open (sign-out)" wait_overlay "n.get('text','')=='Pending approval'" >/dev/null
+must "drawer open (sign-out)" wait_overlay "n.get('text','')=='Help & Support'" >/dev/null
 # No swipe: Sign out is in the drawer's pinned footer, inside the drawer's own
 # bounds on every screen profile. The walk still waits for the row before
 # tapping it, so if it ever stops being reachable this fails as one line naming
