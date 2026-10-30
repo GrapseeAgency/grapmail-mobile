@@ -242,12 +242,14 @@ struct MailSnapshotView: View {
         "mail-contacts", "mail-contact-detail", "mail-files", "mail-attachment-preview",
     ]
 
-    @ViewBuilder private func derived<V: View>(_ content: V) -> some View {
-        if cached {
-            secondary(content)
-        } else {
-            CenteredState(title: "Preparing snapshot…")
-        }
+    /// `AnyView` on the three helpers that take a caller's view type. Without
+    /// it the switch above has a dozen distinct branch types to resolve in one
+    /// pass, and the compiler reports 'generic parameter R could not be inferred'
+    /// against the Group — the same oversized-body class this repo has been
+    /// bitten by twice. Erasing at the boundary costs nothing here: this is a
+    /// test-only host, not a rendered list.
+    private func derived<V: View>(_ content: V) -> AnyView {
+        cached ? secondary(content) : AnyView(CenteredState(title: "Preparing snapshot…"))
     }
 
     // ── frames ───────────────────────────────────────────────────────────────
@@ -328,7 +330,7 @@ struct MailSnapshotView: View {
         .background(GM.bg)
     }
 
-    private func sheetFrame<V: View>(_ content: V) -> some View {
+    private func sheetFrame<V: View>(_ content: V) -> AnyView {
         VStack(alignment: .leading, spacing: 0) {
             content
             Spacer()
@@ -336,8 +338,9 @@ struct MailSnapshotView: View {
         .background(GM.card)
     }
 
-    private func secondary<V: View>(_ content: V) -> some View {
-        content.frame(maxWidth: .infinity, maxHeight: .infinity).background(GM.bg)
+    private func secondary<V: View>(_ content: V) -> AnyView {
+        AnyView(content.frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(GM.bg))
     }
 
     // ── models seeded for the photograph only ────────────────────────────────

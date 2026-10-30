@@ -21,6 +21,7 @@ import androidx.compose.animation.slideOutHorizontally
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.ui.platform.testTagsAsResourceId
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -121,7 +122,7 @@ class MainActivity : ComponentActivity() {
                         // sentence each screen happened to print — and a copy
                         // change broke the walk. Surfacing them as resource-id
                         // gives every handle a name that copy cannot move.
-                        .testTagsAsResourceId(true),
+                        .semantics { testTagsAsResourceId = true },
                     contentAlignment = Alignment.TopCenter,
                 ) {
                     Box(

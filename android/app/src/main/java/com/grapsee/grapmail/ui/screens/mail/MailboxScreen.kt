@@ -375,7 +375,7 @@ private fun SearchField(query: String, onQuery: (String) -> Unit, onFilter: () -
             onValueChange = onQuery,
             maxLines = 1,
             textStyle = androidx.compose.ui.text.TextStyle(fontSize = 14.sp, color = palette.textPrimary),
-            modifier = Modifier.weight(1f).testTag("mail-search")
+            modifier = Modifier.weight(1f).testTag("mail-search"),
             decorationBox = { inner ->
                 Box {
                     if (query.isEmpty()) {
