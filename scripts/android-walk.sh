@@ -37,6 +37,46 @@ must_tap_low() { # tap the first node with this exact text below MINY px —
   must "tap low '$1'" tap_xy "$pos"
 }
 
+# must_shot <name> <predicate> — photograph a screen only once the screen is
+# proven to be on display.
+#
+# Without this, a failed `wait_nodes` still ran `shot`: the drawer that would not
+# close left the sort sheet and the search field unopenable, and the walk still
+# wrote 69-mail-sort-filter.png and 67-mail-search.png — of the mailbox under a
+# scrim. The PNG gate counts those as present, so a frame of the wrong screen
+# satisfies a gate meant to prove the right one was reached. Presence of a file
+# is not evidence of its content, which is the same lesson the snapshot host
+# learned from eleven fake screenshots. A screen that cannot be proven is not
+# photographed, and the final gate then names the missing PNG.
+must_shot() {
+  local name="$1" pred="$2"
+  if wait_nodes "$pred" >/dev/null; then
+    shot "$name"
+  else
+    echo "FAIL: $name not photographed — the screen was not on display" >&2
+    FAILURES=$((FAILURES + 1))
+  fi
+}
+
+# must_shot_ime <name> — gate on the keyboard instead of on a node.
+#
+# The search field is not a destination: tapping it focuses the field on the home
+# and raises the IME, so there is no new screen for a node predicate to name —
+# and a node cannot prove the home was unobstructed anyway, because the drawer's
+# scrim does not remove the nodes underneath it from the dump. That is exactly
+# how a tap on 'Inbox' hit the box tab below the open drawer. Whether the
+# keyboard came up is the one answer that distinguishes a focus that landed from
+# a tap the scrim swallowed.
+must_shot_ime() {
+  local name="$1" i
+  for i in 1 2 3 4 5 6; do
+    keyboard_shown && { shot "$name"; return 0; }
+    sleep 1
+  done
+  echo "FAIL: $name not photographed — nothing took keyboard focus" >&2
+  FAILURES=$((FAILURES + 1))
+}
+
 echo "── GrapMail emulator walk v3 ──────────────────────────"
 
 adb wait-for-device
@@ -162,44 +202,42 @@ echo "· mailbox — the live home, read-only"
 # CI creates may or may not have a provisioned mailbox; whichever state the app
 # shows is the state that gets photographed, and the frame is named for the
 # screen, not for an outcome the run cannot control.
-must "mailbox home" wait_nodes "n.get('content-desc','')=='Open folders'" >/dev/null
-shot 60-mail-home
-must "drawer tap" tap_xy "$(wait_nodes "n.get('content-desc','')=='Open folders'" | head -1)"
-must "drawer open" wait_nodes "n.get('text','')=='Pending approval'" >/dev/null
-shot 62-mail-drawer
-# Close the drawer by tapping the box already on screen. A system BACK does NOT
-# dismiss a Material3 ModalNavigationDrawer — it pops the home route, and the
-# walk then looked for chrome on a screen the app had already left, which is
-# what the 'sort sheet tap' and search failures were reading.
-must "close drawer (Inbox)" tap_xy "$(wait_nodes "n.get('text','')=='Inbox'" | head -1)"
-sleep 2
+must_shot 60-mail-home "n.get('content-desc','')=='Open folders'"
+# The home's own chrome comes first, while nothing overlays it. The drawer is
+# opened LAST and deliberately left open: the security leg enters through the
+# drawer's own Security row, so no step has to dismiss it.
+#
+# That dismissal was the bug this order removes. A system BACK does not close a
+# Material3 ModalNavigationDrawer — it pops the home route — and tapping a node
+# called 'Inbox' was no better: the box tab underneath the scrim carries the
+# same text, `head -1` took the first node in the dump rather than the one on
+# top, the tap landed on the scrim, and the drawer stayed open. Everything after
+# it then timed out against a covered screen: nineteen failures from one gesture.
 must "sort sheet tap" tap_xy "$(wait_nodes "n.get('content-desc','')=='Sort and filter'" | head -1)"
-must "sort sheet open" wait_nodes "n.get('text','')=='Sort & filter'" >/dev/null
-shot 69-mail-sort-filter
+must_shot 69-mail-sort-filter "n.get('text','')=='Sort & filter'"
 adb shell input keyevent KEYCODE_BACK
 sleep 1
 must "search field" tap_xy "$(wait_nodes "n.get('text','')=='Search emails, people, or files…'" | head -1)"
 sleep 2
-shot 67-mail-search
+must_shot_ime 67-mail-search
 adb shell input keyevent KEYCODE_BACK
 sleep 1
+must "drawer tap" tap_xy "$(wait_nodes "n.get('content-desc','')=='Open folders'" | head -1)"
+must_shot 62-mail-drawer "n.get('text','')=='Pending approval'"
 
 echo "· security sector — every hub screen, read-only"
 # Mirrors the iOS walk's security leg: open each hub row, photograph the
 # screen, press system back. No destructive submits — no password change,
 # no revoke, no sign-out-all — the account must survive the walk.
 # (2FA on a fresh account: the hub's toggle routes into the ENABLE flow.)
-# Account security is a drawer row now — the placeholder home's button is gone.
-# The row sits in the lower group, which scrolls, so the drawer is opened and
-# given one swipe before the tap: on the short profile that group is below the
-# fold, and uiautomator cannot tap a node it cannot see.
-must "drawer for security" tap_xy "$(wait_nodes "n.get('content-desc','')=='Open folders'" | head -1)"
-must "drawer open (security)" wait_nodes "n.get('text','')=='Pending approval'" >/dev/null
-adb shell input swipe 150 900 150 500 400
-sleep 1
+# Account security is a drawer row now — the placeholder home's button is gone,
+# and the drawer is already open from the frame above, so the walk continues in
+# it rather than closing and reopening the same overlay. The row is in the
+# drawer's pinned footer, which is why there is no swipe here any more: the
+# account actions were taken out of the scrolling folder list precisely because
+# on a short screen the last of them fell below the fold, unreachable by thumb.
 must "security row" tap_xy "$(wait_nodes "n.get('text','')=='Security'" | head -1)" 
-must "hub opens" wait_nodes "n.get('text','')=='Account Security'" >/dev/null
-shot 20-sec-hub-light
+must_shot 20-sec-hub-light "n.get('text','')=='Account Security'"
 # hub_present — 0 on the hub, 1 definitely NOT on the hub, 2 could not tell.
 # find_nodes prints nothing both when the node is absent AND when the
 # uiautomator dump failed, and the first security leg read that second case as
@@ -389,9 +427,10 @@ fi
 # after the restore proof.
 must "drawer for sign-out" tap_xy "$(wait_nodes "n.get('content-desc','')=='Open folders'" | head -1)"
 must "drawer open (sign-out)" wait_nodes "n.get('text','')=='Pending approval'" >/dev/null
-# Same reason as the security leg: Sign out is the last row of a scrolling group.
-adb shell input swipe 150 900 150 500 400
-sleep 1
+# No swipe: Sign out is in the drawer's pinned footer, inside the drawer's own
+# bounds on every screen profile. The walk still waits for the row before
+# tapping it, so if it ever stops being reachable this fails as one line naming
+# the row rather than as a timeout on whatever comes next.
 must "sign-out row" wait_nodes "n.get('text','')=='Sign out'" >/dev/null
 must "sign-out tap" tap_xy "$(wait_nodes "n.get('text','')=='Sign out'" | head -1)"
 sleep 2
