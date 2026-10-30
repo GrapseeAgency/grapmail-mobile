@@ -20,8 +20,6 @@ import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.ui.platform.testTagsAsResourceId
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -117,12 +115,6 @@ class MainActivity : ComponentActivity() {
                 val bg = com.grapsee.grapmail.ui.theme.LocalPalette.current.bg
                 Box(
                     Modifier.fillMaxSize().background(bg)
-                        // Compose testTags do not reach a uiautomator dump
-                        // otherwise, so the walk had to anchor on whatever
-                        // sentence each screen happened to print — and a copy
-                        // change broke the walk. Surfacing them as resource-id
-                        // gives every handle a name that copy cannot move.
-                        .semantics { testTagsAsResourceId = true },
                     contentAlignment = Alignment.TopCenter,
                 ) {
                     Box(

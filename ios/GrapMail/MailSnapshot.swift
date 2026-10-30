@@ -137,103 +137,161 @@ struct MailSnapshotView: View {
     }
 
     var body: some View {
-        Group {
-            switch name {
+        frame
+            .task(id: name) {
+                // Re-assert the seeds, then fill the cache. The re-assert is not
+                // redundant: the thread screen's own appear-time ask is still in
+                // flight when this lands, and when it fails it writes an error
+                // state over the seeded conversation — so the content goes back
+                // once more after that arrives. The cache is an actor, so its
+                // writes cannot happen in `init` at all, and the screens that
+                // read it wait on `cached` instead of drawing their empty branch.
+                model.applySnapshotSeeds(name)
+                guard Self.derivedNames.contains(name) else { return }
+                await MailStore.shared.putPage(.inbox, nil, Self.page(), replace: true)
+                await MailStore.shared.putBody(Self.attachmentBody())
+                cached = true
+            }
+            .accessibilityIdentifier("gm-snapshot")
+    }
+
+    /// A plain function with one explicit return per arm, not a ViewBuilder
+    /// switch. Twenty-six heterogeneous branch types inside one builder
+    /// expression is past what the compiler will resolve — it fails with
+    /// 'generic parameter R could not be inferred' against the Group and names
+    /// nothing useful. AnyView at each arm keeps the branches independent.
+    private var frame: AnyView {
+        switch name {
             case "mail-home":
+                return AnyView(
                 listFrame(rows: Self.rows, loading: false, failed: false,
                           noMailbox: false, box: .inbox)
+                )
             case "mail-home-dark":
+                return AnyView(
                 listFrame(rows: Self.rows, loading: false, failed: false,
                           noMailbox: false, box: .inbox)
                     .environment(\.colorScheme, .dark)
+                )
             case "mail-drawer":
+                return AnyView(
                 drawerFrame
+                )
             case "mail-empty":
+                return AnyView(
                 listFrame(rows: [], loading: false, failed: false,
                           noMailbox: false, box: .archive)
+                )
             case "mail-loading":
+                return AnyView(
                 listFrame(rows: [], loading: true, failed: false,
                           noMailbox: false, box: .inbox)
+                )
             case "mail-load-failed":
+                return AnyView(
                 listFrame(rows: [], loading: false, failed: true,
                           noMailbox: false, box: .inbox)
+                )
             case "mail-no-mailbox":
+                return AnyView(
                 listFrame(rows: [], loading: false, failed: false,
                           noMailbox: true, box: .inbox)
+                )
             case "mail-search":
+                return AnyView(
                 searchFrame
+                )
             case "mail-selection":
+                return AnyView(
                 selectionFrame
+                )
             case "mail-sort-filter":
+                return AnyView(
                 sheetFrame(SortFilterSheet(sort: .senderAsc, filter: .unread,
                                            sortedCount: 25, total: 148) { _, _ in })
+                )
             case "mail-move-sheet":
+                return AnyView(
                 sheetFrame(MoveSheet { _ in })
+                )
             case "mail-delete-sheet":
+                return AnyView(
                 sheetFrame(PermanentDeleteSheet(count: 3, cancel: {}, confirm: {}))
+                )
             case "mail-assign-label-sheet":
+                return AnyView(
                 sheetFrame(AssignLabelSheet(labels: Self.labels()) { _ in })
+                )
             case "mail-snooze-sheet":
+                return AnyView(
                 sheetFrame(SnoozeSheet { _ in })
+                )
             case "mail-labels":
+                return AnyView(
                 secondary(LabelsView(vm: model, onBack: {}, onCreate: {}))
+                )
             case "mail-label-create":
+                return AnyView(
                 secondary(LabelCreateView(vm: model, onDone: {}))
+                )
             case "mail-thread":
+                return AnyView(
                 secondary(ThreadView(vm: model, id: "t-m1",
                                      isThread: true, onBack: {}, onReply: { _ in }))
+                )
             case "mail-thread-encrypted":
+                return AnyView(
                 secondary(ThreadView(vm: model, id: "t-m9",
                                      isThread: true, onBack: {}, onReply: { _ in }))
+                )
             case "mail-compose":
+                return AnyView(
                 secondary(ComposeView(vm: model, onBack: {}))
+                )
             case "mail-send-receipt":
+                return AnyView(
                 sheetFrame(VStack(alignment: .leading, spacing: 12) {
                     SendReceiptView(status: "queued",
                                     detail: "Accepted for delivery.", error: nil)
                     SendReceiptView(status: "failed",
                                     detail: nil, error: "Recipient domain not reachable.")
                 })
+                )
             case "mail-contacts":
+                return AnyView(
                 derived(ContactsView(vm: model, onBack: {}, onOpen: { _ in }))
+                )
             case "mail-contact-detail":
+                return AnyView(
                 derived(ContactDetailView(vm: model, address: "amira@northwind.example",
                                          onBack: {}, onWrite: {}))
+                )
             case "mail-files":
+                return AnyView(
                 derived(FilesView(vm: model, onBack: {}, onOpen: { _ in }))
+                )
             case "mail-attachment-preview":
+                return AnyView(
                 derived(AttachmentPreviewView(vm: model, attachmentId: "a1",
                                               onBack: {}))
+                )
             case "mail-settings":
+                return AnyView(
                 secondary(MailSettingsView(vm: model, onBack: {},
                                            onSecurity: {}, onScreener: {}, onLabels: {},
                                            onHelp: {}, onSignOut: {}))
+                )
             case "mail-screener":
+                return AnyView(
                 secondary(ScreenerView(vm: model, onBack: {}, onOpenQueue: {}))
+                )
             default:
+                return AnyView(
                 Text("Unknown mail snapshot: \(name)")
                     .foregroundColor(GM.textSecondary)
                     .accessibilityIdentifier("gm-snapshot-unknown")
-            }
+                )
         }
-        .task(id: name) {
-            // Re-assert the seeds, then fill the cache.
-            //
-            // The re-assert is not redundant: the thread screen's own appear-time
-            // ask is still in flight when this lands, and when it fails it writes
-            // an error state over the seeded conversation. Seeding in `init` puts
-            // the content there for the first render; seeding again here puts it
-            // back after that late failure arrives. The cache is an actor, so its
-            // writes cannot happen in `init` at all — the derived screens gate on
-            // `cached` for exactly that reason.
-            model.applySnapshotSeeds(name)
-            if Self.derivedNames.contains(name) {
-                await MailStore.shared.putPage(.inbox, nil, Self.page(), replace: true)
-                await MailStore.shared.putBody(Self.attachmentBody())
-                cached = true
-            }
-        }
-        .accessibilityIdentifier("gm-snapshot")
     }
 
     /// The names whose screens compute content from the cache rather than from
@@ -331,11 +389,13 @@ struct MailSnapshotView: View {
     }
 
     private func sheetFrame<V: View>(_ content: V) -> AnyView {
-        VStack(alignment: .leading, spacing: 0) {
-            content
-            Spacer()
-        }
-        .background(GM.card)
+        AnyView(
+            VStack(alignment: .leading, spacing: 0) {
+                content
+                Spacer()
+            }
+            .background(GM.card)
+        )
     }
 
     private func secondary<V: View>(_ content: V) -> AnyView {
