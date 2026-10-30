@@ -168,6 +168,21 @@ host, so a broken network layer cannot read as a working mailbox.
   the two mail client surfaces — every `mail*` call name and every decoded DTO
   field — and both workflows run it. Three mismatches were caught by hand while
   this sector was built; a reviewer cannot re-derive them from one file.
+- **The contract is pinned separately from parity.** `scripts/mail-honesty.py`
+  asserts both platforms against the *design*, not against each other — two
+  platforms can agree on the same wrong thing. It pins that a queued send is
+  never drawn as delivered, a message action travels in the URL path where the
+  route reads it, permanent destruction is never one bulk tap away, no remote
+  HTML body is given a renderer, and the drawer offers no box the server cannot
+  read back. Structural source assertions, mirroring the web client's
+  `grapmail-send-status-honesty.test.ts`. Its own gate: three seeded regressions
+  each had to fail the run before the script was trusted to hold anything.
+- **A frame is only taken of a screen that is proven on display.** The walk's
+  `must_shot` waits for the screen before it photographs it, and the search
+  field is proven by the keyboard rather than by a node — a drawer's scrim does
+  not remove what is underneath it from the dump, so a node can be present on a
+  screen you cannot see. Without this, a run that reached no screen at all still
+  filled its PNG gate with pictures of the wrong ones.
 - **The band is 26 frames, `60`–`85`.** The plan called it 25; the list it
   printed runs 60 to 85 inclusive, which is 26. The number in the list is what
   CI enforces, and the discrepancy is recorded rather than quietly closed.

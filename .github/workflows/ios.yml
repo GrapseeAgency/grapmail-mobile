@@ -92,6 +92,28 @@ jobs:
         # the platform's own plumbing and are not compared.
         run: python3 scripts/api-parity.py
 
+      - name: Mailbox honesty pins hold on both platforms
+        # The plan's T1.3: mirror the web client's
+        # grapmail-send-status-honesty.test.ts. Structural source assertions
+        # rather than a mounted UI, because the behaviour lives inside a view
+        # closure and the cost of mounting is an emulator per platform plus a
+        # macOS runner for one of them — while the thing at risk is a word on a
+        # screen.
+        #
+        # What it holds: the send receipt keeps `queued` distinct from `sent`
+        # (collapsing them tells a sender external mail is delivered when the
+        # relay has not tried yet); a message action travels in the URL path,
+        # where the route reads it; permanent destruction is never one bulk tap
+        # away; no remote HTML body gets a renderer; and the drawer offers no box
+        # the server cannot read back.
+        #
+        # Deliberately different from the parity step above: that compares the
+        # two platforms against each other, and two platforms can agree on the
+        # same wrong thing. This compares both against the contract. Verified to
+        # bite — three seeded regressions (a collapsed receipt, a Snoozed drawer
+        # row, a permanent delete inside the bulk path) each failed the run.
+        run: python3 scripts/mail-honesty.py --quiet
+
       - name: Mailbox screen set matches Android
         # The band is defined once, in the walk scripts. If either side renames,
         # drops or invents a mail screen, "the same screens on both platforms"
