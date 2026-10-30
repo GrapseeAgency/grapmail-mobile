@@ -294,29 +294,33 @@ struct MailGreeting: View {
 
 /// A pill in the label strip. Selected pills take the label's own colour, which
 /// is why the server stores it rather than the client picking one.
+///
+/// Not a control, and deliberately so — the same rule Android applies in
+/// `Mail.kt`. A label cannot filter this list: the rows the listing returns
+/// carry no label field (`MailMessage`), and the route takes no label query
+/// beyond `box`, `q`, `page`, `pageSize`. Drawing a chip that asks to be tapped
+/// and then doing nothing is the failure this sector was told not to ship, so
+/// the chip reports what is real — the name and the unread count — and takes no
+/// tap.
 struct LabelChip: View {
     let label: String
     let count: Int?
     let color: Color
     let selected: Bool
-    let onClick: () -> Void
 
     var body: some View {
-        Button(action: onClick) {
-            HStack(spacing: 7) {
-                Circle().fill(color).frame(width: 8, height: 8)
-                Text(label).font(.system(size: 13, weight: .medium))
-                    .foregroundColor(selected ? color : GM.textPrimary)
-                    .lineLimit(1)
-                if let count {
-                    Text("\(count)").font(.system(size: 12)).foregroundColor(GM.textSecondary)
-                }
+        HStack(spacing: 7) {
+            Circle().fill(color).frame(width: 8, height: 8)
+            Text(label).font(.system(size: 13, weight: .medium))
+                .foregroundColor(selected ? color : GM.textPrimary)
+                .lineLimit(1)
+            if let count {
+                Text("\(count)").font(.system(size: 12)).foregroundColor(GM.textSecondary)
             }
-            .padding(.horizontal, 12).padding(.vertical, 7)
-            .background(Capsule().fill(selected ? color.opacity(0.16) : GM.softFill))
-            .overlay(Capsule().strokeBorder(selected ? color : Color.clear, lineWidth: 1))
         }
-        .buttonStyle(.plain)
+        .padding(.horizontal, 12).padding(.vertical, 7)
+        .background(Capsule().fill(selected ? color.opacity(0.16) : GM.softFill))
+        .overlay(Capsule().strokeBorder(selected ? color : Color.clear, lineWidth: 1))
     }
 }
 

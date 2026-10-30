@@ -180,11 +180,11 @@ struct LabelStrip: View {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {
                     LabelChip(label: "Inbox", count: unread, color: GM.primarySolid,
-                              selected: true, onClick: {})
+                              selected: true)
                     ForEach(labels) { l in
                         LabelChip(label: l.name, count: l.unread,
                                   color: l.color?.hexColor ?? GM.textSecondary,
-                                  selected: false, onClick: {})
+                                  selected: false)
                     }
                 }
                 .padding(.vertical, 2)
@@ -205,7 +205,7 @@ struct MailBottomBar: View {
 
     var body: some View {
         HStack {
-            tabItem(icon: "tray.full", label: "Mail", active: true, badge: unread, onClick: {})
+            tabItem(icon: "tray.full", label: "Mail", active: true, badge: unread)
             tabItem(icon: "person.2", label: "Contacts", active: false, onClick: onContacts)
             tabItem(icon: "folder", label: "Files", active: false, onClick: onFiles)
             tabItem(icon: "ellipsis", label: "More", active: false, onClick: onMore)
@@ -217,28 +217,39 @@ struct MailBottomBar: View {
         .accessibilityIdentifier("mail-tabs")
     }
 
+    /// One tab in the bar.
+    ///
+    /// `onClick` is optional, and the tab naming the screen you are already on
+    /// passes nothing. A Button whose action does nothing is a control that goes
+    /// nowhere — the rule this sector exists to keep, and the reason the label
+    /// strip is not tappable either. The identifier is applied in both branches so
+    /// the walk's `mail-tab-<label>` handle does not depend on which one renders.
     @ViewBuilder private func tabItem(
-        icon: String, label: String, active: Bool, badge: Int? = nil, onClick: @escaping () -> Void,
+        icon: String, label: String, active: Bool, badge: Int? = nil,
+        onClick: (() -> Void)? = nil,
     ) -> some View {
-        Button(action: onClick) {
-            VStack(spacing: 3) {
-                ZStack(alignment: .topTrailing) {
-                    Image(systemName: icon)
-                        .font(.system(size: 19))
-                        .foregroundColor(active ? GM.primarySolid : GM.textTertiary)
-                    if let badge, badge > 0 {
-                        Circle().fill(GM.error).frame(width: 8, height: 8)
-                            .offset(x: 4, y: -2)
-                    }
-                }
-                Text(label)
-                    .font(.system(size: 11, weight: active ? .medium : .regular))
+        let visual = VStack(spacing: 3) {
+            ZStack(alignment: .topTrailing) {
+                Image(systemName: icon)
+                    .font(.system(size: 19))
                     .foregroundColor(active ? GM.primarySolid : GM.textTertiary)
+                if let badge, badge > 0 {
+                    Circle().fill(GM.error).frame(width: 8, height: 8)
+                        .offset(x: 4, y: -2)
+                }
             }
-            .frame(maxWidth: .infinity)
-            .contentShape(Rectangle())
+            Text(label)
+                .font(.system(size: 11, weight: active ? .medium : .regular))
+                .foregroundColor(active ? GM.primarySolid : GM.textTertiary)
         }
-        .buttonStyle(.plain)
+        .frame(maxWidth: .infinity)
+        .contentShape(Rectangle())
+
+        if let onClick {
+            Button(action: onClick) { visual }.buttonStyle(.plain)
+        } else {
+            visual
+        }
         .accessibilityIdentifier("mail-tab-\(label)")
     }
 }

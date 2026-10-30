@@ -374,15 +374,25 @@ fun MailGreeting(name: String?, address: String?, modifier: Modifier = Modifier)
     }
 }
 
-/** A pill in the label strip. Selected pills take the label's own colour, which
- *  is why the server stores it rather than the client picking one. */
+/**
+ * A pill in the label strip. Selected pills take the label's own colour, which
+ * is why the server stores it rather than the client picking one.
+ *
+ * Not a control, and deliberately so. A label cannot filter this list: the
+ * message rows the listing returns carry no label field (`MailMessageDto`), and
+ * the route takes no label query — only `box`, `q`, `page`, `pageSize`. The
+ * assignments exist server-side (`grapmail-labels.ts`) but are only readable
+ * per-label, not per-row, so there is nothing to filter with on the device.
+ * Until then a tappable chip would be an affordance that goes nowhere, which is
+ * the one thing this sector was told not to ship; so it reports the count, which
+ * is real, and asks for no tap.
+ */
 @Composable
 fun LabelChip(
     label: String,
     count: Int?,
     colorHex: String?,
     selected: Boolean,
-    onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val palette = LocalPalette.current
@@ -392,7 +402,6 @@ fun LabelChip(
             .clip(RoundedCornerShape(50))
             .background(if (selected) tint.copy(alpha = 0.16f) else palette.softFill)
             .border(1.dp, if (selected) tint else Color.Transparent, RoundedCornerShape(50))
-            .clickable(onClick = onClick)
             .padding(horizontal = 12.dp, vertical = 7.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {

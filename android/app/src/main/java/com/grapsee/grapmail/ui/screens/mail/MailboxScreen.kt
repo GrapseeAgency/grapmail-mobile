@@ -207,7 +207,7 @@ fun MailboxScreen(
                         LabelStrip(state)
                         Spacer(Modifier.height(6.dp))
                     }
-                    BoxTabRow(state)
+                    BoxTabRow(state, onSelect = { vm.open(it) })
                 }
 
                 // A refresh that failed over a populated list says so here rather
@@ -273,7 +273,7 @@ fun MailboxScreen(
                 }
 
                 MailBottomBar(selected = 0, unread = state.unreadCount,
-                    onMail = { }, onContacts = onContacts, onFiles = onFiles,
+                    onContacts = onContacts, onFiles = onFiles,
                     onMore = { scope.launch { drawer.open() } })
             }
 
@@ -400,22 +400,32 @@ private fun LabelStrip(s: MailboxViewModel.MailboxUiState) {
     val palette = LocalPalette.current
     LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
         item {
-            LabelChip("Inbox", s.unreadCount, null, s.query.isEmpty() && s.filter == MailFilter.All,
-                onClick = { })
+            LabelChip("Inbox", s.unreadCount, null, s.query.isEmpty() && s.filter == MailFilter.All)
         }
         items(s.labels) { l ->
-            LabelChip(l.name, l.unread, l.color, false, onClick = { })
+            LabelChip(l.name, l.unread, l.color, false)
         }
     }
 }
 
+/**
+ * The box tabs. Tappable, and they go to the same place the drawer rows do.
+ *
+ * These were inert once — the row drew the active underline and the drawer's
+ * counts, so it read as the box switcher the reference shows, and a tap did
+ * nothing. A control that only looks like a control is worse than no control:
+ * the drawer works, so a person concludes the tab row is broken rather than
+ * decorative. It now opens the box through the same `vm.open`, which means the
+ * same fetch policy (a box already read is not re-read) and the same
+ * selection-clearing as the drawer path.
+ */
 @Composable
-private fun BoxTabRow(s: MailboxViewModel.MailboxUiState) {
+private fun BoxTabRow(s: MailboxViewModel.MailboxUiState, onSelect: (MailBox) -> Unit) {
     val counts = drawerCounts(s)
     Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp).testTag("mail-box-tabs"),
         horizontalArrangement = Arrangement.spacedBy(2.dp)) {
         MailBox.tabOrder.forEach { box ->
-            BoxTab(box.title, counts[box], box == s.box, onClick = { })
+            BoxTab(box.title, counts[box], box == s.box, onClick = { onSelect(box) })
         }
     }
 }
@@ -429,7 +439,6 @@ private fun BoxTabRow(s: MailboxViewModel.MailboxUiState) {
 private fun MailBottomBar(
     selected: Int,
     unread: Int?,
-    onMail: () -> Unit,
     onContacts: () -> Unit,
     onFiles: () -> Unit,
     onMore: () -> Unit,
@@ -440,7 +449,8 @@ private fun MailBottomBar(
             .padding(vertical = 8.dp).testTag("mail-tabs"),
         horizontalArrangement = Arrangement.SpaceAround,
     ) {
-        TabItem(Icons.Rounded.Inbox, "Mail", selected == 0, unread) { onMail() }
+        // No handler for Mail: it is the screen this bar is standing on.
+        TabItem(Icons.Rounded.Inbox, "Mail", selected == 0, unread)
         TabItem(Icons.Rounded.Contacts, "Contacts", selected == 1) { onContacts() }
         TabItem(Icons.Rounded.Description, "Files", selected == 2) { onFiles() }
         TabItem(Icons.Rounded.MoreHoriz, "More", selected == 3) { onMore() }
@@ -448,10 +458,17 @@ private fun MailBottomBar(
 }
 
 @Composable
-private fun TabItem(icon: ImageVector, label: String, active: Boolean, badge: Int? = null, onClick: () -> Unit) {
+private fun TabItem(icon: ImageVector, label: String, active: Boolean, badge: Int? = null,
+                    onClick: (() -> Unit)? = null) {
     val palette = LocalPalette.current
     Column(
-        Modifier.clickable(onClick = onClick).padding(horizontal = 14.dp, vertical = 4.dp),
+        // A tab that names the screen you are already on is not a destination, so
+        // it takes no click and no `clickable` at all — no ripple, no accessibility
+        // action, nothing for a tap to fall through to. A Button wired to an empty
+        // lambda is precisely the control-that-goes-nowhere this sector was told
+        // not to ship, and it is invisible to a screenshot: the frame looks right.
+        Modifier.then(if (onClick == null) Modifier else Modifier.clickable(onClick = onClick))
+            .padding(horizontal = 14.dp, vertical = 4.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Box(contentAlignment = Alignment.TopEnd) {
