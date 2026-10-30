@@ -535,8 +535,14 @@ internal fun MailDrawer(
         DrawerRow("Manage labels", Icons.Rounded.Label, null, selected = false) { onLabels() }
         }
 
-        Spacer(Modifier.weight(1f))
-
+        // No spacer here. This one carried `weight(1f)` from the layout that
+        // preceded the scrollable list, when its job was to push the account rows
+        // to the bottom. The folder list now claims `weight(1f)` too, so the two
+        // split the drawer and the list got half the room it asked for: Spam, Trash,
+        // All, the queue row and Manage labels all fell below a fold that gave no
+        // sign it scrolled, and Trash is where the permanent-delete flow lives.
+        // The scroller already takes the leftover height, so the footer sits at the
+        // bottom on its own — which is what iOS's structure does.
         Box(Modifier.fillMaxWidth().padding(horizontal = 16.dp).height(1.dp)
             .background(palette.border))
         DrawerRow("Settings", Icons.Rounded.Settings, null, selected = false) { onSettings() }
