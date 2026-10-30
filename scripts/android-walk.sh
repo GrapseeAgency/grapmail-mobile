@@ -197,6 +197,13 @@ must_tap "Go to Mailbox"
 sleep 3
 
 echo "· mailbox — the live home, read-only"
+# Three affordances are deliberately absent from this leg, and the reason is each
+# one's own: Send writes real mail to a real address and cannot be taken back;
+# permanent delete (`DELETE /message/:id`) is the one call with no undo, unlike
+# trash; Report spam feeds the suppression list that would stop future CI mail
+# reaching the account the next run signs up. Star and archive are reversible and
+# would be fair game, but a fresh CI mailbox has no message to act on, so the
+# populated states are photographed through the snapshot host instead.
 # The signed-in home IS the mailbox now, so the walk's anchors are the mail
 # chrome rather than the words the placeholder screen used to print. The account
 # CI creates may or may not have a provisioned mailbox; whichever state the app
