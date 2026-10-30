@@ -12,6 +12,8 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.testTagsAsResourceId
 import androidx.compose.ui.unit.dp
 import androidx.activity.ComponentActivity
 import androidx.compose.animation.fadeIn
@@ -116,7 +118,22 @@ class MainActivity : ComponentActivity() {
                 // SignInScreen.imePadding) so it is never counted twice.
                 val bg = com.grapsee.grapmail.ui.theme.LocalPalette.current.bg
                 Box(
-                    Modifier.fillMaxSize().background(bg),
+                    Modifier.fillMaxSize().background(bg)
+                        // Every `testTag` in the app is invisible to a uiautomator
+                        // dump unless this is set. It surfaces each one as the node's
+                        // resource-id, which is what `uiautomator dump` reports and
+                        // therefore what the CI walk can query. Without it the walk
+                        // has to anchor on whatever sentence a screen happens to
+                        // print, so a copy change breaks the walk for a reason that
+                        // has nothing to do with the app being wrong — which is
+                        // exactly what happened six times over when the placeholder
+                        // home's "Signed in" was replaced.
+                        //
+                        // The property is in `androidx.compose.ui.semantics`. It is
+                        // NOT in `ui.platform`; importing it from there fails to
+                        // resolve, and reading that as "this Compose version does
+                        // not have it" cost a whole attempt to migrate the anchors.
+                        .semantics { testTagsAsResourceId = true },
                     contentAlignment = Alignment.TopCenter,
                 ) {
                     Box(

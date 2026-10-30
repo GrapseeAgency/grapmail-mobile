@@ -222,7 +222,7 @@ echo "· mailbox — the live home, read-only"
 # CI creates may or may not have a provisioned mailbox; whichever state the app
 # shows is the state that gets photographed, and the frame is named for the
 # screen, not for an outcome the run cannot control.
-must_shot 60-mail-home "n.get('content-desc','')=='Open folders'"
+must_shot 60-mail-home "n.get('resource-id','').rsplit('/',1)[-1]=='mail-menu'"
 # The home's own chrome comes first, while nothing overlays it. The drawer is
 # opened LAST and deliberately left open: the security leg enters through the
 # drawer's own Security row, so no step has to dismiss it.
@@ -234,15 +234,15 @@ must_shot 60-mail-home "n.get('content-desc','')=='Open folders'"
 # top, the tap landed on the scrim, and the drawer stayed open. Everything after
 # it then timed out against a covered screen: nineteen failures from one gesture.
 must "sort sheet tap" tap_xy "$(wait_nodes "n.get('content-desc','')=='Sort and filter'" | head -1)"
-must_shot_overlay 69-mail-sort-filter "n.get('text','')=='Sort & filter'"
+must_shot_overlay 69-mail-sort-filter "n.get('resource-id','').rsplit('/',1)[-1]=='gm-sheets-sort'"
 adb shell input keyevent KEYCODE_BACK
 sleep 1
-must "search field" tap_xy "$(wait_nodes "n.get('text','')=='Search emails, people, or files…'" | head -1)"
+must "search field" tap_xy "$(wait_nodes "n.get('resource-id','').rsplit('/',1)[-1]=='mail-search'" | head -1)"
 sleep 2
 must_shot_ime 67-mail-search
 adb shell input keyevent KEYCODE_BACK
 sleep 1
-must "drawer tap" tap_xy "$(wait_nodes "n.get('content-desc','')=='Open folders'" | head -1)"
+must "drawer tap" tap_xy "$(wait_nodes "n.get('resource-id','').rsplit('/',1)[-1]=='mail-menu'" | head -1)"
 # Proof the drawer is open, taken from its pinned footer rather than from a folder
 # row. 'Pending approval' sits in the scrolling half, and with the account actions
 # pinned below it that half is shorter than the list — on a 1080x2400 profile the
@@ -250,7 +250,7 @@ must "drawer tap" tap_xy "$(wait_nodes "n.get('content-desc','')=='Open folders'
 # iOS can still assert on it because XCUITest resolves elements inside a scroller
 # whether or not they are on screen; the two harnesses see different things, and
 # the marker has to be one both can see.
-must_shot_overlay 62-mail-drawer "n.get('text','')=='Help & Support'"
+must_shot_overlay 62-mail-drawer "n.get('resource-id','').rsplit('/',1)[-1]=='mail-drawer-Help & Support'"
 
 echo "· security sector — every hub screen, read-only"
 # Mirrors the iOS walk's security leg: open each hub row, photograph the
@@ -263,7 +263,7 @@ echo "· security sector — every hub screen, read-only"
 # drawer's pinned footer, which is why there is no swipe here any more: the
 # account actions were taken out of the scrolling folder list precisely because
 # on a short screen the last of them fell below the fold, unreachable by thumb.
-must "security row" tap_xy "$(wait_overlay "n.get('text','')=='Security'" | head -1)" 
+must "security row" tap_xy "$(wait_overlay "n.get('resource-id','').rsplit('/',1)[-1]=='mail-drawer-Security'" | head -1)" 
 must_shot 20-sec-hub-light "n.get('text','')=='Account Security'"
 # hub_present — 0 on the hub, 1 definitely NOT on the hub, 2 could not tell.
 # find_nodes prints nothing both when the node is absent AND when the
@@ -309,7 +309,7 @@ open_2fa_flow() {
   local attempt pos
   for attempt in 1 2 3; do
     pos="$(find_nodes "n.get('content-desc','')=='two-step switch'" | head -1)"
-    [ -n "$pos" ] || pos="$(find_nodes "n.get('resource-id','')=='sec-2fa-switch'" | head -1)"
+    [ -n "$pos" ] || pos="$(find_nodes "n.get('resource-id','').rsplit('/',1)[-1]=='sec-2fa-switch'" | head -1)"
     [ -n "$pos" ] || pos="$(find_nodes "n.get('checkable','')=='true'" | head -1)"
     [ -n "$pos" ] && tap_xy "$pos"
     sleep 2
@@ -342,7 +342,7 @@ must "hub after gate leg" wait_nodes "n.get('text','')=='Account Security'" >/de
 # back out of the hub to the signed-in home, where the restore leg starts
 must "hub back tap" tap_xy "$(wait_nodes "n.get('content-desc','')=='Back'" | head -1)"
 sleep 2
-must "home after security" wait_nodes "n.get('content-desc','')=='Open folders'" >/dev/null
+must "home after security" wait_nodes "n.get('resource-id','').rsplit('/',1)[-1]=='mail-menu'" >/dev/null
 
 echo "· post-write confirmations — via the app's test-only snapshot hook"
 # These screens exist only AFTER a write the walk must not perform: signing out
@@ -420,15 +420,20 @@ for spec in "two-factor-on:40-sec-two-factor-on" \
     # The four sheets render inside a ModalBottomSheet, which animates in. Without
     # a marker the frame can catch the scrim alone — and a scrim is not a sheet.
     # Each title is text that exists only once that sheet's content has composed.
-    mail-move-sheet) settled="Move to" ;;
-    mail-delete-sheet) settled="Delete 3 messages permanently?" ;;
-    mail-assign-label-sheet) settled="Label" ;;
-    mail-snooze-sheet) settled="Snooze until" ;;
+    mail-move-sheet) settled="gm-sheets-move" ;;
+    mail-delete-sheet) settled="gm-sheets-permanent" ;;
+    mail-assign-label-sheet) settled="gm-sheets-label" ;;
+    mail-snooze-sheet) settled="gm-sheets-snooze" ;;
     *) settled="" ;;
   esac
-  if [ -n "$settled" ] && [ -z "$(find_nodes "n.get('text','')=='$settled'")" ]; then
+  # A marker may name a visible string OR a resource-id. Text is right for
+  # content that exists only once data has landed (a seeded label's NAME); an
+  # identifier is right for a screen's own identity, which copy must not be able
+  # to break. Accepting both keeps one mechanism instead of two divergent ones.
+  marker() { find_nodes "n.get('text','')=='$1' or n.get('resource-id','').rsplit('/',1)[-1]=='$1'" | head -1; }
+  if [ -n "$settled" ] && [ -z "$(marker "$settled")" ]; then
     sleep 4   # one retry: the fetch may still be in flight
-    if [ -z "$(find_nodes "n.get('text','')=='$settled'")" ]; then
+    if [ -z "$(marker "$settled")" ]; then
       echo "FAIL: snapshot '$nm' never finished loading" >&2; FAILURES=$((FAILURES + 1))
     fi
   fi
@@ -450,7 +455,7 @@ adb shell am start -W -n "$PKG/.MainActivity" >/dev/null
 sleep 6
 shot 10-session-restored
 # assert, don't tap: the home screen must show the signed-in state
-if wait_nodes "n.get('content-desc','')=='Open folders'" >/dev/null; then
+if wait_nodes "n.get('resource-id','').rsplit('/',1)[-1]=='mail-menu'" >/dev/null; then
   echo "  ✓ session restored (the mailbox is the signed-in home)"
 else
   echo "FAIL: restart did not open signed-in" >&2
@@ -459,14 +464,14 @@ fi
 # Sign out lives in the mailbox drawer now, so the walk opens the drawer and
 # taps it there. This is the leg that ends the session, which is why it runs
 # after the restore proof.
-must "drawer for sign-out" tap_xy "$(wait_nodes "n.get('content-desc','')=='Open folders'" | head -1)"
-must "drawer open (sign-out)" wait_overlay "n.get('text','')=='Help & Support'" >/dev/null
+must "drawer for sign-out" tap_xy "$(wait_nodes "n.get('resource-id','').rsplit('/',1)[-1]=='mail-menu'" | head -1)"
+must "drawer open (sign-out)" wait_overlay "n.get('resource-id','').rsplit('/',1)[-1]=='mail-drawer-Help & Support'" >/dev/null
 # No swipe: Sign out is in the drawer's pinned footer, inside the drawer's own
 # bounds on every screen profile. The walk still waits for the row before
 # tapping it, so if it ever stops being reachable this fails as one line naming
 # the row rather than as a timeout on whatever comes next.
-must "sign-out row" wait_overlay "n.get('text','')=='Sign out'" >/dev/null
-must "sign-out tap" tap_xy "$(wait_overlay "n.get('text','')=='Sign out'" | head -1)"
+must "sign-out row" wait_overlay "n.get('resource-id','').rsplit('/',1)[-1]=='sign-out'" >/dev/null
+must "sign-out tap" tap_xy "$(wait_overlay "n.get('resource-id','').rsplit('/',1)[-1]=='sign-out'" | head -1)"
 sleep 2
 
 echo "· sign-in screen"

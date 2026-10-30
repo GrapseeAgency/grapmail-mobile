@@ -658,11 +658,21 @@ internal fun MailSheet(onDismiss: () -> Unit, content: @Composable () -> Unit) {
     }
 }
 
+/**
+ * A sheet's heading.
+ *
+ * `tag` is the sheet's identity, and it is a parameter rather than something
+ * derived from `text` on purpose: the whole point of the walk anchoring on an
+ * identifier is that re-wording a heading is a copy change and not a test
+ * failure. Deriving the tag from the title would rebuild the exact coupling this
+ * removes. The values match iOS's `gm-sheets-*` identifiers, so the two walks
+ * prove the same thing about the same six sheets.
+ */
 @Composable
-private fun SheetTitle(text: String) {
+private fun SheetTitle(text: String, tag: String) {
     val palette = LocalPalette.current
     Text(text, fontSize = 17.sp, fontWeight = FontWeight.SemiBold, color = palette.textPrimary,
-        modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp))
+        modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp).testTag(tag))
 }
 
 /**
@@ -680,7 +690,7 @@ internal fun SortFilterContent(
     onPick: (MailSort, MailFilter) -> Unit,
 ) {
     val palette = LocalPalette.current
-    SheetTitle("Sort & filter")
+    SheetTitle("Sort & filter", "gm-sheets-sort")
     Text("Sort by", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = palette.textTertiary,
         modifier = Modifier.padding(horizontal = 20.dp, vertical = 6.dp))
     MailSort.entries.forEach { s ->
@@ -708,7 +718,7 @@ internal fun SortFilterContent(
  */
 @Composable
 internal fun MoveContent(onPick: (com.grapsee.grapmail.data.MailAction) -> Unit) {
-    SheetTitle("Move to")
+    SheetTitle("Move to", "gm-sheets-move")
     val palette = LocalPalette.current
     SheetOption("Archive", false) { onPick(com.grapsee.grapmail.data.MailAction.Archive) }
     SheetOption("Trash", false) { onPick(com.grapsee.grapmail.data.MailAction.Trash) }
@@ -727,7 +737,7 @@ internal fun AssignLabelContent(
     onPick: (String) -> Unit,
 ) {
     val palette = LocalPalette.current
-    SheetTitle("Label")
+    SheetTitle("Label", "gm-sheets-label")
     if (labels.isEmpty()) {
         Text("No labels yet. Create one from the drawer.", fontSize = 13.sp,
             color = palette.textSecondary, modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp))
@@ -761,7 +771,7 @@ internal fun SenderDecisionContent(
     val palette = LocalPalette.current
     var scope by remember { mutableStateOf(com.grapsee.grapmail.data.MailSenderScope.Address) }
 
-    SheetTitle("Decide the sender")
+    SheetTitle("Decide the sender", "gm-sheets-sender")
     Text(
         if (senders.size == 1) "Sender: ${senders[0]}"
         else "${senders.size} senders in the selected messages",
@@ -813,7 +823,7 @@ internal fun SenderDecisionContent(
 @Composable
 internal fun SnoozeContent(onPick: (String) -> Unit) {
     val palette = LocalPalette.current
-    SheetTitle("Snooze until")
+    SheetTitle("Snooze until", "gm-sheets-snooze")
     val options = listOf(
         "This evening" to 4,
         "Tomorrow morning" to 16,
@@ -837,7 +847,8 @@ internal fun SnoozeContent(onPick: (String) -> Unit) {
 @Composable
 internal fun PermanentDeleteContent(count: Int, cancel: () -> Unit, confirm: () -> Unit) {
     val palette = LocalPalette.current
-    SheetTitle(if (count == 1) "Delete this message permanently?" else "Delete $count messages permanently?")
+    SheetTitle(if (count == 1) "Delete this message permanently?" else "Delete $count messages permanently?",
+        "gm-sheets-permanent")
     Text(
         "This cannot be undone. Messages in Trash can be restored instead — " +
             "this removes them for good, and only works from Trash.",
