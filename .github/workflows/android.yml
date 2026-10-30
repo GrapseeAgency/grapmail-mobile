@@ -15,7 +15,14 @@ jobs:
     # each with its own settle wait, on three devices at once. The previous run
     # was cut at 1h0m by this ceiling with its walk still going — a timeout set
     # for a smaller walk is not evidence that the walk is slow.
-    timeout-minutes: 90
+    #
+    # 90 then proved the same thing one level up: a runner whose launcher ANRs
+    # repeatedly spends real time in recovery (each dismissal is a tap, a 3s wait
+    # and a fresh dump), which is the walk working correctly on a bad machine
+    # rather than a defect. Two of three devices finished inside 90; the third was
+    # cut at 90m09s mid-recovery. The ceiling now has headroom over the worst
+    # observed clean run instead of matching it.
+    timeout-minutes: 120
     strategy:
       fail-fast: false
       matrix:

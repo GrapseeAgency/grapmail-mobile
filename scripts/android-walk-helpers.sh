@@ -171,14 +171,25 @@ wait_nodes() { # wait_nodes <filter> [count] → prints first match.
                # A missed node may simply be below the fold on a small screen:
                # every third attempt scrolls the page down once (harmless
                # overscroll when the content already fits).
-  local want="${2:-1}" pos="" n=0
+  local want="${2:-1}" pos="" n=0 anrs=0
   for _ in $(seq 1 25); do
     pos="$(find_nodes "$1" | head -"$want" | tail -1)"
     [ -n "$pos" ] && { echo "$pos"; return 0; }
     # A system dialog over the app makes every predicate false at once; dismiss it,
     # bring our own activity back to the front, and keep waiting rather than
     # failing the run for something the OS caused.
-    if anr_in_view; then dismiss_anr; ensure_foreground; continue; fi
+    #
+    # Bounded, though. Recovery is not free — a tap, a 3s wait and a fresh dump —
+    # and `continue` skips the scroll that would otherwise advance the search, so on
+    # a launcher that ANRs every few seconds an unbounded loop spends the whole
+    # job budget here and gets cut off by the timeout. Six recoveries is generous
+    # for a transient dialog; past that the walk reports the miss it would have
+    # reported anyway, and says so.
+    if anr_in_view; then
+      anrs=$((anrs + 1))
+      if [ "$anrs" -le 6 ]; then dismiss_anr; ensure_foreground; continue; fi
+      echo "  [anr] system dialog persisting through 6 recoveries — searching on" >&2
+    fi
     n=$((n + 1))
     # scroll down while searching; once pinned at the bottom, rewind to the
     # top so the next sweep re-scans from the start
