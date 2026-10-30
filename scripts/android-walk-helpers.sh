@@ -61,6 +61,19 @@ collapse_shade() {
   fi
 }
 
+# anr_in_view <dump-file> — is a system "isn't responding" dialog on screen?
+#
+# Reads the dump `find_nodes` has already written, so this costs no extra
+# capture. `dismiss_anr` used to run only inside `shot()`, which means a dialog
+# that appeared *between* two screenshots was never seen by the code doing the
+# waiting: one run spent eighty minutes failing every single assertion from
+# 'Create Account' onward while a "Pixel Launcher isn't responding" dialog covered
+# the screen, and every dump it saved proved the dialog was there. A wait loop is
+# the only place that can notice and recover.
+anr_in_view() {
+  [ -f "${1:-$OUT/.ui.xml}" ] && grep -q "isn't responding" "$1"
+}
+
 
 # Cold swiftshader boots occasionally ANR system_server; the dialog covers
 # everything. Dismiss with "Wait" whenever present.
@@ -148,6 +161,9 @@ wait_nodes() { # wait_nodes <filter> [count] → prints first match.
   for _ in $(seq 1 25); do
     pos="$(find_nodes "$1" | head -"$want" | tail -1)"
     [ -n "$pos" ] && { echo "$pos"; return 0; }
+    # A system dialog over the app makes every predicate false at once; dismiss it
+    # and keep waiting rather than failing the run for something the OS caused.
+    if anr_in_view; then dismiss_anr; continue; fi
     n=$((n + 1))
     # scroll down while searching; once pinned at the bottom, rewind to the
     # top so the next sweep re-scans from the start
@@ -177,6 +193,7 @@ wait_overlay() {
   for _ in $(seq 1 20); do
     pos="$(find_nodes "$1" | head -"$want" | tail -1)"
     [ -n "$pos" ] && { echo "$pos"; return 0; }
+    anr_in_view && dismiss_anr
     sleep 1
   done
   echo "TIMEOUT (overlay): $1" >&2
