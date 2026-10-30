@@ -10,7 +10,12 @@ jobs:
   build-test-screenshot:
     name: Build, live-test & screenshot (${{ matrix.device }})
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    # 60 was right until the mailbox band landed: the walk now relaunches the app
+    # once per snapshot screen, 15 security confirmations plus 21 mail screens,
+    # each with its own settle wait, on three devices at once. The previous run
+    # was cut at 1h0m by this ceiling with its walk still going — a timeout set
+    # for a smaller walk is not evidence that the walk is slow.
+    timeout-minutes: 90
     strategy:
       fail-fast: false
       matrix:
