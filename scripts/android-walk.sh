@@ -167,8 +167,12 @@ shot 60-mail-home
 must "drawer tap" tap_xy "$(wait_nodes "n.get('content-desc','')=='Open folders'" | head -1)"
 must "drawer open" wait_nodes "n.get('text','')=='Pending approval'" >/dev/null
 shot 62-mail-drawer
-adb shell input keyevent KEYCODE_BACK
-sleep 1
+# Close the drawer by tapping the box already on screen. A system BACK does NOT
+# dismiss a Material3 ModalNavigationDrawer — it pops the home route, and the
+# walk then looked for chrome on a screen the app had already left, which is
+# what the 'sort sheet tap' and search failures were reading.
+must "close drawer (Inbox)" tap_xy "$(wait_nodes "n.get('text','')=='Inbox'" | head -1)"
+sleep 2
 must "sort sheet tap" tap_xy "$(wait_nodes "n.get('content-desc','')=='Sort and filter'" | head -1)"
 must "sort sheet open" wait_nodes "n.get('text','')=='Sort & filter'" >/dev/null
 shot 69-mail-sort-filter
@@ -342,7 +346,7 @@ for spec in "two-factor-on:40-sec-two-factor-on" \
     mail-contacts|mail-contact-detail) settled="amira@northwind.example" ;;
     mail-files|mail-attachment-preview) settled="invoice-q3.pdf" ;;
     mail-settings) settled="GrapMail address" ;;
-    mail-screener) settled="Waiting now" ;;
+    mail-screener) settled="Waiting in the queue" ;;
     # "Bills" is a seeded label NAME: it exists only once the labels have landed,
     # which is what makes it a marker. "Manage labels" is a drawer row and never
     # appears on this screen, so the wait would have been on nothing.

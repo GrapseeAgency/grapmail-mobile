@@ -585,7 +585,11 @@ struct ScreenerView: View {
                 }
 
                 HStack {
-                    Text("Waiting now").font(.system(size: 15)).foregroundColor(GM.textPrimary)
+                    // Same words as the Android row: two platforms naming one
+                    // thing differently is how a screen stops being the same
+                    // screen, and the walk marker has to match both.
+                    Text("Waiting in the queue")
+                        .font(.system(size: 15)).foregroundColor(GM.textPrimary)
                     Spacer()
                     Text(vm.screener.pending.map { "\($0)" } ?? "Not reported")
                         .font(.system(size: 15, weight: .semibold))

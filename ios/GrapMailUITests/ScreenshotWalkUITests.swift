@@ -414,7 +414,7 @@ final class ScreenshotWalkUITests: XCTestCase {
             // text the view never draws.
             "mail-attachment-preview": "invoice-q3.pdf",
             "mail-settings": "GrapMail address",
-            "mail-screener": "Waiting now",
+            "mail-screener": "Waiting in the queue",
             // A seeded label's NAME, so it appears only once the labels arrive.
             // "Manage labels" is a drawer row: the previous marker waited on text
             // this screen never draws.
