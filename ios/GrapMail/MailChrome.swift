@@ -245,10 +245,17 @@ struct MailBottomBar: View {
         .frame(maxWidth: .infinity)
         .contentShape(Rectangle())
 
-        if let onClick {
-            Button(action: onClick) { visual }.buttonStyle(.plain)
-        } else {
-            visual
+        // Wrapped in a Group: a leading-dot modifier written after an `if`/`else`
+        // block attaches to the last expression of the `else` branch rather than to
+        // the conditional, and the branch types then stop resolving — the compiler
+        // reports `type 'Any' has no member 'accessibilityIdentifier'` against a
+        // line that looks correct.
+        Group {
+            if let onClick {
+                Button(action: onClick) { visual }.buttonStyle(.plain)
+            } else {
+                visual
+            }
         }
         .accessibilityIdentifier("mail-tab-\(label)")
     }
