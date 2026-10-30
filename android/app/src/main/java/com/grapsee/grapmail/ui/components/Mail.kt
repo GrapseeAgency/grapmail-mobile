@@ -119,6 +119,32 @@ private val AvatarRamp = listOf(
 )
 
 /**
+ * The ramp slot for a sender key.
+ *
+ * An explicit fold rather than `String.hashCode()`, for two reasons that are
+ * both about the two apps disagreeing quietly:
+ *
+ *  - iOS masks its accumulator to 30 bits (`MailUI.tint`), and Java's hash is a
+ *    signed 32-bit overflow. They land on different slots for the same address,
+ *    so a sender would wear one colour on Android and another on iOS — visible
+ *    in the screenshot pair for the very same message.
+ *  - `abs(Int.MIN_VALUE)` is `Int.MIN_VALUE`: negating it does not make it
+ *    positive, so the old `if (h < 0) (-h) % size` could index the list with a
+ *    negative number and crash on one particular address. Keeping the
+ *    accumulator masked means it is never negative and `%` is always safe.
+ *
+ * Masking the low 30 bits after a 32-bit wrap gives the same value as taking
+ * the modulo of the unwrapped product, which is why this matches iOS exactly —
+ * and both iterate UTF-16 units, so a name with an emoji folds the same way on
+ * each platform too.
+ */
+private fun rampIndex(key: String): Int {
+    var h = 0
+    for (ch in key) h = (h * 31 + ch.code) and 0x3FFFFFFF
+    return h % AvatarRamp.size
+}
+
+/**
  * A sender's initial on a stable colour.
  *
  * The initial comes from the display name when there is one and from the
@@ -127,17 +153,17 @@ private val AvatarRamp = listOf(
  */
 @Composable
 fun SenderAvatar(display: String, address: String?, size: Dp = 40.dp, modifier: Modifier = Modifier) {
-    val palette = LocalPalette.current
     val initial = remember(display, address) {
         val source = display.trim().ifBlank { (address ?: "").substringBefore("@") }
         source.firstOrNull { !it.isWhitespace() }?.uppercaseChar()?.toString() ?: "?"
     }
     // Hash the address rather than the name: two people called "Team" should not
-    // share a colour, and one person renaming themselves should not move.
+    // share a colour, and one person renaming themselves should not move. The
+    // name is the fallback only when the server never named an address at all —
+    // iOS applies the same rule in `MailUI.tint`, and the same key has to produce
+    // the same slot on both.
     val tint = remember(address, display) {
-        val key = (address ?: "").ifBlank { display }
-        val h = key.hashCode()
-        AvatarRamp[if (h < 0) (-h) % AvatarRamp.size else h % AvatarRamp.size]
+        AvatarRamp[rampIndex((address ?: "").ifBlank { display })]
     }
     Box(
         modifier.size(size).clip(CircleShape).background(tint),
@@ -149,8 +175,6 @@ fun SenderAvatar(display: String, address: String?, size: Dp = 40.dp, modifier: 
             fontWeight = FontWeight.SemiBold,
             color = Color.White,
         )
-        // The ring keeps a light avatar readable on a light row.
-        if (palette.bg == Color(0xFFFBFCFE)) Unit
     }
 }
 

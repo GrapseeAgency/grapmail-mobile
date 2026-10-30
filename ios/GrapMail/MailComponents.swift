@@ -18,13 +18,26 @@ enum MailUI {
         Color(0x4F46E5), Color(0xCA8A04),
     ]
 
-    static func tint(for address: String) -> Color {
+    /// The ramp slot for a sender, on the same rule Android applies
+    /// (`Mail.kt`'s `rampIndex`): the address when there is one, the name only
+    /// when the server never named an address.
+    ///
+    /// The two implementations have to agree exactly or the same sender wears a
+    /// different colour on each platform, which is visible in the screenshot
+    /// pair for one message. That means the same key, the same accumulator, and
+    /// the same characters: `utf16`, not `unicodeScalars`, because Kotlin
+    /// iterates UTF-16 units and an emoji in a display name would fold to
+    /// different numbers. Masking to 30 bits every round keeps the accumulator
+    /// non-negative, so `%` needs no `abs()` — and a masked value taken mod 2³⁰
+    /// is the same whether the product overflowed at 32 bits first, which is how
+    /// it matches Kotlin's wrapping `Int` arithmetic.
+    static func tint(address: String, display: String = "") -> Color {
         // Hash the address rather than the name: two people called "Team" should
         // not share a colour, and one person renaming themselves should not move.
-        let key = address.isEmpty ? "unknown" : address
+        let key = address.isEmpty ? (display.isEmpty ? "unknown" : display) : address
         var hash: Int = 0
-        for ch in key.unicodeScalars { hash = (hash &* 31 &+ Int(ch.value)) & 0x3FFFFFFF }
-        return avatarRamp[abs(hash) % avatarRamp.count]
+        for ch in key.utf16 { hash = (hash &* 31 &+ Int(ch)) & 0x3FFFFFFF }
+        return avatarRamp[hash % avatarRamp.count]
     }
 }
 
@@ -88,7 +101,7 @@ struct SenderAvatar: View {
 
     var body: some View {
         ZStack {
-            Circle().fill(MailUI.tint(for: address))
+            Circle().fill(MailUI.tint(address: address, display: display))
             Text(initial)
                 .font(.system(size: size * 0.42, weight: .semibold))
                 .foregroundColor(.white)
