@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.testTagsAsResourceId
 import androidx.compose.ui.unit.dp
@@ -103,6 +104,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 
+@OptIn(ExperimentalComposeUiApi::class)
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -133,6 +135,13 @@ class MainActivity : ComponentActivity() {
                         // NOT in `ui.platform`; importing it from there fails to
                         // resolve, and reading that as "this Compose version does
                         // not have it" cost a whole attempt to migrate the anchors.
+                        //
+                        // It is also @ExperimentalComposeUiApi, and this build
+                        // promotes that warning to an error — hence the @OptIn on
+                        // the class. The annotation is the honest label, not an
+                        // obstacle: if a future Compose changes the property, the
+                        // build says so loudly instead of the walk quietly losing
+                        // every identifier anchor and falling back to copy.
                         .semantics { testTagsAsResourceId = true },
                     contentAlignment = Alignment.TopCenter,
                 ) {
