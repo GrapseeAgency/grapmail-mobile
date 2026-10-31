@@ -164,6 +164,19 @@ host, so a broken network layer cannot read as a working mailbox.
   control that goes nowhere), contacts, contact detail, files, attachment
   preview, settings, screener, send receipt, and the no-mailbox state. Same
   screen set on both platforms.
+- **Affordances say what they can actually do.** Swipe-to-file exists on both
+  platforms with the same two directions and the same two colours: leading is
+  archive, or back out of Trash/Spam; trailing is trash. Nothing a swipe can reach
+  destroys mail — permanent deletion stays behind its confirmation sheet, reachable
+  only from Trash — and the honesty gate proves that by failing when the Trash
+  button is rewired to `deletePermanently` on either side. One mechanic cannot be
+  matched: SwiftUI refuses a full fling toward Trash, Material3 has no such mode,
+  which is a reason to keep the gesture reversible rather than a reason to hide it.
+  Three controls were removed instead of faked: the label chips are not tappable
+  (the listing returns no label field and takes no label query, so a chip could
+  filter nothing), the bottom bar's Mail tab takes no click while Mail is the
+  screen it stands on, and the Android box-tab row — which drew an active underline
+  and did nothing — is now wired to the same open-the-box call the drawer uses.
 - **API parity is a gate, not a review habit.** `scripts/api-parity.py` diffs
   the two mail client surfaces — every `mail*` call name and every decoded DTO
   field — and both workflows run it. Three mismatches were caught by hand while

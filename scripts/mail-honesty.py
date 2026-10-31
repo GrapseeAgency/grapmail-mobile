@@ -168,6 +168,36 @@ pin("Android's bulk `actOn` cannot reach permanent deletion",
 pin("iOS's bulk `actOn` cannot reach permanent deletion",
     "mailDeletePermanent" not in body_of(SW_MODEL, "func actOn("))
 
+# A swipe is the one filing gesture with no confirmation in front of it, so the
+# set of things it can do is the safety boundary. Archive, trash and restore all
+# undo; DELETE does not, and must not be reachable from a row gesture on either
+# platform however convenient that would look.
+KT_SWIPE = body_of(KT_BOX, "private fun SwipeableMessageRow")
+pin("Android's swipe component cannot reach permanent deletion",
+    "mailDeletePermanent" not in KT_SWIPE and "deletePermanently" not in KT_SWIPE)
+
+# The span has to cover BOTH swipeActions blocks. Bounding it at the first
+# closing brace at that indent — the obvious way to write it — stops after the
+# leading block, so the trailing "Trash" button, which is exactly where a
+# destructive edit would land, was outside what got checked. Caught by mutating
+# the Trash button to call deletePermanently and watching the gate stay green.
+SW_SWIPES = ios("MailboxView.swift")
+_start = SW_SWIPES.find("swipeActions(edge: .leading")
+_end = SW_SWIPES.find("onAppear", _start)
+swipe_span = SW_SWIPES[_start:_end] if _start != -1 and _end > _start else ""
+pin("iOS's swipe region was located (both blocks, not just the first)",
+    "swipeActions(edge: .trailing" in swipe_span)
+pin("iOS's swipe actions cannot reach permanent deletion",
+    bool(swipe_span) and "deletePermanently" not in swipe_span
+    and "mailDeletePermanent" not in swipe_span)
+# Both directions must be conditional: a swipe that fires in a box where the
+# action cannot change anything is a gesture wired to a no-op.
+pin("Android gates each swipe direction on the box", "leadingTo != null" in KT_SWIPE
+    and "trailingTo != null" in KT_SWIPE)
+pin("iOS gates each swipe direction on the box",
+    ios("MailboxView.swift").count("vm.state.box != .trash") >= 1
+    and ios("MailboxView.swift").count("vm.state.box != .archive") >= 1)
+
 # ── 4. no remote HTML gets a renderer ───────────────────────────────────────
 MAIL_SOURCES = ([ANDROID / "ui/screens/mail" / p for p in
                  sorted((ANDROID / "ui/screens/mail").iterdir())]

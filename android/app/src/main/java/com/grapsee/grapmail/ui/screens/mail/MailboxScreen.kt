@@ -50,6 +50,9 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.SheetState
+import androidx.compose.material3.SwipeToDismissBox
+import androidx.compose.material3.SwipeToDismissBoxValue
+import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.Text
@@ -65,6 +68,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.ExperimentalComposeUiApi
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.testTagsAsResourceId
 import androidx.compose.ui.draw.clip
@@ -259,21 +263,44 @@ fun MailboxScreen(
                     ) {
                         LazyColumn(state = listState, modifier = Modifier.fillMaxSize().testTag("mail-list")) {
                             items(state.rows, key = { it.id }) { row ->
-                                MessageRow(
-                                    message = row,
-                                    selected = state.selection.contains(row.id),
-                                    onSelect = { vm.toggleSelect(row.id) },
-                                    onOpen = {
-                                    val tid = row.threadId
-                                    onOpenThread(tid ?: row.id, tid != null)
-                                },
-                                    onStar = {
-                                        vm.actOn(row.id,
-                                            if (row.isStarred) com.grapsee.grapmail.data.MailAction.Unstar
-                                            else com.grapsee.grapmail.data.MailAction.Star)
+                                // Which swipes mean something depends on where the
+                                // message already is. Archiving something that is in
+                                // Archive, or trashing something already in Trash,
+                                // is a gesture that fires a request to change a state
+                                // it cannot change — so those directions are simply
+                                // not offered there, and the row does not move.
+                                val inTrashOrSpam = state.box == com.grapsee.grapmail.data.MailBox.Trash ||
+                                    state.box == com.grapsee.grapmail.data.MailBox.Spam
+                                val inArchive = state.box == com.grapsee.grapmail.data.MailBox.Archive
+                                SwipeableMessageRow(
+                                    leadingTo = if (inTrashOrSpam) "Back to Inbox"
+                                        else if (inArchive) null else "Archive",
+                                    trailingTo = if (inTrashOrSpam) null else "Trash",
+                                    onLeading = {
+                                        vm.actOn(row.id, if (inTrashOrSpam)
+                                            com.grapsee.grapmail.data.MailAction.Restore
+                                        else com.grapsee.grapmail.data.MailAction.Archive)
                                     },
-                                    selecting = state.selecting,
-                                )
+                                    onTrailing = {
+                                        vm.actOn(row.id, com.grapsee.grapmail.data.MailAction.Trash)
+                                    },
+                                ) {
+                                    MessageRow(
+                                        message = row,
+                                        selected = state.selection.contains(row.id),
+                                        onSelect = { vm.toggleSelect(row.id) },
+                                        onOpen = {
+                                            val tid = row.threadId
+                                            onOpenThread(tid ?: row.id, tid != null)
+                                        },
+                                        onStar = {
+                                            vm.actOn(row.id,
+                                                if (row.isStarred) com.grapsee.grapmail.data.MailAction.Unstar
+                                                else com.grapsee.grapmail.data.MailAction.Star)
+                                        },
+                                        selecting = state.selecting,
+                                    )
+                                }
                                 Box(Modifier.fillMaxWidth().padding(horizontal = 16.dp)
                                     .height(1.dp).background(palette.border))
                             }
@@ -468,6 +495,77 @@ private fun BoxTabRow(s: MailboxViewModel.MailboxUiState, onSelect: (MailBox) ->
             BoxTab(box.title, counts[box], box == s.box, onClick = { onSelect(box) })
         }
     }
+}
+
+/**
+ * A message row that files on swipe.
+ *
+ * Two directions, and each is optional: a null label means that direction is not
+ * offered at all, so the row refuses to move rather than firing a request that
+ * cannot change anything. That is how one component serves Trash — where the
+ * useful swipe is back out to the inbox, and trashing an already-trashed message
+ * is a no-op dressed as an action — and the inbox, where both mean something.
+ *
+ * Nothing here destroys mail. A swipe can archive, trash or restore, and all three
+ * undo; permanent deletion stays behind its confirmation sheet, reachable only
+ * from Trash. So both colours mean "moved", never "gone".
+ *
+ * The action fires on the settled value rather than during the drag, and the row
+ * snaps back afterwards: a swipe released short of the threshold animates home and
+ * must file nothing, and a row left dismissed off-screen would show a gap in a list
+ * whose length has not changed yet.
+ *
+ * One mechanic genuinely differs from iOS, and it is worth naming rather than
+ * describing the two as identical: SwiftUI can refuse a full fling
+ * (`allowsFullSwipe: false`) so the row stays open until the revealed button is
+ * tapped, and Material3 has no equivalent — past the halfway threshold a fling
+ * files the message. Both directions here archive, trash or restore, all of which
+ * undo, so the difference is in how much a stray flick costs: nothing irreversible
+ * is reachable either way.
+ */
+@Composable
+private fun SwipeableMessageRow(
+    leadingTo: String?,
+    trailingTo: String?,
+    onLeading: () -> Unit,
+    onTrailing: () -> Unit,
+    content: @Composable () -> Unit,
+) {
+    val palette = LocalPalette.current
+    val state = rememberSwipeToDismissBoxState()
+
+    LaunchedEffect(state.currentValue) {
+        when (state.currentValue) {
+            SwipeToDismissBoxValue.StartToEnd -> if (leadingTo != null) onLeading()
+            SwipeToDismissBoxValue.EndToStart -> if (trailingTo != null) onTrailing()
+            SwipeToDismissBoxValue.Settled -> Unit
+        }
+        state.snapTo(SwipeToDismissBoxValue.Settled)
+    }
+
+    SwipeToDismissBox(
+        state = state,
+        enableDismissFromStartToEnd = leadingTo != null,
+        enableDismissFromEndToStart = trailingTo != null,
+        backgroundContent = {
+            val toLeading = state.targetValue == SwipeToDismissBoxValue.StartToEnd
+            val label = if (toLeading) leadingTo else trailingTo
+            Row(
+                Modifier.fillMaxSize()
+                    .background(if (toLeading) palette.swipeArchive else palette.swipeTrash)
+                    .padding(horizontal = 24.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = if (toLeading) Arrangement.Start else Arrangement.End,
+            ) {
+                // Nothing at all while the row is at rest: a coloured band behind an
+                // untouched row would read as a state the message is not in.
+                if (state.targetValue != SwipeToDismissBoxValue.Settled && label != null) {
+                    Text(label, fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
+                        color = Color.White)
+                }
+            }
+        },
+    ) { content() }
 }
 
 /**

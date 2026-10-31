@@ -31,6 +31,13 @@ data class GrapMailColors(
     val warnInk: Color = Color(0xFFC2620A),
     val cardAlt: Color = Color(0xFFF5F9FE),
     val otpFill: Color = Color(0xFFFFFFFF),
+    // Mailbox swipe affordances. Two directions, two meanings, so two colours —
+    // and neither is the destructive red: a swipe can only archive or trash, both
+    // of which undo. Permanent destruction stays behind a confirmation sheet, so
+    // no single gesture can erase mail, and the palette has no colour for it on
+    // purpose rather than by omission.
+    val swipeArchive: Color = Color(0xFF1A6DF0),
+    val swipeTrash: Color = Color(0xFFDC2626),
     // Dark theme
     val bgDark: Color = Color(0xFF070F18),
     val cardDark: Color = Color(0xFF0C182A),
@@ -50,6 +57,11 @@ data class GrapMailColors(
     val warnInkDark: Color = Color(0xFFF5A623),
     val cardAltDark: Color = Color(0xFF0B1626),
     val otpFillDark: Color = Color(0xFF0A1220),
+    // Dark variants lifted for the same reason the light pair exists: a swipe
+    // background sits behind a row that is sliding away, so it has to read as a
+    // deliberate colour on both themes rather than as a dark rectangle.
+    val swipeArchiveDark: Color = Color(0xFF3B82F6),
+    val swipeTrashDark: Color = Color(0xFFF87171),
 )
 
 val LocalGrapMailColors = staticCompositionLocalOf { GrapMailColors() }

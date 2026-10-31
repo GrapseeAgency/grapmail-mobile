@@ -44,6 +44,14 @@ enum GM {
     static let warnInk       = color(light: 0xC2620A, dark: 0xF5A623)
     static let cardAlt       = color(light: 0xF5F9FE, dark: 0x0B1626)
     static let otpFill       = color(light: 0xFFFFFF, dark: 0x0A1220)
+    /// Mailbox swipe backgrounds. Same two directions, same two meanings, and the
+    /// same values as Android's `swipeArchive`/`swipeTrash` in `Color.kt` — the
+    /// swipe is the one gesture photographed from two angles in the walk, so a
+    /// colour that differs between platforms shows up as two different artifacts
+    /// of the same screen. Neither is a destructive red: a swipe archives or
+    /// trashes, both of which undo, and permanent destruction stays behind a sheet.
+    static let swipeArchive  = color(light: 0x1A6DF0, dark: 0x3B82F6)
+    static let swipeTrash    = color(light: 0xDC2626, dark: 0xF87171)
 }
 
 extension UIColor {

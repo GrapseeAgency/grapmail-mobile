@@ -233,6 +233,35 @@ struct MailboxView: View {
                 )
                 .listRowInsets(EdgeInsets())
                 .listRowSeparator(.hidden)
+                // Swipe files, and only in the directions that mean something
+                // where the message already is. Same two directions and same two
+                // colours as Android's `SwipeableMessageRow`: leading is archive
+                // (or back out of Trash/Spam), trailing is trash, and neither
+                // destroys — permanent deletion stays behind its confirmation
+                // sheet, so no gesture here can erase mail.
+                //
+                // `allowsFullSwipe` is the one mechanic Android cannot match:
+                // Material3 fires on crossing the halfway threshold, with no
+                // "stay open until tapped" mode. So a fling toward Trash is
+                // refused here and accepted there — which is why neither
+                // direction is allowed to be irreversible.
+                .swipeActions(edge: .leading, allowsFullSwipe: true) {
+                    if vm.state.box == .trash || vm.state.box == .spam {
+                        Button("Back to Inbox") { vm.actOn(row.id, .restore) }
+                            .tint(GM.swipeArchive)
+                    } else if vm.state.box != .archive {
+                        Button("Archive") { vm.actOn(row.id, .archive) }
+                            .tint(GM.swipeArchive)
+                    }
+                }
+                .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                    if vm.state.box != .trash && vm.state.box != .spam {
+                        // Not `.destructive` role: that draws the system red and
+                        // implies irreversibility, and trashing undoes.
+                        Button("Trash") { vm.actOn(row.id, .trash) }
+                            .tint(GM.swipeTrash)
+                    }
+                }
                 .onAppear {
                     if row.id == vm.state.rows.last?.id { vm.loadMore() }
                 }
