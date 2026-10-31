@@ -177,6 +177,9 @@ host, so a broken network layer cannot read as a working mailbox.
   filter nothing), the bottom bar's Mail tab takes no click while Mail is the
   screen it stands on, and the Android box-tab row — which drew an active underline
   and did nothing — is now wired to the same open-the-box call the drawer uses.
+  No screenshot shows a swiped row: the coloured band exists only while a finger is
+  holding the row open, there is no reference render for it, and the CI mailbox has
+  no message to swipe. What is proven instead is the safety boundary, by the gate.
 - **API parity is a gate, not a review habit.** `scripts/api-parity.py` diffs
   the two mail client surfaces — every `mail*` call name and every decoded DTO
   field — and both workflows run it. Three mismatches were caught by hand while
@@ -224,7 +227,20 @@ host, so a broken network layer cannot read as a working mailbox.
   irreversible, one destroys mail, and one feeds the suppression list that would
   stop future CI mail. Those three are photographed from the snapshot host.
 - **Anchors** are identifiers the screens set on themselves (`mail-home`,
-  `mail-menu`, `mail-search`, `sign-out`), not sentences they happen to print.
+  `mail-menu`, `mail-search`, `mail-drawer-*`, `gm-sheets-*`, `sign-out`), not
+  sentences they happen to print. On Android that needs
+  `testTagsAsResourceId` (in `androidx.compose.ui.semantics`, and
+  `@ExperimentalComposeUiApi`), set on the root **and again inside every sheet** —
+  a `ModalBottomSheet` composes into its own window and the property does not cross
+  that boundary. Predicates match the trailing segment, because uiautomator reports
+  the id as `package:id/tag`, and they unescape XML entities, or a label containing
+  `&` can never match at all.
+- **Dark is photographed from the test-only branch.** The plan chose
+  `XCUIDevice.forceDarkMode`; that API is not on this runner's SDK, so the app
+  reads a `-gmDark` launch argument and applies `.preferredColorScheme(.dark)`
+  inside the snapshot branch only, where no live screen can pick it up. Colours
+  still resolve through `GM`'s trait lookup, so the frame goes through the same
+  path a real dark-mode user does.
 
 ### Which backend, and the two halves of it
 

@@ -261,7 +261,24 @@ fun MailboxScreen(
                         boxTitle = state.box.title,
                         onRetry = { vm.load() },
                     ) {
-                        LazyColumn(state = listState, modifier = Modifier.fillMaxSize().testTag("mail-list")) {
+                        LazyColumn(
+                            state = listState,
+                            modifier = Modifier.fillMaxSize().testTag("mail-list"),
+                            // Every item is one row shape, so one content type: it
+                            // is what lets LazyColumn recycle a composition across
+                            // rows instead of treating each as a different layout.
+                            // Keys are the message id, which is what makes a page
+                            // append keep the rows it already composed.
+                            //
+                            // Stated plainly rather than improved in passing: a
+                            // selection change recomposes the rows on screen, because
+                            // `selection` lives in the one state object the list
+                            // reads. Only on-screen rows recompose — the lazy scope
+                            // holds — but per-row `derivedStateOf` would need the
+                            // selection set out of that object, which is a view-model
+                            // change this sector's evidence does not ask for.
+                            contentType = { "row" },
+                        ) {
                             items(state.rows, key = { it.id }) { row ->
                                 // Which swipes mean something depends on where the
                                 // message already is. Archiving something that is in
