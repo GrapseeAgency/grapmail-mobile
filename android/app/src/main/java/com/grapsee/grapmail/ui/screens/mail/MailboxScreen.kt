@@ -1065,9 +1065,17 @@ internal fun SnoozeContent(onPick: (String) -> Unit) {
         }
     }
     Text(
-        "Snoozed mail leaves your inbox until it is due. This build has no way to " +
-            "list messages that are snoozed, because the API has no box for them — " +
-            "unsnoozing needs the message to be visible first.",
+        // The sentence used to end "unsnoozing needs the message to be visible " +
+        // "first", which this build no longer does: the Undo beside the list takes " +
+        // "mail back out of snooze precisely when it is not visible, because the " +
+        // "moment of snoozing is the moment the app knows. A sheet that denies a " +
+        // "capability the same screen is offering is the oldest defect in this " +
+        // "sector wearing new clothes, and this line is photographed in frame " +
+        // "84-mail-snooze-sheet on both platforms, so the claim ships either way. " +
+        // "The box really is absent server-side — that half stays stated."
+        "Snoozed mail leaves your inbox until it is due. The server has no box " +
+            "that lists what is postponed, so Undo appears beside the list for the " +
+            "mail this session snoozed, and for no other mail.",
         fontSize = 12.sp, color = palette.warnInk,
         modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
     )

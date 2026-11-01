@@ -48,6 +48,8 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.grapsee.grapmail.data.MailMessageDto
+import com.grapsee.grapmail.ui.theme.GrapMailAvatarRampDark
+import com.grapsee.grapmail.ui.theme.GrapMailAvatarRampLight
 import com.grapsee.grapmail.ui.theme.LocalPalette
 import java.text.SimpleDateFormat
 import java.util.Calendar
@@ -107,18 +109,6 @@ fun UnreadPill(count: Int, modifier: Modifier = Modifier) {
 // ── sender identity ──────────────────────────────────────────────────────────
 
 /**
- * The avatar ramp, in the order the reference uses (Google's own mark aside).
- * A sender keeps its colour across visits because the choice is a hash of the
- * address, not a position in the list — the same rule the web client follows
- * (`page.tsx:212`, "Deterministic colour so a sender keeps the same avatar").
- */
-private val AvatarRamp = listOf(
-    Color(0xFF7C3AED), Color(0xFF059669), Color(0xFFF97316), Color(0xFF1A6DF0),
-    Color(0xFFEC4899), Color(0xFF0891B2), Color(0xFF65A30D), Color(0xFFDC2626),
-    Color(0xFF4F46E5), Color(0xFFCA8A04),
-)
-
-/**
  * The one unsubscribe address worth offering, or null.
  *
  * `List-Unsubscribe` is the sender's own claim about a URL, and it arrives in the
@@ -133,12 +123,27 @@ private val AvatarRamp = listOf(
  *  - The first http(s) candidate wins, matching what mail clients do.
  *  - Whitespace and angle brackets are stripped; the header format guarantees them.
  *
+ * Angle-bracketed segments are read FIRST, because the header's separator is a
+ * comma and a comma is legal inside a query (`?t=abc,def`, RFC 3986). Inside
+ * `<…>` the whole run is one address, so it cannot be cut short; a bare
+ * `a,b`-style split would hand back the truncated half of it and open a
+ * different request than the sender wrote. The plain split stays as the fallback
+ * for headers that omit the brackets, which the format also permits — and there
+ * the ambiguity belongs to the sender, not to this parser.
+ *
  * Returning null is the safe answer more often than it seems, and the thread shows
  * no control at all when it does — an unsubscribe button that opens a broken URL is
  * worse than no button.
  */
 fun parseUnsubscribe(raw: String?): String? {
     if (raw.isNullOrBlank()) return null
+    // Bracketed candidates first: the closing `>` is the end of the address, so
+    // no comma inside the query can be mistaken for a separator.
+    Regex("<([^>]+)>").findAll(raw).forEach { m ->
+        val candidate = m.groupValues[1].trim()
+        if (candidate.startsWith("https://", ignoreCase = true)
+            || candidate.startsWith("http://", ignoreCase = true)) return candidate
+    }
     raw.split(',').forEach { part ->
         val candidate = part.trim().removeSurrounding("<", ">").trim()
         if (candidate.startsWith("https://", ignoreCase = true)
@@ -147,9 +152,27 @@ fun parseUnsubscribe(raw: String?): String? {
     return null
 }
 
-/** The host a link will take the user to, for the confirmation line. */
-fun urlHost(raw: String): String? =
-    raw.substringAfter("://", "").substringBefore('/').substringBefore('?').takeIf { it.isNotBlank() }
+/**
+ * The host a link will take the user to, for the confirmation line.
+ *
+ * The authority is what follows `://` up to the first path, query or fragment
+ * delimiter — minus any `user:pass@` prefix, because that is NOT part of where
+ * the request goes. A sender writes `List-Unsubscribe:
+ * <https://grapsee.com@evil.example/u>` and the browser goes to `evil.example`;
+ * printing the raw authority would put our own domain at the head of the
+ * sentence whose entire job is to name the stranger the tap is about to contact.
+ * The last `@` is the boundary (userinfo may not contain an unencoded `@`), and
+ * an address that is nothing but an `@` yields null, which falls back to the
+ * sheet's generic "the sender's server" wording rather than a fabricated host.
+ */
+fun urlHost(raw: String): String? {
+    val authority = raw.substringAfter("://", "")
+        .substringBefore('/')
+        .substringBefore('?')
+        .substringBefore('#')
+    return authority.substringAfterLast('@', authority)
+        .takeIf { it.isNotBlank() }
+}
 
 /**
  * The ramp slot for a sender key.
@@ -170,11 +193,15 @@ fun urlHost(raw: String): String? =
  * the modulo of the unwrapped product, which is why this matches iOS exactly —
  * and both iterate UTF-16 units, so a name with an emoji folds the same way on
  * each platform too.
+ *
+ * The size is a parameter rather than a reference to one list, because there are
+ * now two lists — light and dark — and an index taken against the wrong one is an
+ * out-of-bounds crash on a sender whose hash lands in the last two slots.
  */
-private fun rampIndex(key: String): Int {
+private fun rampIndex(key: String, size: Int): Int {
     var h = 0
     for (ch in key) h = (h * 31 + ch.code) and 0x3FFFFFFF
-    return h % AvatarRamp.size
+    return h % size
 }
 
 /**
@@ -195,8 +222,14 @@ fun SenderAvatar(display: String, address: String?, size: Dp = 40.dp, modifier: 
     // name is the fallback only when the server never named an address at all —
     // iOS applies the same rule in `MailUI.tint`, and the same key has to produce
     // the same slot on both.
-    val tint = remember(address, display) {
-        AvatarRamp[rampIndex((address ?: "").ifBlank { display })]
+    //
+    // The appearance is a `remember` key because the resolved colour depends on it:
+    // a disc that keeps its light-theme hue after the system flips to dark is the
+    // same defect as a text colour that does, only smaller.
+    val appearance = androidx.compose.foundation.isSystemInDarkTheme()
+    val tint = remember(address, display, appearance) {
+        val ramp = if (appearance) GrapMailAvatarRampDark else GrapMailAvatarRampLight
+        ramp[rampIndex((address ?: "").ifBlank { display }, ramp.size)]
     }
     Box(
         modifier.size(size).clip(CircleShape).background(tint),

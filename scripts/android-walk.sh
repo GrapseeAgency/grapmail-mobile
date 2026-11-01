@@ -604,11 +604,25 @@ shot 13-step1-name-dark
 adb shell am force-stop "$PKG"
 adb shell am start -W -n "$PKG/.MainActivity" --es gmSnapshot "mail-home" >/dev/null
 sleep 5
-if [ -z "$(find_nodes "n.get('content-desc','')=='gm-snapshot'")" ]; then
-  echo "FAIL: snapshot 'mail-home' (dark) is not the visible screen" >&2
+# The dark home carries the SAME two proofs its light sibling and the other two
+# dark frames do. `gm-snapshot` alone is not a proof: the host's own "Unknown mail
+# snapshot" fallthrough bears that marker, so a mistyped name photographs a
+# placeholder and still fills the PNG gate below — the exact failure the marker
+# rule exists to prevent, re-imported through a new code path. The content marker
+# is a seeded row subject, because the Android snapshot's `listFrame` draws the
+# greeting and the rows only: the `mail-search` field iOS waits on for this frame
+# does not exist in this host's copy of the screen, and a wait on it would have
+# timed out for a reason that had nothing to do with dark mode.
+if [ -n "$(find_nodes "n.get('text','')=='Unknown mail snapshot: mail-home'")" ]; then
+  echo "FAIL: app did not recognise mail snapshot 'mail-home'" >&2
   FAILURES=$((FAILURES + 1))
 fi
-shot 61-mail-home-dark
+if [ -z "$(wait_overlay "n.get('text','')=='Q3 facilities invoice'" | head -1)" ]; then
+  echo "FAIL: 61-mail-home-dark not photographed -- the home never showed its rows" >&2
+  FAILURES=$((FAILURES + 1))
+else
+  shot 61-mail-home-dark
+fi
 
 # Two more mail screens in dark, chosen for what they cover rather than for
 # coverage's sake: the thread carries the body surface, the attachment row, the

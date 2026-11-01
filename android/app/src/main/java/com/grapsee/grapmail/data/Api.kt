@@ -783,33 +783,57 @@ object Api {
         return read(r) { json.decodeFromString(it) }
     }
 
+    /**
+     * Every write below that answers with no body of its own must still say no.
+     *
+     * `execute` reports the status; it does not judge it. Only `read` and `fail`
+     * throw, so a void call written as a bare `execute(req)` cannot fail — and
+     * the mail routes DO refuse: a name collision at 409, a label that is not
+     * yours at 404, a malformed body at 400 (`grapmail-labels.ts:104-192`).
+     * Dropping the pair meant the sheet's own result line read "Saved." over a
+     * label the server had just rejected, and the cached mark was written for a
+     * pair that does not exist — after which the next tap computes its direction
+     * from that invention. iOS throws from every one of these calls because
+     * `ApiClient.request` judges the status itself, so this was also a quiet
+     * cross-platform split that `api-parity.py` cannot see: it compares
+     * declarations, not error behaviour.
+     */
+    private suspend fun executeVoid(request: Request) {
+        val (status, body) = execute(request)
+        if (status >= 400) fail(status, body)
+    }
+
     suspend fun mailRenameLabel(token: String, id: String, name: String, colour: String?) {
         val r = authed("$MAIL/labels/${enc(id)}", token)
             .method("PATCH", postBody(json.encodeToString(
                 MailLabelCreateRequest.serializer(), MailLabelCreateRequest(name, colour))))
             .build()
-        execute(r)
+        executeVoid(r)
     }
 
     suspend fun mailDeleteLabel(token: String, id: String) {
-        execute(authed("$MAIL/labels/${enc(id)}", token).delete().build())
+        executeVoid(authed("$MAIL/labels/${enc(id)}", token).delete().build())
     }
 
     /**
      * Attach / detach a label from a message. Both are idempotent server-side
      * (`onConflictDoNothing` on the insert, an unconditional delete on the removal),
      * so a repeated tap is not an error and a double removal is not either.
+     * Idempotent is not the same as unrefusable: an unknown label id or a message
+     * that is not the caller's still answers 4xx, which is why these go through
+     * [executeVoid] rather than being fired and forgotten.
      */
     suspend fun mailLabelAssign(token: String, messageId: String, labelId: String) {
         val r = authed("$MAIL/labels/message/${enc(messageId)}", token)
             .post(postBody(json.encodeToString(
                 MailLabelAssignRequest.serializer(), MailLabelAssignRequest(labelId))))
             .build()
-        execute(r)
+        executeVoid(r)
     }
 
     suspend fun mailLabelDetach(token: String, messageId: String, labelId: String) {
-        execute(authed("$MAIL/labels/message/${enc(messageId)}/${enc(labelId)}", token).delete().build())
+        executeVoid(authed("$MAIL/labels/message/${enc(messageId)}/${enc(labelId)}", token)
+            .delete().build())
     }
 
     suspend fun mailAliases(token: String): MailAliasesResponse =

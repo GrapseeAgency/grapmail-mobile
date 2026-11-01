@@ -58,6 +58,39 @@ enum GM {
     /// it. The light value is the one the app has always drawn; the dark value is
     /// the web theme's lifted star (`--gm-star`, `grapmail.css:111`).
     static let star          = color(light: 0xF5A623, dark: 0xFDD663)
+
+    /// The sender avatar disc: the web reference's `AVATAR_COLOURS` ramp, in its
+    /// order, with the value each entry resolves to in each theme
+    /// (`src/app/(mail)/mail/page.tsx:305` against `grapmail.css` lines 35, 42, 44,
+    /// 56-63, 100, 108, 110).
+    ///
+    /// Three of the eight web entries are not avatar hues at all — they are
+    /// `--gm-accent`, `--gm-error-strong` and `--gm-warn`, and those three DO change
+    /// with the theme, so the disc lifts with them: `#1a73e8` becomes `#8ab4f8`,
+    /// `#c5221f` becomes `#f2b8b5`, `#e37400` becomes `#fbbc04`. The five plain
+    /// `--gm-avatar-*` slots keep their value in both canvases because the reference
+    /// gives them no dark override — that is a decision to copy, not a gap to fill.
+    ///
+    /// These live in the token table rather than beside the avatar because as hex
+    /// literals in the mail components file they sat outside the gate that says the
+    /// mail screens pick no colour of their own, which let that gate's claim print
+    /// while the most-visited pixel of every row was unaccounted for. Android holds
+    /// the same sixteen values as `GrapMailAvatarRampLight` / `…Dark`
+    /// (`ui/theme/Color.kt`), and `scripts/mail-honesty.py` pins both against the
+    /// reference's list. The slot a sender lands on is the app's own accumulator
+    /// (`MailUI.tint`), shared exactly between the two apps and not with the web:
+    /// what is copied from the reference is the palette and the determinism, not
+    /// the hash.
+    static let avatarRamp: [Color] = [
+        color(light: 0x1A73E8, dark: 0x8AB4F8),
+        color(light: 0x0B8043, dark: 0x0B8043),
+        color(light: 0xA142F4, dark: 0xA142F4),
+        color(light: 0xC5221F, dark: 0xF2B8B5),
+        color(light: 0xE37400, dark: 0xFBBC04),
+        color(light: 0x00796B, dark: 0x00796B),
+        color(light: 0x8E24AA, dark: 0x8E24AA),
+        color(light: 0x3949AB, dark: 0x3949AB),
+    ]
 }
 
 extension UIColor {

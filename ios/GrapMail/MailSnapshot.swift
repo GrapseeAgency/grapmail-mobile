@@ -177,17 +177,15 @@ struct MailSnapshotView: View {
     private var frame: AnyView {
         switch name {
             case "mail-home":
+                // No `mail-home-dark` case: the dark home is this same screen with the
+                // device appearance forced (`overrideUserInterfaceStyle = -gmDark` in
+                // `GrapMailUITests/ScreenshotWalkUITests.swift`). A second name for the
+                // second palette was a second copy of a screen, launched by nothing,
+                // and the name-set pin in `scripts/mail-honesty.py` now refuses that.
                 return AnyView(
                 listFrame(rows: Self.rows, loading: false, failed: false,
                           noMailbox: false, box: .inbox)
                 )
-            case "mail-home-dark":
-                return AnyView(
-                listFrame(rows: Self.rows, loading: false, failed: false,
-                          noMailbox: false, box: .inbox)
-                    .environment(\.colorScheme, .dark)
-                )
-            case "mail-drawer":
                 return AnyView(
                 drawerFrame
                 )
@@ -211,7 +209,6 @@ struct MailSnapshotView: View {
                 listFrame(rows: [], loading: false, failed: false,
                           noMailbox: true, box: .inbox)
                 )
-            case "mail-search":
                 return AnyView(
                 searchFrame
                 )
@@ -219,11 +216,14 @@ struct MailSnapshotView: View {
                 return AnyView(
                 selectionFrame
                 )
-            case "mail-sort-filter":
-                return AnyView(
-                sheetFrame(SortFilterSheet(sort: .senderAsc, filter: .unread,
-                                           sortedCount: 25, total: 148) { _, _ in })
-                )
+            // No `mail-drawer`, `mail-search` or `mail-sort-filter` case, and no
+            // `drawerFrame`/`searchFrame` to draw them: frames 62, 67 and 69 are
+            // photographed from the LIVE screen on both platforms (the walk opens the
+            // drawer, types the term and raises the sort sheet itself). A host case for
+            // a screen the walk already reaches is a second copy of that screen -- the
+            // rule this sector already enforces for the send receipt -- and the name-set
+            // pin in `scripts/mail-honesty.py` now refuses one on either side, which is
+            // how these three were found dead here and on Android at once.
             case "mail-move-sheet":
                 return AnyView(
                 sheetFrame(MoveSheet { _ in })
@@ -383,41 +383,6 @@ struct MailSnapshotView: View {
                 }
             }
         }
-        .background(GM.bg)
-    }
-
-    private var drawerFrame: some View {
-        MailDrawer(
-            box: .inbox,
-            counts: [.inbox: 148, .sent: 31, .drafts: 2, .spam: 4, .trash: 0,
-                     .starred: nil, .archive: nil, .others: nil, .screener: nil],
-            onSelect: { _ in }, onDismiss: {}, onLabels: {}, onScreener: {},
-            onSettings: {}, onSecurity: {}, onHelp: {}, onSignOut: {}
-        )
-        .background(GM.bg)
-    }
-
-    private var searchFrame: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 10) {
-                Image(systemName: "magnifyingglass").foregroundColor(GM.textTertiary)
-                Text("invoice").font(.system(size: 14)).foregroundColor(GM.textPrimary)
-                Spacer()
-            }
-            .padding(.horizontal, 14).padding(.vertical, 11)
-            .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(GM.card))
-            .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .stroke(GM.border, lineWidth: 1))
-            Text("3 results for “invoice”")
-                .font(.system(size: 13)).foregroundColor(GM.textSecondary)
-            MessageRow(message: Self.rows[0], selecting: false, selected: false,
-                       onSelect: {}, onOpen: {}, onStar: {})
-            MessageRow(message: Self.rows[2], selecting: false, selected: false,
-                       onSelect: {}, onOpen: {}, onStar: {})
-            Spacer()
-        }
-        .padding(16)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .background(GM.bg)
     }
 

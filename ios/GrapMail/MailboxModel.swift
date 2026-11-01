@@ -264,16 +264,26 @@ final class MailboxModel: ObservableObject {
             if !replace { self.state.loadingMore = true }
 
             guard let token = self.token else {
+                // The generation moves on this exit too, and `loadAndSettle` below is
+                // the reason: it waits for the number to change, so an early return
+                // that leaves it alone is a pull-to-refresh that never ends.
                 self.state.loading = false
                 self.state.loadingMore = false
                 self.state.fatal = "Sign in again."
+                self.state.settleGeneration += 1
                 return
             }
 
             do {
                 let resp = try await ApiClient.mailInbox(
                     token: token, box: box, page: page, query: term)
-                guard sessionIsLive else { return }
+                guard sessionIsLive else {
+                    // Signed out mid-flight: the same rule as the token guard above.
+                    self.state.loading = false
+                    self.state.loadingMore = false
+                    self.state.settleGeneration += 1
+                    return
+                }
                 await MailStore.shared.putPage(box, term, resp, replace: replace)
                 if term == nil {
                     if let s = try? await ApiClient.mailStats(token) {
@@ -288,6 +298,13 @@ final class MailboxModel: ObservableObject {
                 self.state.settleGeneration += 1
                 self.reproject()
             } catch {
+                // A superseded read says nothing. `load()` cancels the previous task
+                // on every call, so a box switch or one keystroke past the debounce
+                // arrived here as a `cancelled` URLError, which `describe` renders as
+                // "Network error. Please try again." — an error banner painted over
+                // the list the newer read had just filled. Same reasoning as Android's
+                // `CancellationException` rethrow in `load()`.
+                if error is CancellationError || Task.isCancelled { return }
                 let noBox = (error as? ApiError).map { Self.isNoMailbox($0) } ?? false
                 let message = Self.describe(error)
                 self.state.loading = false
@@ -309,11 +326,23 @@ final class MailboxModel: ObservableObject {
 
     /// Pull-to-refresh's work item: returns only once the load has settled, whether
     /// it landed rows or an error.
+    ///
+    /// Waiting on `settleGeneration` is right — the no-blank rule means a refresh over
+    /// a populated list never raises `loading`, so there is nothing else to watch —
+    /// but a bare spin on it is a trap: every early exit that does not bump the number
+    /// leaves this looping at 10 Hz on the main actor for the rest of the process, and
+    /// `try?` swallows the cancellation SwiftUI raises when the gesture dies. So the
+    /// wait checks for cancellation and carries a ceiling that is a safety net, not a
+    /// timeout anyone is meant to hit: every loader that can finish does so long
+    /// before, and the request's own read timeout is 20s (`APIClient`).
     func loadAndSettle() async {
         let before = state.settleGeneration
         load(replace: true)
-        while state.settleGeneration == before {
+        var ticks = 0
+        while state.settleGeneration == before, ticks < 900 {
+            if Task.isCancelled { return }
             try? await Task.sleep(nanoseconds: 100_000_000)
+            ticks += 1
         }
     }
 
@@ -490,21 +519,32 @@ final class MailboxModel: ObservableObject {
             guard let self else { return }
             var failure: String?
             var undone = 0
+            var restored: [String] = []
             for id in ids {
                 do {
                     _ = try await ApiClient.mailAction(token: token, id: id, action: .unsnooze, until: nil)
                     undone += 1
+                    restored.append(id)
+                    self.state.snoozeUndoIds = self.state.snoozeUndoIds.filter { $0 != id }
                 } catch { failure = Self.describe(error) }
             }
             await self.invalidateFor(.unsnooze)
             self.state.busy = false
             // Cleared only for what actually came back; a partial undo keeps the
-            // rest offered rather than forgetting them.
-            if failure == nil {
+            // REST offered rather than forgetting them. The ids removed above are the
+            // proof: leaving the whole list in place would make the next Undo re-send
+            // the action for mail that is already back in the inbox, and count it a
+            // second time in the note — which is exactly what Android's
+            // `snoozeUndoIds - restored` does and this side did not.
+            if failure == nil, restored.count == ids.count {
                 self.state.snoozeUndoIds = []
                 self.state.snoozeUndoNote = nil
-            } else {
-                self.state.snoozeUndoNote = "\(undone) of \(ids.count) came back. \(failure!)"
+            } else if let failure {
+                // `if let`, not an interpolation of the Optional: a nil failure
+                // reaching this line would print "2 of 3 came back. " with a dangling
+                // period, the same shape as the truncated sender clause the
+                // unsubscribe sheet had.
+                self.state.snoozeUndoNote = "\(undone) of \(ids.count) came back. \(failure)"
             }
             self.load(replace: true)
         }
@@ -624,7 +664,19 @@ final class MailboxModel: ObservableObject {
             guard let self else { return }
             do {
                 let resp = try await ApiClient.mailLabelAssignments(token)
-                guard sessionIsLive else { return }
+                guard sessionIsLive else {
+                    // The flag has to leave `.reading` even when the read was
+                    // abandoned: `ensureAssignments` short-circuits on `.reading`, so
+                    // a sign-out during one label read would stop every later one for
+                    // the life of the model — which is a `@StateObject` that lives as
+                    // long as the process. The sheet would go on drawing marks and the
+                    // tap direction would stay locked to "only ever add", making the
+                    // detach unreachable for the rest of the session. Resolving to the
+                    // truth about whatever cache survives is the honest answer.
+                    let stillThere = await MailStore.shared.assignmentsMap() != nil
+                    self.state.assignmentsRead = stillThere ? .read : .failed
+                    return
+                }
                 await MailStore.shared.putAssignments(resp.assignments)
                 self.state.assignmentsRead = .read
                 await self.applyMarks()
@@ -866,6 +918,16 @@ final class MailboxModel: ObservableObject {
         Task { [weak self] in
             guard let self else { return }
             if let cached = await MailStore.shared.body(id) {
+                // Recorded on the hit as well as the fetch, because this field IS the
+                // memo: without it the guard above never fires and every return to an
+                // already-read message costs another actor hop. What is deliberately
+                // NOT changed here is the synchronous `loading` state above — the
+                // cache can only be consulted across an `await`, and clearing the
+                // spinner instead of raising it would leave the PREVIOUS message on
+                // screen during that hop. A brief loader over the right content beats
+                // a moment of the wrong content, which is the trade the reviewer's
+                // suggested shape would have made.
+                self.threadLoadedFor = id
                 self.thread = ThreadState(messages: [cached])
                 return
             }
@@ -977,7 +1039,13 @@ final class MailboxModel: ObservableObject {
             guard let self else { return }
             do {
                 let r = try await ApiClient.mailLabels(token)
-                guard sessionIsLive else { return }
+                guard sessionIsLive else {
+                    // Same trap in the other screen: `LabelState.loading` is what the
+                    // Labels screen draws, and leaving it true after an abandoned read
+                    // shows a spinner forever with nobody left to stop it.
+                    self.labelState.loading = false
+                    return
+                }
                 await MailStore.shared.putLabels(r.labels)
                 self.labelState.labels = r.labels
                 self.labelState.loading = false

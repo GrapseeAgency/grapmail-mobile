@@ -415,10 +415,15 @@ data class MailScreenerDecisionResponse(
  * Two things a caller must not assume:
  *  - `archive` and `others` are answered by the *archive* router, which
  *    `next()`-falls through for every other box. Same URL, different handler.
- *  - There is no `snoozed` box. `snooze` writes `snoozedUntil`
+ *  - There is no `snoozed` box in what is deployed. `snooze` writes `snoozedUntil`
  *    (`grapmail-archive.ts:171`) and the inbox hides those rows
- *    (`grapmail.ts:719-726`), so a snoozed message leaves the visible set with
- *    no way back. The action is offered; no box is claimed for it.
+ *    (`grapmail.ts:719-726`), so a postponed message is not listable anywhere the
+ *    app can reach. It is NOT without a way back: the app offers Undo for exactly
+ *    the mail it just snoozed, because that is the only set it can name honestly,
+ *    and `MailAction.Unsnooze` is wired to it on both platforms. A `?box=snoozed`
+ *    listing is written and tested in the backend's history (T6.1) but undeployed;
+ *    until it ships this enum stays as it is, and `scripts/mail-honesty.py` pins
+ *    the drawer against advertising a box nothing serves.
  */
 enum class MailBox(val apiValue: String) {
     Inbox("inbox"),

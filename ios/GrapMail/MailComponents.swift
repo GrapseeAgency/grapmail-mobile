@@ -1,3 +1,4 @@
+import Foundation
 import SwiftUI
 
 /// Mailbox sector — the parts every mail screen is assembled from.
@@ -8,15 +9,16 @@ import SwiftUI
 /// rather than in twenty call sites where they can quietly disagree.
 enum MailUI {
 
-    /// The avatar ramp, in the order the reference uses (Google's own mark
-    /// aside). A sender keeps its colour across visits because the choice is a
-    /// hash of the address, not a position in the list — the same rule the web
-    /// client follows (`page.tsx:212`).
-    static let avatarRamp: [Color] = [
-        Color(0x7C3AED), Color(0x059669), Color(0xF97316), Color(0x1A6DF0),
-        Color(0xEC4899), Color(0x0891B2), Color(0x65A30D), Color(0xDC2626),
-        Color(0x4F46E5), Color(0xCA8A04),
-    ]
+    /// The avatar disc's colour for a sender. The ramp itself is a token —
+    /// `GM.avatarRamp` in `Theme.swift` — which holds the web reference's
+    /// `AVATAR_COLOURS` list with a value per theme, because three of the eight web
+    /// entries are theme variables rather than fixed avatar hues. Nothing here picks
+    /// a colour of its own, which is what lets this file fall inside the no-literals
+    /// gate instead of being exempted from it.
+    ///
+    /// A sender keeps its colour across visits because the choice is a hash of the
+    /// address, not a position in the list — the same rule the web client follows
+    /// (`page.tsx:212`).
 
     /// The ramp slot for a sender, on the same rule Android applies
     /// (`Mail.kt`'s `rampIndex`): the address when there is one, the name only
@@ -37,7 +39,7 @@ enum MailUI {
         let key = address.isEmpty ? (display.isEmpty ? "unknown" : display) : address
         var hash: Int = 0
         for ch in key.utf16 { hash = (hash &* 31 &+ Int(ch)) & 0x3FFFFFFF }
-        return avatarRamp[hash % avatarRamp.count]
+        return GM.avatarRamp[hash % GM.avatarRamp.count]
     }
 }
 
@@ -554,14 +556,27 @@ func labelSwatch(_ key: String?) -> Color {
 /// untrusted input, and it commonly arrives as a comma-separated pair:
 /// `<https://x.example/u?id=7>, <mailto:u@x.example>`.
 ///
-/// http(s) only: a `mailto:` opens a composition this app cannot fill in, and
-/// anything else (`javascript:`, `file:`, a bare word) is not a link to a list at
-/// all. Angle brackets and padding are stripped because the header format guarantees
-/// them. Returning nil means the thread shows no control whatsoever — an unsubscribe
-/// button that opens something broken is worse than no button. Android's
-/// `parseUnsubscribe` applies the same rules.
+/// Angle brackets are read FIRST, because the header's separator is a comma and a
+/// comma is legal inside a query (`?t=abc,def`, RFC 3986). Inside `<…>` the whole run
+/// is one address and cannot be cut short; splitting first would return the truncated
+/// half and open a different request than the sender wrote. The plain split stays as
+/// the fallback for headers that omit the brackets, which the format also permits.
+/// Android's `parseUnsubscribe` applies the same rules.
 func parseUnsubscribe(_ raw: String?) -> String? {
     guard let raw, !raw.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
+    // `NSRegularExpression` under `try?`, the same shape the HTML stripper in
+    // `MailReaderViews.swift` uses. There is no `String.matches(in:)` in the
+    // standard library — writing one here is a compile error, not a shortcut.
+    if let re = try? NSRegularExpression(pattern: "<([^>]+)>") {
+        let ns = raw as NSString
+        for match in re.matches(in: raw, range: NSRange(location: 0, length: ns.length)) {
+            guard match.numberOfRanges > 1 else { continue }
+            let candidate = ns.substring(with: match.range(at: 1))
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            let lowered = candidate.lowercased()
+            if lowered.hasPrefix("https://") || lowered.hasPrefix("http://") { return candidate }
+        }
+    }
     for part in raw.split(separator: ",") {
         let candidate = part.trimmingCharacters(in: .whitespacesAndNewlines)
             .trimmingCharacters(in: CharacterSet(charactersIn: "<>"))
@@ -575,9 +590,21 @@ func parseUnsubscribe(_ raw: String?) -> String? {
 /// The host a link will take the user to, for the confirmation line. Written on the
 /// string rather than on `URL` because the confirmation must be able to name the
 /// destination even for an address this device cannot open.
+///
+/// Any `user:pass@` prefix is dropped, because it is not part of where the request
+/// goes: a sender writes `List-Unsubscribe: <https://grapsee.com@evil.example/u>`, the
+/// browser goes to `evil.example`, and printing the raw authority would put our own
+/// domain at the head of the one sentence whose job is to name the stranger the tap is
+/// about to contact. The last `@` is the boundary — userinfo may not carry an
+/// unencoded `@`. An address that is nothing but an `@` returns nil, which falls back
+/// to the sheet's generic "the sender's server" wording instead of inventing a host.
 func urlHost(_ raw: String) -> String? {
     guard let range = raw.range(of: "://") else { return nil }
-    let host = raw[range.upperBound...].prefix { $0 != "/" && $0 != "?" && $0 != "#" }
+    var host = Substring(raw[range.upperBound...])
+    for stop in ["/", "?", "#"] {
+        if let cut = host.firstIndex(of: stop) { host = host[host.startIndex..<cut] }
+    }
+    if let at = host.lastIndex(of: "@") { host = host[host.index(after: at)...] }
     return host.isEmpty ? nil : String(host)
 }
 

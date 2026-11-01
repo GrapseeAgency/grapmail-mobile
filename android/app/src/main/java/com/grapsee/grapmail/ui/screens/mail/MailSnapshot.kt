@@ -109,11 +109,22 @@ fun MailSnapshotScreen(name: String) {
             .testTag("gm-snapshot"),
     ) {
         when (name) {
+            // There is no `mail-home-dark` case, and there must not be one: the dark
+            // home is the SAME screen photographed with the system appearance forced
+            // (`cmd uimode night yes` in `scripts/android-walk.sh`), so a second host
+            // name for it would be a second copy of a screen rather than a second
+            // piece of data — and it was one, launched by nothing, until the name-set
+            // pin in `scripts/mail-honesty.py` made an unlaunched case illegal.
             "mail-home" -> listFrame(rows, MailBox.Inbox, loading = false,
                 failed = false, noMailbox = false)
-            "mail-home-dark" -> listFrame(rows, MailBox.Inbox, loading = false,
-                failed = false, noMailbox = false)
-            "mail-drawer" -> drawerFrame()
+            // No `mail-drawer`, `mail-search` or `mail-sort-filter` case, and no
+            // `drawerFrame`/`searchFrame` to draw them: frames 62, 67 and 69 are
+            // photographed from the LIVE screen on both platforms (the walk opens the
+            // drawer, types the term and raises the sort sheet itself). A host case
+            // for a screen the walk already reaches is a second copy of that screen —
+            // the rule this sector already enforces for the send receipt — and the
+            // name-set pin in `scripts/mail-honesty.py` now refuses one on either
+            // side, which is how the three were found dead here and on iOS at once.
             "mail-empty" -> listFrame(emptyList(), MailBox.Archive, loading = false,
                 failed = false, noMailbox = false)
             "mail-loading" -> listFrame(emptyList(), MailBox.Inbox, loading = true,
@@ -122,11 +133,7 @@ fun MailSnapshotScreen(name: String) {
                 failed = true, noMailbox = false)
             "mail-no-mailbox" -> listFrame(emptyList(), MailBox.Inbox, loading = false,
                 failed = false, noMailbox = true)
-            "mail-search" -> searchFrame()
             "mail-selection" -> selectionFrame()
-            "mail-sort-filter" -> sheetHost {
-                SortFilterContent(MailSort.SenderAsc, MailFilter.Unread, 25, 148) { _, _ -> }
-            }
             "mail-move-sheet" -> sheetHost { MoveContent { } }
             "mail-delete-sheet" -> sheetHost { PermanentDeleteContent(3, cancel = {}, confirm = {}) }
             "mail-assign-label-sheet" -> sheetHost {
@@ -346,40 +353,6 @@ private fun listFrame(
                     }
                 }
             }
-        }
-    }
-}
-
-@Composable
-private fun drawerFrame() {
-    MailDrawer(
-        box = MailBox.Inbox,
-        unread = 2,
-        counts = mapOf(
-            MailBox.Inbox to 148, MailBox.Sent to 31, MailBox.Drafts to 2,
-            MailBox.Spam to 4, MailBox.Trash to 0,
-            // Unanswered by the server, so no badge.
-            MailBox.Starred to null, MailBox.Archive to null, MailBox.All to null,
-            MailBox.Screener to null,
-        ),
-        onBox = { }, onLabels = { }, onScreener = { }, onSettings = { },
-        onSecurity = { }, onHelp = { }, onSignOut = { },
-    )
-}
-
-@Composable
-private fun searchFrame() {
-    val palette = LocalPalette.current
-    Column(Modifier.fillMaxSize().padding(16.dp)) {
-        Text("3 results for “invoice”", fontSize = 13.sp, color = palette.textSecondary,
-            modifier = Modifier.padding(vertical = 10.dp))
-        rows[0].let {
-            MessageRow(message = it, selected = false, onSelect = {}, onOpen = {},
-                onStar = {}, selecting = false)
-        }
-        rows[2].let {
-            MessageRow(message = it, selected = false, onSelect = {}, onOpen = {},
-                onStar = {}, selecting = false)
         }
     }
 }

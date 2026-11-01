@@ -235,6 +235,13 @@ class MailboxViewModel(app: Application, private val snapshotMode: Boolean = fal
     /// the home screen — see `loadedBoxes` for why this is not just `load()`.
     fun ensureLoaded() {
         if (loadedBoxes.contains(_state.value.box)) return
+        // Recorded before the request, the way `open()` records it. Testing the set
+        // and never writing to it left the default Inbox permanently absent from it,
+        // so every return from a thread, a reader or Settings paid for a full page-1
+        // read — the exact over-fetch this field's own comment says it exists to
+        // prevent — and one of those reads failing raises a stale-list banner over
+        // mail that is already on screen. iOS inserts here and did not need fixing.
+        loadedBoxes.add(_state.value.box)
         load(replace = true)
     }
 
@@ -281,35 +288,58 @@ class MailboxViewModel(app: Application, private val snapshotMode: Boolean = fal
 
             val t = token()
             if (t == null) {
-                _state.update { it.copy(loading = false, loadingMore = false, fatal = "Sign in again.") }
+                // The generation moves here too. This is an exit from a load, and the
+                // refresh gesture waits on precisely that signal; leaving it out
+                // parks an indeterminate spinner over the list for the rest of the
+                // screen's life the moment a session has expired.
+                _state.update { it.copy(loading = false, loadingMore = false,
+                    fatal = "Sign in again.", settleGeneration = it.settleGeneration + 1) }
                 return@launch
             }
 
-            runCatching { Api.mailInbox(t, box, page = page, q = term) }
-                .onSuccess { resp ->
-                    MailStore.putPage(box, term, resp, replace)
-                    if (term == null) runCatching { MailStore.putStats(
-                        Api.mailStats(t)) }
-                    _state.update { it.copy(loading = false, loadingMore = false, fatal = null,
-                        staleError = null, settleGeneration = it.settleGeneration + 1) }
-                    reproject()
-                }
-                .onFailure { e ->
-                    val noBox = (e as? ApiException)?.code == "NO_MAILBOX"
-                    val msg = mailReason(e)
-                    _state.update { cur ->
-                        cur.copy(
-                            loading = false, loadingMore = false,
-                            noMailbox = noBox,
-                            // With rows on screen this is a stale list, not an
-                            // empty one. Without them it is the error screen.
-                            staleError = if (cur.hasRows) msg else null,
-                            fatal = if (cur.hasRows || noBox) null else msg,
-                            settleGeneration = cur.settleGeneration + 1,
-                        )
+            // Not `runCatching`: it swallows `CancellationException` like any other
+            // Throwable, and this method cancels the previous read on every call. So a
+            // box switch, or one keystroke past the search debounce, ran the failure
+            // arm for a read that was stopped on purpose — and because the blocked
+            // OkHttp call only notices the cancellation when its response lands, the
+            // superseded read can finish AFTER the newer one, printing "couldn't reach
+            // the server" over the list the newer read had just filled.
+            try {
+                val resp = Api.mailInbox(t, box, page = page, q = term)
+                MailStore.putPage(box, term, resp, replace)
+                if (term == null) {
+                    // A side read. If it fails the list above still says what it
+                    // knows, so nothing here raises an error; a cancelled one is
+                    // rethrown like the outer call's.
+                    try {
+                        MailStore.putStats(Api.mailStats(t))
+                    } catch (e: kotlinx.coroutines.CancellationException) {
+                        throw e
+                    } catch (e: Exception) {
+                        // Counts stay null, which draws no badge, rather than 0.
                     }
-                    if (noBox) _state.update { it.copy(rows = emptyList(), loaded = 0, total = 0) }
                 }
+                _state.update { it.copy(loading = false, loadingMore = false, fatal = null,
+                    staleError = null, settleGeneration = it.settleGeneration + 1) }
+                reproject()
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e            // superseded: the read that replaced this one reports
+            } catch (e: Exception) {
+                val noBox = (e as? ApiException)?.code == "NO_MAILBOX"
+                val msg = mailReason(e)
+                _state.update { cur ->
+                    cur.copy(
+                        loading = false, loadingMore = false,
+                        noMailbox = noBox,
+                        // With rows on screen this is a stale list, not an
+                        // empty one. Without them it is the error screen.
+                        staleError = if (cur.hasRows) msg else null,
+                        fatal = if (cur.hasRows || noBox) null else msg,
+                        settleGeneration = cur.settleGeneration + 1,
+                    )
+                }
+                if (noBox) _state.update { it.copy(rows = emptyList(), loaded = 0, total = 0) }
+            }
         }
     }
 

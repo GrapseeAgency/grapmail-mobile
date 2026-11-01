@@ -78,7 +78,59 @@ def pin(desc: str, ok: bool) -> None:
     print(f"  FAIL {desc}")
 
 
+def code_only(src):
+    """The file with its comments removed.
+
+    Several pins forbid a WORD or a PATTERN, and the comments explaining each
+    rule necessarily quote the thing they forbid -- `"Unsubscribed"` appears in a
+    doc comment precisely to say it must never be displayed, and a hex literal
+    appears in a token's comment to record what used to be hardcoded. Testing raw
+    text made those pins fail on their own documentation, which is how a gate gets
+    disabled — and it is also what made one pin pass on a comment instead of on
+    the code it was written against.
+
+    The first version of this helper had the bug it exists to prevent. It opened a
+    block on any line starting with `/*` and decided on the same line whether that
+    line had CLOSED one — `keep = "*/" not in st` — so a complete one-line doc
+    comment (`/** The same object under the name the live envelope uses. */`)
+    left it believing it was inside a block, and it stayed there until some later
+    comment's `*/` line. Half of `Api.kt` disappeared: the interceptor and its
+    mail-path carve-out were gone, which is how the failure surfaced — a new pin
+    asking about `isMailCall` reported the code absent from code that plainly
+    contains it. Any pin of that section had been reading a file that was not the
+    file. A block is only opened when the line does not also close it, and the
+    "already inside a block" test comes first, because a line inside a block can
+    itself begin with `/*`.
+    """
+    out, keep = [], False
+    for line in src.split("\n"):
+        st = line.strip()
+        if keep:
+            if st.endswith("*/"):
+                keep = False
+            continue
+        if st.startswith("/*"):
+            if st.endswith("*/") and len(st) > 4:
+                continue          # a complete one-line doc comment: opens nothing
+            keep = True
+            continue
+        if st.startswith("//") or st.startswith("*"):
+            continue
+        out.append(line)
+    return "\n".join(out)
+
+
 # ── 1. the send receipt prints the server's own three words ──────────────────
+# The reader that every "must NOT appear" pin below depends on, tested on its own
+# text. Without these two the helper can silently eat half a file -- which is what
+# it did, and the only reason it was noticed is that a new pin asked about a line
+# the mutilated copy had swallowed.
+pin("the comment reader keeps code after a one-line doc comment",
+    "val kept = 1" in code_only("/** done. */\nval kept = 1\n"))
+pin("the comment reader drops a whole block and keeps what follows",
+    "middle" not in code_only("/**\n * middle\n */\nafter = 1\n")
+    and "after = 1" in code_only("/**\n * middle\n */\nafter = 1\n"))
+
 KT_COMPOSE = android("ui/screens/mail/ComposeScreen.kt")
 SW_READER = ios("MailReaderViews.swift")
 
@@ -102,9 +154,15 @@ for name, src in (("Android compose", KT_COMPOSE), ("iOS reader", SW_READER)):
 
 # An unknown status must stay unknown rather than default to the good word.
 pin("Android prints an unrecognised status verbatim",
-    re.search(r'else\s*->\s*"Server reported', KT_COMPOSE) is not None)
+    re.search(r'else\s*->\s*"Server reported', code_only(KT_COMPOSE)) is not None)
+# Anchored on the arm itself and run through `code_only`. The first version of
+# this pin was `re.search(r"(default|otherwise).*Server reported", re.S)`, which
+# matched the word "otherwise" in a doc comment 640 lines above the `default:`
+# arm — so deleting the arm that was being pinned left the gate green. That is
+# the same failure class the label read was: a check that cannot fail is worse
+# than no check, because it reports a covered surface.
 pin("iOS prints an unrecognised status verbatim",
-    re.search(r"(default|otherwise).*Server reported", SW_READER, re.S) is not None)
+    re.search(r'default:\s*return\s*"Server reported', code_only(SW_READER)) is not None)
 
 # ── 1b. the receipt frame photographs the live renderer, not a copy of it ────
 #
@@ -172,22 +230,40 @@ SW_MODEL = ios("MailboxModel.swift")
 
 
 def body_of(src: str, header: str) -> str:
-    """One function's text: from its signature to the next sibling declaration.
+    """One member's text: from its signature to the next sibling declaration.
 
-    Crude on purpose. These files put every member at one indent level, so the
-    next `\n    fun `/`\n    func ` is the end of this one — and a scope check
-    that reads a whole file would trivially find the call it was told to look
-    for in some other function.
+    The stop used to be three fixed strings at one indent level (`"\\n    fun "`
+    and friends), which silently returned the whole file tail for any member
+    written at column 0 — and `MailboxScreen.kt` puts every composable at column
+    0, so the swipe slice was 540 lines of drawer, sheet and greeting. A negative
+    pin over that slice is fragile in the wrong direction and a positive pin can
+    be satisfied by any other member in the tail, which is the opposite of what a
+    scope check is for. The stop is now a pattern that accepts any indent and the
+    modifier spellings these files actually use.
+
+    `val`/`var` are deliberately NOT stop markers: a function's own local
+    `val tint = …` would cut the slice at its first statement.
     """
     tail = src.split(header, 1)
     if len(tail) < 2:
         return ""
     rest = tail[1]
-    for stop in ("\n    fun ", "\n    func ", "\n    private func "):
-        cut = rest.find(stop)
-        if cut != -1:
-            rest = rest[:cut]
-    return rest
+    m = _MEMBER_STOP.search(rest)
+    return rest[:m.start()] if m else rest
+
+
+_MEMBER_STOP = re.compile(
+    r"\n[ \t]*(?:@Composable[ \t]*\n[ \t]*|@ViewBuilder[ \t]*\n[ \t]*)?"
+    r"(?:private[ \t]+|internal[ \t]+|public[ \t]+|fileprivate[ \t]+|static[ \t]+"
+    r"|open[ \t]+|override[ \t]+)*(?:suspend[ \t]+)?(?:fun|func|class|struct|enum|actor)[ \t<(]"
+)
+
+
+def slice_found(src: str, header: str) -> bool:
+    """A slice that exists. `"x" not in body_of(..., "missing(")` is True for a
+    renamed member, which turns every negative pin into a pin on the header
+    string being present — so the headers are checked, once, out loud."""
+    return bool(body_of(src, header).strip())
 
 
 pin("Android's bulk `act` cannot reach permanent deletion",
@@ -249,7 +325,23 @@ pin("Android explains an HTML-only body instead of hiding the fact",
     re.search(r"(plain text|stripped|formatting)", KT_BOX if "stripHtml" in KT_BOX else
               android("ui/screens/mail/ThreadScreen.kt"), re.I) is not None)
 
-# ── 5. the drawer offers only boxes the server can read back ─────────────────
+# ── 5. the drawer offers only boxes the server can read back ────────────────
+#
+# Pinned against what is DEPLOYED, not against what is written. `?box=snoozed`,
+# `boxCount` and the complement test exist in the backend's working history (T6.1)
+# and pass their tests there, but that repo has not been pushed or deployed — 36
+# other workstreams' commits carry 664 MB of build artifacts, so no push is
+# possible from it today. Nothing has been fetched from the live endpoint to
+# confirm either way, and no claim is being made about what it answers: the point
+# is that the code that would serve the box has not reached a server, so a drawer
+# row promising postponed mail would be a control wired to nothing. The two pins
+# below stay until the deploy lands. When it does, the change is one commit and
+# four edits, in this order: add `Snoozed` to `MailBox` and `drawerOrder` on both
+# platforms, decode `stats.snoozed` in both DTOs (the field is already answered by
+# the new code, and dropping it is why no badge could appear), invert these two
+# pins into "the drawer advertises exactly the boxes the server answers", and
+# rewrite the snooze sheet's line that still says the server has no such box — a
+# claim `84-mail-snooze-sheet` photographs on both platforms.
 KT_DTO = android("data/MailDto.kt")
 drawer_kt = re.search(r"val drawerOrder[^=]*=\s*listOf\(([^)]*)\)", KT_DTO)
 drawer_sw = re.search(r"static let drawerOrder:\s*\[MailBox\]\s*=\s*\[([^\]]*)\]", SW_API)
@@ -517,31 +609,6 @@ for side, src_file, decl in (("Android", android("ui/components/Mail.kt"), "fun 
     pin(f"{side}'s unsubscribe parser exists and accepts only http(s)",
         "https://" in parser and "http://" in parser and "mailto" not in parser)
 
-def code_only(src):
-    """The file with its comments removed.
-
-    Two pins in this section forbid a WORD or a PATTERN, and the comments explaining
-    each rule necessarily quote the thing they forbid -- `"Unsubscribed"` appears in a
-    doc comment precisely to say it must never be displayed, and a hex literal appears
-    in a token's comment to record what used to be hardcoded. Testing raw text made
-    those pins fail on their own documentation, which is how a gate gets disabled.
-    """
-    out, keep = [], True
-    for line in src.split("\n"):
-        s = line.strip()
-        if s.startswith("/*"):
-            keep = "*/" not in s
-            continue
-        if not keep:
-            if s.endswith("*/"):
-                keep = True
-            continue
-        if s.startswith("//") or s.startswith("*") or s.startswith("///"):
-            continue
-        out.append(line)
-    return "\n".join(out)
-
-
 # The claim that must never be rendered: that the list removed anyone.
 pin("Android's thread never claims the user was unsubscribed",
     '"Unsubscribed' not in code_only(KT_THREAD))
@@ -564,6 +631,11 @@ KT_SCREENS = ["ui/screens/mail/MailboxScreen.kt", "ui/screens/mail/ThreadScreen.
               "ui/screens/mail/ComposeScreen.kt", "ui/screens/mail/MailSecondaryScreens.kt"]
 SW_VIEWS = ["MailboxView.swift", "MailChrome.swift", "MailSheets.swift",
             "MailReaderViews.swift", "MailSecondaryViews.swift"]
+# The two component files are NOT in these lists, because each holds one table
+# that is allowed to name colours: `labelSwatch`, keyed by the server's palette
+# key with a value per theme. Section 18 checks them separately — it strips that
+# table and then requires no literal to survive, so the claim here has no exempt
+# file, only a separately-checked one.
 
 for side, files in (("Android", KT_SCREENS), ("iOS", SW_VIEWS)):
     leaked = []
@@ -594,7 +666,13 @@ def switch_arms(src, start_marker, pattern):
     i = src.find(start_marker)
     if i < 0:
         return None
-    body = src[i:src.find("\n    }", i)]
+    end = src.find("\n    }", i)
+    if end < 0:
+        # Without this guard `src[i:src.find(...)]` reads `-1` as "up to the last
+        # character" and the arm set silently becomes the whole file — a check
+        # that reports "both sides agree" about something it never scoped.
+        return None
+    body = src[i:end]
     # re.M: both patterns are anchored at a line start to pick ARMS rather than
     # every quoted word in the file, and without MULTILINE `^` matches only the
     # beginning of the slice -- which reads as "the switch has no arms" and fails
@@ -630,6 +708,357 @@ pin("Android's label sheet distinguishes a refused read from an empty list",
     "Couldn't read your labels." in KT_BOX)
 pin("iOS's label sheet distinguishes a refused read from an empty list",
     "Couldn't read your labels." in SW_SHEET)
+
+# -- 15. a write the server refused is not a write that succeeded --------------
+#
+# `execute()` reports the status; it does not judge it, and only `read`/`fail`
+# throw. Four Android label calls were written as a bare `execute(req)` with the
+# returned pair dropped, so a 409 name collision, a 404 label that is not the
+# caller's and a 400 body each came back as success: the sheet printed "Saved."
+# over a label the server had rejected, and the cache recorded a pair that does
+# not exist — after which the NEXT tap reads its add-or-remove direction from that
+# invention. iOS cannot make this mistake, because `ApiClient.request` judges the
+# status for every call, and `api-parity.py` cannot SEE it, because it compares
+# declarations and fields rather than error behaviour. Two sides agreeing to omit
+# something is the hole this whole file exists to cover.
+VOID_WRITERS = ["mailRenameLabel", "mailDeleteLabel",
+                "mailLabelAssign", "mailLabelDetach"]
+pin("Android declares one throwing helper for the bodyless writes",
+    re.search(r"private suspend fun executeVoid\(request: Request\)[\s\S]{0,220}?"
+              r"if \(status >= 400\) fail\(status, body\)", code_only(KT_API)) is not None)
+for _fn in VOID_WRITERS:
+    _body = body_of(KT_API, f"suspend fun {_fn}(")
+    pin(f"Android's `{_fn}` slice was located", bool(_body.strip()))
+    pin(f"Android's `{_fn}` sends its write through the throwing helper",
+        "executeVoid(" in _body)
+pin("Android drops no HTTP status anywhere in the mail API",
+    re.search(r"^\s{4,8}execute\(", code_only(KT_API), re.M) is None)
+
+# The other half of the same mistake, on the other side: iOS's attachment byte
+# and upload routes ended the ACCOUNT session on a mail 401, while its JSON path
+# and Android's interceptor both deliberately carve mail out — the mail service is
+# a different backend that refuses a bearer the account endpoints still accept.
+# A download was therefore the one action that could sign a person out of a
+# working sign-in, with the thread they were reading behind it.
+pin("iOS's mail routes end no account session on a 401",
+    "signalUnauthorized" not in code_only(SW_API))
+pin("iOS's JSON carve-out is still scoped to non-mail paths",
+    re.search(r"if http\.statusCode == 401, bearer != nil, !path\.hasPrefix\(mailBase\)",
+              code_only(ios("APIClient.swift"))) is not None)
+pin("Android's interceptor still carves mail out and keeps the rule for accounts",
+    "!isMailCall" in code_only(KT_API) and "SessionEvents.signalExpired()" in code_only(KT_API))
+
+# -- 16. the confirmation names the destination the tap will actually reach ----
+#
+# `List-Unsubscribe` is the sender's own text. A header of
+# `<https://grapsee.com@evil.example/u>` sends the browser to `evil.example`,
+# because everything before the last `@` of an authority is credentials, not
+# host — and the one sentence whose job is to name the stranger would have led
+# with our own domain. Both parsers must also read angle-bracketed segments
+# FIRST: the header's separator is a comma and a comma is legal inside a query,
+# so splitting before validating truncates `?t=abc,def` and opens a request the
+# sender never wrote.
+KT_MAIL_C = android("ui/components/Mail.kt")
+SW_MAIL_C = ios("MailComponents.swift")
+pin("Android's host reader strips the credentials from an authority",
+    "substringAfterLast('@', authority)" in code_only(KT_MAIL_C))
+pin("iOS's host reader strips the credentials from an authority",
+    'host.lastIndex(of: "@")' in code_only(SW_MAIL_C))
+for side, src, bracket, split in (
+        ("Android", KT_MAIL_C, 'Regex("<([^>]+)>")', "raw.split(','"),
+        ("iOS", SW_MAIL_C, 'pattern: "<([^>]+)>"', 'raw.split(separator: ",")')):
+    code = code_only(src)
+    pin(f"{side}'s unsubscribe reader takes bracketed addresses first",
+        bracket in code and code.index(bracket) < code.index(split))
+
+# Which opener iOS uses is a fact about the SDK, not a preference: `OpenURLAction`
+# has no completion form on the runner ("extra arguments at positions #2, #3") and
+# its one-argument call returns `()` ("cannot convert value of type '()' to expected
+# condition type 'Bool'"), so it cannot report an outcome at all.
+# `UIApplication.shared.open(_:options:completionHandler:)` can, and that is the
+# evidence Android has from `startActivity` not throwing. Neither side may claim
+# the list acted; both claim only that the device took the link.
+pin("iOS hands the unsubscribe link to an API that answers",
+    "UIApplication.shared.open(target" in code_only(SW_READER))
+pin("iOS does not test a Void-returning opener as a condition",
+    re.search(r"if\s+openURL\(", code_only(SW_READER)) is None)
+pin("Android's opener still reports a device with no browser",
+    "ActivityNotFoundException" in android("ui/screens/mail/ThreadScreen.kt")
+    or "No app on this device can open that link" in android("ui/screens/mail/ThreadScreen.kt"))
+
+# -- 17. a wait the user started must be a wait that can end --------------------
+#
+# `loadAndSettle` spins on `settleGeneration` because the no-blank rule forbids a
+# refresh from raising `loading` over a populated list. That makes every early
+# return which does not bump the generation a main-actor spin for the life of the
+# process, and `try?` on the sleep swallows the cancellation SwiftUI raises when
+# the gesture dies. Both halves are pinned: the exits bump, and the loop is
+# bounded and cancellation-aware.
+SW_LOAD = body_of(SW_MODEL, "func load(replace")
+KT_LOAD = body_of(KT_VM, "fun load(replace")
+pin("iOS's `load` slice was located", bool(SW_LOAD.strip()))
+pin("Android's `load` slice was located", bool(KT_LOAD.strip()))
+pin("iOS bumps the settle signal on every exit from a load",
+    SW_LOAD.count("settleGeneration += 1") >= 4)
+pin("Android bumps the settle signal on every exit from a load",
+    KT_LOAD.count("settleGeneration + 1") >= 3)
+pin("iOS's refresh wait cannot spin forever",
+    re.search(r"while state\.settleGeneration == before, ticks < \d+", code_only(SW_MODEL)) is not None
+    and "if Task.isCancelled { return }" in code_only(SW_MODEL))
+# A cancelled read is not a failed read: `load()` cancels the previous call on
+# every entry, so the superseded one reaching the failure arm prints "couldn't
+# reach the server" over the list the newer read has already filled.
+pin("Android rethrows a cancelled read instead of reporting it",
+    KT_LOAD.count("catch (e: kotlinx.coroutines.CancellationException)") >= 2
+    and "runCatching { Api.mailInbox" not in KT_LOAD)
+# Two, not one: the slice holds two rethrows — the message read and the stats
+# side read — and the first version of this pin matched the string alone, so
+# deleting the OUTER one (the one that matters) left it green on the inner.
+# Found by mutating exactly that line and watching the gate not move.
+pin("iOS ignores a cancelled read instead of reporting it",
+    "if error is CancellationError || Task.isCancelled { return }" in SW_LOAD)
+
+# A flag raised before an `await` must be lowered on the abandoned path too.
+pin("iOS's abandoned assignment read resolves its own flag",
+    re.search(r"guard sessionIsLive else \{\s*\n?[ \t]*(?://[^\n]*\n)*[ \t]*let stillThere",
+              code_only(SW_MODEL)) is not None
+    or "assignmentsRead = stillThere" in code_only(SW_MODEL))
+pin("iOS's abandoned label-list read clears its spinner",
+    re.search(r"guard sessionIsLive else \{[\s\S]{0,400}?labelState.loading = false",
+              code_only(SW_MODEL)) is not None)
+pin("iOS's undo drops the ids that came back",
+    "snoozeUndoIds.filter { $0 != id }" in code_only(SW_MODEL))
+pin("Android's home entry records the box it fetched",
+    "loadedBoxes.add(_state.value.box)" in body_of(KT_VM, "fun ensureLoaded("))
+pin("iOS records a memoised body on the cache hit as well as the fetch",
+    re.search(r"if let cached = await MailStore\.shared\.body\(id\) {[\s\S]{0,700}?threadLoadedFor = id",
+              code_only(SW_MODEL)) is not None)
+
+# -- 18. the sender disc is a token, and it is the reference's token ------------
+#
+# The avatar ramp sat in the two component files as ten hardcoded light-only
+# literals, which those files' exclusion from the no-literals gate made
+# invisible: the claim "every paint comes from a table holding a light AND a dark
+# value" was printed while the most-visited pixel of every row was exempt. The
+# web reference's ramp (`src/app/(mail)/mail/page.tsx:305`) is EIGHT entries and
+# three of them are theme variables, so the correct table has a value per theme.
+# These are the reference's resolved values, spelled out here rather than read
+# from the outer repo, which this repo's CI cannot check out.
+AVATAR_LIGHT = ["1A73E8", "0B8043", "A142F4", "C5221F", "E37400", "00796B", "8E24AA", "3949AB"]
+AVATAR_DARK = ["8AB4F8", "0B8043", "A142F4", "F2B8B5", "FBBC04", "00796B", "8E24AA", "3949AB"]
+KT_COLORS = android("ui/theme/Color.kt")
+SW_THEME = ios("Theme.swift")
+
+
+def hex_run(src: str, decl: str) -> list[str]:
+    """The hexes inside one token list, in order, until the list closes. Not
+    capped at eight: a ninth colour is a change to the reference palette, and a
+    check that quietly ignored it would report the ramp as verified."""
+    i = src.find(decl)
+    if i < 0:
+        return []
+    end = src.find("\n)", i)
+    return [m.upper() for m in re.findall(r"0x(?:FF)?([0-9A-Fa-f]{6})\b",
+                                          src[i:end if end > i else i + 700])]
+
+
+pin("Android's light avatar ramp is the reference's eight",
+    hex_run(KT_COLORS, "val GrapMailAvatarRampLight") == AVATAR_LIGHT)
+pin("Android's dark avatar ramp is the reference's eight lifted",
+    hex_run(KT_COLORS, "val GrapMailAvatarRampDark") == AVATAR_DARK)
+def list_body(src: str, decl: str) -> str:
+    """A literal array/dictionary declaration's own text, from its name to the
+    closing bracket on a line of its own. `body_of` cannot scope this one: the
+    members of `GM` are `static let`s, and the next stop marker it recognises is
+    a function two tokens further down, so a token added AFTER the ramp would
+    silently join the count and break a check that has nothing to do with it."""
+    i = src.find(decl)
+    if i < 0:
+        return ""
+    j = src.find("\n    ]", i)
+    return src[i:j] if j > i else ""
+
+
+SW_PAIRS = re.findall(r"color\(light: (0x[0-9A-Fa-f]{6}), dark: (0x[0-9A-Fa-f]{6})\)",
+                      list_body(SW_THEME, "static let avatarRamp"))
+pin("iOS's avatar ramp was located with eight light/dark pairs", len(SW_PAIRS) == 8)
+pin("iOS's avatar ramp matches Android value for value",
+    [p[0][2:].upper() for p in SW_PAIRS] == AVATAR_LIGHT
+    and [p[1][2:].upper() for p in SW_PAIRS] == AVATAR_DARK)
+pin("Android's disc picks its ramp by appearance and re-remembers on a flip",
+    "isSystemInDarkTheme()" in code_only(KT_MAIL_C)
+    and "remember(address, display, appearance)" in code_only(KT_MAIL_C))
+# The swatch table is the one place in the components file allowed to hold hexes:
+# it IS a token table, keyed by the server's palette key, with a value per theme.
+def without_swatch(src: str) -> str:
+    return src.replace(body_of(src, "fun labelSwatch("), "")
+
+
+pin("Android's label swatch table was located", bool(body_of(KT_MAIL_C, "fun labelSwatch(").strip()))
+pin("Android's mail components hold no colour outside the swatch table",
+    re.search(r"Color\(0x[0-9A-Fa-f]{6,8}\)", code_only(without_swatch(KT_MAIL_C))) is None)
+pin("iOS's mail components hold no colour of their own",
+    re.search(r"Color\(0x[0-9A-Fa-f]{6,8}\)", code_only(SW_MAIL_C)) is None)
+
+# -- 19. every screen the host can draw is a screen somebody photographs --------
+#
+# Both hosts carried a `mail-home-dark` case that no walk launched: the dark home
+# is the SAME frame taken with the appearance forced, so the extra name was a
+# second copy of a screen with no purpose, and nothing could tell it had gone
+# stale. Two names for one screen is how a snapshot host starts inventing
+# screens, so the name sets are compared against what each walk actually asks
+# for, in both directions.
+KT_WALK = (ROOT / "scripts/android-walk.sh").read_text(encoding="utf-8")
+SW_WALK = (ROOT / "ios/GrapMailUITests/ScreenshotWalkUITests.swift").read_text(encoding="utf-8")
+host_kt = set(re.findall(r'^\s+"([a-z0-9-]+)" ->', KT_HOST, re.M))
+host_sw = set(re.findall(r'case "([a-z0-9-]+)":', SW_HOST))
+launch_kt = set(re.findall(r'--es gmSnapshot "([a-z0-9-]+)"', KT_WALK)) \
+    | set(re.findall(r'"([a-z0-9-]+):\d\d-[a-z0-9-]+"', KT_WALK))
+# The Android walk launches most frames from its `spec` table (`"mail-empty:63-
+# mail-empty"`), and only the dark pass spells out `--es gmSnapshot "name"`. The
+# first version of this pin read only the explicit launches and reported 24 of 27
+# host screens as dead — a gate that cries wolf about 24 things is a gate that
+# gets widened until it says nothing, so both spellings count as a launch.
+launch_sw = set(re.findall(r'\("\d\d-[a-z0-9-]+", "([a-z0-9-]+)"', SW_WALK))
+pin("Android's snapshot hosts were located", len(host_kt) >= 20)
+pin("iOS's snapshot hosts were located", len(host_sw) >= 20)
+pin("Both snapshot hosts can draw exactly the same mail screens", host_kt == host_sw)
+for side, host, launched in (("Android", host_kt, launch_kt), ("iOS", host_sw, launch_sw)):
+    dead = {n for n in host if n.startswith("mail-")} - launched
+    pin(f"{side}'s host defines no mail screen its walk never photographs", not dead)
+    ghost = {n for n in launched if n.startswith("mail-")} - host
+    pin(f"{side}'s walk asks for no mail screen its host cannot draw", not ghost)
+
+# The dark frames must carry both proofs, and the home's was the missing one:
+# a `gm-snapshot` marker is present on the host's own "Unknown mail snapshot"
+# fallthrough, so a mistyped name photographs a placeholder and still fills the
+# PNG gate. Android spells each frame out, so its home names itself in the text;
+# iOS runs one loop over three frames, so its proof is that the home's tuple
+# carries a content marker at all — it used to carry `nil`, and the loop's
+# fallback was a wait on the `mail-search` FIELD, which the snapshot host's
+# `listFrame` never draws. An assertion that can only time out is not a proof.
+i = SW_WALK.find('("61-mail-home-dark", "mail-home"')
+sw_home_tuple = SW_WALK[i:i + 120] if i >= 0 else ""
+pin("iOS's dark home frame names the content it waits on",
+    bool(re.match(r'\("61-mail-home-dark", "mail-home", "[^"]+"\)', sw_home_tuple)))
+pin("iOS's dark loop proves the host recognised the name for every frame",
+    'XCTAssertFalse(app.staticTexts["Unknown mail snapshot: \\(screen)"].firstMatch.exists'
+    in SW_WALK)
+pin("iOS's dark loop waits on the marker for every frame",
+    'app.staticTexts[marker].firstMatch.waitForExistence' in SW_WALK)
+i = KT_WALK.find("61-mail-home-dark")
+kt_home_window = KT_WALK[max(0, i - 1600):i + 400] if i >= 0 else ""
+pin("Android's dark home proves the host recognised the name",
+    "Unknown mail snapshot: mail-home" in kt_home_window)
+pin("Android's dark home waits on seeded content before the shot",
+    "Q3 facilities invoice" in kt_home_window)
+
+# -- 20. a sheet may not deny a capability the same screen is offering ----------
+#
+# Both snooze sheets still ended "unsnoozing needs the message to be visible
+# first" after the Undo banner shipped — a line photographed in
+# `84-mail-snooze-sheet` on both platforms, so the false claim is an artifact, not
+# just copy. The honest form keeps the half that is still true (the server has no
+# box that lists postponed mail) and drops the half the build contradicts.
+SNOOZE_PARTS = ("until it is due.", "The server has no",
+                "that lists what is postponed", "mail this session snoozed")
+for side, src in (("Android", KT_BOX), ("iOS", SW_SHEET)):
+    pin(f"{side}'s snooze sheet no longer says unsnoozing needs the message visible",
+        "unsnoozing needs the message to be visible" not in code_only(src))
+    # Each fragment is checked whole, because both sides write the sentence across
+    # concatenated string literals: a single joined sentence would straddle a line
+    # break and a whole-quote test would fail copy that is word-for-word correct.
+    pin(f"{side}'s snooze sheet states what Undo actually covers",
+        all(part in src for part in SNOOZE_PARTS))
+pin("Both snooze sheets make the same promise in the same words",
+    all(all(part in src for part in SNOOZE_PARTS) for src in (KT_BOX, SW_SHEET)))
+
+# `Set - Set` refused to compile on this runner's toolchain in both spellings, and
+# a silent no-op in the detach would have looked like a label that would not come
+# off. `remove` has no overload resolution to lose.
+pin("iOS's detach mutates the set instead of subtracting from it",
+    re.search(r"func markUnassigned\([\s\S]{0,400}?labels\.remove\(labelId\)", code_only(SW_STORE)) is not None
+    and re.search(r"func markUnassigned[\s\S]{0,400}?\) - ", code_only(SW_STORE)) is None)
+
+# -- 21. the sources at least parse as sources ----------------------------------
+#
+# Neither app can be compiled on this host, so a missing brace reaches CI and
+# costs a runner session to discover — the Android walk alone is two hours. This
+# is NOT a parser and does not try to be one: it strips comments and string
+# literals in one pass and then asks whether the three bracket kinds still balance
+# per file. It caught a `},` that a closure rewrite had dropped in
+# `MailReaderViews.swift`, on a line no diff read had questioned, and a regex
+# version of the same check had pronounced that file balanced because it paired a
+# quote inside a comment with a quote 200 lines later and deleted the code in
+# between. Lexing first is the whole difference between the two.
+def strip_lex(src: str) -> str:
+    out, i, n = [], 0, len(src)
+    while i < n:
+        c = src[i]
+        if c == "/" and i + 1 < n and src[i + 1] == "/":
+            while i < n and src[i] != "\n":
+                i += 1
+            continue
+        if c == "/" and i + 1 < n and src[i + 1] == "*":
+            i += 2
+            while i + 1 < n and not (src[i] == "*" and src[i + 1] == "/"):
+                i += 1
+            i += 2
+            continue
+        if c == '"':
+            triple = src[i:i + 3] == '"""'
+            i += 3 if triple else 1
+            while i < n:
+                if src[i] == "\\":
+                    i += 2
+                    continue
+                if triple and src[i:i + 3] == '"""':
+                    i += 3
+                    break
+                if not triple and src[i] == '"':
+                    i += 1
+                    break
+                if not triple and src[i] == "\n":
+                    break        # unterminated on this line: stop, do not eat the file
+                i += 1
+            continue
+        if c == "'":
+            i += 1
+            while i < n and src[i] != "'":
+                i += 2 if src[i] == "\\" else 1
+            i += 1
+            continue
+        out.append(c)
+        i += 1
+    return "".join(out)
+
+
+BALANCE_FILES = [
+    ("Android", "data/Api.kt"), ("Android", "data/MailDto.kt"),
+    ("Android", "data/MailStore.kt"), ("Android", "data/SessionStore.kt"),
+    ("Android", "logic/MailboxViewModel.kt"),
+    ("Android", "ui/components/Mail.kt"),
+    ("Android", "ui/theme/Color.kt"), ("Android", "ui/theme/Theme.kt"),
+    ("Android", "ui/screens/mail/MailboxScreen.kt"),
+    ("Android", "ui/screens/mail/ThreadScreen.kt"),
+    ("Android", "ui/screens/mail/ComposeScreen.kt"),
+    ("Android", "ui/screens/mail/MailSecondaryScreens.kt"),
+    ("Android", "ui/screens/mail/MailSnapshot.kt"),
+    ("iOS", "MailAPI.swift"), ("iOS", "MailStore.swift"), ("iOS", "MailboxModel.swift"),
+    ("iOS", "MailboxView.swift"), ("iOS", "MailChrome.swift"), ("iOS", "MailSheets.swift"),
+    ("iOS", "MailReaderViews.swift"), ("iOS", "MailSecondaryViews.swift"),
+    ("iOS", "MailComponents.swift"), ("iOS", "MailSnapshot.swift"), ("iOS", "Theme.swift"),
+    ("iOS", "GrapMailUITests/ScreenshotWalkUITests.swift"),
+]
+for side, rel in BALANCE_FILES:
+    # The UI-test file lives outside GrapMail/, so it needs the repo path rather
+    # than the two source roots the rest of this file reads from.
+    path = (ANDROID / rel) if side == "Android" else \
+        (ROOT / "ios" / rel) if rel.startswith("GrapMailUITests") else (IOS / rel)
+    body = strip_lex(path.read_text(encoding="utf-8"))
+    unbalanced = {a: body.count(a) - body.count(b) for a, b in (("{", "}"), ("(", ")"), ("[", "]"))}
+    pin(f"{side}'s {rel} has its brackets in balance",
+        all(v == 0 for v in unbalanced.values()))
 
 print()
 if failures:

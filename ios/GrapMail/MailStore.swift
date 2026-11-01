@@ -116,10 +116,19 @@ actor MailStore {
     }
 
     func markUnassigned(messageId: String, labelId: String) {
-        guard var cur = assignments else { return }
-        // `- [labelId]`, not `- labelId`: Set's minus wants a Sequence, and
-        // passing the bare String is a compile error, not a silent no-op.
-        cur[messageId] = (cur[messageId] ?? []) - [labelId]
+        // Both operator spellings reached the compiler and both were refused on
+        // this line: `- labelId` gave "binary operator '-' cannot be applied to
+        // Set<String> and String", and `- [labelId]` — which ought to resolve
+        // the array literal to a `Set` through `ExpressibleByArrayLiteral` —
+        // gave "cannot be applied to two 'Set<String>' operands", even though
+        // `Set` conforms to `SetAlgebra` and `SetAlgebra` declares `-`. The
+        // runner's toolchain decides this, not the reading of the manuals, so
+        // the mutation goes through `remove`, which has no overload resolution
+        // to lose. A message with no pairs keeps having none: nothing is
+        // invented, and a map that was never read is left nil by the guard.
+        guard var cur = assignments, var labels = cur[messageId] else { return }
+        labels.remove(labelId)
+        cur[messageId] = labels
         assignments = cur
     }
 

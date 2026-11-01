@@ -75,3 +75,40 @@ data class GrapMailColors(
 )
 
 val LocalGrapMailColors = staticCompositionLocalOf { GrapMailColors() }
+
+/**
+ * The sender avatar disc: the web reference's `AVATAR_COLOURS` ramp, in its
+ * order, with the value each entry resolves to in each theme
+ * (`src/app/(mail)/mail/page.tsx:305` against `grapmail.css:35,42,44,56-63,100,
+ * 108,110`).
+ *
+ * Three of the eight web entries are not avatar hues at all — they are
+ * `--gm-accent`, `--gm-error-strong` and `--gm-warn`, and those three DO change
+ * with the theme. That is the fact this table exists to carry: the disc lifts
+ * from `#1a73e8` to `#8ab4f8` in the dark canvas exactly as the web does, and the
+ * five plain `--gm-avatar-*` slots stay put in both because the reference gives
+ * them no dark override. Two values, not one, because a single light hue on a
+ * dark canvas is the exact defect that left the starred marker sitting at
+ * `#F5A623` in both apps until this sector's dark pin was written.
+ *
+ * It lives in the token table rather than beside the avatar composable because as
+ * a hex literal in the mail components file it sat outside the gate that says the
+ * mail screens pick no colour of their own — which let that gate's claim print
+ * while the most-visited pixel of every row was unaccounted for. A token the file
+ * does not name is a token the file cannot drift from.
+ *
+ * iOS holds the same sixteen values as `GM.avatarRamp` (`Theme.swift`), and
+ * `scripts/mail-honesty.py` pins both against the reference's list. The slot a
+ * sender lands on is the app's own accumulator (`Mail.kt`'s `rampIndex`), which
+ * the two apps share exactly and the web does not: what is copied from the
+ * reference is the palette and the determinism, not the hash.
+ */
+val GrapMailAvatarRampLight: List<Color> = listOf(
+    Color(0xFF1A73E8), Color(0xFF0B8043), Color(0xFFA142F4), Color(0xFFC5221F),
+    Color(0xFFE37400), Color(0xFF00796B), Color(0xFF8E24AA), Color(0xFF3949AB),
+)
+
+val GrapMailAvatarRampDark: List<Color> = listOf(
+    Color(0xFF8AB4F8), Color(0xFF0B8043), Color(0xFFA142F4), Color(0xFFF2B8B5),
+    Color(0xFFFBBC04), Color(0xFF00796B), Color(0xFF8E24AA), Color(0xFF3949AB),
+)

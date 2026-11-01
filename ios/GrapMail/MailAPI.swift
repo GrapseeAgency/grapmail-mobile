@@ -586,10 +586,15 @@ struct MailAttachmentResponse: Decodable {
 /// Two things a caller must not assume:
 ///  - `archive` and `others` are answered by the **archive** router, which
 ///    `next()`-falls through for every other box. Same URL, different handler.
-///  - There is no `snoozed` box. `snooze` writes `snoozedUntil`
+///  - There is no `snoozed` box in what is deployed. `snooze` writes `snoozedUntil`
 ///    (`grapmail-archive.ts:171`) and the inbox hides those rows
-///    (`grapmail.ts:719-726`), so a snoozed message leaves the visible set with
-///    no way back. The action is offered; no box is claimed for it.
+///    (`grapmail.ts:719-726`), so a postponed message is not listable anywhere the
+///    app can reach. It is NOT without a way back: the app offers Undo for exactly
+///    the mail it just snoozed, because that is the only set it can name honestly,
+///    and `MailAction.unsnooze` is wired to it on both platforms. A `?box=snoozed`
+///    listing is written and tested in the backend's history (T6.1) but undeployed;
+///    until it ships this enum stays as it is, and `scripts/mail-honesty.py` pins
+///    the drawer against advertising a box nothing serves.
 enum MailBox: String, CaseIterable, Identifiable {
     case inbox, starred, sent, drafts, archive, spam, trash, screener
     case others
@@ -1028,12 +1033,23 @@ extension ApiClient {
     }
 
     /// The same error envelope `request` builds, so a failed download reports the
-    /// server's reason rather than a status number, and the session dies on a 401
-    /// exactly as it does on a JSON call.
+    /// server's reason rather than a status number — and, like every other mail
+    /// path on both platforms, WITHOUT ending the account session.
+    ///
+    /// An earlier version of this function called `signalUnauthorized()` on a 401.
+    /// That was the one mail route in the app that did: `request` carves mail out
+    /// (`!path.hasPrefix(mailBase)`) because the mail service is a different backend
+    /// that refuses a bearer the account endpoints still accept, and Android's
+    /// interceptor carves every `/grapmail` path out for the same reason — including
+    /// these attachment paths, since they share the prefix. Signing out over a
+    /// mail-scoped rejection would have torn the app down to the sign-in screen in
+    /// the middle of a download, with the thread or draft the person was on behind
+    /// it, and it did so only for files: every JSON mail call already behaves
+    /// correctly. A 401 here is still surfaced to the caller as itself, which is
+    /// what the screen can act on.
     private static func mailFailure(
         data: Data, http: HTTPURLResponse,
     ) -> ApiError {
-        if http.statusCode == 401 { signalUnauthorized() }
         let carrier = try? decoder.decode(ErrorCarrier.self, from: data)
         return ApiError.http(
             status: http.statusCode,

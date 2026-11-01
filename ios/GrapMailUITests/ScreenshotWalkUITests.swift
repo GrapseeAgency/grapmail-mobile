@@ -531,7 +531,7 @@ final class ScreenshotWalkUITests: XCTestCase {
         // screen's own content has drawn -- a populated screen and its empty branch
         // look identical until something that exists only in the loaded state is seen.
         for (shot, screen, marker) in [
-            ("61-mail-home-dark", "mail-home", nil as String?),
+            ("61-mail-home-dark", "mail-home", "Q3 facilities invoice"),
             ("88-mail-thread-dark", "mail-thread", "Q3 facilities invoice"),
             ("89-mail-labels-dark", "mail-labels", "Bills")] {
             app.terminate()
@@ -542,14 +542,16 @@ final class ScreenshotWalkUITests: XCTestCase {
                           "snapshot '\(screen)' (dark) is not the visible screen")
             XCTAssertFalse(app.staticTexts["Unknown mail snapshot: \(screen)"].firstMatch.exists,
                            "app did not recognise mail snapshot '\(screen)' (dark)")
-            // The home has no stable piece of seeded TEXT to wait on that the other
-            // two screens do, and its identifier belongs to a text FIELD -- which
-            // `staticTexts` would never match. So the home is proven by the search
-            // field existing, and the other two by a label that only appears once
-            // their content has drawn.
-            let shown = marker.map { app.staticTexts[$0].firstMatch.waitForExistence(timeout: 12) }
-                ?? app.textFields["mail-search"].waitForExistence(timeout: 12)
-            XCTAssertTrue(shown, "dark snapshot '\(screen)' never showed its content")
+            // Every one of the three waits on a piece of text that only exists once the
+            // screen's own content has drawn. The home first waited on the `mail-search`
+            // field, which is a marker of the LIVE mailbox header (`MailboxView.swift`)
+            // and is not in the snapshot host's `listFrame` at all: greeting plus rows.
+            // So that assertion could only ever time out, and it would have said "dark
+            // mode is broken" about a screen whose rows were never the question. A
+            // seeded row subject is the marker Android's dark home uses for the same
+            // reason, which keeps the two artifacts proving the same thing.
+            XCTAssertTrue(app.staticTexts[marker].firstMatch.waitForExistence(timeout: 12),
+                          "dark snapshot '\(screen)' never showed its content")
             sleep(2) // the scheme change propagates through the environment
             snap(shot)
         }

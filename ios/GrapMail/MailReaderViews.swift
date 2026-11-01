@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 import UniformTypeIdentifiers
 
 /// One conversation. The same layout carries the encrypted branch, because an
@@ -123,8 +124,12 @@ private struct ThreadMessageCard: View {
     /// "cannot find 'showUnsub' in scope" -- four errors, and the CI run named them.)
     @State private var showUnsub = false
     @State private var unsubNote: String?
-    /// Handing the link over is the browser's job, not this app's.
-    @Environment(\.openURL) private var openURL
+    // Handing the link over is the browser's job, not this app's, and the note
+    // below says only what this process witnessed. It goes through
+    // `UIApplication.shared.open` rather than `\.openURL`, because this SDK's
+    // `OpenURLAction` cannot report an outcome at all — see the note at the
+    // call — and a confirmation that exists to be exact about the destination
+    // should not be built on an API that cannot say whether it reached it.
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -221,23 +226,34 @@ private struct ThreadMessageCard: View {
                             unsubNote = "That unsubscribe address could not be opened."
                             return
                         }
-                        // `OpenURLAction` has exactly one shape: it returns a Bool
-                        // synchronously, and the compile error "extra arguments at
-                        // positions #2, #3" proved there is no completion-handler
-                        // overload to reach for. What that Bool means is the whole
-                        // point of the wording below: the SYSTEM accepted the
-                        // request to open the link. Nothing here claims the mailing
-                        // list did anything with it, because from this process the
-                        // page's behaviour is not observable at all.
-                        unsubNote = openURL(target)
-                            ? "Opened in your browser. GrapMail cannot see what the page said."
-                            : "This device could not open that link."
+                        // What the two `openURL` shapes are on this SDK, learned
+                        // from the compiler rather than assumed: the
+                        // completion-handler form does not exist ("extra
+                        // arguments at positions #2, #3"), and the one-argument
+                        // form returns `()`, so using it as a condition is
+                        // itself an error ("cannot convert value of type '()'
+                        // to expected condition type 'Bool'"). A previous review
+                        // round insisted the completion form was the honest one;
+                        // the run named both errors, so neither claim survived.
+                        // `UIApplication.open(_:options:completionHandler:)` is
+                        // the API that really does answer, and its Bool means
+                        // only that the system agreed to hand the link to
+                        // something that can show it — the same evidence Android
+                        // has when `startActivity` does not throw
+                        // `ActivityNotFoundException`. Nothing here claims the
+                        // mailing list did anything with the request, because
+                        // the page's behaviour is not observable from this
+                        // process at all.
+                        UIApplication.shared.open(target, options: [:]) { accepted in
+                            unsubNote = accepted
+                                ? "Opened in your browser. GrapMail cannot see what the page said."
+                                : "This device could not open that link."
+                        }
                     },
                     onCancel: { showUnsub = false }
                 )
             }
-                }
-
+        }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
     }

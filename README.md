@@ -257,7 +257,57 @@ working mailbox.
   (empty) label list arrives afterwards, and the frame photographs the wrong
   branch while a file-count gate calls it a pass. Android passes a
   `snapshotMode` flag into the view model's constructor; iOS sets
-  `snapshotSeeded` in its seed seams and every loader checks it.
+  `snapshotSeeded` at the start of `loadAccount` and `refreshLabels`, which are
+  the two reads the host seeds. The list loader is deliberately NOT suppressed on
+  either side: it reads into the cache the host has already written, and the
+  no-blank rule keeps the seeded rows on screen when the CI mailbox refuses the
+  call. Suppressing it would hide a real code path from the photograph, and an
+  earlier version of this bullet claimed every loader checked the flag, which was
+  not true of the one that mattered least.
+
+- **A host case is only worth writing if something photographs it.** Both hosts
+  carried `mail-home-dark` — never launched, because the dark home is the same
+  screen with the appearance forced — and three more (`mail-drawer`,
+  `mail-search`, `mail-sort-filter`) whose frames come from the live walk on both
+  platforms. Four dead names per side, each a second copy of a screen nobody
+  looks at. `scripts/mail-honesty.py` now compares each host's name set against
+  the names its own walk launches, in both directions, and requires the two hosts
+  to draw the same set — which is how all four were found rather than by reading.
+
+- **Every dark frame carries both proofs.** The host recognised the name (the
+  `Unknown mail snapshot: <name>` fallthrough is absent) and the screen's own
+  content drew (a seeded row subject is on screen). Presence of `gm-snapshot`
+  alone proves nothing: the fallthrough bears that marker, so a mistyped name
+  photographs a placeholder and still fills the PNG gate. The dark home was the
+  frame checked only the weak way; iOS's dark loop went further and waited on a
+  `mail-search` text field the snapshot host never draws, which could only ever
+  time out and blame dark mode for it.
+
+- **A refused write cannot be reported as saved.** Android's four bodyless label
+  calls were `execute(req)` with the returned status dropped, so 400/404/409 all
+  read as success — the sheet said "Saved.", the cache recorded a pair the server
+  never wrote, and the next tap chose its direction from that invention. They now
+  go through `executeVoid`, which throws on `status >= 400` like every iOS call
+  already did. `api-parity.py` compares declarations, not error behaviour, so
+  this split is exactly the class of disagreement a name-and-field diff certifies
+  as matching.
+
+- **The sender disc is the reference's palette, with a value per theme.** The
+  ramp was ten hardcoded light-only hexes in the two components files, which those
+  files' exclusion from the no-literals gate kept off every radar. The web
+  reference's list is eight entries and three of them are theme variables, so the
+  disc lifts from `#1a73e8` to `#8ab4f8` in dark exactly as the web does; the
+  values now live in `GrapMailAvatarRampLight`/`…Dark` and `GM.avatarRamp`, the
+  components files hold no colour outside the label-swatch table, and both sides
+  are pinned against the same list.
+
+- **The sources are at least balanced.** Neither app can be compiled here, so a
+  dropped brace costs a whole runner session to find. `scripts/mail-honesty.py`
+  lexes each mail source (comments and string literals removed in one pass) and
+  requires the three bracket kinds to balance per file. It caught a `},` that a
+  closure rewrite had dropped in `MailReaderViews.swift`; a regex version of the
+  same check had pronounced that file balanced, because it paired a quote inside
+  a comment with a quote 200 lines later and deleted the code between them.
 
 - **A write that arrives after sign-out is dropped.** iOS clears the cache
   synchronously and cannot await it, so the guard sits on the writer: no cache
