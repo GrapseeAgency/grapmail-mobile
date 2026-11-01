@@ -1004,13 +1004,23 @@ pin("iOS's detach mutates the set instead of subtracting from it",
 # a strip, and saying otherwise teaches the next reader to trust the wrong reason.
 SW_CHROME = ios("MailChrome.swift")
 pin("iOS's Inbox pill mirrors the list's query and filter",
-    re.search(r'selected:\s*query\.isEmpty\(\) && filter == \.all', code_only(SW_CHROME)) is not None)
+    re.search(r'selected:\s*query\.isEmpty && filter == \.all', code_only(SW_CHROME)) is not None)
 pin("iOS's label strip is given the two fields it mirrors",
     re.search(r'LabelStrip\(labels:[\s\S]{0,160}?query: vm\.state\.query, filter: vm\.state\.filter',
               code_only(SW_BOX)) is not None)
 pin("Android's Inbox pill mirrors the same two fields",
     re.search(r'LabelChip\("Inbox"[^\n]*s\.query\.isEmpty\(\) && s\.filter == MailFilter\.All',
               code_only(KT_BOX)) is not None)
+# Kotlin's `isEmpty()` is a function and Swift's is a property, and writing the
+# first inside the second is a compile error the local gates cannot see -- the
+# pill's pin above passed happily on `query.isEmpty()` for one full runner session
+# before the macOS build named it ("cannot call value of non-function type
+# 'Bool'"). The class is pinned now, in every iOS source, because a Kotlin-ism is
+# not a style slip in a repo where one app is written in each language.
+for swift in sorted(IOS.iterdir()):
+    if swift.suffix == ".swift":
+        pin(f"iOS's {swift.name} calls no `isEmpty()`",
+            ".isEmpty(" not in code_only(swift.read_text(encoding="utf-8")))
 for side, src in (("Android", KT_MAIL_C), ("iOS", SW_CHROME)):
     # What can be pinned is the positive half: the strip's own documentation names
     # the route that makes a filter possible. A grep cannot tell "asserting a false

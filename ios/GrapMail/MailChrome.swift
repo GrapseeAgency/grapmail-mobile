@@ -199,7 +199,7 @@ struct LabelStrip: View {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {
                     LabelChip(label: "Inbox", count: unread, color: GM.primarySolid,
-                              selected: query.isEmpty() && filter == .all)
+                              selected: query.isEmpty && filter == .all)
                     ForEach(labels) { l in
                         // The server's palette key, resolved to a swatch. The old
                         // `l.color?.hexColor` could never parse a colour name, so
