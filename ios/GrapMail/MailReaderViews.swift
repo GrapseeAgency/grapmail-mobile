@@ -27,13 +27,6 @@ struct ThreadView: View {
     /// earlier success on screen.
     @State private var notices: [String: String] = [:]
     @State private var busy: String?
-    /// The unsubscribe confirmation, offered only for a message that carries the
-    /// sender's own `List-Unsubscribe` offer.
-    @State private var showUnsub = false
-    @State private var unsubNote: String?
-    /// Handing the link over is the browser's job, not this app's: opening a URL
-    /// inline keeps the outcome out of the view's own logic.
-    @Environment(\.openURL) private var openURL
 
     var body: some View {
         VStack(spacing: 0) {
@@ -124,6 +117,15 @@ private struct ThreadMessageCard: View {
     let onStar: () -> Void
     let onDownload: (MailAttachment) -> Void
 
+    /// The unsubscribe confirmation. Owned by the CARD, not the screen: the offer is
+    /// a property of one message, and a second message in the same thread can carry a
+    /// different one. (It lived in `ThreadView` first, which compiled as
+    /// "cannot find 'showUnsub' in scope" -- four errors, and the CI run named them.)
+    @State private var showUnsub = false
+    @State private var unsubNote: String?
+    /// Handing the link over is the browser's job, not this app's.
+    @Environment(\.openURL) private var openURL
+
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 10) {
@@ -189,45 +191,53 @@ private struct ThreadMessageCard: View {
                 }
                 GradientButton(title: "Reply", action: onReply)
             }
-            .sheet(isPresented: $showUnsub) {
-                if let unsub = parseUnsubscribe(message.unsubscribe) {
-                    UnsubscribeSheet(
-                        // Blank, not absent: `display` is a non-optional that yields
-                        // "" when the server named nobody, so `??` produced
-                        // "This offer came from the sender, about ." -- the same
-                        // dangling clause Android had, in the sentence that exists to
-                        // be exact about where the request goes.
-                        sender: message.from?.address?.nilIfBlank()
-                            ?? message.from?.display?.nilIfBlank(),
-                        url: unsub,
-                        onOpen: {
-                            showUnsub = false
-                            // Only what this app witnessed is reported. Whether the
-                            // list acted on the request is not observable from here,
-                            // so no branch here says "unsubscribed". A URL the
-                            // system refuses to open is reported as that rather
-                            // than passed to an opener that cannot use it.
-                            guard let target = URL(string: unsub) else {
-                                unsubNote = "That unsubscribe address could not be opened."
-                                return
-                            }
-                            // The completion form, not `if openURL(target)`: the
-                            // one-argument call returns Void because opening is
-                            // asynchronous, so testing it as a condition does not
-                            // compile — and even if it did, the outcome is not known
-                            // at the moment of the call. This is the only way to
-                            // report honestly whether the device took the link.
-                            openURL(target, options: [:]) { accepted in
-                                unsubNote = accepted
-                                    ? "Opened in your browser. GrapMail cannot see what the page said."
-                                    : "This device could not open that link."
-                            }
-                        },
-                        onCancel: { showUnsub = false }
-                    )
-                }
-            }
         }
+        // `.sheet` hangs off the card's outermost view, not off the `if expanded`
+        // block above it. A leading-dot modifier written after a conditional inside a
+        // ViewBuilder binds to the conditional's last expression rather than to the
+        // branch, which in this repo already produced
+        // `type 'Any' has no member 'accessibilityIdentifier'` against a line that
+        // looked correct -- so the presentation is attached where the compiler cannot
+        // misread it.
+        .sheet(isPresented: $showUnsub) {
+            if let unsub = parseUnsubscribe(message.unsubscribe) {
+                UnsubscribeSheet(
+                    // Blank, not absent: `display` is a non-optional that yields
+                    // "" when the server named nobody, so `??` produced
+                    // "This offer came from the sender, about ." -- the same
+                    // dangling clause Android had, in the sentence that exists to
+                    // be exact about where the request goes.
+                    sender: message.from?.address?.nilIfBlank()
+                        ?? message.from?.display?.nilIfBlank(),
+                    url: unsub,
+                    onOpen: {
+                        showUnsub = false
+                        // Only what this app witnessed is reported. Whether the
+                        // list acted on the request is not observable from here,
+                        // so no branch here says "unsubscribed". A URL the
+                        // system refuses to open is reported as that rather
+                        // than passed to an opener that cannot use it.
+                        guard let target = URL(string: unsub) else {
+                            unsubNote = "That unsubscribe address could not be opened."
+                            return
+                        }
+                        // The completion form, not `if openURL(target)`: the
+                        // one-argument call returns Void because opening is
+                        // asynchronous, so testing it as a condition does not
+                        // compile — and even if it did, the outcome is not known
+                        // at the moment of the call. This is the only way to
+                        // report honestly whether the device took the link.
+                        openURL(target, options: [:]) { accepted in
+                            unsubNote = accepted
+                                ? "Opened in your browser. GrapMail cannot see what the page said."
+                                : "This device could not open that link."
+                        }
+                    },
+                    onCancel: { showUnsub = false }
+                )
+            }
+                }
+
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
     }
