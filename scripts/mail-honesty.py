@@ -1156,6 +1156,47 @@ for side, rel in BALANCE_FILES:
     pin(f"{side}'s {rel} has its brackets in balance",
         all(v == 0 for v in unbalanced.values()))
 
+# -- 23. an emulator defence that stays silent is not a defence -----------------
+#
+# The Android walk's artifact for `a2ae4b6` was twenty-three copies of the
+# notification shade: every mailbox frame the same 117 KB SystemUI capture, 107
+# assertions timed out, and the two-hour ceiling -- not any check -- is what ended
+# it. Two defences existed and both failed quietly: `collapse_shade` asked
+# `dumpsys statusbar` whether the shade was down and only collapsed it when a
+# version-specific spelling matched, and `ensure_foreground` grepped for
+# `topResumedActivity`, one of several spellings, then relaunched without saying a
+# word. A 40 KB size floor accepted the shade because byte size cannot tell a real
+# screen from someone else's UI.
+KT_WALK_HELPERS = (ROOT / "scripts/android-walk-helpers.sh").read_text(encoding="utf-8")
+
+
+def shell_fn(name):
+    i = KT_WALK_HELPERS.find(f"{name}() {{")
+    if i < 0:
+        return ""
+    j = KT_WALK_HELPERS.find("\n}", i)
+    return KT_WALK_HELPERS[i:j + 2] if j > i else KT_WALK_HELPERS[i:]
+
+
+collapse = shell_fn("collapse_shade")
+pin("the walk's shade helper was located", bool(collapse))
+pin("the shade is collapsed unconditionally, not when a grep agrees",
+    "cmd statusbar collapse" in collapse and 'grep -q "mShadeOpen' not in collapse)
+pin("the shade helper says when dumpsys disagrees with the screen",
+    '[shade]' in collapse)
+fg = shell_fn("ensure_foreground")
+app_fg = shell_fn("app_in_foreground")
+pin("the foreground helper was located", bool(fg) and bool(app_fg))
+pin("the foreground check reads two dumpsys sources and matches the package itself",
+    app_fg.count("dumpsys") >= 2 and "mCurrentFocus" in app_fg and '"$PKG"' in app_fg)
+pin("a lost foreground is reported and counted, not swallowed",
+    '[foreground]' in fg and "FOREGROUND_LOSSES" in fg)
+pin("the walk aborts on consecutive screens that are not the app",
+    re.search(r"SNAP_MISS=\$\(\(SNAP_MISS \+ 1\)\)[\s\S]{0,600}SNAP_MISS\" -ge 5[\s\S]{0,400}?exit 1",
+              KT_WALK) is not None)
+pin("a recovered snapshot resets that counter",
+    re.search(r"else\s*\n\s+SNAP_MISS=0", KT_WALK) is not None)
+
 print()
 if failures:
     print(f"mail-honesty: {len(failures)} pin(s) broken")

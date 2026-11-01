@@ -8,6 +8,11 @@ SW=$(adb shell wm size | grep -oE '[0-9]+x[0-9]+' | head -1 | cut -d x -f1 | tr 
 SH=$(adb shell wm size | grep -oE '[0-9]+x[0-9]+' | head -1 | cut -d x -f2 | tr -d '\r')
 DENS=$(adb shell wm density | grep -oE '[0-9]+' | tail -1 | tr -d '\r')
 SW=${SW:-1080}; SH=${SH:-2400}; DENS=${DENS:-420}
+# Counters the defences below report through. Declared here because the walk runs
+# under `set -u`, and a counter first read inside an error path is exactly the
+# unbound parameter that once took every device down at the walk's first tap.
+FOREGROUND_LOSSES=${FOREGROUND_LOSSES:-0}
+SNAP_MISS=${SNAP_MISS:-0}
 dp() { echo $(( $1 * DENS / 160 )); }   # dp → px at this density
 CX=$((SW / 2))                           # content center x
 
@@ -54,11 +59,39 @@ scroll_to_top() { # fling back to the page start — searches that scrolled
 # for the move sheet was exactly that: a pull-down from a scroll retry, captured
 # and counted. Collapse it before every frame, and say so when it was in the way.
 collapse_shade() {
-  if adb shell dumpsys statusbar 2>/dev/null | grep -q "mShadeOpen=true\|shadeOpen=true"; then
-    echo "  [shade] notification shade was down — collapsing before the frame" >&2
-    adb shell cmd statusbar collapse >/dev/null 2>&1 || true
-    sleep 1
-  fi
+  # Sent unconditionally. The previous version asked `dumpsys statusbar` whether
+  # the shade was down and collapsed only when its answer matched
+  # `mShadeOpen=true|shadeOpen=true` — spellings that move between Android
+  # versions — and a whole run proved the failure mode: every mailbox frame in
+  # the artifact was the notification shade, ~117 KB of SystemUI repeated
+  # twenty-three times, while 107 assertions timed out. The predicate said the
+  # shade was up, so the collapse never ran, and nothing was reported, because a
+  # defence that does nothing silently is not a defence. `cmd statusbar collapse`
+  # is a no-op when the shade is already closed, so asking is cheaper than
+  # guessing — and when dumpsys disagrees with reality that is said out loud
+  # instead of trusted.
+  local state
+  state=$(adb shell dumpsys statusbar 2>/dev/null | tr '\n' ' ')
+  adb shell cmd statusbar collapse >/dev/null 2>&1 || true
+  case "$state" in
+    *hadeOpen=true*|*SHADE_OPEN*|*"mState=2"*)
+      echo "  [shade] dumpsys says the shade is down — collapsed" >&2 ;;
+  esac
+  sleep 1
+}
+
+# app_in_foreground — is OUR activity the one on screen, by any of the three
+# spellings the frameworks use? Checked against `dumpsys activity activities`
+# (topResumedActivity / mResumedActivity / ResumedActivity:) and
+# `dumpsys window` (mCurrentFocus / mFocusedApp), because a single grep is how
+# the shade check above went wrong: one spelling, one version, silent when it
+# does not match.
+app_in_foreground() {
+  local f
+  f=$(adb shell dumpsys activity activities 2>/dev/null;
+     adb shell dumpsys window 2>/dev/null | grep -i "mCurrentFocus\|mFocusedApp")
+  case "$f" in *"$PKG"*) return 0 ;; esac
+  return 1
 }
 
 # anr_in_view <dump-file> — is a system "isn't responding" dialog on screen?
@@ -101,10 +134,17 @@ dismiss_anr() {
 }
 
 ensure_foreground() {
-  adb shell dumpsys activity activities 2>/dev/null | grep -q "topResumedActivity.*$PKG" || {
-    adb shell am start -W -n "$PKG/.MainActivity" >/dev/null
-    sleep 4
-  }
+  if app_in_foreground; then return 0; fi
+  echo "  [foreground] $PKG is not the on-screen activity — relaunching" >&2
+  adb shell am start -W -n "$PKG/.MainActivity" >/dev/null
+  sleep 4
+  if app_in_foreground; then return 0; fi
+  # Loud, and counted. A run that could not get its own app on screen continued
+  # for another hour and a half photographing SystemUI; the point of saying it
+  # here is that the walk stops being interesting before it stops being useful.
+  FOREGROUND_LOSSES=$((FOREGROUND_LOSSES + 1))
+  echo "  [foreground] STILL not on screen after relaunch ($FOREGROUND_LOSSES)" >&2
+  return 1
 }
 
 shot() {
@@ -116,10 +156,19 @@ shot() {
     adb exec-out screencap -p > "$OUT/$1.png"
     local size
     size=$(stat -c %s "$OUT/$1.png" 2>/dev/null || echo 0)
+    # The floor exists to catch a blank capture, and 40 KB caught nothing here:
+    # the shade is a perfectly detailed 117 KB screen. Byte size cannot tell a
+    # real screen from someone else's UI, so the foreground check above is what
+    # has to carry it — and when that check has already failed, a frame is
+    # recorded as suspect instead of shipped as evidence.
     [ "$size" -gt 40000 ] && break
     sleep 3   # blank capture: activity still recreating — wait and retry
   done
-  echo "  ↳ $1.png ($(stat -c %s "$OUT/$1.png") bytes)"
+  if [ "$FOREGROUND_LOSSES" -gt 0 ] && ! app_in_foreground; then
+    echo "  ↳ $1.png ($(stat -c %s "$OUT/$1.png") bytes) SUSPECT: app not foreground" >&2
+  else
+    echo "  ↳ $1.png ($(stat -c %s "$OUT/$1.png") bytes)"
+  fi
 }
 
 dump_xml() {

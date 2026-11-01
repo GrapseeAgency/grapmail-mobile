@@ -489,6 +489,22 @@ for spec in "two-factor-on:40-sec-two-factor-on" \
   # with content-desc 'gm-snapshot'; without it the shot proves nothing.
   if [ -z "$(find_nodes "n.get('content-desc','')=='gm-snapshot'")" ]; then
     echo "FAIL: snapshot '$nm' is not the visible screen" >&2; FAILURES=$((FAILURES + 1))
+    # Consecutive, and fatal at five. A run whose app never reached the screen —
+    # the notification-shade walk, where all twenty-three mailbox frames were the
+    # same 117 KB SystemUI capture and 107 assertions timed out — spent its entire
+    # two-hour ceiling discovering the same fact once per screen, and the ceiling
+    # is what reported it. Five screens of the same photograph is not five
+    # findings; it is one, and the walk should say so and stop while there is time
+    # to read why.
+    SNAP_MISS=$((SNAP_MISS + 1))
+    if [ "$SNAP_MISS" -ge 5 ]; then
+      echo "ABORT: $SNAP_MISS snapshot screens in a row were not the app." >&2
+      echo "ABORT: the emulator is showing someone else's UI — check the foreground" >&2
+      echo "ABORT:   (last frame: $nm); every later frame would prove the same thing." >&2
+      exit 1
+    fi
+  else
+    SNAP_MISS=0
   fi
   # The suspicious pair fetch on appear, so wait for the loaded branch or the
   # photograph catches "Checking your account…" and proves nothing. Each marker
