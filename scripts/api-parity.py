@@ -170,6 +170,169 @@ def normalise(name):
     return re.sub(r"Dto$", "", name)
 
 
+def code_only(src):
+    """The file with its comments removed, by the same line rules
+    `scripts/mail-honesty.py` applies to it (and the same fix: a one-line
+    `/** ... */` opens nothing).
+
+    This exists because the route check below was satisfied by a doc comment, and
+    then by the tail of a real line of code. Pointing Android's assignment call at
+    `/labels/assignmentz` left the gate green twice over: the function's KDoc cites
+    `GET /labels/assignments`, and `request(...)  // PUT /screener/decision` keeps
+    its prose with its statement when the stripper walks line by line. A contract
+    check has to read the text that can only be executed.
+
+    Same scanner as `code_only` in `scripts/mail-honesty.py`, deliberately
+    duplicated rather than imported: these two scripts run in CI steps that must
+    each work if the other is broken, and a shared helper file would make one
+    import failure silence both gates.
+    """
+    out, i, n = [], 0, len(src)
+    while i < n:
+        c = src[i]
+        if c == "/" and i + 1 < n and src[i + 1] == "/":
+            while i < n and src[i] != "\n":
+                i += 1
+            continue
+        if c == "/" and i + 1 < n and src[i + 1] == "*":
+            i += 2
+            while i + 1 < n and not (src[i] == "*" and src[i + 1] == "/"):
+                i += 1
+            i += 2
+            continue
+        if c == '"':
+            if src[i:i + 3] == '"""':
+                out.append('"""'); i += 3
+                while i < n:
+                    if src[i] == "\\":
+                        out.append(src[i:i + 2]); i += 2; continue
+                    if src[i:i + 3] == '"""':
+                        out.append('"""'); i += 3; break
+                    out.append(src[i]); i += 1
+                continue
+            out.append('"'); i += 1
+            while i < n:
+                if src[i] == "\\":
+                    out.append(src[i:i + 2]); i += 2; continue
+                if src[i] == '"':
+                    out.append('"'); i += 1; break
+                if src[i] == "\n":
+                    break        # unterminated on this line: stop, do not eat the file
+                out.append(src[i]); i += 1
+            continue
+        if c == "'":
+            j, run = i + 1, ["'"]
+            while j < n:
+                if src[j] == "\\":
+                    run.append(src[j:j + 2]); j += 2; continue
+                if src[j] == "'":
+                    run.append("'"); j += 1; break
+                if src[j] == "\n":
+                    break
+                run.append(src[j]); j += 1
+            if len(run) > 1 and run[-1] == "'" and sum(len(x) for x in run) <= 6:
+                out.append("".join(run)); i = j; continue
+            out.append(c); i += 1
+            continue
+        out.append(c); i += 1
+    return "".join(out)
+
+
+# ── the spec's own checklist, checked against BOTH clients ───────────────────
+#
+# T1.2 names the calls the mailbox client owes the server. `labelAssignments` sat
+# on that list unwired on BOTH platforms for a whole review cycle, and this file
+# could not see it: two sides agreeing to omit something produces a clean diff.
+# That is the blind spot item 1 of the mailbox audit was made of, so the spec's
+# list is checked here as its own contract, not as a name comparison.
+#
+# Each entry is the name the plan used, and the implementation name(s) that
+# satisfy it. An alias has to be written down: a plan reader hunting for
+# `mailFiling` finds nothing in either client, and there are three such names
+# (`mailFiling`, `attachmentDownload`, `screenerSetEnabled`) plus the bare
+# `labels`/`labelAssignments` forms. Recording them as renames is what keeps
+# "renamed" from quietly meaning "missing" the next time somebody checks.
+#
+#   mailFiling(id, action, until)  -- there is no `/filing` route on the server;
+#       filing is the same `PATCH /message/:id/:action` with a body carrying the
+#       snooze instant (`grapmail-archive.ts:171`), and `mailAction`'s third
+#       parameter IS that call. Checked further: the `until` argument must exist.
+#   attachmentDownload             -- `mailAttachmentBytes`, because the point is
+#       that the bytes are not decoded (`GET /attachments/:id`).
+#   screenerSetEnabled             -- `mailScreenerSet` (`PUT /screener/enabled`).
+SPEC_CALLS = {
+    "mailMe": ["mailMe"],
+    "mailStats": ["mailStats"],
+    "mailInbox": ["mailInbox"],
+    "mailMessage": ["mailMessage"],
+    "mailThread": ["mailThread"],
+    "mailSend": ["mailSend"],
+    "mailDraft": ["mailDraft"],
+    "mailAction": ["mailAction"],
+    "mailFiling": ["mailAction"],
+    "mailDeletePermanent": ["mailDeletePermanent"],
+    "labels": ["mailLabels"],
+    "labelAssignments": ["mailLabelAssignments"],
+    "labelCreate": ["mailCreateLabel"],
+    "labelRename": ["mailRenameLabel"],
+    "labelDelete": ["mailDeleteLabel"],
+    "labelAttach": ["mailLabelAssign"],
+    "labelDetach": ["mailLabelDetach"],
+    "aliases": ["mailAliases"],
+    "attachmentUpload": ["mailAttachmentUpload"],
+    "attachmentDownload": ["mailAttachmentBytes"],
+    "screener": ["mailScreener"],
+    "screenerSetEnabled": ["mailScreenerSet"],
+    "screenerDecision": ["mailScreenerDecision"],
+}
+
+# The routes those calls must actually reach. Names can be argued about; a path
+# in the source of both clients is the wire contract, and a call renamed on one
+# side but pointed somewhere else is exactly what the name diff would pass.
+SPEC_ROUTES = [
+    "/me", "/stats", "/inbox", "/thread", "/send", "/draft",
+    "/labels", "/labels/assignments", "/labels/message/",
+    "/aliases", "/attachments", "/screener", "/screener/enabled",
+    "/screener/decision",
+]
+
+
+def spec_check(af, _if, android_src, ios_src, problems):
+    """Every capability the plan listed must be callable on BOTH sides."""
+    a_code, i_code = code_only(android_src), code_only(ios_src)
+    for spec, impls in sorted(SPEC_CALLS.items()):
+        on_android = [n for n in impls if n in af]
+        on_ios = [n for n in impls if n in _if]
+        if not on_android:
+            problems.append(f"spec T1.2 `{spec}` has no Android call "
+                            f"(accepted: {', '.join(impls)})")
+        if not on_ios:
+            problems.append(f"spec T1.2 `{spec}` has no iOS call "
+                            f"(accepted: {', '.join(impls)})")
+    # The `until` half of `mailFiling`: a signature that cannot carry a snooze
+    # instant would make the alias above a lie.
+    if "mailFiling" in SPEC_CALLS:
+        for side, src, pat in (("Android", a_code, r"fun mailAction\([^)]*until"),
+                               ("iOS", i_code, r"func mailAction\([^)]*until")):
+            if not re.search(pat, src, re.S):
+                problems.append(f"{side}'s mailAction takes no `until`, so "
+                                f"`mailFiling(id, action, until)` is not satisfied by it")
+    # Routes are looked for in code only. Stripping the comments is the whole
+    # fix: a path that survives it is a path inside a string the client builds a
+    # request from, and both platforms spell theirs the same way once the prose
+    # is gone -- Kotlin `"$MAIL/labels/assignments"`, iOS `mailGet("/labels/...")`
+    # or `"\(mailBase)/screener/enabled"`, whose char before the slash is `)`, not
+    # a quote. Requiring a prefix there would have failed on correct code, so the
+    # check is the route itself, in text that can only be executed.
+    for route in SPEC_ROUTES:
+        for side, code in (("Android", a_code), ("iOS", i_code)):
+            if route not in code:
+                problems.append(f"{side} never calls {route} in code "
+                                f"(a T1.2 route this surface owes the server)")
+    say(f"spec T1.2 capabilities — {len(SPEC_CALLS)} named, "
+        f"{len(SPEC_ROUTES)} routes, both platforms")
+
+
 def main():
     missing = [p for p in (ANDROID, ANDROID_DTO, IOS_API) if not os.path.exists(p)]
     if missing:
@@ -188,6 +351,8 @@ def main():
         problems.append(f"call only on Android: {name}()")
     say(f"mail calls — android {len(af)}  ios {len(_if)}  "
         f"shared {len(af & _if)}")
+
+    spec_check(af, _if, android_src, ios_src, problems)
 
     a_types = _types(android_src, ANDROID_DECL, "(", ")", android_fields)
     i_types = _types(ios_src, SWIFT_DECL, "{", "}", swift_fields)

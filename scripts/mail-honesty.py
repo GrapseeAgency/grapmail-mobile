@@ -102,22 +102,68 @@ def code_only(src):
     "already inside a block" test comes first, because a line inside a block can
     itself begin with `/*`.
     """
-    out, keep = [], False
-    for line in src.split("\n"):
-        st = line.strip()
-        if keep:
-            if st.endswith("*/"):
-                keep = False
+    # Second bug in this helper's history, found by mutation and not by reading:
+    # the line-based version below dropped only comments that OWN a line, so
+    # `request(...)  // PUT /screener/decision` kept its prose with its code, and
+    # a route check was satisfied by the tail of a real line. `api-parity.py` blew
+    # a retargeted route that way on a mutation written precisely to see whether it
+    # could be missed. It scans characters now: both comment kinds go wherever they
+    # sit, string and character literals are passed through untouched (a pin that
+    # forbids a word must still see the word where it is rendered), and the `//`
+    # inside "https://x" is not a comment.
+    out, i, n = [], 0, len(src)
+    while i < n:
+        c = src[i]
+        if c == "/" and i + 1 < n and src[i + 1] == "/":
+            while i < n and src[i] != "\n":
+                i += 1
             continue
-        if st.startswith("/*"):
-            if st.endswith("*/") and len(st) > 4:
-                continue          # a complete one-line doc comment: opens nothing
-            keep = True
+        if c == "/" and i + 1 < n and src[i + 1] == "*":
+            i += 2
+            while i + 1 < n and not (src[i] == "*" and src[i + 1] == "/"):
+                i += 1
+            i += 2
             continue
-        if st.startswith("//") or st.startswith("*"):
+        if c == '"':
+            if src[i:i + 3] == '"""':
+                out.append('"""'); i += 3
+                while i < n:
+                    if src[i] == "\\":
+                        out.append(src[i:i + 2]); i += 2; continue
+                    if src[i:i + 3] == '"""':
+                        out.append('"""'); i += 3; break
+                    out.append(src[i]); i += 1
+                continue
+            out.append('"'); i += 1
+            while i < n:
+                if src[i] == "\\":
+                    out.append(src[i:i + 2]); i += 2; continue
+                if src[i] == '"':
+                    out.append('"'); i += 1; break
+                if src[i] == "\n":
+                    break        # unterminated on this line: stop, do not eat the file
+                out.append(src[i]); i += 1
             continue
-        out.append(line)
-    return "\n".join(out)
+        if c == "'":
+            # A character literal in either language, or an apostrophe in prose.
+            # Only treat it as a literal when it closes within a few characters;
+            # otherwise emit the mark and move on, because swallowing the rest of
+            # the file to find the next quote is how a helper eats real code.
+            j, run = i + 1, ["'"]
+            while j < n:
+                if src[j] == "\\":
+                    run.append(src[j:j + 2]); j += 2; continue
+                if src[j] == "'":
+                    run.append("'"); j += 1; break
+                if src[j] == "\n":
+                    break
+                run.append(src[j]); j += 1
+            if len(run) > 1 and run[-1] == "'" and sum(len(x) for x in run) <= 6:
+                out.append("".join(run)); i = j; continue
+            out.append(c); i += 1
+            continue
+        out.append(c); i += 1
+    return "".join(out)
 
 
 # ── 1. the send receipt prints the server's own three words ──────────────────
