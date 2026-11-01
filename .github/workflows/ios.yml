@@ -111,11 +111,11 @@ jobs:
           # The export chain above never aborts (a failed test still has to
           # upload what it captured), so without these checks the job could go
           # green on an empty artifact while claiming the sector was screened.
-          # The walk photographs 62 screens: 8 signup, 9 hub + gate leg, 7 hub
+          # The walk photographs 63 screens: 8 signup, 9 hub + gate leg, 7 hub
           # rows, 15 post-write + no-open-alert security confirmations, 2
           # recovery, 1 session restore, 1 sign-in, 2 dark (welcome + step 1),
-          # and the mailbox band of 26 — 4 live (60 home, 62 drawer, 67 search,
-          # 69 sort sheet), 21 snapshot names, and 61 shot in dark. Anything
+          # and the mailbox band of 27 — 4 live (60 home, 62 drawer, 67 search,
+          # 69 sort sheet), 22 snapshot names, and 61 shot in dark. Anything
           # under 60 means it died part way through, and the run must not be
           # read as a pass on screenshots.
           COUNT="$(find screenshots -name '*.png' | wc -l | tr -d ' ')"
@@ -136,15 +136,18 @@ jobs:
           # artifact whose frames cannot be attributed to screens is not evidence,
           # however many files it holds.
           MISSING=""
-          for want in $(grep -oE '"[0-9]{2}-mail-[a-z-]+"' \
-                          ios/GrapMailUITests/ScreenshotWalkUITests.swift | tr -d '"' | sort -u); do
+          BAND="$(grep -oE '"[0-9]{2}-mail-[a-z-]+"' \
+                   ios/GrapMailUITests/ScreenshotWalkUITests.swift | tr -d '"' | sort -u)"
+          for want in $BAND; do
             [ -f "screenshots/$want.png" ] || MISSING="$MISSING $want"
           done
           if [ -n "$MISSING" ]; then
             echo "::error::mail frames missing from the artifact:$MISSING"
             exit 1
           fi
-          echo "all 26 mailbox frames present by name"
+          # Counted from the list rather than written here, so the sentence cannot
+          # go stale the way the number above just did when the band grew.
+          echo "all $(echo "$BAND" | wc -l | tr -d ' ') mailbox frames present by name"
 
       - name: Upload screenshots
         if: always()

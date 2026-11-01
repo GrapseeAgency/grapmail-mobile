@@ -391,6 +391,11 @@ final class ScreenshotWalkUITests: XCTestCase {
             ("83-mail-assign-label-sheet", "mail-assign-label-sheet"),
             ("84-mail-snooze-sheet", "mail-snooze-sheet"),
             ("85-mail-contact-detail", "mail-contact-detail"),
+            // The sender-decision sheet is reachable only with the screener queue
+            // open and messages selected, so a read-only walk on a fresh CI
+            // mailbox cannot reach it — the queue is empty there. Android's host
+            // draws the same frame from the same two addresses.
+            ("86-mail-sender-sheet", "mail-sender-sheet"),
         ]
         // These two fetch on appear, so the shutter has to wait for the loaded
         // branch — otherwise the photograph catches "Checking your account…"
@@ -432,6 +437,7 @@ final class ScreenshotWalkUITests: XCTestCase {
             "mail-delete-sheet": "Delete 3 messages permanently?",
             "mail-assign-label-sheet": "Label",
             "mail-snooze-sheet": "Snooze until",
+            "mail-sender-sheet": "Decide the sender",
         ]
         for screen in postWriteScreens {
             app.terminate()

@@ -409,7 +409,8 @@ for spec in "two-factor-on:40-sec-two-factor-on" \
             "mail-send-receipt:82-mail-send-receipt" \
             "mail-assign-label-sheet:83-mail-assign-label-sheet" \
             "mail-snooze-sheet:84-mail-snooze-sheet" \
-            "mail-contact-detail:85-mail-contact-detail"; do
+            "mail-contact-detail:85-mail-contact-detail" \
+            "mail-sender-sheet:86-mail-sender-sheet"; do
   nm="${spec%%:*}"; pic="${spec##*:}"
   adb shell am force-stop "$PKG"
   adb shell am start -W -n "$PKG/.MainActivity" --es gmSnapshot "$nm" >/dev/null
@@ -447,6 +448,7 @@ for spec in "two-factor-on:40-sec-two-factor-on" \
     mail-delete-sheet) settled="gm-sheets-permanent" ;;
     mail-assign-label-sheet) settled="gm-sheets-label" ;;
     mail-snooze-sheet) settled="gm-sheets-snooze" ;;
+    mail-sender-sheet) settled="gm-sheets-sender" ;;
     *) settled="" ;;
   esac
   # A marker may name a visible string OR a resource-id. Text is right for
@@ -574,7 +576,8 @@ for want in 01-welcome-light 02-step1-name-light 03-step2-basicinfo-light \
             76-mail-compose 77-mail-contacts 78-mail-files \
             79-mail-attachment-preview 80-mail-settings 81-mail-screener \
             82-mail-send-receipt 83-mail-assign-label-sheet \
-            84-mail-snooze-sheet 85-mail-contact-detail; do
+            84-mail-snooze-sheet 85-mail-contact-detail \
+            86-mail-sender-sheet; do
   [ -s "$OUT/$want.png" ] || { echo "FAIL: missing $want.png" >&2; FAILURES=$((FAILURES + 1)); }
 done
 if [ "$FAILURES" -gt 0 ]; then

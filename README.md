@@ -213,9 +213,12 @@ host, so a broken network layer cannot read as a working mailbox.
   not remove what is underneath it from the dump, so a node can be present on a
   screen you cannot see. Without this, a run that reached no screen at all still
   filled its PNG gate with pictures of the wrong ones.
-- **The band is 26 frames, `60`–`85`.** The plan called it 25; the list it
-  printed runs 60 to 85 inclusive, which is 26. The number in the list is what
-  CI enforces, and the discrepancy is recorded rather than quietly closed.
+- **The band is 27 frames, `60`–`86`.** The plan called it 25; the list it
+  printed runs 60 to 85 inclusive, which is 26. `86-mail-sender-sheet` is the
+  twenty-seventh: the sender-decision sheet implements a call the plan's own T1.2
+  named (`screenerDecision`) but gave no frame, so it would have shipped as the
+  one screen in the sector with no artifact at all. The number in the list is what
+  CI enforces, and each discrepancy is recorded rather than quietly closed.
 - **Snapshot hosts** (`MailSnapshot.kt` / `MailSnapshot.swift`) render every
   frame that needs a message to exist, from literals, unreachable without the
   launch argument. The view models expose seed seams that only that host calls.
@@ -226,8 +229,10 @@ host, so a broken network layer cannot read as a working mailbox.
   receipt would have photographed "Not delivered"). A frame of a re-implementation
   looks correct, passes a file count, and proves nothing. `scripts/mail-honesty.py`
   now pins that the hosts call the live renderer and hold none of its wording.
-- **Gates.** The Android walk's fixed PNG list carries all 26 names; the iOS
-  floor is 60 of 62. Both workflows diff the two name lists and fail on
+- **Gates.** The Android walk's fixed PNG list carries all 27 names; the iOS
+  floor is 60 of 63, and the iOS artifact is additionally required to contain
+  every `NN-mail-*` name the test source lists — a count says the walk finished,
+  not which screens it reached. Both workflows diff the two name lists and fail on
   asymmetry, because a count and a fixed list can each be satisfied by two
   different screen sets — which is exactly how drift would arrive.
 - **The walk never** taps Send, permanent delete, or Report spam: one is
@@ -318,7 +323,8 @@ All Mail carry no badge — the same call the web client already makes
 `74-mail-thread`, `75-mail-thread-encrypted`, `76-mail-compose`,
 `77-mail-contacts`, `78-mail-files`, `79-mail-attachment-preview`,
 `80-mail-settings`, `81-mail-screener`, `82-mail-send-receipt`,
-`83-mail-assign-label-sheet`, `84-mail-snooze-sheet`, `85-mail-contact-detail`.
+`83-mail-assign-label-sheet`, `84-mail-snooze-sheet`, `85-mail-contact-detail`,
+`86-mail-sender-sheet`.
 
 Contacts is derived from `?box=inbox` + `?box=sent` (there is no contacts
 endpoint), and Files is aggregated from message pages (`GET /attachments/:id`

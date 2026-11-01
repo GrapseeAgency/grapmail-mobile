@@ -226,6 +226,18 @@ struct MailSnapshotView: View {
                 return AnyView(
                 sheetFrame(SnoozeSheet { _ in })
                 )
+            // The sender-decision sheet appears only when the screener queue is
+            // open with messages selected, so no read-only walk reaches it on a
+            // fresh CI mailbox — the queue is empty there. Two senders rather than
+            // one: the plural line is the branch that would never otherwise be
+            // photographed, and the scope row reads differently. Android's host
+            // draws the same two addresses.
+            case "mail-sender-sheet":
+                return AnyView(
+                sheetFrame(SenderDecisionSheet(
+                    senders: ["priya@havenworks.example", "tomas@fieldkit.example"],
+                    busy: false, result: nil, onPick: { _, _ in }))
+                )
             case "mail-labels":
                 return AnyView(
                 secondary(LabelsView(vm: model, onBack: {}, onCreate: {}, onEdit: { _ in }))

@@ -130,6 +130,17 @@ fun MailSnapshotScreen(name: String) {
             "mail-delete-sheet" -> sheetHost { PermanentDeleteContent(3, cancel = {}, confirm = {}) }
             "mail-assign-label-sheet" -> sheetHost { AssignLabelContent(sampleLabels) { } }
             "mail-snooze-sheet" -> sheetHost { SnoozeContent { } }
+            // The sender-decision sheet appears only when the screener queue is
+            // open and messages are selected, so no read-only walk can reach it on
+            // a fresh CI mailbox — the queue is empty there. Two senders rather
+            // than one, because the plural line is the branch that would otherwise
+            // never be photographed and the scope row reads differently.
+            "mail-sender-sheet" -> sheetHost {
+                SenderDecisionContent(
+                    senders = listOf("priya@havenworks.example", "tomas@fieldkit.example"),
+                    busy = false, result = null, onPick = { _, _ -> },
+                )
+            }
             // The snapshot host never edits: this screen is photographed as the
             // list of labels the account has, and the row action is a no-op here
             // exactly as every other control in this host is.
