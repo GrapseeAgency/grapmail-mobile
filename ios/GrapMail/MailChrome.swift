@@ -169,9 +169,28 @@ struct BoxTabRow: View {
 /// / Work / +2` chips are not rendered because that axis does not exist
 /// server-side; this row shows only what the account actually created, and
 /// disappears entirely when it has created none.
+///
+/// The pills take no tap, and the reason written here before was false: it
+/// claimed the listing's rows carry no label field and nothing per-row is
+/// readable, so there would be nothing to filter with. `GET /labels/assignments`
+/// returns every `(messageId, labelId)` pair for the account in one sweep — the
+/// call this sector wired for the Label sheet, and what the web client filters
+/// with (`page.tsx:778,2262`). The strip is display-only because the plan asked
+/// for a strip, not a filter; if one is ever wanted it narrows the LOADED rows
+/// the way `unread` does and prints its scope the way the sort sheet prints
+/// `sortedCount`.
+///
+/// `query` and `filter` exist for one reason: the Inbox pill is the only pill
+/// here with a state to mirror, and it was drawn `selected: true` unconditionally
+/// — highlighted through a search term and through the Unread filter, claiming a
+/// list state it had not been given. Android reads the same two fields
+/// (`MailboxScreen.kt`'s strip), so the comparison is against that and nothing
+/// else.
 struct LabelStrip: View {
     let labels: [MailLabel]
     let unread: Int?
+    let query: String
+    let filter: MailFilter
 
     var body: some View {
         if labels.isEmpty {
@@ -180,7 +199,7 @@ struct LabelStrip: View {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {
                     LabelChip(label: "Inbox", count: unread, color: GM.primarySolid,
-                              selected: true)
+                              selected: query.isEmpty() && filter == .all)
                     ForEach(labels) { l in
                         // The server's palette key, resolved to a swatch. The old
                         // `l.color?.hexColor` could never parse a colour name, so

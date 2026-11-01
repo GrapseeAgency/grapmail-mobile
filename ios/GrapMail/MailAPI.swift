@@ -956,8 +956,14 @@ extension ApiClient {
 
     /// `GET /attachments/:id` — the bytes, not JSON. Separate from `request`,
     /// which decodes and would corrupt binary by round-tripping it as text.
-    /// A 401 still kills the session through the shared signal, so a download
-    /// cannot keep a revoked token alive.
+    ///
+    /// A 401 here does NOT end the account session, and that is deliberate: these
+    /// are `mailBase` paths, and every other mail route on both platforms carves
+    /// them out because the mail service refuses a bearer the account endpoints
+    /// still accept. The status is thrown to the caller as itself, so the file
+    /// screen says what happened. A revoked token is not kept alive by this — the
+    /// next account call rejects it and lands the person on sign-in the way it
+    /// already does for every other screen.
     static func mailAttachmentBytes(token: String, id: String) async throws -> Data {
         let (data, http) = try await mailBinary(
             url: URL(string: "\(base)\(mailBase)/attachments/\(id.percentEncodedPath())"),

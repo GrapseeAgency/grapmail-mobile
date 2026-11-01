@@ -444,17 +444,30 @@ fun MailGreeting(name: String?, address: String?, modifier: Modifier = Modifier)
 }
 
 /**
- * A pill in the label strip. Selected pills take the label's own colour, which
- * is why the server stores it rather than the client picking one.
+ * A pill in the label strip.
  *
- * Not a control, and deliberately so. A label cannot filter this list: the
- * message rows the listing returns carry no label field (`MailMessageDto`), and
- * the route takes no label query — only `box`, `q`, `page`, `pageSize`. The
- * assignments exist server-side (`grapmail-labels.ts`) but are only readable
- * per-label, not per-row, so there is nothing to filter with on the device.
- * Until then a tappable chip would be an affordance that goes nowhere, which is
- * the one thing this sector was told not to ship; so it reports the count, which
- * is real, and asks for no tap.
+ * Not a control, and that is a scope decision rather than a data limitation. The
+ * plan replaced the design's All / Personal / Work chips with a strip driven by
+ * `GET /grapmail/labels` — real, coloured, user-created labels — and did not ask
+ * for a label filter.
+ *
+ * The justification written here before was false, and worth keeping the record
+ * of: it claimed the assignments "are only readable per-label, not per-row, so
+ * there is nothing to filter with on the device". `GET /labels/assignments`
+ * returns every `(messageId, labelId)` pair for the account in one sweep — that
+ * is the call this sector wired for the Label sheet, and it is exactly what the
+ * web client filters with (`page.tsx:778,2262`). Nothing on the device is
+ * missing; the feature was simply not asked for, and an agent inventing a tap is
+ * how unbacked affordances get shipped.
+ *
+ * If a filter is ever wanted, it narrows the LOADED rows the way `unread` does —
+ * the route takes no label query (`grapmail.ts:719-726`) — and it must print its
+ * scope the way the sort sheet prints `sortScope`, never imply the whole box was
+ * filtered.
+ *
+ * `selected` is real for exactly one caller: the Inbox pill mirrors the list's
+ * own filter state (`query empty && filter == All`). A label pill is never
+ * selected, so its colour reaches the pill through the swatch dot either way.
  */
 @Composable
 fun LabelChip(

@@ -145,7 +145,8 @@ struct MailboxView: View {
                 VStack(spacing: 12) {
                     MailGreeting(name: vm.state.accountName, address: vm.state.accountAddress)
                     searchField
-                    LabelStrip(labels: vm.state.labels, unread: vm.state.unreadCount)
+                    LabelStrip(labels: vm.state.labels, unread: vm.state.unreadCount,
+                               query: vm.state.query, filter: vm.state.filter)
                 }
                 .padding(.horizontal, 16)
 

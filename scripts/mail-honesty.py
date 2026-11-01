@@ -991,7 +991,36 @@ pin("iOS's detach mutates the set instead of subtracting from it",
     re.search(r"func markUnassigned\([\s\S]{0,400}?labels\.remove\(labelId\)", code_only(SW_STORE)) is not None
     and re.search(r"func markUnassigned[\s\S]{0,400}?\) - ", code_only(SW_STORE)) is None)
 
-# -- 21. the sources at least parse as sources ----------------------------------
+# -- 22. a pill may not light up for a state it was never given -----------------
+#
+# Item 1 was the Label SHEET claiming an assignment it had not read; the same
+# defect lived in the label STRIP, one file away, and the parity gate could not
+# see it for the same reason: Android derived the Inbox pill from the list's own
+# query and filter, and iOS passed `selected: true` -- the pill stayed
+# highlighted through a search term and through the Unread filter. The comment in
+# both files justified the missing tap by claiming per-row assignments are not
+# readable anywhere, which became false the moment this session wired
+# `GET /labels/assignments`; the strip is display-only because the plan asked for
+# a strip, and saying otherwise teaches the next reader to trust the wrong reason.
+SW_CHROME = ios("MailChrome.swift")
+pin("iOS's Inbox pill mirrors the list's query and filter",
+    re.search(r'selected:\s*query\.isEmpty\(\) && filter == \.all', code_only(SW_CHROME)) is not None)
+pin("iOS's label strip is given the two fields it mirrors",
+    re.search(r'LabelStrip\(labels:[\s\S]{0,160}?query: vm\.state\.query, filter: vm\.state\.filter',
+              code_only(SW_BOX)) is not None)
+pin("Android's Inbox pill mirrors the same two fields",
+    re.search(r'LabelChip\("Inbox"[^\n]*s\.query\.isEmpty\(\) && s\.filter == MailFilter\.All',
+              code_only(KT_BOX)) is not None)
+for side, src in (("Android", KT_MAIL_C), ("iOS", SW_CHROME)):
+    # What can be pinned is the positive half: the strip's own documentation names
+    # the route that makes a filter possible. A grep cannot tell "asserting a false
+    # reason" from "quoting one to refute it", and the rewritten notes do the
+    # latter on purpose -- pretending otherwise would add a pin that fails on good
+    # prose and passes on a lie.
+    pin(f"{side}'s label strip names the assignment sweep a filter would need",
+        "/labels/assignments" in src)
+
+# -- 22. the sources at least parse as sources ----------------------------------
 #
 # Neither app can be compiled on this host, so a missing brace reaches CI and
 # costs a runner session to discover — the Android walk alone is two hours. This
