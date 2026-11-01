@@ -1196,6 +1196,16 @@ pin("the walk aborts on consecutive screens that are not the app",
               KT_WALK) is not None)
 pin("a recovered snapshot resets that counter",
     re.search(r"else\s*\n\s+SNAP_MISS=0", KT_WALK) is not None)
+# The snapshot loop is only the second half of the walk. The shade run died at the
+# FIRST tap -- 'Create Account' -- and then crawled through every later leg for an
+# hour and a half, so an abort that only watches snapshot markers would have let
+# the same run burn its ceiling again. Every `must` counts now.
+pin("the walk aborts on a run of failed interactions and dumps the foreground",
+    re.search(r"MUST_MISS=\$\(\(MUST_MISS \+ 1\)\)[\s\S]{0,700}MUST_MISS\" -ge 8[\s\S]{0,600}?exit 1",
+              KT_WALK) is not None
+    and re.search(r"MUST_MISS=\$\(\(MUST_MISS \+ 1\)\)[\s\S]{0,700}dumpsys window", KT_WALK) is not None)
+pin("a successful interaction resets that counter",
+    re.search(r"else\s*\n\s+MUST_MISS=0", KT_WALK) is not None)
 
 print()
 if failures:

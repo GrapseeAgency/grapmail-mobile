@@ -44,11 +44,29 @@ for scale in window_animation_scale transition_animation_scale animator_duration
 done
 
 FAILURES=0
+MUST_MISS=0
 must() { # must <description> <cmd...> — a failed interaction fails the walk
   local desc="$1"; shift
   if ! "$@"; then
     echo "FAIL: $desc" >&2
     FAILURES=$((FAILURES + 1))
+    # Consecutive, and fatal at eight. The shade run lost `Create Account` at the
+    # first tap of the flow and then spent an hour and a half losing everything
+    # after it — 107 findings that were one finding, and the ceiling is what
+    # stopped it. Eight interactions in a row that the device will not answer is
+    # not flakiness; it is the app not being on screen, or not being up at all, so
+    # the state is printed with the abort rather than left for someone to
+    # reconstruct from an artifact.
+    MUST_MISS=$((MUST_MISS + 1))
+    if [ "$MUST_MISS" -ge 8 ]; then
+      echo "ABORT: $MUST_MISS interactions in a row failed at '$desc'." >&2
+      echo "ABORT: foreground dump —" >&2
+      adb shell dumpsys activity activities 2>/dev/null | grep -iE "topResumedActivity|mResumedActivity|ResumedActivity:" | head -3 >&2
+      adb shell dumpsys window 2>/dev/null | grep -iE "mCurrentFocus|mFocusedApp" | head -3 >&2
+      exit 1
+    fi
+  else
+    MUST_MISS=0
   fi
 }
 must_tap()  { must "tap '$1'"  tap_text "$1"; }
