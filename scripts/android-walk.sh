@@ -306,11 +306,39 @@ hub_present() {
   fi
   return 2
 }
+# ensure_hub — get back to the security hub, however far the walk has drifted.
+#
+# The leg used to assume it was standing on the hub. When one step failed, its
+# BACK popped the hub; the next BACK popped further still, and a run ended up
+# searching hub rows on the mailbox home, then on the welcome screen, then under a
+# pulled-down notification shade — six timeouts of two minutes each, while `shot`
+# kept writing frames that made the artifact look complete. Re-entering through the
+# drawer is the path a person takes, and it works from any of those places. If even
+# that fails, the caller is told: a fast, specific failure beats twenty minutes of
+# searching a screen that is not there.
+ensure_hub() {
+  hub_present && return 0
+  echo "  [hub] not on the hub — re-entering through the drawer"
+  local pos
+  pos="$(wait_overlay "n.get('resource-id','').rsplit('/',1)[-1]=='mail-menu'" | head -1)"
+  [ -n "$pos" ] || { echo "  [hub] no way back to the hub on this screen" >&2; return 1; }
+  tap_xy "$pos" || return 1
+  sleep 2
+  pos="$(wait_overlay "n.get('resource-id','').rsplit('/',1)[-1]=='mail-drawer-Security'" | head -1)"
+  [ -n "$pos" ] || return 1
+  tap_xy "$pos" || return 1
+  sleep 2
+  hub_present
+}
 # sec_visit <hub row text> <shot name>: open a clickable hub row, photograph
 # the screen, and press back ONLY when the tap truly navigated. A row that did
 # not open, or a screen that cannot be read, fails the walk instead of guessing
 # with a BACK that might pop the hub.
 sec_visit() {
+  if ! ensure_hub; then
+    echo "FAIL: cannot reach the hub before '$1' — the tap is skipped, not guessed" >&2
+    FAILURES=$((FAILURES + 1)); return 0
+  fi
   must_tap "$1"; sleep 2; shot "$2"
   hub_present
   case $? in
@@ -328,9 +356,22 @@ sec_visit() {
 # The hub re-fetches every time it reappears, and while that is in flight the
 # switch is DISABLED, so a tap lands on nothing: verify the enable screen
 # actually arrived and retry, rather than marching on blind.
+#
+# The read can also FAIL outright, and then no number of taps helps: the screen
+# shows "We couldn't load your security settings" and the switch stays disabled by
+# design, because an unknown verdict is never drawn as togglable. One runner did
+# exactly this while the other two loaded fine — a transient read failure, not an
+# app defect. So take the retry the screen itself offers, the same thing a person
+# on that device would do, before deciding the step cannot be done.
 open_2fa_flow() {
   local attempt pos
   for attempt in 1 2 3; do
+    if [ -n "$(find_nodes "n.get('text','')=='We couldn\'t load your security settings.'")" ]; then
+      echo "  [hub] security read failed — using the screen's own Try again"
+      tap_text "Try again" || true
+      sleep 3
+      continue
+    fi
     pos="$(find_nodes "n.get('content-desc','')=='two-step switch'" | head -1)"
     [ -n "$pos" ] || pos="$(find_nodes "n.get('resource-id','').rsplit('/',1)[-1]=='sec-2fa-switch'" | head -1)"
     [ -n "$pos" ] || pos="$(find_nodes "n.get('checkable','')=='true'" | head -1)"
@@ -343,7 +384,18 @@ open_2fa_flow() {
 }
 must "open 2FA enable flow" open_2fa_flow
 shot 21-sec-2fa-enable-light
-adb shell input keyevent 4; sleep 1.5
+# Back ONLY when the step actually left the hub. When it fails, the hub is still
+# on screen, and a BACK there pops the hub itself — dropping the walk onto the
+# mailbox home, where every following hub-row search then times out. One run spent
+# twenty minutes on six of those and still photographed all its frames, because
+# `shot` fires either way: the artifact looked complete while the walk was
+# measuring the wrong screen the whole time.
+hub_present
+case $? in
+  0) echo "  [hub] 2FA flow did not open and the hub is still up — no BACK" ;;
+  1) adb shell input keyevent 4; sleep 1.5 ;;
+  2) echo "FAIL: screen unreadable after the 2FA step" >&2; FAILURES=$((FAILURES + 1)) ;;
+esac
 sec_visit "Phone Number" 22-sec-phone-light
 sec_visit "Change Password" 23-sec-change-password-light
 sec_visit "Backup Codes" 24-sec-backup-codes-light
