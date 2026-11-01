@@ -122,31 +122,40 @@ screen that used to print *"The mailbox arrives in the next build phase."* is
 deleted from both apps, and `.home` / `Routes.HOME` open the list, the drawer, the
 thread, compose, labels, contacts, files, settings and the screener.
 
-What has not changed is the server. One fact still gates every **live** mail call,
-and it was true before this batch was written and is true now: **the backend that
-owns mailboxes cannot authenticate a user.**
+What has changed since this section was written is the server, and it changed in
+one place and not another.
 
-`https://api.iqracsc.com/auth/register` answers `500` on the `SELECT` that runs
-before any insert, because it asks for `account_type`, `grapmail_handle` and
-`grapmail_status` and the production `users` table does not have them.
-`POST /auth/login` fails the same way. Applying the migrations that add them
-(`0012_grapmail_mailbox.sql`, `0022_users_columns.sql`) is the fix, and it is
-currently blocked one level further out: the Neon project has exceeded its quota,
-so the database refuses writes outright —
+**The account backend answers.** `POST /api/auth/account/create` with an empty body
+returns `422 {"code":"INVALID_NAME"}` and `POST /api/auth/account/signin` with a
+nonexistent address returns `401 {"code":"INVALID_CREDENTIALS"}` — validation and
+lookup running against the real `users` table, not a `500`. CI proves the same from
+inside the app: the walk creates an account for real, signs in, and the security
+hub renders server verdicts ("One thing left to do", "Off", "Add").
 
-```
-PostgresError: Your account or project has exceeded the quota.
-code 53000 · failed on: CREATE SCHEMA IF NOT EXISTS "drizzle"
-```
+An earlier version of this section cited `POST /auth/register` and `/auth/login` on
+`api.iqracsc.com` failing with a missing-columns `500`. Those are not the paths this
+app calls — it uses `/auth/account/create` and `/auth/account/signin` on
+`grapsee.com/api` — so that evidence was measuring a surface the client never
+touches. Recorded here because the correction matters more than the original claim
+looking right.
 
-Nothing in the migration chain has been applied. The consequence for this build is
-precise, and it is the reason the sector was not deferred: the client is complete
-against the verified contract, so the day the gateway returns it lights up with no
-code change — and until then, the live walk leg photographs whatever the app
-actually says. With a dead gateway that is the load-failed frame, with a live
-gateway and an unprovisioned account it is `66-mail-no-mailbox`. Neither is
-presented as the other, and no seeded row exists outside the test-only snapshot
-host, so a broken network layer cannot read as a working mailbox.
+**The mailbox still does not serve the signed-in account.** Its routes are
+deployed: `GET /api/grapsee/grapmail/inbox` and `/stats` answer `401
+{"error":"Unauthorized"}` with no bearer, which is a live route asking for
+authentication, not a missing one. But the app's authenticated mail request fails,
+and it fails as the *generic* load error — "Couldn't load Inbox / Your mailbox could
+not be reached. Nothing has been deleted." — not as `66-mail-no-mailbox`. So the
+server is refusing or erroring on a request that carries a token the account routes
+accept. Why is visible in the gateway's logs and not from a client, and the client
+will not guess at it.
+
+That distinction is the point of this paragraph. The sector was built against the
+verified contract, so the day the mailbox path is fixed it lights up with no code
+change; until then the live walk leg photographs whatever the app actually says,
+and the two failure states — unreachable, and reachable-but-unprovisioned — stay
+visibly different. Neither is presented as the other, and no seeded row exists
+outside the test-only snapshot host, so a broken network layer cannot read as a
+working mailbox.
 
 ### What shipped, and how CI proves it
 
@@ -258,12 +267,22 @@ host, so a broken network layer cannot read as a working mailbox.
 
 | Surface | Where it actually lives | State |
 | --- | --- | --- |
-| `auth/account/*` (profile, sessions, activity, twofactor, verify-password) | Next.js handlers, JSONL file store | working — what the security sector uses today |
-| `grapmail/*` (the mail API) | gateway `api.iqracsc.com`, Postgres + MTA | routes live (`401`, not `404`) — unreachable without a gateway token |
+| `auth/account/*` (profile, sessions, activity, twofactor, verify-password) | Next.js handlers, JSONL file store | working — what the security sector uses today, and what the walk signs up with |
+| `grapmail/*` (the mail API) | gateway `api.iqracsc.com`, Postgres + MTA, reached through `grapsee.com/api/grapsee/grapmail` | routes live (`401`, not `404`) — the app's authenticated request still fails |
 
-They do not share users: an account created through the app's path is rejected by
-the gateway. Mail therefore requires the app to hold a gateway identity, which is
-what the quota fix unblocks.
+They do not share users: an account created through the app's path is not a
+gateway identity. That is the structural reason the mail surface is the one that
+does not light up while every account surface does — and it is a decision to make,
+not a migration to run. The earlier explanation of this failure ("the auth DB is
+missing its GrapMail columns, blocked on a Neon quota") no longer holds: the
+account routes now validate and look up against the real table and return
+`422`/`401` rather than `500`.
+
+What the client can say and cannot say, precisely: the failure is not
+`NO_MAILBOX`, because that has its own screen and the app is showing the generic
+load error instead. Whether the gateway is refusing the bearer or erroring behind
+it is visible only in the gateway's logs, so the app reports the first and
+withholds the second rather than guessing.
 
 The mail base path for the app is `$BASE/grapsee/grapmail` — the same same-origin
 proxy the website uses (`src/app/api/grapsee/grapmail/[...path]/route.ts:130`

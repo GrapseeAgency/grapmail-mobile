@@ -293,13 +293,28 @@ must_shot 20-sec-hub-light "n.get('text','')=='Account Security'"
 # uiautomator dump failed, and the first security leg read that second case as
 # "the tap navigated", pressed BACK and popped the hub itself — derailing every
 # row after it. A caller presses back on 1 only.
+#
+# "Absent" has a third meaning here, and two runs paid for it: 'Account Security'
+# is the hub's header, uiautomator omits nodes scrolled off screen, and the hub
+# keeps its scroll position when a row's screen is popped back to it. So after a
+# few visits the header is gone, the check says "not on the hub" while the hub is
+# plainly on screen (the timeout dumps prove it — they show the hub's own verdict
+# chips), and the recovery then looks for the home's drawer handle and reports
+# "no way back to the hub" FROM the hub. Scrolling to the top before concluding
+# makes the predicate mean what it says, and costs one fling when it was wrong.
 hub_present() {
   local out
   if out="$(find_nodes "n.get('text','')=='Account Security'")"; then
     [ -n "$out" ] && return 0
-    return 1
+    sleep 2   # one retry: a dump can fail while a transition animates
+    out="$(find_nodes "n.get('text','')=='Account Security'")" || return 2
+    [ -n "$out" ] && return 0
+  else
+    sleep 2
+    out="$(find_nodes "n.get('text','')=='Account Security'")" || return 2
+    [ -n "$out" ] && return 0
   fi
-  sleep 2   # one retry: a dump can fail while a transition animates
+  scroll_to_top
   if out="$(find_nodes "n.get('text','')=='Account Security'")"; then
     [ -n "$out" ] && return 0
     return 1
