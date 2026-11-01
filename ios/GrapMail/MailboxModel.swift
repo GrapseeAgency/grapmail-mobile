@@ -43,6 +43,25 @@ final class MailboxModel: ObservableObject {
         var noMailbox = false
         var selection: Set<String> = []
         var labels: [MailLabel] = []
+        /// Whether `GET /labels/assignments` has answered. Kept apart from
+        /// `labelMarks` so the sheet can say “not known” out loud: marking every
+        /// label off before the read answers would offer to add a label the message
+        /// already carries, and would let a tap remove one on a guess.
+        var assignmentsRead: AssignmentsRead = .notRead
+        /// labelId → its state against the current selection.
+        var labelMarks: [String: LabelMark] = [:]
+        /// The Label sheet's own result line — what the last tap actually did.
+        var labelNote: String?
+        ///
+        /// The messages this session snoozed, kept so the snooze can be undone.
+        ///
+        /// `publicRow` (`grapmail.ts:583-611`) carries no `snoozedUntil` and the
+        /// inbox hides a pending snooze, so the app cannot tell which of the mail on
+        /// screen is postponed — `?box=snoozed` is implemented but not deployed.
+        /// Undo is therefore offered for exactly the mail the app just snoozed,
+        /// which is the whole set a client can honestly name.
+        var snoozeUndoIds: [String] = []
+        var snoozeUndoNote: String?
         var unreadCount: Int?
         var statsSent: Int?
         var statsDrafts: Int?
@@ -365,9 +384,11 @@ final class MailboxModel: ObservableObject {
         Task { [weak self] in
             guard let self else { return }
             var failure: String?
+            var done: [String] = []
             for id in ids {
                 do {
                     _ = try await ApiClient.mailAction(token: token, id: id, action: action, until: until)
+                    done.append(id)
                     await self.applyLocally(id: id, action: action)
                 } catch { failure = Self.describe(error) }
             }
@@ -375,8 +396,77 @@ final class MailboxModel: ObservableObject {
             self.state.busy = false
             self.state.selection = []
             self.state.staleError = failure
+            // Only the messages the server accepted get an undo: offering one for a
+            // message whose snooze failed would unsnooze mail still in the inbox and
+            // report it as postponed.
+            if action == .snooze {
+                if !done.isEmpty {
+                    self.state.snoozeUndoIds = done
+                    self.state.snoozeUndoNote = Self.snoozeNote(done.count, until: until)
+                }
+            } else if action != .unsnooze {
+                // Any other filing action supersedes the offer. An unsnooze keeps it:
+                // a partial undo leaves the rest postponed and still offered.
+                self.state.snoozeUndoIds = []
+                self.state.snoozeUndoNote = nil
+            }
             self.load(replace: true)
         }
+    }
+
+    /// The undo line, naming the instant the server was told to hold the mail until.
+    /// A `until` it cannot parse still produces the count rather than nothing: the
+    /// undo must exist even when the date cannot be shown.
+    static func snoozeNote(_ count: Int, until: String?) -> String {
+        let head = count == 1 ? "Snoozed 1 message" : "Snoozed \(count) messages"
+        // `MailTime.parse` is private to that type, so the formatter is used
+        // directly rather than reaching for a helper that is not exposed.
+        guard let raw = until else { return head }
+        let iso = ISO8601DateFormatter()
+        iso.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        guard let date = iso.date(from: raw) ?? ISO8601DateFormatter().date(from: raw)
+        else { return head }
+        let f = DateFormatter()
+        f.dateFormat = "EEE, d MMM · h:mm a"
+        return "\(head) until \(f.string(from: date))"
+    }
+
+    /// Take the mail back out of snooze — the one place `unsnooze` is reachable.
+    ///
+    /// The action existed on both platforms with nothing calling it, because the
+    /// client could not see which messages were snoozed. The moment of snoozing is
+    /// the moment the app knows, so that is where the undo lives.
+    func undoSnooze() {
+        let ids = state.snoozeUndoIds
+        guard !ids.isEmpty, let token else { return }
+        state.busy = true
+        Task { [weak self] in
+            guard let self else { return }
+            var failure: String?
+            var undone = 0
+            for id in ids {
+                do {
+                    _ = try await ApiClient.mailAction(token: token, id: id, action: .unsnooze, until: nil)
+                    undone += 1
+                } catch { failure = Self.describe(error) }
+            }
+            await self.invalidateFor(.unsnooze)
+            self.state.busy = false
+            // Cleared only for what actually came back; a partial undo keeps the
+            // rest offered rather than forgetting them.
+            if failure == nil {
+                self.state.snoozeUndoIds = []
+                self.state.snoozeUndoNote = nil
+            } else {
+                self.state.snoozeUndoNote = "\(undone) of \(ids.count) came back. \(failure!)"
+            }
+            self.load(replace: true)
+        }
+    }
+
+    func dismissSnoozeUndo() {
+        state.snoozeUndoIds = []
+        state.snoozeUndoNote = nil
     }
 
     func actOn(_ id: String, _ action: MailAction) {
@@ -413,6 +503,9 @@ final class MailboxModel: ObservableObject {
         case .spam: await MailStore.shared.invalidate(.spam)
         case .restore, .unarchive, .unspam: await MailStore.shared.invalidateAllBoxes()
         case .snooze: await MailStore.shared.invalidate(.inbox)
+        // Undoing a snooze puts the mail back where it was hidden from, which is the
+        // inbox listing — so the inbox is the box that must be re-read.
+        case .unsnooze: await MailStore.shared.invalidate(.inbox)
         default: break
         }
     }
@@ -432,6 +525,9 @@ final class MailboxModel: ObservableObject {
                 do { try await ApiClient.mailDeletePermanent(token: token, id: id) }
                 catch { failure = Self.describe(error) }
                 await MailStore.shared.removeEverywhere(id: id)
+                // The message is gone, so its label pairs are gone with it. Left in
+                // the map they could resurface as a tick on mail that does not exist.
+                await MailStore.shared.forgetAssignments(id)
             }
             self.state.busy = false
             self.state.selection = []
@@ -440,20 +536,138 @@ final class MailboxModel: ObservableObject {
         }
     }
 
-    func assignLabel(_ labelId: String) {
+    // ── labels ───────────────────────────────────────────────────────────────
+
+    /// Read the account's label pairs, if that has not already happened.
+    ///
+    /// Asked once per session rather than once per sheet opening: the route returns
+    /// the whole set, so a second call buys nothing the first did not already
+    /// contain, and a sheet that re-read on every appearance inherits the hub's
+    /// defect — a failed refresh presenting itself as a failed load.
+    func ensureAssignments() {
+        // A note from the previous selection must not still be there when the sheet
+        // opens for a different set of messages.
+        state.labelNote = nil
+        switch state.assignmentsRead {
+        case .reading: return
+        case .read: refreshMarks()
+        default: loadAssignments()
+        }
+    }
+
+    private func loadAssignments() {
         let ids = Array(state.selection)
         guard !ids.isEmpty, let token else { return }
+        state.assignmentsRead = .reading
+        state.labelNote = nil
+        Task { [weak self] in
+            guard let self else { return }
+            do {
+                let resp = try await ApiClient.mailLabelAssignments(token)
+                await MailStore.shared.putAssignments(resp.assignments)
+                self.state.assignmentsRead = .read
+                await self.applyMarks()
+            } catch {
+                // A first read that fails leaves the marks unknown. A read that
+                // fails AFTER a good one keeps the marks it had — a refresh may not
+                // blank what is already on screen.
+                if await MailStore.shared.assignmentsMap() == nil {
+                    self.state.assignmentsRead = .failed
+                    self.state.staleError = Self.describe(error)
+                }
+            }
+        }
+    }
+
+    func refreshMarks() {
+        Task { await applyMarks() }
+    }
+
+    /// Recompute the sheet's marks from the cache. Cheap, and never a network call.
+    ///
+    /// `filter{…}.count` rather than `count { … }`: no such overload exists on
+    /// Array (`count(where:)` was withdrawn from the standard library), and it is
+    /// the kind of call that reads as obvious until the compiler rejects it.
+    private func applyMarks() async {
+        let ids = Array(state.selection)
+        let map = await MailStore.shared.assignmentsMap()
+        var marks: [String: LabelMark] = [:]
+        for l in state.labels {
+            let with = ids.filter { (map?[$0] ?? []).contains(l.id) }.count
+            if map == nil || ids.isEmpty { marks[l.id] = .unknown }
+            else if with == 0 { marks[l.id] = .off }
+            else if with == ids.count { marks[l.id] = .on }
+            else { marks[l.id] = .mixed }
+        }
+        state.labelMarks = marks
+    }
+
+    /// Tap a label in the sheet: apply it to the selection, or take it off.
+    ///
+    /// The direction comes from the state the read produced, and both ambiguous
+    /// cases resolve toward ADDING rather than removing:
+    ///
+    ///  - `mixed` completes the label across the selection. Half-checked means the
+    ///    user is mid-operation on a group; finishing it is what a mail client does,
+    ///    and un-tagging the ones that have it would discard work nobody asked to
+    ///    discard.
+    ///  - `unknown` (the read never answered) only ever assigns. Both writes are
+    ///    idempotent server-side, so adding a label that happens to be there costs
+    ///    nothing, while REMOVING on an unknown baseline could take a label off mail
+    ///    the user never meant to touch.
+    ///
+    /// The cache is patched only for the messages the server accepted, and the sheet
+    /// stays open to show the result: nothing in the list changes visibly here, so a
+    /// sheet that closed would leave the user without an answer.
+    func toggleLabel(_ labelId: String) {
+        let ids = Array(state.selection)
+        guard !ids.isEmpty, let token else { return }
+        let mark = state.labelMarks[labelId] ?? .unknown
+        let remove = (mark == .on)
         state.busy = true
         Task { [weak self] in
             guard let self else { return }
+            // On `mixed` only the messages that lack it are written; on `on`, only
+            // the ones carrying it. Writing all of either way would report a count
+            // the server never changed.
+            let map = await MailStore.shared.assignmentsMap()
+            let targets = ids.filter { id in
+                let has = (map?[id] ?? []).contains(labelId)
+                return remove ? has : !has
+            }
+            guard !targets.isEmpty else {
+                self.state.busy = false
+                return
+            }
+            var done = 0
             var failure: String?
-            for id in ids {
-                do { try await ApiClient.mailLabelAssign(token: token, messageId: id, labelId: labelId) }
-                catch { failure = Self.describe(error) }
+            let labelName = self.state.labels.first { $0.id == labelId }?.name ?? "label"
+            for id in targets {
+                do {
+                    if remove { try await ApiClient.mailLabelDetach(token: token, messageId: id, labelId: labelId) }
+                    else { try await ApiClient.mailLabelAssign(token: token, messageId: id, labelId: labelId) }
+                    done += 1
+                    if remove { await MailStore.shared.markUnassigned(messageId: id, labelId: labelId) }
+                    else { await MailStore.shared.markAssigned(messageId: id, labelId: labelId) }
+                } catch { failure = Self.describe(error) }
             }
             self.state.busy = false
-            self.state.selection = []
-            self.state.staleError = failure
+            // A switch, not a chain of nested ternaries. Three of these sentences
+            // depend on two values and a ternary tree deep enough to pick between
+            // them is exactly the expression shape this app's build has already
+            // timed out type-checking in.
+            let note: String
+            if let f = failure, done == 0 {
+                note = f
+            } else if let f = failure {
+                note = "\(done) of \(targets.count) saved. \(f)"
+            } else if remove {
+                note = "Removed \"\(labelName)\" from \(done)"
+            } else {
+                note = done == 1 ? "Labelled 1 message" : "Labelled \(done) messages"
+            }
+            self.state.labelNote = note
+            await self.applyMarks()
         }
     }
 

@@ -117,7 +117,7 @@ struct MailboxView: View {
                 // toolbar must never be able to destroy mail.
                 onDelete: { sheet = .permanent },
                 onMove: { sheet = .move },
-                onLabel: { sheet = .label },
+                onLabel: { vm.ensureAssignments(); sheet = .label },
                 onMore: { sheet = .snooze },
                 // Only the queue offers this. Deciding a sender is a rule about
                 // their next message, which means nothing for a box whose mail
@@ -200,6 +200,31 @@ struct MailboxView: View {
             .background(RoundedRectangle(cornerRadius: 10, style: .continuous)
                 .fill(GM.warnChipBg))
             .padding(.horizontal, 16).padding(.vertical, 6)
+        }
+
+        // The snooze undo — same place and same kind of statement as the stale-list
+        // chip above: a fact about what the app just did, with the action that
+        // reverses it. It names the mail it snoozed rather than offering a list of
+        // postponed messages, because until `?box=snoozed` is deployed the app knows
+        // only about these.
+        if let note = vm.state.snoozeUndoNote, !vm.state.snoozeUndoIds.isEmpty {
+            HStack(spacing: 8) {
+                Text(note + " · out of the inbox until then")
+                    .font(.system(size: 12)).foregroundColor(GM.textPrimary)
+                    .lineLimit(2)
+                Spacer(minLength: 4)
+                Button("Undo") { vm.undoSnooze() }
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(GM.primarySolid)
+                Button("Done") { vm.dismissSnoozeUndo() }
+                    .font(.system(size: 12))
+                    .foregroundColor(GM.textTertiary)
+            }
+            .padding(.horizontal, 12).padding(.vertical, 8)
+            .background(RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .fill(GM.softFill))
+            .padding(.horizontal, 16).padding(.vertical, 6)
+            .accessibilityIdentifier("mail-snooze-undo")
         }
     }
 
@@ -289,8 +314,18 @@ struct MailboxView: View {
         case .move:
             MoveSheet { action in vm.act(action); sheet = nil }
         case .label:
-            AssignLabelSheet(labels: vm.state.labels) { id in
-                vm.assignLabel(id); sheet = nil
+            AssignLabelSheet(
+                labels: vm.state.labels,
+                marks: vm.state.labelMarks,
+                read: vm.state.assignmentsRead,
+                note: vm.state.labelNote,
+                selectedCount: vm.state.selection.count,
+            ) { id in
+                // Not dismissed on pick, unlike the move and snooze sheets. Those
+                // change the list under the user, which is the feedback; a label
+                // changes nothing visible on this screen, so the sheet has to stay
+                // open and show its own result line.
+                vm.toggleLabel(id)
             }
         case .snooze:
             SnoozeSheet { until in vm.act(.snooze, until: until); sheet = nil }

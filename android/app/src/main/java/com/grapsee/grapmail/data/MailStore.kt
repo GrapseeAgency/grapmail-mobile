@@ -5,7 +5,8 @@ import kotlinx.coroutines.sync.withLock
 
 /**
  * The mailbox's process-lifetime cache: the last page of each box, the last
- * stats, the last labels, and the message bodies that were opened.
+ * stats, the last labels, the label pairs the account carries, and the message
+ * bodies that were opened.
  *
  * WHY THIS EXISTS
  * ---------------
@@ -48,6 +49,17 @@ object MailStore {
     private var me: MailMeResponse? = null
     private var bodies: Map<String, MailMessageFullDto> = emptyMap()
 
+    /**
+     * messageId → the label ids that message carries. Null means the account has
+     * never been asked; an EMPTY map means it was asked and nothing is labelled.
+     *
+     * The distinction is the whole point of the field. Collapsed into one value,
+     * “not yet read” would render as “no labels on this message”, which is a
+     * confident statement about a thing nobody was asked — and the Label sheet
+     * would then offer to ADD a label the message already has, twice.
+     */
+    private var assignments: Map<String, Set<String>>? = null
+
     /** A box+query key. `others` and `archive` are separate keys even though a
      *  different router answers them, because their contents genuinely differ. */
     private fun key(box: MailBox, query: String?): String =
@@ -89,6 +101,58 @@ object MailStore {
 
     suspend fun me(): MailMeResponse? = mutex.withLock { me }
     suspend fun putMe(v: MailMeResponse) = mutex.withLock { me = v }
+
+    /** Null until the first successful `GET /labels/assignments`. */
+    suspend fun assignments(): Map<String, Set<String>>? = mutex.withLock { assignments }
+
+    /** Replace the whole map: the route returns every pair the account has, so a
+     *  successful read supersedes the previous answer completely rather than adding
+     *  to it. Holding a stale pair alongside a fresh one would show a label the
+     *  server has since un-tagged, in another box, on a row the user can see. */
+    suspend fun putAssignments(rows: List<MailAssignmentDto>) = mutex.withLock {
+        val built = mutableMapOf<String, MutableSet<String>>()
+        rows.forEach { r ->
+            if (r.messageId.isNotEmpty() && r.labelId.isNotEmpty()) {
+                built.getOrPut(r.messageId) { mutableSetOf() }.add(r.labelId)
+            }
+        }
+        assignments = built.toMap()
+    }
+
+    /**
+     * Patch one pair after a write the server accepted.
+     *
+     * Applied only on success, and only to the pair that was written: the label
+     * routes answer with no body of their own (`{success:true}`), so there is
+     * nothing to reconcile against, and re-reading the whole map after every tap
+     * would make a routine label feel like a page load. If the map was never read,
+     * this stays null — patching an unanswered map would invent a baseline.
+     */
+    suspend fun markAssigned(messageId: String, labelId: String) = mutex.withLock {
+        val cur = assignments ?: return@withLock
+        val next = cur.toMutableMap()
+        next[messageId] = (next[messageId] ?: emptySet()) + labelId
+        assignments = next
+    }
+
+    suspend fun markUnassigned(messageId: String, labelId: String) = mutex.withLock {
+        val cur = assignments ?: return@withLock
+        val next = cur.toMutableMap()
+        next[messageId] = (next[messageId] ?: emptySet()) - labelId
+        assignments = next
+    }
+
+    /** Labels on one message, or null when nobody has answered yet. Null is not
+     *  “none”: callers draw unknown as unknown. */
+    suspend fun labelsOf(messageId: String): Set<String>? = mutex.withLock {
+        assignments?.get(messageId)
+    }
+
+    /** Drop a message's pairs when the message itself goes away, so a permanent
+     *  delete cannot leave a ghost label keyed on an id nothing has any more. */
+    suspend fun forgetAssignments(messageId: String) = mutex.withLock {
+        assignments = assignments?.minus(messageId)
+    }
 
     /** Opened bodies, memoised by id. A body is fetched once: the list payload
      *  has none, and re-reading a payload to redraw a row is the over-fetch the
@@ -161,5 +225,8 @@ object MailStore {
         aliases = null
         me = null
         bodies = emptyMap()
+        // Back to null, not to an empty map: the next account has not been asked
+        // anything, and an empty map would claim its mail carries no labels.
+        assignments = null
     }
 }

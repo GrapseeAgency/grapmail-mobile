@@ -38,6 +38,14 @@ data class GrapMailColors(
     // purpose rather than by omission.
     val swipeArchive: Color = Color(0xFF1A6DF0),
     val swipeTrash: Color = Color(0xFFDC2626),
+    /**
+     * The starred marker. Both values, because the thread used to draw a single
+     * hardcoded amber (`Color(0xFFF5A623)`) at the call site: in dark mode that is
+     * a light-theme colour on a dark canvas, and no screenshot of the light theme
+     * would ever show it. The light value is the one the app has always drawn; the
+     * dark value is the web theme's lifted star (`--gm-star`, `grapmail.css:111`).
+     */
+    val star: Color = Color(0xFFF5A623),
     // Dark theme
     val bgDark: Color = Color(0xFF070F18),
     val cardDark: Color = Color(0xFF0C182A),
@@ -62,6 +70,8 @@ data class GrapMailColors(
     // deliberate colour on both themes rather than as a dark rectangle.
     val swipeArchiveDark: Color = Color(0xFF3B82F6),
     val swipeTrashDark: Color = Color(0xFFF87171),
+    /// The starred marker on a dark canvas — see `star` above.
+    val starDark: Color = Color(0xFFFDD663),
 )
 
 val LocalGrapMailColors = staticCompositionLocalOf { GrapMailColors() }

@@ -39,6 +39,7 @@ data class Palette(
     val warnChipBg: Color, val warnInk: Color,
     val cardAlt: Color, val otpFill: Color,
     val swipeArchive: Color, val swipeTrash: Color,
+    val star: Color,
 )
 
 val LocalPalette = staticCompositionLocalOf {
@@ -54,6 +55,7 @@ val LocalPalette = staticCompositionLocalOf {
         warnChipBg = Color(0xFFFDF0DE), warnInk = Color(0xFFC2620A),
         cardAlt = Color(0xFFF5F9FE), otpFill = Color.White,
         swipeArchive = Color(0xFF1A6DF0), swipeTrash = Color(0xFFDC2626),
+        star = Color(0xFFF5A623),
     )
 }
 
@@ -73,6 +75,7 @@ fun GrapMailTheme(content: @Composable () -> Unit) {
         warnChipBg = base.warnChipBgDark, warnInk = base.warnInkDark,
         cardAlt = base.cardAltDark, otpFill = base.otpFillDark,
         swipeArchive = base.swipeArchiveDark, swipeTrash = base.swipeTrashDark,
+        star = base.starDark,
     ) else Palette(
         bg = base.bg, bgTinted = base.bgTinted, card = base.card, softFill = base.softFill, infoFill = base.infoFill,
         border = base.border, borderSoft = base.borderSoft,
@@ -85,6 +88,7 @@ fun GrapMailTheme(content: @Composable () -> Unit) {
         warnChipBg = base.warnChipBg, warnInk = base.warnInk,
         cardAlt = base.cardAlt, otpFill = base.otpFill,
         swipeArchive = base.swipeArchive, swipeTrash = base.swipeTrash,
+        star = base.star,
     )
     CompositionLocalProvider(LocalPalette provides palette) {
         MaterialTheme(

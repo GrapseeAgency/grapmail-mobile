@@ -508,18 +508,73 @@ struct CenteredState: View {
     }
 }
 
-// ── small parsers ────────────────────────────────────────────────────────────
+// ── label colours ────────────────────────────────────────────────────────────
 
-extension String {
-    /// `#RRGGBB` or `RRGGBB` from the server, or nil. Never a guessed colour.
-    var hexColor: Color? {
-        let s = trimmingCharacters(in: .whitespacesAndNewlines).replacingOccurrences(of: "#", with: "")
-        guard s.count == 6 || s.count == 8, let v = UInt32(s, radix: 16) else { return nil }
-        if s.count == 8 { return Color(red: Double((v >> 16) & 0xFF) / 255,
-                                      green: Double((v >> 8) & 0xFF) / 255,
-                                      blue: Double(v & 0xFF) / 255) }
-        return Color(v)
+/// The eight colour keys the label route accepts (`LABEL_COLOURS`,
+/// `grapmail-labels.ts:39`), in the order the picker shows them. The value stored
+/// on a label is one of these WORDS — never a colour value — exactly as the web
+/// client treats it (`src/app/(mail)/mail/page.tsx:84`).
+let labelColourKeys = ["slate", "red", "amber", "green", "teal", "blue", "violet", "pink"]
+
+/// A label's swatch from its palette key, light and dark.
+///
+/// This replaces `String.hexColor`, which parsed the field as a hex value. That
+/// could never succeed: the route's `normaliseColour` rejects anything outside the
+/// eight words and stores `slate`, so the parse returned nil for every label and
+/// each dot fell back to a neutral grey. The create screen then sent a hex of its
+/// own and the route answered 201 while storing `slate`, so the colour a user
+/// picked was never the colour the label received.
+///
+/// The values are the web theme's own `--gm-label-*` pair for each key
+/// (`src/styles/grapmail.css`), resolved through `GM.color(light:dark:)`, so the
+/// swatch follows the trait the rest of the app does and all three clients show one
+/// colour for one key. An unknown key becomes slate — the server's own fallback —
+/// rather than a colour nobody chose.
+func labelSwatch(_ key: String?) -> Color {
+    switch key {
+    case "red":    return GM.color(light: 0xD93025, dark: 0xF2857D)
+    case "amber":  return GM.color(light: 0xF29900, dark: 0xFDD663)
+    case "green":  return GM.color(light: 0x188038, dark: 0x6DD58C)
+    case "teal":   return GM.color(light: 0x0D9488, dark: 0x5EEAD4)
+    case "blue":   return GM.color(light: 0x1A73E8, dark: 0x8AB4F8)
+    case "violet": return GM.color(light: 0x7C3AED, dark: 0xC4B5FD)
+    case "pink":   return GM.color(light: 0xC01A7A, dark: 0xF7A8D8)
+    default:       return GM.color(light: 0x5F6368, dark: 0x9AA0A6)   // slate
     }
+}
+
+/// The one unsubscribe address worth offering, or nil.
+///
+/// `List-Unsubscribe` is the sender's own claim about a URL and arrives in the
+/// message's header text (`publicRow.unsubscribe`, `grapmail.ts:594`), so it is
+/// untrusted input, and it commonly arrives as a comma-separated pair:
+/// `<https://x.example/u?id=7>, <mailto:u@x.example>`.
+///
+/// http(s) only: a `mailto:` opens a composition this app cannot fill in, and
+/// anything else (`javascript:`, `file:`, a bare word) is not a link to a list at
+/// all. Angle brackets and padding are stripped because the header format guarantees
+/// them. Returning nil means the thread shows no control whatsoever — an unsubscribe
+/// button that opens something broken is worse than no button. Android's
+/// `parseUnsubscribe` applies the same rules.
+func parseUnsubscribe(_ raw: String?) -> String? {
+    guard let raw, !raw.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
+    for part in raw.split(separator: ",") {
+        let candidate = part.trimmingCharacters(in: .whitespacesAndNewlines)
+            .trimmingCharacters(in: CharacterSet(charactersIn: "<>"))
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let lowered = candidate.lowercased()
+        if lowered.hasPrefix("https://") || lowered.hasPrefix("http://") { return candidate }
+    }
+    return nil
+}
+
+/// The host a link will take the user to, for the confirmation line. Written on the
+/// string rather than on `URL` because the confirmation must be able to name the
+/// destination even for an address this device cannot open.
+func urlHost(_ raw: String) -> String? {
+    guard let range = raw.range(of: "://") else { return nil }
+    let host = raw[range.upperBound...].prefix { $0 != "/" && $0 != "?" && $0 != "#" }
+    return host.isEmpty ? nil : String(host)
 }
 
 /// Human-readable size, so a 1.4 MB report does not read as "1415732".

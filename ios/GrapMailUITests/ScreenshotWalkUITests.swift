@@ -396,6 +396,11 @@ final class ScreenshotWalkUITests: XCTestCase {
             // mailbox cannot reach it — the queue is empty there. Android's host
             // draws the same frame from the same two addresses.
             ("86-mail-sender-sheet", "mail-sender-sheet"),
+            // The unsubscribe confirmation hangs off a message carrying the sender's
+            // `List-Unsubscribe` header, which a fresh CI mailbox has none of, so the
+            // screen would otherwise ship with no artifact at all. Android's host
+            // draws the same sheet from the same invented address.
+            ("87-mail-unsubscribe", "mail-unsubscribe"),
         ]
         // These two fetch on appear, so the shutter has to wait for the loaded
         // branch — otherwise the photograph catches "Checking your account…"
@@ -437,6 +442,7 @@ final class ScreenshotWalkUITests: XCTestCase {
             "mail-delete-sheet": "Delete 3 messages permanently?",
             "mail-assign-label-sheet": "Label",
             "mail-snooze-sheet": "Snooze until",
+            "mail-unsubscribe": "Unsubscribe",
             "mail-sender-sheet": "Decide the sender",
         ]
         for screen in postWriteScreens {
@@ -505,18 +511,32 @@ final class ScreenshotWalkUITests: XCTestCase {
         require(app.staticTexts["Find your GrapMail address"].firstMatch, "Recovery: find form", timeout: 8)
         snap("31-recovery-find-address-light")
 
-        // The mailbox in dark. GM resolves its colours through the trait
-        // environment, so overriding the trait here needs no launch argument and
-        // no app-code branch — the photograph goes through the same lookup a
-        // real dark-mode user does.
-        app.terminate()
-        app.launchArguments = ["-gmSnapshot", "mail-home", "-gmDark"]
-        app.launch()
-        XCTAssertTrue(app.descendants(matching: .any)["gm-snapshot"].firstMatch
-                        .waitForExistence(timeout: 8),
-                      "snapshot 'mail-home' (dark) is not the visible screen")
-        sleep(2) // the scheme change propagates through the environment
-        snap("61-mail-home-dark")
+        // Three mail screens in dark. The mailbox's own colours resolve through the
+        // trait environment, and the snapshot host takes `-gmDark` to pin the scheme
+        // for the frame — the earlier version of this comment claimed no launch
+        // argument was needed, which the line below it has contradicted ever since
+        // `XCUIDevice.forceDarkMode` turned out not to exist on this runner's SDK.
+        //
+        // The thread and the labels screen join the home because they carry the parts
+        // of the palette a list of rows does not: the body surface, the attachment row,
+        // the encrypted notice, the new unsubscribe button, and — on labels — the
+        // server's per-label colour, which now resolves through `labelSwatch` with a
+        // light and a dark value per key. Every other colour in the band goes through
+        // the same two token tables, which `scripts/mail-honesty.py` pins
+        // structurally, so the claim "dark is correct across the band" rests on that
+        // check plus these three photographs rather than on thirty relaunches.
+        for (shot, screen) in [("61-mail-home-dark", "mail-home"),
+                               ("88-mail-thread-dark", "mail-thread"),
+                               ("89-mail-labels-dark", "mail-labels")] {
+            app.terminate()
+            app.launchArguments = ["-gmSnapshot", screen, "-gmDark"]
+            app.launch()
+            XCTAssertTrue(app.descendants(matching: .any)["gm-snapshot"].firstMatch
+                            .waitForExistence(timeout: 12),
+                          "snapshot '\(screen)' (dark) is not the visible screen")
+            sleep(2) // the scheme change propagates through the environment
+            snap(shot)
+        }
         app.terminate()
     }
 

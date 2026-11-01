@@ -350,8 +350,11 @@ struct MailLabel: Decodable, Identifiable {
 
     /// See `MailPerson.init()` — the same reason, the same consequence.
     init() {}
-    /// Server-chosen colour, carried as a hex string and never re-derived.
-    /// Decoded from `colour` because that is the key the route writes.
+    /// The server's palette KEY — `slate`, `red`, `amber`, `green`, `teal`,
+    /// `blue`, `violet`, `pink` — never a hex value. Decoded from `colour` because
+    /// that is the key the route writes. Resolved by `labelSwatch(_:)`; the hex
+    /// parse this used to go through could never succeed, so every label drew the
+    /// same fallback.
     var color: String?
     var textColor: String?
     /// Unread count for this label; nil means unknown, not zero.
@@ -400,6 +403,60 @@ struct MailLabelResponse: Decodable {
         error = c.lenientOpt(.error)
         code = c.lenientOpt(.code)
     }
+}
+
+/// One (message, label) pair — `GET /labels/assignments`.
+///
+/// The route answers with every pair the caller has in one response, so a page of
+/// twenty messages costs one request rather than twenty (`grapmail-labels.ts:21-27`).
+struct MailAssignment: Decodable {
+    var messageId = ""
+    var labelId = ""
+
+    init() {}
+
+    private enum CodingKeys: String, CodingKey { case messageId, labelId }
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        messageId = c.lenient(.messageId, "")
+        labelId = c.lenient(.labelId, "")
+    }
+}
+
+struct MailAssignmentsResponse: Decodable {
+    var success = false
+    var assignments: [MailAssignment] = []
+    var error: String?
+    var code: String?
+
+    init() {}
+
+    private enum CodingKeys: String, CodingKey { case success, assignments, error, code }
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        success = c.lenient(.success, false)
+        assignments = c.lenient(.assignments, [])
+        error = c.lenientOpt(.error)
+        code = c.lenientOpt(.code)
+    }
+}
+
+/// How a label stands against the current selection in the Label sheet.
+///
+/// Four states, because two would be wrong twice: `Mixed` is real (three messages
+/// selected, two carry the label) and drawing it as either extreme tells the user
+/// to add or remove something they did not ask about; `Unknown` is the state before
+/// the read answers and the state it stays in when the read fails — marking a label
+/// then would assert a fact nobody was asked, the same class as a badge drawn `0`
+/// because nobody was consulted.
+enum LabelMark {
+    case on, mixed, off, unknown
+}
+
+/// Whether the assignment read has answered. Kept apart from the map so “read, and
+/// nothing is labelled” is never confused with “never asked”.
+enum AssignmentsRead {
+    case notRead, reading, read, failed
 }
 
 /// `GET /aliases` — a second address delivering into this mailbox. This, not a
@@ -785,7 +842,17 @@ extension ApiClient {
            let encoded = term.addingPercentEncoding(withAllowedCharacters: .alphanumerics) {
             path += "&q=\(encoded)"
         }
-        return try await mailGet(path, bearer: token)
+        // Checked at the transport, exactly as Android does: three places read this
+        // response — the list, pull-to-refresh, and the screener's pending count —
+        // and a listing the server said it did not produce must not reach any of
+        // them as an empty box. "Inbox is empty" is a claim about mail the server
+        // never listed.
+        let resp: MailInboxResponse = try await mailGet(path, bearer: token)
+        guard resp.success else {
+            throw ApiError.http(status: 200, code: resp.code,
+                                message: resp.error ?? "The server returned no listing.")
+        }
+        return resp
     }
 
     static func mailMessage(token: String, id: String) async throws -> MailMessageResponse {
@@ -830,6 +897,18 @@ extension ApiClient {
 
     static func mailLabels(_ token: String) async throws -> MailLabelsResponse {
         try await mailGet("/labels", bearer: token)
+    }
+
+    /// Every (message, label) pair the account has, in one call.
+    ///
+    /// This is the read that makes the label surface honest. Without it the app can
+    /// write a label onto a message and cannot tell whether it is there, so the
+    /// sheet must mark every label the same way whatever the mail actually carries,
+    /// and a label can only be removed by someone who happens to remember adding it.
+    /// `mailLabelDetach` existed on both platforms with nothing calling it for
+    /// exactly that reason.
+    static func mailLabelAssignments(_ token: String) async throws -> MailAssignmentsResponse {
+        try await mailGet("/labels/assignments", bearer: token)
     }
 
     static func mailCreateLabel(token: String, name: String, colour: String?) async throws -> MailLabelResponse {

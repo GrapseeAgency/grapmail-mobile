@@ -200,7 +200,12 @@ fun MailboxScreen(
                         // bulk toolbar must never be able to destroy mail.
                         onDelete = { showPermanentConfirm = true },
                         onMove = { showMoveSheet = true },
-                        onLabel = { showLabelSheet = true },
+                        // The read is asked for when the sheet is opened, not when
+                        // the screen loads: a mailbox where nobody labels in bulk
+                        // should not pay for a pair list, and asking here means the
+                        // first open is the only time the question can be unanswered
+                        // — which the sheet says instead of guessing.
+                        onLabel = { vm.ensureAssignments(); showLabelSheet = true },
                         onMore = { showSnoozeSheet = true },
                         // Only the queue can decide a sender. Every other box's
                         // mail has already been delivered, so the sheet's four
@@ -245,6 +250,34 @@ fun MailboxScreen(
                         Spacer(Modifier.width(8.dp))
                         Text("Retry", fontSize = 12.sp, fontWeight = FontWeight.SemiBold,
                             color = palette.primarySolid, modifier = Modifier.clickable { vm.load() })
+                    }
+                }
+
+                // The snooze undo. Shown in the same place as the stale-list chip
+                // because it is the same kind of thing: a fact about what the app
+                // just did, above the list it affects, with the action that reverses
+                // it. It says "Snoozed …" rather than offering a list of postponed
+                // mail, because until `?box=snoozed` is deployed the app only knows
+                // about the ones it snoozed a moment ago.
+                if (state.snoozeUndoNote != null && state.snoozeUndoIds.isNotEmpty()) {
+                    Row(
+                        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp)
+                            .clip(RoundedCornerShape(10.dp)).background(palette.softFill)
+                            .padding(horizontal = 12.dp, vertical = 8.dp)
+                            .testTag("mail-snooze-undo"),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(state.snoozeUndoNote!! + " \u00b7 out of the inbox until then",
+                            fontSize = 12.sp, color = palette.textPrimary,
+                            maxLines = 2, overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f))
+                        Spacer(Modifier.width(8.dp))
+                        Text("Undo", fontSize = 12.sp, fontWeight = FontWeight.SemiBold,
+                            color = palette.primarySolid,
+                            modifier = Modifier.clickable { vm.undoSnooze() })
+                        Spacer(Modifier.width(12.dp))
+                        Text("Done", fontSize = 12.sp, color = palette.textTertiary,
+                            modifier = Modifier.clickable { vm.dismissSnoozeUndo() })
                     }
                 }
 
@@ -366,7 +399,13 @@ fun MailboxScreen(
     }
     if (showLabelSheet) {
         MailSheet(onDismiss = { showLabelSheet = false }) {
-            AssignLabelContent(state.labels) { id -> vm.assignLabel(id); showLabelSheet = false }
+            AssignLabelContent(
+                labels = state.labels,
+                marks = state.labelMarks,
+                read = state.assignmentsRead,
+                note = state.labelNote,
+                selectedCount = state.selection.size,
+            ) { vm.toggleLabel(it) }
         }
     }
     if (showSnoozeSheet) {
@@ -797,10 +836,15 @@ internal fun MailSheet(onDismiss: () -> Unit, content: @Composable () -> Unit) {
  * identifier is that re-wording a heading is a copy change and not a test
  * failure. Deriving the tag from the title would rebuild the exact coupling this
  * removes. The values match iOS's `gm-sheets-*` identifiers, so the two walks
- * prove the same thing about the same six sheets.
+ * prove the same thing about the same sheets.
+ *
+ * `internal`, not `private`: the unsubscribe confirmation lives in `ThreadScreen.kt`
+ * and needs the same heading with the same identifier contract. A second copy of
+ * this in that file is how a sheet heading would stop matching the tag the walk
+ * waits for.
  */
 @Composable
-private fun SheetTitle(text: String, tag: String) {
+internal fun SheetTitle(text: String, tag: String) {
     val palette = LocalPalette.current
     Text(text, fontSize = 17.sp, fontWeight = FontWeight.SemiBold, color = palette.textPrimary,
         modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp).testTag(tag))
@@ -865,6 +909,10 @@ internal fun MoveContent(onPick: (com.grapsee.grapmail.data.MailAction) -> Unit)
 @Composable
 internal fun AssignLabelContent(
     labels: List<com.grapsee.grapmail.data.MailLabelDto>,
+    marks: Map<String, com.grapsee.grapmail.data.LabelMark>,
+    read: com.grapsee.grapmail.data.AssignmentsRead,
+    note: String?,
+    selectedCount: Int,
     onPick: (String) -> Unit,
 ) {
     val palette = LocalPalette.current
@@ -873,7 +921,39 @@ internal fun AssignLabelContent(
         Text("No labels yet. Create one from the drawer.", fontSize = 13.sp,
             color = palette.textSecondary, modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp))
     }
-    labels.forEach { l -> SheetOption(l.name, false) { onPick(l.id) } }
+    // What the marks mean, said before the user reads anything into a tick. This
+    // line is the difference between a sheet that consulted the server and one
+    // that merely looks like it did: when the read has not answered, the rows are
+    // deliberately unmarked and the sheet says so rather than showing them clean.
+    Text(
+        when (read) {
+            com.grapsee.grapmail.data.AssignmentsRead.Reading,
+            com.grapsee.grapmail.data.AssignmentsRead.NotRead ->
+                "Checking which labels these messages carry…"
+            com.grapsee.grapmail.data.AssignmentsRead.Failed ->
+                "Couldn't read which labels they carry, so nothing is marked here. " +
+                "Tapping adds a label; it won't remove one."
+            com.grapsee.grapmail.data.AssignmentsRead.Read ->
+                if (selectedCount > 1)
+                    "Marks show what the $selectedCount selected messages carry. " +
+                    "A dash means some but not all."
+                else "Marks show what this message carries.",
+        },
+        fontSize = 12.sp, color = palette.textTertiary,
+        modifier = Modifier.padding(horizontal = 20.dp, vertical = 6.dp),
+    )
+    labels.forEach { l ->
+        val m = marks[l.id] ?: com.grapsee.grapmail.data.LabelMark.Unknown
+        SheetOption(
+            l.name,
+            active = m == com.grapsee.grapmail.data.LabelMark.On,
+            mixed = m == com.grapsee.grapmail.data.LabelMark.Mixed,
+        ) { onPick(l.id) }
+    }
+    note?.let {
+        Text(it, fontSize = 13.sp, color = palette.successInk,
+            modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp))
+    }
 }
 
 /**
@@ -994,14 +1074,33 @@ internal fun PermanentDeleteContent(count: Int, cancel: () -> Unit, confirm: () 
 }
 
 @Composable
-private fun SheetOption(label: String, active: Boolean, onClick: () -> Unit) {
+private fun SheetOption(
+    label: String,
+    active: Boolean,
+    /** Half-checked: some of the selection carries it. Only the Label sheet has a
+     *  state this can describe — a filing target is either where the message is or
+     *  it is not — so no other caller passes it. */
+    mixed: Boolean = false,
+    onClick: () -> Unit,
+) {
     val palette = LocalPalette.current
     Row(
         Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 20.dp, vertical = 13.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(label, fontSize = 15.sp, color = palette.textPrimary, modifier = Modifier.weight(1f))
-        if (active) {
+        if (mixed) {
+            Box(
+                Modifier.size(18.dp).clip(CircleShape)
+                    .border(1.5.dp, palette.primarySolid, CircleShape),
+                contentAlignment = Alignment.Center,
+            ) {
+                // A dash, not a dot: iOS draws the same half-checked state as a
+                // short bar inside the ring, and a filled square would read as a
+                // different mark rather than as “some of these”.
+                Box(Modifier.width(9.dp).height(3.dp).background(palette.primarySolid))
+            }
+        } else if (active) {
             Box(Modifier.size(18.dp).clip(CircleShape).background(palette.primarySolid),
                 contentAlignment = Alignment.Center) {
                 Text("", fontSize = 10.sp, color = palette.onPrimary)

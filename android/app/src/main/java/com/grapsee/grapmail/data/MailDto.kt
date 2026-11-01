@@ -135,6 +135,18 @@ data class MailInboxResponse(
      * echoing what the field happened to contain when the call went out.
      */
     val q: String? = null,
+    /**
+     * Declared so both platforms decode the same envelope. iOS carried these two
+     * and Android did not, which the parity gate could not see while it matched
+     * only `…Dto` names.
+     *
+     * They are populated only if the route ever answers 200 with `success: false`:
+     * today `NO_MAILBOX` arrives as a 404 and reaches the caller through the error
+     * path. [Api.mailInbox] therefore checks `success` before returning, so a
+     * listing the server refused cannot be drawn as an empty box.
+     */
+    val error: String? = null,
+    val code: String? = null,
 )
 
 /**
@@ -201,7 +213,16 @@ data class MailInboxStatsDto(
 data class MailLabelDto(
     val id: String = "",
     val name: String = "",
-    /** Server-chosen colour, carried as a hex string and never re-derived. */
+    /**
+     * The server's palette KEY — `slate`, `red`, `amber`, `green`, `teal`, `blue`,
+     * `violet`, `pink` (`grapmail-labels.ts:39`) — never a hex value. Declared with
+     * `@SerialName("colour")` because the column is spelled with a u: without it
+     * this field decoded as null for every label the server had coloured, so the
+     * dot beside each name silently fell back to the neutral grey on Android while
+     * iOS, which does map the key, showed something. The two apps disagreed about
+     * the same label, which no screenshot of one of them would reveal.
+     */
+    @SerialName("colour")
     val color: String? = null,
     val textColor: String? = null,
     /** Unread count for this label; absent means unknown, not zero. */
@@ -224,6 +245,48 @@ data class MailLabelResponse(
     val error: String? = null,
     val code: String? = null,
 )
+
+/**
+ * One (message, label) pair — `GET /labels/assignments`.
+ *
+ * The route returns every pair the caller has, in one response, precisely so a
+ * list of twenty messages costs one request rather than twenty (`grapmail-labels.ts`
+ * header). The client therefore holds a messageId → labelIds map and answers the
+ * question “what is this row wearing?” locally.
+ */
+@Serializable
+data class MailAssignmentDto(
+    val messageId: String = "",
+    val labelId: String = "",
+)
+
+@Serializable
+data class MailAssignmentsResponse(
+    val success: Boolean = false,
+    val assignments: List<MailAssignmentDto> = emptyList(),
+    val error: String? = null,
+    val code: String? = null,
+)
+
+/**
+ * How a label stands against the current selection, in the Label sheet.
+ *
+ * Four states, not two, because two would be a lie twice over:
+ *
+ *  - `Mixed` is real and reachable — three messages selected, two carry the label.
+ *    Drawing it as `Off` would tell the user to add a label they already have on
+ *    most of the selection; drawing it as `On` would tell them to remove it from
+ *    the ones that never had it.
+ *  - `Unknown` is the state before the read answers, and the state it stays in
+ *    when the read fails. Marking anything then would be the sheet asserting a
+ *    label's presence from nothing — the same class as a badge that draws `0`
+ *    because nobody was asked.
+ */
+enum class LabelMark { On, Mixed, Off, Unknown }
+
+/** Whether the assignment read has answered. Kept apart from the map itself so
+ *  “read, and nothing is labelled” is not confused with “never asked”. */
+enum class AssignmentsRead { NotRead, Reading, Read, Failed }
 
 /** `GET /grapmail/aliases` — a second address delivering into this mailbox. */
 @Serializable

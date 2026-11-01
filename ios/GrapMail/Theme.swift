@@ -52,6 +52,12 @@ enum GM {
     /// trashes, both of which undo, and permanent destruction stays behind a sheet.
     static let swipeArchive  = color(light: 0x1A6DF0, dark: 0x3B82F6)
     static let swipeTrash    = color(light: 0xDC2626, dark: 0xF87171)
+    /// The starred marker. Both values, because the thread drew a single hardcoded
+    /// amber (`Color(0xF5A623)`) at two call sites: in dark mode that is a
+    /// light-theme colour on a dark canvas, and no light-theme screenshot can show
+    /// it. The light value is the one the app has always drawn; the dark value is
+    /// the web theme's lifted star (`--gm-star`, `grapmail.css:111`).
+    static let star          = color(light: 0xF5A623, dark: 0xFDD663)
 }
 
 extension UIColor {

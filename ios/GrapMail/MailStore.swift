@@ -1,7 +1,8 @@
 import Foundation
 
 /// The mailbox's process-lifetime cache: the last page of each box, the last
-/// stats, the last labels, and the message bodies that were opened.
+/// stats, the last labels, the label pairs the account carries, and the message
+/// bodies that were opened.
 ///
 /// WHY THIS EXISTS
 /// ---------------
@@ -37,6 +38,15 @@ actor MailStore {
     private var aliasesValue: [MailAlias]?
     private var meValue: MailMeResponse?
     private var bodies: [String: MailMessageFull] = [:]
+
+    /// messageId → the label ids that message carries. nil means the account has
+    /// never been asked; an EMPTY dictionary means it was asked and nothing is
+    /// labelled.
+    ///
+    /// The two are not the same fact and the sheet must not merge them: reading
+    /// “not yet asked” as “no labels” would offer to ADD a label the message
+    /// already has, and would let a tap take one away on a guess.
+    private var assignments: [String: Set<String>]?
 
     private func key(_ box: MailBox, _ query: String?) -> String {
         "\(box.rawValue)|\((query ?? "").trimmingCharacters(in: .whitespaces).lowercased())"
@@ -80,6 +90,43 @@ actor MailStore {
 
     func me() -> MailMeResponse? { meValue }
     func putMe(_ v: MailMeResponse) { meValue = v }
+
+    func assignmentsMap() -> [String: Set<String>]? { assignments }
+
+    /// Replace the whole map. The route returns every pair the account has, so a
+    /// successful read supersedes the previous answer rather than adding to it —
+    /// keeping a stale pair would show a tick for a label the server has since
+    /// un-tagged.
+    func putAssignments(_ rows: [MailAssignment]) {
+        var built: [String: Set<String>] = [:]
+        for r in rows where !r.messageId.isEmpty && !r.labelId.isEmpty {
+            built[r.messageId, default: []].insert(r.labelId)
+        }
+        assignments = built
+    }
+
+    /// Patch one pair after a write the server accepted. The label routes answer
+    /// with no body of their own, so there is nothing to reconcile against and a
+    /// re-read of the whole map would make a routine label feel like a page load.
+    /// A map that was never read stays nil — patching it would invent a baseline.
+    func markAssigned(messageId: String, labelId: String) {
+        guard var cur = assignments else { return }
+        cur[messageId, default: []].insert(labelId)
+        assignments = cur
+    }
+
+    func markUnassigned(messageId: String, labelId: String) {
+        guard var cur = assignments else { return }
+        cur[messageId] = (cur[messageId] ?? []) - labelId
+        assignments = cur
+    }
+
+    /// Labels on one message, or nil when nobody has answered. nil is not “none”.
+    func labelsOf(_ messageId: String) -> Set<String>? { assignments?[messageId] }
+
+    /// Drop a message's pairs when the message itself is destroyed, so a permanent
+    /// delete cannot leave a ghost label keyed on an id nothing has any more.
+    func forgetAssignments(_ messageId: String) { assignments?[messageId] = nil }
 
     /// Opened bodies, memoised by id. A body is fetched once: the list payload
     /// has none, and re-reading a payload to redraw a row is the over-fetch the
@@ -142,6 +189,9 @@ actor MailStore {
         aliasesValue = nil
         meValue = nil
         bodies = [:]
+        // Back to nil, not to an empty map: the next account has not been asked
+        // anything, and an empty map would claim its mail carries no labels.
+        assignments = nil
     }
 }
 

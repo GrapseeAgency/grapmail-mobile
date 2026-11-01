@@ -353,6 +353,232 @@ pin("Android encodes the query values on the remove call",
 pin("iOS encodes the query values on the remove call",
     "percentEncodedQuery()" in SW_API)
 
+# ── 7. the Label sheet reports what it read, and can undo what it did ────────
+#
+# The label surface shipped with the write wired and the read absent, on both
+# platforms at once, so the parity diff that exists to catch asymmetry saw nothing:
+# two sides agreeing to omit something passes a name-by-name comparison. These pins
+# hold the contract against the SERVER rather than against each other.
+SW_SHEET = ios("MailSheets.swift")
+SW_VM = ios("MailboxModel.swift")
+KT_STORE = android("data/MailStore.kt")
+SW_STORE = ios("MailStore.swift")
+KT_SECOND = android("ui/screens/mail/MailSecondaryScreens.kt")
+SW_SECOND = ios("MailSecondaryViews.swift")
+KT_HOST = android("ui/screens/mail/MailSnapshot.kt")
+SW_HOST = ios("MailSnapshot.swift")
+
+# Matched on the declaration and the route path, not on the bare name. A first
+# version used `"mailLabelAssignments" in src`, and renaming the iOS function to
+# `mailLabelAssignmentsREMOVED` still passed it — a substring is satisfied by the
+# thing it was meant to forbid. The path is asserted too, because a correctly named
+# call against the wrong URL is the failure that actually reaches a user.
+pin("Android declares the assignment read against the right route",
+    re.search(r"suspend fun mailLabelAssignments\(token", KT_API) is not None
+    and '"$MAIL/labels/assignments"' in KT_API)
+pin("iOS declares the assignment read against the right route",
+    re.search(r"static func mailLabelAssignments\(_ token", SW_API) is not None
+    and '"/labels/assignments"' in SW_API)
+
+# The defect itself: every row rendered with a hardcoded `false`, i.e. the sheet
+# asserting that no message carries any label, having never asked.
+pin("Android's label sheet no longer marks from a constant",
+    re.search(r"SheetOption\(l\.name,\s*false\)", KT_BOX) is None
+    and re.search(r"marks\[l\.id\]", KT_BOX) is not None)
+pin("iOS's label sheet no longer marks from a constant",
+    "SheetOption(label: l.name, active: false)" not in SW_SHEET
+    and "marks[l.id]" in SW_SHEET)
+
+# "Never asked" must survive as its own state in the cache. Collapsed into an empty
+# map, an unread mailbox renders as an unlabelled one — and a tap then removes a
+# label on a guess.
+pin("Android's cache separates unread from empty",
+    re.search(r"private var assignments: Map<String, Set<String>>\? = null", KT_STORE) is not None
+    and re.search(r"assignments = null", KT_STORE) is not None)
+pin("iOS's cache separates unread from empty",
+    re.search(r"private var assignments: \[String: Set<String>\]\?", SW_STORE) is not None
+    and "assignments = nil" in SW_STORE)
+
+# A label must be removable, not just addable — the half of the surface that had no
+# caller on either platform.
+#
+# Asserted on the LINE that calls it, not on the file: the first version was a bare
+# substring test, and wrapping the call in `if (false)` left the pin green while
+# making detach unreachable again — which is precisely the defect this pin exists to
+# notice. Reachability is the claim, so reachability is what gets checked.
+def call_lines(src, needle):
+    return [ln for ln in src.split("\n") if needle in ln]
+
+
+pin("Android's model detaches on a live branch",
+    any("remove" in ln for ln in call_lines(KT_VM, "Api.mailLabelDetach")))
+pin("iOS's model detaches on a live branch",
+    any("remove" in ln for ln in call_lines(SW_VM, "mailLabelDetach")))
+
+# When the read fails, the sheet says so rather than showing a clean list.
+pin("Android's sheet states a failed read",
+    "Couldn't read which labels they carry" in KT_BOX)
+pin("iOS's sheet states a failed read",
+    "Couldn't read which labels they carry" in SW_SHEET)
+
+# An absent mark resolves to unknown, never to off. The qualified name is allowed:
+# `MailboxScreen.kt` refers to the data types by full path as a matter of house
+# style, and a pin that only matches the short spelling fails for a reason that has
+# nothing to do with the behaviour it is meant to hold.
+pin("Android resolves a missing mark to Unknown",
+    re.search(r"\?:\s*(?:com\.grapsee\.grapmail\.data\.)?LabelMark\.Unknown", KT_BOX) is not None)
+pin("iOS resolves a missing mark to unknown",
+    "?? .unknown" in SW_SHEET)
+
+# ── 8. the label palette is the server's eight keys, not a local set of colours ─
+#
+# `normaliseColour` (`grapmail-labels.ts:55-58`) keeps only these words and replaces
+# anything else with `slate`. Both apps sent a hex string and parsed the stored value
+# as a hex string, so the picker chose one colour, the store kept `slate`, and the
+# list drew a third thing (the fallback) — three states for one field, none of them
+# matching. The expected set is written literally here, not read out of the backend
+# repo: the two are separate checkouts, and a pin that silently skips on the runner
+# meant to enforce it is a pin that passes.
+SERVER_COLOURS = {"slate", "red", "amber", "green", "teal", "blue", "violet", "pink"}
+
+kt_keys = re.search(r"val LABEL_COLOUR_KEYS = listOf\(([^)]*)\)", android("ui/components/Mail.kt"))
+sw_keys = re.search(r"let labelColourKeys = \[([^\]]*)\]", ios("MailComponents.swift"))
+pin("Android declares a label palette", kt_keys is not None)
+pin("iOS declares a label palette", sw_keys is not None)
+if kt_keys and sw_keys:
+    got = {k.strip().strip('"') for k in kt_keys.group(1).split(",") if k.strip()}
+    pin("Android's label palette is exactly the server's eight keys",
+        got == SERVER_COLOURS)
+if sw_keys:
+    got_sw = {k.strip().strip('"') for k in sw_keys.group(1).split(",") if k.strip()}
+    pin("iOS's label palette is exactly the server's eight keys", got_sw == SERVER_COLOURS)
+
+# Neither side may send a colour value where a key is required, nor read one back.
+pin("Android's label form sends the key, not a hex string",
+    "hexString(" not in KT_SECOND and "createLabel(name.trim(), chosen" in KT_SECOND)
+pin("iOS's label form sends the key, not a hex string",
+    "Self.hex(" not in SW_SECOND and "colour: colour" in SW_SECOND)
+
+# Both platforms promised a label "becomes a filter on the inbox". Nothing filters:
+# the listing carries no label field per row and accepts no label query. A parity
+# diff cannot catch this because both sides said the same untrue thing.
+#
+# Matched on the RENDERED string (the opening quote is part of the pattern), not on
+# the phrase alone — the comments explaining the fix quote the old copy, and a pin
+# that reads raw file text would then fail on the correction rather than on the
+# defect. Any assertion of this kind that cannot tell code from commentary has to
+# name the shape of the literal it is actually forbidding.
+pin("Neither app promises a label filter it does not have",
+    '"Create one and it becomes a filter' not in KT_SECOND
+    and '"Create one and it becomes a filter' not in SW_SECOND
+    and '"Create one and it becomes available' in KT_SECOND
+    and '"Create one and it becomes available' in SW_SECOND)
+
+# The sheet's three states must be photographed, not merely implemented: the tick
+# and the dash exist in code that no read-only CI mailbox can reach.
+pin("Android's host draws all three label states",
+    "LabelMark.Mixed" in KT_HOST)
+pin("iOS's host draws all three label states",
+    '"l2": .mixed' in SW_HOST)
+
+# -- 9. a snooze can be undone, and the undo is on screen -----------------------
+#
+# `unsnooze` existed in both action enums with nothing calling it. The reason is a
+# genuine limit: `publicRow` carries no `snoozedUntil` and the inbox hides pending
+# snoozes, so the app cannot see which messages are postponed. The answer was not to
+# leave the verb dangling but to offer the undo where the app DOES know -- immediately
+# after it snoozed something.
+KT_BOX = android("ui/screens/mail/MailboxScreen.kt")
+KT_THREAD = android("ui/screens/mail/ThreadScreen.kt")
+SW_READ = ios("MailReaderViews.swift")
+SW_BOX = ios("MailboxView.swift")
+
+pin("Android's model sends unsnooze",
+    any("Unsnooze" in ln for ln in call_lines(KT_VM, "Api.mailAction")))
+pin("iOS's model sends unsnooze",
+    any("unsnooze" in ln for ln in call_lines(SW_VM, "mailAction")))
+pin("Android's undo is reachable from the screen, not only the model",
+    "vm.undoSnooze()" in KT_BOX)
+pin("iOS's undo is reachable from the screen, not only the model",
+    "vm.undoSnooze()" in SW_BOX)
+
+# -- 10. the unsubscribe offer goes to a browser and claims nothing -------------
+#
+# `List-Unsubscribe` is the sender's own claim about a URL, read off an untrusted
+# header. Two rules are pinned: only http(s) is ever offered, and no screen states
+# an outcome the app cannot observe.
+for side, src_file, decl in (("Android", android("ui/components/Mail.kt"), "fun parseUnsubscribe"),
+                             ("iOS", ios("MailComponents.swift"), "func parseUnsubscribe")):
+    # Matched on each language's own declaration keyword. Slicing from the bare name
+    # instead finds the first MENTION of it -- which is the doc comment above, so the
+    # slice stops at that comment's closing brace and the parser body is never read.
+    start = src_file.find(decl)
+    parser = src_file[start:src_file.find("\n}", start)] if start >= 0 else ""
+    pin(f"{side}'s unsubscribe parser exists and accepts only http(s)",
+        "https://" in parser and "http://" in parser and "mailto" not in parser)
+
+def code_only(src):
+    """The file with its comments removed.
+
+    Two pins in this section forbid a WORD or a PATTERN, and the comments explaining
+    each rule necessarily quote the thing they forbid -- `"Unsubscribed"` appears in a
+    doc comment precisely to say it must never be displayed, and a hex literal appears
+    in a token's comment to record what used to be hardcoded. Testing raw text made
+    those pins fail on their own documentation, which is how a gate gets disabled.
+    """
+    out, keep = [], True
+    for line in src.split("\n"):
+        s = line.strip()
+        if s.startswith("/*"):
+            keep = "*/" not in s
+            continue
+        if not keep:
+            if s.endswith("*/"):
+                keep = True
+            continue
+        if s.startswith("//") or s.startswith("*") or s.startswith("///"):
+            continue
+        out.append(line)
+    return "\n".join(out)
+
+
+# The claim that must never be rendered: that the list removed anyone.
+pin("Android's thread never claims the user was unsubscribed",
+    '"Unsubscribed' not in code_only(KT_THREAD))
+pin("iOS's reader never claims the user was unsubscribed",
+    '"Unsubscribed' not in code_only(SW_READ))
+for side, src in (("Android", KT_THREAD), ("iOS", SW_READ)):
+    pin(f"{side}'s unsubscribe sheet names whose server it goes to",
+        "not to GrapMail" in src)
+    pin(f"{side}'s unsubscribe sheet states the liveness cost",
+        "not risk-free" in src)
+
+# -- 11. dark mode is structural, not aspirational ------------------------------
+#
+# Three frames are photographed in dark (home, thread, labels). What carries the rest
+# of the band is that no screen picks its own colour: every paint comes from a table
+# holding a light AND a dark value. A literal at a call site is invisible in a
+# light-theme screenshot and wrong on a dark canvas -- which is exactly how the starred
+# marker sat, amber-on-white, in both apps until this pin was written.
+KT_SCREENS = ["ui/screens/mail/MailboxScreen.kt", "ui/screens/mail/ThreadScreen.kt",
+              "ui/screens/mail/ComposeScreen.kt", "ui/screens/mail/MailSecondaryScreens.kt"]
+SW_VIEWS = ["MailboxView.swift", "MailChrome.swift", "MailSheets.swift",
+            "MailReaderViews.swift", "MailSecondaryViews.swift"]
+
+for side, files in (("Android", KT_SCREENS), ("iOS", SW_VIEWS)):
+    leaked = []
+    for rel in files:
+        src = code_only(android(rel) if side == "Android" else ios(rel))
+        if re.search(r"Color\(0x[0-9A-Fa-f]{6,8}\)", src):
+            leaked.append(rel)
+    pin(f"{side}'s mail screens pick no colour of their own: no literals in {len(files)} files",
+        not leaked)
+
+pin("Android's label swatch resolves a dark value",
+    "isSystemInDarkTheme" in android("ui/components/Mail.kt"))
+pin("iOS's label swatch resolves a dark value",
+    re.search(r"func labelSwatch.*?dark:", ios("MailComponents.swift"), re.S) is not None)
+
 print()
 if failures:
     print(f"mail-honesty: {len(failures)} pin(s) broken")

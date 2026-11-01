@@ -71,6 +71,10 @@ struct MoveSheet: View {
 
 struct AssignLabelSheet: View {
     let labels: [MailLabel]
+    let marks: [String: LabelMark]
+    let read: AssignmentsRead
+    let note: String?
+    let selectedCount: Int
     let onPick: (String) -> Void
 
     var body: some View {
@@ -81,12 +85,43 @@ struct AssignLabelSheet: View {
                     .font(.system(size: 13)).foregroundColor(GM.textSecondary)
                     .padding(.horizontal, 20).padding(.vertical, 10)
             }
+            // What the marks mean, said before a reader puts anything into a tick.
+            // This line is the difference between a sheet that consulted the server
+            // and one that merely looks as if it did: when the read has not
+            // answered, the rows are deliberately unmarked and the sheet says so
+            // rather than showing them clean.
+            Text(explanation)
+                .font(.system(size: 12)).foregroundColor(GM.textTertiary)
+                .padding(.horizontal, 20).padding(.vertical, 6)
             ForEach(labels) { l in
-                SheetOption(label: l.name, active: false) { onPick(l.id) }
+                let m = marks[l.id] ?? .unknown
+                SheetOption(label: l.name, active: m == .on, mixed: m == .mixed) {
+                    onPick(l.id)
+                }
+            }
+            if let note {
+                Text(note)
+                    .font(.system(size: 13)).foregroundColor(GM.successInk)
+                    .padding(.horizontal, 20).padding(.vertical, 8)
             }
         }
         .padding(.bottom, 24)
         .accessibilityIdentifier("gm-sheets-label")
+    }
+
+    private var explanation: String {
+        switch read {
+        case .reading, .notRead:
+            return "Checking which labels these messages carry\u{2026}"
+        case .failed:
+            return "Couldn't read which labels they carry, so nothing is marked here. "
+                + "Tapping adds a label; it won't remove one."
+        case .read:
+            return selectedCount > 1
+                ? "Marks show what the \(selectedCount) selected messages carry. "
+                    + "A dash means some but not all."
+                : "Marks show what this message carries."
+        }
     }
 }
 
@@ -248,6 +283,10 @@ struct SenderDecisionSheet: View {
 struct SheetOption: View {
     let label: String
     let active: Bool
+    /// Half-checked: some of the selection carries it. Only the Label sheet has a
+    /// state this can describe — a filing target either is where the message is or
+    /// is not — so no other caller passes it. Mirrors Android's `mixed` parameter.
+    var mixed: Bool = false
     let onClick: () -> Void
 
     var body: some View {
@@ -258,7 +297,17 @@ struct SheetOption: View {
                     .foregroundColor(GM.textPrimary)
                     .lineLimit(1)
                 Spacer()
-                if active {
+                if mixed {
+                    // A dash inside the ring, not a filled tick: a filled circle is
+                    // what `on` already looks like, and the two states must not read
+                    // as one.
+                    ZStack {
+                        Circle().stroke(GM.primarySolid, lineWidth: 1.5)
+                            .frame(width: 18, height: 18)
+                        Rectangle().fill(GM.primarySolid)
+                            .frame(width: 9, height: 2.5)
+                    }
+                } else if active {
                     Image(systemName: "checkmark.circle.fill")
                         .font(.system(size: 18))
                         .foregroundColor(GM.primarySolid)

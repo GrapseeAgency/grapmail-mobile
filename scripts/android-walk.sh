@@ -476,6 +476,7 @@ for spec in "two-factor-on:40-sec-two-factor-on" \
             "mail-send-receipt:82-mail-send-receipt" \
             "mail-assign-label-sheet:83-mail-assign-label-sheet" \
             "mail-snooze-sheet:84-mail-snooze-sheet" \
+            "mail-unsubscribe:87-mail-unsubscribe" \
             "mail-contact-detail:85-mail-contact-detail" \
             "mail-sender-sheet:86-mail-sender-sheet"; do
   nm="${spec%%:*}"; pic="${spec##*:}"
@@ -515,6 +516,7 @@ for spec in "two-factor-on:40-sec-two-factor-on" \
     mail-delete-sheet) settled="gm-sheets-permanent" ;;
     mail-assign-label-sheet) settled="gm-sheets-label" ;;
     mail-snooze-sheet) settled="gm-sheets-snooze" ;;
+    mail-unsubscribe) settled="gm-sheets-unsub" ;;
     mail-sender-sheet) settled="gm-sheets-sender" ;;
     *) settled="" ;;
   esac
@@ -607,6 +609,32 @@ if [ -z "$(find_nodes "n.get('content-desc','')=='gm-snapshot'")" ]; then
   FAILURES=$((FAILURES + 1))
 fi
 shot 61-mail-home-dark
+
+# Two more mail screens in dark, chosen for what they cover rather than for
+# coverage's sake: the thread carries the body surface, the attachment row, the
+# encrypted notice and now the unsubscribe button, and the labels screen is the one
+# that draws the server's per-label colour — so these two exercise the largest part
+# of the palette that a flat list of rows does not. Every other colour in the mail
+# band resolves through the same two token tables, which `scripts/mail-honesty.py`
+# pins structurally: the claim "dark mode works for all 30 frames" is carried by one
+# check on the tokens plus three photographs, not by thirty relaunches on a runner
+# that already takes ninety minutes.
+adb shell am force-stop "$PKG"
+adb shell am start -W -n "$PKG/.MainActivity" --es gmSnapshot "mail-thread" >/dev/null
+sleep 5
+if [ -z "$(find_nodes "n.get('content-desc','')=='gm-snapshot'")" ]; then
+  echo "FAIL: snapshot 'mail-thread' (dark) is not the visible screen" >&2
+  FAILURES=$((FAILURES + 1))
+fi
+shot 88-mail-thread-dark
+adb shell am force-stop "$PKG"
+adb shell am start -W -n "$PKG/.MainActivity" --es gmSnapshot "mail-labels" >/dev/null
+sleep 5
+if [ -z "$(find_nodes "n.get('content-desc','')=='gm-snapshot'")" ]; then
+  echo "FAIL: snapshot 'mail-labels' (dark) is not the visible screen" >&2
+  FAILURES=$((FAILURES + 1))
+fi
+shot 89-mail-labels-dark
 adb shell am force-stop "$PKG"
 adb shell am force-stop "$PKG"
 adb shell "cmd uimode night no"
@@ -644,7 +672,8 @@ for want in 01-welcome-light 02-step1-name-light 03-step2-basicinfo-light \
             79-mail-attachment-preview 80-mail-settings 81-mail-screener \
             82-mail-send-receipt 83-mail-assign-label-sheet \
             84-mail-snooze-sheet 85-mail-contact-detail \
-            86-mail-sender-sheet; do
+            86-mail-sender-sheet 87-mail-unsubscribe \
+            88-mail-thread-dark 89-mail-labels-dark; do
   [ -s "$OUT/$want.png" ] || { echo "FAIL: missing $want.png" >&2; FAILURES=$((FAILURES + 1)); }
 done
 if [ "$FAILURES" -gt 0 ]; then

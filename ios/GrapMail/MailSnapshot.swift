@@ -107,13 +107,27 @@ struct MailSnapshotView: View {
         Self.full("m1", body: "Attached is the invoice for the quarter, payable on receipt.")
     }
 
+    /// The label colours are the server's palette KEYS, not hex values: a hex is
+    /// not something `grapmail-labels.ts` can answer with, because `normaliseColour`
+    /// rejects it and stores `slate`. Sample data shaped like something the server
+    /// cannot send would make a broken colour lookup look correct in this file.
     fileprivate static func labels() -> [MailLabel] {
         var work = MailLabel()
-        work.id = "l1"; work.name = "Work"; work.color = "#2F6FED"; work.unread = 2
+        work.id = "l1"; work.name = "Work"; work.color = "blue"; work.unread = 2
         var bills = MailLabel()
-        bills.id = "l2"; bills.name = "Bills"; bills.color = "#1E9E6A"; bills.unread = nil
-        return [work, bills]
+        bills.id = "l2"; bills.name = "Bills"; bills.color = "green"; bills.unread = nil
+        var receipts = MailLabel()
+        receipts.id = "l3"; receipts.name = "Receipts"; receipts.color = "amber"
+        receipts.unread = 1
+        return [work, bills, receipts]
     }
+
+    /// All three states the assignment read can produce, for the Label sheet
+    /// frame: on every selected message, on some, on none. Photographing only the
+    /// unmarked sheet would leave the tick and the dash unproven.
+    fileprivate static let labelMarks: [String: LabelMark] = [
+        "l1": .on, "l2": .mixed, "l3": .off,
+    ]
 
     fileprivate static func full(
         _ id: String, body: String?, encrypted: Bool = false,
@@ -220,11 +234,28 @@ struct MailSnapshotView: View {
                 )
             case "mail-assign-label-sheet":
                 return AnyView(
-                sheetFrame(AssignLabelSheet(labels: Self.labels()) { _ in })
+                sheetFrame(AssignLabelSheet(
+                    labels: Self.labels(),
+                    marks: Self.labelMarks,
+                    read: .read,
+                    note: nil,
+                    selectedCount: 3) { _ in })
                 )
             case "mail-snooze-sheet":
                 return AnyView(
                 sheetFrame(SnoozeSheet { _ in })
+                )
+            // The unsubscribe confirmation is reachable only from a message carrying
+            // the sender's `List-Unsubscribe` header, which no CI mailbox has, so
+            // without this frame the screen would ship unphotographed. The address is
+            // an invented newsletter host on a reserved TLD; the renderer is the live
+            // `UnsubscribeSheet`, so the photograph is of the screen a person sees.
+            case "mail-unsubscribe":
+                return AnyView(
+                sheetFrame(UnsubscribeSheet(
+                    sender: "hello@newsletter.example",
+                    url: "https://lists.newsletter.example/unsub?id=7f3",
+                    onOpen: {}, onCancel: {}))
                 )
             // The sender-decision sheet appears only when the screener queue is
             // open with messages selected, so no read-only walk reaches it on a

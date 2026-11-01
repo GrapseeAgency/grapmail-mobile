@@ -694,7 +694,18 @@ object Api {
             append("&page=").append(page).append("&pageSize=").append(pageSize)
             if (term != null) append("&q=").append(enc(term))
         }
-        return read(authed(url, token).get().build()) { json.decodeFromString(it) }
+        val resp: MailInboxResponse =
+            read(authed(url, token).get().build()) { json.decodeFromString(it) }
+        // Checked HERE, at the transport, rather than at each caller: three places
+        // read this response — the list, the pull-to-refresh, and the screener's
+        // pending count — and a listing the server said it did not produce must not
+        // reach any of them as an empty box. "Inbox is empty" and "Screener: none
+        // waiting" are both claims about mail the server never listed, and the
+        // sector's rule is that an unanswered question is drawn as unanswered.
+        if (!resp.success) {
+            throw ApiException(200, resp.code, resp.error ?: "The server returned no listing.")
+        }
+        return resp
     }
 
     /**
@@ -748,6 +759,19 @@ object Api {
         read(authed("$MAIL/labels", token).get().build()) { json.decodeFromString(it) }
 
     /**
+     * Every (message, label) pair the account has, in one call.
+     *
+     * This is the read that makes the label surface honest. Without it the client
+     * can write a label onto a message and cannot tell whether it is there, so the
+     * sheet has to mark every label the same way whatever the mail actually carries
+     * — and the pair can only be removed by someone who happens to remember it was
+     * added. `GET /labels/assignments` exists precisely so a whole page of rows
+     * costs one request instead of one each (`grapmail-labels.ts:21-27,166-176`).
+     */
+    suspend fun mailLabelAssignments(token: String): MailAssignmentsResponse =
+        read(authed("$MAIL/labels/assignments", token).get().build()) { json.decodeFromString(it) }
+
+    /**
      * Create a label. The body key is **`colour`**, not `color`
      * (`grapmail-labels.ts:105`) — sending the American spelling creates the
      * label with no colour and returns 200, so the mistake is invisible.
@@ -771,7 +795,11 @@ object Api {
         execute(authed("$MAIL/labels/${enc(id)}", token).delete().build())
     }
 
-    /** Attach / detach a label from a message. */
+    /**
+     * Attach / detach a label from a message. Both are idempotent server-side
+     * (`onConflictDoNothing` on the insert, an unconditional delete on the removal),
+     * so a repeated tap is not an error and a double removal is not either.
+     */
     suspend fun mailLabelAssign(token: String, messageId: String, labelId: String) {
         val r = authed("$MAIL/labels/message/${enc(messageId)}", token)
             .post(postBody(json.encodeToString(

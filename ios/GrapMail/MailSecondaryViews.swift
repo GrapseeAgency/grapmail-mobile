@@ -106,14 +106,20 @@ struct LabelsView: View {
                 if vm.labelState.loading && vm.labelState.labels.isEmpty {
                     Spacer(); ProgressView().padding(); Spacer()
                 } else if vm.labelState.labels.isEmpty {
+                    // Not “becomes a filter on the inbox”, which is what this said
+                    // on both platforms: the listing returns no label field per row
+                    // and takes no label query, so nothing filters by label today.
+                    // A promise the app cannot keep is the same defect as a control
+                    // that goes nowhere, and a parity diff cannot see it because the
+                    // two sides agree on the wrong words.
                     CenteredState(title: "No labels yet",
-                                  detail: "Create one and it becomes a filter on the inbox.")
+                                  detail: "Create one and it becomes available in the Label sheet.")
                 } else {
                     List {
                         ForEach(vm.labelState.labels) { label in
                             HStack(spacing: 12) {
                                 Circle()
-                                    .fill(label.color?.hexColor ?? GM.textTertiary)
+                                    .fill(labelSwatch(label.color))
                                     .frame(width: 12, height: 12)
                                 Text(label.name)
                                     .font(.system(size: 15)).foregroundColor(GM.textPrimary)
@@ -155,7 +161,11 @@ struct LabelCreateView: View {
     /// place for the two to disagree.
     var editing: MailLabel? = nil
     @State private var name: String
-    @State private var colour: Color
+    /// The server's palette KEY, not a colour. The route stores one of eight words
+    /// and `normaliseColour` replaces anything else with `slate`, so this screen
+    /// used to send a hex string — succeed with 201 — and the label came back slate
+    /// whatever the user had picked. Holding the key makes the round trip verifiable.
+    @State private var colour: String
     @State private var notice: String?
 
     init(vm: MailboxModel, onDone: @escaping () -> Void, editing: MailLabel? = nil) {
@@ -163,24 +173,35 @@ struct LabelCreateView: View {
         self.onDone = onDone
         self.editing = editing
         _name = State(initialValue: editing?.name ?? "")
-        _colour = State(initialValue: editing.flatMap { $0.color?.hexColor }
-            ?? GM.primarySolid)
+        let stored = editing?.color
+        _colour = State(initialValue: stored.flatMap { labelColourKeys.contains($0) ? $0 : nil }
+            ?? "slate")
     }
 
     private struct Swatch: Identifiable {
-        let name: String
-        let color: Color
-        var id: String { name }
+        let key: String
+        var id: String { key }
     }
 
-    private var ramp: [Swatch] {
-        [
-            Swatch(name: "Blue", color: GM.primarySolid),
-            Swatch(name: "Green", color: GM.success),
-            Swatch(name: "Amber", color: GM.warning),
-            Swatch(name: "Violet", color: GM.violet),
-            Swatch(name: "Red", color: GM.error),
-        ]
+    /// The eight keys the route accepts, in its order — not five colours chosen
+    /// locally. A picker that offers a subset of the server's vocabulary is a form
+    /// whose options are defined by whoever last edited the file rather than by the
+    /// contract, and the two lists have already drifted apart once here.
+    private var ramp: [Swatch] { labelColourKeys.map(Swatch.init(key:)) }
+
+    /// The ramp in rows of four. Written as a loop rather than `chunked(4)`: that
+    /// is Kotlin's API on Android (`MailSecondaryScreens.kt` uses it), and Swift's
+    /// standard library has no such method — the shape of the expression is
+    /// identical, which is precisely why it passes a quick read.
+    private var rampRows: [[Swatch]] {
+        var rows: [[Swatch]] = []
+        let all = ramp
+        var i = 0
+        while i < all.count {
+            rows.append(Array(all[i..<min(i + 4, all.count)]))
+            i += 4
+        }
+        return rows
     }
 
     var body: some View {
@@ -199,14 +220,20 @@ struct LabelCreateView: View {
                 VStack(alignment: .leading, spacing: 6) {
                     Text("Colour").font(.system(size: 12, weight: .bold))
                         .foregroundColor(GM.textTertiary)
-                    HStack(spacing: 12) {
-                        ForEach(ramp) { swatch in
-                            Circle().fill(swatch.color).frame(width: 28, height: 28)
-                                .overlay(Circle().stroke(
-                                    colour == swatch.color ? GM.textPrimary : Color.clear,
-                                    lineWidth: 2))
-                                .onTapGesture { colour = swatch.color }
-                                .accessibilityLabel(swatch.name)
+                    // Two rows of four: eight swatches on one line does not fit a
+                    // small phone once the screen's own padding is taken off, and a
+                    // clipped last swatch is an option that cannot be chosen.
+                    ForEach(Array(rampRows.enumerated()), id: \.offset) { _, row in
+                        HStack(spacing: 12) {
+                            ForEach(row) { swatch in
+                                Circle().fill(labelSwatch(swatch.key)).frame(width: 28, height: 28)
+                                    .overlay(Circle().stroke(
+                                        colour == swatch.key ? GM.textPrimary : Color.clear,
+                                        lineWidth: 2))
+                                    .onTapGesture { colour = swatch.key }
+                                    .accessibilityLabel(swatch.key)
+                                    .accessibilityIdentifier("label-colour-\(swatch.key)")
+                            }
                         }
                     }
                 }
@@ -217,21 +244,26 @@ struct LabelCreateView: View {
                                enabled: !name.trimmingCharacters(in: .whitespaces).isEmpty) {
                     let trimmed = name.trimmingCharacters(in: .whitespaces)
                     guard !trimmed.isEmpty else { notice = "A label needs a name."; return }
-                    // The server's own words either way: a create that hit the
-                    // label cap and a rename the route refused both say why, and
-                    // that text is what the person sees.
-                    let hex = Self.hex(colour)
+                    // The key is sent as it stands.
+                    //
+                    // The server's own words either way: a create that hit the label
+                    // cap and a rename the route refused both say why, and that text
+                    // is what the person sees. A create is only dismissed when the
+                    // route accepted it — this used to call `onDone()` unconditionally
+                    // after setting `notice`, so a rejected label (duplicate name, or
+                    // the 200 cap) navigated away with the reason never readable and
+                    // the user left believing the label existed.
                     if let label = editing {
-                        vm.renameLabel(id: label.id, name: trimmed, colour: hex) { result in
+                        vm.renameLabel(id: label.id, name: trimmed, colour: colour) { result in
                             notice = result
                             vm.refreshLabels()
                             if result == "Saved." { onDone() }
                         }
                     } else {
-                        vm.createLabel(name: trimmed, colour: hex) { result in
+                        vm.createLabel(name: trimmed, colour: colour) { result in
                             notice = result
                             vm.refreshLabels()
-                            onDone()
+                            if result.hasPrefix("Created") { onDone() }
                         }
                     }
                 }
@@ -239,17 +271,6 @@ struct LabelCreateView: View {
             }
             .padding(20)
         }
-    }
-
-    /// `#RRGGBB`, the shape the route stores. The palette holds SwiftUI colours,
-    /// so the value written to the server is read back off the colour itself
-    /// rather than assumed from the swatch's name.
-    static func hex(_ color: Color) -> String {
-        let ui = UIColor(color)
-        var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
-        guard ui.getRed(&r, green: &g, blue: &b, alpha: &a) else { return "#4C7DF0" }
-        return String(format: "#%02X%02X%02X",
-                      Int(round(r * 255)), Int(round(g * 255)), Int(round(b * 255)))
     }
 }
 

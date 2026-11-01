@@ -119,6 +119,39 @@ private val AvatarRamp = listOf(
 )
 
 /**
+ * The one unsubscribe address worth offering, or null.
+ *
+ * `List-Unsubscribe` is the sender's own claim about a URL, and it arrives in the
+ * message's header text (`publicRow.unsubscribe`, `grapmail.ts:594`) — so it is
+ * untrusted input, and the shape it commonly arrives in is a comma-separated pair
+ * like `<https://x.example/u?id=7>, <mailto:u@x.example>`.
+ *
+ * Rules, all of them for a reason:
+ *  - http(s) only. A `mailto:` opens a composition the app cannot fill in
+ *    correctly, and anything else (`javascript:`, `file:`, a bare word) is not a
+ *    link to a list at all.
+ *  - The first http(s) candidate wins, matching what mail clients do.
+ *  - Whitespace and angle brackets are stripped; the header format guarantees them.
+ *
+ * Returning null is the safe answer more often than it seems, and the thread shows
+ * no control at all when it does — an unsubscribe button that opens a broken URL is
+ * worse than no button.
+ */
+fun parseUnsubscribe(raw: String?): String? {
+    if (raw.isNullOrBlank()) return null
+    raw.split(',').forEach { part ->
+        val candidate = part.trim().removeSurrounding("<", ">").trim()
+        if (candidate.startsWith("https://", ignoreCase = true)
+            || candidate.startsWith("http://", ignoreCase = true)) return candidate
+    }
+    return null
+}
+
+/** The host a link will take the user to, for the confirmation line. */
+fun urlHost(raw: String): String? =
+    raw.substringAfter("://", "").substringBefore('/').substringBefore('?').takeIf { it.isNotBlank() }
+
+/**
  * The ramp slot for a sender key.
  *
  * An explicit fold rather than `String.hashCode()`, for two reasons that are
@@ -391,12 +424,13 @@ fun MailGreeting(name: String?, address: String?, modifier: Modifier = Modifier)
 fun LabelChip(
     label: String,
     count: Int?,
-    colorHex: String?,
+    /** The label's palette key (`slate`, `green`, …), not a colour value. */
+    colourKey: String?,
     selected: Boolean,
     modifier: Modifier = Modifier,
 ) {
     val palette = LocalPalette.current
-    val tint = parseHex(colorHex) ?: palette.primarySolid
+    val tint = labelSwatch(colourKey)
     Row(
         modifier
             .clip(RoundedCornerShape(50))
@@ -591,12 +625,50 @@ private fun CenteredState(
     }
 }
 
-// ── small parsers ────────────────────────────────────────────────────────────
+// ── label colours ───────────────────────────────────────────────────────────
 
-/** `#RRGGBB` or `RRGGBB` from the server, or null. Never a guessed colour. */
-fun parseHex(raw: String?): Color? {
-    val s = raw?.trim()?.removePrefix("#") ?: return null
-    if (s.length != 6 && s.length != 8) return null
-    val v = s.toLongOrNull(16) ?: return null
-    return if (s.length == 8) Color(v) else Color(0xFF000000 or v)
+/**
+ * The eight colour keys the label route accepts, in the order the picker shows
+ * them. Copied from the server's own set — `LABEL_COLOURS`, `grapmail-labels.ts:39`
+ * — and pinned against it by `scripts/mail-honesty.py`.
+ *
+ * These are KEYS, not colours to draw: the value stored on a label is one of these
+ * words. The web client says so in its own source (`src/app/(mail)/mail/page.tsx:84`)
+ * and resolves the key to a CSS variable, which is why the site's labels look
+ * right and, until this file existed, the apps did not.
+ */
+val LABEL_COLOUR_KEYS = listOf(
+    "slate", "red", "amber", "green", "teal", "blue", "violet", "pink",
+)
+
+/**
+ * A label's swatch, from its palette key.
+ *
+ * The server normalises an unrecognised value to `slate` before storing it
+ * (`normaliseColour`), so anything outside the eight can only arrive from a
+ * response that has since changed. Falling back to slate matches the server rather
+ * than inventing a colour the user never picked.
+ *
+ * Previously the apps parsed this field as a hex string — `parseHex`, which is now
+ * gone. That could never succeed: `normaliseColour` rejects a hex value and stores
+ * `slate`, so the parse always returned null and every label drew the neutral
+ * fallback. Worse, the create screen SENT a hex (Android) or a hex (iOS) and the
+ * route accepted the request with 201 while storing `slate`, so the picker showed
+ * one colour and the label came back another forever. The light and dark values
+ * below are the web theme's own (`--gm-label-*` in `src/styles/grapmail.css`), so
+ * all three clients now show one colour for one key.
+ */
+@Composable
+fun labelSwatch(key: String?): Color {
+    val dark = androidx.compose.foundation.isSystemInDarkTheme()
+    return when (key) {
+        "red" -> if (dark) Color(0xFFF2857D) else Color(0xFFD93025)
+        "amber" -> if (dark) Color(0xFFFDD663) else Color(0xFFF29900)
+        "green" -> if (dark) Color(0xFF6DD58C) else Color(0xFF188038)
+        "teal" -> if (dark) Color(0xFF5EEAD4) else Color(0xFF0D9488)
+        "blue" -> if (dark) Color(0xFF8AB4F8) else Color(0xFF1A73E8)
+        "violet" -> if (dark) Color(0xFFC4B5FD) else Color(0xFF7C3AED)
+        "pink" -> if (dark) Color(0xFFF7A8D8) else Color(0xFFC01A7A)
+        else -> if (dark) Color(0xFF9AA0A6) else Color(0xFF5F6368)   // slate
+    }
 }

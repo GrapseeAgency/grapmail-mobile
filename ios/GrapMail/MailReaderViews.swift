@@ -27,6 +27,13 @@ struct ThreadView: View {
     /// earlier success on screen.
     @State private var notices: [String: String] = [:]
     @State private var busy: String?
+    /// The unsubscribe confirmation, offered only for a message that carries the
+    /// sender's own `List-Unsubscribe` offer.
+    @State private var showUnsub = false
+    @State private var unsubNote: String?
+    /// Handing the link over is the browser's job, not this app's: opening a URL
+    /// inline keeps the outcome out of the view's own logic.
+    @Environment(\.openURL) private var openURL
 
     var body: some View {
         VStack(spacing: 0) {
@@ -87,7 +94,7 @@ struct ThreadView: View {
             if vm.thread.messages.first?.isStarred == true {
                 Image(systemName: "star.fill")
                     .font(.system(size: 18))
-                    .foregroundColor(Color(0xF5A623))
+                    .foregroundColor(GM.star)
             }
         }
         .padding(.horizontal, 12).padding(.vertical, 10)
@@ -137,7 +144,7 @@ private struct ThreadMessageCard: View {
                 Button(action: onStar) {
                     Image(systemName: message.isStarred ? "star.fill" : "star")
                         .font(.system(size: 17))
-                        .foregroundColor(message.isStarred ? Color(0xF5A623) : GM.textTertiary)
+                        .foregroundColor(message.isStarred ? GM.star : GM.textTertiary)
                 }
                 .buttonStyle(.plain)
             }
@@ -161,7 +168,52 @@ private struct ThreadMessageCard: View {
                         .font(.system(size: 12)).foregroundColor(GM.textTertiary)
                 }
                 attachmentRows
+                if let unsub = parseUnsubscribe(message.unsubscribe) {
+                    Spacer(minLength: 10)
+                    Button {
+                        showUnsub = true
+                    } label: {
+                        Text("Unsubscribe from this sender")
+                            .font(.system(size: 15))
+                            .foregroundColor(GM.textPrimary)
+                            .frame(maxWidth: .infinity, minHeight: 44)
+                            .background(RoundedRectangle(cornerRadius: GMShape.button, style: .continuous)
+                                .stroke(GM.border, lineWidth: 1))
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("mail-unsubscribe")
+                    if let unsubNote {
+                        Text(unsubNote)
+                            .font(.system(size: 12)).foregroundColor(GM.error)
+                    }
+                }
                 GradientButton(title: "Reply", action: onReply)
+            }
+            .sheet(isPresented: $showUnsub) {
+                if let unsub = parseUnsubscribe(message.unsubscribe) {
+                    UnsubscribeSheet(
+                        sender: message.from?.address ?? message.from?.display,
+                        url: unsub,
+                        onOpen: {
+                            showUnsub = false
+                            // Only what this app witnessed is reported. Whether the
+                            // list acted on the request is not observable from here,
+                            // so no branch here says "unsubscribed". A URL the
+                            // system refuses to open is reported as that rather
+                            // than passed to an opener that cannot use it.
+                            guard let target = URL(string: unsub) else {
+                                unsubNote = "That unsubscribe address could not be opened."
+                                return
+                            }
+                            if openURL(target) {
+                                unsubNote = "Opened in your browser. GrapMail cannot see what the page said."
+                            } else {
+                                unsubNote = "This device could not open that link."
+                            }
+                        },
+                        onCancel: { showUnsub = false }
+                    )
+                }
             }
         }
         .padding(16)
@@ -495,6 +547,59 @@ struct ComposeView: View {
         let t = existing.trimmingCharacters(in: .whitespaces)
         if t.isEmpty { return address }
         return t.hasSuffix(",") ? "\(t) \(address)" : "\(t), \(address)"
+    }
+}
+
+/// The unsubscribe confirmation. Reached only from a message that actually
+/// carries the sender's `List-Unsubscribe` offer.
+///
+/// It says four things before the user can act, because the honest answer to "did
+/// this unsubscribe me?" is "the app cannot know":
+///
+///  - the request goes to the SENDER's server, not GrapMail's;
+///  - visiting such a link can itself confirm the address is live, a real cost the
+///    one-tap framing of the design hides;
+///  - GrapMail cannot undo it;
+///  - nothing here claims the outcome — the line shown afterwards reports only that
+///    the link was handed to a browser.
+///
+/// Not private, so the CI snapshot host can photograph it: a CI mailbox has no
+/// subscribed mail, so the live path cannot reach this sheet on its own. Android's
+/// `UnsubscribeContent` is the same screen with the same four statements.
+struct UnsubscribeSheet: View {
+    let sender: String?
+    let url: String
+    let onOpen: () -> Void
+    let onCancel: () -> Void
+
+    var body: some View {
+        let host = urlHost(url) ?? "the sender's server"
+        VStack(alignment: .leading, spacing: 0) {
+            SheetTitle(text: "Unsubscribe")
+            Text("This offer came from the sender"
+                 + (sender.map { ", about \($0)" } ?? "")
+                 + ". Opening it goes to \(host) — not to GrapMail.")
+                .font(.system(size: 13)).foregroundColor(GM.textSecondary)
+                .padding(.horizontal, 20).padding(.vertical, 6)
+            Text("Some mailing lists treat any visit as proof that an address is live, "
+                 + "so opening this is not risk-free. GrapMail cannot undo it, and cannot "
+                 + "see what happens after: the page at \(host) is the only thing that "
+                 + "will say whether you were removed.")
+                .font(.system(size: 13)).foregroundColor(GM.textSecondary)
+                .lineSpacing(5)
+                .padding(.horizontal, 20).padding(.vertical, 6)
+            Spacer(minLength: 10)
+            GradientButton(title: "Open in my browser", action: onOpen)
+                .padding(.horizontal, 20)
+            Button(action: onCancel) {
+                Text("Cancel")
+                    .font(.system(size: 15)).foregroundColor(GM.textTertiary)
+                    .frame(maxWidth: .infinity).padding(.vertical, 14)
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(.bottom, 24)
+        .accessibilityIdentifier("gm-sheets-unsub")
     }
 }
 

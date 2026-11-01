@@ -182,8 +182,11 @@ struct LabelStrip: View {
                     LabelChip(label: "Inbox", count: unread, color: GM.primarySolid,
                               selected: true)
                     ForEach(labels) { l in
+                        // The server's palette key, resolved to a swatch. The old
+                        // `l.color?.hexColor` could never parse a colour name, so
+                        // every chip drew the same grey whatever the label carried.
                         LabelChip(label: l.name, count: l.unread,
-                                  color: l.color?.hexColor ?? GM.textSecondary,
+                                  color: labelSwatch(l.color),
                                   selected: false)
                     }
                 }

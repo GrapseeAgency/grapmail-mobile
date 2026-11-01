@@ -70,13 +70,86 @@ def ios_functions(src):
 
 # ── DTO fields ────────────────────────────────────────────────────────────────
 
-ANDROID_CLASS = re.compile(r"data class\s+(Mail[A-Za-z0-9_]*?)Dto\s*\((.*?)\n\)", re.S)
-SWIFT_STRUCT = re.compile(r"struct\s+(Mail[A-Za-z0-9_]*)[^{]*\{(.*?)\n\}", re.S)
-ANDROID_FIELD = re.compile(r"^\s*val\s+([a-zA-Z0-9_]+)\s*:", re.M)
+# Every `data class Mail…` on the Android side — NOT only the ones carrying the
+# `Dto` suffix. Written as `Mail…Dto` it silently matched 8 of the 26 wire types:
+# every response envelope is named `MailLabelsResponse`, `MailInboxResponse` and so
+# on, without the suffix, so all of them fell into the “one side only (plumbing, not
+# compared)” list and their fields were never diffed. A gate that prints a checked
+# number while quietly skipping half the surface is worse than no gate, because the
+# green run reads as evidence — and this is the same blind spot that let a call
+# missing from BOTH platforms pass. `normalise()` still strips the suffix for matching.
+#
+# Both sides are read by bracket balance rather than by “run to the next `)` at the
+# start of a line”. The first version of that ran straight through single-line
+# declarations — `struct MailSnoozeRequest: Encodable { var until: String }`,
+# `data class MailSnoozeRequest(val until: String)` — and collected the FOLLOWING
+# type's fields as its own, reporting invented drift against correct code. A gate
+# that cries wolf teaches the reader to distrust it, which is how a real omission
+# gets waved through next time.
+ANDROID_DECL = re.compile(r"^\s*data class\s+(Mail[A-Za-z0-9_]+)")
+SWIFT_DECL = re.compile(r"^\s*(?:public |private )?struct\s+(Mail[A-Za-z0-9_]+)")
+ANDROID_FIELD = re.compile(r"^\s*(?:@SerialName\([^)]*\)\s*)?val\s+([a-zA-Z0-9_]+)\s*:", re.M)
 # A stored Swift property is `var name: T` or `var name = ...`; a computed one
 # carries a `{`, a getter, or a `get`, and those are behaviour, not wire shape.
-SWIFT_FIELD = re.compile(r"^\s{4}var\s+([a-zA-Z0-9_]+)\s*[:=]", re.M)
-SWIFT_COMPUTED = re.compile(r"^\s{4}var\s+([a-zA-Z0-9_]+)[^{\n]*\{", re.M)
+SWIFT_FIELD = re.compile(r"^[ \t]{4,}var\s+([a-zA-Z0-9_]+)\s*[:=]", re.M)
+SWIFT_COMPUTED = re.compile(r"^[ \t]{4,}var\s+([a-zA-Z0-9_]+)[^{\n]*\{", re.M)
+
+
+def _scrub(line):
+    """Blank out a line's string literals and trailing comment.
+
+    Without this, `"\\u{2026}"` and `"(no subject)"` contribute brackets and the
+    balance goes wrong. Only the brackets are trusted, so the text itself may be
+    destroyed here.
+    """
+    if "//" in line:
+        line = line[:line.index("//")]
+    out, i, n = [], 0, len(line)
+    while i < n:
+        ch = line[i]
+        if ch == '"':
+            i += 1
+            while i < n:
+                if line[i] == "\\":
+                    i += 2
+                    continue
+                if line[i] == '"':
+                    i += 1
+                    break
+                i += 1
+            continue
+        out.append(ch)
+        i += 1
+    return "".join(out)
+
+
+def block_body(lines, start, opener, closer):
+    """The text of a declaration, from its header line to its matching closer."""
+    depth, collected = 0, []
+    for idx in range(start, len(lines)):
+        s = _scrub(lines[idx])
+        for ch in s:
+            if ch == opener:
+                depth += 1
+            elif ch == closer:
+                depth -= 1
+        collected.append(lines[idx])
+        if depth <= 0:
+            return "\n".join(collected)
+    return "\n".join(collected)
+
+
+def _types(src, decl, opener, closer, field_of):
+    lines = src.split("\n")
+    out = {}
+    for i, line in enumerate(lines):
+        m = decl.match(line)
+        if not m:
+            continue
+        name = normalise(m.group(1))
+        if name not in out:                      # first declaration wins
+            out[name] = field_of(block_body(lines, i, opener, closer))
+    return out
 
 
 def swift_fields(body):
@@ -116,10 +189,8 @@ def main():
     say(f"mail calls — android {len(af)}  ios {len(_if)}  "
         f"shared {len(af & _if)}")
 
-    a_types = {normalise(m.group(1)): android_fields(m.group(2))
-               for m in ANDROID_CLASS.finditer(android_src)}
-    i_types = {m.group(1): swift_fields(m.group(2))
-               for m in SWIFT_STRUCT.finditer(ios_src)}
+    a_types = _types(android_src, ANDROID_DECL, "(", ")", android_fields)
+    i_types = _types(ios_src, SWIFT_DECL, "{", "}", swift_fields)
 
     shared = sorted(set(a_types) & set(i_types))
     checked = 0

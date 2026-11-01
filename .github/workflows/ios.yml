@@ -111,16 +111,17 @@ jobs:
           # The export chain above never aborts (a failed test still has to
           # upload what it captured), so without these checks the job could go
           # green on an empty artifact while claiming the sector was screened.
-          # The walk photographs 63 screens: 8 signup, 9 hub + gate leg, 7 hub
-          # rows, 15 post-write + no-open-alert security confirmations, 2
-          # recovery, 1 session restore, 1 sign-in, 2 dark (welcome + step 1),
-          # and the mailbox band of 27 — 4 live (60 home, 62 drawer, 67 search,
-          # 69 sort sheet), 22 snapshot names, and 61 shot in dark. Anything
-          # under 60 means it died part way through, and the run must not be
-          # read as a pass on screenshots.
+          #
+          # The walk photographs 66 frames. The mailbox band is 30 of them, named
+          # 60–89: 4 shot from the live home (60 list, 62 drawer, 67 search, 69 sort
+          # sheet), 3 in dark (61 home, 88 thread, 89 labels), and 23 rendered by the
+          # snapshot host because they need mail that a CI mailbox does not have. The
+          # floor below is NOT the frame count: it is the point past which a run that
+          # died part way is no longer plausible, and the names are enforced separately
+          # further down, which is the check that actually means anything.
           COUNT="$(find screenshots -name '*.png' | wc -l | tr -d ' ')"
           echo "exported $COUNT screenshot attachment(s)"
-          if [ "$COUNT" -lt 60 ]; then
+          if [ "$COUNT" -lt 62 ]; then
             echo "::error::only $COUNT screenshots exported — the walk did not produce its set"
             exit 1
           fi

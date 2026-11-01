@@ -154,8 +154,14 @@ fun LabelsScreen(vm: MailboxViewModel, onBack: () -> Unit, onCreate: () -> Unit,
                     CircularProgressIndicator(color = palette.primarySolid)
                 }
             } else if (state.labels.isEmpty()) {
+                // Not “becomes a filter on the inbox”, which is what this said on
+                // both platforms. The listing returns no label field per row and
+                // takes no label query, so nothing filters by label today; a
+                // promise the app cannot keep is the same defect as a control that
+                // goes nowhere, and the parity gate cannot see it because both
+                // sides agreed on the wrong words.
                 EmptyNote("No labels yet",
-                    "Create one and it becomes a filter on the inbox.")
+                    "Create one and it becomes available in the Label sheet.")
             } else {
                 LazyColumn(Modifier.fillMaxSize()) {
                     items(state.labels, key = { it.id }) { label ->
@@ -169,8 +175,7 @@ fun LabelsScreen(vm: MailboxViewModel, onBack: () -> Unit, onCreate: () -> Unit,
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             Box(Modifier.size(12.dp).clip(CircleShape)
-                                .background(com.grapsee.grapmail.ui.components.parseHex(label.color)
-                                    ?: palette.primarySolid))
+                                .background(com.grapsee.grapmail.ui.components.labelSwatch(label.color)))
                             Spacer(Modifier.width(12.dp))
                             Text(label.name, fontSize = 15.sp, color = palette.textPrimary,
                                 maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
@@ -201,8 +206,14 @@ fun LabelCreateScreen(vm: MailboxViewModel, onDone: () -> Unit,
     // One screen for both, because the fields, the ramp and the validation are
     // the same control and a second copy of them would drift.
     var name by remember { mutableStateOf(editing?.name ?: "") }
-    var chosen by remember { mutableStateOf(com.grapsee.grapmail.ui.components.parseHex(editing?.color)
-            ?: Ramp[0]) }
+    // The server's palette KEY, held as the key rather than as a colour and
+    // converted back at the last moment. Prefilled from the label being edited,
+    // defaulting to the same value the route defaults to (`slate`, the column's
+    // own default) when the label carries something unrecognised.
+    var chosen by remember {
+        mutableStateOf(editing?.color?.takeIf { it in com.grapsee.grapmail.ui.components.LABEL_COLOUR_KEYS }
+            ?: "slate")
+    }
     var result by remember { mutableStateOf<String?>(null) }
 
     MailScaffold(if (editing == null) "New label" else "Edit label", onDone) {
@@ -228,20 +239,27 @@ fun LabelCreateScreen(vm: MailboxViewModel, onDone: () -> Unit,
             Spacer(Modifier.height(20.dp))
             Text("Colour", fontSize = 13.sp, color = palette.textSecondary)
             Spacer(Modifier.height(10.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Ramp.forEach { hex ->
-                    val picked = hex == chosen
-                    Box(
-                        Modifier.size(34.dp).clip(CircleShape).background(hex)
-                            .border(if (picked) 3.dp else 1.dp,
-                                if (picked) palette.textPrimary else palette.border, CircleShape)
-                            .clickable { chosen = hex },
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        if (picked) Icon(Icons.Rounded.Check, null, tint = androidx.compose.ui.graphics.Color.White,
-                            modifier = Modifier.size(16.dp))
+            // Two rows of four: eight swatches on one line does not fit a 360dp
+            // phone once the screen's own 40dp of padding is taken off.
+            com.grapsee.grapmail.ui.components.LABEL_COLOUR_KEYS.chunked(4).forEach { row ->
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    row.forEach { key ->
+                        val picked = key == chosen
+                        val swatch = com.grapsee.grapmail.ui.components.labelSwatch(key)
+                        Box(
+                            Modifier.size(34.dp).clip(CircleShape).background(swatch)
+                                .border(if (picked) 3.dp else 1.dp,
+                                    if (picked) palette.textPrimary else palette.border, CircleShape)
+                                .clickable { chosen = key }
+                                .testTag("label-colour-$key"),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            if (picked) Icon(Icons.Rounded.Check, null, tint = androidx.compose.ui.graphics.Color.White,
+                                modifier = Modifier.size(16.dp))
+                        }
                     }
                 }
+                Spacer(Modifier.height(12.dp))
             }
 
             result?.let {
@@ -259,24 +277,16 @@ fun LabelCreateScreen(vm: MailboxViewModel, onDone: () -> Unit,
                     if (outcome.startsWith("Created") || outcome == "Saved.") onDone()
                     else result = outcome
                 }
-                if (editing == null) vm.createLabel(name.trim(), hexString(chosen), done)
-                else vm.renameLabel(editing.id, name.trim(), hexString(chosen), done)
+                // The key is sent as it stands. It used to be a hex string built
+                // from a local ramp, and the route's `normaliseColour` rejects
+                // anything that is not one of its eight words — so the request
+                // succeeded with 201 while the server stored `slate`, and the
+                // colour the user picked was never the colour the label got.
+                if (editing == null) vm.createLabel(name.trim(), chosen, done)
+                else vm.renameLabel(editing.id, name.trim(), chosen, done)
             }, enabled = name.isNotBlank())
         }
     }
-}
-
-private val Ramp = listOf(
-    androidx.compose.ui.graphics.Color(0xFF1A6DF0), androidx.compose.ui.graphics.Color(0xFF7C3AED),
-    androidx.compose.ui.graphics.Color(0xFF059669), androidx.compose.ui.graphics.Color(0xFFF97316),
-    androidx.compose.ui.graphics.Color(0xFFEC4899), androidx.compose.ui.graphics.Color(0xFFDC2626),
-)
-
-private fun hexString(c: androidx.compose.ui.graphics.Color): String {
-    val r = (c.red * 255).toInt().coerceIn(0, 255)
-    val g = (c.green * 255).toInt().coerceIn(0, 255)
-    val b = (c.blue * 255).toInt().coerceIn(0, 255)
-    return "#%02X%02X%02X".format(r, g, b)
 }
 
 // ── 77 contacts, 85 contact detail ───────────────────────────────────────────

@@ -6,6 +6,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.grapsee.grapmail.data.Api
 import com.grapsee.grapmail.data.ApiException
+import com.grapsee.grapmail.data.AssignmentsRead
+import com.grapsee.grapmail.data.LabelMark
 import com.grapsee.grapmail.data.MailAction
 import com.grapsee.grapmail.data.MailAttachmentDto
 import com.grapsee.grapmail.data.MailBox
@@ -70,6 +72,32 @@ class MailboxViewModel(app: Application) : AndroidViewModel(app) {
         val noMailbox: Boolean = false,
         val selection: Set<String> = emptySet(),
         val labels: List<MailLabelDto> = emptyList(),
+        /**
+         * Whether the account has been asked which messages carry which labels.
+         *
+         * Kept separate from [labelMarks] because the sheet must be able to say
+         * “not known” out loud. Marking every label Off before the read answers
+         * would offer to add a label the message already has, and the sheet would
+         * look like it had checked.
+         */
+        val assignmentsRead: AssignmentsRead = AssignmentsRead.NotRead,
+        /** labelId → its state against the current selection. */
+        val labelMarks: Map<String, LabelMark> = emptyMap(),
+        /** The Label sheet's own result line — what the last tap actually did. */
+        val labelNote: String? = null,
+        /**
+         * The messages this session snoozed, kept so the snooze can be undone.
+         *
+         * The listing's row shape (`publicRow`, `grapmail.ts:583-611`) carries no
+         * `snoozedUntil`, and the inbox hides a pending snooze, so a snoozed message
+         * is not visible anywhere the app can label it as snoozed: `?box=snoozed`
+         * is implemented but not deployed. Undo is therefore offered for exactly the
+         * mail the app just snoozed and for no longer than that — which is the whole
+         * set the client can honestly name — rather than pretending to know which
+         * of the mail on screen is postponed.
+         */
+        val snoozeUndoIds: List<String> = emptyList(),
+        val snoozeUndoNote: String? = null,
         val unreadCount: Int? = null,
         /**
          * The mailbox's own identity from `GET /me`. The greeting is built from
@@ -321,15 +349,89 @@ class MailboxViewModel(app: Application) : AndroidViewModel(app) {
             val t = token() ?: return@launch
             _state.update { it.copy(busy = true) }
             var failure: String? = null
+            val done = mutableListOf<String>()
             for (id in ids) {
                 runCatching { Api.mailAction(t, id, action, until) }
-                    .onSuccess { applyLocally(id, action) }
+                    .onSuccess { done.add(id); applyLocally(id, action) }
                     .onFailure { failure = it.message ?: "That action didn't go through." }
             }
             _state.update { it.copy(busy = false, selection = emptySet(), staleError = failure) }
+            if (action == MailAction.Snooze) {
+                // Only the messages the server accepted get an undo. Offering one
+                // for a message whose snooze failed would unsnooze mail that is
+                // still in the inbox and say it had been postponed.
+                _state.update { s ->
+                    if (done.isEmpty()) s else s.copy(
+                        snoozeUndoIds = done,
+                        snoozeUndoNote = snoozeNote(done.size, until),
+                    )
+                }
+            } else if (action != MailAction.Unsnooze) {
+                // Any other filing action supersedes the offer. An unsnooze keeps it
+                // deliberately: a partial undo leaves the rest postponed, and the
+                // note lists what still is.
+                _state.update { it.copy(snoozeUndoIds = emptyList(), snoozeUndoNote = null) }
+            }
             invalidateFor(action)
             load(replace = true)
         }
+    }
+
+    /** The undo line, with the instant the server was told to hold the mail until. */
+    private fun snoozeNote(count: Int, until: String?): String {
+        val when_ = until?.let { raw ->
+            runCatching {
+                java.time.format.DateTimeFormatter.ofPattern("EEE, d MMM · h:mm a")
+                    .format(java.time.ZonedDateTime.parse(raw)
+                        .withZoneSameInstant(java.time.ZoneId.systemDefault()))
+            }.getOrNull()
+        }
+        val head = if (count == 1) "Snoozed 1 message" else "Snoozed $count messages"
+        return if (when_ != null) "$head until $when_" else head
+    }
+
+    /**
+     * Take the mail back out of snooze — the one place `unsnooze` is reachable.
+     *
+     * The action existed on both platforms with nothing calling it, because the
+     * client had no way to see which messages were snoozed: the row shape carries no
+     * `snoozedUntil` and the inbox hides them. The moment of snoozing IS the moment
+     * the app knows, so that is where the undo lives. Until `?box=snoozed` is
+     * deployed this is the whole of the feature, and the note says so rather than
+     * implying a list of postponed mail exists somewhere.
+     */
+    fun undoSnooze() {
+        val ids = _state.value.snoozeUndoIds
+        if (ids.isEmpty()) return
+        viewModelScope.launch {
+            val t = token() ?: return@launch
+            _state.update { it.copy(busy = true) }
+            var failure: String? = null
+            var undone = 0
+            for (id in ids) {
+                runCatching { Api.mailAction(t, id, MailAction.Unsnooze, null) }
+                    .onSuccess { undone++; MailStore.invalidate(MailBox.Inbox) }
+                    .onFailure { failure = it.message ?: "That action didn't go through." }
+            }
+            _state.update { s ->
+                s.copy(
+                    busy = false,
+                    // Cleared only for what actually came back; a partial undo keeps
+                    // the rest offered rather than forgetting them.
+                    snoozeUndoIds = if (failure == null) emptyList() else s.snoozeUndoIds,
+                    snoozeUndoNote = when {
+                        failure != null -> "$undone of ${ids.size} came back. $failure"
+                        else -> null
+                    },
+                    staleError = failure,
+                )
+            }
+            load(replace = true)
+        }
+    }
+
+    fun dismissSnoozeUndo() {
+        _state.update { it.copy(snoozeUndoIds = emptyList(), snoozeUndoNote = null) }
     }
 
     fun actOn(id: String, action: MailAction) {
@@ -361,6 +463,9 @@ class MailboxViewModel(app: Application) : AndroidViewModel(app) {
             MailAction.Restore, MailAction.Unarchive, MailAction.Unspam ->
                 MailStore.invalidateAllBoxes()
             MailAction.Snooze -> MailStore.invalidate(MailBox.Inbox)
+            // Undoing a snooze returns the mail to the listing it was hidden from,
+            // which is the inbox — so that is the box that must be re-read.
+            MailAction.Unsnooze -> MailStore.invalidate(MailBox.Inbox)
             else -> Unit
         }
     }
@@ -380,7 +485,14 @@ class MailboxViewModel(app: Application) : AndroidViewModel(app) {
             var failure: String? = null
             for (id in ids) {
                 runCatching { Api.mailDeletePermanent(t, id) }
-                    .onSuccess { MailStore.removeEverywhere(id) }
+                    .onSuccess {
+                        MailStore.removeEverywhere(id)
+                        // The message is gone, so its label pairs are gone with it.
+                        // Left in the map they would be resurrected if the same id
+                        // ever appeared again, showing a tick for mail that does not
+                        // exist — and the next read would say nothing about it.
+                        MailStore.forgetAssignments(id)
+                    }
                     .onFailure { failure = it.message }
             }
             _state.update { it.copy(busy = false, selection = emptySet(), staleError = failure) }
@@ -388,15 +500,133 @@ class MailboxViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    fun assignLabel(labelId: String) {
+    /**
+     * Read the account's label pairs, if that has not already happened.
+     *
+     * Asked once per session, not once per sheet opening: the route returns the
+     * whole set, so a second call buys nothing the first one did not already
+     * contain, and a sheet that re-read on every appearance inherits the hub's
+     * defect — a failed refresh that reads as a failed load.
+     */
+    fun ensureAssignments() {
+        // A note from the previous selection must not be sitting there when the
+        // sheet opens for a different set of messages.
+        _state.update { it.copy(labelNote = null) }
+        when (_state.value.assignmentsRead) {
+            AssignmentsRead.Reading -> return
+            AssignmentsRead.Read -> refreshMarks()
+            else -> loadAssignments()
+        }
+    }
+
+    private fun loadAssignments() {
         val ids = _state.value.selection.toList()
         if (ids.isEmpty()) return
         viewModelScope.launch {
             val t = token() ?: return@launch
-            _state.update { it.copy(busy = true) }
+            _state.update { it.copy(assignmentsRead = AssignmentsRead.Reading, labelNote = null) }
+            runCatching { Api.mailLabelAssignments(t) }
+                .onSuccess {
+                    MailStore.putAssignments(it.assignments)
+                    _state.update { s -> s.copy(assignmentsRead = AssignmentsRead.Read) }
+                    applyMarks()
+                }
+                .onFailure { e ->
+                    // A first read that fails leaves the marks unknown. A read that
+                    // fails AFTER a good one keeps the marks it already had — the
+                    // sector's rule that a refresh may not blank what is on screen.
+                    if (MailStore.assignments() == null) {
+                        _state.update { s -> s.copy(assignmentsRead = AssignmentsRead.Failed) }
+                        _state.update { it.copy(staleError = e.message) }
+                    }
+                }
+        }
+    }
+
+    fun refreshMarks() { viewModelScope.launch { applyMarks() } }
+
+    /** Recompute the sheet's marks from the store. Cheap, and never a network call. */
+    private suspend fun applyMarks() {
+        val ids = _state.value.selection.toList()
+        val map = MailStore.assignments()
+        val marks = _state.value.labels.associate { l ->
+            val with = ids.count { (map?.get(it) ?: emptySet()).contains(l.id) }
+            l.id to when {
+                map == null || ids.isEmpty() -> LabelMark.Unknown
+                with == 0 -> LabelMark.Off
+                with == ids.size -> LabelMark.On
+                else -> LabelMark.Mixed
+            }
+        }
+        _state.update { it.copy(labelMarks = marks) }
+    }
+
+    /**
+     * Tap a label in the sheet: apply it to the selection, or take it off.
+     *
+     * The direction comes from the state the read produced, and the two ambiguous
+     * cases are resolved toward adding rather than removing:
+     *
+     *  - `Mixed` completes the label across the selection. Half-checked means the
+     *    user is mid-operation on a group; finishing is what every mail client does
+     *    and un-tagging the ones that have it would discard work they did not ask
+     *    to discard.
+     *  - `Unknown` (the read never answered) only ever assigns. Both writes are
+     *    idempotent server-side, so adding a label that happens to be there costs
+     *    nothing — while REMOVING one on an unknown baseline could take off a label
+     *    the user never meant to touch. The sheet says the state is not known, so
+     *    the tap is not made on a false claim.
+     *
+     * The store is patched only for the messages the server accepted, and the
+     * sheet stays open to show the result: unlike a filing action, nothing in the
+     * list visibly changes here, so a sheet that closed would leave the user
+     * without an answer.
+     */
+    fun toggleLabel(labelId: String) {
+        val ids = _state.value.selection.toList()
+        if (ids.isEmpty()) return
+        val mark = _state.value.labelMarks[labelId] ?: LabelMark.Unknown
+        val remove = mark == LabelMark.On
+        viewModelScope.launch {
+            val t = token() ?: return@launch
+            _state.update { it.copy(busy = true, labelNote = null) }
+            // On `Mixed` only the messages that lack it are written; on `On` only
+            // the ones carrying it are. Writing all of either way would report a
+            // count the server never changed.
+            val targets = ids.filter { id ->
+                val has = (MailStore.assignments()?.get(id) ?: emptySet()).contains(labelId)
+                if (remove) has else !has
+            }
+            if (targets.isEmpty()) {
+                _state.update { it.copy(busy = false) }
+                return@launch
+            }
+            var done = 0
             var failure: String? = null
-            ids.forEach { runCatching { Api.mailLabelAssign(t, it, labelId) }.onFailure { e -> failure = e.message } }
-            _state.update { it.copy(busy = false, selection = emptySet(), staleError = failure) }
+            val labelName = _state.value.labels.firstOrNull { it.id == labelId }?.name ?: "label"
+            targets.forEach { id ->
+                runCatching { if (remove) Api.mailLabelDetach(t, id, labelId)
+                              else Api.mailLabelAssign(t, id, labelId) }
+                    .onSuccess {
+                        done++
+                        if (remove) MailStore.markUnassigned(id, labelId)
+                        else MailStore.markAssigned(id, labelId)
+                    }
+                    .onFailure { failure = it.message }
+            }
+            _state.update { s ->
+                s.copy(
+                    busy = false,
+                    labelNote = when {
+                        failure != null && done == 0 -> failure
+                        failure != null -> "$done of ${targets.size} saved. $failure"
+                        remove -> "Removed \"$labelName\" from $done"
+                        done == 1 -> "Labelled 1 message"
+                        else -> "Labelled $done messages"
+                    },
+                )
+            }
+            refreshMarks()
         }
     }
 

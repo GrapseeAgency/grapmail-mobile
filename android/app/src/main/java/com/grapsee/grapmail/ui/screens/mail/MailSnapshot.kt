@@ -128,8 +128,37 @@ fun MailSnapshotScreen(name: String) {
             }
             "mail-move-sheet" -> sheetHost { MoveContent { } }
             "mail-delete-sheet" -> sheetHost { PermanentDeleteContent(3, cancel = {}, confirm = {}) }
-            "mail-assign-label-sheet" -> sheetHost { AssignLabelContent(sampleLabels) { } }
+            "mail-assign-label-sheet" -> sheetHost {
+                // All three states the assignment read can produce, in one frame:
+                // one label on every selected message, one on some, one on none.
+                // Photographing only the unmarked sheet would leave the tick and
+                // the dash unproven — and the tick is the thing this sheet exists
+                // to show. The renderer is the live one; only the data is invented.
+                AssignLabelContent(
+                    labels = sampleLabels,
+                    marks = mapOf(
+                        "l1" to com.grapsee.grapmail.data.LabelMark.On,
+                        "l2" to com.grapsee.grapmail.data.LabelMark.Mixed,
+                        "l3" to com.grapsee.grapmail.data.LabelMark.Off,
+                    ),
+                    read = com.grapsee.grapmail.data.AssignmentsRead.Read,
+                    note = null,
+                    selectedCount = 3,
+                ) { }
+            }
             "mail-snooze-sheet" -> sheetHost { SnoozeContent { } }
+            // The unsubscribe confirmation is reachable only from a message that
+            // carries the sender's `List-Unsubscribe` header, which no CI mailbox has,
+            // so without this frame the screen would ship unphotographed — the same
+            // gap `mail-sender-sheet` was added for. The URL is an invented
+            // newsletter address on a reserved TLD; the renderer is the live one.
+            "mail-unsubscribe" -> sheetHost {
+                UnsubscribeContent(
+                    sender = "hello@newsletter.example",
+                    url = "https://lists.newsletter.example/unsub?id=7f3",
+                    onOpen = { }, onCancel = { },
+                )
+            }
             // The sender-decision sheet appears only when the screener queue is
             // open and messages are selected, so no read-only walk can reach it on
             // a fresh CI mailbox — the queue is empty there. Two senders rather
@@ -219,9 +248,14 @@ private val rows = listOf(
         "Agreed — we will hold the Thursday slot for both routes."),
 )
 
+/// The label colours are the server's palette KEYS, not hex values, because a hex
+/// value is not something `grapmail-labels.ts` can ever answer with — `normaliseColour`
+/// rejects it and stores `slate`. Sample data that carried a shape the server cannot
+/// send would have made a broken colour lookup look correct here.
 private val sampleLabels = listOf(
-    MailLabelDto(id = "l1", name = "Work", color = "#2F6FED", unread = 2),
-    MailLabelDto(id = "l2", name = "Bills", color = "#1E9E6A"),
+    MailLabelDto(id = "l1", name = "Work", color = "blue", unread = 2),
+    MailLabelDto(id = "l2", name = "Bills", color = "green"),
+    MailLabelDto(id = "l3", name = "Receipts", color = "amber", unread = 1),
 )
 
 /// The sample pages, in the same cache the live list reads. Without them the

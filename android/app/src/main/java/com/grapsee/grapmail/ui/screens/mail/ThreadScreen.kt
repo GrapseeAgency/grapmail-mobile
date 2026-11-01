@@ -108,7 +108,7 @@ fun ThreadScreen(
                 fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = palette.textPrimary)
             Spacer(Modifier.weight(1f))
             if (thread.messages.firstOrNull()?.isStarred == true) {
-                Icon(Icons.Rounded.Star, "Starred", tint = androidx.compose.ui.graphics.Color(0xFFF5A623),
+                Icon(Icons.Rounded.Star, "Starred", tint = palette.star, 
                     modifier = Modifier.size(22.dp))
             }
         }
@@ -175,6 +175,14 @@ private fun ThreadMessageCard(
     notice: Map<String, String>,
 ) {
     val palette = LocalPalette.current
+    val context = androidx.compose.ui.platform.LocalContext.current
+    var showUnsub by androidx.compose.runtime.remember { mutableStateOf(false) }
+    var unsubNote by androidx.compose.runtime.remember { mutableStateOf<String?>(null) }
+    // The sender's own `List-Unsubscribe` offer, narrowed to an http(s) address by
+    // the same rule iOS applies. Null means show nothing: a button that opens a
+    // broken or dangerous URL is worse than no button, and most mail simply has no
+    // such header.
+    val unsubUrl = com.grapsee.grapmail.ui.components.parseUnsubscribe(message.unsubscribe)
     Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 16.dp)) {
         Text(
             message.subject?.takeIf { it.isNotBlank() } ?: "(no subject)",
@@ -201,7 +209,7 @@ private fun ThreadMessageCard(
             Icon(
                 if (message.isStarred) Icons.Rounded.Star else Icons.Rounded.StarBorder,
                 if (message.isStarred) "Starred" else "Star",
-                tint = if (message.isStarred) androidx.compose.ui.graphics.Color(0xFFF5A623) else palette.textTertiary,
+                tint = if (message.isStarred) palette.star else palette.textTertiary,
                 modifier = Modifier.size(20.dp).clip(CircleShape).clickable(onClick = onStar).padding(2.dp),
             )
         }
@@ -248,6 +256,35 @@ private fun ThreadMessageCard(
             message.attachments.forEach { a ->
                 AttachmentRow(a, busy = busy, notice = notice[a.id], onDownload = { onDownload(a) })
                 Spacer(Modifier.height(6.dp))
+            }
+        }
+
+        if (unsubUrl != null) {
+            Spacer(Modifier.height(12.dp))
+            com.grapsee.grapmail.ui.components.OutlineButton(
+                "Unsubscribe from this sender", onClick = { showUnsub = true },
+            )
+            unsubNote?.let {
+                Spacer(Modifier.height(6.dp))
+                Text(it, fontSize = 12.sp, color = palette.error)
+            }
+        }
+
+        if (showUnsub && unsubUrl != null) {
+            MailSheet(onDismiss = { showUnsub = false }) {
+                UnsubscribeContent(
+                    sender = message.from?.address ?: message.from?.display,
+                    url = unsubUrl,
+                    onOpen = {
+                        showUnsub = false
+                        // The result is reported as what actually happened: the link
+                        // was handed to another app. Whether the list processed it is
+                        // something this app cannot know, so nothing here says
+                        // "unsubscribed".
+                        unsubNote = openExternally(context, unsubUrl)
+                    },
+                    onCancel = { showUnsub = false },
+                )
             }
         }
 
@@ -362,3 +399,80 @@ private fun stripHtml(html: String): String =
         .replace("&gt;", ">").replace("&quot;", "\"")
         .replace(Regex("\n{3,}"), "\n\n")
         .trim()
+
+/**
+ * The unsubscribe confirmation. Reached only from a message that actually carries
+ * the sender's `List-Unsubscribe` offer.
+ *
+ * Four things it says before the user can act, because the honest answer to "did
+ * this unsubscribe me?" is "the app cannot know":
+ *
+ *  - the request goes to the SENDER's server, not GrapMail's, and leaves this
+ *    device the moment the link opens;
+ *  - visiting such a link can itself confirm the address is live, which is a real
+ *    cost the design's one-tap framing hides;
+ *  - GrapMail cannot undo it;
+ *  - no screen here claims the outcome. The line after opening reports that the
+ *    link was handed to a browser, which is the only part this app witnessed.
+ *
+ * `internal` so the CI snapshot host can photograph it: a CI mailbox has no
+ * subscribed mail, so the live path cannot reach this sheet on its own.
+ */
+@Composable
+internal fun UnsubscribeContent(
+    sender: String?,
+    url: String,
+    onOpen: () -> Unit,
+    onCancel: () -> Unit,
+) {
+    val palette = LocalPalette.current
+    val host = com.grapsee.grapmail.ui.components.urlHost(url) ?: "the sender's server"
+    SheetTitle("Unsubscribe", "gm-sheets-unsub")
+    Text(
+        "This offer came from the sender" + (sender?.let { ", about $it" } ?: "") +
+            ". Opening it goes to $host — not to GrapMail.",
+        fontSize = 13.sp, color = palette.textSecondary,
+        modifier = Modifier.padding(horizontal = 20.dp, vertical = 6.dp),
+    )
+    Text(
+        "Some mailing lists treat any visit as proof that an address is live, so " +
+            "opening this is not risk-free. GrapMail cannot undo it, and cannot see " +
+            "what happens after: the page at $host is the only thing that will say " +
+            "whether you were removed.",
+        fontSize = 13.sp, color = palette.textSecondary, lineHeight = 19.sp,
+        modifier = Modifier.padding(horizontal = 20.dp, vertical = 6.dp),
+    )
+    Spacer(Modifier.height(10.dp))
+    com.grapsee.grapmail.ui.components.GradientButton(
+        "Open in my browser", onClick = onOpen,
+        modifier = Modifier.padding(horizontal = 20.dp),
+    )
+    Text(
+        "Cancel", fontSize = 14.sp, color = palette.textTertiary,
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp)
+            .clickable(onClick = onCancel),
+    )
+}
+
+/**
+ * Hand the link to whatever app handles web addresses, and report only what this
+ * app actually witnessed.
+ *
+ * Returns the line the thread shows afterwards. It is deliberately not
+ * "Unsubscribed": the request leaves this device the moment the browser opens, and
+ * the sender's response is not observable from here. A failure to find a browser is
+ * reported as that rather than as silence, so the user is not left wondering.
+ */
+internal fun openExternally(context: android.content.Context, url: String): String = try {
+    context.startActivity(
+        android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(url))
+            .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
+    )
+    "Opened in your browser. GrapMail cannot see what the page said."
+} catch (e: Exception) {
+    // ActivityNotFoundException is the expected one (no browser installed, or a
+    // work profile that blocks it); anything else from an Intent construction is
+    // still just "this device could not open it", and reporting the exception
+    // text would show the user a framework message they cannot act on.
+    "No app on this device can open that link."
+}

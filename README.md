@@ -189,10 +189,61 @@ working mailbox.
   No screenshot shows a swiped row: the coloured band exists only while a finger is
   holding the row open, there is no reference render for it, and the CI mailbox has
   no message to swipe. What is proven instead is the safety boundary, by the gate.
+- **Labels are read as well as written.** `GET /labels/assignments` is implemented
+  on both platforms (`mailLabelAssignments`) and held in the cache as a
+  messageId→labelIds map with *nil meaning never-read* — distinct from "read, and
+  nothing is labelled". The Label sheet therefore shows three states (on / some but
+  not all / off) and, when the read has not answered or has failed, says so and marks
+  nothing. A tap on a label that is on takes it off (`DELETE
+  /labels/message/:id/:labelId`, which existed on both platforms with nothing calling
+  it); a tap when the state is unknown only ever adds, because removing on an unknown
+  baseline can un-tag mail nobody meant to touch.
+- **A label's colour is the server's palette key, never a hex value.**
+  `normaliseColour` (`grapmail-labels.ts:55-58`) stores one of eight words and
+  replaces anything else with `slate`. Both apps used to *send* a hex string built
+  from a locally invented ramp of five or six colours and to *read* the stored value
+  back with a hex parser — so the request succeeded with 201, the server stored
+  `slate`, the parser found nothing, and every label drew the same fallback. The
+  eight keys are now declared once per platform, mapped to the web theme's own
+  light/dark pair (`--gm-label-*`), and pinned against the server's set by
+  `scripts/mail-honesty.py`. Android also needed `@SerialName("colour")`: without it
+  the field decoded as null for every label on that platform alone.
+- **A snooze can be undone.** `unsnooze` sat in both action enums with no caller, and
+  the reason is a real limit rather than an oversight: `publicRow` carries no
+  `snoozedUntil` and the inbox hides pending snoozes, so the app cannot see which
+  messages are postponed (`?box=snoozed` is implemented but not deployed). The undo is
+  therefore offered for exactly the mail the app just snoozed — the one set it can
+  honestly name — naming the instant it will return, and it survives a partial undo
+  rather than forgetting the rest.
+- **The unsubscribe offer is a confirmation, not a one-tap.** A message carrying the
+  sender's `List-Unsubscribe` header shows a button that opens a sheet naming the
+  host the request will go to (not GrapMail), stating that visiting such a link can
+  itself confirm the address is live, and stating that this app cannot undo it. Only
+  http(s) is ever offered — a `mailto:` or a `javascript:` in an untrusted header gets
+  nothing. Afterwards the line reports that the link was handed to a browser; **no
+  screen claims anyone was unsubscribed**, because the outcome is not observable here.
+- **Dark mode is proven structurally, then photographed.** Three band frames are shot
+  in dark (home, thread, labels). The claim for the other 27 rests on a check, not on
+  relaunches: no mail screen may name a colour at all (`Color(0x…)` is forbidden in
+  the four Android screens and the five iOS views), so every paint comes from a token
+  table holding a light *and* a dark value. That pin found a real defect the first day
+  it was written — the starred marker was a hardcoded light amber on both platforms.
 - **API parity is a gate, not a review habit.** `scripts/api-parity.py` diffs
   the two mail client surfaces — every `mail*` call name and every decoded DTO
   field — and both workflows run it. Three mismatches were caught by hand while
   this sector was built; a reviewer cannot re-derive them from one file.
+
+  It compared far less than it claimed until the label work: its Android pattern
+  required the `Dto` suffix, so the response envelopes (`MailInboxResponse`,
+  `MailStatsResponse` and the other twenty of them) landed in the "plumbing, not
+  compared" list and their fields were never diffed — 8 types instead of 29, printed
+  as a green run. Its body matcher also ran to
+  the next `)` at column zero, which walks straight through one-line declarations and
+  reports the *following* type's fields as drift. Both fixed: 29 types, 139 fields,
+  balance-scanned. The asymmetry it then found for real — iOS's inbox envelope
+  declaring `error`/`code` that Android's did not — is now matched on both sides, and
+  `mailInbox` refuses a `success: false` listing at the transport so a box the server
+  did not produce can never be drawn as an empty one.
 - **The screener decides senders, and says what it cannot know.** `PUT
   /screener/decision` and `DELETE /screener/decision` are implemented on both
   platforms (`mailScreenerDecision`, `mailScreenerDecisionRemove`), reached from a
@@ -222,11 +273,12 @@ working mailbox.
   not remove what is underneath it from the dump, so a node can be present on a
   screen you cannot see. Without this, a run that reached no screen at all still
   filled its PNG gate with pictures of the wrong ones.
-- **The band is 27 frames, `60`–`86`.** The plan called it 25; the list it
-  printed runs 60 to 85 inclusive, which is 26. `86-mail-sender-sheet` is the
-  twenty-seventh: the sender-decision sheet implements a call the plan's own T1.2
-  named (`screenerDecision`) but gave no frame, so it would have shipped as the
-  one screen in the sector with no artifact at all. The number in the list is what
+- **The band is 30 frames, `60`–`89`.** The plan called it 25; the list it
+  printed runs 60 to 85 inclusive, which is 26. Three names were added after that,
+  each for a screen the plan's own surface list required and no frame proved:
+  `86-mail-sender-sheet` (the `screenerDecision` action), `87-mail-unsubscribe` (the
+  sender's `List-Unsubscribe` offer, reachable only from mail that carries it) and
+  `88`/`89`, the thread and the labels screen in dark. The number in the list is what
   CI enforces, and each discrepancy is recorded rather than quietly closed.
 - **Snapshot hosts** (`MailSnapshot.kt` / `MailSnapshot.swift`) render every
   frame that needs a message to exist, from literals, unreachable without the
@@ -238,8 +290,8 @@ working mailbox.
   receipt would have photographed "Not delivered"). A frame of a re-implementation
   looks correct, passes a file count, and proves nothing. `scripts/mail-honesty.py`
   now pins that the hosts call the live renderer and hold none of its wording.
-- **Gates.** The Android walk's fixed PNG list carries all 27 names; the iOS
-  floor is 60 of 63, and the iOS artifact is additionally required to contain
+- **Gates.** The Android walk's fixed PNG list carries all 30 names; the iOS
+  floor is 62 of 66, and the iOS artifact is additionally required to contain
   every `NN-mail-*` name the test source lists — a count says the walk finished,
   not which screens it reached. Both workflows diff the two name lists and fail on
   asymmetry, because a count and a fixed list can each be satisfied by two
