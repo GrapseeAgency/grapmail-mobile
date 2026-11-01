@@ -939,23 +939,27 @@ internal fun AssignLabelContent(
     // line is the difference between a sheet that consulted the server and one
     // that merely looks like it did: when the read has not answered, the rows are
     // deliberately unmarked and the sheet says so rather than showing them clean.
-    Text(
-        when (read) {
-            com.grapsee.grapmail.data.AssignmentsRead.Reading,
-            com.grapsee.grapmail.data.AssignmentsRead.NotRead ->
-                "Checking which labels these messages carry…"
-            com.grapsee.grapmail.data.AssignmentsRead.Failed ->
-                "Couldn't read which labels they carry, so nothing is marked here. " +
-                "Tapping adds a label; it won't remove one."
-            com.grapsee.grapmail.data.AssignmentsRead.Read ->
-                if (selectedCount > 1)
-                    "Marks show what the $selectedCount selected messages carry. " +
-                    "A dash means some but not all."
-                else "Marks show what this message carries.",
-        },
-        fontSize = 12.sp, color = palette.textTertiary,
-        modifier = Modifier.padding(horizontal = 20.dp, vertical = 6.dp),
-    )
+    // A named local, not `Text(when (…) { … }, fontSize = …)`. Kotlin's parser
+    // read the branch that opens with `if (selectedCount > 1)` as a statement
+    // rather than the arm's value, and the run died with "expecting a
+    // when-condition" plus "none of the following candidates is applicable" on the
+    // Text call -- three errors from one shape. Hoisting the `when` out of the
+    // argument list makes both go away and reads better anyway.
+    val readLine = when (read) {
+        com.grapsee.grapmail.data.AssignmentsRead.Reading,
+        com.grapsee.grapmail.data.AssignmentsRead.NotRead ->
+            "Checking which labels these messages carry…"
+        com.grapsee.grapmail.data.AssignmentsRead.Failed ->
+            "Couldn't read which labels they carry, so nothing is marked here. " +
+            "Tapping adds a label; it won't remove one."
+        com.grapsee.grapmail.data.AssignmentsRead.Read ->
+            if (selectedCount > 1)
+                "Marks show what the $selectedCount selected messages carry. " +
+                "A dash means some but not all."
+            else "Marks show what this message carries."
+    }
+    Text(readLine, fontSize = 12.sp, color = palette.textTertiary,
+        modifier = Modifier.padding(horizontal = 20.dp, vertical = 6.dp))
     labels.forEach { l ->
         val m = marks[l.id] ?: com.grapsee.grapmail.data.LabelMark.Unknown
         SheetOption(

@@ -208,7 +208,7 @@ private struct ThreadMessageCard: View {
                     // dangling clause Android had, in the sentence that exists to
                     // be exact about where the request goes.
                     sender: message.from?.address?.nilIfBlank()
-                        ?? message.from?.display?.nilIfBlank(),
+                        ?? (message.from?.display ?? "").nilIfBlank(),
                     url: unsub,
                     onOpen: {
                         showUnsub = false
@@ -221,17 +221,17 @@ private struct ThreadMessageCard: View {
                             unsubNote = "That unsubscribe address could not be opened."
                             return
                         }
-                        // The completion form, not `if openURL(target)`: the
-                        // one-argument call returns Void because opening is
-                        // asynchronous, so testing it as a condition does not
-                        // compile — and even if it did, the outcome is not known
-                        // at the moment of the call. This is the only way to
-                        // report honestly whether the device took the link.
-                        openURL(target, options: [:]) { accepted in
-                            unsubNote = accepted
-                                ? "Opened in your browser. GrapMail cannot see what the page said."
-                                : "This device could not open that link."
-                        }
+                        // `OpenURLAction` has exactly one shape: it returns a Bool
+                        // synchronously, and the compile error "extra arguments at
+                        // positions #2, #3" proved there is no completion-handler
+                        // overload to reach for. What that Bool means is the whole
+                        // point of the wording below: the SYSTEM accepted the
+                        // request to open the link. Nothing here claims the mailing
+                        // list did anything with it, because from this process the
+                        // page's behaviour is not observable at all.
+                        unsubNote = openURL(target)
+                            ? "Opened in your browser. GrapMail cannot see what the page said."
+                            : "This device could not open that link."
                     },
                     onCancel: { showUnsub = false }
                 )

@@ -117,7 +117,9 @@ actor MailStore {
 
     func markUnassigned(messageId: String, labelId: String) {
         guard var cur = assignments else { return }
-        cur[messageId] = (cur[messageId] ?? []) - labelId
+        // `- [labelId]`, not `- labelId`: Set's minus wants a Sequence, and
+        // passing the bare String is a compile error, not a silent no-op.
+        cur[messageId] = (cur[messageId] ?? []) - [labelId]
         assignments = cur
     }
 
