@@ -500,7 +500,12 @@ struct ComposeView: View {
 
 /// The send receipt. The status word is the server's, and `queued` is shown as
 /// queued — a message the queue has only accepted is not a delivered message.
-private struct SendReceipt: View {
+///
+/// Internal, not private, because the CI snapshot host photographs this receipt.
+/// It used to carry its own copy instead, and the copy handled only `queued` and
+/// `failed` — a `sent` frame would have read "Not delivered". Two lists of one
+/// screen's words drift with nothing to notice it; one renderer cannot.
+struct SendReceipt: View {
     let status: String
     let detail: String?
     let error: String?

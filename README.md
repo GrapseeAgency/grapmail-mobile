@@ -219,6 +219,13 @@ host, so a broken network layer cannot read as a working mailbox.
 - **Snapshot hosts** (`MailSnapshot.kt` / `MailSnapshot.swift`) render every
   frame that needs a message to exist, from literals, unreachable without the
   launch argument. The view models expose seed seams that only that host calls.
+  The hosts invent **data** and never a second copy of a **screen**: the receipt
+  frame used to draw the host's own `SendReceiptPreview` / `SendReceiptView`, and
+  both copies had already drifted from the live one (Android lost the semibold
+  headline and the detail line; iOS handled two of four status words, so a `sent`
+  receipt would have photographed "Not delivered"). A frame of a re-implementation
+  looks correct, passes a file count, and proves nothing. `scripts/mail-honesty.py`
+  now pins that the hosts call the live renderer and hold none of its wording.
 - **Gates.** The Android walk's fixed PNG list carries all 26 names; the iOS
   floor is 60 of 62. Both workflows diff the two name lists and fail on
   asymmetry, because a count and a fixed list can each be satisfied by two

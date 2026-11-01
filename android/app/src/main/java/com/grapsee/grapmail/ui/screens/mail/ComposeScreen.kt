@@ -312,9 +312,16 @@ private fun FieldRow(
 /**
  * The send receipt. The status word is the server's, and `queued` is shown as
  * queued.
+ *
+ * `internal`, not `private`, for one reason: the CI snapshot host photographs
+ * this receipt, and it must photograph THIS composable. It used to carry its own
+ * copy of these words, which drifted immediately — the copy dropped the semibold
+ * headline and the `detail` line and invented a failure sentence the server never
+ * sends. A photograph of a re-implementation proves nothing about the screen a
+ * person sees, and nothing in a build or a PNG count would notice.
  */
 @Composable
-private fun SendReceipt(status: String, detail: String?, error: String?) {
+internal fun SendReceipt(status: String, detail: String?, error: String?) {
     val palette = LocalPalette.current
     val (headline, tone) = when (status) {
         "sent" -> "Sent" to palette.successInk

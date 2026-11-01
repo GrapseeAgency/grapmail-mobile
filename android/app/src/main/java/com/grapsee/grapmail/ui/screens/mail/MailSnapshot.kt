@@ -141,10 +141,17 @@ fun MailSnapshotScreen(name: String) {
                 onBack = {}, onReply = { })
             "mail-compose" -> ComposeScreen(vm, onBack = {})
             "mail-send-receipt" -> sheetHost {
+                // The live `SendReceipt` composable, with the strings a server
+                // would send standing in for a real send. This host used to draw
+                // its own copy of the receipt instead — and the copy had already
+                // lost the semibold headline and the detail line, so the frame
+                // photographed a screen nobody sees. Only the DATA is invented
+                // here; the rendering is the shipping one.
                 Column(Modifier.padding(16.dp)) {
-                    SendReceiptPreview("queued")
+                    SendReceipt(status = "queued", detail = "Accepted for delivery.", error = null)
                     Spacer(Modifier.height(12.dp))
-                    SendReceiptPreview("failed")
+                    SendReceipt(status = "failed", detail = null,
+                        error = "Recipient domain not reachable.")
                 }
             }
             "mail-contacts" -> ContactsScreen(vm, onBack = {}, onOpen = { })
@@ -350,31 +357,6 @@ private fun sheetHost(content: @Composable () -> Unit) {
     ) { content() }
 }
 
-/// The receipt, drawn from the same words the live screen prints. `queued` is
-/// never rendered as delivered — the status word is the server's, and this
-/// photograph exists to prove the screen keeps them apart.
-@Composable
-private fun SendReceiptPreview(status: String) {
-    val palette = LocalPalette.current
-    val (headline, tone) = when (status) {
-        "sent" -> "Sent" to palette.successInk
-        "queued" -> "Queued for delivery" to palette.warnInk
-        "failed" -> "Not delivered" to palette.error
-        else -> "Server reported: $status" to palette.warnInk
-    }
-    Column(
-        Modifier.fillMaxWidth().padding(14.dp)
-            .background(palette.softFill, androidx.compose.foundation.shape.RoundedCornerShape(12.dp)),
-    ) {
-        Text(headline, fontSize = 15.sp, color = tone)
-        if (status == "queued") {
-            Spacer(Modifier.height(4.dp))
-            Text("The queue has accepted it. Delivery is confirmed separately.",
-                fontSize = 12.sp, color = palette.textTertiary)
-        }
-        if (status == "failed") {
-            Spacer(Modifier.height(4.dp))
-            Text("Recipient domain not reachable.", fontSize = 13.sp, color = palette.error)
-        }
-    }
-}
+/// The receipt frame is drawn by the live `SendReceipt` in `ComposeScreen.kt`.
+/// Nothing here reimplements it: a second copy of a screen's words is a photograph
+/// of the copy, and the two drift apart with nothing to notice.

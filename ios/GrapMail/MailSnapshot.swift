@@ -251,9 +251,13 @@ struct MailSnapshotView: View {
             case "mail-send-receipt":
                 return AnyView(
                 sheetFrame(VStack(alignment: .leading, spacing: 12) {
-                    SendReceiptView(status: "queued",
+                    // The live `SendReceipt`, with the strings a server would
+                    // send standing in for a real send. Only the DATA is invented
+                    // here; the rendering is the shipping one, which is what makes
+                    // the photograph evidence rather than a likeness.
+                    SendReceipt(status: "queued",
                                     detail: "Accepted for delivery.", error: nil)
-                    SendReceiptView(status: "failed",
+                    SendReceipt(status: "failed",
                                     detail: nil, error: "Recipient domain not reachable.")
                 })
                 )
@@ -408,39 +412,10 @@ struct MailSnapshotView: View {
 
 }
 
-/// The receipt view, exposed for the snapshot host. `SendReceipt` in
-/// MailReaderViews is private to that screen; the photograph needs the same
-/// rendering, so it names the same strings rather than paraphrasing them.
-private struct SendReceiptView: View {
-    let status: String
-    let detail: String?
-    let error: String?
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(headline)
-                .font(.system(size: 15, weight: .semibold))
-                .foregroundColor(status == "queued" ? GM.warnInk : GM.error)
-            if let detail {
-                Text(detail).font(.system(size: 13)).foregroundColor(GM.textSecondary)
-            }
-            if status == "queued" {
-                Text("The queue has accepted it. Delivery is confirmed separately.")
-                    .font(.system(size: 12)).foregroundColor(GM.textTertiary)
-            }
-            if let error {
-                Text(error).font(.system(size: 13)).foregroundColor(GM.error)
-            }
-        }
-        .padding(14)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(GM.softFill))
-    }
-
-    private var headline: String {
-        status == "queued" ? "Queued for delivery" : "Not delivered"
-    }
-}
+// The receipt frame is drawn by the live `SendReceipt` in `MailReaderViews.swift`.
+// Nothing here reimplements it: the host's own copy used to handle only two of
+// the four status words, so the photograph and the screen were already different
+// pictures of the same fact.
 
 // MARK: - Snapshot seeds on the model
 

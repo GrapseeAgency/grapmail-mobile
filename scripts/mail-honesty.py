@@ -106,6 +106,37 @@ pin("Android prints an unrecognised status verbatim",
 pin("iOS prints an unrecognised status verbatim",
     re.search(r"(default|otherwise).*Server reported", SW_READER, re.S) is not None)
 
+# ── 1b. the receipt frame photographs the live renderer, not a copy of it ────
+#
+# Both snapshot hosts used to define their own receipt view — `SendReceiptPreview`
+# on Android, `SendReceiptView` on iOS — and each copy had already lost something:
+# Android's dropped the semibold headline and the `detail` line, iOS's handled two
+# of the four status words, so a `sent` frame would have read "Not delivered".
+# A frame of a re-implementation looks right in a thumbnail, passes a PNG count and
+# proves nothing about the screen a person actually sees — the same failure class as
+# the eleven wrong screenshots. A host may invent DATA (a status word, a delivery
+# error); it may not re-say the interface's own wording.
+KT_SNAP = android("ui/screens/mail/MailSnapshot.kt")
+SW_SNAP = ios("MailSnapshot.swift")
+
+pin("Android's host calls the live SendReceipt",
+    re.search(r"\bSendReceipt\(status", KT_SNAP) is not None)
+pin("iOS's host calls the live SendReceipt",
+    re.search(r"\bSendReceipt\(status", SW_SNAP) is not None)
+pin("Android's host defines no receipt of its own", "SendReceiptPreview" not in KT_SNAP)
+pin("iOS's host defines no receipt of its own", "SendReceiptView" not in SW_SNAP)
+# Reachable from the host, because the host is a different file — and private
+# would have forced a copy, which is how the drift started.
+pin("Android's live receipt is visible to the snapshot host",
+    re.search(r"internal fun SendReceipt\(", KT_COMPOSE) is not None)
+pin("iOS's live receipt is visible to the snapshot host",
+    re.search(r"^struct SendReceipt: View", SW_READER, re.M) is not None)
+
+for label, src in (("Android", KT_SNAP), ("iOS", SW_SNAP)):
+    for word in ("Queued for delivery", "Not delivered", "Server reported"):
+        pin(f"{label}'s host does not re-say the receipt wording ({word!r})",
+            word not in src)
+
 # ── 2. the action is a path segment, on both platforms ───────────────────────
 KT_API = android("data/Api.kt")
 SW_API = ios("MailAPI.swift")

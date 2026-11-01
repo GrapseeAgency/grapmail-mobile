@@ -423,9 +423,11 @@ final class ScreenshotWalkUITests: XCTestCase {
             // The four sheets present with an animation. Photographed early the
             // frame is a dimmed home behind a scrim, which looks like a sheet in
             // a thumbnail and satisfies a gate that only counts files. Each
-            // marker is the sheet's own title: text that exists only once its
-            // content has drawn. Android waits on the same four strings, so the
-            // two artifacts prove the same thing about the same screens.
+            // marker here is the sheet's own title: text that exists only once its
+            // content has drawn. Android waits on the same four SHEETS but by their
+            // `gm-sheets-*` identifiers rather than these strings — the heading is
+            // re-wordable copy there, and an identifier is not — so the two runs
+            // prove the same thing by the mechanism each harness can hold on to.
             "mail-move-sheet": "Move to",
             "mail-delete-sheet": "Delete 3 messages permanently?",
             "mail-assign-label-sheet": "Label",
