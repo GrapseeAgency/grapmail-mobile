@@ -621,20 +621,36 @@ shot 61-mail-home-dark
 # that already takes ninety minutes.
 adb shell am force-stop "$PKG"
 adb shell am start -W -n "$PKG/.MainActivity" --es gmSnapshot "mail-thread" >/dev/null
+# The dark frames carry the SAME two proofs the light ones do. `gm-snapshot` alone
+# is not enough: it is present on the host's own "Unknown mail snapshot" fallthrough,
+# so a mistyped name would photograph a placeholder and still fill the PNG gate --
+# the exact failure the marker rule exists to prevent, re-imported through a new
+# code path. The content marker is the same string the light pass waits on, so the
+# two artifacts prove the same thing about the same screen in two palettes.
 sleep 5
-if [ -z "$(find_nodes "n.get('content-desc','')=='gm-snapshot'")" ]; then
-  echo "FAIL: snapshot 'mail-thread' (dark) is not the visible screen" >&2
+if [ -n "$(find_nodes "n.get('text','')=='Unknown mail snapshot: mail-thread'")" ]; then
+  echo "FAIL: app did not recognise mail snapshot 'mail-thread'" >&2
   FAILURES=$((FAILURES + 1))
 fi
-shot 88-mail-thread-dark
+if [ -z "$(wait_overlay "n.get('text','')=='Q3 facilities invoice'" | head -1)" ]; then
+  echo "FAIL: 88-mail-thread-dark not photographed -- the thread never showed its body" >&2
+  FAILURES=$((FAILURES + 1))
+else
+  shot 88-mail-thread-dark
+fi
 adb shell am force-stop "$PKG"
 adb shell am start -W -n "$PKG/.MainActivity" --es gmSnapshot "mail-labels" >/dev/null
 sleep 5
-if [ -z "$(find_nodes "n.get('content-desc','')=='gm-snapshot'")" ]; then
-  echo "FAIL: snapshot 'mail-labels' (dark) is not the visible screen" >&2
+if [ -n "$(find_nodes "n.get('text','')=='Unknown mail snapshot: mail-labels'")" ]; then
+  echo "FAIL: app did not recognise mail snapshot 'mail-labels'" >&2
   FAILURES=$((FAILURES + 1))
 fi
-shot 89-mail-labels-dark
+if [ -z "$(wait_overlay "n.get('text','')=='Bills'" | head -1)" ]; then
+  echo "FAIL: 89-mail-labels-dark not photographed -- the labels never showed" >&2
+  FAILURES=$((FAILURES + 1))
+else
+  shot 89-mail-labels-dark
+fi
 adb shell am force-stop "$PKG"
 adb shell am force-stop "$PKG"
 adb shell "cmd uimode night no"

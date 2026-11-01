@@ -579,6 +579,58 @@ pin("Android's label swatch resolves a dark value",
 pin("iOS's label swatch resolves a dark value",
     re.search(r"func labelSwatch.*?dark:", ios("MailComponents.swift"), re.S) is not None)
 
+
+# -- 12. the two receipts must speak the same words ----------------------------
+#
+# The send receipt is one screen drawn twice, and the parity gate compares call
+# names and DTO fields -- not the bodies of a `when` and a `switch`. Android
+# therefore handled sent/queued/failed while iOS also handled `draft`, the word
+# the draft-save path reports on success: on Android a successful draft save fell
+# through to "Server reported: draft" in warn ink, under a line that said "Saved
+# to Drafts". This is the same "both sides agree on the same wrong thing" hole the
+# label read was, caught from the other direction -- both sides work, the two
+# disagree.
+def switch_arms(src, start_marker, pattern):
+    i = src.find(start_marker)
+    if i < 0:
+        return None
+    body = src[i:src.find("\n    }", i)]
+    # re.M: both patterns are anchored at a line start to pick ARMS rather than
+    # every quoted word in the file, and without MULTILINE `^` matches only the
+    # beginning of the slice -- which reads as "the switch has no arms" and fails
+    # a check written against correct code.
+    return {m for m in re.findall(pattern, body, re.M)}
+
+
+kt_arms = switch_arms(KT_COMPOSE, "when (status)", r'^\s{8}"([a-z]+)" ->')
+sw_arms = switch_arms(SW_READER, "var headline: String", r'case "([a-z]+)":')
+pin("Android's receipt arms were located", kt_arms is not None)
+pin("iOS's receipt arms were located", sw_arms is not None)
+if kt_arms is not None and sw_arms is not None:
+    pin("Both receipts name the same status words",
+        kt_arms == sw_arms,
+        )
+    pin("The receipts cover the server's four status words",
+        {"sent", "queued", "failed", "draft"} <= (kt_arms & sw_arms))
+
+# -- 13. the marks a sheet draws must actually be drawn -----------------------
+#
+# Android's "on" mark was `Text("", ...)` inside a filled disc: it painted nothing,
+# so the state that tells a user a tap will REMOVE a label looked like a solid dot
+# while iOS drew a checkmark. Same for the star, which was a hardcoded light amber.
+pin("Android's sheet tick is a glyph, not an empty string",
+    'Text("", fontSize = 10.sp' not in KT_BOX)
+pin("Android's starred row marker comes from the palette",
+    "Color(0xFFF5A623)" not in android("ui/components/Mail.kt"))
+pin("iOS's starred row marker comes from the token table",
+    "GM.warning : GM.textTertiary" not in ios("MailComponents.swift"))
+
+# -- 14. a label list that could not be read is not an empty label list --------
+pin("Android's label sheet distinguishes a refused read from an empty list",
+    "Couldn't read your labels." in KT_BOX)
+pin("iOS's label sheet distinguishes a refused read from an empty list",
+    "Couldn't read your labels." in SW_SHEET)
+
 print()
 if failures:
     print(f"mail-honesty: {len(failures)} pin(s) broken")

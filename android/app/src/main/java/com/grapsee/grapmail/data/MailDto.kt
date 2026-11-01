@@ -1,5 +1,6 @@
 package com.grapsee.grapmail.data
 
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 /**
@@ -224,7 +225,6 @@ data class MailLabelDto(
      */
     @SerialName("colour")
     val color: String? = null,
-    val textColor: String? = null,
     /** Unread count for this label; absent means unknown, not zero. */
     val unread: Int? = null,
 )

@@ -300,7 +300,7 @@ struct MailboxView: View {
         }
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
-        .refreshable { vm.load() }
+        .refreshable { await vm.loadAndSettle() }
         .accessibilityIdentifier("mail-list")
     }
 
@@ -316,6 +316,7 @@ struct MailboxView: View {
         case .label:
             AssignLabelSheet(
                 labels: vm.state.labels,
+                labelsRead: vm.state.labelsRead,
                 marks: vm.state.labelMarks,
                 read: vm.state.assignmentsRead,
                 note: vm.state.labelNote,

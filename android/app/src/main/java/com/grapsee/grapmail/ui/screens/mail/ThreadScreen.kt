@@ -273,7 +273,13 @@ private fun ThreadMessageCard(
         if (showUnsub && unsubUrl != null) {
             MailSheet(onDismiss = { showUnsub = false }) {
                 UnsubscribeContent(
-                    sender = message.from?.address ?: message.from?.display,
+                    // Blank, not absent: `display` is a non-optional that yields ""
+                    // for a sender the server never named, so `?:` on it produced
+                    // "This offer came from the sender, about ." -- a dangling clause
+                    // in the one sentence whose job is to be exact about where the
+                    // request goes.
+                    sender = message.from?.address?.takeIf { it.isNotBlank() }
+                        ?: message.from?.display?.takeIf { it.isNotBlank() },
                     url = unsubUrl,
                     onOpen = {
                         showUnsub = false

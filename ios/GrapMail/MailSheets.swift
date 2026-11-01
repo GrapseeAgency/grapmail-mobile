@@ -71,6 +71,9 @@ struct MoveSheet: View {
 
 struct AssignLabelSheet: View {
     let labels: [MailLabel]
+    /// Whether the label LIST was read. An empty list after a refused read is not
+    /// "no labels", and the sheet asserted exactly that.
+    let labelsRead: AssignmentsRead
     let marks: [String: LabelMark]
     let read: AssignmentsRead
     let note: String?
@@ -81,7 +84,9 @@ struct AssignLabelSheet: View {
         VStack(alignment: .leading, spacing: 0) {
             SheetTitle(text: "Label")
             if labels.isEmpty {
-                Text("No labels yet. Create one from the drawer.")
+                Text(labelsRead == .failed
+                     ? "Couldn't read your labels."
+                     : "No labels yet. Create one from the drawer.")
                     .font(.system(size: 13)).foregroundColor(GM.textSecondary)
                     .padding(.horizontal, 20).padding(.vertical, 10)
             }

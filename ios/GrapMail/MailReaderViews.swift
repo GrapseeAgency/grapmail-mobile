@@ -192,7 +192,13 @@ private struct ThreadMessageCard: View {
             .sheet(isPresented: $showUnsub) {
                 if let unsub = parseUnsubscribe(message.unsubscribe) {
                     UnsubscribeSheet(
-                        sender: message.from?.address ?? message.from?.display,
+                        // Blank, not absent: `display` is a non-optional that yields
+                        // "" when the server named nobody, so `??` produced
+                        // "This offer came from the sender, about ." -- the same
+                        // dangling clause Android had, in the sentence that exists to
+                        // be exact about where the request goes.
+                        sender: message.from?.address?.nilIfBlank()
+                            ?? message.from?.display?.nilIfBlank(),
                         url: unsub,
                         onOpen: {
                             showUnsub = false
@@ -205,10 +211,16 @@ private struct ThreadMessageCard: View {
                                 unsubNote = "That unsubscribe address could not be opened."
                                 return
                             }
-                            if openURL(target) {
-                                unsubNote = "Opened in your browser. GrapMail cannot see what the page said."
-                            } else {
-                                unsubNote = "This device could not open that link."
+                            // The completion form, not `if openURL(target)`: the
+                            // one-argument call returns Void because opening is
+                            // asynchronous, so testing it as a condition does not
+                            // compile — and even if it did, the outcome is not known
+                            // at the moment of the call. This is the only way to
+                            // report honestly whether the device took the link.
+                            openURL(target, options: [:]) { accepted in
+                                unsubNote = accepted
+                                    ? "Opened in your browser. GrapMail cannot see what the page said."
+                                    : "This device could not open that link."
                             }
                         },
                         onCancel: { showUnsub = false }

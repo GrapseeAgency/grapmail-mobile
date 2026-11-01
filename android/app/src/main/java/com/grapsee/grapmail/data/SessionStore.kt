@@ -7,6 +7,7 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 import java.security.KeyStore
@@ -107,6 +108,9 @@ object SessionStore {
         SecurityProfileCache.clear()
         // Same reason, larger blast radius: a cached mailbox would hand the next
         // account on this device another person's subjects, senders and bodies.
-        MailStore.clear()
+        // NonCancellable: this is the one call that must not be skipped, because a
+        // cancelled clear leaves the next account's first screen showing this one's
+        // mail.
+        withContext(NonCancellable) { MailStore.clear() }
     }
 }

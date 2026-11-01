@@ -327,6 +327,11 @@ internal fun SendReceipt(status: String, detail: String?, error: String?) {
         "sent" -> "Sent" to palette.successInk
         "queued" -> "Queued for delivery" to palette.warnInk
         "failed" -> "Not delivered" to palette.error
+        // The draft path answers with this status word, and without an arm for it a
+        // successful save fell through to "Server reported: draft" in warn ink
+        // beneath a line saying "Saved to Drafts". iOS already handles `draft`:
+        // this is parity, and the headline stays the server's own word.
+        "draft" -> "Saved to Drafts" to palette.successInk
         else -> "Server reported: $status" to palette.warnInk
     }
     Column(

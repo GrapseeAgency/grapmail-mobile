@@ -48,6 +48,10 @@ final class MailboxModel: ObservableObject {
         /// label off before the read answers would offer to add a label the message
         /// already carries, and would let a tap remove one on a guess.
         var assignmentsRead: AssignmentsRead = .notRead
+        /// Whether the label LIST has been read. An empty list is only a fact once
+        /// somebody has answered: `labels` staying empty after a refused read is not
+        /// evidence that the mailbox has no labels.
+        var labelsRead: AssignmentsRead = .notRead
         /// labelId → its state against the current selection.
         var labelMarks: [String: LabelMark] = [:]
         /// The Label sheet's own result line — what the last tap actually did.
@@ -77,6 +81,12 @@ final class MailboxModel: ObservableObject {
         var accountStatus: String?
         var memberSince: String?
         var busy = false
+        /// Bumped whenever a list load settles, in either direction. Pull-to-refresh
+        /// needs an async work item that ENDS when the answer arrives, and `loading`
+        /// cannot be that signal: under the no-blank rule a refresh over a populated
+        /// list never raises it, so `.refreshable` would release the spinner the
+        /// instant the request went out. Android waits on the same counter.
+        var settleGeneration = 0
     }
 
     @Published private(set) var state = State()
@@ -156,7 +166,10 @@ final class MailboxModel: ObservableObject {
     /// its loaders and nothing else; this exists so a screen that needs content
     /// the CI account cannot have can still be photographed. The values come
     /// from `MailSnapshot`, never from here, and no live path calls it.
-    func seedForSnapshot(_ mutate: (inout State) -> Void) { mutate(&state) }
+    func seedForSnapshot(_ mutate: (inout State) -> Void) {
+        snapshotSeeded = true
+        mutate(&state)
+    }
 
     /// The same seam for the thread, which is a separate published value because
     /// a thread is one message's body rather than the box's listing.
@@ -184,6 +197,18 @@ final class MailboxModel: ObservableObject {
     }
 
     private var token: String? { SessionStore.token }
+
+    /// Whether a bearer is still held. Every cache write checks this AFTER its
+    /// await, because sign-out clears the store and the cache together, and a
+    /// request that was already in flight would otherwise re-seed the previous
+    /// account's pages a moment later -- the exact cross-account leak the cache
+    /// exists to prevent. iOS cannot await the clear itself: `SessionStore.clear()`
+    /// is synchronous, so the guard belongs on the writer.
+    private var sessionIsLive: Bool { SessionStore.token != nil }
+
+    /// Set by the CI snapshot host's seams, and checked by every loader that would
+    /// otherwise overwrite a seeded field. Nothing in the live flow sets it.
+    var snapshotSeeded = false
 
     // ── list ─────────────────────────────────────────────────────────────────
 
@@ -248,6 +273,7 @@ final class MailboxModel: ObservableObject {
             do {
                 let resp = try await ApiClient.mailInbox(
                     token: token, box: box, page: page, query: term)
+                guard sessionIsLive else { return }
                 await MailStore.shared.putPage(box, term, resp, replace: replace)
                 if term == nil {
                     if let s = try? await ApiClient.mailStats(token) {
@@ -259,6 +285,7 @@ final class MailboxModel: ObservableObject {
                 self.state.loadingMore = false
                 self.state.fatal = nil
                 self.state.staleError = nil
+                self.state.settleGeneration += 1
                 self.reproject()
             } catch {
                 let noBox = (error as? ApiError).map { Self.isNoMailbox($0) } ?? false
@@ -266,6 +293,7 @@ final class MailboxModel: ObservableObject {
                 self.state.loading = false
                 self.state.loadingMore = false
                 self.state.noMailbox = noBox
+                self.state.settleGeneration += 1
                 // With rows on screen this is a stale list, not an empty one.
                 // Without them it is the error screen.
                 self.state.staleError = self.state.rows.isEmpty ? nil : message
@@ -276,6 +304,16 @@ final class MailboxModel: ObservableObject {
                     self.state.total = 0
                 }
             }
+        }
+    }
+
+    /// Pull-to-refresh's work item: returns only once the load has settled, whether
+    /// it landed rows or an error.
+    func loadAndSettle() async {
+        let before = state.settleGeneration
+        load(replace: true)
+        while state.settleGeneration == before {
+            try? await Task.sleep(nanoseconds: 100_000_000)
         }
     }
 
@@ -341,7 +379,7 @@ final class MailboxModel: ObservableObject {
     /// screen calls it on entry, and a screen that re-enters on every return from
     /// a thread must not re-read the same two documents each time.
     func loadAccount() {
-        guard let token, !accountLoaded else { return }
+        guard !snapshotSeeded, let token, !accountLoaded else { return }
         accountLoaded = true
         Task { [weak self] in
             guard let self else { return }
@@ -352,10 +390,18 @@ final class MailboxModel: ObservableObject {
                 self.state.accountStatus = me.status
                 self.state.memberSince = me.memberSince
             }
-            if let labels = try? await ApiClient.mailLabels(token) {
+            // A refused label read is recorded rather than swallowed. `labels`
+            // staying empty is not evidence that the mailbox has no labels, and the
+            // Label sheet says "No labels yet" only when somebody actually answered.
+            do {
+                let labels = try await ApiClient.mailLabels(token)
+                guard sessionIsLive else { return }
                 await MailStore.shared.putLabels(labels.labels)
                 self.state.labels = labels.labels
+                self.state.labelsRead = .read
                 self.labelState.labels = labels.labels
+            } catch {
+                self.state.labelsRead = .failed
             }
         }
     }
@@ -477,6 +523,15 @@ final class MailboxModel: ObservableObject {
                 _ = try await ApiClient.mailAction(token: token, id: id, action: action, until: nil)
                 await self.applyLocally(id: id, action: action)
                 await self.invalidateFor(action)
+                // The undo offer must not outlive the mail it describes: snooze three,
+                // swipe one to Trash, press Undo, and the trashed message is
+                // unsnoozed too. `act()` clears for bulk actions; this path needed
+                // the equivalent for the single row.
+                if self.state.snoozeUndoIds.contains(id) {
+                    let left = self.state.snoozeUndoIds.filter { $0 != id }
+                    self.state.snoozeUndoIds = left
+                    if left.isEmpty { self.state.snoozeUndoNote = nil }
+                }
                 self.reproject()
             } catch {
                 self.state.staleError = Self.describe(error)
@@ -522,8 +577,13 @@ final class MailboxModel: ObservableObject {
             guard let self else { return }
             var failure: String?
             for id in ids {
+                // Only on success. The old order ran the cache removal even after the
+                // server refused, so a refused delete emptied the row from a list
+                // whose mail still exists -- and dropping its label pairs from a map
+                // the sheet will not re-read let the Label sheet later claim `off`
+                // for a label the living message still carries.
                 do { try await ApiClient.mailDeletePermanent(token: token, id: id) }
-                catch { failure = Self.describe(error) }
+                catch { failure = Self.describe(error); continue }
                 await MailStore.shared.removeEverywhere(id: id)
                 // The message is gone, so its label pairs are gone with it. Left in
                 // the map they could resurface as a tick on mail that does not exist.
@@ -564,17 +624,25 @@ final class MailboxModel: ObservableObject {
             guard let self else { return }
             do {
                 let resp = try await ApiClient.mailLabelAssignments(token)
+                guard sessionIsLive else { return }
                 await MailStore.shared.putAssignments(resp.assignments)
                 self.state.assignmentsRead = .read
                 await self.applyMarks()
             } catch {
-                // A first read that fails leaves the marks unknown. A read that
-                // fails AFTER a good one keeps the marks it had — a refresh may not
-                // blank what is already on screen.
-                if await MailStore.shared.assignmentsMap() == nil {
-                    self.state.assignmentsRead = .failed
-                    self.state.staleError = Self.describe(error)
-                }
+                // Either way the flag has to leave `.reading`, or the failure is
+                // unnoticeable forever: `ensureAssignments` short-circuits on
+                // `.reading`, so a state left there silently stops every later read
+                // for the session and the sheet keeps drawing marks computed from an
+                // empty map.
+                //
+                // With a cached map the marks on screen stay (a refresh may not blank
+                // what is displayed) and the state resolves to `.read`, which is the
+                // truth about the cache; without one, `.failed`, which is the honest
+                // unknown. Both report the failure.
+                let hadMap = await MailStore.shared.assignmentsMap() != nil
+                self.state.assignmentsRead = hadMap ? .read : .failed
+                self.state.staleError = Self.describe(error)
+                if hadMap { await self.applyMarks() }
             }
         }
     }
@@ -657,8 +725,13 @@ final class MailboxModel: ObservableObject {
             // them is exactly the expression shape this app's build has already
             // timed out type-checking in.
             let note: String
-            if let f = failure, done == 0 {
-                note = f
+            // `done == 0` tested first. `Self.describe` always yields a String, so
+            // unlike Android's nullable `it.message` no failure can go unreported
+            // here -- but the ORDER still decides whether a zero-count write reads
+            // as a success, and "Labelled 0 messages" over a selection that was not
+            // labelled is the same lie in a nicer form.
+            if done == 0 {
+                note = failure ?? "The label was not saved."
             } else if let f = failure {
                 note = "\(done) of \(targets.count) saved. \(f)"
             } else if remove {
@@ -893,19 +966,27 @@ final class MailboxModel: ObservableObject {
     // ── labels ──────────────────────────────────────────────────────────────
 
     func refreshLabels() {
-        guard let token else { return }
+        // Not while the snapshot host owns these fields: its seed is the first
+        // frame's content, and a live read landing afterwards would replace it
+        // with the CI account's real (empty) label list -- which is how a
+        // screenshot of a populated screen photographs its empty branch and still
+        // passes a file-count gate. Android models this with a constructor flag.
+        guard !snapshotSeeded, let token else { return }
         labelState.loading = true
         Task { [weak self] in
             guard let self else { return }
             do {
                 let r = try await ApiClient.mailLabels(token)
+                guard sessionIsLive else { return }
                 await MailStore.shared.putLabels(r.labels)
                 self.labelState.labels = r.labels
                 self.labelState.loading = false
                 self.state.labels = r.labels
+                self.state.labelsRead = .read
             } catch {
                 self.labelState.loading = false
                 self.labelState.error = Self.describe(error)
+                self.state.labelsRead = .failed
             }
         }
     }

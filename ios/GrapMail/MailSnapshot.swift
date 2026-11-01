@@ -236,6 +236,7 @@ struct MailSnapshotView: View {
                 return AnyView(
                 sheetFrame(AssignLabelSheet(
                     labels: Self.labels(),
+                    labelsRead: .read,
                     marks: Self.labelMarks,
                     read: .read,
                     note: nil,

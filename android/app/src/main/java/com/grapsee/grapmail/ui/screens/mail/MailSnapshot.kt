@@ -64,7 +64,8 @@ fun MailSnapshotScreen(name: String) {
     // The screens under test are the real ones, so they need the real state
     // holder. It is constructed here, in the test-only host, and seeded from the
     // literals below — no live path can reach either half.
-    val vm = remember { MailboxViewModel(app) }
+    // `snapshotMode` so the model's own boot reads do not overwrite the seed.
+    val vm = remember { MailboxViewModel(app, snapshotMode = true) }
 
     // The seeds run in an effect, not in composition. Writing a state flow while
     // composing is a side effect in the wrong place — it can schedule a
@@ -136,6 +137,7 @@ fun MailSnapshotScreen(name: String) {
                 // to show. The renderer is the live one; only the data is invented.
                 AssignLabelContent(
                     labels = sampleLabels,
+                    labelsRead = com.grapsee.grapmail.data.AssignmentsRead.Read,
                     marks = mapOf(
                         "l1" to com.grapsee.grapmail.data.LabelMark.On,
                         "l2" to com.grapsee.grapmail.data.LabelMark.Mixed,

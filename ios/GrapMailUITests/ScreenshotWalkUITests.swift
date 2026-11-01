@@ -525,15 +525,31 @@ final class ScreenshotWalkUITests: XCTestCase {
         // the same two token tables, which `scripts/mail-honesty.py` pins
         // structurally, so the claim "dark is correct across the band" rests on that
         // check plus these three photographs rather than on thirty relaunches.
-        for (shot, screen) in [("61-mail-home-dark", "mail-home"),
-                               ("88-mail-thread-dark", "mail-thread"),
-                               ("89-mail-labels-dark", "mail-labels")] {
+        // Each dark frame carries the same two proofs its light twin does: the host
+        // recognised the name (a typo would otherwise photograph the "Unknown mail
+        // snapshot" placeholder, which also bears the gm-snapshot marker), and the
+        // screen's own content has drawn -- a populated screen and its empty branch
+        // look identical until something that exists only in the loaded state is seen.
+        for (shot, screen, marker) in [
+            ("61-mail-home-dark", "mail-home", nil as String?),
+            ("88-mail-thread-dark", "mail-thread", "Q3 facilities invoice"),
+            ("89-mail-labels-dark", "mail-labels", "Bills")] {
             app.terminate()
             app.launchArguments = ["-gmSnapshot", screen, "-gmDark"]
             app.launch()
             XCTAssertTrue(app.descendants(matching: .any)["gm-snapshot"].firstMatch
                             .waitForExistence(timeout: 12),
                           "snapshot '\(screen)' (dark) is not the visible screen")
+            XCTAssertFalse(app.staticTexts["Unknown mail snapshot: \(screen)"].firstMatch.exists,
+                           "app did not recognise mail snapshot '\(screen)' (dark)")
+            // The home has no stable piece of seeded TEXT to wait on that the other
+            // two screens do, and its identifier belongs to a text FIELD -- which
+            // `staticTexts` would never match. So the home is proven by the search
+            // field existing, and the other two by a label that only appears once
+            // their content has drawn.
+            let shown = marker.map { app.staticTexts[$0].firstMatch.waitForExistence(timeout: 12) }
+                ?? app.textFields["mail-search"].waitForExistence(timeout: 12)
+            XCTAssertTrue(shown, "dark snapshot '\(screen)' never showed its content")
             sleep(2) // the scheme change propagates through the environment
             snap(shot)
         }

@@ -47,7 +47,19 @@ import kotlinx.coroutines.launch
  * says so: [MailboxUiState.sortScope] is the number actually sorted, and the sort
  * sheet prints it rather than implying the whole box was reordered.
  */
-class MailboxViewModel(app: Application) : AndroidViewModel(app) {
+/**
+ * The mailbox's state and its only writer.
+ *
+ * `snapshotMode` is set by the CI snapshot host and by nothing else. It suppresses
+ * the boot reads of `/labels` and `/me`, which would otherwise race the host's own
+ * seed: the seed lands first so the first frame is the populated one, then the
+ * network answer arrives and overwrites it with the CI account's real (empty) label
+ * list -- so `72-mail-labels` could photograph "No labels yet" and the walk's
+ * settled marker for that screen would either fail or, worse, pass on a frame of the
+ * wrong branch. Seeding and fetching cannot both own the same field.
+ */
+class MailboxViewModel(app: Application, private val snapshotMode: Boolean = false) :
+    AndroidViewModel(app) {
 
     data class MailboxUiState(
         val box: MailBox = MailBox.Inbox,
@@ -81,6 +93,9 @@ class MailboxViewModel(app: Application) : AndroidViewModel(app) {
          * look like it had checked.
          */
         val assignmentsRead: AssignmentsRead = AssignmentsRead.NotRead,
+        /** Whether the label LIST has been read. Same distinction as above: an
+         *  empty list is only a fact once somebody has answered. */
+        val labelsRead: AssignmentsRead = AssignmentsRead.NotRead,
         /** labelId → its state against the current selection. */
         val labelMarks: Map<String, LabelMark> = emptyMap(),
         /** The Label sheet's own result line — what the last tap actually did. */
@@ -122,6 +137,17 @@ class MailboxViewModel(app: Application) : AndroidViewModel(app) {
         val statsSpam: Int? = null,
         val statsTrash: Int? = null,
         val busy: Boolean = false,
+        /**
+         * Bumped whenever a list load settles, successfully or not.
+         *
+         * The refresh gesture needs a signal that a load has ENDED, and cannot use
+         * [loading]: part of the no-blank rule is that a refresh over a populated
+         * list never raises `loading` at all, so keying the spinner's release on
+         * that Boolean meant the key never changed, the effect never re-ran, and one
+         * pull-to-refresh left an indeterminate spinner parked over the inbox for the
+         * rest of the session.
+         */
+        val settleGeneration: Int = 0,
     ) {
         val selecting: Boolean get() = selection.isNotEmpty()
         val hasRows: Boolean get() = rows.isNotEmpty()
@@ -165,6 +191,7 @@ class MailboxViewModel(app: Application) : AndroidViewModel(app) {
 
     init {
         viewModelScope.launch {
+            if (snapshotMode) return@launch
             val t = token() ?: return@launch
             // The label strip is the reference's only backed substitute for the
             // personal/work chips, so it loads with the list rather than waiting
@@ -172,7 +199,14 @@ class MailboxViewModel(app: Application) : AndroidViewModel(app) {
             runCatching { Api.mailLabels(t) }
                 .onSuccess {
                     MailStore.putLabels(it.labels)
-                    _state.update { s -> s.copy(labels = it.labels) }
+                    _state.update { s -> s.copy(labels = it.labels, labelsRead = AssignmentsRead.Read) }
+                }
+                // An empty label list and a refused label list are different facts.
+                // Without this the sheet says "No labels yet. Create one from the
+                // drawer." for a mailbox whose labels simply could not be read -- the
+                // same invented-negative the assignments read refuses to make.
+                .onFailure {
+                    _state.update { s -> s.copy(labelsRead = AssignmentsRead.Failed) }
                 }
             // `/me` answers with the mailbox's own name and address. A failure
             // here is not an error screen: the greeting falls back to no name,
@@ -257,7 +291,7 @@ class MailboxViewModel(app: Application) : AndroidViewModel(app) {
                     if (term == null) runCatching { MailStore.putStats(
                         Api.mailStats(t)) }
                     _state.update { it.copy(loading = false, loadingMore = false, fatal = null,
-                        staleError = null) }
+                        staleError = null, settleGeneration = it.settleGeneration + 1) }
                     reproject()
                 }
                 .onFailure { e ->
@@ -271,6 +305,7 @@ class MailboxViewModel(app: Application) : AndroidViewModel(app) {
                             // empty one. Without them it is the error screen.
                             staleError = if (cur.hasRows) msg else null,
                             fatal = if (cur.hasRows || noBox) null else msg,
+                            settleGeneration = cur.settleGeneration + 1,
                         )
                     }
                     if (noBox) _state.update { it.copy(rows = emptyList(), loaded = 0, total = 0) }
@@ -407,20 +442,23 @@ class MailboxViewModel(app: Application) : AndroidViewModel(app) {
             val t = token() ?: return@launch
             _state.update { it.copy(busy = true) }
             var failure: String? = null
-            var undone = 0
+            val restored = mutableListOf<String>()
             for (id in ids) {
                 runCatching { Api.mailAction(t, id, MailAction.Unsnooze, null) }
-                    .onSuccess { undone++; MailStore.invalidate(MailBox.Inbox) }
+                    .onSuccess { restored.add(id); MailStore.invalidate(MailBox.Inbox) }
                     .onFailure { failure = it.message ?: "That action didn't go through." }
             }
             _state.update { s ->
                 s.copy(
                     busy = false,
-                    // Cleared only for what actually came back; a partial undo keeps
-                    // the rest offered rather than forgetting them.
-                    snoozeUndoIds = if (failure == null) emptyList() else s.snoozeUndoIds,
+                    // Only the messages that did NOT come back stay offered. Keeping
+                    // the whole list on a partial failure would make the next Undo
+                    // re-send the action for mail that is already back in the inbox,
+                    // and reporting `restored.size` from the full list would count
+                    // them twice.
+                    snoozeUndoIds = s.snoozeUndoIds - restored,
                     snoozeUndoNote = when {
-                        failure != null -> "$undone of ${ids.size} came back. $failure"
+                        failure != null -> "${restored.size} of ${ids.size} came back. $failure"
                         else -> null
                     },
                     staleError = failure,
@@ -438,8 +476,28 @@ class MailboxViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             val t = token() ?: return@launch
             runCatching { Api.mailAction(t, id, action, null) }
-                .onSuccess { applyLocally(id, action); invalidateFor(action); reproject() }
-                .onFailure { _state.update { s -> s.copy(staleError = it.message) } }
+                .onSuccess {
+                    applyLocally(id, action); invalidateFor(action); reproject()
+                    // A single-message action supersedes the undo offer for THAT
+                    // message. Without this, snooze three, swipe one of them to
+                    // Trash, press Undo, and the trashed message is unsnoozed too --
+                    // `act()` clears the offer for bulk actions but this path had no
+                    // equivalent, so the banner outlived the mail it described.
+                    _state.update { s ->
+                        if (!s.snoozeUndoIds.contains(id)) s
+                        else {
+                            val left = s.snoozeUndoIds - id
+                            s.copy(snoozeUndoIds = left,
+                                snoozeUndoNote = if (left.isEmpty()) null else s.snoozeUndoNote)
+                        }
+                    }
+                }
+                .onFailure {
+                    _state.update { s ->
+                        s.copy(staleError = (it as? ApiException)?.message
+                            ?: "That action didn't go through.")
+                    }
+                }
         }
     }
 
@@ -532,13 +590,24 @@ class MailboxViewModel(app: Application) : AndroidViewModel(app) {
                     applyMarks()
                 }
                 .onFailure { e ->
-                    // A first read that fails leaves the marks unknown. A read that
-                    // fails AFTER a good one keeps the marks it already had — the
-                    // sector's rule that a refresh may not blank what is on screen.
-                    if (MailStore.assignments() == null) {
-                        _state.update { s -> s.copy(assignmentsRead = AssignmentsRead.Failed) }
-                        _state.update { it.copy(staleError = e.message) }
+                    // Either way the flag has to leave `Reading`, or a second failure
+                    // is impossible to notice: `ensureAssignments` short-circuits on
+                    // Reading, so a state left there silently stops every later read
+                    // for the rest of the session and the sheet keeps drawing marks
+                    // it computed from an empty map.
+                    //
+                    // With a cached map the marks already on screen stay (a refresh
+                    // may not blank what is displayed) and the state resolves to Read,
+                    // which is the truth about the cache; without one, Failed, which is
+                    // the honest unknown. Both report the failure.
+                    val hadMap = MailStore.assignments() != null
+                    _state.update { s ->
+                        s.copy(
+                            assignmentsRead = if (hadMap) AssignmentsRead.Read else AssignmentsRead.Failed,
+                            staleError = e.message ?: "The labels could not be read.",
+                        )
                     }
+                    if (hadMap) applyMarks()
                 }
         }
     }
@@ -612,13 +681,19 @@ class MailboxViewModel(app: Application) : AndroidViewModel(app) {
                         if (remove) MailStore.markUnassigned(id, labelId)
                         else MailStore.markAssigned(id, labelId)
                     }
-                    .onFailure { failure = it.message }
+                    .onFailure { failure = (it as? ApiException)?.message
+                        ?: "The label was not saved." }
             }
             _state.update { s ->
                 s.copy(
                     busy = false,
+                    // `done == 0` is tested FIRST, and the failure string can never
+                    // be null: `Throwable.message` is nullable, so a bare
+                    // `it.message` made "every write failed, none said why" fall
+                    // through to the success wording and render "Labelled 0
+                    // messages" over a selection that was not labelled at all.
                     labelNote = when {
-                        failure != null && done == 0 -> failure
+                        done == 0 -> failure ?: "The label was not saved."
                         failure != null -> "$done of ${targets.size} saved. $failure"
                         remove -> "Removed \"$labelName\" from $done"
                         done == 1 -> "Labelled 1 message"
@@ -836,6 +911,13 @@ class MailboxViewModel(app: Application) : AndroidViewModel(app) {
             _thread.update { it.copy(loading = true, error = null) }
             runCatching { Api.mailThread(t, threadId) }
                 .onSuccess { r ->
+                    // Remembered on success, because this field IS the memo: without
+                    // it the guard above never fires and every return from a thread
+                    // to the list costs the whole conversation payload again -- which
+                    // is the over-fetch the field's own comment promises not to do,
+                    // and iOS does not. A failure deliberately does not record it, so
+                    // re-opening retries instead of caching an empty conversation.
+                    threadLoadedFor = threadId
                     r.messages.forEach { MailStore.putBody(it) }
                     _thread.update { it.copy(messages = r.messages, loading = false) }
                     // Opening marks read server-side; mirror it locally so the
@@ -857,12 +939,17 @@ class MailboxViewModel(app: Application) : AndroidViewModel(app) {
             _thread.update { it.copy(loading = true, error = null) }
             val cached = MailStore.body(id)
             if (cached != null) {
+                threadLoadedFor = id
                 _thread.update { it.copy(messages = listOf(cached), loading = false) }
                 return@launch
             }
             runCatching { Api.mailMessage(t, id) }
                 .onSuccess { r ->
+                    // Recorded only when a body actually arrived: caching the id for
+                    // an empty response would make the guard above skip the retry and
+                    // leave the screen showing nothing for a message that exists.
                     r.message?.let {
+                        threadLoadedFor = id
                         MailStore.putBody(it)
                         _thread.update { s -> s.copy(messages = listOf(it), loading = false) }
                         MailStore.patchFlags(it.id, read = true)
@@ -890,17 +977,19 @@ class MailboxViewModel(app: Application) : AndroidViewModel(app) {
 
     fun refreshLabels() {
         viewModelScope.launch {
+            if (snapshotMode) return@launch
             val t = token() ?: return@launch
             _labels.update { it.copy(loading = true, error = null) }
             runCatching { Api.mailLabels(t) }
                 .onSuccess {
                     MailStore.putLabels(it.labels)
                     _labels.update { s -> s.copy(labels = it.labels, loading = false) }
-                    _state.update { s -> s.copy(labels = it.labels) }
+                    _state.update { s -> s.copy(labels = it.labels, labelsRead = AssignmentsRead.Read) }
                 }
                 .onFailure { e ->
                     _labels.update { it.copy(loading = false,
                         error = e.message ?: "Labels could not be loaded.") }
+                    _state.update { it.copy(labelsRead = AssignmentsRead.Failed) }
                 }
         }
     }

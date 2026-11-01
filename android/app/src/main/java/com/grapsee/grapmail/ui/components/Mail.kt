@@ -368,7 +368,10 @@ fun MessageRow(
             Icon(
                 if (message.isStarred) Icons.Rounded.Star else Icons.Rounded.StarBorder,
                 if (message.isStarred) "Starred" else "Star",
-                tint = if (message.isStarred) Color(0xFFF5A623) else palette.textTertiary,
+                // The token, not a literal. This row is what the dark screenshot of
+                // the home photographs, and a hardcoded light amber renders a
+                // different star from the thread's for the very same message.
+                tint = if (message.isStarred) palette.star else palette.textTertiary,
                 modifier = Modifier.size(20.dp).clip(CircleShape)
                     .clickable { onStar() }.padding(2.dp),
             )

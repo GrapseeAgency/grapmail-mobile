@@ -356,19 +356,17 @@ struct MailLabel: Decodable, Identifiable {
     /// parse this used to go through could never succeed, so every label drew the
     /// same fallback.
     var color: String?
-    var textColor: String?
     /// Unread count for this label; nil means unknown, not zero.
     var unread: Int?
 
     private enum CodingKeys: String, CodingKey {
-        case id, name, color = "colour", textColor, unread
+        case id, name, color = "colour", unread
     }
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         id = c.lenient(.id, "")
         name = c.lenient(.name, "")
         color = c.lenientOpt(.color)
-        textColor = c.lenientOpt(.textColor)
         unread = c.lenientOpt(.unread)
     }
 }

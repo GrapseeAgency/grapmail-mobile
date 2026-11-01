@@ -39,6 +39,7 @@ import androidx.compose.material.icons.rounded.Menu
 import androidx.compose.material.icons.rounded.MoreHoriz
 import androidx.compose.material.icons.rounded.Report
 import androidx.compose.material.icons.rounded.Search
+import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Send
 import androidx.compose.material.icons.rounded.Shield
 import androidx.compose.material.icons.rounded.Settings
@@ -165,10 +166,13 @@ fun MailboxScreen(
     LaunchedEffect(Unit) { vm.ensureLoaded() }
 
     var refreshing by remember { mutableStateOf(false) }
-    // The spinner is the server's answer, not the gesture: it clears when the
-    // load finishes, whether that lands rows or an error, so a failed refresh
-    // cannot leave the indicator running forever over a stale list.
-    LaunchedEffect(state.loading) { if (!state.loading) refreshing = false }
+    // The gesture's spinner is released by the load SETTLING, not by `loading`
+    // going false. The two are not the same thing here: a refresh over a populated
+    // list deliberately never raises `loading` (that is the no-blank rule), so
+    // keying on it meant the key never changed, this effect never re-ran, and one
+    // pull left an indeterminate spinner parked over the inbox for the rest of the
+    // session -- whether the refresh brought rows or an error.
+    LaunchedEffect(state.settleGeneration) { if (state.settleGeneration > 0) refreshing = false }
 
     ModalNavigationDrawer(
         drawerState = drawer,
@@ -401,6 +405,7 @@ fun MailboxScreen(
         MailSheet(onDismiss = { showLabelSheet = false }) {
             AssignLabelContent(
                 labels = state.labels,
+                labelsRead = state.labelsRead,
                 marks = state.labelMarks,
                 read = state.assignmentsRead,
                 note = state.labelNote,
@@ -909,6 +914,7 @@ internal fun MoveContent(onPick: (com.grapsee.grapmail.data.MailAction) -> Unit)
 @Composable
 internal fun AssignLabelContent(
     labels: List<com.grapsee.grapmail.data.MailLabelDto>,
+    labelsRead: com.grapsee.grapmail.data.AssignmentsRead,
     marks: Map<String, com.grapsee.grapmail.data.LabelMark>,
     read: com.grapsee.grapmail.data.AssignmentsRead,
     note: String?,
@@ -918,8 +924,16 @@ internal fun AssignLabelContent(
     val palette = LocalPalette.current
     SheetTitle("Label", "gm-sheets-label")
     if (labels.isEmpty()) {
-        Text("No labels yet. Create one from the drawer.", fontSize = 13.sp,
-            color = palette.textSecondary, modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp))
+        // Two different facts, and the old copy asserted the second one whatever
+        // had happened: a mailbox whose label list could not be read is not a
+        // mailbox with no labels, and "create one from the drawer" is advice to
+        // act on. Same rule the sheet already applies to the assignment read.
+        Text(
+            if (labelsRead == com.grapsee.grapmail.data.AssignmentsRead.Failed)
+                "Couldn't read your labels."
+            else "No labels yet. Create one from the drawer.",
+            fontSize = 13.sp, color = palette.textSecondary,
+            modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp))
     }
     // What the marks mean, said before the user reads anything into a tick. This
     // line is the difference between a sheet that consulted the server and one
@@ -1101,9 +1115,15 @@ private fun SheetOption(
                 Box(Modifier.width(9.dp).height(3.dp).background(palette.primarySolid))
             }
         } else if (active) {
+            // A real glyph. The child here was `Text("", ...)`, which paints
+            // nothing: `on` was a solid disc while iOS drew a checkmark inside the
+            // same circle. That matters now because the tick is the signal that a
+            // tap will REMOVE the label -- an invisible mark is a wrong affordance,
+            // not a cosmetic one, and it is what frame 83 is meant to show.
             Box(Modifier.size(18.dp).clip(CircleShape).background(palette.primarySolid),
                 contentAlignment = Alignment.Center) {
-                Text("", fontSize = 10.sp, color = palette.onPrimary)
+                Icon(Icons.Rounded.Check, null, tint = palette.onPrimary,
+                    modifier = Modifier.size(12.dp))
             }
         }
     }

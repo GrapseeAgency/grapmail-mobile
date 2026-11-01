@@ -243,7 +243,11 @@ struct MessageRow: View {
                 }
                 Image(systemName: message.isStarred ? "star.fill" : "star")
                     .font(.system(size: 16))
-                    .foregroundColor(message.isStarred ? GM.warning : GM.textTertiary)
+                    // The star token, not `GM.warning`: this is the row the dark
+                    // home screenshot photographs, and `warning` carries a single
+                    // value with no dark counterpart, so the list and the thread of
+                    // the same starred message showed two different ambers.
+                    .foregroundColor(message.isStarred ? GM.star : GM.textTertiary)
                     .onTapGesture(perform: onStar)
             }
             .frame(width: 24)

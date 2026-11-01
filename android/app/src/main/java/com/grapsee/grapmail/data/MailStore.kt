@@ -142,12 +142,6 @@ object MailStore {
         assignments = next
     }
 
-    /** Labels on one message, or null when nobody has answered yet. Null is not
-     *  “none”: callers draw unknown as unknown. */
-    suspend fun labelsOf(messageId: String): Set<String>? = mutex.withLock {
-        assignments?.get(messageId)
-    }
-
     /** Drop a message's pairs when the message itself goes away, so a permanent
      *  delete cannot leave a ghost label keyed on an id nothing has any more. */
     suspend fun forgetAssignments(messageId: String) = mutex.withLock {
@@ -215,10 +209,14 @@ object MailStore {
         bodies = emptyMap()
     }
 
-    fun clear() {
-        // Not a suspend: SessionStore.clear() is on the sign-out path and a
-        // cancelled coroutine there would leave the next account reading this
-        // one's mail.
+    suspend fun clear() = mutex.withLock {
+        // Takes the same lock every mutator takes. It did not: `clear()` was a
+        // plain function writing seven fields that coroutines on other dispatchers
+        // mutate under the mutex, so a sign-out racing an in-flight `putPage` had no
+        // happens-before edge with it and could leave a half-cleared cache — some
+        // fields emptied, `me` still the previous account. The caller wraps this in
+        // `NonCancellable`, which is where the "must not be cancelled" guarantee
+        // actually belongs.
         pages = emptyMap()
         stats = null
         labels = null

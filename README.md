@@ -227,7 +227,8 @@ working mailbox.
   relaunches: no mail screen may name a colour at all (`Color(0x…)` is forbidden in
   the four Android screens and the five iOS views), so every paint comes from a token
   table holding a light *and* a dark value. That pin found a real defect the first day
-  it was written — the starred marker was a hardcoded light amber on both platforms.
+  it was written — the starred marker was a hardcoded light amber on both platforms,
+  in the row as well as the thread, which is what the dark home frame photographs.
 - **API parity is a gate, not a review habit.** `scripts/api-parity.py` diffs
   the two mail client surfaces — every `mail*` call name and every decoded DTO
   field — and both workflows run it. Three mismatches were caught by hand while
@@ -244,6 +245,25 @@ working mailbox.
   declaring `error`/`code` that Android's did not — is now matched on both sides, and
   `mailInbox` refuses a `success: false` listing at the transport so a box the server
   did not produce can never be drawn as an empty one.
+- **The two receipts are compared, not just the two APIs.** The send receipt is
+  one screen drawn twice, and a name-and-field diff cannot see the bodies of a
+  `when` and a `switch`: Android handled `sent`/`queued`/`failed` while iOS also
+  handled `draft`, so a successful draft save read "Server reported: draft" in
+  warn ink under a line saying "Saved to Drafts". `scripts/mail-honesty.py` now
+  extracts the status words from both arms and requires the sets to agree.
+
+- **The snapshot host owns its seeded fields.** A seeded screen and a live read
+  cannot both write the same state: the host seeds first, the CI account's real
+  (empty) label list arrives afterwards, and the frame photographs the wrong
+  branch while a file-count gate calls it a pass. Android passes a
+  `snapshotMode` flag into the view model's constructor; iOS sets
+  `snapshotSeeded` in its seed seams and every loader checks it.
+
+- **A write that arrives after sign-out is dropped.** iOS clears the cache
+  synchronously and cannot await it, so the guard sits on the writer: no cache
+  write lands once the bearer is gone. Android's `clear()` now takes the same
+  mutex every mutator takes, and its caller wraps it in `NonCancellable`.
+
 - **The screener decides senders, and says what it cannot know.** `PUT
   /screener/decision` and `DELETE /screener/decision` are implemented on both
   platforms (`mailScreenerDecision`, `mailScreenerDecisionRemove`), reached from a
@@ -274,7 +294,7 @@ working mailbox.
   screen you cannot see. Without this, a run that reached no screen at all still
   filled its PNG gate with pictures of the wrong ones.
 - **The band is 30 frames, `60`–`89`.** The plan called it 25; the list it
-  printed runs 60 to 85 inclusive, which is 26. Three names were added after that,
+  printed runs 60 to 85 inclusive, which is 26. Four names were added after that,
   each for a screen the plan's own surface list required and no frame proved:
   `86-mail-sender-sheet` (the `screenerDecision` action), `87-mail-unsubscribe` (the
   sender's `List-Unsubscribe` offer, reachable only from mail that carries it) and

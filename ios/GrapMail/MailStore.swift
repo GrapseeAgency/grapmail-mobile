@@ -121,9 +121,6 @@ actor MailStore {
         assignments = cur
     }
 
-    /// Labels on one message, or nil when nobody has answered. nil is not “none”.
-    func labelsOf(_ messageId: String) -> Set<String>? { assignments?[messageId] }
-
     /// Drop a message's pairs when the message itself is destroyed, so a permanent
     /// delete cannot leave a ghost label keyed on an id nothing has any more.
     func forgetAssignments(_ messageId: String) { assignments?[messageId] = nil }
