@@ -20,6 +20,29 @@ STAMP="$(date +%s)"
 HANDLE="e2e${STAMP: -6}"
 source "$(dirname "$0")/android-walk-helpers.sh"
 
+# ── quiet the device before anything is measured ─────────────────────────────
+# One run on the low-memory profile spent 797 recovery cycles on
+# "Pixel Launcher isn't responding" and was still cut by the job ceiling with
+# four snapshots short. A system dialog is not something the walk can prevent —
+# only clean up after — and every cleanup costs a tap, a wait and a fresh dump.
+# Suppressing it at the source is what Google's own emulator guidance says to do
+# for automation, so the dialog is never raised in the first place.
+#
+# The trade-off is named rather than glossed: if THIS app crashes, its dialog is
+# hidden too. The walk still goes red, because the crashed screen's marker never
+# appears and the PNG gate counts the missing frame — the loss is a less specific
+# message, not a lost failure. The ANR detector stays in the wait loops as the
+# fallback for a runner where this setting is ignored.
+#
+# The three animation scales are the other half. Every sheet, drawer and tab is
+# photographed after it settles, so at 1x each of ~60 screens pays a fixed
+# transition tax and the run is bounded by a wall clock instead of by what it
+# proves.
+adb shell settings put global hide_error_dialogs 1 >/dev/null 2>&1 || true
+for scale in window_animation_scale transition_animation_scale animator_duration_scale; do
+  adb shell settings put global "$scale" 0 >/dev/null 2>&1 || true
+done
+
 FAILURES=0
 must() { # must <description> <cmd...> — a failed interaction fails the walk
   local desc="$1"; shift
