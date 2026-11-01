@@ -601,7 +601,11 @@ func parseUnsubscribe(_ raw: String?) -> String? {
 func urlHost(_ raw: String) -> String? {
     guard let range = raw.range(of: "://") else { return nil }
     var host = Substring(raw[range.upperBound...])
-    for stop in ["/", "?", "#"] {
+    // `: Character`, because `firstIndex(of:)` on a Substring wants the
+    // element type and an unannotated literal array here infers `[String]` --
+    // "cannot convert value of type 'String' to expected argument type
+    // 'Substring.Element' (aka 'Character')", named by the compiler at this line.
+    for stop: Character in ["/", "?", "#"] {
         if let cut = host.firstIndex(of: stop) { host = host[host.startIndex..<cut] }
     }
     if let at = host.lastIndex(of: "@") { host = host[host.index(after: at)...] }

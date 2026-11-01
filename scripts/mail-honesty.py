@@ -923,6 +923,17 @@ launch_sw = set(re.findall(r'\("\d\d-[a-z0-9-]+", "([a-z0-9-]+)"', SW_WALK))
 pin("Android's snapshot hosts were located", len(host_kt) >= 20)
 pin("iOS's snapshot hosts were located", len(host_sw) >= 20)
 pin("Both snapshot hosts can draw exactly the same mail screens", host_kt == host_sw)
+# One return per arm, and no more arms than returns. Deleting a `case` by its
+# header line leaves the arm's `return AnyView(...)` behind as a statement inside
+# the PREVIOUS arm — compiles as unreachable code, does not fail the name set,
+# and only the compiler names it ("cannot find 'drawerFrame' in scope", on the
+# second such orphan). Counting arms against returns catches the shape here, in
+# the seconds it takes to run, instead of the minutes a macOS runner costs.
+frame_sw = SW_HOST[SW_HOST.find("private var frame: AnyView"):]
+frame_sw = frame_sw[:frame_sw.find("\n    }\n") if "\n    }\n" in frame_sw else len(frame_sw)]
+arms_sw = len(re.findall(r'^\s+(?:case "[a-z0-9-]+"|default):', frame_sw, re.M))
+pin("iOS's snapshot switch returns exactly once per arm", arms_sw > 0 and
+    arms_sw == len(re.findall(r"return AnyView\(", frame_sw)))
 for side, host, launched in (("Android", host_kt, launch_kt), ("iOS", host_sw, launch_sw)):
     dead = {n for n in host if n.startswith("mail-")} - launched
     pin(f"{side}'s host defines no mail screen its walk never photographs", not dead)

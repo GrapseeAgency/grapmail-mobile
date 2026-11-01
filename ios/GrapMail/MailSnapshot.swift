@@ -186,9 +186,6 @@ struct MailSnapshotView: View {
                 listFrame(rows: Self.rows, loading: false, failed: false,
                           noMailbox: false, box: .inbox)
                 )
-                return AnyView(
-                drawerFrame
-                )
             case "mail-empty":
                 return AnyView(
                 listFrame(rows: [], loading: false, failed: false,
@@ -208,9 +205,6 @@ struct MailSnapshotView: View {
                 return AnyView(
                 listFrame(rows: [], loading: false, failed: false,
                           noMailbox: true, box: .inbox)
-                )
-                return AnyView(
-                searchFrame
                 )
             case "mail-selection":
                 return AnyView(
