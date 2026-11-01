@@ -264,11 +264,18 @@ fun MailboxScreen(
                         LazyColumn(
                             state = listState,
                             modifier = Modifier.fillMaxSize().testTag("mail-list"),
-                            // Every item is one row shape, so one content type: it
-                            // is what lets LazyColumn recycle a composition across
-                            // rows instead of treating each as a different layout.
-                            // Keys are the message id, which is what makes a page
-                            // append keep the rows it already composed.
+                        ) {
+                            // `key` and `contentType` are arguments of `items`, not
+                            // of `LazyColumn` — the spec writes them as if they sat on
+                            // the list, and the compiler rejects that ("no parameter
+                            // with name 'contentType' found"). They belong to the item
+                            // provider because they are per-item facts.
+                            //
+                            // Keys are the message id, which is what lets an appended
+                            // page keep the rows it already composed. One content type
+                            // because every item is the same row shape: it is how the
+                            // list may recycle a composition between rows instead of
+                            // treating each as a different layout.
                             //
                             // Stated plainly rather than improved in passing: a
                             // selection change recomposes the rows on screen, because
@@ -277,9 +284,7 @@ fun MailboxScreen(
                             // holds — but per-row `derivedStateOf` would need the
                             // selection set out of that object, which is a view-model
                             // change this sector's evidence does not ask for.
-                            contentType = { "row" },
-                        ) {
-                            items(state.rows, key = { it.id }) { row ->
+                            items(state.rows, key = { it.id }, contentType = { "row" }) { row ->
                                 // Which swipes mean something depends on where the
                                 // message already is. Archiving something that is in
                                 // Archive, or trashing something already in Trash,
