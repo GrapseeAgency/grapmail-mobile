@@ -209,9 +209,18 @@ jobs:
             -keypass "$PW" -alias grapmail-ci -keyalg RSA -keysize 2048 \
             -validity 3650 \
             -dname "CN=GrapMail CI test signature (not the distribution key), OU=ephemeral, O=Grapsee, C=US" >&2
-          echo "CI_KEYSTORE_FILE=$KS" >> "$GITHUB_ENV"
-          echo "CI_KEYSTORE_PASSWORD=$PW" >> "$GITHUB_ENV"
-          echo "CI_KEYSTORE_ALIAS=grapmail-ci" >> "$GITHUB_ENV"
+          # `export`, not `$GITHUB_ENV`. The first attempt wrote these to
+          # GITHUB_ENV in this same step and ran gradlew on the line below it —
+          # and GITHUB_ENV only reaches the NEXT step, so the build saw no
+          # keystore, AGP applied no signing config, and it emitted
+          # `app-release-unsigned.apk`. The prove step then failed on the missing
+          # `app-release.apk` and nothing unverified was published, which is what
+          # the gate is for. But a variable that has to be in the environment of
+          # the command on the next line belongs in the environment, not in a
+          # file the runner reads after the step is over.
+          export CI_KEYSTORE_FILE="$KS"
+          export CI_KEYSTORE_PASSWORD="$PW"
+          export CI_KEYSTORE_ALIAS=grapmail-ci
           ./gradlew assembleRelease --no-daemon
           ls -la app/build/outputs/apk/release/
 
@@ -223,6 +232,17 @@ jobs:
         run: |
           set -eu
           APK=android/app/build/outputs/apk/release/app-release.apk
+          # An unsigned release is not a near-miss, it is the specific failure:
+          # AGP happily builds it, names it differently, and a job that only
+          # looked for "an apk in that folder" would install and publish a file no
+          # device will accept. Say which file is there instead of guessing.
+          if [ -f android/app/build/outputs/apk/release/app-release-unsigned.apk ]; then
+            echo "::error::AGP emitted an UNSIGNED release — the signing config was not"
+            echo "::error::applied, so the keystore env vars did not reach this build"
+            ls -la android/app/build/outputs/apk/release/ >&2
+            exit 1
+          fi
+          [ -f "$APK" ] || { echo "::error::no $APK to publish"; exit 1; }
           AAPT=$(ls "$ANDROID_HOME"/build-tools/*/aapt | tail -1)
           "$AAPT" dump badging "$APK" > /tmp/badging.txt
           head -2 /tmp/badging.txt

@@ -36,9 +36,13 @@ android {
         targetSdk = 34
         // Bumped for the mailbox sector. `versionName` is what the release page
         // and `aapt dump badging` are checked against, so the tag and the APK
-        // cannot quietly disagree about which build this is.
-        versionCode = 2
-        versionName = "0.2.0"
+        // cannot quietly disagree about which build this is. 0.2.1 is the first
+        // tag whose release job actually signed: v0.2.0's run emitted
+        // `app-release-unsigned.apk` because the keystore variables were handed to
+        // `$GITHUB_ENV` in the same step that built, and the gate refused to
+        // publish it — that failed tag stays in history as the attempt.
+        versionCode = 3
+        versionName = "0.2.1"
         // Real account API — same contract the website uses.
         buildConfigField("String", "API_BASE", "\"https://grapsee.com/api\"")
     }
