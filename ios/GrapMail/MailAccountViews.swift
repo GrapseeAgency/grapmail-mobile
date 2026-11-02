@@ -43,12 +43,15 @@ private struct NoteLine: View {
 }
 
 /// The add-a-row editor every list screen shares: field, button, empty guard.
+/// `onAdd` is declared LAST so the call sites' trailing closure binds to it --
+/// Swift's memberwise initialiser keeps declaration order, and CI named the
+/// call sites that tried to pass it out of position.
 private struct AccountAddRow: View {
     let hint: String
     @Binding var value: String
-    let onAdd: () -> Void
     let busy: Bool
     let marker: String
+    let onAdd: () -> Void
 
     var body: some View {
         HStack(spacing: 10) {
@@ -99,8 +102,8 @@ private struct AccountRadioRow: View {
 
 private struct AccountListRow: View {
     let text: String
-    let onRemove: () -> Void
     let marker: String
+    let onRemove: () -> Void
 
     var body: some View {
         HStack(alignment: .top) {

@@ -181,14 +181,15 @@ object MailE2e {
     /** `subtle().deriveBits({name:'X25519', public}, priv, 256)`. */
     private fun deriveSharedSecret(privateKey: java.security.PrivateKey, publicKey: java.security.PublicKey): ByteArray {
         val agreement = javax.crypto.KeyAgreement.getInstance("X25519")
-        // The documented three-step shape: init, one phase that finishes the
-        // agreement, then the no-arg doFinal. The one-shot `doFinal(Key)`
-        // spelling reads fine on a JVM but does not resolve against the
-        // Android crypto stubs this module compiles against -- CI named it,
-        // and the two forms agree on the 32-byte preshare either way.
+        // Android's KeyAgreement is NOT the JDK's: its method list is init,
+        // doPhase and generateSecret -- there is no doFinal at all (CI's
+        // unresolved reference said so) -- and `generateSecret()` returns the
+        // raw agreed bytes in a new buffer, which is exactly the 32-byte X25519
+        // preshare WebCrypto's deriveBits and Node's deriveSecretBits hand to
+        // HKDF. Same bytes, the platform's own spelling.
         agreement.init(privateKey)
         agreement.doPhase(publicKey, true)
-        val shared = agreement.doFinal()
+        val shared = agreement.generateSecret()
         require(shared.size == 32) { "X25519 agreed to ${shared.size} bytes, not 32." }
         return shared
     }

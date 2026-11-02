@@ -1170,7 +1170,7 @@ struct ApiClient {
         text("Content-Type: \(mime)\r\n\r\n")
         body.append(bytes)
         text("\r\n--\(boundary)--\r\n")
-        let (data, http) = try accountBinary(
+        let (data, http) = try await accountBinary(
             path: "/auth/account/avatar", method: "POST", bearer: token,
             body: body, contentType: "multipart/form-data; boundary=\(boundary)")
         guard (200..<300).contains(http.statusCode) else { throw requestFailure(data: data, http: http) }
@@ -1178,7 +1178,7 @@ struct ApiClient {
     }
 
     static func deleteAvatar(token: String) async throws -> AvatarResponse {
-        let (data, http) = try accountBinary(
+        let (data, http) = try await accountBinary(
             path: "/auth/account/avatar", method: "DELETE", bearer: token,
             body: nil, contentType: nil)
         guard (200..<300).contains(http.statusCode) else { throw requestFailure(data: data, http: http) }
@@ -1192,7 +1192,7 @@ struct ApiClient {
     /// "nobody answered the photo" are different sentences for the screen, and
     /// the caller distinguishes them by the code, which only the route chose.
     static func avatarBytes(token: String) async throws -> Data {
-        let (data, http) = try accountBinary(
+        let (data, http) = try await accountBinary(
             path: "/auth/account/avatar", method: "GET", bearer: token,
             body: nil, contentType: nil)
         guard (200..<300).contains(http.statusCode) else { throw requestFailure(data: data, http: http) }

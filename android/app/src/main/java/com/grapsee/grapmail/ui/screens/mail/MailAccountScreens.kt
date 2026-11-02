@@ -704,7 +704,10 @@ fun ProfileEditScreen(vm: ProfileViewModel, onBack: () -> Unit) {
                 fontSize = 12.sp, color = palette.textTertiary)
             AppTextField("Birthday", birthday, { birthday = it },
                 hint = "YYYY-MM-DD",
-                keyboard = KeyboardType.Date, modifier = Modifier.padding(top = 6.dp))
+                // KeyboardType.Text, not a date keyboard: Compose has no Date
+                // keyboard type (the enum stops at ASCII/Percent), and the
+                // field takes the route's own `YYYY-MM-DD` free text.
+                keyboard = KeyboardType.Text, modifier = Modifier.padding(top = 6.dp))
             SectionLabel("Gender", palette)
             listOf("Female", "Male", "Rather not say", "Custom").forEach { g ->
                 RadioRow(g, gender == g, { gender = if (gender == g) "" else g })
@@ -815,6 +818,7 @@ fun PrivacyScreen(
 }
 
 /** Same helper the mail screens use, reached from the privacy rows. */
+@Composable
 private fun DetailLine(label: String, value: String, palette: com.grapsee.grapmail.ui.theme.Palette) {
     Row(Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
         Text(label, fontSize = 13.sp, color = palette.textSecondary, modifier = Modifier.width(150.dp))
