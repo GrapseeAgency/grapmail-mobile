@@ -1199,11 +1199,8 @@ pin("a recovered snapshot resets that counter",
 # The snapshot loop is only the second half of the walk. The shade run died at the
 # FIRST tap -- 'Create Account' -- and then crawled through every later leg for an
 # hour and a half, so an abort that only watches snapshot markers would have let
-# the same run burn its ceiling again. Every `must` counts now.
-pin("the walk aborts on a run of failed interactions and dumps the foreground",
-    re.search(r"MUST_MISS=\$\(\(MUST_MISS \+ 1\)\)[\s\S]{0,700}MUST_MISS\" -ge 8[\s\S]{0,1600}?exit 1",
-              KT_WALK) is not None
-    and re.search(r"MUST_MISS=\$\(\(MUST_MISS \+ 1\)\)[\s\S]{0,1600}dumpsys window", KT_WALK) is not None)
+# the same run burn its ceiling again. Every `must` counts now (the assertions on
+# that counter live just below, in section 23's block reader).
 pin("a successful interaction resets that counter",
     re.search(r"else\s*\n\s+MUST_MISS=0", KT_WALK) is not None)
 # The recovery itself must not be silent. `ensure_foreground` relaunched with
@@ -1214,9 +1211,59 @@ launch_lines = [l for l in fg.split("\n") if "am start" in l]
 pin("the foreground relaunch keeps what `am start` said",
     bool(launch_lines) and all(">/dev/null" not in l for l in launch_lines)
     and "[foreground] am start" in fg)
+def shell_block(src, start_marker, end_marker):
+    """A slice of a shell script from a marker to the next `end_marker` line.
+
+    Used instead of one long regex with a `{0,1600}` window: the abort body has
+    grown comments and dumps, and a window that silently stops covering them
+    reports the defence as missing when the code simply got more careful. A slice
+    with an explicit end says how much it read.
+    """
+    i = src.find(start_marker)
+    if i < 0:
+        return ""
+    j = src.find(end_marker, i)
+    return src[i:j + len(end_marker)] if j > i else src[i:]
+
+
+must_abort = shell_block(KT_WALK, "MUST_MISS=$((MUST_MISS + 1))", "\n      exit 1")
+pin("the walk counts a run of failed interactions and stops on it",
+    'MUST_MISS" -ge 8' in must_abort and "exit 1" in must_abort)
+pin("the abort prints what the frameworks say is on screen",
+    "dumpsys activity activities" in must_abort and "dumpsys window" in must_abort)
 pin("the abort asks whether the package is installed and what crashed",
-    "pm list packages" in KT_WALK and "logcat -d -b crash" in KT_WALK
-    and "AndroidRuntime" in KT_WALK)
+    "pm list packages" in must_abort and "logcat -d -b crash" in must_abort
+    and "AndroidRuntime" in must_abort)
+pin("the crash dump is taken from its header, so the exception class survives",
+    re.search(r'logcat -d -b crash[^|]*\|\s*grep -A\d+ "FATAL EXCEPTION"', must_abort) is not None)
+
+# -- 24. a ViewModel built by reflection must have the constructor the factory asks for
+#
+# The Android walk has not been photographing mail since `d9868c4`: it has been
+# photographing the Pixel launcher, because the app died inside its first
+# `setContent` with
+#
+#   NoSuchMethodException: com.grapsee.grapmail.logic.MailboxViewModel.<init>
+#   [class android.app.Application]
+#
+# Adding `snapshotMode: Boolean = false` to the constructor is what did it. A
+# Kotlin default parameter emits ONE Java constructor -- `(Application, boolean)`
+# -- unless `@JvmOverloads` asks for the shorter overloads too, and the default
+# `ViewModelProvider` factory builds an `AndroidViewModel` subclass by reflecting
+# for `<init>(Application)`. Nothing in a build, a type check, a parity diff or a
+# screenshot can see this: the code is valid Kotlin, the class is valid, and the
+# method it needs is simply absent from the bytecode. Only a run finds out, which
+# is exactly why eight runs found out nothing until the walk was made to say so.
+pin("MailboxViewModel's reflective constructor is the one the factory looks for",
+    re.search(r"class MailboxViewModel @JvmOverloads constructor", KT_VM) is not None)
+for kt in sorted(ANDROID.rglob("*.kt")):
+    src = kt.read_text(encoding="utf-8")
+    for m in re.finditer(r"^class\s+\w+[\s\S]{0,400}?AndroidViewModel\(", src, re.M):
+        header = m.group(0)
+        has_default = re.search(r":\s*\w+\s*=", header) is not None
+        pin(f"Android's {kt.name} ViewModel{'' if not has_default else ' with a default param'} "
+            f"emits the Java constructor a factory can call",
+            (not has_default) or "@JvmOverloads" in header)
 
 print()
 if failures:

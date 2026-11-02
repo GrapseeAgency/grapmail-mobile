@@ -73,7 +73,12 @@ must() { # must <description> <cmd...> — a failed interaction fails the walk
       adb shell pm list packages "$PKG" >&2
       adb shell dumpsys package "$PKG" 2>/dev/null | grep -m2 -E "versionName|codePath" >&2
       echo "ABORT: crash buffer —" >&2
-      adb logcat -d -b crash -t 120 2>/dev/null | tail -40 >&2
+      # The exception CLASS and MESSAGE are the answer, and they sit at the TOP of
+      # a FATAL block: `tail -40` kept the bottom of the stack and threw the answer
+      # away, so the run that named `NoSuchMethodException: MailboxViewModel.<init>
+      # [class android.app.Application]` had to be dug out of the raw log by hand
+      # afterwards. Grab the block by its header and keep enough of it to read.
+      adb logcat -d -b crash 2>/dev/null | grep -A24 "FATAL EXCEPTION" | tail -80 >&2
       echo "ABORT: last 25 lines of the main buffer for $PKG —" >&2
       adb logcat -d 2>/dev/null | grep -E "$PKG|AndroidRuntime|FATAL" | tail -25 >&2
       exit 1

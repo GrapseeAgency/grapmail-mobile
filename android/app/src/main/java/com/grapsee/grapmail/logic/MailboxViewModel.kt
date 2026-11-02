@@ -57,8 +57,23 @@ import kotlinx.coroutines.launch
  * list -- so `72-mail-labels` could photograph "No labels yet" and the walk's
  * settled marker for that screen would either fail or, worse, pass on a frame of the
  * wrong branch. Seeding and fetching cannot both own the same field.
+ *
+ * `@JvmOverloads` is not decoration, and the build cannot say why it is needed —
+ * only a run can. A Kotlin default parameter does NOT emit the shorter Java
+ * constructor unless asked, so adding `snapshotMode: Boolean = false` left this
+ * class with one Java constructor, `(Application, boolean)`. The default
+ * `ViewModelProvider` factory builds an `AndroidViewModel` subclass by reflecting
+ * for `<init>(Application)`, did not find it, and threw
+ * `NoSuchMethodException: com.grapsee.grapmail.logic.MailboxViewModel.<init>
+ * [class android.app.Application]` inside the first `setContent` — which is not a
+ * mailbox crash but a whole-app one, on every screen, from the commit that added
+ * the flag until this line. Eight Android runs photographed the Pixel launcher
+ * before this was readable from a log.
  */
-class MailboxViewModel(app: Application, private val snapshotMode: Boolean = false) :
+class MailboxViewModel @JvmOverloads constructor(
+    app: Application,
+    private val snapshotMode: Boolean = false,
+) :
     AndroidViewModel(app) {
 
     data class MailboxUiState(
