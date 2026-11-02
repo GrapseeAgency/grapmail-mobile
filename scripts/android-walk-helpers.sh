@@ -136,7 +136,16 @@ dismiss_anr() {
 ensure_foreground() {
   if app_in_foreground; then return 0; fi
   echo "  [foreground] $PKG is not the on-screen activity — relaunching" >&2
-  adb shell am start -W -n "$PKG/.MainActivity" >/dev/null
+  # `-W` prints Status/Activity/Error, and `>/dev/null` was throwing it away. The
+  # run this matters to ended with the Pixel launcher on screen and our activity
+  # never once visible, and the one command that could have said WHY — "Error:
+  # Activity class {com.grapsee.grapmail/com.grapsee.grapmail.MainActivity} does
+  # not exist", or a permission or install failure — was silenced by the helper
+  # meant to recover from it. Keep the output; a recovery that cannot explain
+  # itself is not a recovery.
+  local launched
+  launched=$(adb shell am start -W -n "$PKG/.MainActivity" 2>&1 | tr -d '\r' | head -6)
+  echo "  [foreground] am start — $(echo "$launched" | tr '\n' ' ')" >&2
   sleep 4
   if app_in_foreground; then return 0; fi
   # Loud, and counted. A run that could not get its own app on screen continued

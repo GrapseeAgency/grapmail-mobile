@@ -63,6 +63,19 @@ must() { # must <description> <cmd...> — a failed interaction fails the walk
       echo "ABORT: foreground dump —" >&2
       adb shell dumpsys activity activities 2>/dev/null | grep -iE "topResumedActivity|mResumedActivity|ResumedActivity:" | head -3 >&2
       adb shell dumpsys window 2>/dev/null | grep -iE "mCurrentFocus|mFocusedApp" | head -3 >&2
+      # Is it even installed, and did it crash on the way up? The launcher on
+      # screen with our activity never visible has exactly two explanations — the
+      # package is not there, or it died after starting — and both are readable
+      # from the device in one line each. Asking is the difference between a run
+      # that names the cause and a run that ends with a screenshot of someone
+      # else's home screen, which is what the last three did.
+      echo "ABORT: install/state —" >&2
+      adb shell pm list packages "$PKG" >&2
+      adb shell dumpsys package "$PKG" 2>/dev/null | grep -m2 -E "versionName|codePath" >&2
+      echo "ABORT: crash buffer —" >&2
+      adb logcat -d -b crash -t 120 2>/dev/null | tail -40 >&2
+      echo "ABORT: last 25 lines of the main buffer for $PKG —" >&2
+      adb logcat -d 2>/dev/null | grep -E "$PKG|AndroidRuntime|FATAL" | tail -25 >&2
       exit 1
     fi
   else

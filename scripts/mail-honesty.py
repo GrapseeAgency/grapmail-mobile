@@ -1201,11 +1201,22 @@ pin("a recovered snapshot resets that counter",
 # hour and a half, so an abort that only watches snapshot markers would have let
 # the same run burn its ceiling again. Every `must` counts now.
 pin("the walk aborts on a run of failed interactions and dumps the foreground",
-    re.search(r"MUST_MISS=\$\(\(MUST_MISS \+ 1\)\)[\s\S]{0,700}MUST_MISS\" -ge 8[\s\S]{0,600}?exit 1",
+    re.search(r"MUST_MISS=\$\(\(MUST_MISS \+ 1\)\)[\s\S]{0,700}MUST_MISS\" -ge 8[\s\S]{0,1600}?exit 1",
               KT_WALK) is not None
-    and re.search(r"MUST_MISS=\$\(\(MUST_MISS \+ 1\)\)[\s\S]{0,700}dumpsys window", KT_WALK) is not None)
+    and re.search(r"MUST_MISS=\$\(\(MUST_MISS \+ 1\)\)[\s\S]{0,1600}dumpsys window", KT_WALK) is not None)
 pin("a successful interaction resets that counter",
     re.search(r"else\s*\n\s+MUST_MISS=0", KT_WALK) is not None)
+# The recovery itself must not be silent. `ensure_foreground` relaunched with
+# `am start -W … >/dev/null`, which threw away the one line that says whether the
+# activity exists, installed, or died -- and three runs ended with the Pixel
+# launcher photographed as a mailbox screen and no explanation anywhere in the log.
+launch_lines = [l for l in fg.split("\n") if "am start" in l]
+pin("the foreground relaunch keeps what `am start` said",
+    bool(launch_lines) and all(">/dev/null" not in l for l in launch_lines)
+    and "[foreground] am start" in fg)
+pin("the abort asks whether the package is installed and what crashed",
+    "pm list packages" in KT_WALK and "logcat -d -b crash" in KT_WALK
+    and "AndroidRuntime" in KT_WALK)
 
 print()
 if failures:
