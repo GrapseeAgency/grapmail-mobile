@@ -181,10 +181,14 @@ object MailE2e {
     /** `subtle().deriveBits({name:'X25519', public}, priv, 256)`. */
     private fun deriveSharedSecret(privateKey: java.security.PrivateKey, publicKey: java.security.PublicKey): ByteArray {
         val agreement = javax.crypto.KeyAgreement.getInstance("X25519")
+        // The documented three-step shape: init, one phase that finishes the
+        // agreement, then the no-arg doFinal. The one-shot `doFinal(Key)`
+        // spelling reads fine on a JVM but does not resolve against the
+        // Android crypto stubs this module compiles against -- CI named it,
+        // and the two forms agree on the 32-byte preshare either way.
         agreement.init(privateKey)
-        // doFinal gives the raw 32-byte preshare for X25519; there is no
-        // generateSecret(int) overload to ask for a length.
-        val shared = agreement.doFinal(publicKey)
+        agreement.doPhase(publicKey, true)
+        val shared = agreement.doFinal()
         require(shared.size == 32) { "X25519 agreed to ${shared.size} bytes, not 32." }
         return shared
     }
@@ -193,7 +197,10 @@ object MailE2e {
     private fun recipientKey(publicKeyB64: String): java.security.PublicKey =
         try {
             val key = x25519Public(publicKeyB64)
-            require(key.algorithm.name == "X25519") { "not X25519" }
+            // `getAlgorithm()` is a String on the JCA key types; there is no
+            // `.name` on it (the TS/WebCrypto naming that got copied here
+            // resolves on nothing, and CI said so).
+            require(key.algorithm == "X25519") { "not X25519" }
             key
         } catch (e: Exception) {
             throw IllegalArgumentException(
@@ -363,12 +370,6 @@ object MailE2e {
             envelope = envelope.copy(sig = base64(s.sign()), signerPub = signing.publicKey)
         }
         return envelope
-    }
-
-    /** Recognise a stored envelope without trusting it or decrypting it. */
-    fun parse(value: JsonElementLike?): Any? {
-        val obj = value ?: return null
-        return parseFrom(obj)
     }
 
     private val lenient = Json { ignoreUnknownKeys = true }
@@ -787,6 +788,3 @@ object MailE2e {
         )
     }
 }
-
-/** Marker for a value this module can hand to [MailE2e.parse]; JSON only today. */
-typealias JsonElementLike = kotlinx.serialization.json.JsonElement

@@ -1416,7 +1416,8 @@ class MailboxViewModel @JvmOverloads constructor(
      * The key directory's state, plus the last verification a screen asked for.
      *
      * Nothing here claims a message was opened. The device publishes the PUBLIC
-     * halves the platform can make (`MailE2eIdentity`) and asks the server what it
+     * halves the platform can make (`MailE2e.generateIdentity`) and asks the
+     * server what it
      * knows about other people's keys (`/plan`, `/lookup`); the sealed body itself
      * is left exactly as the server stored it, because a client that showed a
      * half-implemented decrypt would be inventing plaintext.
@@ -1475,15 +1476,24 @@ class MailboxViewModel @JvmOverloads constructor(
         viewModelScope.launch {
             val t = token() ?: run { then("Sign in again to set up encryption."); return@launch }
             _e2e.update { it.copy(busy = true, note = null, error = null) }
-            val made = com.grapsee.grapmail.data.MailE2eIdentity.generate(getApplication(), t, passphrase)
+            // generateIdentity is the module's own entry: it makes both pairs,
+            // writes the passphrase-protected record BEFORE the network ask, and
+            // throws with the device's or the passphrase's reason when either
+            // refuses. runCatching keeps that reason as the answer; a publish
+            // that then fails leaves a usable identity the screen can retry.
+            val made = runCatching {
+                com.grapsee.grapmail.data.MailE2e.generateIdentity(getApplication(), t, passphrase ?: "")
+            }
             if (made.isFailure) {
                 val why = made.exceptionOrNull()?.message ?: "This device could not create the keys."
                 _e2e.update { it.copy(busy = false, error = why) }
                 then(why)
                 return@launch
             }
-            val pair = made.getOrNull()!!
-            runCatching { Api.mailE2ePublish(t, pair.encryptionPublicKey, pair.signingPublicKey) }
+            val identity = made.getOrNull()!!
+            runCatching {
+                Api.mailE2ePublish(t, identity.encryption.publicKey, identity.signing?.publicKey)
+            }
                 .onSuccess { r ->
                     if (r.success) {
                         _e2e.update { it.copy(busy = false, keys = r.keys, read = AssignmentsRead.Read) }

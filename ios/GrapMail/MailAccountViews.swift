@@ -863,7 +863,7 @@ struct PrivacyView: View {
                         "Your messages: stored for your account only. Nobody at Grapsee " +
                             "reads message contents to build profiles, and addresses are not sold.",
                         "When you agreed to the terms: a timestamp, so the record can answer " +
-                            "\u201cdid they agree, and when?\u201d",
+                            "“did they agree, and when?”",
                     ], id: \.self) { line in
                         Text("• \(line)")
                             .font(.system(size: 13)).foregroundColor(GM.textSecondary)
@@ -983,11 +983,11 @@ struct SupportView: View {
          + "that rule."),
         ("What is an alias for?",
          "An alias delivers into the same mailbox under a second address, and can be "
-         + "chosen as the sender. Useful when you want to write as \u201cbusiness\u201d "
+         + "chosen as the sender. Useful when you want to write as “business” "
          + "without a second account."),
         ("Mail I was expecting never arrived.",
          "In order: check the sending address was spelled exactly, look in Spam and "
-         + "Trash under \u201cOthers\u201d, then check that the sender is not on the "
+         + "Trash under “Others”, then check that the sender is not on the "
          + "suppression list because they unsubscribed earlier. If the mailbox is "
          + "connected and the message is still missing, the mail server has to be "
          + "involved. That is a support matter."),

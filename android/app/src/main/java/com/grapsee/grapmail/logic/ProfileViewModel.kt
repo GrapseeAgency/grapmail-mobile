@@ -18,8 +18,11 @@ import kotlinx.coroutines.launch
 
 /**
  * The account record and its writers — the eight screens the web client splits
- * across `/mail/account/*`, `/mail/settings`, `/mail/notes` and `/mail/tasks`
- * all read and change this one document (`auth-account-profile.ts`).
+ * across its `/mail/account` pages, `/mail/settings`, `/mail/notes` and
+ * `/mail/tasks` all read and change this one document (`auth-account-profile.ts`).
+ * (Kotlin block comments NEST: a route glob spelled with a bare star would open
+ * a second comment level here and the file would end unclosed — CI learned that
+ * the hard way, so route paths in comments stay globs-free.)
  *
  * ── WHY ONE VIEW MODEL FOR EIGHT SCREENS ─────────────────────────────────────
  * The PATCH response carries the full updated profile (`:675-679`), so a save
