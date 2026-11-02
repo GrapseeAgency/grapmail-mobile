@@ -250,6 +250,46 @@ class ApiException(val status: Int, val code: String?, message: String) : Except
     val backupCodesRemaining: Int? = null,
     val passwordChangedAt: String? = null,
     val createdAt: String? = null,
+    // ── The mail-preference half of the same record ──────────────────────────
+    //
+    // `GET /auth/account/profile` answers one document that carries the person's
+    // name, their display name, their recovery targets, their photo and every
+    // mail preference the website's settings page edits
+    // (`auth-account-profile.ts:69-80`, `:175-214`). The mobile app used to read
+    // only the security fields out of it and discard the rest, which left a
+    // signature, a vacation reply and a forwarding address uneditable on mobile
+    // while being live on the web — the same record, two views of it.
+    val firstName: String? = null,
+    val lastName: String? = null,
+    val birthday: String? = null,
+    val gender: String? = null,
+    /** What a recipient sees in the From line. Empty means the server falls back
+     *  to `name`, and the field says so rather than the client guessing. */
+    val displayName: String? = null,
+    val recoveryEmail: String? = null,
+    val recoveryPhone: String? = null,
+    val domain: String? = null,
+    val fromHeader: String? = null,
+    val avatarUrl: String? = null,
+    val phoneVerified: Boolean? = null,
+    val settings: ProfileSettingsDto? = null,
+    /**
+     * The alias rows the profile carries beside the mailbox list (`:208`) — the
+     * same table `GET /grapmail/aliases` answers, delivered with the profile so
+     * the Addresses screen and the security hub cannot disagree about how many
+     * addresses an account has. Null means the read did not answer; empty means
+     * the account truly has none, which the screen says differently.
+     */
+    val aliases: List<ProfileAliasDto>? = null,
+    /**
+     * Apps that already hold a session for this account (`:213`). The web's
+     * Connections page is the reference: this list reports what already happened
+     * and cuts it off — there is no grant control here, because nothing on this
+     * screen ever granted anything.
+     */
+    val connections: List<ProfileConnectionDto>? = null,
+    /** When the person accepted the terms — the privacy screen's one hard fact. */
+    val termsAcceptedAt: String? = null,
 ) {
     /** The one verdict the hub acts on: the server's own flag when it sends
      *  one, otherwise the legacy string read as a flag, otherwise null — and
@@ -261,6 +301,147 @@ class ApiException(val status: Int, val code: String?, message: String) : Except
             else -> null
         }
 }
+
+/**
+ * One alias row as the profile carries it (`auth-account-profile.ts:146-154`).
+ * `isActive` is the server's own word for "still receives"; the Addresses screen
+ * says "paused" from it rather than re-deriving anything.
+ */
+@Serializable data class ProfileAliasDto(
+    val address: String = "",
+    val label: String = "",
+    val isActive: Boolean = true,
+    val createdAt: String? = null,
+)
+
+/**
+ * One connected app (`:213`, and the JSONL route's cleaned shape at
+ * `src/app/api/auth/account/profile/route.ts:330-345`). `product` is the display
+ * name and the key the disconnect acts on; `host` only exists for third-party
+ * apps — our own products have no domain to draw a logo from, so they render a
+ * monogram, the same rule the web applies.
+ */
+@Serializable data class ProfileConnectionDto(
+    val product: String = "",
+    val host: String? = null,
+    val scopes: List<String> = emptyList(),
+    val connectedAt: String? = null,
+)
+
+/**
+ * The settings keys a screen can write, every one optional.
+ *
+ * `PATCH /auth/account/profile` merges the sent `settings` object over the
+ * stored one (`auth-account-profile.ts:638-641`), and the sparse encoder omits
+ * nulls — so a screen that changes the signature cannot blank the notes. The
+ * vacation and forwarding keys are deliberately NOT here: nothing in the mail
+ * pipeline reads them yet (the sieve interpreter supports the actions, but no
+ * code turns these settings into sieve rules), and a switch that changes a
+ * stored value with no effect is the dead toggle this project refuses to ship.
+ */
+@Serializable data class ProfileSettingsPatch(
+    val signature: String? = null,
+    val density: String? = null,
+    val signatures: Map<String, String>? = null,
+    val blockedSenders: List<String>? = null,
+    val safeSenders: List<String>? = null,
+    val notes: List<String>? = null,
+    val tasks: List<String>? = null,
+    val locale: LocaleDto? = null,
+)
+
+/**
+ * A partial profile write. Only the keys the caller set are sent, and the
+ * server touches only the keys that arrive (`:395-441`) — which is what lets
+ * eight screens share one endpoint without eight full-record round trips.
+ */
+@Serializable data class ProfilePatch(
+    val firstName: String? = null,
+    val lastName: String? = null,
+    val birthday: String? = null,
+    val gender: String? = null,
+    val displayName: String? = null,
+    val recoveryEmail: String? = null,
+    val recoveryPhone: String? = null,
+    val settings: ProfileSettingsPatch? = null,
+    val connections: List<ProfileConnectionDto>? = null,
+)
+
+/**
+ * `settings` on the profile document — `auth-account-profile.ts:69-80`.
+ *
+ * Every field defaults to the server's own default rather than an invented one,
+ * and a null [ProfileSettingsDto] on the parent means the read did not answer:
+ * the screens then say "could not be read" instead of drawing empty strings as
+ * though the account had been asked and had nothing to say.
+ *
+ * The write is a whole-object replace per key (`:638-641` merges the sent object
+ * over the stored one, shallow), so a screen that sends `signature` alone cannot
+ * blank `vacation`. That is why the calls below send the smallest object that
+ * names only what the user changed.
+ */
+@Serializable data class ProfileSettingsDto(
+    val signature: String = "",
+    /** `comfortable` or `compact` — the list's row height, which the app applies,
+     *  not merely stores. Anything else is read back as comfortable. */
+    val density: String = "comfortable",
+    /** Per-address signatures, keyed by the full alias address (`:74`). */
+    val signatures: Map<String, String> = emptyMap(),
+    val vacation: VacationDto = VacationDto(),
+    val forwarding: ForwardingDto = ForwardingDto(),
+    val blockedSenders: List<String> = emptyList(),
+    val safeSenders: List<String> = emptyList(),
+    val notes: List<String> = emptyList(),
+    val tasks: List<String> = emptyList(),
+    val locale: LocaleDto = LocaleDto(),
+)
+
+/** `settings.vacation` — an on/off window with a message (`auth-account-profile.ts:75`). */
+@Serializable data class VacationDto(
+    val enabled: Boolean = false,
+    /** `YYYY-MM-DD` — the date the sender's own form uses, so the two agree. */
+    val from: String = "",
+    val to: String = "",
+    val message: String = "",
+)
+
+/** `settings.forwarding` — a copy of everything sent onward, with the choice of keeping it. */
+@Serializable data class ForwardingDto(
+    val enabled: Boolean = false,
+    val address: String = "",
+    val keepCopy: Boolean = true,
+)
+
+/**
+ * `settings.locale` — language, timezone and date order (`:79`).
+ *
+ * The timezone is what every timestamp on the mail screens is rendered in, and
+ * the date format is what the thread's absolute time prints, so this is not a
+ * display preference the app may ignore while claiming to show the setting.
+ */
+@Serializable data class LocaleDto(
+    val language: String = "en-US",
+    val timezone: String = "Asia/Dhaka",
+    /** `dmy`, `mdy` or `ymd`. */
+    val dateFormat: String = "dmy",
+)
+
+/**
+ * The avatar routes' answer. `avatarUrl` arrives only from the upload and
+ * carries the cache nonce the server minted — the screen keeps THAT, not the
+ * stale one it loaded, or a replaced photo shows the old bytes until relaunch
+ * (`auth-account-profile.ts:313-321`).
+ */
+@Serializable data class AvatarResponse(
+    val success: Boolean = false,
+    val avatarUrl: String? = null,
+    /** Null means the route said nothing, which is different from an empty
+     *  sentence; the screen's own words stand in, and `error` is kept because
+     *  the failure envelope carries it — 4xx throws before this decodes, but a
+     *  200-shaped refusal must stay readable rather than become a blank. */
+    val message: String? = null,
+    val error: String? = null,
+)
 
 @Serializable data class ProfileResponse(
     val success: Boolean = false,
@@ -351,6 +532,21 @@ object Api {
     val BASE: String = com.grapsee.grapmail.BuildConfig.API_BASE
 
     private val json = Json { ignoreUnknownKeys = true; coerceInputValues = true }
+
+    /**
+     * For the partial PATCH bodies only.
+     *
+     * `PATCH /auth/account/profile` writes exactly the keys that arrive
+     * (`auth-account-profile.ts:397-441`, and `:638-641` merges the `settings`
+     * object it was given over the stored one). kotlinx.serialization's default
+     * encoder emits every default value, including the `null`s that mean "this
+     * screen did not touch that field" — so on the shared [json] a save from the
+     * signature screen would send `vacation`, `forwarding`, `blockedSenders` and
+     * the rest as nulls and blank them. This encoder omits absent optionals, so
+     * a partial write is partial on the wire and not just in the type.
+     */
+    private val jsonSparse = Json(json) { encodeDefaults = false }
+
     private val JSON_MEDIA = "application/json".toMediaType()
 
     private val client: OkHttpClient = OkHttpClient.Builder()
@@ -581,6 +777,59 @@ object Api {
 
     suspend fun profile(token: String): ProfileResponse = read(authed("$BASE/auth/account/profile", token).get().build()) {
         json.decodeFromString<ProfileResponse>(it)
+    }
+
+    /**
+     * A partial profile write — the eight account-record screens' only writer.
+     *
+     * Encoded with [jsonSparse], not [json]: the default encoder emits every
+     * field including the nulls that mean "this screen did not touch that", and
+     * the server merges the sent `settings` object over the stored one — so a
+     * full-record encode from the notes screen would blank the signature, the
+     * density and the sender lists on every save. Sparse on the wire is what
+     * makes "only the keys that arrive are touched" true rather than intended.
+     */
+    suspend fun patchProfile(token: String, patch: ProfilePatch): ProfileResponse {
+        val req = authed("$BASE/auth/account/profile", token)
+            .method("PATCH", postBody(jsonSparse.encodeToString(ProfilePatch.serializer(), patch)))
+            .build()
+        return read(req) { json.decodeFromString<ProfileResponse>(it) }
+    }
+
+    /**
+     * The profile photo, as multipart — the same field name (`file`) and the
+     * same 256 KB ceiling the route enforces (`auth-account-profile.ts:256`).
+     * The answer's `avatarUrl` carries a cache nonce; storing it is what makes a
+     * replaced photo show immediately instead of after a kill and relaunch.
+     */
+    suspend fun uploadAvatar(token: String, bytes: ByteArray, filename: String, mime: String): AvatarResponse {
+        val body = MultipartBody.Builder().setType(MultipartBody.FORM)
+            .addFormDataPart("file", filename, bytes.toRequestBody(mime.toMediaType()))
+            .build()
+        return read(authed("$BASE/auth/account/avatar", token).post(body).build()) {
+            json.decodeFromString<AvatarResponse>(it)
+        }
+    }
+
+    suspend fun deleteAvatar(token: String): AvatarResponse {
+        val req = authed("$BASE/auth/account/avatar", token).delete().build()
+        return read(req) { json.decodeFromString<AvatarResponse>(it) }
+    }
+
+    /**
+     * The photo bytes. Null on 404 — "no profile photo is set" is a real answer
+     * the profile screen draws as the empty state, not as a failure; anything
+     * else throws like every other read, because a 500 must not look like no photo.
+     */
+    suspend fun avatarBytes(token: String): ByteArray? = withContext(Dispatchers.IO) {
+        val request = authed("$BASE/auth/account/avatar", token).get().build()
+        client.newCall(request).execute().use { resp ->
+            when {
+                resp.code == 404 -> null
+                resp.code >= 400 -> fail(resp.code, resp.body?.string() ?: "")
+                else -> resp.body?.bytes()
+            }
+        }
     }
 
     suspend fun enableTwoFactor(token: String, proof: String?, phoneProof: String?): ProfileResponse {
@@ -838,6 +1087,99 @@ object Api {
 
     suspend fun mailAliases(token: String): MailAliasesResponse =
         read(authed("$MAIL/aliases", token).get().build()) { json.decodeFromString(it) }
+
+    /**
+     * `POST /aliases` — mint a second address that delivers here
+     * (`grapmail-aliases.ts:155-275`).
+     *
+     * Only a label is sent. The server composes `label.handle@domain`, checks it
+     * against every existing alias AND every active primary mailbox, and holds a
+     * row lock while it counts the account's aliases against its ceiling — so a
+     * client that tried to name the whole address could not use one, and a client
+     * that raced itself could not exceed the limit. The refusal words (`duplicate`
+     * / `taken` / `limit`) and the throttle's 429 come back as `error`, and the
+     * screen prints the server's own `message` when it succeeds.
+     */
+    suspend fun mailCreateAlias(token: String, label: String): MailAliasCreateResponse {
+        val req = authed("$MAIL/aliases", token)
+            .post(postBody(json.encodeToString(MailAliasLabelRequest.serializer(), MailAliasLabelRequest(label))))
+            .build()
+        return read(req) { json.decodeFromString(it) }
+    }
+
+    /**
+     * `DELETE /aliases/:address` — stop receiving on one alias
+     * (`grapmail-aliases.ts:277-300`). The address is a path segment, encoded,
+     * and the server decodes it back and lower-cases it before the delete.
+     */
+    suspend fun mailDeleteAlias(token: String, address: String): MailAliasDeleteResponse {
+        val req = authed("$MAIL/aliases/${enc(address)}", token).delete().build()
+        return read(req) { json.decodeFromString(it) }
+    }
+
+    /**
+     * `DELETE /attachments/:id` — drop a stored upload
+     * (`grapmail-attachments.ts:412`). The route scopes the delete to the
+     * caller's own rows, so this can only ever be one of the account's files.
+     */
+    suspend fun mailDeleteAttachment(token: String, id: String): MailAttachmentDeleteResponse {
+        val req = authed("$MAIL/attachments/${enc(id)}", token).delete().build()
+        return read(req) { json.decodeFromString(it) }
+    }
+
+    // ── End-to-end encryption ────────────────────────────────────────────────
+    //
+    // `GET/PUT/DELETE /e2e/keys` read, publish and unpublish this account's
+    // PUBLIC keys; `POST /e2e/plan` asks whether a message to a recipient list
+    // can be sealed; `POST /e2e/lookup` returns a sender's published signing key
+    // so an inbound signature can be checked. See the block comment on the
+    // matching DTOs in MailDto.kt for the mounts, the shape, and why the
+    // addresses ride in bodies rather than URLs.
+    //
+    // No call here can carry a private key: the directory refuses one
+    // (`mail-service/src/routes/e2e.ts:209`), and the request types have no
+    // field for one either.
+
+    suspend fun mailE2eKeys(token: String): MailE2eKeysResponse =
+        read(authed("$MAIL/e2e/keys", token).get().build()) { json.decodeFromString(it) }
+
+    suspend fun mailE2ePublish(
+        token: String, encryptionPublicKey: String, signingPublicKey: String?,
+    ): MailE2ePublishResponse {
+        val req = authed("$MAIL/e2e/keys", token)
+            .method("PUT", postBody(jsonSparse.encodeToString(
+                MailE2ePublishRequest.serializer(),
+                MailE2ePublishRequest(encryptionPublicKey, signingPublicKey))))
+            .build()
+        return read(req) { json.decodeFromString(it) }
+    }
+
+    suspend fun mailE2eUnpublish(token: String): MailE2eUnpublishResponse {
+        val req = authed("$MAIL/e2e/keys", token).delete().build()
+        return read(req) { json.decodeFromString(it) }
+    }
+
+    /**
+     * Can a message to these addresses be encrypted? A failure here is thrown and
+     * the caller must NOT read it as "send it unencrypted": the difference between
+     * "the server said this cannot be sealed" and "we could not ask" is the
+     * difference between a choice and an accident (`mailE2eApi.ts:133-139`).
+     */
+    suspend fun mailE2ePlan(token: String, addresses: List<String>): MailE2ePlanResponse {
+        val req = authed("$MAIL/e2e/plan", token)
+            .post(postBody(json.encodeToString(
+                MailE2eAddressesRequest.serializer(), MailE2eAddressesRequest(addresses))))
+            .build()
+        return read(req) { json.decodeFromString(it) }
+    }
+
+    suspend fun mailE2eLookup(token: String, addresses: List<String>): MailE2eLookupResponse {
+        val req = authed("$MAIL/e2e/lookup", token)
+            .post(postBody(json.encodeToString(
+                MailE2eAddressesRequest.serializer(), MailE2eAddressesRequest(addresses))))
+            .build()
+        return read(req) { json.decodeFromString(it) }
+    }
 
     /**
      * `GET /attachments/:id` — the bytes, not JSON.

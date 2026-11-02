@@ -17,7 +17,9 @@ import SwiftUI
 /// that the intended screen was on screen — eleven screenshots in the previous
 /// sector were taken of a different view layered over the stub.
 enum MailSnapshot {
-    static func requested(_ name: String) -> Bool { name.hasPrefix("mail-") }
+    static func requested(_ name: String) -> Bool {
+        name.hasPrefix("mail-") || name.hasPrefix("account-")
+    }
 }
 
 struct MailSnapshotView: View {
@@ -39,9 +41,19 @@ struct MailSnapshotView: View {
     /// derived screens gate on that flag for the same reason.
     @State private var model: MailboxModel
 
+    /// The account record the eight Phase-1 screens read, seeded the same way
+    /// as the mailbox model: the host owns the document for these frames, and
+    /// the model's snapshot guard keeps its own boot read from overwriting it
+    /// with the CI account's real (empty) notes list — the race the mailbox
+    /// seeds already guard against.
+    @State private var profile: ProfileModel
+
     init(name: String) {
         self.name = name
         _model = State(initialValue: MailSnapshotView.seededModel(name))
+        let pm = ProfileModel()
+        pm.seedForSnapshot(MailSnapshotView.sampleProfile())
+        _profile = State(initialValue: pm)
     }
 
     private static func seededModel(_ name: String) -> MailboxModel {
@@ -105,6 +117,56 @@ struct MailSnapshotView: View {
 
     fileprivate static func attachmentBody() -> MailMessageFull {
         Self.full("m1", body: "Attached is the invoice for the quarter, payable on receipt.")
+    }
+
+    /// The account record the eight Phase-1 frames are photographed with.
+    /// Invented, like every seed in this file — it never appears in a live
+    /// path — but built by DECODING the JSON `GET /auth/account/profile`
+    /// answers (`auth-account-profile.ts:175-214`), so the snapshot exercises
+    /// the real decoder rather than a parallel object graph. The alias rows
+    /// carry the table's own fields; the connection list mixes a first-party
+    /// product (no host, so it draws a monogram) with a third-party app (a
+    /// host, so it draws its domain); and every settled marker the walk waits
+    /// for — the birthday, the note, the task, the signature, the alias
+    /// address, the product name, the created date — exists only once this
+    /// document has landed.
+    fileprivate static func sampleProfile() -> ProfileDto {
+        let json = """
+        {"id":"p1","name":"Amira Rahman","firstName":"Amira","lastName":"Rahman",
+         "birthday":"1993-04-12","gender":"Female",
+         "address":"amira@grapmail.com","handle":"amira","domain":"grapmail.com",
+         "phone":"+8801711223344","phoneVerified":true,"twoFactor":"sms",
+         "twoFactorEnabled":true,"backupCodesRemaining":7,
+         "displayName":"Amira Rahman","recoveryEmail":"amira@northwind.example",
+         "fromHeader":"Amira Rahman <amira@grapmail.com>",
+         "createdAt":"2026-03-14T04:30:00.000Z",
+         "passwordChangedAt":"2026-06-02T11:00:00.000Z",
+         "termsAcceptedAt":"2026-03-14T04:31:10.000Z",
+         "settings":{"signature":"Sent with GrapMail","density":"comfortable",
+           "notes":["Send the Q3 numbers before Friday"],
+           "tasks":["Book the studio visit"],
+           "signatures":{"business@grapmail.com":"Northwind Studio"},
+           "blockedSenders":["deals@spamyard.example"],
+           "safeSenders":["hello@northwind.example"]},
+         "aliases":[{"address":"business@grapmail.com","label":"Business",
+                     "isActive":true,"createdAt":"2026-04-02T10:00:00.000Z"},
+                    {"address":"old@grapmail.com","label":"Old",
+                     "isActive":false,"createdAt":"2026-03-20T09:00:00.000Z"}],
+         "connections":[{"product":"Grapsee Projects","scopes":["profile","projects"],
+                         "connectedAt":"2026-07-01T08:00:00.000Z"},
+                        {"product":"Northwind SSO","host":"sso.northwind.example",
+                         "scopes":["profile"],"connectedAt":"2026-07-19T15:20:00.000Z"}]}
+        """
+        // A snapshot that decoded nothing would photograph the empty branches
+        // of eight screens and call them populated, so a seed that fails to
+        // decode — because the shape drifted from the route — stops the build
+        // here instead of shipping eight lies.
+        guard let seeded = try? JSONDecoder().decode(ProfileDto.self,
+                                                    from: Data(json.utf8)) else {
+            preconditionFailure("sampleProfile did not decode: the seed drifted "
+                              + "from the profile route's answer")
+        }
+        return seeded
     }
 
     /// The label colours are the server's palette KEYS, not hex values: a hex is
@@ -321,8 +383,34 @@ struct MailSnapshotView: View {
                 return AnyView(
                 secondary(MailSettingsView(vm: model, onBack: {},
                                            onSecurity: {}, onScreener: {}, onLabels: {},
+                                           onNotes: {}, onTasks: {}, onPrefs: {},
+                                           onAddresses: {}, onConnections: {},
+                                           onProfile: {}, onPrivacy: {},
                                            onHelp: {}, onSignOut: {}))
                 )
+            // The eight account-record frames. One document seeds them all;
+            // each frame's settled marker is a value that exists only once
+            // that document has landed (the walk waits for it).
+            case "mail-notes":
+                return AnyView(secondary(NotesView(vm: profile, onBack: {})))
+            case "mail-tasks":
+                return AnyView(secondary(TasksView(vm: profile, onBack: {})))
+            case "mail-settings-prefs":
+                return AnyView(secondary(MailPrefsView(vm: profile, onBack: {})))
+            case "mail-addresses":
+                return AnyView(secondary(AddressesView(vm: profile, onBack: {})))
+            case "account-connections":
+                return AnyView(secondary(ConnectionsView(vm: profile, onBack: {})))
+            case "account-profile":
+                return AnyView(secondary(ProfileEditView(vm: profile, onBack: {})))
+            case "account-privacy":
+                return AnyView(secondary(PrivacyView(vm: profile, onBack: {},
+                                                     onProfile: {}, onPhone: {},
+                                                     onAddresses: {}, onPrefs: {},
+                                                     onSupport: {})))
+            case "mail-support":
+                return AnyView(secondary(SupportView(onBack: {}, onForgot: {},
+                                                     onPhone: {}, onAddresses: {})))
             case "mail-screener":
                 return AnyView(
                 secondary(ScreenerView(vm: model, onBack: {}, onOpenQueue: {}))

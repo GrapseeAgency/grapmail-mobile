@@ -1104,6 +1104,58 @@ final class MailboxModel: ObservableObject {
 
     // ── aliases ──────────────────────────────────────────────────────────────
 
+    /// The addresses this mailbox also receives as, WITH the state of the read
+    /// that produced them — the mirror of Android's `AliasesState`. The
+    /// settings rows must not claim "no aliases on this mailbox" while the
+    /// read is outstanding or after it died: "nobody answered" and "there are
+    /// none" are different sentences, and only the second one is the server's.
+    struct AliasesState {
+        var read: AssignmentsRead = .notRead
+        var list: [MailAlias] = []
+        var error: String?
+    }
+
+    @Published var aliasesState = AliasesState()
+
+    func loadAliases(force: Bool = false) {
+        switch aliasesState.read {
+        case .reading: return
+        case .read: if !force { return }
+        default: break
+        }
+        guard let token else {
+            aliasesState.read = .failed
+            aliasesState.error = "Sign in again."
+            return
+        }
+        aliasesState.read = .reading
+        Task {
+            if let cached = await MailStore.shared.aliases() {
+                aliasesState.read = .read
+                aliasesState.list = cached
+                return
+            }
+            do {
+                let r = try await ApiClient.mailAliases(token)
+                await MailStore.shared.putAliases(r.aliases)
+                aliasesState.read = .read
+                aliasesState.list = r.aliases
+                aliasesState.error = nil
+            } catch {
+                // A failed read over a cache is still the cache's answer; a
+                // failed read with nothing held is `failed`, and the screen
+                // says so rather than showing an invented empty list.
+                if let cached = await MailStore.shared.aliases() {
+                    aliasesState.read = .read
+                    aliasesState.list = cached
+                } else {
+                    aliasesState.read = .failed
+                }
+                aliasesState.error = Self.describe(error)
+            }
+        }
+    }
+
     /// The addresses this mailbox also receives as. This is what the reference's
     /// account chip can honestly show: one signed-in account and its aliases, not
     /// a switcher between accounts the app cannot hold — `SessionStore` stores

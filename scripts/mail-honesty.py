@@ -981,9 +981,14 @@ arms_sw = len(re.findall(r'^\s+(?:case "[a-z0-9-]+"|default):', frame_sw, re.M))
 pin("iOS's snapshot switch returns exactly once per arm", arms_sw > 0 and
     arms_sw == len(re.findall(r"return AnyView\(", frame_sw)))
 for side, host, launched in (("Android", host_kt, launch_kt), ("iOS", host_sw, launch_sw)):
-    dead = {n for n in host if n.startswith("mail-")} - launched
+    # `account-` joined `mail-` with the Phase-1 band: three of the eight new
+    # host names are launched as `account-*` snapshot frames, and a name-set
+    # check that only watches `mail-*` would let a dead or ghost account screen
+    # through on either side — the exact hole this section was written for.
+    band = ("mail-", "account-")
+    dead = {n for n in host if n.startswith(band)} - launched
     pin(f"{side}'s host defines no mail screen its walk never photographs", not dead)
-    ghost = {n for n in launched if n.startswith("mail-")} - host
+    ghost = {n for n in launched if n.startswith(band)} - host
     pin(f"{side}'s walk asks for no mail screen its host cannot draw", not ghost)
 
 # The dark frames must carry both proofs, and the home's was the missing one:
@@ -1264,6 +1269,141 @@ for kt in sorted(ANDROID.rglob("*.kt")):
         pin(f"Android's {kt.name} ViewModel{'' if not has_default else ' with a default param'} "
             f"emits the Java constructor a factory can call",
             (not has_default) or "@JvmOverloads" in header)
+
+# -- 25. the account-record band -- eight screens, one document, nothing fake ----
+#
+# Phase 1 put the web client's `/mail/notes`, `/mail/tasks`, `/mail/settings`
+# and `/mail/account/{profile,privacy,addresses,connections,support}` on both
+# phones. Every screen reads the one `GET /auth/account/profile` document
+# (`auth-account-profile.ts:175-214`), and the sector's whole defect history
+# says the danger is not the missing field but the invented one: a control the
+# server cannot honour, a default that reads as an answer, a delete button in
+# front of an endpoint that does not exist. Each pin below can fail: rename a
+# screen on one side, add a vacation switch, swap "could not be read" for an
+# empty string, and the run goes red naming the file.
+KT_ACCT = android("ui/screens/mail/MailAccountScreens.kt")
+SW_ACCT = ios("MailAccountViews.swift")
+KT_PVM = android("logic/ProfileViewModel.kt")
+SW_PVM = ios("ProfileModel.swift")
+KT_MAIN = android("MainActivity.kt")
+SW_ROOT = ios("RootView.swift")
+SW_APIC = ios("APIClient.swift")
+
+# The eight screens, by the names each platform spells, both sides or neither.
+for kt_name, sw_name in (("NotesScreen", "NotesView"), ("TasksScreen", "TasksView"),
+                         ("MailPrefsScreen", "MailPrefsView"),
+                         ("AddressesScreen", "AddressesView"),
+                         ("ConnectionsScreen", "ConnectionsView"),
+                         ("ProfileEditScreen", "ProfileEditView"),
+                         ("PrivacyScreen", "PrivacyView"),
+                         ("SupportScreen", "SupportView")):
+    pin(f"Android ships its {kt_name}", f"fun {kt_name}(" in KT_ACCT)
+    pin(f"iOS ships its {sw_name}", f"struct {sw_name}: View" in SW_ACCT)
+
+# One model per platform holds the document; the nav hosts one instance for all
+# eight screens (eight copies of one record is eight chances to disagree).
+pin("Android's nav holds exactly one ProfileViewModel",
+    "ProfileViewModel = viewModel()" in KT_MAIN)
+pin("iOS's nav holds exactly one ProfileModel",
+    "@StateObject private var account = ProfileModel()" in SW_ROOT)
+for side, src, guard_word in (("Android", KT_PVM, "snapshotMode"), ("iOS", SW_PVM, "snapshotSeeded")):
+    pin(f"{side}'s profile model keeps the snapshot seed out of the boot-read race",
+        guard_word in src)
+
+# NO DEAD TOGGLES: the profile stores vacation/forwarding and the sieve
+# interpreter supports the actions, but no code turns a setting into a rule,
+# so neither the write type nor any screen may carry the switch. The web page
+# promises "only settings that do something"; a mobile toggle writing what no
+# pipeline reads would break that promise quietly, from a Settings screen.
+kt_api_c, sw_apic_c = code_only(KT_API), code_only(SW_APIC)
+kt_patch_seg = kt_api_c[kt_api_c.find("class ProfileSettingsPatch"):
+                        kt_api_c.find("class ProfilePatch")]
+sw_patch_seg = sw_apic_c[sw_apic_c.find("struct ProfileSettingsPatch"):
+                          sw_apic_c.find("struct ProfileDto")]
+pin("Android's settings patch has no vacation or forwarding key",
+    "vacation" not in kt_patch_seg.lower() and "forwarding" not in kt_patch_seg.lower())
+pin("iOS's settings patch has no vacation or forwarding key",
+    "vacation" not in sw_patch_seg.lower() and "forwarding" not in sw_patch_seg.lower())
+pin("neither platform's account screens edit vacation or forwarding",
+    not re.search(r"VacationDto\(|ForwardingDto\(|VacationInfo\(|ForwardingInfo\(",
+                  code_only(KT_ACCT) + code_only(SW_ACCT)))
+
+# The settings surface edits ONLY fields with a verified enforcement point:
+# the signature the compose appends, the density the list draws, the locale
+# every timestamp renders in, and the two sender lists the screener reads.
+pin("the prefs screen's writes name exactly the five enforced keys",
+    {m.group(1) for m in re.finditer(r"ProfileSettingsPatch\(\s*([A-Za-z]+) =",
+                                      code_only(KT_ACCT))} ==
+    {"signature", "density", "locale", "safeSenders", "blockedSenders", "notes", "tasks"}
+    and len({m.group(1) for m in re.finditer(
+        r"ProfileSettingsPatch\(\s*([A-Za-z]+) =", code_only(KT_ACCT))}) >= 5)
+
+# UNKNOWN IS NOT EMPTY, on the account record too: a null profile is "could not
+# be read", never a blank name; a null alias list is never "No aliases yet".
+pin("Android's addresses screen says unreadable and empty differently",
+    "Aliases could not be read." in KT_ACCT and "No aliases yet." in KT_ACCT
+    and "aliases != null && aliases.isEmpty()" in code_only(KT_ACCT))
+pin("iOS's addresses screen says unreadable and empty differently",
+    "Aliases could not be read." in SW_ACCT and "No aliases yet." in SW_ACCT)
+pin("the privacy screen refuses to invent an unread created date",
+    "Could not be read" in KT_ACCT and "Could not be read" in SW_ACCT)
+
+# DELETE-ACCOUNT: no endpoint exists on either store, so the page must say the
+# truth in the web's own words and route to a person -- and no client may call
+# a delete-account route that does not exist.
+pin("both privacy pages state that self-serve deletion is not built",
+    "that path is not built" in KT_ACCT and "that path is not built" in SW_ACCT)
+pin("no client calls a delete-account route that does not exist",
+    not re.search(r"account/delete|deleteAccount", KT_API + SW_APIC))
+
+# The PATCH is the whole write path, and "only the keys that arrive are
+# touched" is only true if the ENCODER omits what the caller did not set:
+# Android through jsonSparse, iOS through dictionaries that drop nils.
+pin("Android's profile PATCH encodes sparsely",
+    "jsonSparse.encodeToString(ProfilePatch.serializer()" in kt_api_c)
+pin("iOS's profile PATCH builds bodies that drop untouched keys",
+    "if let value { body[key] = value }" in sw_apic_c)
+
+# The avatar routes: the server's answer carries the cache-nonce URL a replaced
+# photo needs to show NOW, and both platforms keep it instead of the stale one.
+pin("Android adopts the upload's nonce-bearing avatar URL",
+    re.search(r"profile = it\.profile\?\.copy\(avatarUrl = resp\.avatarUrl", code_only(KT_PVM)) is not None)
+pin("iOS adopts the upload's nonce-bearing avatar URL",
+    re.search(r"state\.profile\?\.avatarUrl = url", code_only(SW_PVM)) is not None)
+# And the 256 KB ceiling is the route's (`auth-account-profile.ts:256`); the
+# screen quotes it before uploading, so a refusal is the person's words first.
+pin("both photo pickers honour the server's ceiling before uploading",
+    "256 * 1024" in code_only(KT_ACCT) and "256 * 1024" in code_only(SW_ACCT))
+
+# The eight frames must photograph CONTENT, not chrome: every seeded value the
+# walks wait on lives in both hosts' `sampleProfile` -- the two platforms
+# photograph the same record. (Android's `mail-support` waits on the FAQ copy,
+# which is identical on both sides and is checked as screen text above.)
+for seeded in ("Send the Q3 numbers before Friday", "Book the studio visit",
+               "Sent with GrapMail", "business@grapmail.com", "Northwind SSO",
+               "1993-04-12", "2026-03-14", "deals@spamyard.example",
+               "hello@northwind.example"):
+    pin(f"the seed value {seeded!r} exists in both hosts' account records",
+        seeded in KT_HOST and seeded in SW_HOST)
+pin("Android waits on seeded content for the account band",
+    all(f'settled="{m}"' in KT_WALK for m in
+        ("1993-04-12", "Send the Q3 numbers before Friday", "Book the studio visit",
+         "Northwind SSO", "Sent with GrapMail", "business@grapmail.com", "2026-03-14")))
+pin("iOS waits on seeded content for the account band",
+    all(f'"{m}"' in SW_WALK for m in
+        ("Send the Q3 numbers before Friday", "Book the studio visit",
+         "Northwind SSO", "business@grapmail.com", "2026-03-14")))
+# The iOS seed is a JSON literal run through the REAL decoder -- if the shape
+# drifts from the route, the photograph stops with a name instead of shipping
+# eight empty screens. Android builds the same record typed, so its drift
+# defence is the parity diff's profile section, not this file.
+pin("iOS's account seed decodes through the live decoder and fails loudly",
+    "preconditionFailure" in SW_HOST and "sampleProfile" in SW_HOST)
+
+# The scope words are the web's SHARED map (`connections/page.tsx`), copied to
+# both phones so one scope has one phrase on three clients.
+pin("both clients copy the web's scope words",
+    "name, address and photo" in KT_ACCT and "name, address and photo" in SW_ACCT)
 
 print()
 if failures:

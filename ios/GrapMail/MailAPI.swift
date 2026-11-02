@@ -316,9 +316,20 @@ struct MailStatsResponse: Decodable {
     var drafts: Int?
     var spam: Int?
     var trash: Int?
+    /// Counted by the same `boxCount` that builds the listing beside each badge
+    /// (`grapmail.ts:666-688`). Null on a deployment that has not answered
+    /// yet — and the drawer reads that null as "not offered here", never as 0.
+    var starred: Int?
+    var archive: Int?
+    /// `?box=others` — everything still in the account (`grapmail-box-terms.ts:78`).
+    var others: Int?
+    /// The count of `?box=snoozed`. Null is read as two different things by
+    /// the drawer, and both are true of a null: nobody was asked, or this
+    /// deployment has no snoozed list. Neither licenses a `0`.
+    var snoozed: Int?
 
     private enum CodingKeys: String, CodingKey {
-        case success, inbox, sent, drafts, spam, trash
+        case success, inbox, sent, drafts, spam, trash, starred, archive, others, snoozed
     }
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -328,6 +339,10 @@ struct MailStatsResponse: Decodable {
         drafts = c.lenientOpt(.drafts)
         spam = c.lenientOpt(.spam)
         trash = c.lenientOpt(.trash)
+        starred = c.lenientOpt(.starred)
+        archive = c.lenientOpt(.archive)
+        others = c.lenientOpt(.others)
+        snoozed = c.lenientOpt(.snoozed)
     }
 }
 
@@ -460,22 +475,32 @@ enum AssignmentsRead {
 /// `GET /aliases` — a second address delivering into this mailbox. This, not a
 /// fake multi-account switcher, is what the reference's account chip can
 /// honestly show.
+///
+/// `id` and `isActive` used to live here with defaults, and both were lies with
+/// consequences: `GET /aliases` answers three columns — label, address,
+/// createdAt (`grapmail-aliases.ts:131-152`) — so a cached list that defaulted
+/// `isActive` to true drew a mailbox whose aliases were all asserted live (and
+/// the "paused" tag could therefore never appear), and every row carried the
+/// same empty `id`, which is a duplicate identity in a list keyed by one.
+/// `address` is the identity here: the DELETE route takes an address, not an id
+/// (`:277`). Paused state comes from the profile's alias rows, where the
+/// account store really does answer `isActive`.
 struct MailAlias: Decodable, Identifiable {
-    var id = ""
     var label = ""
     var address = ""
-    var isActive = true
     var createdAt: String?
+    var id: String { address }
 
-    private enum CodingKeys: String, CodingKey { case id, label, address, isActive, createdAt }
+    private enum CodingKeys: String, CodingKey { case label, address, createdAt }
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
-        id = c.lenient(.id, "")
         label = c.lenient(.label, "")
         address = c.lenient(.address, "")
-        isActive = c.lenient(.isActive, true)
         createdAt = c.lenientOpt(.createdAt)
     }
+    /// A blank row for the same reason `MailMessage.init()` exists: a
+    /// hand-decoded type has no memberwise init, and callers need one.
+    init() {}
 }
 
 struct MailAliasesResponse: Decodable {
@@ -488,6 +513,308 @@ struct MailAliasesResponse: Decodable {
         success = c.lenient(.success, false)
         aliases = c.lenient(.aliases, [])
     }
+}
+
+/// The body of `POST /grapmail/aliases` — one field, `label`
+/// (`grapmail-aliases.ts:169` reads `body?.label`, slugifies it, and builds the
+/// address at `:188`). There is deliberately no address field to fill in: the
+/// server owns the domain and the handle, so this client cannot name the
+/// mailbox an alias is created in.
+struct MailAliasLabelRequest: Encodable { var label: String }
+
+/// `POST /grapmail/aliases` — `grapmail-aliases.ts:155-275`. The three
+/// refusals — duplicate, taken, limit — come back as `success: false` with a
+/// sentence, and a 429 with `retryAfter` when the throttle trips.
+struct MailAliasCreateResponse: Decodable {
+    var success = false
+    var alias: MailAlias?
+    var message: String?
+    var error: String?
+    var code: String?
+    var retryAfter: Int?
+
+    private enum CodingKeys: String, CodingKey {
+        case success, alias, message, error, code, retryAfter
+    }
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        success = c.lenient(.success, false)
+        alias = c.lenientOpt(.alias)
+        message = c.lenientOpt(.message)
+        error = c.lenientOpt(.error)
+        code = c.lenientOpt(.code)
+        retryAfter = c.lenientOpt(.retryAfter)
+    }
+}
+
+/// `DELETE /grapmail/aliases/:address` — `grapmail-aliases.ts:277-300`. A row
+/// that was not the caller's is answered 404 "No such alias" rather than 403,
+/// so this cannot be used to learn whether somebody else owns an address.
+struct MailAliasDeleteResponse: Decodable {
+    var success = false
+    var address: String?
+    var error: String?
+    /// The gateway route answers one; the JSONL route may. Optional because
+    /// an absent sentence is no answer, and the screen falls back to its own.
+    var message: String?
+    var retryAfter: Int?
+
+    private enum CodingKeys: String, CodingKey { case success, address, error, message, retryAfter }
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        success = c.lenient(.success, false)
+        address = c.lenientOpt(.address)
+        error = c.lenientOpt(.error)
+        message = c.lenientOpt(.message)
+        retryAfter = c.lenientOpt(.retryAfter)
+    }
+}
+
+/// `DELETE /grapmail/attachments/:id` — `grapmail-attachments.ts:412`. The
+/// route is scoped to the caller's own rows, so an attachment id belonging to
+/// another account is refused the same way as one that does not exist.
+struct MailAttachmentDeleteResponse: Decodable {
+    var success = false
+    var id: String?
+    var error: String?
+    var code: String?
+
+    private enum CodingKeys: String, CodingKey { case success, id, error, code }
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        success = c.lenient(.success, false)
+        id = c.lenientOpt(.id)
+        error = c.lenientOpt(.error)
+        code = c.lenientOpt(.code)
+    }
+}
+
+// ── End-to-end encryption: wire types ──────────────────────────────────────────
+//
+// Field names are copied from the route answers, not invented: one published
+// key carries the base64 SPKI DER plus the identifiers the SERVER derived from
+// it, and a client that re-derived a fingerprint by its own rules would compare
+// unequal to the one the web shows for the same key.
+
+/// One published key, with the identifiers the server derives from it.
+struct MailE2eKey: Decodable {
+    /// base64 SPKI DER — X25519 for encryption, Ed25519 for signing.
+    var publicKey = ""
+    /// SHA-256 over the DER, uppercase hex, colon-separated.
+    var fingerprint = ""
+    /// The low-order 64 bits of the fingerprint, for list views and logs.
+    var keyId = ""
+
+    private enum CodingKeys: String, CodingKey { case publicKey, fingerprint, keyId }
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        publicKey = c.lenient(.publicKey, "")
+        fingerprint = c.lenient(.fingerprint, "")
+        keyId = c.lenient(.keyId, "")
+    }
+    init() {}
+}
+
+struct MailE2eKeys: Decodable {
+    var userId = ""
+    var encryption: MailE2eKey?
+    var signing: MailE2eKey?
+    var publishedAt: String?
+    var updatedAt: String?
+
+    private enum CodingKeys: String, CodingKey {
+        case userId, encryption, signing, publishedAt, updatedAt
+    }
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        userId = c.lenient(.userId, "")
+        encryption = c.lenientOpt(.encryption)
+        signing = c.lenientOpt(.signing)
+        publishedAt = c.lenientOpt(.publishedAt)
+        updatedAt = c.lenientOpt(.updatedAt)
+    }
+}
+
+struct MailE2eKeysResponse: Decodable {
+    var success = false
+    var published = false
+    var keys: MailE2eKeys?
+    var error: String?
+    var code: String?
+    var detail: String?
+
+    private enum CodingKeys: String, CodingKey {
+        case success, published, keys, error, code, detail
+    }
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        success = c.lenient(.success, false)
+        published = c.lenient(.published, false)
+        keys = c.lenientOpt(.keys)
+        error = c.lenientOpt(.error)
+        code = c.lenientOpt(.code)
+        detail = c.lenientOpt(.detail)
+    }
+}
+
+/// `PUT /e2e/keys`. `discoverable` is part of the answer and not a flourish:
+/// "your key is published" and "your key is published and senders can find it"
+/// are different sentences, and an account whose handle could not be resolved
+/// gets the first without the second.
+struct MailE2ePublishResponse: Decodable {
+    var success = false
+    var keys: MailE2eKeys?
+    var discoverable = false
+    var error: String?
+    var detail: String?
+
+    private enum CodingKeys: String, CodingKey {
+        case success, keys, discoverable, error, detail
+    }
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        success = c.lenient(.success, false)
+        keys = c.lenientOpt(.keys)
+        discoverable = c.lenient(.discoverable, false)
+        error = c.lenientOpt(.error)
+        detail = c.lenientOpt(.detail)
+    }
+}
+
+struct MailE2eUnpublishResponse: Decodable {
+    var success = false
+    var removed = false
+    var error: String?
+    var detail: String?
+
+    private enum CodingKeys: String, CodingKey { case success, removed, error, detail }
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        success = c.lenient(.success, false)
+        removed = c.lenient(.removed, false)
+        error = c.lenientOpt(.error)
+        detail = c.lenientOpt(.detail)
+    }
+}
+
+/// Why one address could not be sealed to. A closed set, mirroring the
+/// server's (`mailE2eApi.ts:50-54`), because the sentence a user needs differs
+/// per reason — and anything this build does not know lands on `unknown` and is
+/// said plainly rather than drawn as the wrong sentence.
+enum MailE2eBlockReason: String {
+    case notAnAddress = "not-an-address"
+    case remoteDomain = "remote-domain"
+    case noSuchAccount = "no-such-account"
+    case noKeyPublished = "no-key-published"
+    case unknown
+}
+
+/// Read through the closed set, never by trusting `reason` as a string the UI
+/// branches on directly.
+func mailE2eBlockReason(_ reason: String?) -> MailE2eBlockReason {
+    MailE2eBlockReason(rawValue: reason ?? "") ?? .unknown
+}
+
+struct MailE2eBlocked: Decodable {
+    var status = "unavailable"
+    var address = ""
+    var reason: String?
+    var domain = ""
+    var why: MailE2eBlockReason { mailE2eBlockReason(reason) }
+
+    private enum CodingKeys: String, CodingKey { case status, address, reason, domain }
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        status = c.lenient(.status, "unavailable")
+        address = c.lenient(.address, "")
+        reason = c.lenientOpt(.reason)
+        domain = c.lenient(.domain, "")
+    }
+}
+
+/// `POST /e2e/plan` — `grapmail-e2e.ts:194-229`.
+struct MailE2ePlan: Decodable {
+    /// `seal` or `plain`.
+    var mode = ""
+    var keys: [String] = []
+    var recipients: [String] = []
+    var blocked: [MailE2eBlocked] = []
+    var canSeal: Bool { mode == "seal" }
+
+    private enum CodingKeys: String, CodingKey { case mode, keys, recipients, blocked }
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        mode = c.lenient(.mode, "")
+        keys = c.lenient(.keys, [])
+        recipients = c.lenient(.recipients, [])
+        blocked = c.lenient(.blocked, [])
+    }
+}
+
+struct MailE2ePlanResponse: Decodable {
+    var success = false
+    var plan: MailE2ePlan?
+    var error: String?
+    var detail: String?
+
+    private enum CodingKeys: String, CodingKey { case success, plan, error, detail }
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        success = c.lenient(.success, false)
+        plan = c.lenientOpt(.plan)
+        error = c.lenientOpt(.error)
+        detail = c.lenientOpt(.detail)
+    }
+}
+
+/// One answer from `POST /e2e/lookup` — the sender's signing key, or why none.
+struct MailE2eLookupEntry: Decodable {
+    /// `found` or `unavailable`.
+    var status = ""
+    var address = ""
+    var signing: MailE2eKey?
+    var reason: String?
+    var domain = ""
+    var why: MailE2eBlockReason { mailE2eBlockReason(reason) }
+
+    private enum CodingKeys: String, CodingKey {
+        case status, address, signing, reason, domain
+    }
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        status = c.lenient(.status, "")
+        address = c.lenient(.address, "")
+        signing = c.lenientOpt(.signing)
+        reason = c.lenientOpt(.reason)
+        domain = c.lenient(.domain, "")
+    }
+}
+
+struct MailE2eLookupResponse: Decodable {
+    var success = false
+    var results: [MailE2eLookupEntry] = []
+    var error: String?
+    var detail: String?
+
+    private enum CodingKeys: String, CodingKey { case success, results, error, detail }
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        success = c.lenient(.success, false)
+        results = c.lenient(.results, [])
+        error = c.lenientOpt(.error)
+        detail = c.lenientOpt(.detail)
+    }
+}
+
+/// `PUT /e2e/keys` body. Only the public halves — see the block comment above.
+struct MailE2ePublishRequest: Encodable {
+    var encryptionPublicKey: String
+    var signingPublicKey: String?
+}
+
+/// `POST /e2e/plan` and `POST /e2e/lookup` bodies.
+struct MailE2eAddressesRequest: Encodable {
+    var addresses: [String]
 }
 
 /// `POST /send` — `grapmail.ts:1136-1143`.
@@ -952,6 +1279,92 @@ extension ApiClient {
 
     static func mailAliases(_ token: String) async throws -> MailAliasesResponse {
         try await mailGet("/aliases", bearer: token)
+    }
+
+    /// `POST /aliases` — only a label goes over the wire; the server composes
+    /// the address from the account's own handle and domain
+    /// (`grapmail-aliases.ts:169,188`). The caller re-reads the alias list
+    /// after, because the address the app would build and the address the
+    /// route built are two chances to disagree.
+    static func mailCreateAlias(
+        _ token: String, label: String,
+    ) async throws -> MailAliasCreateResponse {
+        try await request("\(mailBase)/aliases", method: "POST",
+                          body: try encoder.encode(MailAliasLabelRequest(label: label)),
+                          bearer: token)
+    }
+
+    /// `DELETE /aliases/:address` — the route keys the row by address, not id,
+    /// because `GET /aliases` answers no id at all.
+    static func mailDeleteAlias(
+        _ token: String, address: String,
+    ) async throws -> MailAliasDeleteResponse {
+        try await request("\(mailBase)/aliases/\(address.percentEncodedPath())",
+                          method: "DELETE", bearer: token)
+    }
+
+    /// `DELETE /attachments/:id` — take one stored upload out of the message
+    /// for good, scoped to the caller's own rows (`grapmail-attachments.ts:412`).
+    static func mailDeleteAttachment(
+        _ token: String, id: String,
+    ) async throws -> MailAttachmentDeleteResponse {
+        try await request("\(mailBase)/attachments/\(id.percentEncodedPath())",
+                          method: "DELETE", bearer: token)
+    }
+
+    // ── End-to-end encryption ────────────────────────────────────────────
+    //
+    // The four routes are mounted by the auth service at `/grapmail/e2e`
+    // (`services/auth-service/src/index.ts:139`) and forwarded to the mail
+    // service's key directory (`services/mail-service/src/routes/e2e.ts`). What
+    // the directory holds is the PUBLIC half only — the store refuses a body
+    // that carries any private material (`grapmail-e2e.ts:151-169`), so nothing
+    // in these types has a place to put one. The device-side crypto that uses
+    // them arrives with the encryption screens; until those exist on this
+    // platform these calls are the same unwired surface Android already holds.
+
+    /// `GET /e2e/keys` — `grapmail-e2e.ts:137-149`. `published: false` is a
+    /// real answer ("this account has no key"), kept distinct from a failed
+    /// read the same way the label list keeps `notRead` apart from `read`.
+    static func mailE2eKeys(_ token: String) async throws -> MailE2eKeysResponse {
+        try await mailGet("/e2e/keys", bearer: token)
+    }
+
+    /// `PUT /e2e/keys` — publish (or replace) the public halves. Omitting the
+    /// signing half rather than sending a null: the route writes what arrives.
+    static func mailE2ePublish(
+        _ token: String, encryptionPublicKey: String, signingPublicKey: String?,
+    ) async throws -> MailE2ePublishResponse {
+        try await request("\(mailBase)/e2e/keys", method: "PUT",
+                          body: try encoder.encode(MailE2ePublishRequest(
+                            encryptionPublicKey: encryptionPublicKey,
+                            signingPublicKey: signingPublicKey)),
+                          bearer: token)
+    }
+
+    /// `DELETE /e2e/keys` — idempotent: `removed: false` is a success, not an error.
+    static func mailE2eUnpublish(_ token: String) async throws -> MailE2eUnpublishResponse {
+        try await request("\(mailBase)/e2e/keys", method: "DELETE", bearer: token)
+    }
+
+    /// Can a message to these addresses be encrypted? The addresses travel in
+    /// a POST body and never a query string: a URL is written to access logs
+    /// and proxy history, and recipient addresses are exactly the metadata an
+    /// encrypted message exists to keep out of those.
+    static func mailE2ePlan(
+        _ token: String, addresses: [String],
+    ) async throws -> MailE2ePlanResponse {
+        try await request("\(mailBase)/e2e/plan", method: "POST",
+                          body: try encoder.encode(MailE2eAddressesRequest(addresses: addresses)),
+                          bearer: token)
+    }
+
+    static func mailE2eLookup(
+        _ token: String, addresses: [String],
+    ) async throws -> MailE2eLookupResponse {
+        try await request("\(mailBase)/e2e/lookup", method: "POST",
+                          body: try encoder.encode(MailE2eAddressesRequest(addresses: addresses)),
+                          bearer: token)
     }
 
     /// `GET /attachments/:id` — the bytes, not JSON. Separate from `request`,

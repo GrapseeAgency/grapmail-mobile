@@ -116,15 +116,17 @@ class MailboxViewModel @JvmOverloads constructor(
         /** The Label sheet's own result line — what the last tap actually did. */
         val labelNote: String? = null,
         /**
-         * The messages this session snoozed, kept so the snooze can be undone.
+         * The messages this session snoozed, kept so the snooze can be undone from
+         * the banner the action itself raises.
          *
-         * The listing's row shape (`publicRow`, `grapmail.ts:583-611`) carries no
-         * `snoozedUntil`, and the inbox hides a pending snooze, so a snoozed message
-         * is not visible anywhere the app can label it as snoozed: `?box=snoozed`
-         * is implemented but not deployed. Undo is therefore offered for exactly the
-         * mail the app just snoozed and for no longer than that — which is the whole
-         * set the client can honestly name — rather than pretending to know which
-         * of the mail on screen is postponed.
+         * The listing's row shape (`publicRow`, `grapmail.ts:583-612`) carries no
+         * `snoozedUntil`, so a row on screen can never say "this one is postponed
+         * until Thursday" — the box that holds them can, and does: `?box=snoozed`
+         * is answered by `grapmail-boxes.ts:178` and the drawer offers it as soon
+         * as `/stats` reports the count. Undo is therefore reachable two ways: from
+         * this banner, for exactly the mail the app just snoozed, and from a row in
+         * the Snoozed box. Neither claim is invented — the banner lists only the
+         * ids the server accepted, and the box lists only what the server lists.
          */
         val snoozeUndoIds: List<String> = emptyList(),
         val snoozeUndoNote: String? = null,
@@ -142,15 +144,34 @@ class MailboxViewModel @JvmOverloads constructor(
         val accountStatus: String? = null,
         val memberSince: String? = null,
         /**
-         * The four extra counts `/stats` answers for. Each is null until the
-         * server says it, and a null draws no badge — `0` would claim the folder
-         * is empty when nobody was asked. Starred, Archive and All Mail are
-         * never in this response, so they have no field here at all.
+         * The counts `/stats` answers for. Each is null until the server says it,
+         * and a null draws no badge — `0` would claim the folder is empty when
+         * nobody was asked. The list grew with the deployment: `starred`,
+         * `archive`, `others` and `snoozed` are answered now
+         * (`grapmail.ts:677-688`), which is why they have fields below rather
+         * than the hardcoded nulls they used to have in the drawer.
          */
         val statsSent: Int? = null,
         val statsDrafts: Int? = null,
         val statsSpam: Int? = null,
         val statsTrash: Int? = null,
+        /**
+         * The four figures this deployment added to `/stats`
+         * (`grapmail.ts:666-688`: `starred`, `archive`, `others`, `snoozed`),
+         * counted by the same `boxCount` that answers the listing beside them.
+         *
+         * [statsSnoozed] does double duty: it is the capability signal for the
+         * drawer's Snoozed row. `grapmail-box-terms.ts:43,66-68` puts `snoozed`
+         * in `BOXES` and `grapmail-boxes.ts:178` answers it, so the box is real;
+         * whether the server the app is talking to has that code is a fact about
+         * the deployment, and the only honest way to learn it is to be answered.
+         * A null therefore hides the row rather than showing a folder that might
+         * answer 400 "Unknown box".
+         */
+        val statsStarred: Int? = null,
+        val statsArchive: Int? = null,
+        val statsOthers: Int? = null,
+        val statsSnoozed: Int? = null,
         val busy: Boolean = false,
         /**
          * Bumped whenever a list load settles, successfully or not.
@@ -398,6 +419,10 @@ class MailboxViewModel @JvmOverloads constructor(
             statsDrafts = stats?.drafts,
             statsSpam = stats?.spam,
             statsTrash = stats?.trash,
+            statsStarred = stats?.starred,
+            statsArchive = stats?.archive,
+            statsOthers = stats?.others,
+            statsSnoozed = stats?.snoozed,
         ) }
     }
 
@@ -471,14 +496,13 @@ class MailboxViewModel @JvmOverloads constructor(
     }
 
     /**
-     * Take the mail back out of snooze — the one place `unsnooze` is reachable.
+     * Take the mail back out of snooze, for the ids this session just postponed.
      *
-     * The action existed on both platforms with nothing calling it, because the
-     * client had no way to see which messages were snoozed: the row shape carries no
-     * `snoozedUntil` and the inbox hides them. The moment of snoozing IS the moment
-     * the app knows, so that is where the undo lives. Until `?box=snoozed` is
-     * deployed this is the whole of the feature, and the note says so rather than
-     * implying a list of postponed mail exists somewhere.
+     * The banner exists because the row that was snoozed disappears from the inbox
+     * the instant the action succeeds: without a record here, "undo" would have had
+     * nothing to name. The Snoozed box is the other way in, and it needs no state —
+     * the server already knows which mail is waiting, so `actOn(id, Unsnooze)` on a
+     * row in that box is the permanent path. This is the immediate one.
      */
     fun undoSnooze() {
         val ids = _state.value.snoozeUndoIds
@@ -565,10 +589,21 @@ class MailboxViewModel @JvmOverloads constructor(
             MailAction.Spam -> MailStore.invalidate(MailBox.Spam)
             MailAction.Restore, MailAction.Unarchive, MailAction.Unspam ->
                 MailStore.invalidateAllBoxes()
-            MailAction.Snooze -> MailStore.invalidate(MailBox.Inbox)
+            // A snooze moves the message out of the inbox's view and into the
+            // snoozed box's (`grapmail-boxes.ts:178` lists it over every folder),
+            // so both listings are wrong the moment the action succeeds and
+            // neither may be shown from the cache it just invalidated.
+            MailAction.Snooze -> {
+                MailStore.invalidate(MailBox.Inbox)
+                MailStore.invalidate(MailBox.Snoozed)
+            }
             // Undoing a snooze returns the mail to the listing it was hidden from,
-            // which is the inbox — so that is the box that must be re-read.
-            MailAction.Unsnooze -> MailStore.invalidate(MailBox.Inbox)
+            // which is the inbox — so that is the box that must be re-read, and the
+            // snoozed box loses it at the same moment.
+            MailAction.Unsnooze -> {
+                MailStore.invalidate(MailBox.Inbox)
+                MailStore.invalidate(MailBox.Snoozed)
+            }
             else -> Unit
         }
     }
@@ -1283,4 +1318,300 @@ class MailboxViewModel @JvmOverloads constructor(
         MailStore.allBodies().flatMap { m ->
             m.attachments.map { FileEntry(it, m.subject?.takeIf { s -> s.isNotBlank() }) }
         }
+
+    /**
+     * Take one attachment out of the message for good.
+     *
+     * `DELETE /attachments/:id` is scoped to the caller's own rows
+     * (`grapmail-attachments.ts:412`), and the answer is the route's, not the
+     * app's guess. The body cache is dropped on success because the row the app
+     * is holding still lists a file that no longer exists — leaving it would let
+     * the Files screen offer a download of bytes the server has thrown away.
+     */
+    fun deleteAttachment(id: String, then: (String) -> Unit) {
+        viewModelScope.launch {
+            val t = token() ?: run { then("Sign in again to remove this."); return@launch }
+            runCatching { Api.mailDeleteAttachment(t, id) }
+                .onSuccess { r ->
+                    if (r.success) {
+                        MailStore.forgetAttachment(id)
+                        MailStore.invalidateAllBoxes()
+                        then("Removed.")
+                    } else {
+                        then(r.error ?: "The server refused to remove that file.")
+                    }
+                }
+                .onFailure { e ->
+                    then(mailReason(e))
+                }
+        }
+    }
+
+    // ── aliases ──────────────────────────────────────────────────────────────
+    //
+    // Create and delete moved to `ProfileViewModel.aliasWrite` with the Addresses
+    // screen: the minted address is only knowable from the server's answer, the
+    // alias list rides the profile document beside every other address claim, and
+    // a second holder of the same record is a second chance to disagree about it.
+    // The READ stays here because the compose sender sheet needs the aliases
+    // before any account screen exists.
+
+    /**
+     * The aliases, with the state of the read that produced them.
+     *
+     * `isActive` and `id` are not in the route's answer, so the row type has no
+     * such fields: a cached list that defaulted `isActive` to true drew a mailbox
+     * whose aliases were all asserted live and gave every row the same empty
+     * identity, which is the shape of a duplicate-key crash rather than a missing
+     * feature. A failed read is `Failed`, not an empty list — "this mailbox has no
+     * aliases" is a statement about the account, and the screen may only make it
+     * when the server made it.
+     */
+    data class AliasesState(
+        val read: AssignmentsRead = AssignmentsRead.NotRead,
+        val list: List<com.grapsee.grapmail.data.MailAliasDto> = emptyList(),
+        val error: String? = null,
+    )
+
+    private val _aliases = MutableStateFlow(AliasesState())
+    val aliasesState: StateFlow<AliasesState> = _aliases.asStateFlow()
+
+    fun loadAliases(force: Boolean = false) {
+        when (_aliases.value.read) {
+            AssignmentsRead.Reading -> return
+            AssignmentsRead.Read -> if (!force) return
+            else -> Unit
+        }
+        viewModelScope.launch {
+            val t = token() ?: run {
+                _aliases.update { it.copy(read = AssignmentsRead.Failed, error = "Sign in again.") }
+                return@launch
+            }
+            _aliases.update { it.copy(read = AssignmentsRead.Reading) }
+            runCatching { Api.mailAliases(t) }
+                .onSuccess { r ->
+                    MailStore.putAliases(r.aliases)
+                    _aliases.update {
+                        it.copy(read = if (r.success) AssignmentsRead.Read else AssignmentsRead.Failed,
+                            list = r.aliases,
+                            error = if (r.success) null else "The alias list did not load.")
+                    }
+                }
+                .onFailure { e ->
+                    val cached = MailStore.aliases()
+                    _aliases.update {
+                        it.copy(
+                            read = if (cached != null) AssignmentsRead.Read else AssignmentsRead.Failed,
+                            list = cached ?: emptyList(),
+                            error = mailReason(e),
+                        )
+                    }
+                }
+        }
+    }
+
+    // ── end-to-end encryption ───────────────────────────────────────────────
+
+    /**
+     * The key directory's state, plus the last verification a screen asked for.
+     *
+     * Nothing here claims a message was opened. The device publishes the PUBLIC
+     * halves the platform can make (`MailE2eIdentity`) and asks the server what it
+     * knows about other people's keys (`/plan`, `/lookup`); the sealed body itself
+     * is left exactly as the server stored it, because a client that showed a
+     * half-implemented decrypt would be inventing plaintext.
+     */
+    data class E2eState(
+        val read: AssignmentsRead = AssignmentsRead.NotRead,
+        val keys: com.grapsee.grapmail.data.MailE2eKeysDto? = null,
+        val discoverable: Boolean? = null,
+        val busy: Boolean = false,
+        val note: String? = null,
+        val error: String? = null,
+        val plan: com.grapsee.grapmail.data.MailE2ePlanDto? = null,
+        val lookup: List<com.grapsee.grapmail.data.MailE2eLookupEntryDto> = emptyList(),
+        val lookupFor: List<String> = emptyList(),
+    )
+
+    private val _e2e = MutableStateFlow(E2eState())
+    val e2e: StateFlow<E2eState> = _e2e.asStateFlow()
+
+    fun loadE2eKeys(force: Boolean = false) {
+        when (_e2e.value.read) {
+            AssignmentsRead.Reading -> return
+            AssignmentsRead.Read -> if (!force) return
+            else -> Unit
+        }
+        viewModelScope.launch {
+            val t = token() ?: run { _e2e.update { it.copy(read = AssignmentsRead.Failed) }; return@launch }
+            _e2e.update { it.copy(read = AssignmentsRead.Reading) }
+            runCatching { Api.mailE2eKeys(t) }
+                .onSuccess { r ->
+                    _e2e.update {
+                        it.copy(
+                            read = if (r.success) AssignmentsRead.Read else AssignmentsRead.Failed,
+                            keys = r.keys,
+                            discoverable = r.keys?.let { k -> k.encryption != null },
+                            error = if (r.success) null else (r.error ?: "The key directory did not answer."),
+                        )
+                    }
+                }
+                .onFailure { e ->
+                    _e2e.update { it.copy(read = AssignmentsRead.Failed, error = mailReason(e)) }
+                }
+        }
+    }
+
+    /**
+     * Generate this device's keypair and publish the public halves.
+     *
+     * The private halves never leave: the store rejects any body carrying private
+     * material with 400 (`mail-service/src/routes/e2e.ts:209`), and this client has
+     * no field to put one in. When the platform cannot make an X25519 key the call
+     * says which Android version introduced it rather than publishing half a
+     * identity or faking one.
+     */
+    fun publishKeys(passphrase: String?, then: (String) -> Unit) {
+        viewModelScope.launch {
+            val t = token() ?: run { then("Sign in again to set up encryption."); return@launch }
+            _e2e.update { it.copy(busy = true, note = null, error = null) }
+            val made = com.grapsee.grapmail.data.MailE2eIdentity.generate(getApplication(), t, passphrase)
+            if (made.isFailure) {
+                val why = made.exceptionOrNull()?.message ?: "This device could not create the keys."
+                _e2e.update { it.copy(busy = false, error = why) }
+                then(why)
+                return@launch
+            }
+            val pair = made.getOrNull()!!
+            runCatching { Api.mailE2ePublish(t, pair.encryptionPublicKey, pair.signingPublicKey) }
+                .onSuccess { r ->
+                    if (r.success) {
+                        _e2e.update { it.copy(busy = false, keys = r.keys, read = AssignmentsRead.Read) }
+                        then(if (r.discoverable == false)
+                            "Published — but only people you name can use it." else "Published.")
+                    } else {
+                        val why = r.error ?: "The directory refused those keys."
+                        _e2e.update { it.copy(busy = false, error = why) }
+                        then(why)
+                    }
+                }
+                .onFailure { e ->
+                    val why = mailReason(e)
+                    _e2e.update { it.copy(busy = false, error = why) }
+                    then(why)
+                }
+        }
+    }
+
+    fun unpublishKeys(then: (String) -> Unit) {
+        viewModelScope.launch {
+            val t = token() ?: run { then("Sign in again to change this."); return@launch }
+            _e2e.update { it.copy(busy = true, error = null) }
+            runCatching { Api.mailE2eUnpublish(t) }
+                .onSuccess { r ->
+                    _e2e.update {
+                        it.copy(busy = false, read = AssignmentsRead.Read,
+                            keys = if (r.removed == true) null else it.keys,
+                            discoverable = if (r.removed == true) false else it.discoverable)
+                    }
+                    then(if (r.removed == true) r.detail ?: "Keys removed."
+                    else r.detail ?: "No published key was found to remove.")
+                }
+                .onFailure { e ->
+                    _e2e.update { it.copy(busy = false, error = mailReason(e)) }
+                    then(mailReason(e))
+                }
+        }
+    }
+
+    /**
+     * Ask the server whether a message to THESE people could be sealed.
+     *
+     * Addresses go in the body, never the URL (`grapmail-e2e.ts:194`), so a
+     * recipient's address does not end up in an access log. The answer's `mode` is
+     * what the compose screen shows: `seal` means every address has a key,
+     * `mixed`/`plain` name the ones that do not, and the screen repeats the
+     * server's reason for each rather than inventing one.
+     */
+    fun planEncryption(addresses: List<String>, then: (String) -> Unit) {
+        viewModelScope.launch {
+            val t = token() ?: run { then("Sign in again to check this."); return@launch }
+            _e2e.update { it.copy(busy = true, plan = null) }
+            runCatching { Api.mailE2ePlan(t, addresses) }
+                .onSuccess { r ->
+                    _e2e.update { it.copy(busy = false, plan = r.plan, error = if (r.success) null else r.error) }
+                    then(r.plan?.let { p ->
+                        if (p.canSeal) "Every recipient has a published key."
+                        else "${p.blocked.size} of ${addresses.size} cannot be sealed."
+                    } ?: r.error ?: "The server did not answer.")
+                }
+                .onFailure { e ->
+                    _e2e.update { it.copy(busy = false, error = mailReason(e)) }
+                    then(mailReason(e))
+                }
+        }
+    }
+
+    /** Who has a key, and what their fingerprint is — the verification read. */
+    fun lookupContacts(addresses: List<String>, then: (String) -> Unit) {
+        viewModelScope.launch {
+            val t = token() ?: run { then("Sign in again to look this up."); return@launch }
+            _e2e.update { it.copy(busy = true) }
+            runCatching { Api.mailE2eLookup(t, addresses) }
+                .onSuccess { r ->
+                    _e2e.update {
+                        it.copy(busy = false, lookup = r.results, lookupFor = addresses,
+                            error = if (r.success) null else r.error)
+                    }
+                    then(if (r.success) "${r.results.size} addressed checked."
+                    else r.error ?: "The directory did not answer.")
+                }
+                .onFailure { e ->
+                    _e2e.update { it.copy(busy = false, error = mailReason(e)) }
+                    then(mailReason(e))
+                }
+        }
+    }
+
+    // ── bulk read ───────────────────────────────────────────────────────────
+
+    /**
+     * Mark the unread mail in this box read.
+     *
+     * There is no bulk endpoint — `PATCH /message/:id/:action` is per message and
+     * no route takes a list — so this is a loop of real writes over the unread rows
+     * the app has fetched, and the receipt names that set. Saying "all read" while
+     * a server-side box holds 4,000 messages the client never fetched would be a
+     * claim the code cannot support, which is why the line reports the number it
+     * actually changed.
+     */
+    fun markAllRead(then: (String) -> Unit) {
+        val unread = _state.value.rows.filterNot { it.isRead }.map { it.id }
+        if (unread.isEmpty()) { then("Nothing unread in what is loaded."); return }
+        viewModelScope.launch {
+            val t = token() ?: run { then("Sign in again."); return@launch }
+            _state.update { it.copy(busy = true) }
+            var failure: String? = null
+            var done = 0
+            for (id in unread) {
+                try {
+                    Api.mailAction(t, id, MailAction.Read, null)
+                    MailStore.patchFlags(id, read = true)
+                    done++
+                } catch (e: kotlinx.coroutines.CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    failure = mailReason(e)
+                }
+            }
+            _state.update { it.copy(busy = false, staleError = failure) }
+            reproject()
+            then(when {
+                failure != null && done == 0 -> failure!!
+                failure != null -> "$done of ${unread.size} marked read. $failure"
+                else -> "Marked $done read."
+            })
+        }
+    }
 }
+

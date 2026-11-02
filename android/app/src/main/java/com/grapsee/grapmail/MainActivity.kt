@@ -227,6 +227,21 @@ object Routes {
     const val MAIL_SETTINGS = "mail/settings"
     const val MAIL_SCREENER = "mail/screener"
 
+    // ── account-record band ─────────────────────────────────────────────────
+    // The web client's `/mail/notes`, `/mail/tasks`, `/mail/settings`,
+    // `/mail/account/{profile,privacy,addresses,connections,support}` — one
+    // profile document, eight screens over it. They hang off MAIL_SETTINGS the
+    // way the security screens hang off SECURITY: every one has a parent, so a
+    // deep link can never strand somebody on a child with no way back.
+    const val MAIL_NOTES = "mail/notes"
+    const val MAIL_TASKS = "mail/tasks"
+    const val MAIL_PREFS = "mail/settings/prefs"
+    const val MAIL_ADDRESSES = "mail/settings/addresses"
+    const val MAIL_CONNECTIONS = "mail/settings/connections"
+    const val ACCOUNT_PROFILE = "mail/settings/profile"
+    const val ACCOUNT_PRIVACY = "mail/settings/privacy"
+    const val MAIL_SUPPORT = "mail/support"
+
     fun mailThread(id: String, isThread: Boolean) =
         "mail/thread/${encode(id)}/${if (isThread) "1" else "0"}"
     fun mailContact(address: String) = "mail/contact/${encode(address)}"
@@ -258,6 +273,10 @@ fun GrapMailNav() {
     /// the list, the thread and the secondary screens read and write the same
     /// pages rather than each fetching its own copy of the same mailbox.
     val mail: MailboxViewModel = viewModel()
+    // The account record every Phase-1 screen reads and writes. One instance for
+    // the activity: the screens are eight views of one document, and eight
+    // separate copies of it is eight chances to disagree about the same account.
+    val profile: com.grapsee.grapmail.logic.ProfileViewModel = viewModel()
     val scope = androidx.compose.runtime.rememberCoroutineScope()
 
     fun openSupport() {
@@ -342,7 +361,7 @@ fun GrapMailNav() {
     // offline, with closures that do nothing. No real launch carries the extra.
     val snapshot = (nav.context as? android.app.Activity)?.intent?.getStringExtra("gmSnapshot")
     if (snapshot != null) {
-        if (snapshot.startsWith("mail-")) MailSnapshotScreen(snapshot)
+        if (snapshot.startsWith("mail-") || snapshot.startsWith("account-")) MailSnapshotScreen(snapshot)
         else SecuritySnapshotScreen(snapshot)
         return
     }
@@ -865,12 +884,57 @@ fun GrapMailNav() {
                 onSecurity = { nav.navigate(Routes.SECURITY) },
                 onScreener = { nav.navigate(Routes.MAIL_SCREENER) },
                 onLabels = { nav.navigate(Routes.MAIL_LABELS) },
-                onHelp = { openSupport() },
+                onNotes = { nav.navigate(Routes.MAIL_NOTES) },
+                onTasks = { nav.navigate(Routes.MAIL_TASKS) },
+                onPrefs = { nav.navigate(Routes.MAIL_PREFS) },
+                onAddresses = { nav.navigate(Routes.MAIL_ADDRESSES) },
+                onConnections = { nav.navigate(Routes.MAIL_CONNECTIONS) },
+                onProfile = { nav.navigate(Routes.ACCOUNT_PROFILE) },
+                onPrivacy = { nav.navigate(Routes.ACCOUNT_PRIVACY) },
+                onHelp = { nav.navigate(Routes.MAIL_SUPPORT) },
                 onSignOut = {
                     com.grapsee.grapmail.ui.screens.security.SecurityFlow.reset()
                     scope.launch { SessionStore.clear(nav.context.applicationContext) }
                     nav.navigate(Routes.WELCOME) { popUpTo(0) { inclusive = true } }
                 },
+            )
+        }
+        composable(Routes.MAIL_NOTES) {
+            com.grapsee.grapmail.ui.screens.mail.NotesScreen(vm = profile, onBack = { nav.popBackStack() })
+        }
+        composable(Routes.MAIL_TASKS) {
+            com.grapsee.grapmail.ui.screens.mail.TasksScreen(vm = profile, onBack = { nav.popBackStack() })
+        }
+        composable(Routes.MAIL_PREFS) {
+            com.grapsee.grapmail.ui.screens.mail.MailPrefsScreen(vm = profile, onBack = { nav.popBackStack() })
+        }
+        composable(Routes.MAIL_ADDRESSES) {
+            com.grapsee.grapmail.ui.screens.mail.AddressesScreen(vm = profile, onBack = { nav.popBackStack() })
+        }
+        composable(Routes.MAIL_CONNECTIONS) {
+            com.grapsee.grapmail.ui.screens.mail.ConnectionsScreen(vm = profile, onBack = { nav.popBackStack() })
+        }
+        composable(Routes.ACCOUNT_PROFILE) {
+            com.grapsee.grapmail.ui.screens.mail.ProfileEditScreen(vm = profile, onBack = { nav.popBackStack() })
+        }
+        composable(Routes.ACCOUNT_PRIVACY) {
+            com.grapsee.grapmail.ui.screens.mail.PrivacyScreen(
+                vm = profile,
+                onBack = { nav.popBackStack() },
+                onProfile = { nav.navigate(Routes.ACCOUNT_PROFILE) },
+                onPhone = { nav.navigate(Routes.PHONE_VERIFY) },
+                onAddresses = { nav.navigate(Routes.MAIL_ADDRESSES) },
+                onPrefs = { nav.navigate(Routes.MAIL_PREFS) },
+                onSupport = { nav.navigate(Routes.MAIL_SUPPORT) },
+            )
+        }
+        composable(Routes.MAIL_SUPPORT) {
+            com.grapsee.grapmail.ui.screens.mail.SupportScreen(
+                vm = profile,
+                onBack = { nav.popBackStack() },
+                onForgot = { nav.navigate(Routes.FORGOT_PASSWORD) },
+                onPhone = { nav.navigate(Routes.PHONE_VERIFY) },
+                onAddresses = { nav.navigate(Routes.MAIL_ADDRESSES) },
             )
         }
         composable(Routes.MAIL_SCREENER) {

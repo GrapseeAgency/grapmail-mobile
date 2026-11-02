@@ -44,6 +44,15 @@ struct RootView: View {
         case mailContacts, mailContactDetail(address: String)
         case mailFiles, mailAttachment(id: String)
         case mailSettings, mailScreener
+        // ── account-record band ──────────────────────────────────────────────
+        // The web client's `/mail/notes`, `/mail/tasks`, `/mail/settings`,
+        // `/mail/account/{profile,privacy,addresses,connections,support}` —
+        // one profile document, eight screens over it. They hang off
+        // mailSettings the way the security screens hang off .security: every
+        // one has a parent, so a deep link can never strand somebody on a
+        // child with no way back.
+        case mailNotes, mailTasks, mailPrefs, mailAddresses, mailConnections
+        case accountProfile, accountPrivacy, mailSupport
     }
 
     /// One mailbox for the whole signed-in stack. The list, the thread, compose
@@ -51,6 +60,13 @@ struct RootView: View {
     /// in the list is visible in the thread that opens next, and a body read in
     /// the thread is not fetched again by the Files screen.
     @StateObject private var mail = MailboxModel()
+
+    /// The account record every account-band screen reads and writes. One
+    /// instance for the stack: the screens are eight views of one document,
+    /// and eight separate copies of it is eight chances to disagree about the
+    /// same account. Mirror of Android's `profile: ProfileViewModel` in
+    /// `GrapMailNav`.
+    @StateObject private var account = ProfileModel()
 
     // A stored, unexpired session opens the app signed-in — the Keychain
     // token has to be read at launch, not just written.
@@ -104,7 +120,7 @@ struct RootView: View {
                 // ever carries the argument, and nothing here fetches or submits.
                 if let snapshot = SecuritySnapshot.requested() {
                     Group {
-                        if snapshot.hasPrefix("mail-") {
+                        if snapshot.hasPrefix("mail-") || snapshot.hasPrefix("account-") {
                             MailSnapshotView(name: snapshot)
                         } else {
                             SecuritySnapshotView(name: snapshot)
@@ -493,11 +509,52 @@ struct RootView: View {
                         onSecurity: { path.append(.security) },
                         onScreener: { path.append(.mailScreener) },
                         onLabels: { path.append(.mailLabels) },
-                        onHelp: openSupport,
+                        onNotes: { path.append(.mailNotes) },
+                        onTasks: { path.append(.mailTasks) },
+                        onPrefs: { path.append(.mailPrefs) },
+                        onAddresses: { path.append(.mailAddresses) },
+                        onConnections: { path.append(.mailConnections) },
+                        onProfile: { path.append(.accountProfile) },
+                        onPrivacy: { path.append(.accountPrivacy) },
+                        onHelp: { path.append(.mailSupport) },
                         onSignOut: {
                             SessionStore.clear()
                             path.removeAll()
                         }
+                    )
+                case .mailNotes:
+                    NotesView(vm: account, onBack: { path.removeLast() })
+                case .mailTasks:
+                    TasksView(vm: account, onBack: { path.removeLast() })
+                case .mailPrefs:
+                    MailPrefsView(vm: account, onBack: { path.removeLast() })
+                case .mailAddresses:
+                    AddressesView(vm: account, onBack: { path.removeLast() })
+                case .mailConnections:
+                    ConnectionsView(vm: account, onBack: { path.removeLast() })
+                case .accountProfile:
+                    ProfileEditView(vm: account, onBack: { path.removeLast() })
+                case .accountPrivacy:
+                    PrivacyView(
+                        vm: account,
+                        onBack: { path.removeLast() },
+                        onProfile: { path.append(.accountProfile) },
+                        onPhone: { path.append(.phoneVerify) },
+                        onAddresses: { path.append(.mailAddresses) },
+                        onPrefs: { path.append(.mailPrefs) },
+                        onSupport: { path.append(.mailSupport) },
+                    )
+                case .mailSupport:
+                    SupportView(
+                        onBack: { path.removeLast() },
+                        // The in-app doors the Android support screen routes
+                        // to. Sign-in carries the forgot-password entry on iOS
+                        // (there is no separate forgot route), and phone
+                        // verification is the same proven-by-code flow the
+                        // security sector runs.
+                        onForgot: { path.append(.signIn) },
+                        onPhone: { path.append(.phoneVerify) },
+                        onAddresses: { path.append(.mailAddresses) },
                     )
                 case .mailScreener:
                     ScreenerView(

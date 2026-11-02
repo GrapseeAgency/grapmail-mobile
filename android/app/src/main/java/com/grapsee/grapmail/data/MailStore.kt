@@ -169,6 +169,32 @@ object MailStore {
     }
 
     /**
+     * Take one attachment out of every cached body.
+     *
+     * `DELETE /attachments/:id` destroys the file, not the message
+     * (`grapmail-attachments.ts:412`), so the body stays cached and only that one
+     * row of its `attachments` list goes. Leaving it would keep the Files screen
+     * offering a download of bytes the server has thrown away — the request would
+     * 404 and the person would reasonably blame the network.
+     */
+    suspend fun forgetAttachment(attachmentId: String) = mutex.withLock {
+        bodies = bodies.mapValues { (_, b) ->
+            if (b.attachments.none { it.id == attachmentId }) b
+            else b.copy(attachments = b.attachments.filterNot { it.id == attachmentId })
+        }
+    }
+
+    /**
+     * Forget the alias list so the next visit re-reads it.
+     *
+     * Used after a create or a delete: the server composes the address from the
+     * account's handle and domain (`grapmail-aliases.ts:188`), so the row the app
+     * would build and the row the route wrote are two chances to disagree — and the
+     * list carries no id to patch by.
+     */
+    suspend fun invalidateAliases() = mutex.withLock { aliases = null }
+
+    /**
      * Apply a local flag change to every cached page, so starring or reading a
      * message shows immediately and survives a scroll back — without waiting for
      * a refetch that may not happen and may not succeed.

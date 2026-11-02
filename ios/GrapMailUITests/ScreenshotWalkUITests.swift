@@ -401,6 +401,19 @@ final class ScreenshotWalkUITests: XCTestCase {
             // screen would otherwise ship with no artifact at all. Android's host
             // draws the same sheet from the same invented address.
             ("87-mail-unsubscribe", "mail-unsubscribe"),
+            // The account band (Phase 1). Eight screens over the one profile
+            // document, photographed from the snapshot host's seeded record:
+            // the CI account's real lists are empty, and an empty screen
+            // cannot prove the populated branch exists. Android's walk names
+            // the same eight frames.
+            ("90-account-profile", "account-profile"),
+            ("91-account-privacy", "account-privacy"),
+            ("92-mail-notes", "mail-notes"),
+            ("93-mail-tasks", "mail-tasks"),
+            ("94-account-connections", "account-connections"),
+            ("95-mail-prefs", "mail-settings-prefs"),
+            ("96-mail-addresses", "mail-addresses"),
+            ("97-mail-support", "mail-support"),
         ]
         // These two fetch on appear, so the shutter has to wait for the loaded
         // branch — otherwise the photograph catches "Checking your account…"
@@ -444,6 +457,19 @@ final class ScreenshotWalkUITests: XCTestCase {
             "mail-snooze-sheet": "Snooze until",
             "mail-unsubscribe": "Unsubscribe",
             "mail-sender-sheet": "Decide the sender",
+            // The account band: markers are seeded values that exist only once
+            // the profile document has landed. Where the value lives in a text
+            // FIELD (the birthday, the signature) rather than static text —
+            // which this check cannot read — the marker is a neighbouring
+            // static label the populated branch alone draws.
+            "account-profile": "Rather not say",
+            "account-privacy": "2026-03-14",
+            "mail-notes": "Send the Q3 numbers before Friday",
+            "mail-tasks": "Book the studio visit",
+            "account-connections": "Northwind SSO",
+            "mail-settings-prefs": "Comfortable — the roomier list",
+            "mail-addresses": "business@grapmail.com",
+            "mail-support": "Why can I not create an account for someone under 13?",
         ]
         for screen in postWriteScreens {
             app.terminate()

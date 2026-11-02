@@ -33,6 +33,7 @@ import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.HelpOutline
 import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.MailOutline
+import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.PersonAddAlt1
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.Shield
@@ -80,7 +81,7 @@ import com.grapsee.grapmail.ui.theme.LocalPalette
  */
 
 @Composable
-private fun MailScaffold(title: String, onBack: () -> Unit, content: @Composable () -> Unit) {
+internal fun MailScaffold(title: String, onBack: () -> Unit, content: @Composable () -> Unit) {
     val palette = LocalPalette.current
     Column(Modifier.fillMaxSize().background(palette.bg).statusBarsPadding()) {
         Row(
@@ -513,14 +514,24 @@ fun MailSettingsScreen(
     onSecurity: () -> Unit,
     onScreener: () -> Unit,
     onLabels: () -> Unit,
+    onNotes: () -> Unit,
+    onTasks: () -> Unit,
+    onPrefs: () -> Unit,
+    onAddresses: () -> Unit,
+    onConnections: () -> Unit,
+    onProfile: () -> Unit,
+    onPrivacy: () -> Unit,
     onHelp: () -> Unit,
     onSignOut: () -> Unit,
 ) {
     val palette = LocalPalette.current
-    var aliases by remember { mutableStateOf<List<MailAliasDto>>(emptyList()) }
-    LaunchedEffect(Unit) {
-        aliases = vm.aliases()
-    }
+    // The alias list is a read with a state, not a value that appears: `GET
+    // /aliases` answers three columns and nothing else, so the screen says
+    // "Checking…" while it is outstanding and names the failure when it is not.
+    // A locally cached list rendered as though it were the server's answer would
+    // show a create or a delete that had not happened.
+    val aliases by vm.aliasesState.collectAsState()
+    LaunchedEffect(Unit) { vm.loadAliases() }
 
     MailScaffold("Settings", onBack) {
         Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
@@ -533,15 +544,27 @@ fun MailSettingsScreen(
                 vm.state.value.memberSince ?: "Not reported", palette)
 
             SectionLabel("Sending as", palette)
-            if (aliases.isEmpty()) {
-                Text("No aliases on this mailbox. An alias is a second address " +
-                    "that delivers into the same inbox.",
-                    fontSize = 13.sp, color = palette.textSecondary,
-                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp))
-            } else {
-                aliases.forEach { a ->
-                    SettingRow(Icons.Rounded.PersonAddAlt1, a.label, a.address, palette,
-                        trailing = if (!a.isActive) "paused" else null)
+            // Three answers, not two: while the read is outstanding the screen
+            // must not claim the mailbox has no aliases — "nobody answered yet"
+            // and "there are none" are different sentences (the same rule the
+            // Addresses screen's null-vs-empty split enforces).
+            when {
+                aliases.read == com.grapsee.grapmail.data.AssignmentsRead.Reading ||
+                    aliases.read == com.grapsee.grapmail.data.AssignmentsRead.NotRead ->
+                    Text("Checking…", fontSize = 13.sp, color = palette.textTertiary,
+                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp))
+                aliases.list.isEmpty() ->
+                    Text("No aliases on this mailbox. An alias is a second address " +
+                        "that delivers into the same inbox.",
+                        fontSize = 13.sp, color = palette.textSecondary,
+                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp))
+                else -> aliases.list.forEach { a ->
+                    // No "paused" chip here: `GET /aliases` answers three
+                    // columns and none of them is a state (`grapmail-aliases
+                    // .ts:131-152`), so this list can only say what the
+                    // mailbox receives as. The Addresses screen shows paused —
+                    // the profile's alias rows DO answer `isActive`.
+                    SettingRow(Icons.Rounded.PersonAddAlt1, a.label, a.address, palette)
                 }
             }
 
@@ -552,10 +575,26 @@ fun MailSettingsScreen(
                 "Approval for unknown senders", palette, onClick = onScreener)
             SettingRow(Icons.Rounded.Settings, "Labels",
                 "Filters for the inbox", palette, onClick = onLabels)
+            SettingRow(Icons.Rounded.MailOutline, "Mail settings",
+                "Signature, density, language, senders", palette, onClick = onPrefs)
+            SettingRow(Icons.Rounded.PersonAddAlt1, "Addresses",
+                "Primary and aliases", palette, onClick = onAddresses)
+            SettingRow(Icons.Rounded.Person, "Connected accounts",
+                "Apps that can use this sign-in", palette, onClick = onConnections)
+            SettingRow(Icons.Rounded.Star, "Notes",
+                "Kept on the account", palette, onClick = onNotes)
+            SettingRow(Icons.Rounded.Check, "Tasks",
+                "The list beside the mailbox", palette, onClick = onTasks)
+
+            SectionLabel("This account", palette)
+            SettingRow(Icons.Rounded.Person, "Personal info",
+                "Name, birthday, photo", palette, onClick = onProfile)
+            SettingRow(Icons.Rounded.Shield, "Data & privacy",
+                "What is kept, what you control", palette, onClick = onPrivacy)
 
             SectionLabel("Support", palette)
             SettingRow(Icons.Rounded.HelpOutline, "Help & Support",
-                "grapsee.com/contact", palette, onClick = onHelp)
+                "Questions this product actually raises", palette, onClick = onHelp)
 
             Spacer(Modifier.height(20.dp))
             Text("Sign out", fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = palette.error,
@@ -567,13 +606,13 @@ fun MailSettingsScreen(
 }
 
 @Composable
-private fun SectionLabel(text: String, palette: com.grapsee.grapmail.ui.theme.Palette) {
+internal fun SectionLabel(text: String, palette: com.grapsee.grapmail.ui.theme.Palette) {
     Text(text.uppercase(), fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp,
         color = palette.textTertiary, modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp))
 }
 
 @Composable
-private fun SettingRow(
+internal fun SettingRow(
     icon: ImageVector,
     title: String,
     subtitle: String,

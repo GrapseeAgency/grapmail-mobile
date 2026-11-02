@@ -508,9 +508,17 @@ struct MailSettingsView: View {
     let onSecurity: () -> Void
     let onScreener: () -> Void
     let onLabels: () -> Void
+    // The account-record band — the same rows Android's MailSettingsScreen
+    // gained; each one opens a screen over the one profile document.
+    let onNotes: () -> Void
+    let onTasks: () -> Void
+    let onPrefs: () -> Void
+    let onAddresses: () -> Void
+    let onConnections: () -> Void
+    let onProfile: () -> Void
+    let onPrivacy: () -> Void
     let onHelp: () -> Void
     let onSignOut: () -> Void
-    @State private var aliases: [MailAlias] = []
 
     var body: some View {
         MailScaffold(title: "Settings", onBack: onBack) {
@@ -528,16 +536,33 @@ struct MailSettingsView: View {
                                value: vm.state.memberSince ?? "Not reported")
 
                     SectionLabel(text: "Sending as")
-                    if aliases.isEmpty {
-                        Text("No aliases on this mailbox. An alias is a second address " +
-                             "that delivers into the same inbox.")
+                    // Three answers, not two: while the read is outstanding the
+                    // screen must not claim the mailbox has no aliases.
+                    switch vm.aliasesState.read {
+                    case .notRead, .reading:
+                        Text("Checking…")
+                            .font(.system(size: 13)).foregroundColor(GM.textTertiary)
+                            .padding(.horizontal, 20).padding(.vertical, 8)
+                    case .failed where vm.aliasesState.list.isEmpty:
+                        Text(vm.aliasesState.error ?? "The alias list did not load.")
                             .font(.system(size: 13)).foregroundColor(GM.textSecondary)
                             .padding(.horizontal, 20).padding(.vertical, 8)
-                    } else {
-                        ForEach(aliases) { a in
-                            SettingRow(icon: "person.badge.plus", title: a.label,
-                                       value: a.address,
-                                       trailing: a.isActive ? nil : "paused")
+                    default:
+                        if vm.aliasesState.list.isEmpty {
+                            Text("No aliases on this mailbox. An alias is a second address " +
+                                 "that delivers into the same inbox.")
+                                .font(.system(size: 13)).foregroundColor(GM.textSecondary)
+                                .padding(.horizontal, 20).padding(.vertical, 8)
+                        } else {
+                            ForEach(vm.aliasesState.list) { a in
+                                // No "paused" chip: `GET /aliases` answers three
+                                // columns and none of them is a state, so this
+                                // list can only say what the mailbox receives
+                                // as. The Addresses screen shows paused — the
+                                // profile's alias rows DO answer `isActive`.
+                                SettingRow(icon: "person.badge.plus", title: a.label,
+                                           value: a.address)
+                            }
                         }
                     }
 
@@ -548,10 +573,26 @@ struct MailSettingsView: View {
                                value: "Approval for unknown senders", onClick: onScreener)
                     SettingRow(icon: "tag", title: "Labels",
                                value: "Filters for the inbox", onClick: onLabels)
+                    SettingRow(icon: "envelope", title: "Mail settings",
+                               value: "Signature, density, language, senders", onClick: onPrefs)
+                    SettingRow(icon: "person.badge.plus", title: "Addresses",
+                               value: "Primary and aliases", onClick: onAddresses)
+                    SettingRow(icon: "person", title: "Connected accounts",
+                               value: "Apps that can use this sign-in", onClick: onConnections)
+                    SettingRow(icon: "note.text", title: "Notes",
+                               value: "Kept on the account", onClick: onNotes)
+                    SettingRow(icon: "checkmark", title: "Tasks",
+                               value: "The list beside the mailbox", onClick: onTasks)
+
+                    SectionLabel(text: "This account")
+                    SettingRow(icon: "person", title: "Personal info",
+                               value: "Name, birthday, photo", onClick: onProfile)
+                    SettingRow(icon: "checkmark.shield", title: "Data & privacy",
+                               value: "What is kept, what you control", onClick: onPrivacy)
 
                     SectionLabel(text: "Support")
                     SettingRow(icon: "questionmark.circle", title: "Help & Support",
-                               value: "grapsee.com/contact", onClick: onHelp)
+                               value: "Questions this product actually raises", onClick: onHelp)
 
                     Button(action: onSignOut) {
                         Text("Sign out")
@@ -564,7 +605,7 @@ struct MailSettingsView: View {
                 .padding(.bottom, 30)
             }
         }
-        .task { aliases = await vm.aliases() }
+        .task { vm.loadAliases() }
     }
 }
 

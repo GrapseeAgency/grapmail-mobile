@@ -33,6 +33,10 @@ import com.grapsee.grapmail.data.MailStore
 import com.grapsee.grapmail.data.MailMessageFullDto
 import com.grapsee.grapmail.data.MailPersonDto
 import com.grapsee.grapmail.data.MailSort
+import com.grapsee.grapmail.data.ProfileAliasDto
+import com.grapsee.grapmail.data.ProfileConnectionDto
+import com.grapsee.grapmail.data.ProfileDto
+import com.grapsee.grapmail.data.ProfileSettingsDto
 import com.grapsee.grapmail.logic.MailboxViewModel
 import com.grapsee.grapmail.ui.components.MailGreeting
 import com.grapsee.grapmail.ui.components.MailStateBlock
@@ -66,6 +70,11 @@ fun MailSnapshotScreen(name: String) {
     // literals below — no live path can reach either half.
     // `snapshotMode` so the model's own boot reads do not overwrite the seed.
     val vm = remember { MailboxViewModel(app, snapshotMode = true) }
+    // The account record the eight Phase-1 screens read, seeded the same way:
+    // the host owns the document for these frames, and `snapshotMode` keeps the
+    // model's own boot read from overwriting it with the CI account's real
+    // (empty) notes list — the race the mailbox seeds already guard against.
+    val profileVm = remember { com.grapsee.grapmail.logic.ProfileViewModel(app, snapshotMode = true) }
 
     // The seeds run in an effect, not in composition. Writing a state flow while
     // composing is a side effect in the wrong place — it can schedule a
@@ -98,6 +107,12 @@ fun MailSnapshotScreen(name: String) {
                 )
             }
             "mail-screener" -> vm.seedScreenerForSnapshot(enabled = true, pending = 3)
+            // The account-record screens all read one document; one seed covers
+            // all eight, and each frame's settled marker is a value that exists
+            // only once that document has landed.
+            "mail-notes", "mail-tasks", "mail-settings-prefs", "mail-addresses",
+            "account-connections", "account-profile", "account-privacy", "mail-support" ->
+                profileVm.seed(sampleProfile())
         }
     }
 
@@ -209,7 +224,19 @@ fun MailSnapshotScreen(name: String) {
             "mail-files" -> FilesScreen(vm, onBack = {}, onOpen = { })
             "mail-attachment-preview" -> AttachmentPreviewScreen(vm, attachmentId = "a1", onBack = {})
             "mail-settings" -> MailSettingsScreen(vm, onBack = {}, onSecurity = {},
-                onScreener = {}, onLabels = {}, onHelp = {}, onSignOut = {})
+                onScreener = {}, onLabels = {}, onNotes = {}, onTasks = {}, onPrefs = {},
+                onAddresses = {}, onConnections = {}, onProfile = {}, onPrivacy = {},
+                onHelp = {}, onSignOut = {})
+            "mail-notes" -> NotesScreen(profileVm, onBack = {})
+            "mail-tasks" -> TasksScreen(profileVm, onBack = {})
+            "mail-settings-prefs" -> MailPrefsScreen(profileVm, onBack = {})
+            "mail-addresses" -> AddressesScreen(profileVm, onBack = {})
+            "account-connections" -> ConnectionsScreen(profileVm, onBack = {})
+            "account-profile" -> ProfileEditScreen(profileVm, onBack = {})
+            "account-privacy" -> PrivacyScreen(profileVm, onBack = {}, onProfile = {},
+                onPhone = {}, onAddresses = {}, onPrefs = {}, onSupport = {})
+            "mail-support" -> SupportScreen(profileVm, onBack = {}, onForgot = {},
+                onPhone = {}, onAddresses = {})
             "mail-screener" -> ScreenerScreen(vm, onBack = {}, onOpenQueue = {})
             else -> Text(
                 "Unknown mail snapshot: $name",
@@ -265,6 +292,60 @@ private val sampleLabels = listOf(
     MailLabelDto(id = "l1", name = "Work", color = "blue", unread = 2),
     MailLabelDto(id = "l2", name = "Bills", color = "green"),
     MailLabelDto(id = "l3", name = "Receipts", color = "amber", unread = 1),
+)
+
+/**
+ * The account record the eight Phase-1 frames are photographed with. Invented,
+ * like every seed in this file — it never appears in a live path — but shaped
+ * exactly like `GET /auth/account/profile` answers (`auth-account-profile.ts:175-214`):
+ * the alias rows carry the table's own fields, the connection list mixes a
+ * first-party product (no host, so it draws a monogram) with a third-party app
+ * (a host, so it draws its domain), and every settled marker the walk waits for
+ * — the birthday, the note, the task, the signature, the alias address, the
+ * product name, the created date — exists only once this document has landed.
+ */
+private fun sampleProfile(): ProfileDto = ProfileDto(
+    id = "p1",
+    name = "Amira Rahman",
+    firstName = "Amira",
+    lastName = "Rahman",
+    birthday = "1993-04-12",
+    gender = "Female",
+    address = "amira@grapmail.com",
+    handle = "amira",
+    domain = "grapmail.com",
+    phone = "+8801711223344",
+    phoneVerified = true,
+    twoFactor = "sms",
+    twoFactorEnabled = true,
+    displayName = "Amira Rahman",
+    recoveryEmail = "amira@northwind.example",
+    fromHeader = "Amira Rahman <amira@grapmail.com>",
+    createdAt = "2026-03-14T04:30:00.000Z",
+    passwordChangedAt = "2026-06-02T11:00:00.000Z",
+    termsAcceptedAt = "2026-03-14T04:31:10.000Z",
+    backupCodesRemaining = 7,
+    settings = ProfileSettingsDto(
+        signature = "Sent with GrapMail",
+        density = "comfortable",
+        notes = listOf("Send the Q3 numbers before Friday"),
+        tasks = listOf("Book the studio visit"),
+        signatures = mapOf("business@grapmail.com" to "Northwind Studio"),
+        blockedSenders = listOf("deals@spamyard.example"),
+        safeSenders = listOf("hello@northwind.example"),
+    ),
+    aliases = listOf(
+        ProfileAliasDto(address = "business@grapmail.com", label = "Business",
+            isActive = true, createdAt = "2026-04-02T10:00:00.000Z"),
+        ProfileAliasDto(address = "old@grapmail.com", label = "Old",
+            isActive = false, createdAt = "2026-03-20T09:00:00.000Z"),
+    ),
+    connections = listOf(
+        ProfileConnectionDto(product = "Grapsee Projects", host = null,
+            scopes = listOf("profile", "projects"), connectedAt = "2026-07-01T08:00:00.000Z"),
+        ProfileConnectionDto(product = "Northwind SSO", host = "sso.northwind.example",
+            scopes = listOf("profile"), connectedAt = "2026-07-19T15:20:00.000Z"),
+    ),
 )
 
 /// The sample pages, in the same cache the live list reads. Without them the

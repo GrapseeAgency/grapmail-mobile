@@ -529,7 +529,15 @@ for spec in "two-factor-on:40-sec-two-factor-on" \
             "mail-snooze-sheet:84-mail-snooze-sheet" \
             "mail-unsubscribe:87-mail-unsubscribe" \
             "mail-contact-detail:85-mail-contact-detail" \
-            "mail-sender-sheet:86-mail-sender-sheet"; do
+            "mail-sender-sheet:86-mail-sender-sheet" \
+            "account-profile:90-account-profile" \
+            "account-privacy:91-account-privacy" \
+            "mail-notes:92-mail-notes" \
+            "mail-tasks:93-mail-tasks" \
+            "account-connections:94-account-connections" \
+            "mail-settings-prefs:95-mail-prefs" \
+            "mail-addresses:96-mail-addresses" \
+            "mail-support:97-mail-support"; do
   nm="${spec%%:*}"; pic="${spec##*:}"
   adb shell am force-stop "$PKG"
   adb shell am start -W -n "$PKG/.MainActivity" --es gmSnapshot "$nm" >/dev/null
@@ -585,6 +593,21 @@ for spec in "two-factor-on:40-sec-two-factor-on" \
     mail-snooze-sheet) settled="gm-sheets-snooze" ;;
     mail-unsubscribe) settled="gm-sheets-unsub" ;;
     mail-sender-sheet) settled="gm-sheets-sender" ;;
+    # The account band: every marker is a SEEDED VALUE from `sampleProfile()`
+    # (MailSnapshot.kt) — text that exists on screen only once the profile
+    # document has landed in the model. A photograph of Loading… would prove
+    # the frame shipped empty, which is the hole these waits exist to close.
+    account-profile) settled="1993-04-12" ;;
+    account-privacy) settled="2026-03-14" ;;
+    mail-notes) settled="Send the Q3 numbers before Friday" ;;
+    mail-tasks) settled="Book the studio visit" ;;
+    account-connections) settled="Northwind SSO" ;;
+    mail-settings-prefs) settled="Sent with GrapMail" ;;
+    mail-addresses) settled="business@grapmail.com" ;;
+    # Support is the one frame whose content does not depend on the document:
+    # its questions are the web page's copy, and the marker proves the screen
+    # composed rather than the fetch settled.
+    mail-support) settled="Why can I not create an account for someone under 13?" ;;
     *) settled="" ;;
   esac
   # A marker may name a visible string OR a resource-id. Text is right for
@@ -770,7 +793,10 @@ for want in 01-welcome-light 02-step1-name-light 03-step2-basicinfo-light \
             82-mail-send-receipt 83-mail-assign-label-sheet \
             84-mail-snooze-sheet 85-mail-contact-detail \
             86-mail-sender-sheet 87-mail-unsubscribe \
-            88-mail-thread-dark 89-mail-labels-dark; do
+            88-mail-thread-dark 89-mail-labels-dark \
+            90-account-profile 91-account-privacy 92-mail-notes \
+            93-mail-tasks 94-account-connections 95-mail-prefs \
+            96-mail-addresses 97-mail-support; do
   [ -s "$OUT/$want.png" ] || { echo "FAIL: missing $want.png" >&2; FAILURES=$((FAILURES + 1)); }
 done
 if [ "$FAILURES" -gt 0 ]; then

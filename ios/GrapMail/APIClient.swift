@@ -476,6 +476,169 @@ struct LinkPhoneResponse: Codable {
 
 // ── Security sector (the 24-screen batch) ───────────────────────────────────
 
+/// `settings.locale` — language, timezone and date order
+/// (`auth-account-profile.ts:79`). The timezone is what every timestamp is
+/// rendered in and the date format is what the thread's absolute time prints,
+/// so this is not a preference the app may store while ignoring.
+struct LocaleInfo: Codable {
+    var language = "en-US"
+    var timezone = "Asia/Dhaka"
+    /// `dmy`, `mdy` or `ymd`.
+    var dateFormat = "dmy"
+
+    private enum CodingKeys: String, CodingKey { case language, timezone, dateFormat }
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        language = c.lenient(.language, "en-US")
+        timezone = c.lenient(.timezone, "Asia/Dhaka")
+        dateFormat = c.lenient(.dateFormat, "dmy")
+    }
+    init(language: String = "en-US", timezone: String = "Asia/Dhaka", dateFormat: String = "dmy") {
+        self.language = language; self.timezone = timezone; self.dateFormat = dateFormat
+    }
+}
+
+/// `settings.vacation` — stored on the record, and read here so a settings
+/// write from this app cannot overwrite it with a default. No screen EDITS it:
+/// nothing in the mail pipeline turns it into a sieve rule yet, and a switch
+/// that changes a stored value with no effect is the dead toggle this project
+/// refuses to ship (`auth-account-profile.ts:75`).
+struct VacationInfo: Codable {
+    var enabled = false
+    var from = ""
+    var to = ""
+    var message = ""
+
+    private enum CodingKeys: String, CodingKey { case enabled, from, to, message }
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        enabled = c.lenient(.enabled, false)
+        from = c.lenient(.from, "")
+        to = c.lenient(.to, "")
+        message = c.lenient(.message, "")
+    }
+    init() {}
+}
+
+/// `settings.forwarding` — same rule as `VacationInfo`: carried, not offered.
+struct ForwardingInfo: Codable {
+    var enabled = false
+    var address = ""
+    var keepCopy = true
+
+    private enum CodingKeys: String, CodingKey { case enabled, address, keepCopy }
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        enabled = c.lenient(.enabled, false)
+        address = c.lenient(.address, "")
+        keepCopy = c.lenient(.keepCopy, true)
+    }
+    init() {}
+}
+
+/// The mail-preference half of the profile document (`:69-80`). Every default
+/// is the SERVER's default, so a decode of an older partial document lands on
+/// the same values `withDefaults` would answer with.
+struct ProfileSettings: Codable {
+    var signature = ""
+    /// `comfortable` or `compact` — the list's row height, which the app
+    /// applies, not merely stores.
+    var density = "comfortable"
+    /// Per-address signatures, keyed by the full alias address (`:74`).
+    var signatures: [String: String] = [:]
+    var vacation = VacationInfo()
+    var forwarding = ForwardingInfo()
+    var blockedSenders: [String] = []
+    var safeSenders: [String] = []
+    var notes: [String] = []
+    var tasks: [String] = []
+    var locale = LocaleInfo()
+
+    private enum CodingKeys: String, CodingKey {
+        case signature, density, signatures, vacation, forwarding,
+             blockedSenders, safeSenders, notes, tasks, locale
+    }
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        signature = c.lenient(.signature, "")
+        density = c.lenient(.density, "comfortable")
+        signatures = c.lenient(.signatures, [:])
+        vacation = c.lenient(.vacation, VacationInfo())
+        forwarding = c.lenient(.forwarding, ForwardingInfo())
+        blockedSenders = c.lenient(.blockedSenders, [])
+        safeSenders = c.lenient(.safeSenders, [])
+        notes = c.lenient(.notes, [])
+        tasks = c.lenient(.tasks, [])
+        locale = c.lenient(.locale, LocaleInfo())
+    }
+    init() {}
+}
+
+/// One alias row as the profile carries it (`:208`) — the same table
+/// `GET /grapmail/aliases` answers, delivered with the profile so the Addresses
+/// screen and the settings rows cannot disagree about an account's addresses.
+struct ProfileAlias: Codable, Identifiable {
+    var address = ""
+    var label = ""
+    /// The server's own word for "still receives"; the screen says "paused"
+    /// from it rather than re-deriving anything.
+    var isActive = true
+    var createdAt: String?
+    var id: String { address }
+
+    private enum CodingKeys: String, CodingKey { case address, label, isActive, createdAt }
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        address = c.lenient(.address, "")
+        label = c.lenient(.label, "")
+        isActive = c.lenient(.isActive, true)
+        createdAt = c.lenientOpt(.createdAt)
+    }
+    init() {}
+}
+
+/// One connected app (`:213`, and the JSONL route's cleaned shape at
+/// `src/app/api/auth/account/profile/route.ts:330-345`). `product` is the
+/// display name and the key the disconnect acts on; `host` only exists for
+/// third-party apps — our own products have no domain, so they draw a monogram.
+struct ProfileConnection: Codable, Identifiable {
+    var product = ""
+    var host: String?
+    var scopes: [String] = []
+    var connectedAt: String?
+    var id: String { product }
+
+    private enum CodingKeys: String, CodingKey { case product, host, scopes, connectedAt }
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        product = c.lenient(.product, "")
+        host = c.lenientOpt(.host)
+        scopes = c.lenient(.scopes, [])
+        connectedAt = c.lenientOpt(.connectedAt)
+    }
+    init() {}
+}
+
+/// The settings keys a screen can write, every one optional — the mirror of
+/// Android's `ProfileSettingsPatch`. Absent means "this screen did not touch
+/// that"; an empty string means "clear it". The two must not collapse, so the
+/// patch is optionals all the way down and the encoder that builds the body
+/// omits the nils (`patchSettings`).
+///
+/// vacation and forwarding are DELIBERATELY absent: no code turns them into
+/// sieve rules yet, and a switch that changes a stored value with no effect on
+/// any message is the dead toggle this project refuses to ship.
+struct ProfileSettingsPatch {
+    var signature: String? = nil
+    var density: String? = nil
+    var signatures: [String: String]? = nil
+    var blockedSenders: [String]? = nil
+    var safeSenders: [String]? = nil
+    var notes: [String]? = nil
+    var tasks: [String]? = nil
+    var locale: LocaleInfo? = nil
+}
+
 struct ProfileDto: Codable {
     var id = ""
     var name = ""
@@ -497,6 +660,35 @@ struct ProfileDto: Codable {
     var backupCodesRemaining: Int?
     var passwordChangedAt: String?
     var createdAt: String?
+    // ── The mail-preference half of the same record ────────────────────────
+    //
+    // `GET /auth/account/profile` answers one document that carries the person's
+    // name, display name, recovery targets, photo and every mail preference the
+    // website's settings pages edit (`auth-account-profile.ts:69-80`,
+    // `:175-214`). This app used to read only the security fields out of it and
+    // discard the rest — the same record, two views of it, with the web editing
+    // what mobile could not see.
+    var firstName: String?
+    var lastName: String?
+    var birthday: String?
+    var gender: String?
+    /// What a recipient sees in the From line. Empty means the server falls
+    /// back to `name`, and the field says so rather than the client guessing.
+    var displayName: String?
+    var recoveryEmail: String?
+    var recoveryPhone: String?
+    var domain: String?
+    var fromHeader: String?
+    var avatarUrl: String?
+    var phoneVerified: Bool?
+    /// nil means the read did not answer; the screens then say "could not be
+    /// read" instead of drawing empty strings as though the account had been
+    /// asked and had nothing to say.
+    var settings: ProfileSettings?
+    var aliases: [ProfileAlias]?
+    var connections: [ProfileConnection]?
+    /// When the person accepted the terms — the privacy screen's one hard fact.
+    var termsAcceptedAt: String?
 
     /// The one verdict the hub acts on: the server's own flag when it sends
     /// one, otherwise the legacy string read as a flag, otherwise nil — and
@@ -512,7 +704,10 @@ struct ProfileDto: Codable {
 
     private enum CodingKeys: String, CodingKey {
         case id, name, address, handle, phone, twoFactor, twoFactorEnabled,
-             twoFactorEnabledAt, backupCodesRemaining, passwordChangedAt, createdAt
+             twoFactorEnabledAt, backupCodesRemaining, passwordChangedAt, createdAt,
+             firstName, lastName, birthday, gender, displayName, recoveryEmail,
+             recoveryPhone, domain, fromHeader, avatarUrl, phoneVerified, settings,
+             aliases, connections, termsAcceptedAt
     }
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -527,6 +722,38 @@ struct ProfileDto: Codable {
         backupCodesRemaining = c.lenientOpt(.backupCodesRemaining)
         passwordChangedAt = c.lenientOpt(.passwordChangedAt)
         createdAt = c.lenientOpt(.createdAt)
+        firstName = c.lenientOpt(.firstName)
+        lastName = c.lenientOpt(.lastName)
+        birthday = c.lenientOpt(.birthday)
+        gender = c.lenientOpt(.gender)
+        displayName = c.lenientOpt(.displayName)
+        recoveryEmail = c.lenientOpt(.recoveryEmail)
+        recoveryPhone = c.lenientOpt(.recoveryPhone)
+        domain = c.lenientOpt(.domain)
+        fromHeader = c.lenientOpt(.fromHeader)
+        avatarUrl = c.lenientOpt(.avatarUrl)
+        phoneVerified = c.lenientOpt(.phoneVerified)
+        settings = c.lenientOpt(.settings)
+        aliases = c.lenientOpt(.aliases)
+        connections = c.lenientOpt(.connections)
+        termsAcceptedAt = c.lenientOpt(.termsAcceptedAt)
+    }
+
+    /// Hand-written and deliberately SPARSE: the route touches only the keys
+    /// that arrive (`auth-account-profile.ts:395-441`), so a nil property must
+    /// be ABSENT from the body, not sent as JSON null — the settings merge is
+    /// shallow, and one screen writing a null over a key it does not own would
+    /// blank another screen's field. Synthesized encoding emits `null` for
+    /// every nil optional, which is exactly the wrong wire shape here.
+    func encode(to encoder: Encoder) throws {
+        var v = encoder.container(keyedBy: CodingKeys.self)
+        if let s = firstName { try v.encodeIfPresent(s, forKey: .firstName) }
+        if let s = lastName { try v.encodeIfPresent(s, forKey: .lastName) }
+        if let s = birthday { try v.encodeIfPresent(s, forKey: .birthday) }
+        if let s = gender { try v.encodeIfPresent(s, forKey: .gender) }
+        if let s = displayName { try v.encodeIfPresent(s, forKey: .displayName) }
+        if let s = recoveryEmail { try v.encodeIfPresent(s, forKey: .recoveryEmail) }
+        if let s = recoveryPhone { try v.encodeIfPresent(s, forKey: .recoveryPhone) }
     }
 }
 
@@ -869,6 +1096,146 @@ struct ApiClient {
     static func profile(token: String) async throws -> ProfileResponse {
         try await request("/auth/account/profile", bearer: token)
     }
+
+    // ── Account-record sector (the eight profile screens) ──────────────────
+
+    /// One partial profile write — the eight account screens' only writer.
+    ///
+    /// The dictionaries carry exactly the keys the caller touched, and NSJSON-
+    /// Serialization drops nil-valued entries: "only keys that arrive are
+    /// touched" (`auth-account-profile.ts:395-441`) is a wire property, so it
+    /// must be true of the BYTES, not just of the Swift types. The PATCH answer
+    /// is the full updated record, so saves settle from it rather than firing a
+    /// follow-up GET — a second read opens a window where two screens show two
+    /// versions of one document.
+    static func patchProfile(
+        token: String,
+        personal: [String: String?] = [:],
+        settings: [String: Any?]? = nil,
+        connections: [[String: Any?]]? = nil,
+    ) async throws -> ProfileResponse {
+        var body: [String: Any] = [:]
+        for (key, value) in personal { if let value { body[key] = value } }
+        if let settings {
+            var clean: [String: Any] = [:]
+            for (key, value) in settings { if let value { clean[key] = value } }
+            body["settings"] = clean
+        }
+        if let connections {
+            body["connections"] = connections.map { row in
+                var clean: [String: Any] = [:]
+                for (key, value) in row { if let value { clean[key] = value } }
+                return clean
+            }
+        }
+        let data = try JSONSerialization.data(withJSONObject: body)
+        return try await request("/auth/account/profile", method: "PATCH", body: data, bearer: token)
+    }
+
+    /// A profile-settings write is `patchProfile` with the `settings` object
+    /// named and nothing else — the route shallow-merges the sent object over
+    /// the stored one (`auth-account-profile.ts:638-641`), so naming one key
+    /// cannot blank another. The screens build that object through
+    /// `ProfileModel.saveSettings`; there is no second writer to keep in step.
+    
+    /// `POST/DELETE /auth/account/avatar` — `auth-account-profile.ts:277-361`.
+    struct AvatarResponse: Decodable {
+        var success = false
+        /// Only from the upload, and it carries the cache nonce the server
+        /// minted — keeping THAT is what makes a replaced photo show now
+        /// rather than after a relaunch.
+        var avatarUrl: String?
+        var message: String?
+        var error: String?
+
+        private enum CodingKeys: String, CodingKey { case success, avatarUrl, message, error }
+        init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            success = c.lenient(.success, false)
+            avatarUrl = c.lenientOpt(.avatarUrl)
+            message = c.lenientOpt(.message)
+            error = c.lenientOpt(.error)
+        }
+    }
+
+    /// Multipart with the field name the route reads (`file`), the same shapes
+    /// the compose attachment upload uses. The 256 KB ceiling is checked by the
+    /// screen in the person's own words before these bytes exist on the wire.
+    static func uploadAvatar(token: String, bytes: Data, filename: String, mime: String) async throws -> AvatarResponse {
+        let boundary = "----GrapMail\(UUID().uuidString)"
+        var body = Data()
+        func text(_ s: String) { body.append(Data(s.utf8)) }
+        text("--\(boundary)\r\n")
+        text("Content-Disposition: form-data; name=\"file\"; filename=\"\(filename)\"\r\n")
+        text("Content-Type: \(mime)\r\n\r\n")
+        body.append(bytes)
+        text("\r\n--\(boundary)--\r\n")
+        let (data, http) = try accountBinary(
+            path: "/auth/account/avatar", method: "POST", bearer: token,
+            body: body, contentType: "multipart/form-data; boundary=\(boundary)")
+        guard (200..<300).contains(http.statusCode) else { throw requestFailure(data: data, http: http) }
+        return try decoder.decode(AvatarResponse.self, from: data)
+    }
+
+    static func deleteAvatar(token: String) async throws -> AvatarResponse {
+        let (data, http) = try accountBinary(
+            path: "/auth/account/avatar", method: "DELETE", bearer: token,
+            body: nil, contentType: nil)
+        guard (200..<300).contains(http.statusCode) else { throw requestFailure(data: data, http: http) }
+        return try decoder.decode(AvatarResponse.self, from: data)
+    }
+
+    /// The photo's bytes. `GET /avatar` is authenticated — the profile record
+    /// holds only a path with a cache buster, so a plain image load with no
+    /// bearer would 401 and the app must read the bytes itself. A 404 with code
+    /// `NO_AVATAR` is thrown, NOT returned as empty: "there is no photo" and
+    /// "nobody answered the photo" are different sentences for the screen, and
+    /// the caller distinguishes them by the code, which only the route chose.
+    static func avatarBytes(token: String) async throws -> Data {
+        let (data, http) = try accountBinary(
+            path: "/auth/account/avatar", method: "GET", bearer: token,
+            body: nil, contentType: nil)
+        guard (200..<300).contains(http.statusCode) else { throw requestFailure(data: data, http: http) }
+        return data
+    }
+
+    /// The same envelope the JSON `request` builds its errors from, shared by
+    /// the binary calls so a refused upload reports the server's reason.
+    private static func requestFailure(data: Data, http: HTTPURLResponse) -> ApiError {
+        let carrier = try? decoder.decode(ErrorCarrier.self, from: data)
+        return ApiError.http(
+            status: http.statusCode,
+            code: carrier?.code,
+            message: carrier?.message ?? carrier?.error ?? "")
+    }
+
+    /// The account-side binary transport (the mail side has its own carve-out —
+    /// see `mailBinary`). This one DOES signal a 401: these paths live on the
+    /// account store, whose bearer the app's session is, so an expired one must
+    /// take the app to sign-in exactly like every other JSON account call.
+    private static func accountBinary(
+        path: String, method: String, bearer: String,
+        body: Data?, contentType: String?,
+    ) async throws -> (Data, HTTPURLResponse) {
+        guard let url = URL(string: base + path) else {
+            throw ApiError.http(status: -1, code: nil, message: "Bad URL")
+        }
+        var req = URLRequest(url: url)
+        req.httpMethod = method
+        req.setValue("Bearer \(bearer)", forHTTPHeaderField: "Authorization")
+        if let contentType { req.setValue(contentType, forHTTPHeaderField: "Content-Type") }
+        req.httpBody = body
+        let (data, response) = try await URLSession.shared.data(for: req)
+        guard let http = response as? HTTPURLResponse else {
+            throw ApiError.http(status: -1, code: nil, message: "No response")
+        }
+        if http.statusCode == 401 { signalUnauthorized() }
+        return (data, http)
+    }
+
+    // `POST/DELETE /grapmail/aliases` live on the mail surface in `MailAPI.swift`
+    // (`mailCreateAlias`, `mailDeleteAlias`) — one owner per call, the same as
+    // every other `mail*` route, so the parity gate reads one pair of lists.
 
     static func enableTwoFactor(token: String, proof: String?, phoneProof: String?) async throws -> ProfileResponse {
         let body = try encoder.encode(TwoFactorEnableRequest(twoFactor: "on", proof: proof ?? "", phoneProof: phoneProof ?? ""))

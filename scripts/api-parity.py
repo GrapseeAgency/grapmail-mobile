@@ -36,6 +36,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 ANDROID = os.path.join(ROOT, "android/app/src/main/java/com/grapsee/grapmail/data/Api.kt")
 ANDROID_DTO = os.path.join(ROOT, "android/app/src/main/java/com/grapsee/grapmail/data/MailDto.kt")
 IOS_API = os.path.join(ROOT, "ios/GrapMail/MailAPI.swift")
+IOS_ACCOUNT = os.path.join(ROOT, "ios/GrapMail/APIClient.swift")
 QUIET = "--quiet" in sys.argv
 
 
@@ -168,6 +169,38 @@ def android_fields(body):
 def normalise(name):
     """`MailMessageDto` and `MailMessage` are the same row on the wire."""
     return re.sub(r"Dto$", "", name)
+
+
+# ── profile sector (the account-record band) ──────────────────────────────
+#
+# The eight Phase-1 screens read and write ONE document, and both platforms
+# decode it through a hand-written type — the same drift class the mail sector
+# diff exists for, on the half of the API the mail lists never touch. iOS
+# names a few of these without the `Dto` strip's reach, so the pairs are
+# spelled out rather than guessed from a naming rule: an explicit list is the
+# thing a rename cannot slip past.
+PROFILE_PAIRS = {
+    "ProfileDto": "ProfileDto",
+    "ProfileSettingsDto": "ProfileSettings",
+    "ProfileAliasDto": "ProfileAlias",
+    "ProfileConnectionDto": "ProfileConnection",
+    "VacationDto": "VacationInfo",
+    "ForwardingDto": "ForwardingInfo",
+    "LocaleDto": "LocaleInfo",
+    "ProfileSettingsPatch": "ProfileSettingsPatch",
+    "AvatarResponse": "AvatarResponse",
+    "ProfileResponse": "ProfileResponse",
+}
+# Fields whose WIRE key both platforms read, but only one stores under its own
+# name. Each needs a sentence, not a shrug; a bare name in a skip list is how
+# a gate forgets what it forgave.
+PROFILE_FIELD_EXCEPTIONS = {
+    # Android stores both relative shapes and folds them at use
+    # (`tokenExpiresIn ?: expiresIn`); iOS folds `expiresIn` INTO
+    # tokenExpiresIn at decode, so the wire key is handled on both sides and
+    # only the stored representation differs.
+    ("ProfileResponse", "expiresIn"): "folded into tokenExpiresIn at iOS decode",
+}
 
 
 def code_only(src):
@@ -334,7 +367,7 @@ def spec_check(af, _if, android_src, ios_src, problems):
 
 
 def main():
-    missing = [p for p in (ANDROID, ANDROID_DTO, IOS_API) if not os.path.exists(p)]
+    missing = [p for p in (ANDROID, ANDROID_DTO, IOS_API, IOS_ACCOUNT) if not os.path.exists(p)]
     if missing:
         print("api-parity: source file(s) not found: " + ", ".join(missing))
         return 2
@@ -373,6 +406,45 @@ def main():
     if only_android or only_ios:
         say("types on one side only (plumbing, not compared): "
             + ", ".join(only_android + only_ios))
+
+    # ── profile sector ────────────────────────────────────────────────────
+    # The Mail-prefixed decls above cannot see these names; the same balance
+    # and field rules run over profile-scoped declarations instead, so the
+    # parsing rules stay one set and only the name filter differs.
+    prof_a = re.compile(r"^\s*(?:@Serializable\s*)?data class\s+"
+                        r"(Profile[A-Za-z0-9_]*|LocaleDto|VacationDto|ForwardingDto|AvatarResponse)", re.M)
+    prof_i = re.compile(r"^\s*struct\s+(Profile[A-Za-z]*|LocaleInfo|VacationInfo|"
+                        r"ForwardingInfo|AvatarResponse)", re.M)
+    android_profile_src = read(ANDROID)
+    ios_profile_src = read(IOS_ACCOUNT)
+    pa = _types(android_profile_src, prof_a, "(", ")", android_fields)
+    pi = _types(ios_profile_src, prof_i, "{", "}", swift_fields)
+    pchecked, pfields = 0, 0
+    for a_name, i_name in sorted(PROFILE_PAIRS.items()):
+        # `_types` normalises through the shared rule, which strips the `Dto`
+        # suffix — the lookup key must be normalised the same way or every
+        # stripped pair reports as "missing on Android".
+        a, i = pa.get(normalise(a_name)), pi.get(normalise(i_name))
+        if a is None or i is None:
+            problems.append(f"profile type missing on "
+                            f"{'Android' if a is None else 'iOS'}: "
+                            f"{a_name} / {i_name}")
+            continue
+        pchecked += 1
+        for field in sorted(i - a):
+            if (i_name, field) not in PROFILE_FIELD_EXCEPTIONS:
+                problems.append(f"{a_name}: field only on iOS: {field}")
+        for field in sorted(a - i):
+            if (a_name, field) not in PROFILE_FIELD_EXCEPTIONS:
+                problems.append(f"{a_name}: field only on Android: {field}")
+        pfields += len((a & i))
+    # The pass cannot silently compare nothing: a refactor that renames both
+    # sides in step, or deletes the section, empties the count — and an empty
+    # "profile sector checked" line reads exactly like a passing one.
+    if pchecked < len(PROFILE_PAIRS):
+        problems.append(f"profile types compared {pchecked}/{len(PROFILE_PAIRS)} "
+                        f"— a pair stopped resolving, which is drift in itself")
+    say(f"profile sector — {pchecked} types, {pfields} shared fields")
 
     if problems:
         print(f"\napi-parity FAILED: {len(problems)} asymmetry(ies)")

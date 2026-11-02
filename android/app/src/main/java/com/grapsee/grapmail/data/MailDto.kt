@@ -97,11 +97,19 @@ data class MailMessageFullDto(
     val inReplyTo: String? = null,
     val sizeBytes: Int? = null,
     /**
-     * The sealed envelope, opaque to the server and returned byte for byte.
-     * Nothing in the app decrypts it here — that is the E2E path's job — so it
-     * is carried only so "is this encrypted" can be answered with the proof.
+     * The sealed envelope, opaque to the server and returned byte for byte
+     * (`grapmail.ts:618-625` — "the one route where it is the point").
+     *
+     * It is a JSON OBJECT, not a string: the row stores `e2e_envelope` as JSONB
+     * and the handler answers with the parsed value. Declaring this as a String
+     * made every sealed message fail to decode, which is how an encrypted
+     * message would have shown up as "this message could not be loaded" — a
+     * network-shaped excuse for a working server.
+     *
+     * [MailE2e.envelopeFrom] reads it, and nothing else in the app opens it
+     * without this device's key and passphrase.
      */
-    val e2eEnvelope: String? = null,
+    val e2eEnvelope: kotlinx.serialization.json.JsonObject? = null,
     val attachments: List<MailAttachmentDto> = emptyList(),
 )
 
@@ -185,13 +193,19 @@ data class MailMeResponse(
 )
 
 /**
- * `GET /grapmail/stats` — `grapmail.ts:664-668`.
+ * `GET /grapmail/stats` — `grapmail.ts:647-691`.
  *
- * Exactly five boxes are reported. Starred, Archive and All Mail are not, so
- * they carry no badge — the same call the web client makes
- * (`src/app/(mail)/mail/page.tsx:2306`). `null` here means "the server did not
- * answer", and the UI must render nothing rather than `0`, because `0` is a
- * claim that the folder is empty.
+ * `null` here means "the server did not answer", and the UI must render nothing
+ * rather than `0`, because `0` is a claim that the folder is empty.
+ *
+ * The four extra fields (`starred`, `archive`, `others`, `snoozed`) are what the
+ * backend added when `/stats` began counting the same containers the listings
+ * read (`boxCount` + `EVERYTHING_BOX` + `SNOOZED_BOX`). They stay nullable for a
+ * second reason than "not asked": an older deployment simply does not send them.
+ * That is load-bearing for Snoozed — the drawer row and its badge appear only
+ * when the server reports the box, so the app never advertises a list it cannot
+ * fetch, and it needs no hardcoded build flag that goes stale the day production
+ * moves.
  */
 @Serializable
 data class MailStatsResponse(
@@ -201,6 +215,16 @@ data class MailStatsResponse(
     val drafts: Int? = null,
     val spam: Int? = null,
     val trash: Int? = null,
+    val starred: Int? = null,
+    val archive: Int? = null,
+    /** `?box=others` — everything still in the account (`grapmail-box-terms.ts:78`). */
+    val others: Int? = null,
+    /**
+     * The count of `?box=snoozed`. Null is read as two different things by the
+     * drawer, and both are true of a null: nobody was asked, or this deployment
+     * has no snoozed list. Neither licenses a `0`.
+     */
+    val snoozed: Int? = null,
 )
 
 @Serializable
@@ -288,13 +312,21 @@ enum class LabelMark { On, Mixed, Off, Unknown }
  *  “read, and nothing is labelled” is not confused with “never asked”. */
 enum class AssignmentsRead { NotRead, Reading, Read, Failed }
 
-/** `GET /grapmail/aliases` — a second address delivering into this mailbox. */
+/**
+ * `GET /grapmail/aliases` — a second address delivering into this mailbox.
+ *
+ * Three fields, because three is what the route selects: `grapmail-aliases.ts:131-152`
+ * reads `label`, `address` and `createdAt` and nothing else. This used to declare
+ * `id` and `isActive` with defaults, and both were lies with consequences — an
+ * alias was asserted live when nobody had said so (and the "paused" tag could
+ * therefore never appear), and every row carried the same empty `id`, which is a
+ * duplicate identity in a list keyed by one. `address` is the identity here: the
+ * DELETE route takes an address, not an id (`:277`).
+ */
 @Serializable
 data class MailAliasDto(
-    val id: String = "",
     val label: String = "",
     val address: String = "",
-    val isActive: Boolean = true,
     val createdAt: String? = null,
 )
 
@@ -303,6 +335,245 @@ data class MailAliasesResponse(
     val success: Boolean = false,
     val aliases: List<MailAliasDto> = emptyList(),
 )
+
+/**
+ * The body of `POST /grapmail/aliases` — one field, `label`
+ * (`grapmail-aliases.ts:169` reads `body?.label`, slugifies it, and builds the
+ * address at `:188` as slug + "." + handle + "@" + the account's domain).
+ *
+ * There is deliberately no address field to fill in: the server owns the domain
+ * and the handle, so this client cannot name the mailbox an alias is created in.
+ * Sending `color`-style extras is worse than useless here — the route ignores
+ * unknown keys, so an invented `isActive` would read back as the server's own
+ * default and the screen would show a state nobody set.
+ */
+@Serializable
+data class MailAliasLabelRequest(val label: String)
+
+/**
+ * `POST /grapmail/aliases` — `grapmail-aliases.ts:155-275`.
+ *
+ * The server mints the address itself (`label + '.' + handle + '@' + domain`);
+ * the client sends only a label and never a full address, which is what stops one
+ * account claiming another's primary. The three refusals — `duplicate`, `taken`,
+ * `limit` — come back as `success: false` with a sentence, and a 429 with
+ * `retryAfter` when the throttle trips, so the screen can say which of them it is
+ * rather than "something went wrong".
+ */
+@Serializable
+data class MailAliasCreateResponse(
+    val success: Boolean = false,
+    val alias: MailAliasDto? = null,
+    val message: String? = null,
+    val error: String? = null,
+    val code: String? = null,
+    val retryAfter: Int? = null,
+)
+
+/**
+ * `DELETE /grapmail/aliases/:address` — `grapmail-aliases.ts:277-300`.
+ *
+ * A row that was not the caller's is answered 404 "No such alias" rather than
+ * 403, so this cannot be used to learn whether somebody else owns an address.
+ */
+@Serializable
+data class MailAliasDeleteResponse(
+    val success: Boolean = false,
+    val address: String? = null,
+    val error: String? = null,
+    /** The gateway route answers one; the JSONL route may. Optional because
+     *  an absent sentence is no answer, and the screen falls back to its own. */
+    val message: String? = null,
+    val retryAfter: Int? = null,
+)
+
+/**
+ * `DELETE /grapmail/attachments/:id` — `grapmail-attachments.ts:412`.
+ *
+ * The route is scoped to the caller's own rows, so an attachment id belonging to
+ * another account is refused the same way as one that does not exist.
+ */
+@Serializable
+data class MailAttachmentDeleteResponse(
+    val success: Boolean = false,
+    val id: String? = null,
+    val error: String? = null,
+    val code: String? = null,
+)
+
+// ── End-to-end encryption ────────────────────────────────────────────────────
+//
+// The four routes are mounted by the auth service at `/grapmail/e2e`
+// (`services/auth-service/src/index.ts:139`) and forwarded to the mail service's
+// key directory (`services/mail-service/src/routes/e2e.ts`). They are app-facing:
+// the account id is filled in from the session and is never sent from here, so
+// there is no field through which this client could name another account.
+//
+// What the directory holds is the PUBLIC half only. The store refuses a body that
+// carries any private material (`grapmail-e2e.ts:151-169`, and the private-material
+// check in `mail-service/src/routes/e2e.ts:209`), so a client that tried to upload
+// a private key is answered 400 with the sentence that names the field. Nothing in
+// this file has a place to put one.
+
+/** One published key, with the identifiers the server derives from it. */
+@Serializable
+data class MailE2eKeyDto(
+    /** base64 SPKI DER — X25519 for encryption, Ed25519 for signing. */
+    val publicKey: String = "",
+    /** SHA-256 over the DER, uppercase hex, colon-separated. */
+    val fingerprint: String = "",
+    /** The low-order 64 bits of the fingerprint, for list views and logs. */
+    val keyId: String = "",
+)
+
+@Serializable
+data class MailE2eKeysDto(
+    val userId: String = "",
+    val encryption: MailE2eKeyDto? = null,
+    val signing: MailE2eKeyDto? = null,
+    val publishedAt: String? = null,
+    val updatedAt: String? = null,
+)
+
+/**
+ * `GET /e2e/keys` — `grapmail-e2e.ts:137-149`.
+ *
+ * `published: false` is a real answer ("this account has no key"), and it is kept
+ * distinct from a failed read, which is the same distinction the label list makes
+ * with [AssignmentsRead]: an unknown must not be drawn as a no.
+ */
+@Serializable
+data class MailE2eKeysResponse(
+    val success: Boolean = false,
+    val published: Boolean = false,
+    val keys: MailE2eKeysDto? = null,
+    val error: String? = null,
+    val code: String? = null,
+    val detail: String? = null,
+)
+
+/**
+ * `PUT /e2e/keys` — `grapmail-e2e.ts:151-169`, forwarding to
+ * `mail-service/src/routes/e2e.ts:199-268`.
+ *
+ * `discoverable` is part of the answer and not a flourish: "your key is published"
+ * and "your key is published and senders can find it" are different sentences, and
+ * an account whose handle could not be resolved gets the first without the second.
+ */
+@Serializable
+data class MailE2ePublishResponse(
+    val success: Boolean = false,
+    val keys: MailE2eKeysDto? = null,
+    val discoverable: Boolean = false,
+    val error: String? = null,
+    val detail: String? = null,
+)
+
+/** `DELETE /e2e/keys` — idempotent: `removed: false` is a success, not an error. */
+@Serializable
+data class MailE2eUnpublishResponse(
+    val success: Boolean = false,
+    val removed: Boolean = false,
+    val error: String? = null,
+    val detail: String? = null,
+)
+
+/**
+ * Why one address could not be sealed to. A closed set, mirroring the server's
+ * (`mailE2eApi.ts:50-54`), because the sentence a user needs differs per reason:
+ * "this person has not set up encryption" and "this is not a GrapMail address"
+ * lead to different actions.
+ */
+enum class MailE2eBlockReason(val apiValue: String) {
+    NotAnAddress("not-an-address"),
+    RemoteDomain("remote-domain"),
+    NoSuchAccount("no-such-account"),
+    NoKeyPublished("no-key-published"),
+    /** Anything the server says that is not in this build's list. */
+    Unknown("unknown"),
+    ;
+
+    companion object {
+        fun from(value: String?): MailE2eBlockReason =
+            entries.firstOrNull { it.apiValue == value } ?: Unknown
+    }
+}
+
+@Serializable
+data class MailE2eBlockedDto(
+    val status: String = "unavailable",
+    val address: String = "",
+    val reason: String? = null,
+    val domain: String = "",
+) {
+    /** Read through the closed set, never by trusting `reason` as a string the
+     *  UI branches on directly: a server that adds a reason must land on
+     *  [Unknown] and be said plainly, not drawn as the wrong sentence. */
+    val why: MailE2eBlockReason get() = MailE2eBlockReason.from(reason)
+}
+
+/**
+ * `POST /e2e/plan` — `grapmail-e2e.ts:194-229`, and the shape the web client
+ * declares at `src/app/lib/mailE2eApi.ts:70-72`.
+ *
+ * The addresses travel in a POST body and never a query string, on both the plan
+ * and the lookup routes: a URL is written to access logs, proxy logs and browser
+ * history, and recipient addresses are exactly the metadata an encrypted message
+ * exists to keep out of those.
+ */
+@Serializable
+data class MailE2ePlanDto(
+    /** `seal` or `plain`. */
+    val mode: String = "",
+    val keys: List<String> = emptyList(),
+    val recipients: List<String> = emptyList(),
+    val blocked: List<MailE2eBlockedDto> = emptyList(),
+) {
+    val canSeal: Boolean get() = mode == "seal"
+}
+
+@Serializable
+data class MailE2ePlanResponse(
+    val success: Boolean = false,
+    val plan: MailE2ePlanDto? = null,
+    val error: String? = null,
+    val detail: String? = null,
+)
+
+/** One answer from `POST /e2e/lookup` — the sender's signing key, or why there is none. */
+@Serializable
+data class MailE2eLookupEntryDto(
+    /** `found` or `unavailable`. */
+    val status: String = "",
+    val address: String = "",
+    val signing: MailE2eKeyDto? = null,
+    val reason: String? = null,
+    val domain: String = "",
+) {
+    val why: MailE2eBlockReason get() = MailE2eBlockReason.from(reason)
+}
+
+@Serializable
+data class MailE2eLookupResponse(
+    val success: Boolean = false,
+    val results: List<MailE2eLookupEntryDto> = emptyList(),
+    val error: String? = null,
+    val detail: String? = null,
+)
+
+/** `PUT /e2e/keys` body. Only the public halves — see the block comment above. */
+@Serializable
+data class MailE2ePublishRequest(
+    val encryptionPublicKey: String,
+    val signingPublicKey: String? = null,
+)
+
+/** `POST /e2e/plan` and `POST /e2e/lookup` bodies. */
+@Serializable
+data class MailE2eAddressesRequest(
+    val addresses: List<String>,
+)
+
 
 /**
  * `POST /grapmail/send` — `grapmail.ts:1136-1143`.
@@ -415,21 +686,20 @@ data class MailScreenerDecisionResponse(
  * Two things a caller must not assume:
  *  - `archive` and `others` are answered by the *archive* router, which
  *    `next()`-falls through for every other box. Same URL, different handler.
- *  - There is no `snoozed` box in what is deployed. `snooze` writes `snoozedUntil`
- *    (`grapmail-archive.ts:171`) and the inbox hides those rows
- *    (`grapmail.ts:719-726`), so a postponed message is not listable anywhere the
- *    app can reach. It is NOT without a way back: the app offers Undo for exactly
- *    the mail it just snoozed, because that is the only set it can name honestly,
- *    and `MailAction.Unsnooze` is wired to it on both platforms. A `?box=snoozed`
- *    listing is written and tested in the backend's history (T6.1) but undeployed;
- *    until it ships this enum stays as it is, and `scripts/mail-honesty.py` pins
- *    the drawer against advertising a box nothing serves.
+ *  - `?box=snoozed` is served by the deployment that answers `/stats` with a
+ *    `snoozed` count (`grapmail-box-terms.ts:43,66-68`, `grapmail.ts:670,688`).
+ *    The app therefore treats that field as the capability signal: the drawer
+ *    shows Snoozed when the server reports it and hides it when it does not,
+ *    rather than shipping a flag that goes stale the day production moves. The
+ *    in-session Undo stays whatever the box answers, because it is the one
+ *    snooze the app knows it caused itself.
  */
 enum class MailBox(val apiValue: String) {
     Inbox("inbox"),
     Starred("starred"),
     Sent("sent"),
     Drafts("drafts"),
+    Snoozed("snoozed"),
     Archive("archive"),
     Spam("spam"),
     Trash("trash"),
@@ -450,6 +720,7 @@ enum class MailBox(val apiValue: String) {
         Starred -> "Starred"
         Sent -> "Sent"
         Drafts -> "Drafts"
+        Snoozed -> "Snoozed"
         Archive -> "Archive"
         Spam -> "Spam"
         Trash -> "Trash"
@@ -459,8 +730,9 @@ enum class MailBox(val apiValue: String) {
     }
 
     companion object {
-        /** The drawer's order — the boxes the reference lists, minus the ones the
-         *  server cannot answer (see the README's honest-UI contract). */
+        /** The drawer's order, in the reference's sequence. `Snoozed` is not in
+         *  this list — it is inserted by the drawer only when `/stats` reports
+         *  the box, which is why it is still a member of the enum. */
         val drawerOrder: List<MailBox> = listOf(Inbox, Starred, Sent, Drafts, Archive, Spam, Trash, All)
 
         /**

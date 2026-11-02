@@ -38,6 +38,7 @@ import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.Menu
 import androidx.compose.material.icons.rounded.MoreHoriz
 import androidx.compose.material.icons.rounded.Report
+import androidx.compose.material.icons.rounded.Schedule
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Send
@@ -179,6 +180,7 @@ fun MailboxScreen(
         drawerContent = {
             MailDrawer(
                 box = state.box,
+                boxes = drawerBoxes(state),
                 unread = state.unreadCount,
                 counts = drawerCounts(state),
                 onBox = { scope.launch { drawer.close() }; vm.open(it) },
@@ -464,12 +466,35 @@ internal fun drawerCounts(s: MailboxViewModel.MailboxUiState): Map<MailBox, Int?
     MailBox.Drafts to s.statsDrafts,
     MailBox.Spam to s.statsSpam,
     MailBox.Trash to s.statsTrash,
-    // Unanswered by the server, so no badge — see CountBadge.
-    MailBox.Starred to null,
-    MailBox.Archive to null,
-    MailBox.All to null,
+    // These three used to be hardcoded nulls on the claim that `/stats` never
+    // answers them. It does now — `starred`, `archive` and `others` are counted by
+    // the same `boxCount` that builds the listing beside each badge
+    // (`grapmail.ts:666-688`) — so the drawer shows the server's number, and shows
+    // nothing at all on a deployment that has not answered yet.
+    MailBox.Starred to s.statsStarred,
+    MailBox.Archive to s.statsArchive,
+    MailBox.All to s.statsOthers,
+    MailBox.Snoozed to s.statsSnoozed,
     MailBox.Screener to null,
 )
+
+/**
+ * The drawer's folder list.
+ *
+ * `Snoozed` is inserted only when `/stats` answered the `snoozed` key. That is a
+ * capability read off the server's own response shape, not a build flag: a
+ * deployment whose `BOXES` lacks `snoozed` (`grapmail-box-terms.ts:66-68`) also
+ * fails to answer the count, and the row must not exist for a listing that would
+ * refuse it. Derived from the state snapshot rather than from the view model so a
+ * Compose recomposition follows the answer as it arrives.
+ */
+internal fun drawerBoxes(s: MailboxViewModel.MailboxUiState): List<MailBox> =
+    if (s.statsSnoozed != null) {
+        listOf(
+            MailBox.Inbox, MailBox.Starred, MailBox.Sent, MailBox.Drafts,
+            MailBox.Snoozed, MailBox.Archive, MailBox.Spam, MailBox.Trash, MailBox.All,
+        )
+    } else MailBox.drawerOrder
 
 // ── chrome ───────────────────────────────────────────────────────────────────
 
@@ -692,13 +717,16 @@ private fun TabItem(icon: ImageVector, label: String, active: Boolean, badge: In
 // ── drawer ───────────────────────────────────────────────────────────────────
 
 /**
- * The folder drawer. Reference rows it can honestly answer for are kept; the
- * three it cannot (Important, Snoozed as a box, Calendar) are absent, and the
- * reason is in the README with the file:line that proves it.
+ * The folder drawer. `boxes` comes from the view model, not from a constant: the
+ * Snoozed row is only there when `/stats` answered the `snoozed` key, so the row
+ * and the route behind it appear together or not at all. What stays absent is
+ * Important and Calendar — no `importance` column and no calendar backend anywhere
+ * in the API, recorded with the file:line in the README's honest-UI contract.
  */
 @Composable
 internal fun MailDrawer(
     box: MailBox,
+    boxes: List<MailBox>,
     unread: Int?,
     counts: Map<MailBox, Int?>,
     onBox: (MailBox) -> Unit,
@@ -726,7 +754,7 @@ internal fun MailDrawer(
         Column(
             Modifier.fillMaxWidth().weight(1f).verticalScroll(rememberScrollState()),
         ) {
-        MailBox.drawerOrder.forEach { b ->
+        boxes.forEach { b ->
             DrawerRow(b.title, iconFor(b), counts[b], selected = b == box) { onBox(b) }
         }
 
@@ -799,6 +827,9 @@ private fun iconFor(b: MailBox): ImageVector = when (b) {
     MailBox.Starred -> Icons.Rounded.Star
     MailBox.Sent -> Icons.Rounded.Send
     MailBox.Drafts -> Icons.Rounded.Description
+    // A clock, not a bell: the box holds mail the server is holding back until a
+    // moment the user chose, and iOS draws the same metaphor in the same slot.
+    MailBox.Snoozed -> Icons.Rounded.Schedule
     MailBox.Archive -> Icons.Rounded.Folder
     MailBox.Spam -> Icons.Rounded.Report
     MailBox.Trash -> Icons.Rounded.Delete
