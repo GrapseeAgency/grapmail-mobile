@@ -161,8 +161,23 @@ echo "boot completed — settling system 80s (cold emulators ANR under early dum
 sleep 80
 
 adb uninstall "$PKG" >/dev/null 2>&1 || true
-adb install -r "$APK" >/dev/null
-adb shell am start -W -n "$PKG/.MainActivity" >/dev/null
+# Both of these were `>/dev/null`. That is the silence that made eight runs of
+# launcher screenshots undiagnosable from CI: `adb install` fails for a reason it
+# prints (signature mismatch, missing file, ABI), and `am start -W` prints
+# Status/Error for an activity that does not exist — and the walk then carried on
+# as if the app were there, because nothing it checked could see that the install
+# had never happened. Failures now stop the run and carry their own output.
+if ! adb install -r "$APK" >/tmp/install.log 2>&1; then
+  echo "FATAL: adb install of $APK failed:" >&2
+  tr -d '\r' < /tmp/install.log >&2
+  exit 1
+fi
+if ! adb shell am start -W -n "$PKG/.MainActivity" >/tmp/launch.log 2>&1; then
+  echo "FATAL: launching $PKG/.MainActivity failed:" >&2
+  tr -d '\r' < /tmp/launch.log >&2
+  exit 1
+fi
+echo "  install ok — $(tr -d '\r' < /tmp/launch.log | grep -E 'Status|Activity' | tr '\n' ' ')"
 sleep 6
 
 echo "· welcome"

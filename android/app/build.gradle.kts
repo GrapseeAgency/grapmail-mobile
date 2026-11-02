@@ -9,12 +9,36 @@ android {
     namespace = "com.grapsee.grapmail"
     compileSdk = 34
 
+    // The signing identity is a decision the founder owns, not a build detail:
+    // a key that ships once cannot be swapped later without every install
+    // reinstalling. So nothing here reads a keystore out of the repo, and nothing
+    // here invents one either. CI generates an EPHEMERAL keystore on the runner,
+    // passes its location and password as environment variables for that one
+    // job, and the APK it signs is labelled as test-signed on the release page.
+    // When the real distribution key exists, it goes into the same three
+    // variables as repository secrets and this block does not change.
+    val ciKeystore = System.getenv("CI_KEYSTORE_FILE")?.takeIf { it.isNotBlank() }
+
+    signingConfigs {
+        if (ciKeystore != null) {
+            create("ci") {
+                storeFile = file(ciKeystore)
+                storePassword = System.getenv("CI_KEYSTORE_PASSWORD")
+                keyAlias = System.getenv("CI_KEYSTORE_ALIAS")
+                keyPassword = System.getenv("CI_KEYSTORE_PASSWORD")
+            }
+        }
+    }
+
     defaultConfig {
         applicationId = "com.grapsee.grapmail"
         minSdk = 26
         targetSdk = 34
-        versionCode = 1
-        versionName = "0.0.0.1"
+        // Bumped for the mailbox sector. `versionName` is what the release page
+        // and `aapt dump badging` are checked against, so the tag and the APK
+        // cannot quietly disagree about which build this is.
+        versionCode = 2
+        versionName = "0.2.0"
         // Real account API — same contract the website uses.
         buildConfigField("String", "API_BASE", "\"https://grapsee.com/api\"")
     }
@@ -23,7 +47,14 @@ android {
         release {
             isMinifyEnabled = true
             isShrinkResources = true
+            // Explicit, because "release" is a claim about the artifact and this
+            // file is the only place that can make it stick: a debuggable release
+            // build is a debug build with a misleading name, and the CI gate that
+            // publishes to the Releases page now reads the manifest to prove it
+            // is not one.
+            isDebuggable = false
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            if (ciKeystore != null) signingConfig = signingConfigs.getByName("ci")
         }
     }
     compileOptions {
