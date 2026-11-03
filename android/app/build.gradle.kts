@@ -41,8 +41,14 @@ android {
         // `app-release-unsigned.apk` because the keystore variables were handed to
         // `$GITHUB_ENV` in the same step that built, and the gate refused to
         // publish it — that failed tag stays in history as the attempt.
-        versionCode = 3
-        versionName = "0.2.1"
+        // 0.3.0 carries the account-record band, the mailbox write sector, the
+        // E2E encryption sector, subscriptions and the store-compliance work.
+        // v0.3.0's first release-job run FAILED HERE ON PURPOSE: the tag said
+        // 0.3.0, this file still said 0.2.1, and the badging check refused to
+        // publish a release page describing a build it could not name. The
+        // disagreement was real; the tag was moved to the commit that fixes it.
+        versionCode = 4
+        versionName = "0.3.0"
         // Real account API — same contract the website uses.
         buildConfigField("String", "API_BASE", "\"https://grapsee.com/api\"")
     }
