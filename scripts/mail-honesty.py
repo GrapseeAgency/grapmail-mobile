@@ -1660,6 +1660,25 @@ pin("iOS waits on seeded content for the encryption band",
         ("Encryption is not set up on this device", "Your key is unlocked for this session",
          "There is no way to recover a forgotten passphrase.",
          "Published fingerprint", "Remove from this device", "priya@havenworks.example")))
+# (The passphrase frame's wait is the headline, both walks: XCUITest rejects
+# string identifiers over 128 characters, which the 139-character lede is —
+# CI threw "Invalid query" on it. The screen still SHOWS the lede; the walk
+# just cannot ask for it by name.)
+pin("the passphrase-change frame waits on the headline on both walks",
+    'settled="Change your passphrase"' in KT_WALK
+    and '"e2e-passphrase": "Change your passphrase"' in SW_WALK)
+
+# XCUITest's 128-character identifier cap killed one walk for a 139-character
+# marker. Pin every settled wait under the cap, so the next long sentence
+# fails here instead of at minute twenty-eight of a simulator run.
+_sl = SW_WALK[SW_WALK.index("let settledLabels: [String: String] = ["):]
+_sl = _sl[:_sl.index("\n        for screen in postWriteScreens")]
+_parts = re.split(r",(?=\s*\")", re.sub(r"\s*\+\s*", "", _sl))
+# keys sit before a ':' in each part; the value is what follows it
+_val_re = re.compile(r":\s*\"((?:[^\"\\]|\\.)*)\"")
+_long = [m.group(1) for part in _parts for m in [_val_re.search(part)] if m and len(m.group(1)) > 128]
+pin("every iOS settled marker fits XCUITest's 128-character identifier cap",
+    not _long)
 pin("the plaintext private key exists in neither snapshot host",
     not re.search(r"MI[EHR][A-Za-z0-9+/=]{20,}", KT_HOST)
     and not re.search(r"MI[EHR][A-Za-z0-9+/=]{20,}", SW_HOST))

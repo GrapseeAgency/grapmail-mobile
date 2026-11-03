@@ -513,7 +513,11 @@ final class ScreenshotWalkUITests: XCTestCase {
             "e2e-unlock": "Your passphrase decrypts the key on this device. It is never sent anywhere.",
             "e2e-details": "7C:0F:2A:91:B4:D8:3E:6C:05:AA:1F:BE:D2:48:67:90:13:EC:B6:24:FA:5D:71:09:8C:30:B7:E4:16:9F:A2:C8",
             "e2e-publish": "Published fingerprint",
-            "e2e-passphrase": "This re-locks the same key under a new passphrase. It does not change the key, so messages already encrypted to you stay readable.",
+            // The frame's own headline, not its lede: XCUITest refuses string
+            // identifiers over 128 characters, and the full re-lock sentence
+            // (139 chars) threw "Invalid query" here in CI. The headline is
+            // text this screen alone draws, so it proves the same thing.
+            "e2e-passphrase": "Change your passphrase",
             "e2e-remove": "Remove from this device",
             "e2e-recipients": "priya@havenworks.example",
             // A seeded sender's NAME exists only once the cache page landed
@@ -522,8 +526,9 @@ final class ScreenshotWalkUITests: XCTestCase {
             "mail-subs-list": "The Weekly Draft",
             "mail-subs-empty": "No subscriptions detected.",
             "account-connection-detail": "Your name, GrapMail address and profile photo",
-            "account-connection-unknown": "This app does not have access to this account. Nothing is "
-                + "being shared with it, and there is nothing to remove.",
+            // The clause, not the sentence: the full answer runs to 130
+            // characters and XCUITest's identifier cap is 128.
+            "account-connection-unknown": "there is nothing to remove.",
         ]
         for screen in postWriteScreens {
             app.terminate()

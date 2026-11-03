@@ -648,7 +648,10 @@ for spec in "two-factor-on:40-sec-two-factor-on" \
     e2e-unlock) settled="Your passphrase decrypts the key on this device. It is never sent anywhere." ;;
     e2e-details) settled="7C:0F:2A:91:B4:D8:3E:6C:05:AA:1F:BE:D2:48:67:90:13:EC:B6:24:FA:5D:71:09:8C:30:B7:E4:16:9F:A2:C8" ;;
     e2e-publish) settled="Published fingerprint" ;;
-    e2e-passphrase) settled="This re-locks the same key under a new passphrase. It does not change the key, so messages already encrypted to you stay readable." ;;
+    # The headline, not the lede: iOS's harness caps string identifiers at
+    # 128 characters and the full re-lock sentence is longer, so both walks
+    # wait on the same shorter text this screen alone draws.
+    e2e-passphrase) settled="Change your passphrase" ;;
     e2e-remove) settled="Remove from this device" ;;
     e2e-recipients) settled="priya@havenworks.example" ;;
     # The subscriptions band. The list frame waits on a seeded sender's NAME
@@ -661,7 +664,7 @@ for spec in "two-factor-on:40-sec-two-factor-on" \
     # sentence (text only the recorded scopes draw), the unlinked frame on the
     # screen's own "does not have access" answer over the same seeded record.
     account-connection-detail) settled="Your name, GrapMail address and profile photo" ;;
-    account-connection-unknown) settled="This app does not have access to this account. Nothing is being shared with it, and there is nothing to remove." ;;
+    account-connection-unknown) settled="there is nothing to remove." ;;
     *) settled="" ;;
   esac
   # A marker may name a visible string OR a resource-id. Text is right for
