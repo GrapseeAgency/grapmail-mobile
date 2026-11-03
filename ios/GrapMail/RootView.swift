@@ -191,13 +191,44 @@ struct RootView: View {
         }
     }
 
-    /// Every routed screen, one switch. Each screen draws its own header
-    /// with its own back control — without the hidden toolbar below the
-    /// system bar would add a second, unguarded back button above it, and
-    /// an unguarded way past screens that ask for confirmation first.
+    /// Routed screens, dispatched by sector. The whole map lived in one
+    /// switch; the type-checker gave up on it twice (CI: "unable to
+    /// type-check this expression in reasonable time" at the body, then at
+    /// the single `destination`), so each sector is its own ViewBuilder
+    /// function now. Every case below is verbatim what it was — same
+    /// closures, same path edits.
     @ViewBuilder private func destination(_ route: Route) -> some View {
         Group {
             switch route {
+            case .welcome, .signIn, .twoFactor, .backupCode, .forgotPassword,
+                 .recoveryCode, .newPassword, .resetDone, .recoveryPending,
+                 .findAddress, .addressFound, .phoneVerify, .phoneVerified:
+                authDestination(route)
+            case .security, .secEnable, .secConfirmPassword, .secVerifyPhone, .secEnabled,
+                 .secDisable, .secDisabled, .secBackup, .secBackupSaved, .secPassword,
+                 .secPasswordDone, .secPasswordAfter, .secPasswordUpdated, .secSignOutAll,
+                 .secSignOutAllDone, .secSessions, .secRevoke, .secRevoked, .secRevokeAlert,
+                 .secRevokedAlert, .secActivity, .secAlert, .secSecure:
+                securityDestination(route)
+            case .stepName, .stepInfo, .stepAddress, .stepPassword, .stepTerms,
+                 .humanVerify, .created, .createdAlt:
+                wizardDestination(route)
+            default:
+                // Everything signed-in: mailbox, account band, encryption
+                // band, subscriptions. A new mail-band route needs no new
+                // dispatch line, and `mailDestination`'s switch keeps its
+                // own default, so the compiler stays happy either side.
+                mailDestination(route)
+            }
+        }
+        .toolbar(.hidden, for: .navigationBar)
+        .navigationBarBackButtonHidden(true)
+    }
+
+    /// Sign-in, recovery and the phone arc.
+    @ViewBuilder private func authDestination(_ route: Route) -> some View {
+        switch route {
+
                 case .welcome:
                     WelcomeView(
                         onCreateAccount: { path.append(.stepName) },
@@ -305,6 +336,13 @@ struct RootView: View {
                         onGoToSecurity: { path.append(.security) },
                         onBackHome: { backToHome() }
                     )
+        }
+    }
+
+    /// The security sector's twenty-three screens.
+    @ViewBuilder private func securityDestination(_ route: Route) -> some View {
+        switch route {
+
                 case .security:
                     AccountSecurityView(
                         onBack: { path.removeLast() },
@@ -437,6 +475,13 @@ struct RootView: View {
                             }
                         }
                     )
+        }
+    }
+
+    /// Sign-up's five steps, the human check and the two finish screens.
+    @ViewBuilder private func wizardDestination(_ route: Route) -> some View {
+        switch route {
+
                 case .stepName:
                     NameStepView(model: model, onBack: { path.removeLast() }, onSignIn: { path.append(.signIn) }) {
                         model.update { $0.step = 2 }
@@ -497,6 +542,14 @@ struct RootView: View {
                             path.append(.home)
                         }
                     )
+        }
+    }
+
+    /// The signed-in world: mailbox, account record, encryption,
+    /// subscriptions. `default:` above routes here.
+    @ViewBuilder private func mailDestination(_ route: Route) -> some View {
+        switch route {
+
                 case .home:
                     MailboxView(
                         vm: mail,
@@ -628,11 +681,11 @@ struct RootView: View {
                         onBack: { path.removeLast() },
                         onOpenQueue: { mail.open(.screener); backToHome() }
                     )
-                }
-            .toolbar(.hidden, for: .navigationBar)
-            .navigationBarBackButtonHidden(true)
+        @unknown default:
+            EmptyView()
         }
     }
+
 
     /// The encryption band's eight destinations, in their own switch. The
     /// body's own switch passed the type-checker's patience the way the
