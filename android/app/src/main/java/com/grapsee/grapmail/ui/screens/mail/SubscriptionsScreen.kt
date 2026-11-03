@@ -197,7 +197,7 @@ fun SubscriptionsScreen(vm: MailboxViewModel, onBack: () -> Unit) {
                     "Reading your mail…", fontSize = 14.sp, color = palette.textTertiary,
                     modifier = Modifier.padding(vertical = 16.dp).testTag("gm-subs-reading"),
                 )
-                subs.isEmpty -> Column(Modifier.testTag("gm-subs-empty")) {
+                subs.size == 0 -> Column(Modifier.testTag("gm-subs-empty")) {
                     Text(
                         "No subscriptions detected.",
                         fontSize = 15.sp, color = palette.textPrimary,

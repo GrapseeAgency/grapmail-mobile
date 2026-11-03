@@ -629,7 +629,6 @@ struct RootView: View {
                         onOpenQueue: { mail.open(.screener); backToHome() }
                     )
                 }
-                }
             .toolbar(.hidden, for: .navigationBar)
             .navigationBarBackButtonHidden(true)
         }
