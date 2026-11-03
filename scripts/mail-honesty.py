@@ -1816,6 +1816,12 @@ pin("the empty subscriptions frame seeds an empty read, not an unread cache",
     'total: Int = 0' in KT_MDTO
     and "MailInboxResponse(success = true, box = \"inbox\", messages = emptyList())" in KT_HOST
     and 'empty.total = 0' in code_only(SW_HOST) and 'empty.messages = []' in code_only(SW_HOST))
+# The subscription detector is incoming-only on both platforms, and the seed
+# rows must carry the server's own word for arriving mail or every seeded row
+# is dropped and the populated frame quietly photographs its own empty branch
+# -- exactly what CI caught when iOS's seed helper never set `direction`.
+pin("both hosts' subscription seeds carry the incoming direction the detector reads",
+    'direction = "inbound"' in KT_HOST and 'm.direction = "in"' in code_only(SW_HOST))
 pin("both walks photograph both subscriptions frames with the same waits",
     all(f'settled="{m}"' in KT_WALK for m in ("The Weekly Draft",
                                               "No subscriptions detected."))

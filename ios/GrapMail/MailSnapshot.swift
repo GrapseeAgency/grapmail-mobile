@@ -91,6 +91,12 @@ struct MailSnapshotView: View {
         var m = MailMessage()
         m.id = id
         m.threadId = "t-\(id)"
+        // The server's own word for an arriving message (publicRow carries
+        // `direction` on every row; Android's seed msg() sets it too).
+        // Without it the subscriptions detector's incoming-only rule drops
+        // every seeded row -- CI proved it: the list frame rendered its
+        // empty branch and the walk waited on a name that never drew.
+        m.direction = "in"
         var p = MailPerson()
         p.name = from
         p.address = address
