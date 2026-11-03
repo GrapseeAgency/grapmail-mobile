@@ -506,12 +506,12 @@ struct RootView: View {
                         onCompose: { path.append(.mailCompose(reply: "", mode: "reply")) },
                         onLabels: { path.append(.mailLabels) },
                         onScreener: { path.append(.mailScreener) },
+                        onSubscriptions: { path.append(.mailSubscriptions) },
                         onSettings: { path.append(.mailSettings) },
                         onSecurity: { path.append(.security) },
                         onHelp: openSupport,
                         onContacts: { path.append(.mailContacts) },
                         onFiles: { path.append(.mailFiles) },
-                        onSubscriptions: { path.append(.mailSubscriptions) },
                         onSignOut: {
                             SessionStore.clear()
                             path.removeAll()

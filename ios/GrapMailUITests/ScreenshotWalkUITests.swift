@@ -605,7 +605,17 @@ final class ScreenshotWalkUITests: XCTestCase {
         for (shot, screen, marker) in [
             ("61-mail-home-dark", "mail-home", "Q3 facilities invoice"),
             ("88-mail-thread-dark", "mail-thread", "Q3 facilities invoice"),
-            ("89-mail-labels-dark", "mail-labels", "Bills")] {
+            ("89-mail-labels-dark", "mail-labels", "Bills"),
+            // Phase 6: one dark frame per band added after the first three.
+            // Same rule as above — the host case stays the light one's name
+            // (a `-dark` case would be a second copy of a screen), and each
+            // frame carries BOTH proofs: the name check runs in the loop,
+            // and the marker below is settled content the seeded state
+            // draws only once its data has landed.
+            ("111-account-profile-dark", "account-profile", "Rather not say"),
+            ("112-e2e-status-unlocked-dark", "e2e-status-unlocked",
+             "Your key is unlocked for this session"),
+            ("113-mail-subs-list-dark", "mail-subs-list", "The Weekly Draft")] {
             app.terminate()
             app.launchArguments = ["-gmSnapshot", screen, "-gmDark"]
             app.launch()

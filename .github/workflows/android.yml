@@ -225,8 +225,40 @@ jobs:
           export CI_KEYSTORE_FILE="$KS"
           export CI_KEYSTORE_PASSWORD="$PW"
           export CI_KEYSTORE_ALIAS=grapmail-ci
-          ./gradlew assembleRelease --no-daemon
+          ./gradlew assembleRelease bundleRelease --no-daemon
           ls -la app/build/outputs/apk/release/
+          ls -la app/build/outputs/bundle/release/
+          # The keystore the APK was signed with dies with this step's env, so
+          # the same exported variables sign the bundle in THIS step — Play's
+          # upload format must carry the same identity proof as the APK, or the
+          # page would offer two artifacts from two different signers. The
+          # gradle signing config reads CI_KEYSTORE_* from the environment, so
+          # one `bundleRelease` under the same exports produces both.
+
+      - name: Prove and publish the AAB (Play's upload format)
+        # Google Play no longer accepts bare APKs for new apps; the AAB is the
+        # artifact the store actually hosts, and its existence beside the APK
+        # is what makes the Data-safety/roll-out step answerable. Proved the
+        # same way as the APK — read out of the file, not out of the task name:
+        # a bundle is a zip whose root MANIFEST.MF names the generator, and
+        # its base slice carries the compiled manifest of the same app.
+        run: |
+          set -eu
+          AAB=android/app/build/outputs/bundle/release/app-release.aab
+          [ -f "$AAB" ] || { echo "::error::no $AAB — bundleRelease did not run"; exit 1; }
+          unzip -l "$AAB" | grep -q "^.*BUNDLE-METADATA/" || \
+            unzip -l "$AAB" | grep -q "base/manifest/AndroidManifest.xml" || \
+            { echo "::error::$AAB is not a bundle structure"; unzip -l "$AAB" | head -20 >&2; exit 1; }
+          unzip -l "$AAB" | grep -q "base/manifest/AndroidManifest.xml" \
+            || { echo "::error::bundle has no base manifest"; exit 1; }
+          unzip -p "$AAB" com/android/tools/bundleBuilder/bundle-metadata.textproto 2>/dev/null | head -3 || true
+          echo "AAB present with a base manifest: $(stat -c %s "$AAB") bytes"
+
+      - name: Upload the AAB beside the APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: grapmail-android-aab
+          path: android/app/build/outputs/bundle/release/app-release.aab
 
       - name: Prove the artifact is what the page will call it
         # Every claim here is read out of the APK, not out of the build command:
@@ -317,6 +349,12 @@ jobs:
             shrunk, `android:debuggable` absent from the manifest (the build asserts it
             by reading the APK back, not by trusting the Gradle task name).
 
+            `app-release.aab` — the same variant in the format Google Play hosts
+            for new apps (Android App Bundle, built by `bundleRelease` from the same
+            compiled code and asserted by structure: base slice, compiled manifest);
+            the direct-download artifact stays the APK because no store middleman
+            signs the AAB here.
+
             ## How it was verified
 
             * Built, installed and **live-walked on a real Android 34 emulator** by this
@@ -348,6 +386,7 @@ jobs:
             constructor that R8-era naming and eight emulator runs could not see.
           files: |
             android/app/build/outputs/apk/release/app-release.apk
+            android/app/build/outputs/bundle/release/app-release.aab
             screenshots-release/*.png
           prerelease: false
           make_latest: "true"

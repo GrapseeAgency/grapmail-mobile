@@ -1,0 +1,178 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  GrapMail privacy manifest — Apple's PrivacyInfo.xcprivacy.
+
+  Every entry below names an API or a data type the code ACTUALLY uses, with
+  the file that uses it. Nothing is declared "just in case": a manifest that
+  over-declares is a manifest nobody trusts, and App Review reads this file
+  against the binary. The companion audit lives in ../DATA-FLOW.md, which
+  derives the same list from the endpoint surface rather than from memory.
+
+  The app has no third-party SDKs, no ad identifiers, no analytics, and no
+  tracking domains. `NSPrivacyTracking` is false and `NSPrivacyTrackingDomains`
+  is empty because that is the fact, not because empty is the safe default:
+  the only network peer is grapsee.com, the app's own API (APIClient.swift).
+-->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>NSPrivacyTracking</key>
+	<false/>
+	<key>NSPrivacyTrackingDomains</key>
+	<array/>
+
+	<key>NSPrivacyAccessedAPITypes</key>
+	<array>
+		<!-- SessionStore.swift keeps the signed-in address, display name and
+		     expiry in UserDefaults so the launch decision (hasValidSession)
+		     can be made before any network call. The token itself is Keychain
+		     (`kSecClassGenericPassword`, SessionStore.swift) — Keychain is
+		     not a required-reason API and nothing sensitive sits here.
+		     Reason: disk storage of app config across launches. -->
+		<dict>
+			<key>NSPrivacyAccessedAPIType</key>
+			<string>NSPrivacyAccessedAPICategoryUserDefaults</string>
+			<key>NSPrivacyAccessedAPITypeReasons</key>
+			<array>
+				<string>CA92.1</string>
+			</array>
+		</dict>
+		<!-- Compose's attachment picker (MailReaderViews.swift) calls
+		     startAccessingSecurityScopedResource() on a URL the USER picked
+		     through .fileImporter, for exactly the one upload, so the app
+		     can read a file the person pointed it at. Reason: user-selected
+		     document access. -->
+		<dict>
+			<key>NSPrivacyAccessedAPIType</key>
+			<string>NSPrivacyAccessedAPICategoryFileProvider</string>
+			<key>NSPrivacyAccessedAPITypeReasons</key>
+			<array>
+				<string>C617.1</string>
+			</array>
+		</dict>
+		<!-- The E2E identity file (MailE2e.swift) and the saved attachments
+		     (MailboxModel.swift) are plain reads/writes inside the app's own
+		     container — FileManager path operations, not file-attribute
+		     timestamp reads — so they need NO required-reason declaration,
+		     and none is made here. An entry for an API the binary never
+		     calls is exactly the over-declaration this file refuses. -->
+	</array>
+
+	<key>NSPrivacyCollectedDataTypes</key>
+	<array>
+		<!-- Email address: the mailbox itself. Sent to grapsee.com over HTTPS
+		     for sign-up, sign-in and every mail call (APIClient.swift,
+		     MailAPI.swift). Not linked to anything off-device; no tracking. -->
+		<dict>
+			<key>NSPrivacyCollectedDataType</key>
+			<string>NSPrivacyCollectedDataTypeEmailAddress</string>
+			<key>NSPrivacyCollectedDataTypeLinked</key>
+			<true/>
+			<key>NSPrivacyCollectedDataTypeTracking</key>
+			<false/>
+			<key>NSPrivacyCollectedDataTypePurposes</key>
+			<array>
+				<string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+			</array>
+		</dict>
+		<!-- Display name: profile field, shown in the greeting and sent on
+		     sign-up / profile writes (auth-account-profile contract). -->
+		<dict>
+			<key>NSPrivacyCollectedDataType</key>
+			<string>NSPrivacyCollectedDataTypeName</string>
+			<key>NSPrivacyCollectedDataTypeLinked</key>
+			<true/>
+			<key>NSPrivacyCollectedDataTypeTracking</key>
+			<false/>
+			<key>NSPrivacyCollectedDataTypePurposes</key>
+			<array>
+				<string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+			</array>
+		</dict>
+		<!-- Phone number and recovery email: account security fields the
+		     app reads and writes through the account API; fraud prevention
+		     is what the rate-limit and verification routes are for. -->
+		<dict>
+			<key>NSPrivacyCollectedDataType</key>
+			<string>NSPrivacyCollectedDataTypePhoneNumber</string>
+			<key>NSPrivacyCollectedDataTypeLinked</key>
+			<true/>
+			<key>NSPrivacyCollectedDataTypeTracking</key>
+			<false/>
+			<key>NSPrivacyCollectedDataTypePurposes</key>
+			<array>
+				<string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+				<string>NSPrivacyCollectedDataTypePurposeFraudPrevention</string>
+			</array>
+		</dict>
+		<!-- Message content and the sender/recipient addresses the mailbox
+		     stores: that IS the product; the mail service holds the mailbox.
+		     E2E-encrypted bodies arrive as envelopes this app alone opens
+		     (MailE2e.swift) — the server keeps only its notice text. -->
+		<dict>
+			<key>NSPrivacyCollectedDataType</key>
+			<string>NSPrivacyCollectedDataTypeMessageContent</string>
+			<key>NSPrivacyCollectedDataTypeLinked</key>
+			<true/>
+			<key>NSPrivacyCollectedDataTypeTracking</key>
+			<false/>
+			<key>NSPrivacyCollectedDataTypePurposes</key>
+			<array>
+				<string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+			</array>
+		</dict>
+		<!-- Contacts: derived from mail the account has received
+		     (ContactsScreen rule — there is no contacts endpoint), stored
+		     server-side only as part of the messages themselves. -->
+		<dict>
+			<key>NSPrivacyCollectedDataType</key>
+			<string>NSPrivacyCollectedDataTypeContacts</string>
+			<key>NSPrivacyCollectedDataTypeLinked</key>
+			<true/>
+			<key>NSPrivacyCollectedDataTypeTracking</key>
+			<false/>
+			<key>NSPrivacyCollectedDataTypePurposes</key>
+			<array>
+				<string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+			</array>
+		</dict>
+		<!-- The session token (st1 cookie / bearer): the credential the
+		     Keychain exists for (SessionStore.swift); never logged, never in
+		     UserDefaults, cleared on sign-out and on 401. -->
+		<dict>
+			<key>NSPrivacyCollectedDataType</key>
+			<string>NSPrivacyCollectedDataTypePassword</string>
+			<key>NSPrivacyCollectedDataTypeLinked</key>
+			<true/>
+			<key>NSPrivacyCollectedDataTypeTracking</key>
+			<false/>
+			<key>NSPrivacyCollectedDataTypePurposes</key>
+			<array>
+				<string>NSPrivacyCollectedDataTypePurposeAccountManagement</string>
+			</array>
+		</dict>
+		<!-- Device identifier: the random UUID behind the `x-device-id`
+		     header (SessionStore.swift DeviceId), which the account API
+		     counts sign-ups against. Keychain-persisted, never personal,
+		     regenerated by reinstall of the Keychain. -->
+		<dict>
+			<key>NSPrivacyCollectedDataType</key>
+			<string>NSPrivacyCollectedDataTypeDeviceID</string>
+			<key>NSPrivacyCollectedDataTypeLinked</key>
+			<true/>
+			<key>NSPrivacyCollectedDataTypeTracking</key>
+			<false/>
+			<key>NSPrivacyCollectedDataTypePurposes</key>
+			<array>
+				<string>NSPrivacyCollectedDataTypePurposeOther</string>
+			</array>
+		</dict>
+		<!-- Coarse location: the birthday/age gate is date math on a typed
+		     field, NOT location — no location is collected, and this entry
+		     says so by being absent. E2E passphrases, message keys and the
+		     unlocked key halves never leave the device (E2eViewModel /
+		     E2eModel: plaintext halves are in-memory only) — so no key
+		     material appears in this list either. -->
+	</array>
+</dict>
+</plist>

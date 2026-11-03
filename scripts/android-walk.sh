@@ -803,6 +803,32 @@ else
   shot 89-mail-labels-dark
 fi
 adb shell am force-stop "$PKG"
+
+# One dark frame for each band added after the 30-frame palette check was
+# written -- the plan's Phase-6 rule ("every new band gets a dark frame with
+# both proofs"). Same two proofs as the light passes (the host's negative
+# name-check, then the settled content the seeded state alone draws), same
+# reuse of the existing snapshot names: a `-dark` host case would be a second
+# copy of a screen, which §19 refuses. The account band carries the form
+# surfaces, the encryption band the state card, subscriptions the row list.
+for darkspec in "account-profile:Rather not say:111-account-profile-dark" \
+                "e2e-status-unlocked:Your key is unlocked for this session:112-e2e-status-unlocked-dark" \
+                "mail-subs-list:The Weekly Draft:113-mail-subs-list-dark"; do
+  nm="${darkspec%%:*}"; rest="${darkspec#*:}"; marker="${rest%%:*}"; pic="${rest##*:}"
+  adb shell am start -W -n "$PKG/.MainActivity" --es gmSnapshot "$nm" >/dev/null
+  sleep 5
+  if [ -n "$(find_nodes "n.get('text','')=='Unknown mail snapshot: $nm'")" ]; then
+    echo "FAIL: app did not recognise dark snapshot '$nm'" >&2
+    FAILURES=$((FAILURES + 1))
+  fi
+  if [ -z "$(wait_overlay "n.get('text','')=='$marker'" | head -1)" ]; then
+    echo "FAIL: $pic not photographed -- '$marker' never drew in dark" >&2
+    FAILURES=$((FAILURES + 1))
+  else
+    shot "$pic"
+  fi
+  adb shell am force-stop "$PKG"
+done
 adb shell am force-stop "$PKG"
 adb shell "cmd uimode night no"
 
@@ -847,7 +873,9 @@ for want in 01-welcome-light 02-step1-name-light 03-step2-basicinfo-light \
             99-mail-undo 100-e2e-status-none 101-e2e-status-unlocked \
             102-e2e-setup 103-e2e-unlock 104-e2e-details 105-e2e-publish \
             106-e2e-passphrase 107-e2e-remove 108-e2e-recipients \
-            109-mail-subs-list 110-mail-subs-empty; do
+            109-mail-subs-list 110-mail-subs-empty \
+            111-account-profile-dark 112-e2e-status-unlocked-dark \
+            113-mail-subs-list-dark; do
   [ -s "$OUT/$want.png" ] || { echo "FAIL: missing $want.png" >&2; FAILURES=$((FAILURES + 1)); }
 done
 if [ "$FAILURES" -gt 0 ]; then
