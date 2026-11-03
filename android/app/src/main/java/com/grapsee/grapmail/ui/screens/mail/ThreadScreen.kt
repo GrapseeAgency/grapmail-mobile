@@ -23,10 +23,12 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.AttachFile
 import androidx.compose.material.icons.rounded.Download
+import androidx.compose.material.icons.rounded.Forward
 import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.Reply
 import androidx.compose.material.icons.rounded.Star
 import androidx.compose.material.icons.rounded.StarBorder
+import androidx.compose.material.icons.rounded.SupervisedUserCircle
 import androidx.compose.material.icons.rounded.Unarchive
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -84,7 +86,10 @@ fun ThreadScreen(
     /// that exists.
     isThread: Boolean,
     onBack: () -> Unit,
-    onReply: (MailMessageFullDto) -> Unit,
+    /** The row to answer, and how: "reply", "all" or "forward". The compose
+     *  screen builds the quote and the addressing from the FULL row, so the
+     *  thread hands over the row it actually displayed. */
+    onReply: (MailMessageFullDto, String) -> Unit,
 ) {
     val palette = LocalPalette.current
     val thread by vm.thread.collectAsState()
@@ -140,7 +145,7 @@ fun ThreadScreen(
                     message = message,
                     expanded = index == thread.messages.lastIndex,
                     busy = busy == message.id,
-                    onReply = { onReply(message) },
+                    onReply = { mode -> onReply(message, mode) },
                     onStar = {
                         busy = message.id
                         vm.actOn(message.id, if (message.isStarred) MailAction.Unstar else MailAction.Star)
@@ -169,7 +174,7 @@ private fun ThreadMessageCard(
     message: MailMessageFullDto,
     expanded: Boolean,
     busy: Boolean,
-    onReply: () -> Unit,
+    onReply: (String) -> Unit,
     onStar: () -> Unit,
     onDownload: (MailAttachmentDto) -> Unit,
     notice: Map<String, String>,
@@ -296,8 +301,14 @@ private fun ThreadMessageCard(
 
         Spacer(Modifier.height(14.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            com.grapsee.grapmail.ui.components.OutlineButton("Reply", onReply,
+            com.grapsee.grapmail.ui.components.OutlineButton("Reply", { onReply("reply") },
                 trailing = { Icon(Icons.Rounded.Reply, null, tint = palette.primarySolid,
+                    modifier = Modifier.size(16.dp)) })
+            com.grapsee.grapmail.ui.components.OutlineButton("Reply all", { onReply("all") },
+                trailing = { Icon(Icons.Rounded.SupervisedUserCircle, null,
+                    tint = palette.primarySolid, modifier = Modifier.size(16.dp)) })
+            com.grapsee.grapmail.ui.components.OutlineButton("Forward", { onReply("forward") },
+                trailing = { Icon(Icons.Rounded.Forward, null, tint = palette.primarySolid,
                     modifier = Modifier.size(16.dp)) })
         }
     }

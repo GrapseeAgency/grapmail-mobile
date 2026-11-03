@@ -537,7 +537,9 @@ for spec in "two-factor-on:40-sec-two-factor-on" \
             "account-connections:94-account-connections" \
             "mail-settings-prefs:95-mail-prefs" \
             "mail-addresses:96-mail-addresses" \
-            "mail-support:97-mail-support"; do
+            "mail-support:97-mail-support" \
+            "mail-adv-search:98-mail-adv-search" \
+            "mail-undo:99-mail-undo"; do
   nm="${spec%%:*}"; pic="${spec##*:}"
   adb shell am force-stop "$PKG"
   adb shell am start -W -n "$PKG/.MainActivity" --es gmSnapshot "$nm" >/dev/null
@@ -608,6 +610,16 @@ for spec in "two-factor-on:40-sec-two-factor-on" \
     # its questions are the web page's copy, and the marker proves the screen
     # composed rather than the fetch settled.
     mail-support) settled="Why can I not create an account for someone under 13?" ;;
+    # The Phase-2 frames: the sheet's title proves the sheet composed (sheets
+    # animate in -- a scrim is not a sheet), and the banner's note is the exact
+    # text the seeded filing state produces.
+    mail-adv-search) settled="Search filters" ;;
+    mail-undo) settled="Archived 2 messages" ;;
+    # The compose frame now waits: the profile seed lands through an effect, and
+    # the signature the frame exists to prove arrives with it. Photographed a
+    # frame early, compose looks unsigned and the feature ships unseen. (iOS
+    # seeds in init -- synchronous -- so its compose frame needs no wait.)
+    mail-compose) settled="Sent with GrapMail" ;;
     *) settled="" ;;
   esac
   # A marker may name a visible string OR a resource-id. Text is right for
@@ -796,7 +808,8 @@ for want in 01-welcome-light 02-step1-name-light 03-step2-basicinfo-light \
             88-mail-thread-dark 89-mail-labels-dark \
             90-account-profile 91-account-privacy 92-mail-notes \
             93-mail-tasks 94-account-connections 95-mail-prefs \
-            96-mail-addresses 97-mail-support; do
+            96-mail-addresses 97-mail-support 98-mail-adv-search \
+            99-mail-undo; do
   [ -s "$OUT/$want.png" ] || { echo "FAIL: missing $want.png" >&2; FAILURES=$((FAILURES + 1)); }
 done
 if [ "$FAILURES" -gt 0 ]; then

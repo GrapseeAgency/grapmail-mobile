@@ -212,7 +212,14 @@ object Routes {
     // at the destination — so a thread opened from a list survives a recreate
     // with the conversation it was opened for.
     const val MAIL_THREAD = "mail/thread/{id}/{thread}"
-    const val MAIL_COMPOSE = "mail/compose"
+    // Compose carries an optional reply target and mode: "mail/compose" opens
+    // blank, "mail/compose?reply=<id>&mode=reply|all|forward" opens prepared.
+    // The quote and the addressing are built from the FULL row at the
+    // destination, not from what the list snippet happens to show.
+    const val MAIL_COMPOSE = "mail/compose?reply={reply}&mode={mode}"
+
+    fun mailCompose(reply: String, mode: String) =
+        "mail/compose?reply=${encode(reply)}&mode=$mode"
     const val MAIL_LABELS = "mail/labels"
     const val MAIL_LABEL_CREATE = "mail/labels/create/{id}"
 
@@ -827,11 +834,14 @@ fun GrapMailNav() {
                 threadId = id,
                 isThread = isThread,
                 onBack = { nav.popBackStack() },
-                onReply = { nav.navigate(Routes.MAIL_COMPOSE) },
+                onReply = { m, mode -> nav.navigate(Routes.mailCompose(m.id, mode)) },
             )
         }
-        composable(Routes.MAIL_COMPOSE) {
-            ComposeScreen(vm = mail, onBack = { nav.popBackStack() })
+        composable(Routes.MAIL_COMPOSE) { entry ->
+            val reply = entry.arguments?.getString("reply")?.let(android.net.Uri::decode) ?: ""
+            val mode = entry.arguments?.getString("mode") ?: "reply"
+            ComposeScreen(vm = mail, profile = profile, replyId = reply, mode = mode,
+                onBack = { nav.popBackStack() })
         }
         composable(Routes.MAIL_LABELS) {
             LabelsScreen(

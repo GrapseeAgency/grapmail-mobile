@@ -14,6 +14,8 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -75,6 +77,10 @@ fun MailSnapshotScreen(name: String) {
     // model's own boot read from overwriting it with the CI account's real
     // (empty) notes list — the race the mailbox seeds already guard against.
     val profileVm = remember { com.grapsee.grapmail.logic.ProfileViewModel(app, snapshotMode = true) }
+    // The sheet below prints the scope line from the live state; collecting it
+    // (not reading .value once) is what lets the seeded numbers recompose the
+    // photograph instead of the initial empty state being what ships.
+    val mailboxState by vm.state.collectAsState()
 
     // The seeds run in an effect, not in composition. Writing a state flow while
     // composing is a side effect in the wrong place — it can schedule a
@@ -107,11 +113,31 @@ fun MailSnapshotScreen(name: String) {
                 )
             }
             "mail-screener" -> vm.seedScreenerForSnapshot(enabled = true, pending = 3)
+            // The advanced-search sheet photographs its scope line with real
+            // numbers: the seeded page's five rows are what the filters ran
+            // over, and the box's total says the box is bigger than that.
+            "mail-adv-search" -> {
+                seedCache()
+                vm.seedForSnapshot {
+                    it.copy(accountAddress = "amira@grapmail.com", total = 40, advScope = 5)
+                }
+            }
+            // The undo banner exists only after a filing, and a read-only walk
+            // must not file anything -- so the words a real archive produces are
+            // drawn by the live banner composable over the live list frame.
+            "mail-undo" -> vm.seedForSnapshot {
+                it.copy(undoIds = listOf("m1", "m2"),
+                    undoInverse = com.grapsee.grapmail.data.MailAction.Unarchive,
+                    undoNote = "Archived 2 messages")
+            }
             // The account-record screens all read one document; one seed covers
             // all eight, and each frame's settled marker is a value that exists
-            // only once that document has landed.
+            // only once that document has landed. `mail-compose` joins the list:
+            // the compose frame is the photograph that proves the profile's
+            // signature arrives as editable text in the body, on both phones.
             "mail-notes", "mail-tasks", "mail-settings-prefs", "mail-addresses",
-            "account-connections", "account-profile", "account-privacy", "mail-support" ->
+            "account-connections", "account-profile", "account-privacy", "mail-support",
+            "mail-compose" ->
                 profileVm.seed(sampleProfile())
         }
     }
@@ -200,10 +226,10 @@ fun MailSnapshotScreen(name: String) {
             "mail-labels" -> LabelsScreen(vm, onBack = {}, onCreate = {}, onEdit = { })
             "mail-label-create" -> LabelCreateScreen(vm, onDone = {})
             "mail-thread" -> ThreadScreen(vm, threadId = "t-m1", isThread = true,
-                onBack = {}, onReply = { })
+                onBack = {}, onReply = { _, _ -> })
             "mail-thread-encrypted" -> ThreadScreen(vm, threadId = "t-m9", isThread = true,
-                onBack = {}, onReply = { })
-            "mail-compose" -> ComposeScreen(vm, onBack = {})
+                onBack = {}, onReply = { _, _ -> })
+            "mail-compose" -> ComposeScreen(vm = vm, profile = profileVm, onBack = {})
             "mail-send-receipt" -> sheetHost {
                 // The live `SendReceipt` composable, with the strings a server
                 // would send standing in for a real send. This host used to draw
@@ -238,6 +264,14 @@ fun MailSnapshotScreen(name: String) {
             "mail-support" -> SupportScreen(profileVm, onBack = {}, onForgot = {},
                 onPhone = {}, onAddresses = {})
             "mail-screener" -> ScreenerScreen(vm, onBack = {}, onOpenQueue = {})
+            "mail-adv-search" -> sheetHost {
+                AdvancedSearchContent(mailboxState, vm, onDone = { })
+            }
+            "mail-undo" -> Column(Modifier.fillMaxSize()) {
+                UndoBanner("Archived 2 messages", "mail-undo", onUndo = {}, onDone = {})
+                listFrame(rows, MailBox.Inbox, loading = false, failed = false,
+                    noMailbox = false)
+            }
             else -> Text(
                 "Unknown mail snapshot: $name",
                 fontSize = 15.sp, color = palette.textSecondary,

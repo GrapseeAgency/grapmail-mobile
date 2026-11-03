@@ -46,6 +46,99 @@ struct SortFilterSheet: View {
     }
 }
 
+/// The advanced search sheet -- six filters the server has no route for, run
+/// CLIENT-SIDE over the pages this device has loaded, and saying so in its own
+/// scope line the way the sort sheet does. The server's `q` is one literal term
+/// over subject, body and from (`grapmail-search.ts:110-118`); there is no
+/// from/to/attachment/date endpoint, so this filters what is here and never
+/// claims to search the box. Android's `AdvancedSearchContent` is the same
+/// sheet with the same words.
+struct AdvancedSearchSheet: View {
+    let state: MailboxModel.State
+    let onApply: (_ from: String, _ to: String, _ subject: String, _ files: Bool,
+                  _ after: String, _ before: String) -> Void
+    let onClear: () -> Void
+    let onDone: () -> Void
+
+    @State private var from = ""
+    @State private var to = ""
+    @State private var subject = ""
+    @State private var files = false
+    @State private var after = ""
+    @State private var before = ""
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            SheetTitle(text: "Search filters")
+            VStack(alignment: .leading, spacing: 10) {
+                AdvRow(label: "From", placeholder: "A name or address in the sender", text: $from)
+                AdvRow(label: "To", placeholder: "A name or address in the recipients", text: $to)
+                AdvRow(label: "Subject", placeholder: "A word the subject contains", text: $subject)
+                Button {
+                    files.toggle()
+                } label: {
+                    HStack(spacing: 10) {
+                        Image(systemName: "paperclip")
+                            .font(.system(size: 15))
+                            .foregroundColor(files ? GM.primarySolid : GM.textTertiary)
+                        Text("Has attachments")
+                            .font(.system(size: 14))
+                            .foregroundColor(files ? GM.primarySolid : GM.textPrimary)
+                        Spacer()
+                    }
+                }
+                .buttonStyle(.plain)
+                HStack(spacing: 12) {
+                    AdvRow(label: "After", placeholder: "YYYY-MM-DD", text: $after)
+                    AdvRow(label: "Before", placeholder: "YYYY-MM-DD", text: $before)
+                }
+                HStack(spacing: 16) {
+                    Button("Apply") {
+                        onApply(from, to, subject, files, after, before)
+                        onDone()
+                    }
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(GM.primarySolid)
+                    Button("Clear") {
+                        onClear()
+                        from = ""; to = ""; subject = ""; files = false
+                        after = ""; before = ""
+                    }
+                    .font(.system(size: 14))
+                    .foregroundColor(GM.textSecondary)
+                }
+                // The scope, stated exactly as the sort sheet states its own.
+                Text("These filters run on the \(state.advScope) messages loaded on " +
+                     "this device — not all \(state.total) in this box. The typed " +
+                     "term is the whole-box search.")
+                    .font(.system(size: 12)).foregroundColor(GM.warnInk)
+            }
+            .padding(.horizontal, 20)
+        }
+        .padding(.bottom, 24)
+        .accessibilityIdentifier("gm-sheets-advsearch")
+    }
+}
+
+private struct AdvRow: View {
+    let label: String
+    let placeholder: String
+    @Binding var text: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(label)
+                .font(.system(size: 11, weight: .bold))
+                .foregroundColor(GM.textTertiary)
+            TextField(placeholder, text: $text)
+                .font(.system(size: 14))
+                .foregroundColor(GM.textPrimary)
+            Rectangle().fill(GM.border).frame(height: 1)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
 /// The filing targets that actually exist. `FILING_ACTIONS` is
 /// archive/unarchive/spam/unspam (`grapmail-archive.ts:146`) plus
 /// trash/restore (`grapmail-boxes.ts:265`). Nothing else is offered, so no

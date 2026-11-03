@@ -22,7 +22,10 @@ struct ThreadView: View {
     /// message id and the thread route would not know it.
     let isThread: Bool
     let onBack: () -> Void
-    let onReply: (String) -> Void
+    /// The row to answer and how: "reply", "all" or "forward". Compose builds
+    /// the quote and the addressing from the FULL row, so the thread hands
+    /// over the id it actually displayed -- same contract as Android's.
+    let onReply: (String, String) -> Void
     /// Per-attachment, not global: a download result belongs to the row that
     /// asked for it, and a shared variable would let a later failure overwrite an
     /// earlier success on screen.
@@ -45,7 +48,7 @@ struct ThreadView: View {
                                 expanded: index == vm.thread.messages.count - 1,
                                 busy: busy == m.id,
                                 notices: notices,
-                                onReply: { onReply(m.id) },
+                                onReply: { mode in onReply(m.id, mode) },
                                 onStar: {
                                     busy = m.id
                                     vm.actOn(m.id, m.isStarred ? .unstar : .star)
@@ -114,7 +117,7 @@ private struct ThreadMessageCard: View {
     let expanded: Bool
     let busy: Bool
     let notices: [String: String]
-    let onReply: () -> Void
+    let onReply: (String) -> Void
     let onStar: () -> Void
     let onDownload: (MailAttachment) -> Void
 
@@ -194,7 +197,15 @@ private struct ThreadMessageCard: View {
                             .font(.system(size: 12)).foregroundColor(GM.error)
                     }
                 }
-                GradientButton(title: "Reply", action: onReply)
+                // Three doors, same words as Android's thread: reply answers
+                // the sender, reply-all answers everyone the message was
+                // addressed to, forward sends the row on to new people. All
+                // three build from the full message, not the snippet.
+                HStack(spacing: 10) {
+                    GradientButton(title: "Reply", action: { onReply("reply") })
+                    GradientButton(title: "Reply all", action: { onReply("all") })
+                    GradientButton(title: "Forward", action: { onReply("forward") })
+                }
             }
         }
         // `.sheet` hangs off the card's outermost view, not off the `if expanded`
@@ -346,12 +357,28 @@ private struct HtmlStrippedNotice: View {
 /// server's own status word.
 struct ComposeView: View {
     @ObservedObject var vm: MailboxModel
+    /// The account record, for the signature the profile carries. Same rule
+    /// as Android's compose: the per-address override first, then the
+    /// default; empty when the profile has not been read or was never filled
+    /// in -- an invented "-- Sent with GrapMail" would sign mail the person
+    /// did not sign.
+    @ObservedObject var account: ProfileModel
+    let replyId: String
+    let mode: String
     let onBack: () -> Void
     @State private var attached: [MailAttachment] = []
     @State private var notice: String?
     @State private var showCc = false
     @State private var picking = false
     @State private var people: [MailboxModel.Person] = []
+    @State private var prepared = false
+
+    private var signature: String {
+        guard let s = account.state.profile?.settings else { return "" }
+        let me = vm.state.accountAddress
+        let per = (me.flatMap { s.signatures[$0] } ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        return per.isEmpty ? s.signature.trimmingCharacters(in: .whitespacesAndNewlines) : per
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -386,7 +413,27 @@ struct ComposeView: View {
                       allowsMultipleSelection: false) { result in
             pick(result)
         }
-        .task { await refreshSuggestions() }
+        .task(id: signature) {
+            account.load()
+            // A prepared compose (reply / reply-all / forward from the thread)
+            // builds its fields from the full server row; a blank one gets the
+            // signature appended as editable text, the way the web client
+            // appends it client-side. Both run once per opened target, so a
+            // re-run of this task cannot double-append what the person already
+            // edited.
+            if !prepared {
+                if !replyId.isEmpty {
+                    prepared = true
+                    vm.prepareReply(id: replyId, mode: mode, signature: signature)
+                } else if !signature.isEmpty {
+                    vm.composeUpdate { s in
+                        if s.body.isEmpty { s.body = "\n\n-- \n" + signature }
+                    }
+                    prepared = true
+                }
+            }
+            await refreshSuggestions()
+        }
         .onChange(of: vm.compose.to) { _ in Task { await refreshSuggestions() } }
         .accessibilityIdentifier("mail-compose-screen")
     }

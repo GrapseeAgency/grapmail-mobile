@@ -414,6 +414,11 @@ final class ScreenshotWalkUITests: XCTestCase {
             ("95-mail-prefs", "mail-settings-prefs"),
             ("96-mail-addresses", "mail-addresses"),
             ("97-mail-support", "mail-support"),
+            // Phase 2: the advanced-search sheet (its scope line is the thing
+            // under test) and the filing undo banner (reachable only after a
+            // filing a read-only walk must not perform).
+            ("98-mail-adv-search", "mail-adv-search"),
+            ("99-mail-undo", "mail-undo"),
         ]
         // These two fetch on appear, so the shutter has to wait for the loaded
         // branch — otherwise the photograph catches "Checking your account…"
@@ -470,6 +475,8 @@ final class ScreenshotWalkUITests: XCTestCase {
             "mail-settings-prefs": "Comfortable — the roomier list",
             "mail-addresses": "business@grapmail.com",
             "mail-support": "Why can I not create an account for someone under 13?",
+            "mail-adv-search": "Search filters",
+            "mail-undo": "Archived 2 messages",
         ]
         for screen in postWriteScreens {
             app.terminate()

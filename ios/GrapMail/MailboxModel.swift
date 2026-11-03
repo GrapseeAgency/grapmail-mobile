@@ -66,11 +66,42 @@ final class MailboxModel: ObservableObject {
         /// which is the whole set a client can honestly name.
         var snoozeUndoIds: [String] = []
         var snoozeUndoNote: String?
+        /// The last filing this session did, kept so the banner can offer its
+        /// exact reverse. Same rule as the snooze pair: only the ids the server
+        /// accepted, and any newer filing supersedes the offer.
+        var undoIds: [String] = []
+        var undoInverse: MailAction?
+        var undoNote: String?
+        /// The advanced search's filters, applied CLIENT-SIDE to the pages this
+        /// device has loaded -- the server's `q` is one literal term over
+        /// subject, body and from (`grapmail-search.ts:110-118`) and there is
+        /// no from/to/attachment/date route to call. The sheet prints
+        /// `advScope` the way the sort sheet prints its scope.
+        var advFrom = ""
+        var advTo = ""
+        var advSubject = ""
+        var advFiles = false
+        var advAfter = ""    // YYYY-MM-DD
+        var advBefore = ""   // YYYY-MM-DD
+        /// Rows the advanced filters ran over -- the honest scope line.
+        var advScope = 0
         var unreadCount: Int?
         var statsSent: Int?
         var statsDrafts: Int?
         var statsSpam: Int?
         var statsTrash: Int?
+        /// Counted by the same `boxCount` that builds the listing beside each
+        /// badge (`grapmail.ts:666-688`). Nil on a deployment that has not
+        /// answered; the drawer reads that nil as "not offered here", never 0.
+        var statsStarred: Int?
+        var statsArchive: Int?
+        /// `?box=others` -- everything still in the account
+        /// (`grapmail-box-terms.ts:78`).
+        var statsOthers: Int?
+        /// The count of `?box=snoozed`. Nil means "nobody asked" or "this
+        /// deployment has no snoozed list" -- neither licenses a 0, and the
+        /// drawer row exists only when this is not nil.
+        var statsSnoozed: Int?
         /// `GET /me`. The greeting is built from these, not from the sign-in
         /// account: `/me` answers with the name the mailbox carries, and nil
         /// means it never said so — so the screen shows no name rather than a
@@ -365,6 +396,28 @@ final class MailboxModel: ObservableObject {
 
             if self.state.filter == .unread { rows = rows.filter { !$0.isRead } }
 
+            // The advanced filters run here, on the loaded pages, before the
+            // sort. Blank fields are absent filters, not empty-string matches.
+            let advOn = !self.state.advFrom.trimmed.isEmpty || !self.state.advTo.trimmed.isEmpty
+                || !self.state.advSubject.trimmed.isEmpty || self.state.advFiles
+                || !self.state.advAfter.trimmed.isEmpty || !self.state.advBefore.trimmed.isEmpty
+            if advOn {
+                let f = self.state.advFrom.trimmed.lowercased()
+                let tt = self.state.advTo.trimmed.lowercased()
+                let sj = self.state.advSubject.trimmed.lowercased()
+                let after = self.state.advAfter.trimmed
+                let before = self.state.advBefore.trimmed
+                rows = rows.filter { m in
+                    (f.isEmpty || (m.from?.display ?? "").lowercased().contains(f))
+                    && (tt.isEmpty || m.to.contains { $0.lowercased().contains(tt) }
+                        || m.cc.contains { $0.lowercased().contains(tt) })
+                    && (sj.isEmpty || (m.subject ?? "").lowercased().contains(sj))
+                    && (!self.state.advFiles || m.hasAttachments)
+                    && (after.isEmpty || String((m.createdAt ?? "").prefix(10)) >= after)
+                    && (before.isEmpty || String((m.createdAt ?? "").prefix(10)) <= before)
+                }
+            }
+
             // The keys are computed through locals on purpose. Written inline as
             // `$0.from?.display.lowercased() < $1.from?.display.lowercased()`,
             // the optional chain makes both sides `String?`, `<` has no such
@@ -388,6 +441,10 @@ final class MailboxModel: ObservableObject {
             self.state.total = total
             self.state.loaded = cache?.messages.count ?? self.state.loaded
             self.state.pages = cache?.pages ?? self.state.pages
+            // The scope the sheet prints: how many loaded rows the filters ran
+            // over BEFORE filtering, so "12 of 40" cannot be read as the
+            // server's answer about the whole box.
+            self.state.advScope = cache?.messages.count ?? self.state.loaded
             // Each stays nil when the server did not answer it. A nil draws no
             // badge; a 0 would claim an empty folder.
             self.state.unreadCount = stats?.inbox?.unread
@@ -395,6 +452,10 @@ final class MailboxModel: ObservableObject {
             self.state.statsDrafts = stats?.drafts
             self.state.statsSpam = stats?.spam
             self.state.statsTrash = stats?.trash
+            self.state.statsStarred = stats?.starred
+            self.state.statsArchive = stats?.archive
+            self.state.statsOthers = stats?.others
+            self.state.statsSnoozed = stats?.snoozed
         }
     }
 
@@ -480,10 +541,23 @@ final class MailboxModel: ObservableObject {
                     self.state.snoozeUndoNote = Self.snoozeNote(done.count, until: until)
                 }
             } else if action != .unsnooze {
-                // Any other filing action supersedes the offer. An unsnooze keeps it:
-                // a partial undo leaves the rest postponed and still offered.
+                // Any other filing action supersedes the snooze offer. An
+                // unsnooze keeps it: a partial undo leaves the rest postponed
+                // and still offered.
                 self.state.snoozeUndoIds = []
                 self.state.snoozeUndoNote = nil
+            }
+            // The filing undo, same rule as the snooze pair: only the ids the
+            // server accepted, and only for the actions with a real inverse
+            // route. Read/star do not raise it -- their rows keep their toggle.
+            if let inv = action.inverse(), !done.isEmpty {
+                self.state.undoIds = done
+                self.state.undoInverse = inv
+                self.state.undoNote = action.pastLine(done.count)
+            } else if action.inverse() == nil {
+                self.state.undoIds = []
+                self.state.undoInverse = nil
+                self.state.undoNote = nil
             }
             self.load(replace: true)
         }
@@ -555,6 +629,55 @@ final class MailboxModel: ObservableObject {
         state.snoozeUndoNote = nil
     }
 
+    /// Reverse the last filing, for exactly the ids the server accepted then.
+    /// The inverse is another `PATCH /message/:id/:action` -- archive/unarchive,
+    /// spam/unspam, trash/restore are the route's own pairs -- so this is a real
+    /// path back, not a local reshuffle of rows the server already moved. A
+    /// partial failure keeps offering only the ones that did NOT go back, same
+    /// as the snooze undo.
+    func undoFiling() {
+        let ids = state.undoIds
+        guard let inv = state.undoInverse, !ids.isEmpty, let token else { return }
+        state.busy = true
+        Task { [weak self] in
+            guard let self else { return }
+            var failure: String?
+            var redone: [String] = []
+            for id in ids {
+                do {
+                    _ = try await ApiClient.mailAction(token: token, id: id, action: inv, until: nil)
+                    redone.append(id)
+                    await self.applyLocally(id: id, action: inv)
+                } catch { failure = Self.describe(error) }
+            }
+            await self.invalidateFor(inv)
+            let left = self.state.undoIds.filter { !redone.contains($0) }
+            self.state.busy = false
+            self.state.undoIds = left
+            if left.isEmpty { self.state.undoInverse = nil }
+            self.state.undoNote = failure.map { "\(redone.count) of \(ids.count) reversed. \($0)" }
+            self.state.staleError = failure
+            self.load(replace: true)
+        }
+    }
+
+    func dismissUndo() {
+        state.undoIds = []
+        state.undoInverse = nil
+        state.undoNote = nil
+    }
+
+    /// Write the advanced filters and re-project. No network call: these run
+    /// on the loaded pages, which is what the sheet's scope line says.
+    func setAdvanced(from: String, to: String, subject: String, files: Bool,
+                     after: String, before: String) {
+        state.advFrom = from; state.advTo = to; state.advSubject = subject
+        state.advFiles = files; state.advAfter = after; state.advBefore = before
+        reproject()
+    }
+
+    func clearAdvanced() { setAdvanced(from: "", to: "", subject: "", files: false, after: "", before: "") }
+
     func actOn(_ id: String, _ action: MailAction) {
         guard let token else { return }
         Task { [weak self] in
@@ -571,6 +694,16 @@ final class MailboxModel: ObservableObject {
                     let left = self.state.snoozeUndoIds.filter { $0 != id }
                     self.state.snoozeUndoIds = left
                     if left.isEmpty { self.state.snoozeUndoNote = nil }
+                }
+                // A swipe is the most common filing there is, and the mail
+                // leaves the screen the instant it succeeds -- the banner must
+                // offer the reverse here too, or the single most undoable
+                // action would have no path back (Android's `actOn` learned the
+                // same lesson from the same gap).
+                if let inv = action.inverse() {
+                    self.state.undoIds = [id]
+                    self.state.undoInverse = inv
+                    self.state.undoNote = action.pastLine(1)
                 }
                 self.reproject()
             } catch {
@@ -834,9 +967,36 @@ final class MailboxModel: ObservableObject {
         }
     }
 
-    /// Save an attachment into the app's own Documents directory and report what
-    /// actually happened. A failure never receives a path.
+    /// Take one attachment out of the message for good.
+    ///
+    /// `DELETE /attachments/:id` is scoped to the caller's own rows
+    /// (`grapmail-attachments.ts:412`), and the answer is the route's, not the
+    /// app's guess. The body cache is dropped on success because the row the
+    /// app is holding still lists a file that no longer exists -- leaving it
+    /// would let the Files screen offer a download of bytes the server has
+    /// thrown away.
+    func deleteAttachment(_ id: String, then: @escaping (String) -> Void) {
+        guard let token else { then("Sign in again to remove this."); return }
+        Task { [weak self] in
+            guard let self else { return }
+            do {
+                let r = try await ApiClient.mailDeleteAttachment(token, id: id)
+                if r.success {
+                    await MailStore.shared.forgetAttachment(id)
+                    await MailStore.shared.invalidateAllBoxes()
+                    then("Removed.")
+                } else {
+                    then(r.error ?? "The server refused to remove that file.")
+                }
+            } catch {
+                then(Self.describe(error))
+            }
+        }
+    }
+
     func downloadAttachment(_ a: MailAttachment, then: @escaping (String) -> Void) {
+        // Save an attachment into the app's own Documents directory and report
+        // what actually happened. A failure never receives a path.
         guard let token else { then("Sign in again to save this."); return }
         // No `self` captured: this task reads the network, writes to disk and
         // reports back through the caller's closure. Holding the model until the
@@ -956,6 +1116,85 @@ final class MailboxModel: ObservableObject {
         compose.inReplyTo = m.id
     }
 
+    /// Prepare a reply, reply-all or forward from the FULL message row.
+    ///
+    /// The quote is built from what the server actually said the message
+    /// contains (`GET /message/:id` -- bodyText, the to/cc lists, the date),
+    /// never from the snippet the list row carries. Reply-all adds the
+    /// original To and Cc minus this account's own address, because "reply
+    /// all" that drops the thread's other recipients is a lie about who will
+    /// read it. Forward carries no In-Reply-To: the server threads replies by
+    /// that header, and a forwarded message is not a reply.
+    func prepareReply(id: String, mode: String, signature: String) {
+        guard let token else { return }
+        Task { [weak self] in
+            guard let self else { return }
+            guard let full = try? await ApiClient.mailMessage(token: token, id: id),
+                  let m = full.message else { return }
+            let me = self.state.accountAddress?.lowercased()
+            let quoted = Self.quoteOf(m)
+            let sig = Self.signatureBlock(signature)
+            switch mode {
+            case "all":
+                var seen = Set<String>()
+                let others = ([m.from?.address].compactMap { $0 } + m.to + m.cc)
+                    .map { $0.trimmingCharacters(in: .whitespaces) }
+                    .filter { !$0.isEmpty && $0.lowercased() != me }
+                    .filter { seen.insert($0.lowercased()).inserted }
+                self.compose.to = others.joined(separator: ", ")
+                self.compose.subject = Self.replySubject(m.subject)
+                self.compose.body = quoted + sig
+                self.compose.inReplyTo = m.id
+            case "forward":
+                let head = "Forwarded message\n" +
+                    "From: \(m.from?.display ?? m.from?.address ?? "")\n" +
+                    "Date: \(m.createdAt ?? "")\n" +
+                    "Subject: \(m.subject ?? "(no subject)")\n" +
+                    "To: \(m.to.joined(separator: ", "))\n\n"
+                self.compose.to = ""
+                self.compose.subject = Self.forwardSubject(m.subject)
+                self.compose.body = head + quoted + sig
+                self.compose.inReplyTo = nil
+            default:
+                self.compose.to = m.from?.address ?? ""
+                self.compose.subject = Self.replySubject(m.subject)
+                self.compose.body = quoted + sig
+                self.compose.inReplyTo = m.id
+            }
+        }
+    }
+
+    /// The quote block: every body line prefixed. An empty body quotes
+    /// nothing -- inventing a blank line under the header would claim the
+    /// message had a body.
+    static func quoteOf(_ m: MailMessageFull) -> String {
+        let who = m.from?.display ?? m.from?.address ?? ""
+        let body = (m.bodyText ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        if body.isEmpty {
+            return "\n\nOn \(m.createdAt ?? "an unknown date"), \(who) wrote:\n"
+        }
+        let lines = body.components(separatedBy: "\n")
+            .map { $0.isEmpty ? ">" : "> \($0)" }
+            .joined(separator: "\n")
+        return "\n\nOn \(m.createdAt ?? "an unknown date"), \(who) wrote:\n\(lines)\n"
+    }
+
+    /// The signature arrives as EDITABLE text appended when the compose opens,
+    /// the same way the web client appends it client-side -- what the person
+    /// sees in the body is what is sent; nothing is stitched on behind the
+    /// scenes at send time.
+    static func signatureBlock(_ signature: String) -> String {
+        signature.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            ? "" : "\n\n-- \n\(signature)"
+    }
+
+    static func forwardSubject(_ s: String?) -> String {
+        guard let t = s?.trimmingCharacters(in: .whitespacesAndNewlines), !t.isEmpty
+        else { return "Fwd:" }
+        if t.hasPrefix("Fwd:") { return t }
+        return "Fwd: \(t)"
+    }
+
     private static func replySubject(_ s: String?) -> String {
         guard let t = s?.trimmingCharacters(in: .whitespacesAndNewlines), !t.isEmpty else { return "Re:" }
         if t.hasPrefix("Re:") || t.hasPrefix("Fwd:") { return t }
@@ -970,6 +1209,14 @@ final class MailboxModel: ObservableObject {
     /// pin.
     func send() {
         guard let token, !compose.sending else { return }
+        // An empty To is refused here, not by the server: a message with no
+        // recipient is not a send, and a receipt naming the server's 422 after
+        // the person pressed Send twice is worse than a button that says why
+        // it is waiting. Cc and Bcc do not count -- the route requires `to`.
+        if Self.splitAddresses(compose.to).isEmpty {
+            compose.error = "Add at least one recipient in To."
+            return
+        }
         compose.sending = true
         compose.error = nil
         compose.result = nil

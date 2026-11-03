@@ -1405,6 +1405,99 @@ pin("iOS's account seed decodes through the live decoder and fails loudly",
 pin("both clients copy the web's scope words",
     "name, address and photo" in KT_ACCT and "name, address and photo" in SW_ACCT)
 
+# -- 26. Phase 2: undo, filters, replies -- features whose every claim is a call --
+#
+# The mailbox features the plan could ship against endpoints that already exist:
+# the filing undo (the PATCH is reversible by shape), the advanced search sheet
+# (client-side over loaded pages, scope stated like the sort sheet's), reply-all
+# and forward (built from the full server row), signature insertion (the profile's
+# own text, editable), and attachment removal (two steps, the route's answer).
+# Each pin below fails if the feature drifts into a claim the code cannot keep.
+KT_MS = android("ui/screens/mail/MailboxScreen.kt")
+SW_MS = ios("MailboxView.swift")
+KT_SHEETS = KT_MS  # the sheet lives in the same file
+KT_COMPOSE = android("ui/screens/mail/ComposeScreen.kt")
+SW_RDR = ios("MailReaderViews.swift")
+SW_SHEETS = ios("MailSheets.swift")
+KT_VM = KT_VM  # the mailbox view model, already read for @JvmOverloads
+SW_VM = ios("MailboxModel.swift")
+KT_MDTO = android("data/MailDto.kt")
+SW_MAPI = ios("MailAPI.swift")
+
+# The undo pairs are the route's own (`grapmail-archive.ts` / `grapmail-boxes.ts`
+# answer exactly these action words). A wrong inverse would file the mail
+# somewhere the person never asked it to go.
+pin("Android's inverse map names the three real pairs",
+    all(s in code_only(KT_MDTO) for s in
+        ("MailAction.Archive -> MailAction.Unarchive",
+         "MailAction.Spam -> MailAction.Unspam",
+         "MailAction.Trash -> MailAction.Restore")))
+pin("iOS's inverse map names the three real pairs",
+    all(s in code_only(SW_MAPI) for s in
+        ("case .archive: return .unarchive",
+         "case .spam: return .unspam",
+         "case .trash: return .restore")))
+pin("the undo banner is one component per platform, not a copy per screen",
+    "internal fun UndoBanner(" in KT_MS and "struct GMUndoBanner: View" in SW_MS
+    and "GMUndoBanner(" in SW_HOST and "UndoBanner(" in KT_HOST
+    and "Button(\"Undo\")" not in SW_HOST)  # the host never re-draws the banner
+pin("undo is offered only for ids the server accepted, both sides",
+    "undoIds = done" in code_only(KT_VM) and "self.state.undoIds = done" in code_only(SW_VM))
+pin("both walks photograph the undo banner and the filter sheet",
+    all(f'"{n}:9' in KT_WALK for n in ("mail-adv-search", "mail-undo"))
+    and all(f'"{n}")' in SW_WALK.replace('"mail-adv-search"', '"mail-adv-search")')
+        for n in ("mail-adv-search", "mail-undo")))
+
+# The advanced sheet's whole honesty claim is its scope line, in the same words
+# on both phones; and it must never reach the network, because no filter route
+# exists to reach.
+pin("the advanced filter scope line is one sentence on both platforms",
+    "messages loaded on this " in code_only(KT_MS)
+    and "messages loaded on " in code_only(SW_SHEETS))
+pin("the advanced filters never pretend a server route exists",
+    "Api." not in code_only(KT_VM)[code_only(KT_VM).find("fun setAdvanced"):][:300]
+    and "ApiClient" not in code_only(SW_VM)[code_only(SW_VM).find("func setAdvanced"):][:300])
+pin("the search placeholder names what the term actually covers",
+    "Search subject, body or sender" in KT_MS and "Search subject, body or sender" in SW_MS
+    and "people, or files" not in KT_MS and "people, or files" not in SW_MS)
+
+# Replies and forwards build from the FULL row; a forward that carried
+# In-Reply-To would thread a forwarded message under a reply it is not.
+pin("both prepares fetch the full message before composing",
+    "Api.mailMessage(t, id)" in code_only(KT_VM)
+    and "ApiClient.mailMessage(token: token, id: id)" in code_only(SW_VM))
+pin("forward carries no In-Reply-To on either platform",
+    re.search(r'"forward"[\s\S]{0,700}?inReplyTo = null', code_only(KT_VM)) is not None
+    and re.search(r'case "forward"[\s\S]{0,700}?inReplyTo = nil', code_only(SW_VM)) is not None)
+pin("reply-all drops this account's own address, both sides",
+    "filterNot { it.lowercase() == me }" in code_only(KT_VM)
+    and "$0.lowercased() != me" in code_only(SW_VM))
+
+# The signature is text the person sees and can edit -- appended when compose
+# opens, never stitched on at send time. If send() touched the signature the
+# receipt would describe bytes the body editor never showed.
+pin("the signature arrives as editable body text, not a send-time patch",
+    'body = "\\n\\n-- \\n$signature"' in code_only(KT_COMPOSE)
+    and 's.body = "\\n\\n-- \\n" + signature' in code_only(SW_RDR)
+    and "signature" not in code_only(KT_VM)[code_only(KT_VM).find("fun send("):][:700]
+    and "signature" not in code_only(SW_VM)[code_only(SW_VM).find("func send("):][:700])
+pin("an empty To is refused before anything is sent, both platforms",
+    "Add at least one recipient in To." in code_only(KT_VM)
+    and "Add at least one recipient in To." in code_only(SW_VM))
+
+# Attachment removal is two steps and drops the cache on success, or the Files
+# screen keeps offering bytes the server threw away.
+pin("attachment delete asks first and drops the cached row, both platforms",
+    "mail-attachment-confirm" in code_only(android("ui/screens/mail/MailSecondaryScreens.kt"))
+    and "mail-attachment-confirm" in code_only(SW_SECOND)
+    and "MailStore.forgetAttachment(id)" in code_only(KT_VM)
+    and "MailStore.shared.forgetAttachment(id)" in code_only(SW_VM))
+
+# Explicitly excluded features stay excluded: no send-later field may appear
+# on either client, because no `/send` parameter accepts one.
+pin("no scheduling field crept into either client",
+    not re.search(r"sendAt|scheduledAt|scheduleAt", code_only(KT_API) + code_only(SW_APIC)))
+
 print()
 if failures:
     print(f"mail-honesty: {len(failures)} pin(s) broken")

@@ -9,6 +9,10 @@ import SwiftUI
 /// way; a mailbox has more of these than any screen before it.
 struct MailDrawer: View {
     let box: MailBox
+    /// The folder rows to draw -- `drawerBoxes(state)` from the model, which
+    /// inserts Snoozed only when `/stats` answered its count. Hardcoding the
+    /// list here would offer a box the server may refuse.
+    let boxes: [MailBox]
     let counts: [MailBox: Int?]
     let onSelect: (MailBox) -> Void
     /// Tapping the scrim closes the drawer. Reusing `onSelect` for it would
@@ -37,7 +41,7 @@ struct MailDrawer: View {
                             .padding(.top, 34)
                             .padding(.bottom, 20)
 
-                        ForEach(MailBox.drawerOrder) { b in
+                        ForEach(boxes) { b in
                             DrawerRow(label: b.title, icon: drawerIcon(b),
                                       count: counts[b] ?? nil, selected: b == box) {
                                 onSelect(b)
@@ -143,6 +147,7 @@ private func drawerIcon(_ b: MailBox) -> String {
     case .trash:    return "trash"
     case .screener: return "lock"
     case .others:   return "mail"
+    case .snoozed:  return "clock"
     }
 }
 

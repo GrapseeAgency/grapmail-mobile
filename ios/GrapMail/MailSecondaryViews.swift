@@ -445,11 +445,19 @@ struct AttachmentPreviewView: View {
     @State private var entry: MailboxModel.FileEntry?
     @State private var outcome: String?
     @State private var saving = false
+    // The delete is a two-step: the button asks, the panel confirms, and only
+    // then does the route see it. `DELETE /attachments/:id` takes the file out
+    // of the message for good; the body cache is dropped on success, so the
+    // screen goes to the honest "removed" state rather than keeping a card for
+    // bytes the server has thrown away.
+    @State private var confirmDelete = false
+    @State private var deleting = false
+    @State private var deleted = false
 
     var body: some View {
         MailScaffold(title: "Attachment", onBack: onBack) {
             VStack(alignment: .leading, spacing: 0) {
-                if let a = entry?.attachment {
+                if let a = entry?.attachment, !deleted {
                     VStack(alignment: .leading, spacing: 12) {
                         Spacer().frame(height: 16)
                         ZStack {
@@ -484,12 +492,54 @@ struct AttachmentPreviewView: View {
                             }
                         }
                         .padding(.top, 10)
+                        if !confirmDelete {
+                            Button {
+                                confirmDelete = true
+                            } label: {
+                                Text("Remove from this message")
+                                    .font(.system(size: 14, weight: .semibold))
+                                    .foregroundColor(GM.error)
+                                    .frame(maxWidth: .infinity).padding(.vertical, 12)
+                                    .overlay(RoundedRectangle(cornerRadius: 24)
+                                        .stroke(GM.error, lineWidth: 1))
+                            }
+                            .disabled(deleting)
+                            .accessibilityIdentifier("mail-attachment-delete")
+                        } else {
+                            VStack(alignment: .leading, spacing: 12) {
+                                Text("Remove \(a.name ?? "this file") from the message? " +
+                                     "The message keeps everything else; this file is " +
+                                     "gone from it for good.")
+                                    .font(.system(size: 13)).foregroundColor(GM.textPrimary)
+                                HStack(spacing: 24) {
+                                    Button("Cancel") { confirmDelete = false }
+                                        .foregroundColor(GM.textSecondary)
+                                    Button(deleting ? "Removing…" : "Remove") {
+                                        deleting = true
+                                        vm.deleteAttachment(a.id) { r in
+                                            deleting = false; confirmDelete = false
+                                            deleted = true; outcome = r
+                                        }
+                                    }
+                                    .foregroundColor(GM.error)
+                                    .fontWeight(.semibold)
+                                    .disabled(deleting)
+                                }
+                                .font(.system(size: 14))
+                            }
+                            .padding(16)
+                            .background(RoundedRectangle(cornerRadius: 12).fill(GM.warnChipBg))
+                            .accessibilityIdentifier("mail-attachment-confirm")
+                        }
                     }
                     .padding(.horizontal, 20)
                 } else {
                     CenteredState(
-                        title: "This attachment is no longer listed.",
-                        detail: "Open its message again.")
+                        title: deleted
+                            ? "This attachment has been removed from the message. "
+                              + "The message itself is unchanged."
+                            : "This attachment is no longer listed.",
+                        detail: deleted ? nil : "Open its message again.")
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)

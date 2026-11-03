@@ -925,6 +925,10 @@ struct MailAttachmentResponse: Decodable {
 enum MailBox: String, CaseIterable, Identifiable {
     case inbox, starred, sent, drafts, archive, spam, trash, screener
     case others
+    /// `?box=snoozed` -- implemented server-side (`grapmail-boxes.ts:178`) and
+    /// offered by the drawer only when `/stats` answers the `snoozed` key, so a
+    /// deployment without the box never shows a row that would refuse it.
+    case snoozed
 
     var id: String { rawValue }
 
@@ -939,6 +943,7 @@ enum MailBox: String, CaseIterable, Identifiable {
         case .trash:    return "Trash"
         case .screener: return "Pending approval"
         case .others:   return "All Mail"
+        case .snoozed:  return "Snoozed"
         }
     }
 
@@ -968,6 +973,38 @@ enum MailAction: String {
     case archive, unarchive, spam, unspam, snooze, unsnooze
 
     var apiValue: String { rawValue }
+
+    /// The action that reverses this one, for the six filing actions the undo
+    /// banner offers -- `PATCH /message/:id/:action` is reversible by the
+    /// route's own shape, so the inverse is another call, not a local guess.
+    /// Read/star return nil: their rows stay visible with their own toggle.
+    /// Snooze has its dedicated undo path.
+    func inverse() -> MailAction? {
+        switch self {
+        case .archive: return .unarchive
+        case .unarchive: return .archive
+        case .spam: return .unspam
+        case .unspam: return .spam
+        case .trash: return .restore
+        case .restore: return .trash
+        default: return nil
+        }
+    }
+
+    /// The banner's past tense, in the same words for the same fact on both
+    /// platforms: what the app just did to the selection.
+    func pastLine(_ count: Int) -> String {
+        let noun = count == 1 ? "1 message" : "\(count) messages"
+        switch self {
+        case .archive: return "Archived \(noun)"
+        case .unarchive: return "Moved \(noun) back to the inbox"
+        case .spam: return "Reported \(noun) as spam"
+        case .unspam: return "Moved \(noun) out of Spam"
+        case .trash: return "Moved \(noun) to Trash"
+        case .restore: return "Restored \(noun)"
+        default: return noun
+        }
+    }
 }
 
 /// Sort options. The server orders by UID descending and nothing else

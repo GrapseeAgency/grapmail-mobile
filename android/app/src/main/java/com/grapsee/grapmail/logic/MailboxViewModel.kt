@@ -130,6 +130,34 @@ class MailboxViewModel @JvmOverloads constructor(
          */
         val snoozeUndoIds: List<String> = emptyList(),
         val snoozeUndoNote: String? = null,
+        /**
+         * The last filing this session did, kept so the banner can offer its
+         * exact reverse. Same rule as the snooze pair: only the ids the server
+         * accepted are listed, and any newer filing supersedes the offer, so
+         * "Undo" can never act on mail the app cannot name.
+         */
+        val undoIds: List<String> = emptyList(),
+        val undoInverse: com.grapsee.grapmail.data.MailAction? = null,
+        val undoNote: String? = null,
+        /**
+         * The advanced search's own filters, applied CLIENT-SIDE to the pages
+         * this device has loaded.
+         *
+         * The server's `q` is a literal ILIKE over subject, body and from
+         * (`grapmail-search.ts:110-118`, 2-100 chars) and nothing else -- there
+         * is no from/to/attachment/date filter route to call. So these narrow
+         * what is on the device, exactly like the sort does, and the sheet
+         * prints [advScope] the way the sort sheet prints its scope. A whole-box
+         * search is the typed term; the sheet must not imply otherwise.
+         */
+        val advFrom: String = "",
+        val advTo: String = "",
+        val advSubject: String = "",
+        val advFiles: Boolean = false,
+        val advAfter: String = "",   // YYYY-MM-DD
+        val advBefore: String = "",   // YYYY-MM-DD
+        /** Rows the advanced filters ran over -- the honest scope line. */
+        val advScope: Int = 0,
         val unreadCount: Int? = null,
         /**
          * The mailbox's own identity from `GET /me`. The greeting is built from
@@ -396,6 +424,27 @@ class MailboxViewModel @JvmOverloads constructor(
 
         if (s.filter == MailFilter.Unread) rows = rows.filterNot { it.isRead }
 
+        // The advanced filters run here, on the loaded pages, before the sort.
+        // Blank fields are absent filters, not empty-string matches: a screen
+        // that sent "" at the server would match nothing, and one that matched
+        // "" here would hide mail the person never meant to exclude.
+        val advOn = s.advFrom.isNotBlank() || s.advTo.isNotBlank() ||
+            s.advSubject.isNotBlank() || s.advFiles ||
+            s.advAfter.isNotBlank() || s.advBefore.isNotBlank()
+        if (advOn) {
+            rows = rows.filter { m ->
+                (s.advFrom.isBlank() ||
+                    (m.from?.display ?: "").contains(s.advFrom.trim(), ignoreCase = true)) &&
+                (s.advTo.isBlank() || m.to.any { it.contains(s.advTo.trim(), ignoreCase = true) } ||
+                    m.cc.any { it.contains(s.advTo.trim(), ignoreCase = true) }) &&
+                (s.advSubject.isBlank() ||
+                    (m.subject ?: "").contains(s.advSubject.trim(), ignoreCase = true)) &&
+                (!s.advFiles || m.hasAttachments) &&
+                (s.advAfter.isBlank() || (m.createdAt ?: "").take(10) >= s.advAfter.trim()) &&
+                (s.advBefore.isBlank() || (m.createdAt ?: "").take(10) <= s.advBefore.trim())
+            }
+        }
+
         rows = when (s.sort) {
             // The server's own order: covers the whole box, not just the pages.
             MailSort.Newest -> rows
@@ -412,6 +461,10 @@ class MailboxViewModel @JvmOverloads constructor(
             total = total,
             loaded = cache?.messages?.size ?: it.loaded,
             pages = cache?.pages ?: it.pages,
+            // The scope the sheet prints: how many loaded rows the filters ran
+            // over BEFORE filtering, so "12 of 40" cannot be read as the
+            // server's answer about the whole box.
+            advScope = cache?.messages?.size ?: it.loaded,
             // Each stays null when the server did not answer it. A null draws no
             // badge; a 0 would claim an empty folder.
             unreadCount = stats?.inbox?.unread,
@@ -472,10 +525,21 @@ class MailboxViewModel @JvmOverloads constructor(
                     )
                 }
             } else if (action != MailAction.Unsnooze) {
-                // Any other filing action supersedes the offer. An unsnooze keeps it
-                // deliberately: a partial undo leaves the rest postponed, and the
-                // note lists what still is.
+                // Any other filing action supersedes the snooze offer. An
+                // unsnooze keeps it deliberately: a partial undo leaves the rest
+                // postponed, and the note lists what still is.
                 _state.update { it.copy(snoozeUndoIds = emptyList(), snoozeUndoNote = null) }
+            }
+            // The filing undo, same rule as the snooze pair: only the ids the
+            // server accepted, and only for the six actions that have a real
+            // inverse route. Read/star do not raise it -- their rows stay on
+            // screen with their own toggle.
+            val inv = action.inverse()
+            _state.update { s ->
+                if (inv == null || done.isEmpty()) s.copy(undoIds = emptyList(),
+                    undoInverse = null, undoNote = null)
+                else s.copy(undoIds = done, undoInverse = inv,
+                    undoNote = action.pastLine(done.size))
             }
             invalidateFor(action)
             load(replace = true)
@@ -541,6 +605,62 @@ class MailboxViewModel @JvmOverloads constructor(
         _state.update { it.copy(snoozeUndoIds = emptyList(), snoozeUndoNote = null) }
     }
 
+    /**
+     * Reverse the last filing, for exactly the ids the server accepted then.
+     *
+     * The inverse is another `PATCH /message/:id/:action` -- the route is
+     * reversible by shape (archive/unarchive, spam/unspam, trash/restore are
+     * its own pairs) -- so this is a real path back, not a local reshuffle of
+     * rows the server already moved. A partial failure keeps offering the
+     * ones that did NOT go back, same as the snooze undo.
+     */
+    fun undoFiling() {
+        val ids = _state.value.undoIds
+        val inv = _state.value.undoInverse
+        if (ids.isEmpty() || inv == null) return
+        viewModelScope.launch {
+            val t = token() ?: return@launch
+            _state.update { it.copy(busy = true) }
+            var failure: String? = null
+            val redone = mutableListOf<String>()
+            for (id in ids) {
+                runCatching { Api.mailAction(t, id, inv, null) }
+                    .onSuccess { redone.add(id); applyLocally(id, inv) }
+                    .onFailure { failure = it.message ?: "That action didn't go through." }
+            }
+            _state.update { s ->
+                val left = s.undoIds - redone
+                s.copy(
+                    busy = false,
+                    undoIds = left,
+                    undoInverse = if (left.isEmpty()) null else s.undoInverse,
+                    undoNote = when {
+                        failure != null -> "${redone.size} of ${ids.size} reversed. $failure"
+                        else -> null
+                    },
+                    staleError = failure,
+                )
+            }
+            invalidateFor(inv)
+            load(replace = true)
+        }
+    }
+
+    fun dismissUndo() {
+        _state.update { it.copy(undoIds = emptyList(), undoInverse = null, undoNote = null) }
+    }
+
+    /** Write the advanced filters and re-project. No network call: these run
+     *  on the loaded pages, which is what the sheet's scope line says. */
+    fun setAdvanced(from: String, to: String, subject: String, files: Boolean,
+                    after: String, before: String) {
+        _state.update { it.copy(advFrom = from, advTo = to, advSubject = subject,
+            advFiles = files, advAfter = after, advBefore = before) }
+        viewModelScope.launch { reproject() }
+    }
+
+    fun clearAdvanced() = setAdvanced("", "", "", false, "", "")
+
     fun actOn(id: String, action: MailAction) {
         viewModelScope.launch {
             val t = token() ?: return@launch
@@ -559,6 +679,18 @@ class MailboxViewModel @JvmOverloads constructor(
                             s.copy(snoozeUndoIds = left,
                                 snoozeUndoNote = if (left.isEmpty()) null else s.snoozeUndoNote)
                         }
+                    }
+                    // A swipe is the most common filing there is, and the mail
+                    // leaves the screen the instant it succeeds -- so the banner
+                    // must offer the reverse here too, or the undo would exist
+                    // only for selections and the single most undoable action
+                    // would have no path back.
+                    val inv = action.inverse()
+                    _state.update { s ->
+                        if (inv == null) s else s.copy(
+                            undoIds = listOf(id), undoInverse = inv,
+                            undoNote = action.pastLine(1),
+                        )
                     }
                 }
                 .onFailure {
@@ -808,6 +940,90 @@ class MailboxViewModel @JvmOverloads constructor(
         it.copy(to = m.from?.address ?: "", subject = replySubject(m.subject), inReplyTo = m.id)
     }
 
+    /**
+     * Prepare a reply, reply-all or forward from the FULL message row.
+     *
+     * The quote is built from what the server actually said the message
+     * contains (`GET /message/:id` -- bodyText, the to/cc lists, the date),
+     * never from the snippet the list row carries: a quoted reply that got
+     * the first 90 characters would look complete and be wrong. Reply-all
+     * adds the original To and Cc minus this account's own address, because
+     * "reply all" that drops the thread's other recipients is a lie about
+     * who will read it. Forward carries no In-Reply-To: the server threads
+     * replies by that header, and a forwarded message is not a reply.
+     */
+    fun prepareReply(id: String, mode: String, signature: String) {
+        viewModelScope.launch {
+            val t = token() ?: return@launch
+            val full = runCatching { Api.mailMessage(t, id) }.getOrNull()?.message
+                ?: return@launch
+            val me = _state.value.accountAddress?.lowercase()
+            val quoted = quoteOf(full)
+            when (mode) {
+                "all" -> {
+                    val others = (listOfNotNull(full.from?.address) + full.to + full.cc)
+                        .map { it.trim() }.filter { it.isNotEmpty() }
+                        .filterNot { it.lowercase() == me }
+                        .distinct()
+                    _compose.update { it.copy(
+                        to = others.joinToString(", "),
+                        subject = replySubject(full.subject),
+                        body = quoted + signatureBlock(signature),
+                        inReplyTo = full.id,
+                    ) }
+                }
+                "forward" -> {
+                    val head = "Forwarded message\n" +
+                        "From: ${full.from?.display ?: full.from?.address ?: ""}\n" +
+                        "Date: ${full.createdAt ?: ""}\n" +
+                        "Subject: ${full.subject ?: "(no subject)"}\n" +
+                        "To: ${full.to.joinToString(", ")}\n\n"
+                    _compose.update { it.copy(
+                        to = "", subject = forwardSubject(full.subject),
+                        body = head + quoted + signatureBlock(signature),
+                        inReplyTo = null,
+                    ) }
+                }
+                else -> {
+                    _compose.update { it.copy(
+                        to = full.from?.address ?: "",
+                        subject = replySubject(full.subject),
+                        body = quoted + signatureBlock(signature),
+                        inReplyTo = full.id,
+                    ) }
+                }
+            }
+        }
+    }
+
+    /** The quote block: every body line prefixed, the way the web's replies
+     *  read. An empty body quotes nothing -- inventing a blank line under the
+     *  header would claim the message had a body. */
+    private fun quoteOf(m: MailMessageFullDto): String {
+        val body = m.bodyText?.trim() ?: ""
+        if (body.isEmpty()) return "\n\n" +
+            "On ${m.createdAt ?: "an unknown date"}, ${(m.from?.display ?: m.from?.address ?: "")} wrote:\n"
+        val who = (m.from?.display ?: m.from?.address ?: "")
+        val lines = body.lines().joinToString("\n") { if (it.isEmpty()) ">" else "> $it" }
+        return "\n\nOn ${m.createdAt ?: "an unknown date"}, $who wrote:\n$lines\n"
+    }
+
+    /**
+     * The signature arrives as EDITABLE text appended when the compose opens,
+     * the same way the web client appends it client-side -- what the person
+     * sees in the body is what is sent; nothing is stitched on behind the
+     * scenes at send time. Per-address override first (`settings.signatures`),
+     * then the default, because the profile keys one per alias.
+     */
+    private fun signatureBlock(signature: String): String =
+        if (signature.isBlank()) "" else "\n\n-- \n$signature"
+
+    private fun forwardSubject(s: String?): String {
+        val t = s?.trim()?.takeIf { it.isNotEmpty() } ?: return "Fwd:"
+        if (t.startsWith("Fwd:", true)) return t
+        return "Fwd: $t"
+    }
+
     private fun replySubject(s: String?): String {
         val t = s?.trim()?.takeIf { it.isNotEmpty() } ?: return "Re:"
         if (t.startsWith("Re:", true) || t.startsWith("Fwd:", true)) return t
@@ -825,6 +1041,14 @@ class MailboxViewModel @JvmOverloads constructor(
     fun send() {
         val s = _compose.value
         if (s.sending) return
+        // An empty To is refused here, not by the server: a message with no
+        // recipient is not a send, and a receipt naming the server's 422 after
+        // the person pressed Send twice is worse than a button that says why
+        // it is waiting. Cc and Bcc do not count -- the route requires `to`.
+        if (splitAddresses(s.to).isEmpty()) {
+            _compose.update { it.copy(error = "Add at least one recipient in To.") }
+            return
+        }
         viewModelScope.launch {
             val t = token() ?: run { _compose.update { it.copy(error = "Sign in again.") }; return@launch }
             _compose.update { it.copy(sending = true, error = null, result = null, resultStatus = null) }

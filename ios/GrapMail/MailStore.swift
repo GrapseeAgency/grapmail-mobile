@@ -142,6 +142,23 @@ actor MailStore {
     func body(_ id: String) -> MailMessageFull? { bodies[id] }
     func putBody(_ v: MailMessageFull) { bodies[v.id] = v }
 
+    /// Take one attachment out of every cached body.
+    ///
+    /// `DELETE /attachments/:id` destroys the file, not the message
+    /// (`grapmail-attachments.ts:412`), so the body stays cached and only that
+    /// one row of its `attachments` list goes. Leaving it would keep the Files
+    /// screen offering a download of bytes the server has thrown away. Android
+    /// carries the same rule in its store.
+    func forgetAttachment(_ attachmentId: String) {
+        for (id, b) in bodies {
+            if b.attachments.contains(where: { $0.id == attachmentId }) {
+                var copy = b
+                copy.attachments.removeAll { $0.id == attachmentId }
+                bodies[id] = copy
+            }
+        }
+    }
+
     /// Every body the app has opened. This is what the Files screen is built
     /// from, and it is honest only because the screen says so: there is no
     /// list-all attachments route, so a file inside mail the user has not opened

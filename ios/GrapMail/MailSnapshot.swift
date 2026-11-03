@@ -337,16 +337,17 @@ struct MailSnapshotView: View {
             case "mail-thread":
                 return AnyView(
                 secondary(ThreadView(vm: model, id: "t-m1",
-                                     isThread: true, onBack: {}, onReply: { _ in }))
+                                     isThread: true, onBack: {}, onReply: { _, _ in }))
                 )
             case "mail-thread-encrypted":
                 return AnyView(
                 secondary(ThreadView(vm: model, id: "t-m9",
-                                     isThread: true, onBack: {}, onReply: { _ in }))
+                                     isThread: true, onBack: {}, onReply: { _, _ in }))
                 )
             case "mail-compose":
                 return AnyView(
-                secondary(ComposeView(vm: model, onBack: {}))
+                secondary(ComposeView(vm: model, account: profile,
+                                      replyId: "", mode: "reply", onBack: {}))
                 )
             case "mail-send-receipt":
                 return AnyView(
@@ -414,6 +415,29 @@ struct MailSnapshotView: View {
             case "mail-screener":
                 return AnyView(
                 secondary(ScreenerView(vm: model, onBack: {}, onOpenQueue: {}))
+                )
+            // The advanced-search sheet, drawn by the live component with the
+            // scope numbers the seed puts in state: five loaded, forty in the
+            // box. The line is the thing under test -- a sheet that promised a
+            // whole-box search would photograph a lie.
+            case "mail-adv-search":
+                return AnyView(
+                sheetFrame(AdvancedSearchSheet(
+                    state: model.state,
+                    onApply: { _, _, _, _, _, _ in },
+                    onClear: {}, onDone: {}))
+                )
+            // The filing undo banner over the live list: a read-only walk
+            // cannot archive anything, so the words a real archive produces
+            // are drawn by the same GMUndoBanner the live screen raises.
+            case "mail-undo":
+                return AnyView(
+                VStack(spacing: 0) {
+                    GMUndoBanner(note: "Archived 2 messages", marker: "mail-undo",
+                                 onUndo: {}, onDone: {})
+                    listFrame(rows: Self.rows, loading: false, failed: false,
+                              noMailbox: false, box: .inbox)
+                }
                 )
             default:
                 return AnyView(
@@ -534,6 +558,14 @@ extension MailboxModel {
                                   for: "t-m9")
         case "mail-screener":
             seedScreenerForSnapshot(enabled: true, pending: 3)
+        case "mail-adv-search":
+            // The scope line's numbers: the sheet says what it ran over.
+            s.total = 40
+            s.advScope = 5
+        case "mail-undo":
+            s.undoIds = ["m1", "m2"]
+            s.undoInverse = .unarchive
+            s.undoNote = "Archived 2 messages"
         default:
             break
         }

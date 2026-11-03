@@ -36,7 +36,7 @@ struct MailboxView: View {
     @State private var decisionResult: String?
 
     enum MailSheet: String, Identifiable {
-        case sortFilter, move, label, snooze, permanent, sender
+        case sortFilter, move, label, snooze, permanent, sender, advanced
         var id: String { rawValue }
     }
 
@@ -46,6 +46,7 @@ struct MailboxView: View {
             if drawerOpen {
                 MailDrawer(
                     box: vm.state.box,
+                    boxes: drawerBoxes(vm.state),
                     counts: drawerCounts(vm.state),
                     onSelect: { open($0); drawerOpen = false },
                     onDismiss: { toggleDrawer() },
@@ -159,13 +160,24 @@ struct MailboxView: View {
         HStack(spacing: 10) {
             Image(systemName: "magnifyingglass")
                 .font(.system(size: 15)).foregroundColor(GM.textTertiary)
-            TextField("Search emails, people, or files…",
+            // The wording names what the server's term actually covers --
+            // subject, body, sender (`grapmail-search.ts:110-118`) -- because
+            // a placeholder promising "people or files" would advertise a
+            // search the route does not run. Android's field says the same.
+            TextField("Search subject, body or sender…",
                       text: Binding(
                         get: { vm.state.query },
                         set: { vm.query($0) }))
                 .font(.system(size: 14))
                 .foregroundColor(GM.textPrimary)
                 .accessibilityIdentifier("mail-search")
+            Button { sheet = .advanced } label: {
+                Image(systemName: "slider.horizontal.3")
+                    .font(.system(size: 15))
+                    .foregroundColor(advActive ? GM.primarySolid : GM.textSecondary)
+            }
+            .accessibilityLabel("Search filters")
+            .accessibilityIdentifier("mail-adv-filter")
             Button { sheet = .sortFilter } label: {
                 Image(systemName: "tag")
                     .font(.system(size: 15))
@@ -178,6 +190,12 @@ struct MailboxView: View {
         .background(GM.card)
         .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous)
             .stroke(GM.border, lineWidth: 1))
+    }
+
+    private var advActive: Bool {
+        !vm.state.advFrom.isEmpty || !vm.state.advTo.isEmpty ||
+        !vm.state.advSubject.isEmpty || vm.state.advFiles ||
+        !vm.state.advAfter.isEmpty || !vm.state.advBefore.isEmpty
     }
 
     private var filterActive: Bool {
@@ -209,23 +227,18 @@ struct MailboxView: View {
         // postponed messages, because until `?box=snoozed` is deployed the app knows
         // only about these.
         if let note = vm.state.snoozeUndoNote, !vm.state.snoozeUndoIds.isEmpty {
-            HStack(spacing: 8) {
-                Text(note + " · out of the inbox until then")
-                    .font(.system(size: 12)).foregroundColor(GM.textPrimary)
-                    .lineLimit(2)
-                Spacer(minLength: 4)
-                Button("Undo") { vm.undoSnooze() }
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundColor(GM.primarySolid)
-                Button("Done") { vm.dismissSnoozeUndo() }
-                    .font(.system(size: 12))
-                    .foregroundColor(GM.textTertiary)
-            }
-            .padding(.horizontal, 12).padding(.vertical, 8)
-            .background(RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .fill(GM.softFill))
-            .padding(.horizontal, 16).padding(.vertical, 6)
-            .accessibilityIdentifier("mail-snooze-undo")
+            GMUndoBanner(note: note + " · out of the inbox until then",
+                         marker: "mail-snooze-undo",
+                         onUndo: { vm.undoSnooze() }, onDone: { vm.dismissSnoozeUndo() })
+        }
+
+        // The filing undo: same kind of fact in the same place -- what the
+        // app just did, above the list it affects, with the inverse PATCH as
+        // the way back. It names the ids the server accepted, not "all your
+        // mail", and it disappears the moment another filing supersedes it.
+        if let note = vm.state.undoNote, !vm.state.undoIds.isEmpty {
+            GMUndoBanner(note: note, marker: "mail-undo",
+                         onUndo: { vm.undoFiling() }, onDone: { vm.dismissUndo() })
         }
     }
 
@@ -312,6 +325,16 @@ struct MailboxView: View {
                             sortedCount: vm.sortScope, total: vm.state.total) { s, f in
                 vm.setSort(s); vm.setFilter(f); sheet = nil
             }
+        case .advanced:
+            AdvancedSearchSheet(state: vm.state) {
+                from, to, subject, files, after, before in
+                vm.setAdvanced(from: from, to: to, subject: subject, files: files,
+                               after: after, before: before)
+            } onClear: {
+                vm.clearAdvanced()
+            } onDone: {
+                sheet = nil
+            }
         case .move:
             MoveSheet { action in vm.act(action); sheet = nil }
         case .label:
@@ -372,9 +395,13 @@ struct MailboxView: View {
 }
 
 /// Counts the app can honestly show: only the boxes `/grapmail/stats` answers.
-/// Starred, Archive and All Mail get no badge because the server reports no
-/// count for them, and a `0` there would claim an empty folder it never said
-/// anything about.
+/// Starred, Archive and All Mail used to get no badge because the server
+/// reported no count for them -- it does now (`starred`, `archive`, `others`
+/// and `snoozed` are counted by the same `boxCount` that builds the listing
+/// beside each badge, `grapmail.ts:666-688`), so the drawer shows the server's
+/// number and shows nothing at all on a deployment that has not answered yet.
+/// A `0` where the server said nothing would claim an empty folder it never
+/// said anything about.
 func drawerCounts(_ s: MailboxModel.State) -> [MailBox: Int?] {
     [
         // The listing's own total, which only describes the box currently open.
@@ -383,9 +410,57 @@ func drawerCounts(_ s: MailboxModel.State) -> [MailBox: Int?] {
         .drafts: s.statsDrafts,
         .spam: s.statsSpam,
         .trash: s.statsTrash,
-        .starred: nil,
-        .archive: nil,
-        .others: nil,
+        .starred: s.statsStarred,
+        .archive: s.statsArchive,
+        .others: s.statsOthers,
+        .snoozed: s.statsSnoozed,
         .screener: nil,
     ]
+}
+
+/// The drawer's folder list. `Snoozed` is inserted only when `/stats` answered
+/// the `snoozed` key -- a capability read off the server's own response shape,
+/// not a build flag: a deployment whose `BOXES` lacks `snoozed`
+/// (`grapmail-box-terms.ts:66-68`) also fails to answer the count, and the row
+/// must not exist for a listing that would refuse it. The same derivation
+/// Android's `drawerBoxes` applies.
+func drawerBoxes(_ s: MailboxModel.State) -> [MailBox] {
+    if s.statsSnoozed != nil {
+        return [.inbox, .starred, .sent, .drafts, .snoozed, .archive, .spam, .trash, .others]
+    }
+    return MailBox.drawerOrder
+}
+
+/// The undo banner -- one view for both undo offers (snooze and filing),
+/// because they are the same kind of fact: what the app just did, above the
+/// list it affects, with the action that reverses it. The live screen raises
+/// it after a real filing; the snapshot host draws it with the words a real
+/// filing would produce, because a read-only walk cannot archive anything and
+/// a banner no photograph has ever taken is a banner whose layout nobody has
+/// seen. Android's `UndoBanner` is the same component.
+struct GMUndoBanner: View {
+    let note: String
+    let marker: String
+    let onUndo: () -> Void
+    let onDone: () -> Void
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Text(note)
+                .font(.system(size: 12)).foregroundColor(GM.textPrimary)
+                .lineLimit(2)
+            Spacer(minLength: 4)
+            Button("Undo", action: onUndo)
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundColor(GM.primarySolid)
+            Button("Done", action: onDone)
+                .font(.system(size: 12))
+                .foregroundColor(GM.textTertiary)
+        }
+        .padding(.horizontal, 12).padding(.vertical, 8)
+        .background(RoundedRectangle(cornerRadius: 10, style: .continuous)
+            .fill(GM.softFill))
+        .padding(.horizontal, 16).padding(.vertical, 6)
+        .accessibilityIdentifier(marker)
+    }
 }

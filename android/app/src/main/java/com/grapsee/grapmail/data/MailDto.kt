@@ -772,6 +772,39 @@ enum class MailAction(val apiValue: String) {
     Unsnooze("unsnooze"),
 }
 
+/**
+ * The action that reverses this one, for the six filing actions the undo
+ * banner offers — `PATCH /message/:id/:action` is reversible by the route's own
+ * shape, so the inverse is another call, not a local guess. Read/star are not
+ * here because their rows stay visible and keep their own toggle: an undo
+ * banner for a star would cover the star. Snooze has its dedicated path
+ * because its inverse must not fire after the offer is superseded.
+ */
+fun MailAction.inverse(): MailAction? = when (this) {
+    MailAction.Archive -> MailAction.Unarchive
+    MailAction.Unarchive -> MailAction.Archive
+    MailAction.Spam -> MailAction.Unspam
+    MailAction.Unspam -> MailAction.Spam
+    MailAction.Trash -> MailAction.Restore
+    MailAction.Restore -> MailAction.Trash
+    else -> null
+}
+
+/** The banner's past tense, in the same words for the same fact on both
+ *  platforms: what the app just did to the selection. */
+fun MailAction.pastLine(count: Int): String {
+    val noun = if (count == 1) "1 message" else "$count messages"
+    return when (this) {
+        MailAction.Archive -> "Archived $noun"
+        MailAction.Unarchive -> "Moved $noun back to the inbox"
+        MailAction.Spam -> "Reported $noun as spam"
+        MailAction.Unspam -> "Moved $noun out of Spam"
+        MailAction.Trash -> "Moved $noun to Trash"
+        MailAction.Restore -> "Restored $noun"
+        else -> noun
+    }
+}
+
 /** Sort options. The server only ever orders by UID descending, so everything
  *  below `Newest` is applied by the client to the loaded page — which the sort
  *  sheet has to say out loud rather than imply. */

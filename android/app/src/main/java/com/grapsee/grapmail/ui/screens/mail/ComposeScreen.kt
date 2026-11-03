@@ -83,15 +83,48 @@ import com.grapsee.grapmail.ui.theme.LocalPalette
 @Composable
 fun ComposeScreen(
     vm: MailboxViewModel,
+    profile: com.grapsee.grapmail.logic.ProfileViewModel,
+    replyId: String = "",
+    mode: String = "reply",
     onBack: () -> Unit,
 ) {
     val palette = LocalPalette.current
     val context = LocalContext.current
     val state by vm.compose.collectAsState()
+    val profileState by profile.state.collectAsState()
     val attached = remember { mutableStateListOf<MailAttachmentDto>() }
     var notice by remember { mutableStateOf<String?>(null) }
     var showCc by remember { mutableStateOf(false) }
     var showEmoji by remember { mutableStateOf(false) }
+
+    // The signature the profile carries: the per-address override for the
+    // address this account sends from first, then the default. Empty when the
+    // profile has not been read or was never filled in -- an invented
+    // "-- Sent with GrapMail" would sign mail the person did not sign.
+    val signature = (profileState.profile?.settings?.let { s ->
+        val me = vm.state.value.accountAddress
+        (me?.let { s.signatures[it] } ?: "").ifBlank { s.signature }
+    } ?: "").trim()
+
+    LaunchedEffect(Unit) { profile.load() }
+
+    // A prepared compose (reply / reply-all / forward from the thread) builds
+    // its fields from the full server row; a blank one gets the signature
+    // appended as editable text. Both run once per opened target, so a
+    // rotation does not double-append what the person already edited.
+    var prepared by remember { mutableStateOf(false) }
+    LaunchedEffect(replyId, signature) {
+        if (prepared) return@LaunchedEffect
+        if (replyId.isNotBlank()) {
+            prepared = true
+            vm.prepareReply(replyId, mode, signature)
+        } else if (signature.isNotBlank()) {
+            vm.composeUpdate { s ->
+                if (s.body.isBlank()) s.copy(body = "\n\n-- \n$signature") else s
+            }
+            prepared = true
+        }
+    }
 
     // People the To field can offer. Derived, not an address book — see
     // MailboxViewModel.people for why that distinction is stated rather than

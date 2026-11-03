@@ -45,6 +45,7 @@ import androidx.compose.material.icons.rounded.Send
 import androidx.compose.material.icons.rounded.Shield
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.Star
+import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
@@ -138,6 +139,7 @@ fun MailboxScreen(
     val listState = rememberLazyListState()
 
     var showSortSheet by remember { mutableStateOf(false) }
+    var showAdvSheet by remember { mutableStateOf(false) }
     var showMoveSheet by remember { mutableStateOf(false) }
     var showLabelSheet by remember { mutableStateOf(false) }
     var showSnoozeSheet by remember { mutableStateOf(false) }
@@ -234,6 +236,10 @@ fun MailboxScreen(
                             onQuery = vm::query,
                             onFilter = { showSortSheet = true },
                             filterActive = state.filter != MailFilter.All || state.sort != MailSort.Newest,
+                            onAdvanced = { showAdvSheet = true },
+                            advActive = state.advFrom.isNotBlank() || state.advTo.isNotBlank() ||
+                                state.advSubject.isNotBlank() || state.advFiles ||
+                                state.advAfter.isNotBlank() || state.advBefore.isNotBlank(),
                         )
                         Spacer(Modifier.height(12.dp))
                         LabelStrip(state)
@@ -266,25 +272,19 @@ fun MailboxScreen(
                 // mail, because until `?box=snoozed` is deployed the app only knows
                 // about the ones it snoozed a moment ago.
                 if (state.snoozeUndoNote != null && state.snoozeUndoIds.isNotEmpty()) {
-                    Row(
-                        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp)
-                            .clip(RoundedCornerShape(10.dp)).background(palette.softFill)
-                            .padding(horizontal = 12.dp, vertical = 8.dp)
-                            .testTag("mail-snooze-undo"),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Text(state.snoozeUndoNote!! + " \u00b7 out of the inbox until then",
-                            fontSize = 12.sp, color = palette.textPrimary,
-                            maxLines = 2, overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.weight(1f))
-                        Spacer(Modifier.width(8.dp))
-                        Text("Undo", fontSize = 12.sp, fontWeight = FontWeight.SemiBold,
-                            color = palette.primarySolid,
-                            modifier = Modifier.clickable { vm.undoSnooze() })
-                        Spacer(Modifier.width(12.dp))
-                        Text("Done", fontSize = 12.sp, color = palette.textTertiary,
-                            modifier = Modifier.clickable { vm.dismissSnoozeUndo() })
-                    }
+                    UndoBanner(state.snoozeUndoNote!! + " \u00b7 out of the inbox until then",
+                        "mail-snooze-undo", onUndo = { vm.undoSnooze() },
+                        onDone = { vm.dismissSnoozeUndo() })
+                }
+
+                // The filing undo: the same kind of fact in the same place --
+                // what the app just did, above the list it affects, with the
+                // inverse PATCH as the way back. It names the ids the server
+                // accepted, not "all your mail", and it disappears the moment
+                // another filing supersedes it.
+                if (state.undoNote != null && state.undoIds.isNotEmpty()) {
+                    UndoBanner(state.undoNote!!, "mail-undo", onUndo = { vm.undoFiling() },
+                        onDone = { vm.dismissUndo() })
                 }
 
                 PullToRefreshBox(
@@ -396,6 +396,11 @@ fun MailboxScreen(
             SortFilterContent(state.sort, state.filter, state.sortScope, state.total) { sort, filter ->
                 vm.setSort(sort); vm.setFilter(filter); showSortSheet = false
             }
+        }
+    }
+    if (showAdvSheet) {
+        MailSheet(onDismiss = { showAdvSheet = false }) {
+            AdvancedSearchContent(state, vm, onDone = { showAdvSheet = false })
         }
     }
     if (showMoveSheet) {
@@ -517,7 +522,8 @@ private fun MailTopBar(onMenu: () -> Unit, onSearch: () -> Unit) {
 }
 
 @Composable
-private fun SearchField(query: String, onQuery: (String) -> Unit, onFilter: () -> Unit, filterActive: Boolean) {
+private fun SearchField(query: String, onQuery: (String) -> Unit, onFilter: () -> Unit, filterActive: Boolean,
+                        onAdvanced: () -> Unit, advActive: Boolean) {
     val palette = LocalPalette.current
     Row(
         Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(palette.card)
@@ -527,7 +533,10 @@ private fun SearchField(query: String, onQuery: (String) -> Unit, onFilter: () -
         Icon(Icons.Rounded.Search, null, tint = palette.textTertiary, modifier = Modifier.size(18.dp))
         Spacer(Modifier.width(10.dp))
         // A real value field: the reference's placeholder is not a hint that the
-        // box is empty, it is what an unfocused search looks like.
+        // box is empty, it is what an unfocused search looks like. The wording
+        // names what the server's term actually covers -- subject, body, sender
+        // (`grapmail-search.ts:110-118`) -- because a placeholder promising
+        // "people or files" would advertise a search the route does not run.
         androidx.compose.foundation.text.BasicTextField(
             value = query,
             onValueChange = onQuery,
@@ -537,13 +546,20 @@ private fun SearchField(query: String, onQuery: (String) -> Unit, onFilter: () -
             decorationBox = { inner ->
                 Box {
                     if (query.isEmpty()) {
-                        Text("Search emails, people, or files…", fontSize = 14.sp, color = palette.textTertiary)
+                        Text("Search subject, body or sender\u2026", fontSize = 14.sp, color = palette.textTertiary)
                     }
                     inner()
                 }
             },
         )
         Spacer(Modifier.width(8.dp))
+        Icon(
+            Icons.Rounded.Tune, "Search filters",
+            tint = if (advActive) palette.primarySolid else palette.textSecondary,
+            modifier = Modifier.size(18.dp).clip(CircleShape).clickable(onClick = onAdvanced)
+                .testTag("mail-adv-filter"),
+        )
+        Spacer(Modifier.width(10.dp))
         Icon(
             Icons.Rounded.Label, "Sort and filter",
             tint = if (filterActive) palette.primarySolid else palette.textSecondary,
@@ -918,6 +934,128 @@ internal fun SortFilterContent(
             fontSize = 12.sp, color = palette.warnInk,
             modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
         )
+    }
+}
+
+/**
+ * The undo banner -- one composable for both undo offers (snooze and filing),
+ * because they are the same kind of fact: what the app just did, above the
+ * list it affects, with the action that reverses it. The live screen raises it
+ * after a real filing; the snapshot host draws it with the words a real
+ * filing would produce, because a read-only walk cannot archive anything and
+ * a banner no photograph has ever taken is a banner whose layout nobody has
+ * seen.
+ */
+@Composable
+internal fun UndoBanner(note: String, tag: String, onUndo: () -> Unit, onDone: () -> Unit) {
+    val palette = LocalPalette.current
+    Row(
+        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp)
+            .clip(RoundedCornerShape(10.dp)).background(palette.softFill)
+            .padding(horizontal = 12.dp, vertical = 8.dp)
+            .testTag(tag),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(note, fontSize = 12.sp, color = palette.textPrimary,
+            maxLines = 2, overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f))
+        Spacer(Modifier.width(8.dp))
+        Text("Undo", fontSize = 12.sp, fontWeight = FontWeight.SemiBold,
+            color = palette.primarySolid, modifier = Modifier.clickable(onClick = onUndo))
+        Spacer(Modifier.width(12.dp))
+        Text("Done", fontSize = 12.sp, color = palette.textTertiary,
+            modifier = Modifier.clickable(onClick = onDone))
+    }
+}
+
+/**
+ * The advanced search sheet -- six filters the server has no route for, run
+ * CLIENT-SIDE over the pages this device has loaded, and saying so in its own
+ * scope line the way the sort sheet does. The server's `q` is one literal term
+ * over subject, body and from (`grapmail-search.ts:110-118`); there is no
+ * from/to/attachment/date filter endpoint to call, so this sheet filters what
+ * is here and never claims to search the box.
+ */
+@Composable
+internal fun AdvancedSearchContent(
+    state: com.grapsee.grapmail.logic.MailboxViewModel.MailboxUiState,
+    vm: com.grapsee.grapmail.logic.MailboxViewModel,
+    onDone: () -> Unit,
+) {
+    val palette = LocalPalette.current
+    var from by remember { mutableStateOf(state.advFrom) }
+    var to by remember { mutableStateOf(state.advTo) }
+    var subject by remember { mutableStateOf(state.advSubject) }
+    var files by remember { mutableStateOf(state.advFiles) }
+    var after by remember { mutableStateOf(state.advAfter) }
+    var before by remember { mutableStateOf(state.advBefore) }
+    SheetTitle("Search filters", "gm-sheets-advsearch")
+    Column(Modifier.padding(horizontal = 20.dp)) {
+        AdvField("From", "A name or address in the sender", from) { from = it }
+        AdvField("To", "A name or address in the recipients", to) { to = it }
+        AdvField("Subject", "A word the subject contains", subject) { subject = it }
+        Row(
+            Modifier.fillMaxWidth().clickable { files = !files }.padding(vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(Icons.Rounded.AttachFile, null,
+                tint = if (files) palette.primarySolid else palette.textTertiary,
+                modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(10.dp))
+            Text("Has attachments", fontSize = 14.sp,
+                color = if (files) palette.primarySolid else palette.textPrimary)
+        }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Box(Modifier.weight(1f)) { AdvField("After", "YYYY-MM-DD", after) { after = it } }
+            Box(Modifier.weight(1f)) { AdvField("Before", "YYYY-MM-DD", before) { before = it } }
+        }
+        Row(
+            Modifier.fillMaxWidth().padding(vertical = 10.dp),
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text("Apply", fontSize = 14.sp, fontWeight = FontWeight.SemiBold,
+                color = palette.primarySolid,
+                modifier = Modifier.clickable {
+                    vm.setAdvanced(from, to, subject, files, after, before); onDone()
+                })
+            Text("Clear", fontSize = 14.sp, color = palette.textSecondary,
+                modifier = Modifier.clickable {
+                    vm.clearAdvanced()
+                    from = ""; to = ""; subject = ""; files = false; after = ""; before = ""
+                })
+        }
+        // The scope, stated exactly as the sort sheet states its own: these
+        // filters run on the loaded pages, not the box. The typed term above
+        // is the whole-box search; this sheet is what it narrows further.
+        Text("These filters run on the ${state.advScope} messages loaded on this " +
+            "device \u2014 not all ${state.total} in this box. The typed term is " +
+            "the whole-box search.",
+            fontSize = 12.sp, color = palette.warnInk,
+            modifier = Modifier.padding(vertical = 8.dp))
+        Spacer(Modifier.height(16.dp))
+    }
+}
+
+@Composable
+private fun AdvField(label: String, placeholder: String, value: String, onValue: (String) -> Unit) {
+    val palette = LocalPalette.current
+    Column(Modifier.fillMaxWidth().padding(vertical = 5.dp)) {
+        Text(label, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = palette.textTertiary)
+        androidx.compose.foundation.text.BasicTextField(
+            value = value,
+            onValueChange = onValue,
+            maxLines = 1,
+            textStyle = androidx.compose.ui.text.TextStyle(fontSize = 14.sp, color = palette.textPrimary),
+            modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
+            decorationBox = { inner ->
+                Box {
+                    if (value.isEmpty()) Text(placeholder, fontSize = 14.sp, color = palette.textTertiary)
+                    inner()
+                }
+            },
+        )
+        Box(Modifier.fillMaxWidth().height(1.dp).background(palette.border))
     }
 }
 

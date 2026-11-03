@@ -462,6 +462,14 @@ fun AttachmentPreviewScreen(vm: MailboxViewModel, attachmentId: String, onBack: 
     var entry by remember { mutableStateOf<MailboxViewModel.FileEntry?>(null) }
     var outcome by remember { mutableStateOf<String?>(null) }
     var saving by remember { mutableStateOf(false) }
+    // The delete is a two-step: the button asks, the panel confirms, and only
+    // then does the route see it. `DELETE /attachments/:id` takes the file out
+    // of the message for good -- the body cache is dropped on success, so the
+    // screen's own row goes to the honest "no longer listed" state rather
+    // than keeping a card for bytes the server has thrown away.
+    var confirmDelete by remember { mutableStateOf(false) }
+    var deleting by remember { mutableStateOf(false) }
+    var deleted by remember { mutableStateOf(false) }
 
     LaunchedEffect(attachmentId) {
         entry = vm.files().firstOrNull { it.attachment.id == attachmentId }
@@ -470,9 +478,11 @@ fun AttachmentPreviewScreen(vm: MailboxViewModel, attachmentId: String, onBack: 
     MailScaffold("Attachment", onBack) {
         Column(Modifier.fillMaxSize().padding(horizontal = 20.dp)) {
             val a = entry?.attachment
-            if (a == null) {
+            if (a == null || deleted) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text("This attachment is no longer listed. Open its message again.",
+                    Text(if (deleted) "This attachment has been removed from the message. " +
+                        "The message itself is unchanged."
+                        else "This attachment is no longer listed. Open its message again.",
                         fontSize = 14.sp, color = palette.textSecondary)
                 }
                 return@Column
@@ -501,6 +511,39 @@ fun AttachmentPreviewScreen(vm: MailboxViewModel, attachmentId: String, onBack: 
                 saving = true
                 vm.downloadAttachment(a) { r -> saving = false; outcome = r }
             }, enabled = !saving)
+            Spacer(Modifier.height(12.dp))
+            if (!confirmDelete) {
+                Text("Remove from this message", fontSize = 14.sp,
+                    fontWeight = FontWeight.SemiBold, color = palette.error,
+                    modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(24.dp))
+                        .border(1.dp, palette.error, RoundedCornerShape(24.dp))
+                        .clickable(enabled = !deleting && !deleted) { confirmDelete = true }
+                        .padding(vertical = 12.dp).testTag("mail-attachment-delete"),
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+            } else {
+                Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
+                    .background(palette.warnChipBg).padding(16.dp)
+                    .testTag("mail-attachment-confirm")) {
+                    Text("Remove ${a.name ?: "this file"} from the message? The message keeps " +
+                        "everything else; this file is gone from it for good.",
+                        fontSize = 13.sp, color = palette.textPrimary)
+                    Row(Modifier.padding(top = 12.dp)) {
+                        Text("Cancel", fontSize = 14.sp, color = palette.textSecondary,
+                            modifier = Modifier.clickable { confirmDelete = false })
+                        Spacer(Modifier.width(24.dp))
+                        Text(if (deleting) "Removing…" else "Remove", fontSize = 14.sp,
+                            fontWeight = FontWeight.SemiBold, color = palette.error,
+                            modifier = Modifier.clickable(enabled = !deleting) {
+                                deleting = true
+                                vm.deleteAttachment(a.id ?: "") { r ->
+                                    deleting = false; confirmDelete = false
+                                    deleted = true
+                                    outcome = r
+                                }
+                            })
+                    }
+                }
+            }
         }
     }
 }

@@ -39,7 +39,9 @@ struct RootView: View {
         case createdAlt(address: String, name: String)
         case home
         case mailThread(id: String, isThread: Bool)
-        case mailCompose
+        // Compose carries an optional reply target and mode: empty reply opens
+        // blank, "reply|all|forward" opens prepared from the full server row.
+        case mailCompose(reply: String, mode: String)
         case mailLabels, mailLabelCreate(id: String)
         case mailContacts, mailContactDetail(address: String)
         case mailFiles, mailAttachment(id: String)
@@ -453,7 +455,7 @@ struct RootView: View {
                         onThread: { id, isThread in
                             path.append(.mailThread(id: id, isThread: isThread))
                         },
-                        onCompose: { path.append(.mailCompose) },
+                        onCompose: { path.append(.mailCompose(reply: "", mode: "reply")) },
                         onLabels: { path.append(.mailLabels) },
                         onScreener: { path.append(.mailScreener) },
                         onSettings: { path.append(.mailSettings) },
@@ -470,10 +472,11 @@ struct RootView: View {
                     ThreadView(
                         vm: mail, id: id, isThread: isThread,
                         onBack: { path.removeLast() },
-                        onReply: { _ in path.append(.mailCompose) }
+                        onReply: { id, mode in path.append(.mailCompose(reply: id, mode: mode)) }
                     )
-                case .mailCompose:
-                    ComposeView(vm: mail, onBack: { path.removeLast() })
+                case let .mailCompose(reply, mode):
+                    ComposeView(vm: mail, account: account, replyId: reply, mode: mode,
+                                onBack: { path.removeLast() })
                 case .mailLabels:
                     LabelsView(vm: mail,
                                onBack: { path.removeLast() },
@@ -494,7 +497,7 @@ struct RootView: View {
                 case let .mailContactDetail(address):
                     ContactDetailView(vm: mail, address: address,
                                       onBack: { path.removeLast() },
-                                      onWrite: { path.append(.mailCompose) })
+                                      onWrite: { path.append(.mailCompose(reply: "", mode: "reply")) })
                 case .mailFiles:
                     FilesView(vm: mail,
                               onBack: { path.removeLast() },
