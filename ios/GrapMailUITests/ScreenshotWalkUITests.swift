@@ -523,12 +523,17 @@ final class ScreenshotWalkUITests: XCTestCase {
             // A seeded sender's NAME exists only once the cache page landed
             // and detection grouped it; the empty sentence only once an
             // honestly-empty read landed.
-            "mail-subs-list": "The Weekly Draft",
+            // The frequency label, not the sender NAME: the name row carries
+            // lineLimit(1), and a truncated element no longer answers to the
+            // seed string. The label has no line limit and draws only once the
+            // page landed and detection grouped it.
+            "mail-subs-list": "10 or fewer emails recently",
             "mail-subs-empty": "No subscriptions detected.",
             "account-connection-detail": "Your name, GrapMail address and profile photo",
-            // The clause, not the sentence: the full answer runs to 130
-            // characters and XCUITest's identifier cap is 128.
-            "account-connection-unknown": "there is nothing to remove.",
+            // The subtitle: walk waits match exactly, and the card's answer
+            // wraps across literals and truncates at one line -- a fragment
+            // of it is a name no element ever answers to.
+            "account-connection-unknown": "Not connected to this account",
         ]
         for screen in postWriteScreens {
             app.terminate()
@@ -628,7 +633,7 @@ final class ScreenshotWalkUITests: XCTestCase {
             ("111-account-profile-dark", "account-profile", "Rather not say"),
             ("112-e2e-status-unlocked-dark", "e2e-status-unlocked",
              "Your key is unlocked for this session"),
-            ("113-mail-subs-list-dark", "mail-subs-list", "The Weekly Draft")] {
+            ("113-mail-subs-list-dark", "mail-subs-list", "10 or fewer emails recently")] {
             app.terminate()
             app.launchArguments = ["-gmSnapshot", screen, "-gmDark"]
             app.launch()

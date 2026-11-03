@@ -798,6 +798,7 @@ struct ConnectionDetailView: View {
                 } ?? "Not connected to this account")
                     .font(.system(size: 13)).foregroundColor(GM.textSecondary)
                     .fixedSize(horizontal: false, vertical: true)
+                    .lineLimit(2)
             }
             Spacer()
         }

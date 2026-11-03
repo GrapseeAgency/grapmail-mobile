@@ -1823,10 +1823,10 @@ pin("the empty subscriptions frame seeds an empty read, not an unread cache",
 pin("both hosts' subscription seeds carry the incoming direction the detector reads",
     'direction = "inbound"' in KT_HOST and 'm.direction = "in"' in code_only(SW_HOST))
 pin("both walks photograph both subscriptions frames with the same waits",
-    all(f'settled="{m}"' in KT_WALK for m in ("The Weekly Draft",
+    all(f'settled="{m}"' in KT_WALK for m in ("10 or fewer emails recently",
                                               "No subscriptions detected."))
     and all(f'"{m}",]' in SW_WALK or f': "{m}"' in SW_WALK for m in
-            ("The Weekly Draft", "No subscriptions detected.")))
+            ("10 or fewer emails recently", "No subscriptions detected.")))
 
 # -- 29. the store round -- dark frames, labels, and the two privacy files ------
 #
@@ -1979,6 +1979,25 @@ pin("the unknown product is answered, not redirected",
 for fr in ("114-account-connection-detail", "115-account-connection-unknown"):
     pin(f"the detail frame {fr} is launched AND gated by both walks",
         KT_WALK.count(fr) >= 2 and SW_WALK.count(fr) >= 1)
+# The exact-match lesson, pinned: a walk wait matches one element's WHOLE
+# text, so the marker must be a contiguous literal in the sources -- a
+# fragment of a sentence that wraps across literals matches nothing, and
+# CI discovers that at minute twenty-seven, not at gate time. (114's
+# sharing sentence already lived whole inside one literal; 115's card
+# answer did not, and its wait moved to the single-literal subtitle.)
+pin("the detail frames' settled waits are contiguous literals in the sources",
+    "Not connected to this account" in KT_ACCT_C and "Not connected to this account" in SW_ACCT_C)
+# The subscriptions waits, checked for the same two hazards at once: the
+# empty sentence must be a whole literal on both platforms, and the
+# populated marker must NOT be the sender name -- name rows carry
+# lineLimit(1), and a truncated element's text is no longer the seed.
+pin("the subscriptions waits are contiguous literals, never the truncated name",
+    "No subscriptions detected." in code_only(KT_SUBS)
+    and "No subscriptions detected." in code_only(SW_SUBS)
+    and 'settled="10 or fewer emails recently"' in KT_WALK
+    and '"mail-subs-list": "10 or fewer emails recently"' in SW_WALK
+    and 'settled="The Weekly Draft"' not in KT_WALK
+    and '"mail-subs-list": "The Weekly Draft"' not in SW_WALK)
 
 print()
 if failures:

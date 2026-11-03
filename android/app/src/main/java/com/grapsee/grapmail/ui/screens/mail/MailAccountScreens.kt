@@ -666,7 +666,8 @@ fun ConnectionDetailScreen(vm: ProfileViewModel, product: String, onBack: () -> 
                     val who = entry?.let { (it.host ?: "Grapsee product") + " · connected " +
                         (it.connectedAt ?: "").take(10) }
                     Text(who ?: "Not connected to this account",
-                        fontSize = 13.sp, color = palette.textSecondary)
+                        fontSize = 13.sp, color = palette.textSecondary,
+                        maxLines = 2)
                 }
             }
             if (entry == null) {

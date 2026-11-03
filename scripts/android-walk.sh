@@ -658,13 +658,20 @@ for spec in "two-factor-on:40-sec-two-factor-on" \
     # -- text that exists only once the cache page has landed and detection
     # has grouped it; the empty frame waits on the screen's own no-mail
     # sentence over the honestly-empty seeded read.
-    mail-subs-list) settled="The Weekly Draft" ;;
+    # The frequency label, not the sender name: a row's name carries
+    # maxLines=1, and a truncated element's text is no longer the seed string.
+    # The label has no line limit, and it exists only once the cache page
+    # landed AND detection grouped it.
+    mail-subs-list) settled="10 or fewer emails recently" ;;
     mail-subs-empty) settled="No subscriptions detected." ;;
     # The per-app detail: the linked frame waits on the web's full sharing
     # sentence (text only the recorded scopes draw), the unlinked frame on the
     # screen's own "does not have access" answer over the same seeded record.
     account-connection-detail) settled="Your name, GrapMail address and profile photo" ;;
-    account-connection-unknown) settled="there is nothing to remove." ;;
+    # The subtitle, not the card paragraph: walk waits match a text EXACTLY,
+    # so a marker can never be a fragment of a sentence that wraps across
+    # literals (CI: 115 waited 27 minutes for a clause of a wrapped Text).
+    account-connection-unknown) settled="Not connected to this account" ;;
     *) settled="" ;;
   esac
   # A marker may name a visible string OR a resource-id. Text is right for
@@ -823,7 +830,7 @@ adb shell am force-stop "$PKG"
 # surfaces, the encryption band the state card, subscriptions the row list.
 for darkspec in "account-profile:Rather not say:111-account-profile-dark" \
                 "e2e-status-unlocked:Your key is unlocked for this session:112-e2e-status-unlocked-dark" \
-                "mail-subs-list:The Weekly Draft:113-mail-subs-list-dark"; do
+                "mail-subs-list:10 or fewer emails recently:113-mail-subs-list-dark"; do
   nm="${darkspec%%:*}"; rest="${darkspec#*:}"; marker="${rest%%:*}"; pic="${rest##*:}"
   adb shell am start -W -n "$PKG/.MainActivity" --es gmSnapshot "$nm" >/dev/null
   sleep 5
