@@ -617,9 +617,12 @@ for spec in "two-factor-on:40-sec-two-factor-on" \
     mail-undo) settled="Archived 2 messages" ;;
     # The compose frame now waits: the profile seed lands through an effect, and
     # the signature the frame exists to prove arrives with it. Photographed a
-    # frame early, compose looks unsigned and the feature ships unseen. (iOS
-    # seeds in init -- synchronous -- so its compose frame needs no wait.)
-    mail-compose) settled="Sent with GrapMail" ;;
+    # frame early, compose looks unsigned and the feature ships unseen. The
+    # marker is a testTag, not the signature text -- an EditText's uiautomator
+    # text is the WHOLE body value, so an exact-match wait on "Sent with
+    # GrapMail" could never fire against "-- \nSent with GrapMail". (iOS seeds
+    # in init -- synchronous -- so its compose frame needs no wait.)
+    mail-compose) settled="gm-signed-body" ;;
     *) settled="" ;;
   esac
   # A marker may name a visible string OR a resource-id. Text is right for

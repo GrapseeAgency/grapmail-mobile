@@ -212,7 +212,16 @@ fun ComposeScreen(
             BasicTextField(
                 value = state.body,
                 onValueChange = { vm.composeUpdate { s -> s.copy(body = it) } },
-                modifier = Modifier.fillMaxWidth().testTag("mail-body-field").padding(vertical = 14.dp)
+                // The tag names the signed state because the walk needs a
+                // settled marker that is not the field's text: the body's
+                // uiautomator text is the WHOLE value ("-- \\nSent with
+                // GrapMail"), and an exact-match wait on the signature alone
+                // could never fire. A testTag flips with the signature landing
+                // -- the same mechanism the bottom sheets are photographed by.
+                modifier = Modifier.fillMaxWidth()
+                    .testTag(if (signature.isNotBlank() && state.body.contains(signature))
+                        "gm-signed-body" else "mail-body-field")
+                    .padding(vertical = 14.dp)
                     .heightIn(min = 160.dp),
                 textStyle = TextStyle(fontSize = 15.sp, color = palette.textPrimary, lineHeight = 22.sp),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
