@@ -86,7 +86,7 @@ final class E2eModel: ObservableObject {
                 }
             } catch {
                 state.publishedLoaded = true
-                state.publishedError = describe(error)
+                state.publishedError = Self.describe(error)
             }
         }
     }
@@ -110,7 +110,7 @@ final class E2eModel: ObservableObject {
                 note(error.localizedDescription, bad: true)
                 return
             case .success(let identity):
-                session = try? MailE2e.unlock(identity, passphrase)
+                session = try? MailE2e.unlock(identity, passphrase: passphrase)
                 state.record = identity
                 state.fingerprint = MailE2e.fingerprint(publicKeyB64: identity.encryption.publicKey)
                 state.unlocked = session != nil
@@ -151,7 +151,7 @@ final class E2eModel: ObservableObject {
             }
         } catch {
             state.busy = false
-            note(describe(error), bad: true)
+            note(Self.describe(error), bad: true)
         }
     }
 
@@ -170,7 +170,7 @@ final class E2eModel: ObservableObject {
                     bad: !r.success)
             } catch {
                 state.busy = false
-                note(describe(error), bad: true)
+                note(Self.describe(error), bad: true)
             }
         }
     }
@@ -179,7 +179,7 @@ final class E2eModel: ObservableObject {
         guard !snapshotSeeded, let record = state.record else { return }
         state.busy = true
         Task {
-            let opened = E2eModel.attempt { try MailE2e.unlock(record, passphrase) }
+            let opened = E2eModel.attempt { try MailE2e.unlock(record, passphrase: passphrase) }
             state.busy = false
             switch opened {
             case .success(let s):
@@ -209,8 +209,12 @@ final class E2eModel: ObservableObject {
         state.busy = true
         Task {
             let done = E2eModel.attempt {
-                let reEnc = try MailE2e.changePassphrase(record.encryption, oldPhrase, newPhrase)
-                let reSign = try record.signing.map { try MailE2e.changePassphrase($0, oldPhrase, newPhrase) }
+                let reEnc = try MailE2e.changePassphrase(record.encryption,
+                                                         oldPassphrase: oldPhrase,
+                                                         newPassphrase: newPhrase)
+                let reSign = try record.signing.map {
+                    try MailE2e.changePassphrase($0, oldPassphrase: oldPhrase, newPassphrase: newPhrase)
+                }
                 guard MailE2e.saveIdentity(accountKey: t,
                       identity: MailE2e.Identity(encryption: reEnc, signing: reSign,
                                                 createdAt: record.createdAt)) else {
@@ -254,7 +258,7 @@ final class E2eModel: ObservableObject {
                 if !r.success { note(r.error ?? "The directory did not answer.", bad: true) }
             } catch {
                 state.busy = false
-                note(describe(error), bad: true)
+                note(Self.describe(error), bad: true)
             }
         }
     }
@@ -297,7 +301,7 @@ final class E2eModel: ObservableObject {
         }
         let result = await Task.detached {
             E2eModel.attempt {
-                let priv = try MailE2e.unlockPrivateKey(record.encryption, passphrase)
+                let priv = try MailE2e.unlockPrivateKey(record.encryption, passphrase: passphrase)
                 return try MailE2e.open(envelopeJson, recipientPrivateKeyB64: priv)
             }
         }.value
@@ -324,7 +328,7 @@ final class E2eModel: ObservableObject {
         state.noteIsBad = bad
     }
 
-    private func describe(_ error: Error) -> String {
+    private nonisolated static func describe(_ error: Error) -> String {
         if let api = error as? ApiError, case let .http(_, _, message) = api,
            !message.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return message }
         return "That did not go through."
@@ -336,7 +340,11 @@ final class E2eModel: ObservableObject {
 /// screens ever see. A raw stack trace reaching the UI would leak more about
 /// the key material than the person needs and more than this app ever shows.
 extension E2eModel {
-    static func attempt<T>(_ body: () throws -> T) -> Result<T, Error> {
+    // `nonisolated`: a detached crypto child must be able to call this
+    // WITHOUT hopping back to the main actor -- otherwise the 600,000-round
+    // derivation this wraps runs on the main thread, the exact thing the
+    // Task.detached around it exists to prevent. The helper is pure.
+    nonisolated static func attempt<T>(_ body: () throws -> T) -> Result<T, Error> {
         do { return .success(try body()) }
         catch { return .failure(error) }
     }

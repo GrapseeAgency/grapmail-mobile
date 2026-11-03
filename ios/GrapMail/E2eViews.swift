@@ -172,30 +172,18 @@ struct E2eStatusScreen: View {
                             Spacer().frame(height: 10)
                         }
                         // The state card: one sentence, and the sentence is true.
-                        let headline: String
-                        let lede: String
-                        switch vm.state.state3 {
-                        case "unlocked":
-                            headline = "Your key is unlocked for this session"
-                            lede = "It is held in memory only and is never written down. "
-                                 + "Closing the app locks it."
-                        case "locked":
-                            headline = "Your key is locked"
-                            lede = "It locks again whenever the app is closed. Unlock it to send "
-                                 + "or read encrypted mail."
-                        default:
-                            headline = "Encryption is not set up on this device"
-                            lede = "Without a key, mail to you cannot be encrypted and encrypted mail "
-                                 + "cannot be read here."
-                        }
-                        E2eCard(headline, marker: "gm-e2e-state-\(vm.state.state3)") {
+                        // The sentences come from functions, not local `let`s: a
+                        // ViewBuilder body takes expressions, and variable
+                        // declarations are not statements it accepts (CI).
+                        E2eCard(Self.headline(for: vm.state.state3),
+                                marker: "gm-e2e-state-\(vm.state.state3)") {
                             HStack(alignment: .top, spacing: 12) {
                                 Image(systemName: vm.state.state3 == "unlocked"
                                       ? "checkmark.shield" : "lock")
                                     .font(.system(size: 16))
                                     .foregroundColor(vm.state.state3 == "unlocked"
                                                      ? GM.primarySolid : GM.textSecondary)
-                                VStack(alignment: .leading, spacing: 0) { E2eLede(lede) }
+                                VStack(alignment: .leading, spacing: 0) { E2eLede(Self.lede(for: vm.state.state3)) }
                             }
                             Spacer().frame(height: 12)
                             switch vm.state.state3 {
@@ -238,6 +226,31 @@ struct E2eStatusScreen: View {
             }
         }
         .task { vm.load() }
+    }
+
+    /// The state's one true sentence, and its one true lede. Functions for
+    /// the same reason the card takes them: ViewBuilder has no room for local
+    /// declarations, and the sentences must not drift from Android's.
+    static func headline(for state3: String) -> String {
+        switch state3 {
+        case "unlocked": return "Your key is unlocked for this session"
+        case "locked": return "Your key is locked"
+        default: return "Encryption is not set up on this device"
+        }
+    }
+
+    static func lede(for state3: String) -> String {
+        switch state3 {
+        case "unlocked":
+            return "It is held in memory only and is never written down. "
+                 + "Closing the app locks it."
+        case "locked":
+            return "It locks again whenever the app is closed. Unlock it to send "
+                 + "or read encrypted mail."
+        default:
+            return "Without a key, mail to you cannot be encrypted and encrypted mail "
+                 + "cannot be read here."
+        }
     }
 }
 
