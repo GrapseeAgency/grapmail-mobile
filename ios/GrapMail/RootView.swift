@@ -583,43 +583,15 @@ struct RootView: View {
                         onAddresses: { path.append(.mailAddresses) },
                     )
                 // ── encryption band ──────────────────────────────────────────
-                case .e2eStatus:
-                    E2eStatusScreen(vm: e2e, onBack: { path.removeLast() },
-                                    onSetup: { path.append(.e2eSetup) },
-                                    onUnlock: { path.append(.e2eUnlock) },
-                                    onDetails: { path.append(.e2eDetails) },
-                                    onPublish: { path.append(.e2ePublish) },
-                                    onChangePassphrase: { path.append(.e2eChangePassphrase) },
-                                    onRemove: { path.append(.e2eRemove) },
-                                    onRecipients: { path.append(.e2eRecipients) })
-                case .e2eSetup:
-                    E2eSetupScreen(vm: e2e, onBack: { path.removeLast() })
-                case .e2eUnlock:
-                    E2eUnlockScreen(vm: e2e, onBack: { path.removeLast() })
-                case .e2eDetails:
-                    E2eDetailsScreen(vm: e2e, onBack: { path.removeLast() })
-                case .e2ePublish:
-                    E2ePublishScreen(vm: e2e, onBack: { path.removeLast() })
-                case .e2eChangePassphrase:
-                    E2ePassphraseScreen(vm: e2e, onBack: { path.removeLast() })
-                case .e2eRemove:
-                    E2eRemoveScreen(vm: e2e, onBack: { path.removeLast() })
-                case .e2eRecipients:
-                    E2eRecipientsScreen(vm: e2e, onBack: { path.removeLast() },
-                                        onCompose: {
-                                            // Same door Android's lookup screen
-                                            // opens: back to compose, where the
-                                            // encrypt row reads the same session.
-                                            // Pop to the mailbox first -- the
-                                            // band sits under Settings -- then
-                                            // one fresh compose, so a stale
-                                            // reply-target compose is never
-                                            // reused for a new message.
-                                            while let last = path.last, last != .home {
-                                                path.removeLast()
-                                            }
-                                            path.append(.mailCompose(reply: "", mode: "reply"))
-                                        })
+                // Handed off whole to `e2eDestination`: the body's switch had
+                // grown past what the type-checker will resolve in one pass
+                // (CI: "unable to type-check this expression in reasonable
+                // time"), and the switch's type erasure already lives on the
+                // Group, so extracting a sub-switch changes nothing about the
+                // views themselves.
+                case .e2eStatus, .e2eSetup, .e2eUnlock, .e2eDetails,
+                     .e2ePublish, .e2eChangePassphrase, .e2eRemove, .e2eRecipients:
+                    e2eDestination(route)
                 case .mailScreener:
                     ScreenerView(
                         vm: mail,
@@ -641,6 +613,56 @@ struct RootView: View {
                 guard path.last != .signIn else { return }
                 path = [.signIn]
             }
+        }
+    }
+
+    /// The encryption band's eight destinations, in their own switch. The
+    /// body's own switch passed the type-checker's patience the way the
+    /// snapshot host's frame did at twenty-six branches — a ViewBuilder
+    /// function keeps every case legal, and the sub-switch is one expression
+    /// the parent resolves instead of eight branch types of its own.
+    @ViewBuilder private func e2eDestination(_ route: Route) -> some View {
+        switch route {
+        case .e2eStatus:
+            E2eStatusScreen(vm: e2e, onBack: { path.removeLast() },
+                            onSetup: { path.append(.e2eSetup) },
+                            onUnlock: { path.append(.e2eUnlock) },
+                            onDetails: { path.append(.e2eDetails) },
+                            onPublish: { path.append(.e2ePublish) },
+                            onChangePassphrase: { path.append(.e2eChangePassphrase) },
+                            onRemove: { path.append(.e2eRemove) },
+                            onRecipients: { path.append(.e2eRecipients) })
+        case .e2eSetup:
+            E2eSetupScreen(vm: e2e, onBack: { path.removeLast() })
+        case .e2eUnlock:
+            E2eUnlockScreen(vm: e2e, onBack: { path.removeLast() })
+        case .e2eDetails:
+            E2eDetailsScreen(vm: e2e, onBack: { path.removeLast() })
+        case .e2ePublish:
+            E2ePublishScreen(vm: e2e, onBack: { path.removeLast() })
+        case .e2eChangePassphrase:
+            E2ePassphraseScreen(vm: e2e, onBack: { path.removeLast() })
+        case .e2eRemove:
+            E2eRemoveScreen(vm: e2e, onBack: { path.removeLast() })
+        case .e2eRecipients:
+            E2eRecipientsScreen(vm: e2e, onBack: { path.removeLast() },
+                                onCompose: {
+                                    // Same door Android's lookup screen
+                                    // opens: back to compose, where the
+                                    // encrypt row reads the same session.
+                                    // Pop to the mailbox first -- the band
+                                    // sits under Settings -- then one fresh
+                                    // compose, so a stale reply-target
+                                    // compose is never reused.
+                                    while let last = path.last, last != .home {
+                                        path.removeLast()
+                                    }
+                                    path.append(.mailCompose(reply: "", mode: "reply"))
+                                })
+        default:
+            // Unreachable: the parent routes here only for the eight cases
+            // above, and the switch inside a ViewBuilder must stay total.
+            EmptyView()
         }
     }
 }

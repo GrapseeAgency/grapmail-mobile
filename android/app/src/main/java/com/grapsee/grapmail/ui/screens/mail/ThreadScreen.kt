@@ -560,8 +560,13 @@ internal fun UnsubscribeContent(
  * "Unsubscribed": the request leaves this device the moment the browser opens, and
  * the sender's response is not observable from here. A failure to find a browser is
  * reported as that rather than as silence, so the user is not left wondering.
+ *
+ * Public, not file-private: `internal` at top level is FILE-scoped in Kotlin, and
+ * the subscriptions screen hands off through this same witnessed-only path —
+ * one handoff mechanism per app, so the sentence a user reads cannot differ
+ * between the two doors to the same sender page.
  */
-internal fun openExternally(context: android.content.Context, url: String): String = try {
+fun openExternally(context: android.content.Context, url: String): String = try {
     context.startActivity(
         android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(url))
             .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
