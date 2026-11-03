@@ -160,7 +160,10 @@ enum MailE2e {
 
     private static func deriveSharedSecret(_ priv: Curve25519.KeyAgreement.PrivateKey,
                                            _ pub: Curve25519.KeyAgreement.PublicKey) throws -> Data {
-        let shared = try priv.agreement(with: pub)
+        // swift-crypto's spelled-out name (identical in CryptoKit): the
+        // `agreement(with:)` a browser-flavoured port reaches for does not
+        // exist -- CI's compiler said so in as many words.
+        let shared = try priv.sharedSecretFromKeyAgreement(with: pub)
         let bytes = shared.withUnsafeBytes { Data($0) }
         guard bytes.count == 32 else {
             throw E2eError(text: "X25519 agreed to \(bytes.count) bytes, not 32.")
