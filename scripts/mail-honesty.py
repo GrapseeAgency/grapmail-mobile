@@ -1902,6 +1902,42 @@ pin("the data-flow doc names every on-device store the code writes",
 pin("the release job builds and proves the AAB beside the APK",
     "./gradlew assembleRelease bundleRelease" in WF_TEXT and "app-release.aab" in WF_TEXT)
 
+# The manifest is a plist Apple parses at upload time — a structure error or a
+# reason code off Apple's list is an email from App Review two weeks after the
+# build was "green". plistlib is stdlib, and the vocabularies below are
+# Apple's documented ones, so the same check the validation service runs
+# happens before the artifact exists.
+import plistlib as _plistlib
+try:
+    _MAN = _plistlib.load(open(IOS / "PrivacyInfo.xcprivacy", "rb"))
+except Exception as e:  # noqa: BLE001 - any parse failure is the finding
+    _MAN = None
+    pin(f"the privacy manifest parses as a plist ({e})", False)
+if _MAN is not None:
+    pin("the manifest's top level is exactly Apple's four keys",
+        set(_MAN) == {"NSPrivacyTracking", "NSPrivacyTrackingDomains",
+                      "NSPrivacyCollectedDataTypes", "NSPrivacyAccessedAPITypes"})
+    pin("tracking is declared false with an empty domain list",
+        _MAN.get("NSPrivacyTracking") is False and _MAN.get("NSPrivacyTrackingDomains") == [])
+    _KNOWN_REASONS = {"CA92.1", "35F9.1", "4868.1", "E174.1", "C617.1",
+                      "3B52.1", "DA65.1", "F4C8.1", "0000.1", "DB09.1", "3E3E.1"}
+    pin("every required-reason entry has Apple's shape and a documented code",
+        all(set(e) == {"NSPrivacyAccessedAPIType", "NSPrivacyAccessedAPITypeReasons"}
+            and all(r in _KNOWN_REASONS for r in e["NSPrivacyAccessedAPITypeReasons"])
+            for e in _MAN.get("NSPrivacyAccessedAPITypes", [])))
+    _CATS = {"NSPrivacyCollectedDataType", "NSPrivacyCollectedDataTypeLinked",
+             "NSPrivacyCollectedDataTypeTracking", "NSPrivacyCollectedDataTypePurposes"}
+    pin("every collected-data entry has Apple's shape and documented purposes",
+        all(set(e) == _CATS
+            and e["NSPrivacyCollectedDataTypeTracking"] is False
+            and all(p.startswith("NSPrivacyCollectedDataTypePurpose")
+                    for p in e["NSPrivacyCollectedDataTypePurposes"])
+            for e in _MAN.get("NSPrivacyCollectedDataTypes", [])))
+    _declared = {e["NSPrivacyAccessedAPIType"].replace("NSPrivacyAccessedAPICategory", "")
+                 for e in _MAN.get("NSPrivacyAccessedAPITypes", [])}
+    pin("the manifest declares exactly the two required-reason APIs the code calls",
+        _declared == {"UserDefaults", "FileProvider"})
+
 # -- 30. the per-app detail -- the web's links/<product> page, honestly ported ---
 #
 # The web's account section has a thirteenth page the phones were missing:
