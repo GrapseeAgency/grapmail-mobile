@@ -1803,6 +1803,86 @@ pin("both walks photograph both subscriptions frames with the same waits",
     and all(f'"{m}",]' in SW_WALK or f': "{m}"' in SW_WALK for m in
             ("The Weekly Draft", "No subscriptions detected.")))
 
+# -- 29. the store round -- dark frames, labels, and the two privacy files ------
+#
+# Phase 6 is the release gate, and its claims are the easiest to make and the
+# easiest to silently drop: "dark mode works" without a dark frame, "the
+# manifest covers the app" after someone adds a new API, "Data safety filled
+# in" from memory rather than from the route list. Each pin below reads the
+# artifacts that make the claim true, and fails the day the artifact drifts.
+KT_E2EV = KT_E2ES  # the Kotlin encryption screens, already read for §27
+SW_E2EV = SW_E2ES
+
+# The plan: every band added after the first palette check carries its own
+# dark frame with BOTH proofs. A `-dark` HOST case would be a second copy of
+# a screen (§19 refuses one), so the frames reuse the light names — which is
+# exactly why the pairing needs pinning: nothing else stops a dark pass from
+# launching a name the app never learns.
+for dark in ("111-account-profile-dark", "112-e2e-status-unlocked-dark",
+             "113-mail-subs-list-dark"):
+    # Twice, not once: a frame named only in the launch loop can fail to
+    # photograph and still leave the walk green — the PNG gate list is what
+    # makes an absent screenshot a failure, so the pin counts both places.
+    pin(f"the dark frame {dark} is launched AND gated by both walks",
+        KT_WALK.count(dark) >= 2 and SW_WALK.count(dark) >= 1)
+pin("the dark frames launch host cases that exist",
+    all(n in KT_HOST and n in SW_HOST for n in
+        ("account-profile", "e2e-status-unlocked", "mail-subs-list")))
+
+# Two destructive/exit buttons were once the only taps in the band with no
+# identifier at all; the fix paired `tag =` on Kotlin with `marker:` on Swift,
+# and the walk's markers depend on those names matching.
+for twin in ("gm-e2e-remove-keep", "gm-e2e-lookup-compose"):
+    pin(f"the button identifier {twin} exists under both platforms' markers",
+        f'"{twin}"' in KT_E2EV and f'"{twin}"' in SW_E2EV)
+pin("no iOS encryption button falls back to a shared identifier",
+    'marker ?? "gm-e2e-button"' not in SW_E2EV)
+
+# The privacy manifest is only worth its filename if it names what the binary
+# actually calls. Both required-reason APIs here were audited out of the code
+# (SessionStore's UserDefaults, the compose picker's security scope); a new
+# required-reason user must extend the manifest, and these two pins are where
+# that becomes loud instead of silent.
+MANIFEST = (IOS / "PrivacyInfo.xcprivacy").read_text(encoding="utf-8")
+pin("the manifest declares UserDefaults exactly where the session store uses it",
+    "NSPrivacyAccessedAPICategoryUserDefaults" in MANIFEST
+    and "UserDefaults.standard" in ios("SessionStore.swift")
+    and "CA92.1" in MANIFEST)
+pin("the manifest declares the file-provider scope the attachment picker takes",
+    "NSPrivacyAccessedAPICategoryFileProvider" in MANIFEST
+    and "startAccessingSecurityScopedResource" in ios("MailReaderViews.swift")
+    and "C617.1" in MANIFEST)
+pin("the manifest says plainly that nothing tracks",
+    re.search(r"<key>NSPrivacyTracking</key>\s*<false/>", MANIFEST) is not None
+    and re.search(r"<key>NSPrivacyTrackingDomains</key>\s*<array/>", MANIFEST) is not None)
+# The tracking answer rests on one fact: the code talks to one host. The hosts
+# are read out of the CODE (comments excluded — a comment about a third-party
+# URL is documentation, and an earlier version of this pin proved that by
+# failing on one): iOS's `base` literal and Android's `API_BASE` build field.
+_API_URLS = (re.findall(r"https?://([A-Za-z0-9.-]+)", code_only(SW_APIC))
+             + re.findall(r'https?://([A-Za-z0-9.-]+)',
+                          (ROOT / "android/app/build.gradle.kts").read_text(encoding="utf-8")))
+pin("both clients address exactly one host and it is the app's own API",
+    set(_API_URLS) == {"grapsee.com"})
+
+# The data-flow document is the source of the store forms' answers; it must
+# keep naming the endpoints from the clients' own code, the on-device stores,
+# and — the honest part — the deletion route that does NOT exist yet, in the
+# same words the privacy screens use.
+WF_TEXT = (ROOT / ".github/workflows/android.yml").read_text(encoding="utf-8")
+DFLOW = (ROOT / "DATA-FLOW.md").read_text(encoding="utf-8")
+pin("the data-flow doc covers the real endpoint groups",
+    all(g in DFLOW for g in ("/auth/account/create", "/auth/account/signin",
+                             "/auth/account/profile", "e2e/keys", "e2e/plan",
+                             "/screener/decision", "/send", "/draft")))
+pin("the data-flow doc states the deletion gap in the screens' own words",
+    "that path is not built" in DFLOW and "no account-delete endpoint" in DFLOW.lower())
+pin("the data-flow doc names every on-device store the code writes",
+    all(s in DFLOW for s in ("Keychain", "UserDefaults", "Keystore",
+                             "grapmail-e2e-protected-key/1", "MailStore")))
+pin("the release job builds and proves the AAB beside the APK",
+    "./gradlew assembleRelease bundleRelease" in WF_TEXT and "app-release.aab" in WF_TEXT)
+
 print()
 if failures:
     print(f"mail-honesty: {len(failures)} pin(s) broken")

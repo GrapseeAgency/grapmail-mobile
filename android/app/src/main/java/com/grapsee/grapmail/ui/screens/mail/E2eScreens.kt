@@ -428,7 +428,8 @@ fun E2eRemoveScreen(vm: E2eViewModel, onBack: () -> Unit) {
                     enabled = !state.busy, tag = "gm-e2e-remove-confirm",
                     onClick = { vm.removeKey(); confirmRemove = false; onBack() })
                 Spacer(Modifier.height(8.dp))
-                E2eButton("Keep it", enabled = true, quiet = true, onClick = { confirmRemove = false })
+                E2eButton("Keep it", enabled = true, quiet = true,
+                    tag = "gm-e2e-remove-keep", onClick = { confirmRemove = false })
             }
         }
     }
@@ -497,7 +498,8 @@ fun E2eRecipientsScreen(vm: E2eViewModel, onBack: () -> Unit, onCompose: () -> U
                     }
                 }
                 Spacer(Modifier.height(10.dp))
-                E2eButton("Back to compose", enabled = true, quiet = true, onClick = onCompose)
+                E2eButton("Back to compose", enabled = true, quiet = true,
+                    tag = "gm-e2e-lookup-compose", onClick = onCompose)
             } else if (state.lookupFor.isNotEmpty() && !state.busy) {
                 Text("The directory answered nothing for that check.", fontSize = 13.sp,
                     color = palette.textTertiary, modifier = Modifier.padding(vertical = 10.dp))

@@ -110,7 +110,10 @@ private struct E2eButton: View {
                     .strokeBorder(quiet ? GM.border : GM.primarySolid, lineWidth: 1)))
             .contentShape(Rectangle())
             .onTapGesture { if enabled { onClick() } }
-            .accessibilityIdentifier(marker ?? "gm-e2e-button")
+            // No shared fallback identifier: two buttons answering to one name
+            // is how a walk marker stops meaning anything. Every caller names
+            // its own; Android's `tag =` on the same buttons is the twin.
+            .modifier(E2eMarker(id: marker))
     }
 }
 
@@ -518,6 +521,7 @@ struct E2eRemoveScreen: View {
                               onClick: { vm.removeKey(); confirmRemove = false; onBack() })
                     Spacer().frame(height: 8)
                     E2eButton(text: "Keep it", enabled: true, quiet: true,
+                              marker: "gm-e2e-remove-keep",
                               onClick: { confirmRemove = false })
                 }
                 Spacer()
@@ -568,7 +572,7 @@ struct E2eRecipientsScreen: View {
                         }
                         Spacer().frame(height: 10)
                         E2eButton(text: "Back to compose", enabled: true, quiet: true,
-                                  onClick: onCompose)
+                                  marker: "gm-e2e-lookup-compose", onClick: onCompose)
                     } else if !vm.state.lookupFor.isEmpty && !vm.state.busy {
                         Text("The directory answered nothing for that check.")
                             .font(.system(size: 13)).foregroundColor(GM.textTertiary)
