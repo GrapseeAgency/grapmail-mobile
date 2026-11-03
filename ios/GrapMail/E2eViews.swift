@@ -415,10 +415,13 @@ struct E2ePublishScreen: View {
                         Spacer().frame(height: 8)
                         E2eRow(label: "Published fingerprint", value: p.encryption?.fingerprint ?? "-")
                         E2eRow(label: "Updated", value: p.updatedAt ?? p.publishedAt ?? "-")
-                        let mismatch = vm.state.fingerprint != nil
-                            && p.encryption?.fingerprint != nil
-                            && p.encryption?.fingerprint != vm.state.fingerprint
-                        if mismatch {
+                        // The condition is a function call, not a local `let`:
+                        // a ViewBuilder branch takes expressions, and the
+                        // status screen already learned that from CI. The
+                        // mismatch itself is the web's warning — two
+                        // different keys for one account is a fact the person
+                        // must see before trusting either.
+                        if Self.isMismatch(local: vm.state.fingerprint, published: p.encryption?.fingerprint) {
                             Spacer().frame(height: 10)
                             E2eNote(text: "The key published for your account is NOT the key on this device. "
                                     + "Anyone encrypting to you right now is encrypting to a key this device "
@@ -448,6 +451,14 @@ struct E2ePublishScreen: View {
             }
         }
         .task { vm.loadPublished() }
+    }
+
+    /// Two known fingerprints that differ is the mismatch; a missing one on
+    /// either side is an unanswered question, not a difference — the warning
+    /// must not fire on an absent read.
+    static func isMismatch(local: String?, published: String?) -> Bool {
+        guard let local, let published else { return false }
+        return local != published
     }
 }
 
