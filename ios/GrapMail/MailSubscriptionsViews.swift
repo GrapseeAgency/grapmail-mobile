@@ -304,7 +304,7 @@ struct SubscriptionsView: View {
                 Text("Unsubscribe")
                     .font(.system(size: 13, weight: .medium))
                     .foregroundColor(.white)
-                    .padding(.horizontal, 18).padding(.vertical, 9)
+                    .padding(.horizontal, 18).padding(.vertical, 13)
                     .background(Capsule().fill(GM.primarySolid))
             }
             .accessibilityIdentifier("gm-subs-action")

@@ -358,7 +358,7 @@ private fun SubscriptionRowLine(
                     if (webTarget != null) onUnsubscribe()
                     else if (mailto != null) onMailto(mailto)
                 }
-                .padding(horizontal = 18.dp, vertical = 9.dp)
+                .padding(horizontal = 18.dp, vertical = 13.dp)
                 .testTag("gm-subs-action"),
         )
     }
