@@ -243,21 +243,26 @@ struct TasksView: View {
                                 .padding(.vertical, 16)
                         }
                         ForEach(tasks, id: \.self) { task in
-                            Button {
+                            // A tappable ROW, not a Button: SwiftUI folds a
+                            // Button's whole label into one accessibility
+                            // element, and the walk's static-text wait could
+                            // never see the task text -- Android's clickable
+                            // Row exposes each Text on its own, and the frame
+                            // that failed here proved the two must agree in
+                            // structure, not just in words.
+                            HStack(spacing: 12) {
+                                RoundedRectangle(cornerRadius: 6)
+                                    .strokeBorder(GM.border, lineWidth: 1.5)
+                                    .frame(width: 22, height: 22)
+                                Text(task).font(.system(size: 15)).foregroundColor(GM.textPrimary)
+                                Spacer()
+                            }
+                            .contentShape(Rectangle())
+                            .onTapGesture {
                                 vm.saveSettings(ProfileSettingsPatch(
                                     tasks: tasks.filter { $0 != task }))
-                            } label: {
-                                HStack(spacing: 12) {
-                                    RoundedRectangle(cornerRadius: 6)
-                                        .strokeBorder(GM.border, lineWidth: 1.5)
-                                        .frame(width: 22, height: 22)
-                                    Text(task).font(.system(size: 15)).foregroundColor(GM.textPrimary)
-                                    Spacer()
-                                }
-                                .contentShape(Rectangle())
-                                .padding(.vertical, 12)
                             }
-                            .buttonStyle(.plain)
+                            .padding(.vertical, 12)
                             .accessibilityIdentifier("gm-task-row")
                         }
                     }
