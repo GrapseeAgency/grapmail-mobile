@@ -560,12 +560,17 @@ extension MailboxModel {
             seedScreenerForSnapshot(enabled: true, pending: 3)
         case "mail-adv-search":
             // The scope line's numbers: the sheet says what it ran over.
-            s.total = 40
-            s.advScope = 5
+            seedForSnapshot { s in
+                s.total = 40
+                s.advScope = 5
+            }
         case "mail-undo":
-            s.undoIds = ["m1", "m2"]
-            s.undoInverse = .unarchive
-            s.undoNote = "Archived 2 messages"
+            // The banner's words: exactly what a real archive of two raises.
+            seedForSnapshot { s in
+                s.undoIds = ["m1", "m2"]
+                s.undoInverse = .unarchive
+                s.undoNote = "Archived 2 messages"
+            }
         default:
             break
         }

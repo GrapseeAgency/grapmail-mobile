@@ -16,10 +16,13 @@ import com.grapsee.grapmail.data.MailDraftRequest
 import com.grapsee.grapmail.data.MailFilter
 import com.grapsee.grapmail.data.MailLabelDto
 import com.grapsee.grapmail.data.MailMessageDto
+import com.grapsee.grapmail.data.MailMessageFullDto
 import com.grapsee.grapmail.data.MailSendRequest
 import com.grapsee.grapmail.data.MailSenderScope
 import com.grapsee.grapmail.data.MailSort
 import com.grapsee.grapmail.data.MailStore
+import com.grapsee.grapmail.data.inverse
+import com.grapsee.grapmail.data.pastLine
 import com.grapsee.grapmail.data.SessionStore
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
