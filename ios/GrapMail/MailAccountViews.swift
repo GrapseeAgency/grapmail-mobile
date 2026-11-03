@@ -672,18 +672,19 @@ struct ConnectionsView: View {
         }
         .task { vm.load() }
     }
+}
 
-    /// Initials for a product with no domain, the web's rule copied: strip to
-    /// letters and digits, take the first character of each word, cap at two.
-    private func monogram(_ product: String) -> String {
-        let cleaned = product.unicodeScalars.filter {
-            CharacterSet.alphanumerics.contains($0) || $0 == " "
-        }
-        let words = String(String.UnicodeScalarView(cleaned))
-            .split(separator: " ").filter { !$0.isEmpty }
-        let initials = words.prefix(2).map { String($0.first!) }.joined().uppercased()
-        return initials.isEmpty ? "?" : initials
+/// Initials for a product with no domain, the web's rule copied: strip to
+/// letters and digits, take the first character of each word, cap at two.
+/// File-scope because the list row and the per-app detail draw the same mark.
+private func monogram(_ product: String) -> String {
+    let cleaned = product.unicodeScalars.filter {
+        CharacterSet.alphanumerics.contains($0) || $0 == " "
     }
+    let words = String(String.UnicodeScalarView(cleaned))
+        .split(separator: " ").filter { !$0.isEmpty }
+    let initials = words.prefix(2).map { String($0.first!) }.joined().uppercased()
+    return initials.isEmpty ? "?" : initials
 }
 
 /// The web's own scope words (`connections/page.tsx` SHARED map), copied rather

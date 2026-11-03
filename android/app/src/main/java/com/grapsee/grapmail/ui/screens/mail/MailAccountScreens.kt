@@ -664,7 +664,7 @@ fun ConnectionDetailScreen(vm: ProfileViewModel, product: String, onBack: () -> 
                     Text(product, fontSize = 20.sp, color = palette.textPrimary, maxLines = 1,
                         modifier = Modifier.testTag("gm-connection-detail-name"))
                     val who = entry?.let { (it.host ?: "Grapsee product") + " · connected " +
-                        it.connectedAt.take(10) }
+                        (it.connectedAt ?: "").take(10) }
                     Text(who ?: "Not connected to this account",
                         fontSize = 13.sp, color = palette.textSecondary)
                 }
@@ -693,7 +693,7 @@ fun ConnectionDetailScreen(vm: ProfileViewModel, product: String, onBack: () -> 
                         "below. Your password is never shared with $product.",
                     fontSize = 13.sp, lineHeight = 20.sp, color = palette.textSecondary,
                     modifier = Modifier.padding(top = 8.dp))
-                Text("WHAT $PRODUCT CAN REACH".uppercase(),
+                Text(product.uppercase() + " CAN REACH",
                     fontSize = 12.sp, fontWeight = FontWeight.Medium,
                     color = palette.textSecondary,
                     modifier = Modifier.padding(top = 14.dp))
