@@ -438,6 +438,11 @@ final class ScreenshotWalkUITests: XCTestCase {
             // empty read. Android's walk names the same two frames.
             ("109-mail-subs-list", "mail-subs-list"),
             ("110-mail-subs-empty", "mail-subs-empty"),
+            // The per-app detail: the linked frame over a seeded connection,
+            // the unlinked frame over a name the record does not carry.
+            // Android names the same two frames and waits on the same text.
+            ("114-account-connection-detail", "account-connection-detail"),
+            ("115-account-connection-unknown", "account-connection-unknown"),
         ]
         // These two fetch on appear, so the shutter has to wait for the loaded
         // branch — otherwise the photograph catches "Checking your account…"
@@ -516,6 +521,9 @@ final class ScreenshotWalkUITests: XCTestCase {
             // honestly-empty read landed.
             "mail-subs-list": "The Weekly Draft",
             "mail-subs-empty": "No subscriptions detected.",
+            "account-connection-detail": "Your name, GrapMail address and profile photo",
+            "account-connection-unknown": "This app does not have access to this account. Nothing is "
+                + "being shared with it, and there is nothing to remove.",
         ]
         for screen in postWriteScreens {
             app.terminate()

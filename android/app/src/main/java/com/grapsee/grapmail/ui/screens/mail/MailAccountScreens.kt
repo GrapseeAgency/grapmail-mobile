@@ -484,7 +484,7 @@ private fun vmAliasDelete(vm: ProfileViewModel, address: String) {
  * a third-party app shows its real mark.
  */
 @Composable
-fun ConnectionsScreen(vm: ProfileViewModel, onBack: () -> Unit) {
+fun ConnectionsScreen(vm: ProfileViewModel, onBack: () -> Unit, onOpen: (String) -> Unit) {
     val palette = LocalPalette.current
     val state by vm.state.collectAsState()
     var query by remember { mutableStateOf("") }
@@ -535,7 +535,12 @@ fun ConnectionsScreen(vm: ProfileViewModel, onBack: () -> Unit) {
             }
             shown.forEach { c ->
                 Row(Modifier.fillMaxWidth().testTag("gm-connection-row")
-                    .padding(vertical = 12.dp),
+                    .padding(vertical = 12.dp)
+                    // The row opens the per-app page the web links from the same
+                    // list (`/mail/account/connections/<product>`); the Remove
+                    // control stays on the row because it is the one action a
+                    // person takes without wanting the detail.
+                    .clickable { onOpen(c.product) },
                     verticalAlignment = Alignment.CenterVertically) {
                     val mono = c.product.replace(Regex("[^A-Za-z0-9 ]"), "")
                         .split(" ").filter { it.isNotBlank() }
@@ -591,6 +596,166 @@ private fun scopeWord(scope: String): String = when (scope) {
     "projects" -> "your projects"
     "contacts" -> "your contacts"
     else -> scope
+}
+
+/** The web's FULL sharing sentences (`LinkedAppDetail.tsx` SHARED map), for the
+ *  per-app page where the person decides what cutting access actually costs.
+ *  The list row uses the short words; the detail uses these, exactly as the
+ *  web splits the two. */
+fun sharedWord(scope: String): String = when (scope) {
+    "profile" -> "Your name, GrapMail address and profile photo"
+    "mailbox" -> "Read and send mail in your GrapMail mailbox"
+    "projects" -> "Projects and client records you own on Grapsee products"
+    "contacts" -> "The people you have exchanged mail with"
+    else -> scope
+}
+
+// ── 94b · one linked app, in full ────────────────────────────────────────────
+
+/**
+ * The web's `/mail/account/connections/<product>`: what this app is, what it
+ * received at the moment access was granted, and the one honest way to cut it
+ * off. The scopes shown are the recorded ones, not a generic catalogue; an
+ * unknown product word is shown as its own name rather than dropped, because a
+ * scope the server knows and this build does not is the server's fact, not a
+ * reason to hide a line. A product with no entry says so — nothing is shared,
+ * nothing to remove, and the screen does not pretend the name being looked at
+ * is connected just because the URL said so.
+ */
+@Composable
+fun ConnectionDetailScreen(vm: ProfileViewModel, product: String, onBack: () -> Unit,
+                           onSupport: () -> Unit) {
+    val palette = LocalPalette.current
+    val state by vm.state.collectAsState()
+    var confirmRemove by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { vm.load() }
+    val connected = state.profile?.connections ?: emptyList()
+    val entry = connected.firstOrNull { it.product.lowercase() == product.lowercase() }
+    MailScaffold(product, onBack) {
+        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())
+            .padding(horizontal = 20.dp)) {
+            // The unread shape FIRST: an entry missing because the profile has
+            // not been read is not an entry that is absent. Showing "not
+            // connected" during the read would be the invention this whole
+            // screen exists to avoid.
+            if (state.profile == null) {
+                Text(if (state.loading) "Loading…"
+                     else "The account could not be read, so this screen cannot " +
+                             "say what the app can reach.",
+                    fontSize = 14.sp, color = palette.textTertiary,
+                    modifier = Modifier.padding(vertical = 16.dp)
+                        .testTag("gm-connection-detail-read"))
+                return@Column
+            }
+            state.note?.let { NoteLine(it, state.noteIsBad) }
+            Spacer(Modifier.height(8.dp))
+            val mono = product.replace(Regex("[^A-Za-z0-9 ]"), "")
+                .split(" ").filter { it.isNotBlank() }
+                .map { it.first() }.joinToString("").take(2).uppercase()
+                .ifBlank { "?" }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(Modifier.size(48.dp).clip(RoundedCornerShape(12.dp))
+                    .background(palette.softFill), contentAlignment = Alignment.Center) {
+                    Text(mono, fontSize = 18.sp, fontWeight = FontWeight.SemiBold,
+                        color = palette.primarySolid)
+                }
+                Spacer(Modifier.width(14.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(product, fontSize = 20.sp, color = palette.textPrimary, maxLines = 1,
+                        modifier = Modifier.testTag("gm-connection-detail-name"))
+                    val who = entry?.let { (it.host ?: "Grapsee product") + " · connected " +
+                        it.connectedAt.take(10) }
+                    Text(who ?: "Not connected to this account",
+                        fontSize = 13.sp, color = palette.textSecondary)
+                }
+            }
+            if (entry == null) {
+                // The web's exact stance: a link to an app that is not linked
+                // is answered, not redirected and not fabricated.
+                Text("This app does not have access to this account. Nothing is " +
+                        "being shared with it, and there is nothing to remove.",
+                    fontSize = 14.sp, lineHeight = 20.sp, color = palette.textSecondary,
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 20.dp)
+                        .background(palette.softFill, RoundedCornerShape(12.dp))
+                        .padding(14.dp).testTag("gm-connection-not-linked"))
+                Spacer(Modifier.height(24.dp))
+                return@Column
+            }
+            Spacer(Modifier.height(18.dp))
+            Column(Modifier.fillMaxWidth()
+                .clip(RoundedCornerShape(16.dp)).background(palette.card)
+                .border(1.dp, palette.border, RoundedCornerShape(16.dp))
+                .padding(18.dp)) {
+                Text("How GrapMail helps you sign in to $product",
+                    fontSize = 15.sp, color = palette.textPrimary)
+                Text("When you use your Grapsee account to sign in to $product, this " +
+                        "account proves who you are and hands over only what is listed " +
+                        "below. Your password is never shared with $product.",
+                    fontSize = 13.sp, lineHeight = 20.sp, color = palette.textSecondary,
+                    modifier = Modifier.padding(top = 8.dp))
+                Text("WHAT $PRODUCT CAN REACH".uppercase(),
+                    fontSize = 12.sp, fontWeight = FontWeight.Medium,
+                    color = palette.textSecondary,
+                    modifier = Modifier.padding(top = 14.dp))
+                if (entry.scopes.isEmpty()) {
+                    Text("No access was recorded when this was connected.",
+                        fontSize = 13.sp, color = palette.textSecondary,
+                        modifier = Modifier.padding(top = 6.dp))
+                }
+                entry.scopes.forEach { s ->
+                    Row(Modifier.padding(top = 8.dp), verticalAlignment = Alignment.Top) {
+                        Box(Modifier.size(6.dp).padding(top = 6.dp)
+                            .clip(CircleShape).background(palette.primarySolid))
+                        Spacer(Modifier.width(10.dp))
+                        Text(sharedWord(s), fontSize = 13.sp, color = palette.textPrimary,
+                            modifier = Modifier.weight(1f))
+                    }
+                }
+            }
+            Spacer(Modifier.height(18.dp))
+            Row(Modifier.fillMaxWidth()
+                .clip(RoundedCornerShape(16.dp)).background(palette.card)
+                .border(1.dp, palette.border, RoundedCornerShape(16.dp))
+                .clickable(enabled = !state.busy) { confirmRemove = true }
+                .padding(horizontal = 18.dp, vertical = 16.dp),
+                verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text(if (state.busy) "Removing…" else "Remove access",
+                        fontSize = 15.sp, fontWeight = FontWeight.Medium, color = palette.error)
+                    Text("Remove all links and stop sharing this account's data with $product.",
+                        fontSize = 12.sp, lineHeight = 17.sp, color = palette.textSecondary)
+                }
+            }
+            if (confirmRemove) {
+                Column(Modifier.fillMaxWidth().padding(top = 10.dp)
+                    .background(palette.warnChipBg, RoundedCornerShape(12.dp))
+                    .padding(16.dp).testTag("gm-connection-confirm")) {
+                    Text("Cut $product off? It loses access to everything listed above " +
+                            "and has to sign in again to get back in.",
+                        fontSize = 13.sp, color = palette.textPrimary)
+                    Row(Modifier.padding(top = 12.dp)) {
+                        Text("Cancel", fontSize = 14.sp, color = palette.textSecondary,
+                            modifier = Modifier.clickable { confirmRemove = false })
+                        Spacer(Modifier.width(24.dp))
+                        Text("Remove access", fontSize = 14.sp, fontWeight = FontWeight.SemiBold,
+                            color = palette.error,
+                            modifier = Modifier.clickable {
+                                confirmRemove = false
+                                vm.saveConnections(connected.filter {
+                                    it.product.lowercase() != product.lowercase()
+                                })
+                            })
+                    }
+                }
+            }
+            Spacer(Modifier.height(16.dp))
+            Text("Something wrong with this app?", fontSize = 12.sp, color = palette.textSecondary)
+            Text("Report this app", fontSize = 13.sp, fontWeight = FontWeight.Medium,
+                color = palette.primarySolid,
+                modifier = Modifier.padding(top = 4.dp).clickable { onSupport() })
+            Spacer(Modifier.height(24.dp))
+        }
+    }
 }
 
 // ── 90 · personal info ───────────────────────────────────────────────────────

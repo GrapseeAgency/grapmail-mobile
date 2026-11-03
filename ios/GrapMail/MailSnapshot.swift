@@ -555,7 +555,18 @@ struct MailSnapshotView: View {
             case "mail-addresses":
                 return AnyView(secondary(AddressesView(vm: profile, onBack: {})))
             case "account-connections":
-                return AnyView(secondary(ConnectionsView(vm: profile, onBack: {})))
+                return AnyView(secondary(ConnectionsView(vm: profile, onBack: {}, onOpen: { _ in })))
+            // The per-app detail frames, both over the ONE seeded record: the
+            // linked frame names an app the document lists, the unlinked one
+            // asks about an app it does not — which IS the server's answer for
+            // that name, so "not connected" is a true read, not a fake-empty
+            // profile (Android's host draws the same two).
+            case "account-connection-detail":
+                return AnyView(secondary(ConnectionDetailView(vm: profile, product: "Northwind SSO",
+                                                              onBack: {}, onSupport: {})))
+            case "account-connection-unknown":
+                return AnyView(secondary(ConnectionDetailView(vm: profile, product: "Stranger App",
+                                                              onBack: {}, onSupport: {})))
             // The subscriptions band. The populated frame photographs the two
             // detected senders seeded in the cache; the empty one photographs
             // the screen's own no-mail sentence over an honest empty read.

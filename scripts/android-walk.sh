@@ -550,7 +550,9 @@ for spec in "two-factor-on:40-sec-two-factor-on" \
             "e2e-remove:107-e2e-remove" \
             "e2e-recipients:108-e2e-recipients" \
             "mail-subs-list:109-mail-subs-list" \
-            "mail-subs-empty:110-mail-subs-empty"; do
+            "mail-subs-empty:110-mail-subs-empty" \
+            "account-connection-detail:114-account-connection-detail" \
+            "account-connection-unknown:115-account-connection-unknown"; do
   nm="${spec%%:*}"; pic="${spec##*:}"
   adb shell am force-stop "$PKG"
   adb shell am start -W -n "$PKG/.MainActivity" --es gmSnapshot "$nm" >/dev/null
@@ -655,6 +657,11 @@ for spec in "two-factor-on:40-sec-two-factor-on" \
     # sentence over the honestly-empty seeded read.
     mail-subs-list) settled="The Weekly Draft" ;;
     mail-subs-empty) settled="No subscriptions detected." ;;
+    # The per-app detail: the linked frame waits on the web's full sharing
+    # sentence (text only the recorded scopes draw), the unlinked frame on the
+    # screen's own "does not have access" answer over the same seeded record.
+    account-connection-detail) settled="Your name, GrapMail address and profile photo" ;;
+    account-connection-unknown) settled="This app does not have access to this account. Nothing is being shared with it, and there is nothing to remove." ;;
     *) settled="" ;;
   esac
   # A marker may name a visible string OR a resource-id. Text is right for
@@ -875,7 +882,8 @@ for want in 01-welcome-light 02-step1-name-light 03-step2-basicinfo-light \
             106-e2e-passphrase 107-e2e-remove 108-e2e-recipients \
             109-mail-subs-list 110-mail-subs-empty \
             111-account-profile-dark 112-e2e-status-unlocked-dark \
-            113-mail-subs-list-dark; do
+            113-mail-subs-list-dark 114-account-connection-detail \
+            115-account-connection-unknown; do
   [ -s "$OUT/$want.png" ] || { echo "FAIL: missing $want.png" >&2; FAILURES=$((FAILURES + 1)); }
 done
 if [ "$FAILURES" -gt 0 ]; then

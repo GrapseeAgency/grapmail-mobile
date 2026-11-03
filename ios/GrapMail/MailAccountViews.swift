@@ -552,6 +552,9 @@ struct AddressesView: View {
 struct ConnectionsView: View {
     @ObservedObject var vm: ProfileModel
     let onBack: () -> Void
+    /// The web links the per-app detail from the same list; the row opens it.
+    /// Remove stays on the row — it is the action taken without wanting detail.
+    let onOpen: (String) -> Void
     @State private var query = ""
     @State private var viewFilter = "all"
     @State private var pendingRemove: ProfileConnection?
@@ -639,6 +642,8 @@ struct ConnectionsView: View {
                             .accessibilityIdentifier("gm-connection-row")
                         }
                         .padding(.vertical, 12)
+                        .contentShape(Rectangle())
+                        .onTapGesture { onOpen(c.product) }
                     }
                     if let c = pendingRemove {
                         VStack(alignment: .leading, spacing: 12) {
@@ -690,6 +695,209 @@ private func scopeWord(_ scope: String) -> String {
     case "projects": return "your projects"
     case "contacts": return "your contacts"
     default: return scope
+    }
+}
+
+/// The web's FULL sharing sentences (`LinkedAppDetail.tsx` SHARED map), for
+/// the per-app page where the person decides what cutting access costs. The
+/// list row uses the short words; the detail uses these, exactly as the web
+/// splits the two. Android's `sharedWord` is the twin.
+func sharedWord(_ scope: String) -> String {
+    switch scope {
+    case "profile": return "Your name, GrapMail address and profile photo"
+    case "mailbox": return "Read and send mail in your GrapMail mailbox"
+    case "projects": return "Projects and client records you own on Grapsee products"
+    case "contacts": return "The people you have exchanged mail with"
+    default: return scope
+    }
+}
+
+// ── 94b · one linked app, in full ────────────────────────────────────────────
+
+/// The web's `/mail/account/connections/<product>`: what this app is, what it
+/// received at the moment access was granted, and the one honest way to cut
+/// it off. The scopes shown are the recorded ones, not a generic catalogue; a
+/// product with no entry says so — nothing shared, nothing to remove. An
+/// unread profile is never drawn as "not connected": that is the invention
+/// this screen exists to avoid.
+struct ConnectionDetailView: View {
+    @ObservedObject var vm: ProfileModel
+    let product: String
+    let onBack: () -> Void
+    let onSupport: () -> Void
+    @State private var confirmRemove = false
+
+    private var connected: [ProfileConnection] { vm.state.profile?.connections ?? [] }
+    private var entry: ProfileConnection? {
+        connected.first { $0.product.lowercased() == product.lowercased() }
+    }
+    private var scopes: [String] { entry?.scopes ?? [] }
+
+    var body: some View {
+        MailScaffold(title: product, onBack: onBack) {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 0) {
+                    if vm.state.profile == nil {
+                        Text(vm.state.loading ? "Loading…"
+                             : "The account could not be read, so this screen " +
+                               "cannot say what the app can reach.")
+                            .font(.system(size: 14)).foregroundColor(GM.textTertiary)
+                            .padding(.vertical, 16)
+                            .accessibilityIdentifier("gm-connection-detail-read")
+                    } else {
+                        if let note = vm.state.note {
+                            NoteLine(text: note, bad: vm.state.noteIsBad)
+                        }
+                        Spacer().frame(height: 8)
+                        header
+                        if entry == nil {
+                            // The web's exact stance: a link to an app that is
+                            // not linked is answered, not redirected.
+                            Text("This app does not have access to this account. "
+                                 + "Nothing is being shared with it, and there is "
+                                 + "nothing to remove.")
+                                .font(.system(size: 14)).lineSpacing(5)
+                                .foregroundColor(GM.textSecondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                                .padding(14)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .background(RoundedRectangle(cornerRadius: 12).fill(GM.softFill))
+                                .padding(.vertical, 20)
+                                .accessibilityIdentifier("gm-connection-not-linked")
+                        } else {
+                            scopesCard
+                            removeRow
+                            if confirmRemove { confirmBlock }
+                            supportLink
+                        }
+                    }
+                    Spacer().frame(height: 24)
+                }
+                .padding(.horizontal, 20)
+            }
+        }
+        .task { vm.load() }
+    }
+
+    private var header: some View {
+        HStack(spacing: 14) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 12).fill(GM.softFill)
+                    .frame(width: 48, height: 48)
+                Text(monogram(product)).font(.system(size: 18, weight: .semibold))
+                    .foregroundColor(GM.primarySolid)
+            }
+            VStack(alignment: .leading, spacing: 2) {
+                Text(product).font(.system(size: 20)).foregroundColor(GM.textPrimary)
+                    .lineLimit(1)
+                    .accessibilityIdentifier("gm-connection-detail-name")
+                Text(entry.map { c in
+                    (c.host ?? "Grapsee product") + " · connected "
+                        + String((c.connectedAt ?? "").prefix(10))
+                } ?? "Not connected to this account")
+                    .font(.system(size: 13)).foregroundColor(GM.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer()
+        }
+        .padding(.top, 8)
+    }
+
+    private var scopesCard: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text("How GrapMail helps you sign in to \(product)")
+                .font(.system(size: 15)).foregroundColor(GM.textPrimary)
+            Text("When you use your Grapsee account to sign in to \(product), this "
+                 + "account proves who you are and hands over only what is listed "
+                 + "below. Your password is never shared with \(product).")
+                .font(.system(size: 13)).lineSpacing(5)
+                .foregroundColor(GM.textSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.top, 8)
+            Text("WHAT \(product.uppercased()) CAN REACH")
+                .font(.system(size: 12, weight: .medium))
+                .foregroundColor(GM.textSecondary)
+                .padding(.top, 14)
+            let scopes = self.scopes
+            if scopes.isEmpty {
+                Text("No access was recorded when this was connected.")
+                    .font(.system(size: 13)).foregroundColor(GM.textSecondary)
+                    .padding(.top, 6)
+            }
+            ForEach(scopes, id: \.self) { s in
+                HStack(alignment: .top, spacing: 10) {
+                    Circle().fill(GM.primarySolid).frame(width: 6, height: 6)
+                        .padding(.top, 7)
+                    Text(sharedWord(s)).font(.system(size: 13))
+                        .foregroundColor(GM.textPrimary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Spacer()
+                }
+                .padding(.top, 8)
+            }
+        }
+        .padding(18)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(RoundedRectangle(cornerRadius: 16, style: .continuous)
+            .fill(GM.card).overlay(RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .strokeBorder(GM.border, lineWidth: 1)))
+        .padding(.top, 18)
+    }
+
+    private var removeRow: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(vm.state.busy ? "Removing…" : "Remove access")
+                .font(.system(size: 15, weight: .medium)).foregroundColor(GM.error)
+            Text("Remove all links and stop sharing this account's data with \(product).")
+                .font(.system(size: 12)).lineSpacing(4)
+                .foregroundColor(GM.textSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 18).padding(.vertical, 16)
+        .background(RoundedRectangle(cornerRadius: 16, style: .continuous)
+            .fill(GM.card).overlay(RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .strokeBorder(GM.border, lineWidth: 1)))
+        .padding(.top, 18)
+        .contentShape(Rectangle())
+        .onTapGesture { if !vm.state.busy { confirmRemove = true } }
+    }
+
+    private var confirmBlock: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Cut \(product) off? It loses access to everything listed above "
+                 + "and has to sign in again to get back in.")
+                .font(.system(size: 13)).foregroundColor(GM.textPrimary)
+                .fixedSize(horizontal: false, vertical: true)
+            HStack(spacing: 24) {
+                Button("Cancel") { confirmRemove = false }
+                    .foregroundColor(GM.textSecondary)
+                Button("Remove access") {
+                    confirmRemove = false
+                    vm.saveConnections(keep: connected.filter {
+                        $0.product.lowercased() != product.lowercased()
+                    })
+                }
+                .foregroundColor(GM.error).fontWeight(.semibold)
+            }
+            .font(.system(size: 14))
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(RoundedRectangle(cornerRadius: 12).fill(GM.warnChipBg))
+        .padding(.top, 10)
+        .accessibilityIdentifier("gm-connection-confirm")
+    }
+
+    private var supportLink: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text("Something wrong with this app?")
+                .font(.system(size: 12)).foregroundColor(GM.textSecondary)
+            Button("Report this app", action: onSupport)
+                .font(.system(size: 13, weight: .medium))
+                .foregroundColor(GM.primarySolid)
+        }
+        .padding(.top, 16)
     }
 }
 

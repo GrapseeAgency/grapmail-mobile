@@ -55,6 +55,10 @@ struct RootView: View {
         // child with no way back.
         case mailNotes, mailTasks, mailPrefs, mailAddresses, mailConnections
         case accountProfile, accountPrivacy, mailSupport
+        // The web's `/mail/account/connections/<product>`: one linked app in
+        // full. The product rides as a route payload, mirroring the encoded
+        // path segment on the web and Android.
+        case accountConnectionDetail(product: String)
         // The web's `/mail/subscriptions` — senders detected from the loaded
         // inbox, each with a browser handoff. One screen; it hangs off the
         // same Settings/drawer doors as the account band.
@@ -336,6 +340,11 @@ struct RootView: View {
                         onGoToSecurity: { path.append(.security) },
                         onBackHome: { backToHome() }
                     )
+            default:
+                // Unreachable while the dispatcher's lists stay exact, and
+                // safer than an EmptyView: a stray route lands in the
+                // signed-in switch, whose own default draws nothing quietly.
+                mailDestination(route)
         }
     }
 
@@ -475,6 +484,8 @@ struct RootView: View {
                             }
                         }
                     )
+            default:
+                mailDestination(route)
         }
     }
 
@@ -542,6 +553,8 @@ struct RootView: View {
                             path.append(.home)
                         }
                     )
+            default:
+                mailDestination(route)
         }
     }
 
@@ -638,7 +651,12 @@ struct RootView: View {
                 case .mailAddresses:
                     AddressesView(vm: account, onBack: { path.removeLast() })
                 case .mailConnections:
-                    ConnectionsView(vm: account, onBack: { path.removeLast() })
+                    ConnectionsView(vm: account, onBack: { path.removeLast() },
+                                    onOpen: { path.append(.accountConnectionDetail(product: $0)) })
+                case let .accountConnectionDetail(product):
+                    ConnectionDetailView(vm: account, product: product,
+                                         onBack: { path.removeLast() },
+                                         onSupport: { path.append(.mailSupport) })
                 case .mailSubscriptions:
                     SubscriptionsView(vm: mail, onBack: { path.removeLast() })
                 case .accountProfile:

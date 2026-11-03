@@ -247,6 +247,7 @@ object Routes {
     const val MAIL_PREFS = "mail/settings/prefs"
     const val MAIL_ADDRESSES = "mail/settings/addresses"
     const val MAIL_CONNECTIONS = "mail/settings/connections"
+    const val MAIL_CONNECTION_DETAIL = "mail/settings/connections/{product}"
     const val ACCOUNT_PROFILE = "mail/settings/profile"
     const val ACCOUNT_PRIVACY = "mail/settings/privacy"
     const val MAIL_SUPPORT = "mail/support"
@@ -947,7 +948,22 @@ fun GrapMailNav() {
             com.grapsee.grapmail.ui.screens.mail.AddressesScreen(vm = profile, onBack = { nav.popBackStack() })
         }
         composable(Routes.MAIL_CONNECTIONS) {
-            com.grapsee.grapmail.ui.screens.mail.ConnectionsScreen(vm = profile, onBack = { nav.popBackStack() })
+            com.grapsee.grapmail.ui.screens.mail.ConnectionsScreen(
+                vm = profile, onBack = { nav.popBackStack() },
+                onOpen = { nav.navigate("mail/settings/connections/${android.net.Uri.encode(it)}") },
+            )
+        }
+        // The web links the same detail from its list; the product rides as an
+        // encoded path segment so the screen is a real destination with a real
+        // back stack, and an unknown name opens the honest "not connected"
+        // answer rather than a redirect.
+        composable(Routes.MAIL_CONNECTION_DETAIL) { entry ->
+            val product = entry.arguments?.getString("product")?.let(android.net.Uri::decode) ?: ""
+            com.grapsee.grapmail.ui.screens.mail.ConnectionDetailScreen(
+                vm = profile, product = product,
+                onBack = { nav.popBackStack() },
+                onSupport = { nav.navigate(Routes.MAIL_SUPPORT) },
+            )
         }
         composable(Routes.ACCOUNT_PROFILE) {
             com.grapsee.grapmail.ui.screens.mail.ProfileEditScreen(vm = profile, onBack = { nav.popBackStack() })

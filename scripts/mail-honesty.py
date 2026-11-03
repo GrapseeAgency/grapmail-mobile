@@ -1883,6 +1883,42 @@ pin("the data-flow doc names every on-device store the code writes",
 pin("the release job builds and proves the AAB beside the APK",
     "./gradlew assembleRelease bundleRelease" in WF_TEXT and "app-release.aab" in WF_TEXT)
 
+# -- 30. the per-app detail -- the web's links/<product> page, honestly ported ---
+#
+# The web's account section has a thirteenth page the phones were missing:
+# `/mail/account/connections/<product>` (`LinkedAppDetail.tsx`), one linked app
+# in full. Porting it raises the two questions this section pins: does the
+# screen show the RECORDED sharing (the web's SHARED sentences, not the list's
+# short words), and does it distinguish "this name has no entry" from "the
+# account has not been read" -- the invention the whole page exists to avoid.
+KT_ACCT_C = KT_ACCT  # the Kotlin account screens, read for §25
+SW_ACCT_C = SW_ACCT
+# Rendered sentences, not raw text: both files wrap the long lines, and a
+# raw check would pass on the literal as typed rather than as shown.
+KT_ACCT_R = rendered(KT_ACCT_C)
+SW_ACCT_R = rendered(SW_ACCT_C)
+pin("both platforms ship the per-app detail screen",
+    "fun ConnectionDetailScreen" in KT_ACCT_C and "struct ConnectionDetailView: View" in SW_ACCT_C)
+for sentence in ("Your name, GrapMail address and profile photo",
+                 "Read and send mail in your GrapMail mailbox",
+                 "Projects and client records you own on Grapsee products",
+                 "The people you have exchanged mail with",
+                 "Your password is never shared with"):
+    pin(f"the web's sharing sentence {sentence[:34]!r} ships on both platforms",
+        sentence in KT_ACCT_R and sentence in SW_ACCT_R)
+pin("the detail distinguishes unread from not-connected, both platforms",
+    "The account could not be read" in KT_ACCT_R and "The account could not be read" in SW_ACCT_R
+    and "does not have access to this account" in KT_ACCT_R
+    and "does not have access to this account" in SW_ACCT_R)
+pin("removing from the detail rides the same verified write as the list",
+    KT_ACCT_C.count("saveConnections(") >= 2 and SW_ACCT_C.count("saveConnections(keep:") >= 2)
+pin("the unknown product is answered, not redirected",
+    "does not have access to this account" in KT_ACCT_R
+    and "does not have access to this account" in SW_ACCT_R)
+for fr in ("114-account-connection-detail", "115-account-connection-unknown"):
+    pin(f"the detail frame {fr} is launched AND gated by both walks",
+        KT_WALK.count(fr) >= 2 and SW_WALK.count(fr) >= 1)
+
 print()
 if failures:
     print(f"mail-honesty: {len(failures)} pin(s) broken")

@@ -152,6 +152,13 @@ fun MailSnapshotScreen(name: String) {
             "account-connections", "account-profile", "account-privacy", "mail-support",
             "mail-compose" ->
                 profileVm.seed(sampleProfile())
+            // The per-app detail frames, both over the ONE seeded record: the
+            // linked frame names an app the document lists, the unlinked
+            // frames asks about an app it does not — which IS the server's
+            // answer for that name, so the "not connected" branch is a true
+            // read, not a hand-emptyled profile.
+            "account-connection-detail", "account-connection-unknown" ->
+                profileVm.seed(sampleProfile())
             // The encryption frames share one seeded device identity; the
             // settled markers are values that exist only once it lands.
             "e2e-status-none" -> e2eVm.seedForSnapshot(
@@ -285,7 +292,13 @@ fun MailSnapshotScreen(name: String) {
             "mail-tasks" -> TasksScreen(profileVm, onBack = {})
             "mail-settings-prefs" -> MailPrefsScreen(profileVm, onBack = {})
             "mail-addresses" -> AddressesScreen(profileVm, onBack = {})
-            "account-connections" -> ConnectionsScreen(profileVm, onBack = {})
+            "account-connections" -> ConnectionsScreen(profileVm, onBack = {}, onOpen = {})
+            "account-connection-detail" -> com.grapsee.grapmail.ui.screens.mail
+                .ConnectionDetailScreen(profileVm, product = "Northwind SSO",
+                    onBack = {}, onSupport = {})
+            "account-connection-unknown" -> com.grapsee.grapmail.ui.screens.mail
+                .ConnectionDetailScreen(profileVm, product = "Stranger App",
+                    onBack = {}, onSupport = {})
             "account-profile" -> ProfileEditScreen(profileVm, onBack = {})
             "account-privacy" -> PrivacyScreen(profileVm, onBack = {}, onProfile = {},
                 onPhone = {}, onAddresses = {}, onPrefs = {}, onSupport = {})
