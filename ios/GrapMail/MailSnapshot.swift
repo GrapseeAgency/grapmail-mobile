@@ -86,6 +86,7 @@ struct MailSnapshotView: View {
         _ id: String, _ from: String, _ address: String, _ subject: String,
         _ snippet: String, unread: Bool = false, starred: Bool = false,
         files: Bool = false, when: String = "2026-10-29T09:12:00Z",
+        unsub: MailUnsubscribe? = nil,
     ) -> MailMessage {
         var m = MailMessage()
         m.id = id
@@ -100,6 +101,7 @@ struct MailSnapshotView: View {
         m.isRead = !unread
         m.isStarred = starred
         m.hasAttachments = files
+        m.unsubscribe = unsub
         m.createdAt = when
         return m
     }
@@ -116,7 +118,51 @@ struct MailSnapshotView: View {
             "The kit is generated on your device and never leaves it unread."),
         row("m5", "Tomas Varga", "tomas@fieldkit.example", "Re: Winter delivery windows",
             "Agreed — we will hold the Thursday slot for both routes."),
+        // The subscription seeds, decoded through the REAL offer decoder from
+        // the server's parsed shape (Android seeds the same two senders with
+        // the same three rows each): a newsletter with the offers array, and
+        // a no-reply digest carrying the legacy header string, so both
+        // branches of `unsubscribeTarget` are photographed.
+        row("n1", "The Weekly Draft", "hello@newsletter.example", "This week in type",
+            "Three essays and a link dump.", when: "2026-10-27T08:00:00Z",
+            unsub: MailSnapshotView.newsletterUnsub),
+        row("n2", "The Weekly Draft", "hello@newsletter.example", "This week in letterforms",
+            "Kerning quarrels, mostly.", when: "2026-10-28T08:00:00Z",
+            unsub: MailSnapshotView.newsletterUnsub),
+        row("n3", "The Weekly Draft", "hello@newsletter.example", "This week in ink",
+            "A risograph issue.", when: "2026-10-29T08:00:00Z",
+            unsub: MailSnapshotView.newsletterUnsub),
+        row("g1", "Geo Weekly", "noreply@digest.example.org", "Your weekly map digest",
+            "Six layers changed since Sunday.", when: "2026-10-26T07:00:00Z",
+            unsub: MailSnapshotView.legacyDigestUnsub),
+        row("g2", "Geo Weekly", "noreply@digest.example.org", "Your weekly map digest",
+            "Two layers changed.", when: "2026-10-27T07:00:00Z",
+            unsub: MailSnapshotView.legacyDigestUnsub),
+        row("g3", "Geo Weekly", "noreply@digest.example.org", "Your weekly map digest",
+            "One layer changed.", when: "2026-10-28T07:00:00Z",
+            unsub: MailSnapshotView.legacyDigestUnsub),
     ]
+
+    /// The parsed-offer record, decoded from the JSON the mail service
+    /// answers — `oneClickAdvertised` deliberately false: offering the header
+    /// is not the same claim as RFC 8058's POST, and the seed must not
+    /// overstate what the sender advertised.
+    fileprivate static let newsletterUnsub: MailUnsubscribe? = {
+        let json = """
+        {"offers":[{"url":"https://lists.newsletter.example/unsub?id=7f3","oneClick":false},
+                    {"url":"mailto:leave@newsletter.example","oneClick":false}],
+         "oneClickAdvertised":false}
+        """
+        return try? JSONDecoder().decode(MailUnsubscribe.self, from: Data(json.utf8))
+    }()
+
+    /// The legacy header string, so the frame exercises the parser fallback
+    /// rather than only the offer array. Android seeds the same bytes.
+    fileprivate static let legacyDigestUnsub: MailUnsubscribe? = {
+        let json = "\"<https://digest.example.org/remove?id=42>, " +
+            "<mailto:remove@digest.example.org>\""
+        return try? JSONDecoder().decode(MailUnsubscribe.self, from: Data(json.utf8))
+    }()
 
     /// The sample page, in the cache the derived screens read. Contacts come from
     /// loaded mail and Files from opened bodies — the API has no contacts index
@@ -317,6 +363,20 @@ struct MailSnapshotView: View {
                 // read it wait on `cached` instead of drawing their empty branch.
                 model.applySnapshotSeeds(name)
                 guard Self.derivedNames.contains(name) else { return }
+                if name == "mail-subs-empty" {
+                    // The honest empty read: the server ANSWERED the inbox with
+                    // nothing. "Unread" and "empty" are different sentences on
+                    // every screen, and the frame proving the empty branch must
+                    // not stand in the failed one.
+                    var empty = MailInboxResponse()
+                    empty.success = true
+                    empty.box = "inbox"
+                    empty.total = 0
+                    empty.messages = []
+                    await MailStore.shared.putPage(.inbox, nil, empty, replace: true)
+                    cached = true
+                    return
+                }
                 await MailStore.shared.putPage(.inbox, nil, Self.page(), replace: true)
                 await MailStore.shared.putBody(Self.attachmentBody())
                 cached = true
@@ -479,6 +539,7 @@ struct MailSnapshotView: View {
                                            onSecurity: {}, onScreener: {}, onLabels: {},
                                            onNotes: {}, onTasks: {}, onPrefs: {},
                                            onAddresses: {}, onConnections: {},
+                                           onSubscriptions: {},
                                            onProfile: {}, onPrivacy: {}, onEncryption: {},
                                            onHelp: {}, onSignOut: {}))
                 )
@@ -495,6 +556,13 @@ struct MailSnapshotView: View {
                 return AnyView(secondary(AddressesView(vm: profile, onBack: {})))
             case "account-connections":
                 return AnyView(secondary(ConnectionsView(vm: profile, onBack: {})))
+            // The subscriptions band. The populated frame photographs the two
+            // detected senders seeded in the cache; the empty one photographs
+            // the screen's own no-mail sentence over an honest empty read.
+            case "mail-subs-list":
+                return AnyView(derived(SubscriptionsView(vm: model, onBack: {})))
+            case "mail-subs-empty":
+                return AnyView(derived(SubscriptionsView(vm: model, onBack: {})))
             case "account-profile":
                 return AnyView(secondary(ProfileEditView(vm: profile, onBack: {})))
             case "account-privacy":
@@ -574,6 +642,7 @@ struct MailSnapshotView: View {
     /// the state the host seeds directly.
     static let derivedNames: Set<String> = [
         "mail-contacts", "mail-contact-detail", "mail-files", "mail-attachment-preview",
+        "mail-subs-list", "mail-subs-empty",
     ]
 
     /// `AnyView` on the three helpers that take a caller's view type. Without

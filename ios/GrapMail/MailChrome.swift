@@ -20,6 +20,7 @@ struct MailDrawer: View {
     let onDismiss: () -> Void
     let onLabels: () -> Void
     let onScreener: () -> Void
+    let onSubscriptions: () -> Void
     let onSettings: () -> Void
     let onSecurity: () -> Void
     let onHelp: () -> Void
@@ -55,6 +56,14 @@ struct MailDrawer: View {
                         section("Labels")
                         DrawerRow(label: "Manage labels", icon: "tag", count: nil,
                                   selected: false, onClick: onLabels)
+
+                        // The web account shell's Subscriptions page, on the
+                        // phone. Android's drawer names the same row; the
+                        // screen itself states its scope, so the row does not
+                        // have to.
+                        section("Mail")
+                        DrawerRow(label: "Subscriptions", icon: "envelope",
+                                  count: nil, selected: false, onClick: onSubscriptions)
                     }
                 }
 

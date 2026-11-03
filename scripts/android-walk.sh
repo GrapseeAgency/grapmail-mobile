@@ -548,7 +548,9 @@ for spec in "two-factor-on:40-sec-two-factor-on" \
             "e2e-publish:105-e2e-publish" \
             "e2e-passphrase:106-e2e-passphrase" \
             "e2e-remove:107-e2e-remove" \
-            "e2e-recipients:108-e2e-recipients"; do
+            "e2e-recipients:108-e2e-recipients" \
+            "mail-subs-list:109-mail-subs-list" \
+            "mail-subs-empty:110-mail-subs-empty"; do
   nm="${spec%%:*}"; pic="${spec##*:}"
   adb shell am force-stop "$PKG"
   adb shell am start -W -n "$PKG/.MainActivity" --es gmSnapshot "$nm" >/dev/null
@@ -647,6 +649,12 @@ for spec in "two-factor-on:40-sec-two-factor-on" \
     e2e-passphrase) settled="This re-locks the same key under a new passphrase. It does not change the key, so messages already encrypted to you stay readable." ;;
     e2e-remove) settled="Remove from this device" ;;
     e2e-recipients) settled="priya@havenworks.example" ;;
+    # The subscriptions band. The list frame waits on a seeded sender's NAME
+    # -- text that exists only once the cache page has landed and detection
+    # has grouped it; the empty frame waits on the screen's own no-mail
+    # sentence over the honestly-empty seeded read.
+    mail-subs-list) settled="The Weekly Draft" ;;
+    mail-subs-empty) settled="No subscriptions detected." ;;
     *) settled="" ;;
   esac
   # A marker may name a visible string OR a resource-id. Text is right for
@@ -838,7 +846,8 @@ for want in 01-welcome-light 02-step1-name-light 03-step2-basicinfo-light \
             96-mail-addresses 97-mail-support 98-mail-adv-search \
             99-mail-undo 100-e2e-status-none 101-e2e-status-unlocked \
             102-e2e-setup 103-e2e-unlock 104-e2e-details 105-e2e-publish \
-            106-e2e-passphrase 107-e2e-remove 108-e2e-recipients; do
+            106-e2e-passphrase 107-e2e-remove 108-e2e-recipients \
+            109-mail-subs-list 110-mail-subs-empty; do
   [ -s "$OUT/$want.png" ] || { echo "FAIL: missing $want.png" >&2; FAILURES=$((FAILURES + 1)); }
 done
 if [ "$FAILURES" -gt 0 ]; then

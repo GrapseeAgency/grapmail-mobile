@@ -184,7 +184,7 @@ private struct ThreadMessageCard: View {
                         .font(.system(size: 12)).foregroundColor(GM.textTertiary)
                 }
                 attachmentRows
-                if let unsub = parseUnsubscribe(message.unsubscribe) {
+                if let unsub = unsubscribeTarget(message.unsubscribe) {
                     Spacer(minLength: 10)
                     Button {
                         showUnsub = true
@@ -222,7 +222,7 @@ private struct ThreadMessageCard: View {
         // looked correct -- so the presentation is attached where the compiler cannot
         // misread it.
         .sheet(isPresented: $showUnsub) {
-            if let unsub = parseUnsubscribe(message.unsubscribe) {
+            if let unsub = unsubscribeTarget(message.unsubscribe) {
                 UnsubscribeSheet(
                     // Blank, not absent: `display` is a non-optional that yields
                     // "" when the server named nobody, so `??` produced

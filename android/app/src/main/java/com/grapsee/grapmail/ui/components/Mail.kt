@@ -153,6 +153,35 @@ fun parseUnsubscribe(raw: String?): String? {
 }
 
 /**
+ * The address a tap on "Unsubscribe" opens, from the server's parsed offer.
+ * The first http(s) offer wins, exactly as the web's `normalizeUnsubscribe`
+ * takes its `http`; with no offer list the legacy header string still parses
+ * through [parseUnsubscribe]. null means no door: the thread shows no
+ * unsubscribe control, and the subscriptions screen says nothing was offered.
+ */
+fun unsubscribeTarget(u: com.grapsee.grapmail.data.MailUnsubscribeDto?): String? {
+    if (u == null) return null
+    u.offers.firstOrNull {
+        it.url.startsWith("https://", ignoreCase = true) ||
+            it.url.startsWith("http://", ignoreCase = true)
+    }?.let { return it.url }
+    return parseUnsubscribe(u.raw)
+}
+
+/** The sender's mailto: offer, kept apart from the web target: opening a
+ *  compose window addressed to it is a different handoff, and the
+ *  subscriptions row says which one it is doing. */
+fun unsubscribeMailto(u: com.grapsee.grapmail.data.MailUnsubscribeDto?): String? {
+    u?.offers?.firstOrNull { it.url.startsWith("mailto:", ignoreCase = true) }
+        ?.let { return it.url.removePrefix("mailto:").removePrefix("mailto:") }
+    val fromHeader = u?.raw?.let { raw ->
+        Regex("<([^>]+)>").findAll(raw).map { m -> m.groupValues[1].trim() }
+            .firstOrNull { it.startsWith("mailto:", ignoreCase = true) }
+    }
+    return fromHeader?.removePrefix("mailto:")?.removePrefix("mailto:")
+}
+
+/**
  * The host a link will take the user to, for the confirmation line.
  *
  * The authority is what follows `://` up to the first path, query or fragment

@@ -55,6 +55,10 @@ struct RootView: View {
         // child with no way back.
         case mailNotes, mailTasks, mailPrefs, mailAddresses, mailConnections
         case accountProfile, accountPrivacy, mailSupport
+        // The web's `/mail/subscriptions` — senders detected from the loaded
+        // inbox, each with a browser handoff. One screen; it hangs off the
+        // same Settings/drawer doors as the account band.
+        case mailSubscriptions
         // ── encryption band ──────────────────────────────────────────────────
         // The web client's `/mail/account/encryption`, split into the eight
         // screens a phone needs. One model for the stack: the in-memory unlock
@@ -477,6 +481,7 @@ struct RootView: View {
                         onHelp: openSupport,
                         onContacts: { path.append(.mailContacts) },
                         onFiles: { path.append(.mailFiles) },
+                        onSubscriptions: { path.append(.mailSubscriptions) },
                         onSignOut: {
                             SessionStore.clear()
                             path.removeAll()
@@ -531,6 +536,7 @@ struct RootView: View {
                         onPrefs: { path.append(.mailPrefs) },
                         onAddresses: { path.append(.mailAddresses) },
                         onConnections: { path.append(.mailConnections) },
+                        onSubscriptions: { path.append(.mailSubscriptions) },
                         onProfile: { path.append(.accountProfile) },
                         onPrivacy: { path.append(.accountPrivacy) },
                         onEncryption: { path.append(.e2eStatus) },
@@ -550,6 +556,8 @@ struct RootView: View {
                     AddressesView(vm: account, onBack: { path.removeLast() })
                 case .mailConnections:
                     ConnectionsView(vm: account, onBack: { path.removeLast() })
+                case .mailSubscriptions:
+                    SubscriptionsView(vm: mail, onBack: { path.removeLast() })
                 case .accountProfile:
                     ProfileEditView(vm: account, onBack: { path.removeLast() })
                 case .accountPrivacy:

@@ -100,6 +100,12 @@ fun MailSnapshotScreen(name: String) {
             "mail-thread" -> seedThread(vm, id = "t-m1", encrypted = false)
             "mail-thread-encrypted" -> seedThread(vm, id = "t-m9", encrypted = true)
             "mail-files", "mail-attachment-preview" -> seedCache()
+            // The subscriptions frames read the same cache Contacts derives
+            // from; the populated frame is the sample inbox, and the empty
+            // frame gets an inbox the server answered with NOTHING -- an
+            // honest empty read, not an unread one.
+            "mail-subs-list" -> seedCache()
+            "mail-subs-empty" -> seedEmptyInbox()
             "mail-contacts", "mail-contact-detail" -> {
                 // Contacts are derived from the mail the app has loaded, with no
                 // contacts endpoint behind them, so the only way this screen can
@@ -270,7 +276,8 @@ fun MailSnapshotScreen(name: String) {
             "mail-attachment-preview" -> AttachmentPreviewScreen(vm, attachmentId = "a1", onBack = {})
             "mail-settings" -> MailSettingsScreen(vm, onBack = {}, onSecurity = {},
                 onScreener = {}, onLabels = {}, onNotes = {}, onTasks = {}, onPrefs = {},
-                onAddresses = {}, onConnections = {}, onProfile = {}, onPrivacy = {},
+                onAddresses = {}, onConnections = {}, onSubscriptions = {}, onProfile = {},
+                onPrivacy = {},
                 onEncryption = {}, onHelp = {}, onSignOut = {})
             "mail-notes" -> NotesScreen(profileVm, onBack = {})
             "mail-tasks" -> TasksScreen(profileVm, onBack = {})
@@ -299,6 +306,13 @@ fun MailSnapshotScreen(name: String) {
             "e2e-recipients" -> com.grapsee.grapmail.ui.screens.mail.E2eRecipientsScreen(
                 e2eVm, onBack = {}, onCompose = {})
             "mail-screener" -> ScreenerScreen(vm, onBack = {}, onOpenQueue = {})
+            // The subscriptions band. The populated frame photographs the two
+            // detected senders (three rows each, offers on the newest);
+            // the empty one photographs the screen's own no-mail sentence,
+            // which on the CI mailbox is ALSO the live truth -- the walk
+            // launches these names, and the host's cases below pin that.
+            "mail-subs-list" -> SubscriptionsScreen(vm, onBack = {})
+            "mail-subs-empty" -> SubscriptionsScreen(vm, onBack = {})
             "mail-adv-search" -> sheetHost {
                 AdvancedSearchContent(mailboxState, vm, onDone = { })
             }
@@ -324,6 +338,8 @@ fun MailSnapshotScreen(name: String) {
 private fun msg(
     id: String, from: String, address: String, subject: String, snippet: String,
     unread: Boolean = false, starred: Boolean = false, files: Boolean = false,
+    at: String = "2026-10-29T09:12:00Z",
+    unsub: MailUnsubscribeDto? = null,
 ): MailMessageDto = MailMessageDto(
     id = id,
     threadId = "t-$id",
@@ -336,7 +352,32 @@ private fun msg(
     isRead = !unread,
     isStarred = starred,
     hasAttachments = files,
-    createdAt = "2026-10-29T09:12:00Z",
+    unsubscribe = unsub,
+    createdAt = at,
+)
+
+/**
+ * The parsed offer the mail service carries (`{ offers: [{url, oneClick}],
+ * oneClickAdvertised }`) — the shape the subscriptions frames seed with, so
+ * the detection runs on data shaped like the route's answer rather than a
+ * parallel object graph. `oneClickAdvertised` is FALSE on purpose: the
+ * sender offered the header, which is not the same claim as RFC 8058's
+ * POST token, and the screen's lines must not overstate the difference.
+ */
+private val newsletterUnsub = MailUnsubscribeDto(
+    offers = listOf(
+        MailUnsubscribeOfferDto("https://lists.newsletter.example/unsub?id=7f3", false),
+        MailUnsubscribeOfferDto("mailto:leave@newsletter.example", false),
+    ),
+    oneClickAdvertised = false,
+    raw = null,
+)
+
+/// The legacy header shape, kept parseable through the fallback: three rows
+/// from a sender with no offers array, so the frame photographs the parser
+/// AND the "no web target, mailto handoff" branch.
+private val legacyDigestUnsub = MailUnsubscribeDto(
+    raw = "<https://digest.example.org/remove?id=42>, <mailto:remove@digest.example.org>",
 )
 
 private val rows = listOf(
@@ -351,6 +392,30 @@ private val rows = listOf(
         "The kit is generated on your device and never leaves it unread."),
     msg("m5", "Tomas Varga", "tomas@fieldkit.example", "Re: Winter delivery windows",
         "Agreed — we will hold the Thursday slot for both routes."),
+    // The subscription seeds. The Weekly Draft carries the parsed offer and
+    // three rows, so it qualifies on either web rule (>=2 with an offer, and
+    // it is over the >=3 bar as well); the digest mails a no-reply local part
+    // with the legacy header shape and three rows, so the frame photographs
+    // the header fallback. Real senders, invented on a reserved TLD, exactly
+    // like every other row here.
+    msg("n1", "The Weekly Draft", "hello@newsletter.example", "This week in type",
+        "Three essays and a link dump.", at = "2026-10-27T08:00:00Z",
+        unsub = newsletterUnsub),
+    msg("n2", "The Weekly Draft", "hello@newsletter.example", "This week in letterforms",
+        "Kerning quarrels, mostly.", at = "2026-10-28T08:00:00Z",
+        unsub = newsletterUnsub),
+    msg("n3", "The Weekly Draft", "hello@newsletter.example", "This week in ink",
+        "A risograph issue.", at = "2026-10-29T08:00:00Z",
+        unsub = newsletterUnsub),
+    msg("g1", "Geo Weekly", "noreply@digest.example.org", "Your weekly map digest",
+        "Six layers changed since Sunday.", at = "2026-10-26T07:00:00Z",
+        unsub = legacyDigestUnsub),
+    msg("g2", "Geo Weekly", "noreply@digest.example.org", "Your weekly map digest",
+        "Two layers changed.", at = "2026-10-27T07:00:00Z",
+        unsub = legacyDigestUnsub),
+    msg("g3", "Geo Weekly", "noreply@digest.example.org", "Your weekly map digest",
+        "One layer changed.", at = "2026-10-28T07:00:00Z",
+        unsub = legacyDigestUnsub),
 )
 
 /// The label colours are the server's palette KEYS, not hex values, because a hex
@@ -501,6 +566,17 @@ private suspend fun seedCache() {
                 mimeType = "application/pdf", sizeBytes = 1_415_732)),
         ),
     )
+}
+
+/// The honest empty read: the server ANSWERED the inbox with nothing. The
+/// subscriptions screen's empty branch must be photographed on a mailbox that
+/// is truly empty, not on a cache that was never written — "unread" and
+/// "empty" are different sentences on every screen in this app, and the
+/// frame proving the empty branch must not stand in the failed one.
+private suspend fun seedEmptyInbox() {
+    MailStore.putPage(MailBox.Inbox, null,
+        MailInboxResponse(success = true, box = "inbox", total = 0, messages = emptyList()),
+        replace = true)
 }
 
 private fun seedThread(vm: MailboxViewModel, id: String, encrypted: Boolean) {

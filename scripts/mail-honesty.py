@@ -1664,6 +1664,143 @@ pin("the plaintext private key exists in neither snapshot host",
     not re.search(r"MI[EHR][A-Za-z0-9+/=]{20,}", KT_HOST)
     and not re.search(r"MI[EHR][A-Za-z0-9+/=]{20,}", SW_HOST))
 
+# -- 28. the subscriptions band -- detection rules, and a handoff that cannot lie --
+#
+# The web's `/mail/subscriptions` on both phones, over the ONE piece of truth
+# the API carries: the sender's List-Unsubscribe offer, parsed by the mail
+# service into `{offers, oneClickAdvertised}` (`grapmail.ts:589`,
+# `mail-service/src/mime/unsubscribe.ts`). Two failure classes live here: a
+# decode that silently nils the object (the `e2eEnvelope` defect, which is how
+# the thread's unsubscribe door never appeared on real mail), and a list that
+# claims more than the loaded mail supports. Every pin below can fail, and the
+# run names the file.
+KT_SUBS = android("ui/screens/mail/SubscriptionsScreen.kt")
+SW_SUBS = ios("MailSubscriptionsViews.swift")
+KT_MAIL = android("ui/components/Mail.kt")
+SW_COMPS = ios("MailComponents.swift")
+
+# Sentence checks below read RENDERED strings, not raw text: a long line is
+# wrapped across concatenated literals in both languages, and a raw substring
+# check would pass only when the prose happened not to wrap -- the kind of pin
+# that breaks on a reflow and gets loosened rather than fixed.
+_QUOTED = re.compile(r'"((?:[^"\\]|\\.)*)"')
+_CAT = re.compile(r'[ \t]*(?:\+|,)[ \t]*\n[ \t]*|\n[ \t]*\+[ \t]*')
+
+
+def rendered(src: str) -> str:
+    # Blank comments first: code in a comment must not forge a sentence.
+    src = code_only(src)
+    # Glue literal-to-literal concatenations (`"a" +\n  "b"`, Swift's leading
+    # `+` on a modifier line, Kotlin's trailing comma before a wrapped
+    # argument), then drop every remaining quoted run. Wrapped literals each
+    # keep their own trailing space, so the run of whitespace collapses once
+    # here -- a sentence is matched as it renders, not as it was typed.
+    src = _CAT.sub("", src)
+    return re.sub(r"\s+", " ", " ".join(_QUOTED.findall(src)).replace('\\"', '"'))
+
+KT_SUBS_R = rendered(KT_SUBS)
+SW_SUBS_R = rendered(SW_SUBS)
+
+# The offer is the server's PARSED record, decoded as such on both platforms.
+# A String field nils the object on every real message -- the silent-absence
+# class this repo has now caught twice, once per shape.
+pin("both clients decode the parsed unsubscribe record, not a header string",
+    "class MailUnsubscribeDto" in KT_MDTO and "offers" in KT_MDTO
+    and "struct MailUnsubscribe: Decodable" in SW_COMPS
+    and "var unsubscribe: MailUnsubscribe?" in SW_MAPI
+    and "val unsubscribe: MailUnsubscribeDto? = null" in KT_MDTO)
+pin("the web's offer URLs win over the legacy header, both platforms",
+    "fun unsubscribeTarget" in KT_MAIL and "func unsubscribeTarget" in SW_COMPS
+    and "https://" in KT_MAIL[KT_MAIL.find("fun unsubscribeTarget"):][:400]
+    and "https://" in SW_COMPS[SW_COMPS.find("func unsubscribeTarget"):][:400])
+pin("the thread opens the door the target helper names, both platforms",
+    "unsubscribeTarget(message.unsubscribe)" in code_only(KT_THREAD)
+    and "unsubscribeTarget(message.unsubscribe)" in code_only(SW_RDR))
+
+# DETECTION IS THE WEB'S RULE, unchanged: two rows with an offer, three
+# without, a service local part decides which bar applies, the newest row wins
+# name and offer, the noisiest sender sorts first, three frequency buckets.
+# Two phones grouping one mailbox differently would be two answers about the
+# same senders.
+for phrase in ("20+ emails recently", "10-20 emails recently",
+               "10 or fewer emails recently",
+               "noreply", "donotreply", "bounce"):
+    pin(f"the detection rule text {phrase!r} exists identically on both platforms",
+        phrase in KT_SUBS and phrase in SW_SUBS)
+pin("both apply the web's two-or-three threshold rule",
+    "p.count >= 2" in code_only(KT_SUBS) and "p.count >= 3" in code_only(KT_SUBS)
+    and "b.count >= 2" in code_only(SW_SUBS) and "b.count >= 3" in code_only(SW_SUBS))
+pin("subscriptions are read from INCOMING mail only, both platforms",
+    'in" || m.direction' in code_only(KT_SUBS).replace("in\" || it.direction", "")
+    or ('direction' in code_only(KT_SUBS) and 'inbound' in code_only(KT_SUBS)
+        and 'direction' in code_only(SW_SUBS) and 'inbound' in code_only(SW_SUBS)))
+
+# THE ACTION IS A HANDOFF. No client may POST to a sender's URL: the web does
+# it from ITS server behind the SSRF guard, and the plan says a gateway route
+# would be a backend task. If a device aimed the request, "unsubscribe" would
+# leak the user's IP and become a request generator for arbitrary hosts. The
+# shape is checked against the code: an unsubscribe reached by anything but
+# the browser handoff (`ACTION_VIEW` / `UIApplication.open`) fails here.
+pin("no client posts to a sender's unsubscribe URL",
+    not re.search(r"mailE2e|mailSend|\"POST\"",
+                  re.sub(r"\s+", " ", code_only(KT_SUBS) + code_only(SW_SUBS)))
+    # The handoff rides the EXISTING browser-handoff helpers: Android's
+    # `openExternally` (whose ACTION_VIEW intent lives in ThreadScreen) and
+    # iOS's completion-handler `UIApplication.open`; the mailto row hands a
+    # draft to the mail app via ACTION_SENDTO. Nothing else exists, and a
+    # future POST-shaped unsubscribe would have to introduce one of these.
+    and "openExternally" in code_only(KT_SUBS)
+    and "ACTION_VIEW" in code_only(android("ui/screens/mail/ThreadScreen.kt"))
+    and "ACTION_SENDTO" in code_only(KT_SUBS)
+    and "UIApplication.shared.open" in code_only(SW_SUBS))
+pin("the handoff refuses to claim the outcome",
+    "cannot see what the page said" in KT_SUBS_R
+    and "cannot see what the page said" in SW_SUBS_R
+    and not re.search(r'"Unsubscribed from', code_only(KT_SUBS) + code_only(SW_SUBS)))
+pin("the mailto offer drafts, it does not send",
+    "Nothing has left this phone until you send it" in KT_SUBS_R
+    and "Nothing has left this phone until you send it" in SW_SUBS_R)
+pin("the confirmation is the thread's own sheet on both platforms",
+    "UnsubscribeContent(" in code_only(KT_SUBS)
+    and "UnsubscribeSheet(" in code_only(SW_SUBS))
+
+# THE SCOPE LINE: the screen says which messages it grouped. A list that
+# claimed the whole mailbox would claim more than the cache can answer --
+# the same rule the advanced-search sheet is pinned by.
+pin("the subscriptions screen states its scope in one sentence on both platforms",
+    "This screen grouped the $scopeCount incoming messages the app has loaded" in KT_SUBS_R
+    and "incoming messages the app has loaded; a sender whose mail is not on this device" in SW_SUBS_R
+    and "incoming inbox mail the app has loaded on this device" in KT_SUBS_R
+    and "incoming inbox mail the app has loaded on this device" in SW_SUBS_R
+    and "Nothing was sent to any sender until you press Unsubscribe. This screen "
+        "never mails on your behalf on its own." in KT_SUBS_R + " " + SW_SUBS_R)
+pin("the empty branch states what it is waiting for, both platforms",
+    "No subscriptions detected." in KT_SUBS and "No subscriptions detected." in SW_SUBS)
+
+# The doors: Settings row and drawer row, in one phrase per platform pair.
+kt_settings = android("ui/screens/mail/MailSecondaryScreens.kt")
+sw_settings = ios("MailSecondaryViews.swift")
+pin("both settings screens open the subscriptions door with the same words",
+    "Subscriptions" in kt_settings and "Senders that mail you most" in kt_settings
+    and "Subscriptions" in sw_settings and "Senders that mail you most" in sw_settings)
+pin("both drawers name the same row as the web's page",
+    '"Subscriptions"' in android("ui/screens/mail/MailboxScreen.kt")
+    and '"Subscriptions"' in ios("MailChrome.swift"))
+
+# Frames and seeds: both hosts seed the same two senders; both walks launch
+# the same two frames and wait on the same sentences; the empty frame's seed
+# is an honest empty READ, never an absent cache dressed as emptiness.
+for seeded in ("The Weekly Draft", "noreply@digest.example.org",
+               "https://lists.newsletter.example/unsub?id=7f3"):
+    pin(f"the subscriptions seed {seeded!r} exists in both hosts", seeded in KT_HOST and seeded in SW_HOST)
+pin("the empty subscriptions frame seeds an empty read, not an unread cache",
+    'total = 0' in code_only(KT_HOST) and 'empty.total = 0' in code_only(SW_HOST))
+pin("both walks photograph both subscriptions frames with the same waits",
+    all(f'settled="{m}"' in KT_WALK for m in ("The Weekly Draft",
+                                              "No subscriptions detected."))
+    and all(f'"{m}",]' in SW_WALK or f': "{m}"' in SW_WALK for m in
+            ("The Weekly Draft", "No subscriptions detected.")))
+
 print()
 if failures:
     print(f"mail-honesty: {len(failures)} pin(s) broken")

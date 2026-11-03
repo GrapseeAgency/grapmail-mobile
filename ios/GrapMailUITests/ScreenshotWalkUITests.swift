@@ -433,6 +433,11 @@ final class ScreenshotWalkUITests: XCTestCase {
             ("106-e2e-passphrase", "e2e-passphrase"),
             ("107-e2e-remove", "e2e-remove"),
             ("108-e2e-recipients", "e2e-recipients"),
+            // The subscriptions band: the two detected senders seeded through
+            // the real offer decoder, and the empty branch over an honest
+            // empty read. Android's walk names the same two frames.
+            ("109-mail-subs-list", "mail-subs-list"),
+            ("110-mail-subs-empty", "mail-subs-empty"),
         ]
         // These two fetch on appear, so the shutter has to wait for the loaded
         // branch — otherwise the photograph catches "Checking your account…"
@@ -506,6 +511,11 @@ final class ScreenshotWalkUITests: XCTestCase {
             "e2e-passphrase": "This re-locks the same key under a new passphrase. It does not change the key, so messages already encrypted to you stay readable.",
             "e2e-remove": "Remove from this device",
             "e2e-recipients": "priya@havenworks.example",
+            // A seeded sender's NAME exists only once the cache page landed
+            // and detection grouped it; the empty sentence only once an
+            // honestly-empty read landed.
+            "mail-subs-list": "The Weekly Draft",
+            "mail-subs-empty": "No subscriptions detected.",
         ]
         for screen in postWriteScreens {
             app.terminate()

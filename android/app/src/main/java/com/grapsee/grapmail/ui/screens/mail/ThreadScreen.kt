@@ -54,6 +54,7 @@ import com.grapsee.grapmail.data.MailAttachmentDto
 import com.grapsee.grapmail.data.MailMessageFullDto
 import com.grapsee.grapmail.logic.MailboxViewModel
 import com.grapsee.grapmail.ui.components.SenderAvatar
+import com.grapsee.grapmail.ui.components.unsubscribeTarget
 import com.grapsee.grapmail.ui.components.absoluteDateTimeOrRaw
 import com.grapsee.grapmail.ui.components.mailTime
 import com.grapsee.grapmail.ui.theme.LocalPalette
@@ -192,7 +193,7 @@ private fun ThreadMessageCard(
     // the same rule iOS applies. Null means show nothing: a button that opens a
     // broken or dangerous URL is worse than no button, and most mail simply has no
     // such header.
-    val unsubUrl = com.grapsee.grapmail.ui.components.parseUnsubscribe(message.unsubscribe)
+    val unsubUrl = unsubscribeTarget(message.unsubscribe)
     Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 16.dp)) {
         Text(
             message.subject?.takeIf { it.isNotBlank() } ?: "(no subject)",

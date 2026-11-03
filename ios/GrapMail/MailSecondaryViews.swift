@@ -565,6 +565,7 @@ struct MailSettingsView: View {
     let onPrefs: () -> Void
     let onAddresses: () -> Void
     let onConnections: () -> Void
+    let onSubscriptions: () -> Void
     let onProfile: () -> Void
     let onPrivacy: () -> Void
     let onEncryption: () -> Void
@@ -630,6 +631,8 @@ struct MailSettingsView: View {
                                value: "Primary and aliases", onClick: onAddresses)
                     SettingRow(icon: "person", title: "Connected accounts",
                                value: "Apps that can use this sign-in", onClick: onConnections)
+                    SettingRow(icon: "envelope", title: "Subscriptions",
+                               value: "Senders that mail you most", onClick: onSubscriptions)
                     SettingRow(icon: "note.text", title: "Notes",
                                value: "Kept on the account", onClick: onNotes)
                     SettingRow(icon: "checkmark", title: "Tasks",

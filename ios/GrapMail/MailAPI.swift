@@ -72,8 +72,9 @@ struct MailMessage: Decodable, Identifiable {
     var isRead = false
     var isStarred = false
     var hasAttachments = false
-    /// The sender's List-Unsubscribe offer — `grapmail.ts:589`.
-    var unsubscribe: String?
+    /// The sender's List-Unsubscribe offer — `grapmail.ts:589`. The server
+    /// sends the PARSED record, not a header string; see `MailUnsubscribe`.
+    var unsubscribe: MailUnsubscribe?
     var isE2eEncrypted = false
     /// ISO instant. nil means there is no trustworthy time to display.
     var createdAt: String?
@@ -101,7 +102,7 @@ struct MailMessage: Decodable, Identifiable {
         isRead = c.lenient(.isRead, false)
         isStarred = c.lenient(.isStarred, false)
         hasAttachments = c.lenient(.hasAttachments, false)
-        unsubscribe = c.lenientOpt(.unsubscribe)
+        unsubscribe = try? c.decodeIfPresent(MailUnsubscribe.self, forKey: .unsubscribe)
         isE2eEncrypted = c.lenient(.isE2eEncrypted, false)
         createdAt = c.lenientOpt(.createdAt)
     }
@@ -130,7 +131,7 @@ struct MailMessageFull: Decodable, Identifiable {
     var isRead = false
     var isStarred = false
     var hasAttachments = false
-    var unsubscribe: String?
+    var unsubscribe: MailUnsubscribe?
     var isE2eEncrypted = false
     var createdAt: String?
     var bodyText: String?
@@ -163,7 +164,7 @@ struct MailMessageFull: Decodable, Identifiable {
         isRead = c.lenient(.isRead, false)
         isStarred = c.lenient(.isStarred, false)
         hasAttachments = c.lenient(.hasAttachments, false)
-        unsubscribe = c.lenientOpt(.unsubscribe)
+        unsubscribe = try? c.decodeIfPresent(MailUnsubscribe.self, forKey: .unsubscribe)
         isE2eEncrypted = c.lenient(.isE2eEncrypted, false)
         createdAt = c.lenientOpt(.createdAt)
         bodyText = c.lenientOpt(.bodyText)

@@ -37,6 +37,73 @@ data class MailPersonDto(
 }
 
 /**
+ * The sender's List-Unsubscribe offer, as the mail service PARSES it —
+ * `{ offers: [{ url, oneClick }], oneClickAdvertised }` (the shape the web
+ * client's `normalizeUnsubscribe` reads, `src/app/lib/subscriptions.ts:61-81`).
+ *
+ * It was decoded as a raw header String here, and the server does not send
+ * one: a String field nils the object on every real message, which is how the
+ * unsubscribe door stays closed on mail that offers it — the same defect
+ * class `e2eEnvelope` was caught in, one shape-drift, one silent absence.
+ *
+ * `raw` carries the legacy header form for the same reason the browser keeps
+ * its fallback: an older row may still hold the comma-separated bracket list,
+ * and the existing header parser is honest about that shape.
+ */
+@Serializable(with = MailUnsubscribeDtoSerializer::class)
+data class MailUnsubscribeDto(
+    val offers: List<MailUnsubscribeOfferDto> = emptyList(),
+    val oneClickAdvertised: Boolean = false,
+    val raw: String? = null,
+)
+
+@Serializable
+data class MailUnsubscribeOfferDto(val url: String = "", val oneClick: Boolean = false)
+
+object MailUnsubscribeDtoSerializer : kotlinx.serialization.json.JsonSerializer<MailUnsubscribeDto>() {
+    // A plain @Serializable shadow of the same shape: the custom serializer
+    // must not reach for `MailUnsubscribeDto.serializer()` (the plugin makes
+    // that THIS object), so the boring field-by-field half is generated
+    // elsewhere and mapped in one line each way.
+    @Serializable private data class Wire(
+        val offers: List<MailUnsubscribeOfferDto> = emptyList(),
+        val oneClickAdvertised: Boolean = false,
+        val raw: String? = null,
+    )
+
+    override fun serialize(encoder: kotlinx.serialization.json.JsonEncoder, value: MailUnsubscribeDto) {
+        encoder.encodeSerializableValue(Wire.serializer(),
+            Wire(value.offers, value.oneClickAdvertised, value.raw))
+    }
+
+    override fun deserialize(decoder: kotlinx.serialization.json.JsonDecoder): MailUnsubscribeDto {
+        val el = decoder.decodeJsonElement()
+        return when (el) {
+            is kotlinx.serialization.json.JsonObject -> MailUnsubscribeDto(
+                offers = (el["offers"] as? kotlinx.serialization.json.JsonArray)
+                    ?.mapNotNull { o ->
+                        val obj = (o as? kotlinx.serialization.json.JsonObject) ?: return@mapNotNull null
+                        val url = (obj["url"] as? kotlinx.serialization.json.JsonPrimitive)?.content
+                            ?: return@mapNotNull null
+                        MailUnsubscribeOfferDto(
+                            url = url,
+                            oneClick = (obj["oneClick"] as? kotlinx.serialization.json.JsonPrimitive)?.content == "true",
+                        )
+                    } ?: emptyList(),
+                oneClickAdvertised =
+                    (el["oneClickAdvertised"] as? kotlinx.serialization.json.JsonPrimitive)?.content == "true",
+            )
+            // A bare string is the legacy header, kept parseable rather than
+            // dropped: `null` under the old shape, this under the new one, and
+            // `parseUnsubscribe` reads the header when there is no offer list.
+            is kotlinx.serialization.json.JsonPrimitive ->
+                if (el.isString) MailUnsubscribeDto(raw = el.content) else MailUnsubscribeDto()
+            else -> MailUnsubscribeDto()
+        }
+    }
+}
+
+/**
  * `publicRow` — `grapmail.ts:579-607`. The list shape. It deliberately carries
  * no body: a listing renders fifty previews and none of them shows a message, so
  * fetching bodies here would read fifty payloads to draw fifty rows.
@@ -59,7 +126,7 @@ data class MailMessageDto(
     val isStarred: Boolean = false,
     val hasAttachments: Boolean = false,
     /** The sender's List-Unsubscribe offer, or null. `grapmail.ts:589`. */
-    val unsubscribe: String? = null,
+    val unsubscribe: MailUnsubscribeDto? = null,
     val isE2eEncrypted: Boolean = false,
     /** ISO instant. Null means the row has no trustworthy time to show. */
     val createdAt: String? = null,
@@ -89,7 +156,7 @@ data class MailMessageFullDto(
     val isRead: Boolean = false,
     val isStarred: Boolean = false,
     val hasAttachments: Boolean = false,
-    val unsubscribe: String? = null,
+    val unsubscribe: MailUnsubscribeDto? = null,
     val isE2eEncrypted: Boolean = false,
     val createdAt: String? = null,
     val bodyText: String? = null,

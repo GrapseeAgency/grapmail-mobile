@@ -54,6 +54,7 @@ import com.grapsee.grapmail.ui.screens.mail.MailSettingsScreen
 import com.grapsee.grapmail.ui.screens.mail.MailboxScreen
 import com.grapsee.grapmail.ui.screens.mail.MailSnapshotScreen
 import com.grapsee.grapmail.ui.screens.mail.ScreenerScreen
+import com.grapsee.grapmail.ui.screens.mail.SubscriptionsScreen
 import com.grapsee.grapmail.ui.screens.mail.ThreadScreen
 import com.grapsee.grapmail.ui.screens.AccountCreatedAltScreen
 import com.grapsee.grapmail.ui.screens.AccountCreatedScreen
@@ -233,6 +234,7 @@ object Routes {
     const val MAIL_ATTACHMENT = "mail/attachment/{id}"
     const val MAIL_SETTINGS = "mail/settings"
     const val MAIL_SCREENER = "mail/screener"
+    const val MAIL_SUBSCRIPTIONS = "mail/subscriptions"
 
     // ── account-record band ─────────────────────────────────────────────────
     // The web client's `/mail/notes`, `/mail/tasks`, `/mail/settings`,
@@ -829,6 +831,7 @@ fun GrapMailNav() {
                 onContacts = { nav.navigate(Routes.MAIL_CONTACTS) },
                 onFiles = { nav.navigate(Routes.MAIL_FILES) },
                 onScreener = { nav.navigate(Routes.MAIL_SCREENER) },
+                onSubscriptions = { nav.navigate(Routes.MAIL_SUBSCRIPTIONS) },
                 onSignOut = {
                     // The token leaves, and so does everything the security sector
                     // was holding in memory: ten plaintext recovery codes and a live
@@ -913,12 +916,14 @@ fun GrapMailNav() {
                 onBack = { nav.popBackStack() },
                 onSecurity = { nav.navigate(Routes.SECURITY) },
                 onScreener = { nav.navigate(Routes.MAIL_SCREENER) },
+                onSubscriptions = { nav.navigate(Routes.MAIL_SUBSCRIPTIONS) },
                 onLabels = { nav.navigate(Routes.MAIL_LABELS) },
                 onNotes = { nav.navigate(Routes.MAIL_NOTES) },
                 onTasks = { nav.navigate(Routes.MAIL_TASKS) },
                 onPrefs = { nav.navigate(Routes.MAIL_PREFS) },
                 onAddresses = { nav.navigate(Routes.MAIL_ADDRESSES) },
                 onConnections = { nav.navigate(Routes.MAIL_CONNECTIONS) },
+                onSubscriptions = { nav.navigate(Routes.MAIL_SUBSCRIPTIONS) },
                 onProfile = { nav.navigate(Routes.ACCOUNT_PROFILE) },
                 onPrivacy = { nav.navigate(Routes.ACCOUNT_PRIVACY) },
                 onEncryption = { nav.navigate(Routes.E2E_STATUS) },
@@ -1019,6 +1024,12 @@ fun GrapMailNav() {
                     nav.navigate(Routes.HOME) { popUpTo(Routes.HOME) }
                 },
             )
+        }
+        // The subscriptions band sits with the other doors off Settings and
+        // the drawer: one screen over the mail this device has loaded, no
+        // state of its own the mailbox does not already hold.
+        composable(Routes.MAIL_SUBSCRIPTIONS) {
+            SubscriptionsScreen(vm = mail, onBack = { nav.popBackStack() })
         }
     }
 }

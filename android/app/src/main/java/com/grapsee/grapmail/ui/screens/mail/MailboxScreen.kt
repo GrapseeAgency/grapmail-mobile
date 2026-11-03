@@ -130,6 +130,7 @@ fun MailboxScreen(
     onContacts: () -> Unit,
     onFiles: () -> Unit,
     onScreener: () -> Unit,
+    onSubscriptions: () -> Unit,
     onSignOut: () -> Unit,
 ) {
     val palette = LocalPalette.current
@@ -188,6 +189,7 @@ fun MailboxScreen(
                 onBox = { scope.launch { drawer.close() }; vm.open(it) },
                 onLabels = { scope.launch { drawer.close() }; onLabels() },
                 onScreener = { scope.launch { drawer.close() }; onScreener() },
+                onSubscriptions = { scope.launch { drawer.close() }; onSubscriptions() },
                 onSettings = { scope.launch { drawer.close() }; onSettings() },
                 onSecurity = { scope.launch { drawer.close() }; onSecurity() },
                 onHelp = { scope.launch { drawer.close() }; onHelp() },
@@ -748,6 +750,7 @@ internal fun MailDrawer(
     onBox: (MailBox) -> Unit,
     onLabels: () -> Unit,
     onScreener: () -> Unit,
+    onSubscriptions: () -> Unit,
     onSettings: () -> Unit,
     onSecurity: () -> Unit,
     onHelp: () -> Unit,
@@ -781,6 +784,16 @@ internal fun MailDrawer(
         Spacer(Modifier.height(14.dp))
         DrawerSection("Labels")
         DrawerRow("Manage labels", Icons.Rounded.Label, null, selected = false) { onLabels() }
+
+        Spacer(Modifier.height(14.dp))
+        // The web account shell's Subscriptions page, on the phone. The word
+        // is the screen's claim exactly: senders detected from loaded mail,
+        // each with a handoff to stop them -- the screen itself states its
+        // scope, so the row does not have to.
+        DrawerSection("Mail")
+        DrawerRow("Subscriptions", Icons.Rounded.MailOutline, null, selected = false) {
+            onSubscriptions()
+        }
         }
 
         // No spacer here. This one carried `weight(1f)` from the layout that

@@ -24,6 +24,7 @@ struct MailboxView: View {
     let onCompose: () -> Void
     let onLabels: () -> Void
     let onScreener: () -> Void
+    let onSubscriptions: () -> Void
     let onSettings: () -> Void
     let onSecurity: () -> Void
     let onHelp: () -> Void
@@ -52,6 +53,7 @@ struct MailboxView: View {
                     onDismiss: { toggleDrawer() },
                     onLabels: { drawerOpen = false; onLabels() },
                     onScreener: { drawerOpen = false; onScreener() },
+                    onSubscriptions: { drawerOpen = false; onSubscriptions() },
                     onSettings: { drawerOpen = false; onSettings() },
                     onSecurity: { drawerOpen = false; onSecurity() },
                     onHelp: { drawerOpen = false; onHelp() },

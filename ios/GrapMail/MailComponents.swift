@@ -549,6 +549,56 @@ func labelSwatch(_ key: String?) -> Color {
     }
 }
 
+/// The sender's List-Unsubscribe offer as the mail service PARSES it —
+/// `{ offers: [{ url, oneClick }], oneClickAdvertised }`, the same record the
+/// web's `normalizeUnsubscribe` reads (`src/app/lib/subscriptions.ts:61-81`).
+/// Decoding it as a raw header String nil-ed the object on every real
+/// message — the `e2eEnvelope` defect class again, one shape-drift and the
+/// door silently never appears. The bare-string legacy shape is kept in
+/// `raw` so the header parser below still has something to read.
+struct MailUnsubscribeOffer: Decodable {
+    var url = ""
+    var oneClick = false
+
+    private enum CodingKeys: String, CodingKey { case url, oneClick }
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        url = c.lenient(.url, "")
+        oneClick = c.lenient(.oneClick, false)
+    }
+    init(url: String, oneClick: Bool) { self.url = url; self.oneClick = oneClick }
+}
+
+struct MailUnsubscribe: Decodable {
+    var offers: [MailUnsubscribeOffer] = []
+    var oneClickAdvertised = false
+    var raw: String?
+
+    private enum CodingKeys: String, CodingKey { case offers, oneClickAdvertised, raw }
+    init(from decoder: Decoder) throws {
+        // The wire is EITHER the parsed record (an object) or the legacy
+        // header text (a string); a number or null under the key is no offer
+        // at all, and stays an empty record rather than becoming a guess.
+        if let s = try? decoder.singleValueContainer().decode(String.self) {
+            raw = s.isEmpty ? nil : s
+            return
+        }
+        // The keyed read is guarded: a record whose shape the app does not
+        // know is "no offer", not a row that fails to decode — the whole
+        // mailbox must not drop off the list because one sender wrote a
+        // header the service passed through in an unexpected shape.
+        if let c = try? decoder.container(keyedBy: CodingKeys.self) {
+            offers = c.lenient(.offers, [])
+            oneClickAdvertised = c.lenient(.oneClickAdvertised, false)
+        }
+    }
+    init(offers: [MailUnsubscribeOffer], oneClickAdvertised: Bool, raw: String?) {
+        self.offers = offers
+        self.oneClickAdvertised = oneClickAdvertised
+        self.raw = raw
+    }
+}
+
 /// The one unsubscribe address worth offering, or nil.
 ///
 /// `List-Unsubscribe` is the sender's own claim about a URL and arrives in the
@@ -583,6 +633,42 @@ func parseUnsubscribe(_ raw: String?) -> String? {
             .trimmingCharacters(in: .whitespacesAndNewlines)
         let lowered = candidate.lowercased()
         if lowered.hasPrefix("https://") || lowered.hasPrefix("http://") { return candidate }
+    }
+    return nil
+}
+
+/// The address a tap on "Unsubscribe" opens, from the server's parsed offer:
+/// the first http(s) offer wins, exactly as the web's `normalizeUnsubscribe`
+/// takes its `http`; with no offer list the legacy header string still parses
+/// through `parseUnsubscribe`. nil means no door — the thread shows no
+/// unsubscribe control, and the subscriptions row says nothing was offered.
+/// Android's `unsubscribeTarget` applies the same rules.
+func unsubscribeTarget(_ u: MailUnsubscribe?) -> String? {
+    guard let u else { return nil }
+    if let offer = u.offers.first(where: {
+        $0.url.lowercased().hasPrefix("https://") || $0.url.lowercased().hasPrefix("http://")
+    }) { return offer.url }
+    return parseUnsubscribe(u.raw)
+}
+
+/// The sender's mailto: offer, kept apart from the web target: opening a
+/// compose window addressed to it is a different handoff, and the
+/// subscriptions row says which one it is doing.
+func unsubscribeMailto(_ u: MailUnsubscribe?) -> String? {
+    guard let u else { return nil }
+    if let offer = u.offers.first(where: { $0.url.lowercased().hasPrefix("mailto:") }) {
+        return String(offer.url.dropFirst("mailto:".count))
+    }
+    if let raw = u.raw, let re = try? NSRegularExpression(pattern: "<([^>]+)>") {
+        let ns = raw as NSString
+        for match in re.matches(in: raw, range: NSRange(location: 0, length: ns.length)) {
+            guard match.numberOfRanges > 1 else { continue }
+            let candidate = ns.substring(with: match.range(at: 1))
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            if candidate.lowercased().hasPrefix("mailto:") {
+                return String(candidate.dropFirst("mailto:".count))
+            }
+        }
     }
     return nil
 }
