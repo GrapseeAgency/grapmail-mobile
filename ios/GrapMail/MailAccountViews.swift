@@ -71,6 +71,11 @@ private struct AccountAddRow: View {
                 }
             }
             .disabled(value.trimmed.isEmpty || busy)
+            // The plus is the button's only visible content, and a system-name
+            // image labels nobody: without this VoiceOver announces the control
+            // with no word at all. Android's twin passes "Add" as the icon's
+            // contentDescription (MailAccountScreens.kt); this is the same word.
+            .accessibilityLabel("Add")
             .accessibilityIdentifier(marker)
         }
         .padding(.vertical, 8)

@@ -1999,6 +1999,65 @@ pin("the subscriptions waits are contiguous literals, never the truncated name",
     and 'settled="The Weekly Draft"' not in KT_WALK
     and '"mail-subs-list": "The Weekly Draft"' not in SW_WALK)
 
+# ── 31. the accessibility pass, pinned (§31) ─────────────────────────────────
+# The plan's Phase-6 line: "TalkBack/VoiceOver labels on all new screens; 44pt
+# targets; existing a11y conventions extended by pins." The pass itself was a
+# measurement from the sources, and the one defect it found (the subscriptions
+# capsule at ~35dp, the iOS Add circle with no VoiceOver word) is now the
+# thing these pins refuse to let back in. A pin here fails by EDITING THE
+# SCREEN it guards — change a padding back to 9, drop a label — which is
+# exactly the regression class being closed.
+
+# Worded buttons carry their own label; a 13pt-text capsule needs ~13dp of
+# vertical padding to clear 44dp. Both platforms chose 13; the pin accepts
+# anything at 10+ so a deliberate enlargement cannot trip it. The first
+# version of these four pins searched the whole file, and the file has SIX
+# other `vertical = 1X.dp` paddings on cards and rows — the mutation that
+# made them dead was putting the capsule back to 9.dp and watching the gate
+# not blink. Each check is now anchored to the element's own declaration:
+# the testTag/accessibilityIdentifier line the padding rides against, or
+# the button component's own body.
+def _before(src: str, anchor: str, span: int = 260) -> str:
+    i = src.find(anchor)
+    return src[max(0, i - span):i] if i >= 0 else ""
+
+KT_SUBS_ACTION = _before(code_only(KT_SUBS), '.testTag("gm-subs-action")')
+SW_SUBS_ACTION = _before(code_only(SW_SUBS), '.accessibilityIdentifier("gm-subs-action")')
+pin("the subscriptions action clears ~44dp on both platforms",
+    re.search(r"vertical = 1[0-9]\.dp", KT_SUBS_ACTION) is not None
+    and re.search(r"\.padding\(\.vertical, 1[0-9]\)", SW_SUBS_ACTION) is not None)
+KT_E2E_BTN = body_of(code_only(KT_E2ES), "private fun E2eButton")
+SW_E2E_BTN = body_of(code_only(SW_E2ES), "private struct E2eButton")
+pin("the E2E sector's shared button clears ~44dp on both platforms",
+    re.search(r"\.padding\(vertical = 1[0-9]\.dp\)", KT_E2E_BTN) is not None
+    and re.search(r"\.padding\(\.vertical, 1[0-9]\)", SW_E2E_BTN) is not None)
+# iOS hit frames are literal: the add circle declares its own 44pt side.
+pin("the iOS add circle declares a 44pt hit frame",
+    ".frame(width: 44, height: 44)" in code_only(SW_ACCT))
+
+# Icon-only actions speak; icons beside a sentence stay decorative. The Add
+# button found unlabeled this pass (Android's twin always said "Add"); the
+# two trash icons were labeled as written. The count of decorative `null`
+# descriptions is pinned at four so a NEW clickable icon cannot arrive
+# silently unlabeled — it would trip the count and force a label or a
+# deliberate, reviewed change to this pin.
+pin("the icon-only actions carry words on both platforms",
+    'Icons.Rounded.Add, "Add"' in code_only(KT_ACCT)
+    and '.accessibilityLabel("Add")' in code_only(SW_ACCT)
+    and 'Icons.Rounded.Delete, "Remove"' in code_only(KT_ACCT)
+    and '.accessibilityLabel("Remove")' in code_only(SW_ACCT)
+    and 'accessibilityLabel("Remove \\(a.address)")' in code_only(SW_ACCT))
+pin("the decorative icons are the four reviewed ones — no new silent icon",
+    len(re.findall(r",\s*null\b", code_only(KT_ACCT)))
+    + len(re.findall(r",\s*null\b", code_only(KT_E2ES))) == 4
+    and "Icons." not in code_only(KT_SUBS))
+# The subscriptions row says its action in a word, both platforms — the
+# capsule is Text("Unsubscribe"), never an icon nobody can name. Android
+# wraps that call after the open paren, so the regex allows a newline.
+pin("the unsubscribe action is a word, not an icon, on both platforms",
+    re.search(r'Text\(\s*"Unsubscribe"', code_only(KT_SUBS)) is not None
+    and 'Text("Unsubscribe")' in code_only(SW_SUBS))
+
 print()
 if failures:
     print(f"mail-honesty: {len(failures)} pin(s) broken")
