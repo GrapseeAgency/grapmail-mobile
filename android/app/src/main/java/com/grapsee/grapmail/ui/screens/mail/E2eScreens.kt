@@ -245,8 +245,8 @@ fun E2eSetupScreen(vm: E2eViewModel, onBack: () -> Unit) {
             E2eLede("Not by us, and not by you. A recovery route would mean a second copy of your " +
                 "key held somewhere else, which is the one thing this feature exists to prevent.")
             Spacer(Modifier.height(14.dp))
-            AppTextField("Passphrase", passphrase, { passphrase = it }, isPassword = true)
-            AppTextField("Repeat passphrase", confirm, { confirm = it }, isPassword = true,
+            AppTextField("Passphrase", passphrase, { passphrase = it }, password = true)
+            AppTextField("Repeat passphrase", confirm, { confirm = it }, password = true,
                 modifier = Modifier.padding(top = 8.dp))
             Row(Modifier.padding(top = 12.dp).clickable { publishOnSetup = !publishOnSetup },
                 verticalAlignment = Alignment.Top) {
@@ -287,7 +287,7 @@ fun E2eUnlockScreen(vm: E2eViewModel, onBack: () -> Unit) {
             state.note?.let { E2eNote(it, state.noteIsBad); Spacer(Modifier.height(10.dp)) }
             E2eLede("Your passphrase decrypts the key on this device. It is never sent anywhere.")
             Spacer(Modifier.height(14.dp))
-            AppTextField("Passphrase", phrase, { phrase = it }, isPassword = true)
+            AppTextField("Passphrase", phrase, { phrase = it }, password = true)
             Spacer(Modifier.height(16.dp))
             E2eButton(if (state.busy) "Unlocking…" else "Unlock",
                 enabled = !state.busy && phrase.isNotEmpty(), tag = "gm-e2e-unlock-submit",
@@ -388,8 +388,8 @@ fun E2ePassphraseScreen(vm: E2eViewModel, onBack: () -> Unit) {
             E2eLede("This re-locks the same key under a new passphrase. It does not change the key, " +
                 "so messages already encrypted to you stay readable.")
             Spacer(Modifier.height(14.dp))
-            AppTextField("Current passphrase", oldPhrase, { oldPhrase = it }, isPassword = true)
-            AppTextField("New passphrase", newPhrase, { newPhrase = it }, isPassword = true,
+            AppTextField("Current passphrase", oldPhrase, { oldPhrase = it }, password = true)
+            AppTextField("New passphrase", newPhrase, { newPhrase = it }, password = true,
                 modifier = Modifier.padding(top = 8.dp))
             Spacer(Modifier.height(16.dp))
             E2eButton(if (state.busy) "Changing…" else "Change passphrase",

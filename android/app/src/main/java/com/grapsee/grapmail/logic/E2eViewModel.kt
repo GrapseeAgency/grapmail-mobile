@@ -142,11 +142,11 @@ class E2eViewModel @JvmOverloads constructor(
                     }
                 }
                 .onFailure { e ->
+                    // The exception's own sentence when the API threw one it
+                    // wrote, the module's line otherwise. A stack trace never
+                    // reaches the screen.
                     _state.update {
-                        it.copy(publishedLoaded = true,
-                            publishedError = (e as? com.grapsee.grapmail.data.ApiException)?.message
-                                ?: "The key directory did not answer.")
-                        )
+                        s -> s.copy(publishedLoaded = true, publishedError = reason(e))
                     }
                 }
         }

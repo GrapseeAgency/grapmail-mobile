@@ -1,6 +1,5 @@
 import Foundation
 import Crypto
-import CommonCrypto
 
 /// GrapMail end-to-end encryption, the iOS half — the mirror of Android's
 /// `MailE2e.kt` and the browser's `src/app/lib/mailE2e.ts`.
@@ -16,12 +15,13 @@ import CommonCrypto
 /// "nothing" includes this app itself, on the very next launch.
 ///
 /// ── WHY swift-crypto RATHER THAN CryptoKit ───────────────────────────────────
-/// CryptoKit has no X25519 key agreement and no HKDF. swift-crypto is Apple's
-/// own package carrying exactly those (`Curve25519.KeyAgreement`, `HKDF`),
-/// built on the same BoringSSL the OS itself uses. PBKDF2 comes from
-/// CommonCrypto, run over the UTF-8 bytes of the passphrase — the same bytes
-/// `crypto.importKey('raw', utf8(passphrase))` uses in the browser and the
-/// same bytes Android's hand-rolled PBKDF2 feeds it. A key derivation that
+/// CryptoKit has no X25519 key agreement. swift-crypto is Apple's own package
+/// carrying exactly that (`Curve25519.KeyAgreement`), built on the same
+/// BoringSSL the OS itself uses. HKDF and PBKDF2 are hand-rolled on the
+/// framework's HMAC, because neither ships as a public symbol in either
+/// framework. PBKDF2 runs over the UTF-8 bytes of the passphrase — the same
+/// bytes `crypto.importKey('raw', utf8(passphrase))` uses in the browser and
+/// the same bytes Android's hand-rolled PBKDF2 feeds it. A key derivation that
 /// differs by one byte makes the key written on one device unreadable on
 /// another, which is why this file spells the encoding out rather than
 /// trusting a convenience.
@@ -160,17 +160,30 @@ enum MailE2e {
 
     private static func deriveSharedSecret(_ priv: Curve25519.KeyAgreement.PrivateKey,
                                            _ pub: Curve25519.KeyAgreement.PublicKey) throws -> Data {
-        let shared = try priv.keyAgreement(with: pub)
-        guard shared.count == 32 else {
-            throw E2eError(text: "X25519 agreed to \(shared.count) bytes, not 32.")
+        let shared = try priv.agreement(with: pub)
+        let bytes = shared.withUnsafeBytes { Data($0) }
+        guard bytes.count == 32 else {
+            throw E2eError(text: "X25519 agreed to \(bytes.count) bytes, not 32.")
         }
-        return shared
+        return bytes
     }
 
     // ── HKDF / AES-GCM ───────────────────────────────────────────────────────
 
+    /// RFC 5869 HKDF-SHA256, one 32-byte block: extract then expand once.
+    /// Hand-rolled on the Crypto framework's HMAC rather than a library HKDF,
+    /// because `HKDF` is not part of swift-crypto's public surface -- and
+    /// 12 lines of RFC text are auditable in a way a convenience is not.
+    /// Identical construction to Android's `MailE2e.kt` and the browser's.
     private static func hkdf(_ ikm: Data, _ info: Data) -> SymmetricKey {
-        HKDF<SHA256>.deriveKey(input: ikm, salt: hkdfSalt, info: info)
+        let prk = HMAC<SHA256>.authenticationCode(for: ikm, using: SymmetricKey(data: hkdfSalt))
+        let prkData = Data(prk)
+        var input = Data()
+        input.append(contentsOf: info)
+        input.append(1)
+        let okm = HMAC<SHA256>.authenticationCode(for: input,
+                                                  using: SymmetricKey(data: prkData))
+        return SymmetricKey(data: Data(okm))
     }
 
     /// Ciphertext and tag apart, because the wire format stores them apart.
@@ -178,7 +191,7 @@ enum MailE2e {
                                       _ plaintext: Data) throws -> (ct: Data, tag: Data) {
         let sealed = try AES.GCM.seal(plaintext, using: key,
                                       nonce: AES.GCM.Nonce(data: iv), authenticating: aad)
-        return (sealed.ciphertext!, sealed.tag!)
+        return (sealed.ciphertext, sealed.tag)
     }
 
     private static func aesGcmDecrypt(_ key: SymmetricKey, _ iv: Data, _ aad: Data,
@@ -289,7 +302,7 @@ enum MailE2e {
             guard let iv = obj["iv"] as? String, let ct = obj["ct"] as? String,
                   let tag = obj["tag"] as? String,
                   let arr = obj["recipients"] as? [[String: Any]], !arr.isEmpty,
-                  arr.allSatisfy({ ["epk", "wrapIv", "wrappedKey", "wrapTag"].allSatisfy { k in $0[k] is String } })
+                  arr.allSatisfy({ e in ["epk", "wrapIv", "wrappedKey", "wrapTag"].allSatisfy { k in e[k] is String } })
             else { return nil }
             return (v, obj["sig"] is String)
         }
@@ -422,24 +435,25 @@ enum MailE2e {
 
     /// PBKDF2-HMAC-SHA256 over the UTF-8 passphrase, 32 bytes out — the same
     /// bytes the browser's `importKey('raw', utf8(passphrase))` and Android's
-    /// hand-rolled construction derive. CommonCrypto takes raw bytes, so
-    /// there is no char[] conversion to disagree about here.
+    /// hand-rolled construction derive. Implemented on the Crypto framework's
+    /// HMAC rather than CommonCrypto: the C enum constants do not bridge into
+    /// Swift without a bridging header, and RFC 2898's single-block case is
+    /// eight lines. A key derivation that differs by one byte makes the key
+    /// written on one device unreadable on another, which is why the loop is
+    /// spelled out here rather than trusted to a convenience.
     private static func derivePassphraseKey(_ passphrase: String, _ salt: Data,
                                             _ iterations: Int) -> Data {
-        let pwd = Array(passphrase.utf8)
-        var out = Data(count: contentKeyBytes)
-        salt.withUnsafeBytes { saltPtr in
-            out.withUnsafeMutableBytes { outPtr in
-                CCKeyDerivationPBKDF(
-                    CCPBKDFAlgorithm(kPBKDF2HMACSHA256),
-                    pwd, pwd.count,
-                    saltPtr.assumingMemoryBound(to: UInt8.self), salt.count,
-                    CCPseudoRandomAlgorithm(kCCPRFHmacAlgSHA256),
-                    UInt32(iterations),
-                    outPtr.assumingMemoryBound(to: UInt8.self), contentKeyBytes)
+        let pwd = SymmetricKey(data: Data(passphrase.utf8))
+        var u = HMAC<SHA256>.authenticationCode(for: salt + Data([0, 0, 0, 1]), using: pwd)
+        var result = Data(u)
+        if iterations > 1 {  // `2...1` would be an invalid range on a 1-round record
+            for _ in 2...iterations {
+                u = HMAC<SHA256>.authenticationCode(for: Data(u), using: pwd)
+                let next = Data(u)
+                for j in 0..<32 { result[j] ^= next[j] }
             }
         }
-        return out
+        return result
     }
 
     static func protectPrivateKey(privateKeyB64: String, passphrase: String, kind: String,
@@ -482,7 +496,7 @@ enum MailE2e {
 
     static func changePassphrase(_ record: ProtectedPrivateKey, oldPassphrase: String,
                                  newPassphrase: String) throws -> ProtectedPrivateKey {
-        let privateKey = try unlockPrivateKey(record, oldPassphrase)
+        let privateKey = try unlockPrivateKey(record, passphrase: oldPassphrase)
         return try protectPrivateKey(privateKeyB64: privateKey, passphrase: newPassphrase,
                                      kind: record.kind, publicKey: record.publicKey,
                                      iterations: record.iterations)
@@ -590,8 +604,8 @@ enum MailE2e {
 
     /// The private halves, held only for as long as the session keeps them.
     static func unlock(_ identity: Identity, passphrase: String) throws -> Unlocked {
-        let encPrivate = try unlockPrivateKey(identity.encryption, passphrase)
-        let sigPrivate = try identity.signing.map { try unlockPrivateKey($0, passphrase) }
+        let encPrivate = try unlockPrivateKey(identity.encryption, passphrase: passphrase)
+        let sigPrivate = try identity.signing.map { try unlockPrivateKey($0, passphrase: passphrase) }
         return Unlocked(encryptionPrivateKey: encPrivate,
                         encryptionPublicKey: identity.encryption.publicKey,
                         signingPrivateKey: sigPrivate,

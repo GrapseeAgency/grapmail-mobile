@@ -57,6 +57,7 @@ import com.grapsee.grapmail.ui.components.SenderAvatar
 import com.grapsee.grapmail.ui.components.absoluteDateTimeOrRaw
 import com.grapsee.grapmail.ui.components.mailTime
 import com.grapsee.grapmail.ui.theme.LocalPalette
+import kotlinx.coroutines.launch
 
 /**
  * Reference 74 — a conversation. 75 is the same screen with an encrypted message
@@ -359,7 +360,7 @@ private fun EncryptedBlock(message: MailMessageFullDto, e2e: com.grapsee.grapmai
                     "anywhere, and it is not kept after the message opens.",
                     fontSize = 12.sp, color = palette.textTertiary)
                 Spacer(Modifier.height(8.dp))
-                AppTextField("Passphrase", phrase, { phrase = it }, isPassword = true)
+                AppTextField("Passphrase", phrase, { phrase = it }, password = true)
                 Row(Modifier.padding(top = 8.dp)) {
                     Text(if (working) "Opening…" else "Open", fontSize = 14.sp,
                         fontWeight = FontWeight.SemiBold, color = palette.primarySolid,

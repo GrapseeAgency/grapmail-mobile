@@ -31,6 +31,7 @@ import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.EmojiEmotions
 import androidx.compose.material.icons.rounded.Image
 import androidx.compose.material.icons.rounded.Link
+import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.PersonAddAlt1
 import androidx.compose.material.icons.rounded.Send
 import androidx.compose.material3.Icon
@@ -59,6 +60,7 @@ import com.grapsee.grapmail.logic.MailboxViewModel
 import com.grapsee.grapmail.ui.components.GradientButton
 import com.grapsee.grapmail.ui.components.OutlineButton
 import com.grapsee.grapmail.ui.theme.LocalPalette
+import kotlinx.coroutines.launch
 
 /**
  * Reference 76 — compose — and 82, the send receipt, which is this screen's own
