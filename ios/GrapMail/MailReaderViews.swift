@@ -17,6 +17,10 @@ import UniformTypeIdentifiers
 /// downgrade rather than a silent one.
 struct ThreadView: View {
     @ObservedObject var vm: MailboxModel
+    /// The encryption sector's state, for the decrypt path on an encrypted
+    /// message. Same single instance compose reads, so the answer to "is the
+    /// key open" cannot differ between the two screens.
+    @ObservedObject var e2e: E2eModel
     let id: String
     /// True when the id came from a row's `threadId`; otherwise it is a single
     /// message id and the thread route would not know it.
@@ -45,6 +49,7 @@ struct ThreadView: View {
                         ForEach(Array(vm.thread.messages.enumerated()), id: \.element.id) { index, m in
                             ThreadMessageCard(
                                 message: m,
+                                e2e: e2e,
                                 expanded: index == vm.thread.messages.count - 1,
                                 busy: busy == m.id,
                                 notices: notices,
@@ -114,6 +119,7 @@ struct ThreadView: View {
 
 private struct ThreadMessageCard: View {
     let message: MailMessageFull
+    let e2e: E2eModel
     let expanded: Bool
     let busy: Bool
     let notices: [String: String]
@@ -270,8 +276,11 @@ private struct ThreadMessageCard: View {
     }
 
     @ViewBuilder private var bodyView: some View {
-        if message.isE2eEncrypted {
-            EncryptedNotice()
+        // The flag is the claim — the server sets `isE2eEncrypted` and stores
+        // the envelope beside it — but the envelope decides whether anything
+        // can actually be opened here. Mirrors Android's condition exactly.
+        if message.isE2eEncrypted || message.e2eEnvelope != nil {
+            E2eEncryptedBlock(message: message, e2e: e2e)
         } else if let text = message.bodyText?.nilIfBlank() {
             Text(text)
                 .font(.system(size: 15))
@@ -324,19 +333,115 @@ private struct ThreadMessageCard: View {
 
 private struct EncryptedNotice: View {
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack(spacing: 6) {
-                Image(systemName: "lock.fill").font(.system(size: 13))
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 8) {
+                Image(systemName: "lock.fill").font(.system(size: 14))
+                    .foregroundColor(GM.successInk)
                 Text("End-to-end encrypted").font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(GM.textPrimary)
             }
-            .foregroundColor(GM.successInk)
-            Text("The body is encrypted to the keys on your other devices. This app " +
-                 "reads the mailbox through the server, which never holds the key, so " +
-                 "the text is not available here.")
-                .font(.system(size: 12)).foregroundColor(GM.textSecondary)
+            Text("Only you and the sender can read this. The server holds the sealed "
+                 + "envelope and cannot open it. Unlocking this device's key opens "
+                 + "the body below — a wrong passphrase and a message not sealed "
+                 + "to this key each say so, and the ciphertext is never shown as "
+                 + "a body.")
+                .font(.system(size: 13)).lineSpacing(4)
+                .foregroundColor(GM.textSecondary)
+                .fixedSize(horizontal: false, vertical: true)
         }
-        .padding(12)
-        .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(GM.successChipBg))
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(GM.infoFill))
+    }
+}
+
+/// The encrypted message, as a state of the card. The notice is the server's
+/// own text; the decrypt path needs the passphrase every time — the private
+/// half is opened for one operation and kept nowhere. A wrong phrase, a
+/// message not sealed to this key, and a damaged envelope each get their own
+/// true sentence, and none of them ever shows ciphertext as a body. Swift
+/// mirror of Android's `EncryptedBlock`.
+private struct E2eEncryptedBlock: View {
+    let message: MailMessageFull
+    @ObservedObject var e2e: E2eModel
+    @State private var showPhrase = false
+    @State private var phrase = ""
+    @State private var opened: String?
+    @State private var working = false
+    @State private var failed: String?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            EncryptedNotice()
+            if let opened {
+                Text(opened)
+                    .font(.system(size: 15)).lineSpacing(5)
+                    .foregroundColor(GM.textPrimary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .accessibilityIdentifier("gm-e2e-opened-body")
+            } else if let envelope = message.e2eEnvelope {
+                if !showPhrase {
+                    Text("Decrypt with your passphrase")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundColor(GM.primarySolid)
+                        .padding(.vertical, 6)
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            e2e.load()
+                            showPhrase = true
+                        }
+                        .accessibilityIdentifier("gm-e2e-decrypt-open")
+                } else {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Your passphrase decrypts this message on this device. It is never sent "
+                             + "anywhere, and it is not kept after the message opens.")
+                            .font(.system(size: 12)).foregroundColor(GM.textTertiary)
+                            .fixedSize(horizontal: false, vertical: true)
+                        AppTextField(title: "Passphrase", value: $phrase, isPassword: true)
+                        HStack(spacing: 16) {
+                            Text(working ? "Opening…" : "Open")
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundColor(GM.primarySolid)
+                                .padding(.vertical, 6)
+                                .contentShape(Rectangle())
+                                .onTapGesture {
+                                    guard !working, !phrase.isEmpty else { return }
+                                    working = true
+                                    Task {
+                                        opened = await e2e.decrypt(envelopeJson: envelope,
+                                                                    passphrase: phrase)
+                                        working = false
+                                        phrase = ""
+                                        if opened == nil {
+                                            failed = e2e.state.note
+                                            showPhrase = true
+                                        }
+                                    }
+                                }
+                            Text("Cancel")
+                                .font(.system(size: 14))
+                                .foregroundColor(GM.textSecondary)
+                                .padding(.vertical, 6)
+                                .contentShape(Rectangle())
+                                .onTapGesture { showPhrase = false }
+                        }
+                        if let failed {
+                            Text(failed).font(.system(size: 12)).foregroundColor(GM.error)
+                                .fixedSize(horizontal: false, vertical: true)
+                                .accessibilityIdentifier("gm-e2e-decrypt-error")
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .accessibilityIdentifier("gm-e2e-decrypt-panel")
+                }
+            } else {
+                // Flagged encrypted with no envelope to open: say that, not nothing.
+                Text("No encrypted content came with this message.")
+                    .font(.system(size: 12)).foregroundColor(GM.warnInk)
+                    .accessibilityIdentifier("gm-e2e-no-envelope")
+            }
+        }
     }
 }
 
@@ -363,6 +468,10 @@ struct ComposeView: View {
     /// in -- an invented "-- Sent with GrapMail" would sign mail the person
     /// did not sign.
     @ObservedObject var account: ProfileModel
+    /// The encryption sector's state — the same instance the eight E2E
+    /// screens and the thread read, so the encrypt row and the key's real
+    /// state can never disagree on screen.
+    @ObservedObject var e2e: E2eModel
     let replyId: String
     let mode: String
     let onBack: () -> Void
@@ -372,6 +481,7 @@ struct ComposeView: View {
     @State private var picking = false
     @State private var people: [MailboxModel.Person] = []
     @State private var prepared = false
+    @State private var encryptOn = false
 
     private var signature: String {
         guard let s = account.state.profile?.settings else { return "" }
@@ -415,6 +525,7 @@ struct ComposeView: View {
         }
         .task(id: signature) {
             account.load()
+            e2e.load()
             // A prepared compose (reply / reply-all / forward from the thread)
             // builds its fields from the full server row; a blank one gets the
             // signature appended as editable text, the way the web client
@@ -458,7 +569,7 @@ struct ComposeView: View {
                 .font(.system(size: 17, weight: .semibold))
                 .foregroundColor(GM.textPrimary)
             Spacer()
-            Button { vm.send() } label: {
+            Button { sendTapped() } label: {
                 Image(systemName: "paperplane.fill")
                     .font(.system(size: 18))
                     .foregroundColor(vm.compose.sending ? GM.textTertiary : GM.primarySolid)
@@ -488,6 +599,46 @@ struct ComposeView: View {
         }
         field(label: "Subject", key: \MailboxModel.ComposeState.subject, placeholder: "Add a subject", tag: "mail-subject")
         Divider().overlay(GM.border)
+        // The encrypt row. The states are the web compose's own, and Android's:
+        // a device with no key never sees the option; a locked key says what
+        // would fix it; only an unlocked key can flip it on. And when it is on,
+        // the person is told plainly that the body is sealed before it leaves
+        // the device -- the server will store a notice, not text.
+        if e2e.state.record != nil {
+            HStack(spacing: 10) {
+                Image(systemName: "lock").font(.system(size: 15))
+                    .foregroundColor(encryptOn ? GM.primarySolid : GM.textTertiary)
+                Text(encryptOn ? "Encrypting this message" : "Encrypt this message")
+                    .font(.system(size: 14))
+                    .foregroundColor(encryptOn ? GM.primarySolid : GM.textPrimary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                ZStack {
+                    Circle().strokeBorder(encryptOn ? GM.primarySolid : GM.border, lineWidth: 1.5)
+                        .frame(width: 20, height: 20)
+                    if encryptOn {
+                        Circle().fill(GM.primarySolid).frame(width: 20, height: 20)
+                        Text("✓").font(.system(size: 12)).foregroundColor(.white)
+                    }
+                }
+            }
+            .padding(.vertical, 8)
+            .contentShape(Rectangle())
+            .onTapGesture {
+                if e2e.state.unlocked { encryptOn.toggle() }
+            }
+            .accessibilityIdentifier("gm-compose-encrypt")
+            if !e2e.state.unlocked {
+                Text("Unlock your key to encrypt — it locks when the app closes.")
+                    .font(.system(size: 12)).foregroundColor(GM.textTertiary)
+                    .fixedSize(horizontal: false, vertical: true)
+            } else if encryptOn {
+                Text("Only the recipients' published keys can open this. The server will "
+                     + "store a notice, not your text.")
+                    .font(.system(size: 12)).foregroundColor(GM.textTertiary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer().frame(height: 4)
+        }
     }
 
     private func field(
@@ -542,6 +693,12 @@ struct ComposeView: View {
                 .foregroundColor(GM.textPrimary)
                 .scrollContentBackground(.hidden)
                 .frame(minHeight: 180)
+                // The identifier names the signed state, not the field: frame
+                // 76's settled marker must flip when the signature lands, the
+                // same mechanism as Android's `gm-signed-body` testTag.
+                .accessibilityIdentifier(
+                    !signature.isEmpty && vm.compose.body.contains(signature)
+                        ? "gm-signed-body" : "mail-body-field")
             if !attached.isEmpty {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 8) {
@@ -582,10 +739,42 @@ struct ComposeView: View {
             Spacer()
             GradientButton(title: vm.compose.sending ? "Sending…" : "Send",
                            enabled: !vm.compose.sending,
-                           action: { vm.send() })
+                           action: { sendTapped() })
         }
         .padding(.top, 14)
         .padding(.bottom, 28)
+    }
+
+    /// Send, or the seal path when the encrypt row is on: ask the directory
+    /// for the plan, and only send encrypted when EVERY recipient has a key
+    /// and this device can open its own. A plan that says "plain", a locked
+    /// key, or no answer at all stops the send with a sentence — an encrypted
+    /// message half built is the failure mode this gate exists to stop.
+    /// Mirror of Android's compose send-icon logic.
+    private func sendTapped() {
+        if !encryptOn { vm.send(); return }
+        Task {
+            let recipients = (MailboxModel.splitAddresses(vm.compose.to)
+                + MailboxModel.splitAddresses(vm.compose.cc)
+                + MailboxModel.splitAddresses(vm.compose.bcc)).reduce(into: [String]()) {
+                    list, a in if !list.contains(a) { list.append(a) }
+                }
+            let plan = await vm.encryptionPlan(addresses: recipients)
+            if plan == nil {
+                notice = "The directory did not answer, so nothing was encrypted "
+                       + "and nothing was sent. Try again."
+            } else if plan!.mode != "seal" {
+                notice = "Not every recipient has a published key, so this message "
+                       + "cannot be encrypted. Turn encryption off to send it "
+                       + "unencrypted, or stop and wait for the recipients."
+            } else if let envelope = await e2e.seal(plaintext: vm.compose.body,
+                                                    recipientKeys: plan!.keys) {
+                vm.send(e2eEnvelope: envelope)
+            }
+            // A nil seal leaves the reason in the E2E model's note — the
+            // locked-key line, or the crypto module's own sentence. It shows
+            // on the E2E screens; compose's notice stays the send's story.
+        }
     }
 
     /// The people the To field can name — derived from mail the app has loaded,

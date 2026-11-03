@@ -419,6 +419,20 @@ final class ScreenshotWalkUITests: XCTestCase {
             // filing a read-only walk must not perform).
             ("98-mail-adv-search", "mail-adv-search"),
             ("99-mail-undo", "mail-undo"),
+            // The encryption band (Phase 3). Nine frames over the seeded
+            // identity, published answer and lookup rows — the CI account has
+            // no key, so every populated branch here exists only because the
+            // host seeded it. Android's walk names the same nine frames and
+            // waits on the same sentences.
+            ("100-e2e-status-none", "e2e-status-none"),
+            ("101-e2e-status-unlocked", "e2e-status-unlocked"),
+            ("102-e2e-setup", "e2e-setup"),
+            ("103-e2e-unlock", "e2e-unlock"),
+            ("104-e2e-details", "e2e-details"),
+            ("105-e2e-publish", "e2e-publish"),
+            ("106-e2e-passphrase", "e2e-passphrase"),
+            ("107-e2e-remove", "e2e-remove"),
+            ("108-e2e-recipients", "e2e-recipients"),
         ]
         // These two fetch on appear, so the shutter has to wait for the loaded
         // branch — otherwise the photograph catches "Checking your account…"
@@ -477,6 +491,21 @@ final class ScreenshotWalkUITests: XCTestCase {
             "mail-support": "Why can I not create an account for someone under 13?",
             "mail-adv-search": "Search filters",
             "mail-undo": "Archived 2 messages",
+            // The encryption band: each marker is a sentence one specific
+            // seeded state draws. "Encryption is not set up on this device"
+            // exists only with no record; the unlocked headline only with a
+            // record and an open session; the fingerprint only once the
+            // seeded identity has landed. A wrong state photographs the
+            // wrong headline and the walk fails rather than lies.
+            "e2e-status-none": "Encryption is not set up on this device",
+            "e2e-status-unlocked": "Your key is unlocked for this session",
+            "e2e-setup": "There is no way to recover a forgotten passphrase.",
+            "e2e-unlock": "Your passphrase decrypts the key on this device. It is never sent anywhere.",
+            "e2e-details": "7C:0F:2A:91:B4:D8:3E:6C:05:AA:1F:BE:D2:48:67:90:13:EC:B6:24:FA:5D:71:09:8C:30:B7:E4:16:9F:A2:C8",
+            "e2e-publish": "Published fingerprint",
+            "e2e-passphrase": "This re-locks the same key under a new passphrase. It does not change the key, so messages already encrypted to you stay readable.",
+            "e2e-remove": "Remove from this device",
+            "e2e-recipients": "priya@havenworks.example",
         ]
         for screen in postWriteScreens {
             app.terminate()

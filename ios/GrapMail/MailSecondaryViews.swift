@@ -567,6 +567,7 @@ struct MailSettingsView: View {
     let onConnections: () -> Void
     let onProfile: () -> Void
     let onPrivacy: () -> Void
+    let onEncryption: () -> Void
     let onHelp: () -> Void
     let onSignOut: () -> Void
 
@@ -639,6 +640,8 @@ struct MailSettingsView: View {
                                value: "Name, birthday, photo", onClick: onProfile)
                     SettingRow(icon: "checkmark.shield", title: "Data & privacy",
                                value: "What is kept, what you control", onClick: onPrivacy)
+                    SettingRow(icon: "lock", title: "Encryption",
+                               value: "Your end-to-end key, on this device", onClick: onEncryption)
 
                     SectionLabel(text: "Support")
                     SettingRow(icon: "questionmark.circle", title: "Help & Support",

@@ -539,7 +539,16 @@ for spec in "two-factor-on:40-sec-two-factor-on" \
             "mail-addresses:96-mail-addresses" \
             "mail-support:97-mail-support" \
             "mail-adv-search:98-mail-adv-search" \
-            "mail-undo:99-mail-undo"; do
+            "mail-undo:99-mail-undo" \
+            "e2e-status-none:100-e2e-status-none" \
+            "e2e-status-unlocked:101-e2e-status-unlocked" \
+            "e2e-setup:102-e2e-setup" \
+            "e2e-unlock:103-e2e-unlock" \
+            "e2e-details:104-e2e-details" \
+            "e2e-publish:105-e2e-publish" \
+            "e2e-passphrase:106-e2e-passphrase" \
+            "e2e-remove:107-e2e-remove" \
+            "e2e-recipients:108-e2e-recipients"; do
   nm="${spec%%:*}"; pic="${spec##*:}"
   adb shell am force-stop "$PKG"
   adb shell am start -W -n "$PKG/.MainActivity" --es gmSnapshot "$nm" >/dev/null
@@ -623,6 +632,21 @@ for spec in "two-factor-on:40-sec-two-factor-on" \
     # GrapMail" could never fire against "-- \nSent with GrapMail". (iOS seeds
     # in init -- synchronous -- so its compose frame needs no wait.)
     mail-compose) settled="gm-signed-body" ;;
+    # The encryption band: most markers are a seeded state's sentence -- text
+    # that exists only once the identity has landed in the model. The two
+    # status frames wait on their own headline because the headline IS the
+    # state claim the sector is built on. `e2e-remove` is the exception, like
+    # `mail-support`: its warning is the screen's static copy and the marker
+    # proves the screen composed, not a fetch settled.
+    e2e-status-none) settled="Encryption is not set up on this device" ;;
+    e2e-status-unlocked) settled="Your key is unlocked for this session" ;;
+    e2e-setup) settled="There is no way to recover a forgotten passphrase." ;;
+    e2e-unlock) settled="Your passphrase decrypts the key on this device. It is never sent anywhere." ;;
+    e2e-details) settled="7C:0F:2A:91:B4:D8:3E:6C:05:AA:1F:BE:D2:48:67:90:13:EC:B6:24:FA:5D:71:09:8C:30:B7:E4:16:9F:A2:C8" ;;
+    e2e-publish) settled="Published fingerprint" ;;
+    e2e-passphrase) settled="This re-locks the same key under a new passphrase. It does not change the key, so messages already encrypted to you stay readable." ;;
+    e2e-remove) settled="Remove from this device" ;;
+    e2e-recipients) settled="priya@havenworks.example" ;;
     *) settled="" ;;
   esac
   # A marker may name a visible string OR a resource-id. Text is right for
@@ -812,7 +836,9 @@ for want in 01-welcome-light 02-step1-name-light 03-step2-basicinfo-light \
             90-account-profile 91-account-privacy 92-mail-notes \
             93-mail-tasks 94-account-connections 95-mail-prefs \
             96-mail-addresses 97-mail-support 98-mail-adv-search \
-            99-mail-undo; do
+            99-mail-undo 100-e2e-status-none 101-e2e-status-unlocked \
+            102-e2e-setup 103-e2e-unlock 104-e2e-details 105-e2e-publish \
+            106-e2e-passphrase 107-e2e-remove 108-e2e-recipients; do
   [ -s "$OUT/$want.png" ] || { echo "FAIL: missing $want.png" >&2; FAILURES=$((FAILURES + 1)); }
 done
 if [ "$FAILURES" -gt 0 ]; then

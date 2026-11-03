@@ -18,7 +18,7 @@ import SwiftUI
 /// sector were taken of a different view layered over the stub.
 enum MailSnapshot {
     static func requested(_ name: String) -> Bool {
-        name.hasPrefix("mail-") || name.hasPrefix("account-")
+        name.hasPrefix("mail-") || name.hasPrefix("account-") || name.hasPrefix("e2e-")
     }
 }
 
@@ -48,12 +48,28 @@ struct MailSnapshotView: View {
     /// seeds already guard against.
     @State private var profile: ProfileModel
 
+    /// The encryption sector's model, seeded before the first render like the
+    /// other two. The E2E frames photograph state cards and gated actions, so
+    /// the record, the published answer and the unlock flag all belong to the
+    /// frame, never to a live probe (`seedForSnapshot` guards `load()` out).
+    @State private var e2e: E2eModel
+
     init(name: String) {
         self.name = name
         _model = State(initialValue: MailSnapshotView.seededModel(name))
         let pm = ProfileModel()
         pm.seedForSnapshot(MailSnapshotView.sampleProfile())
         _profile = State(initialValue: pm)
+        let em = E2eModel()
+        let record = name == "e2e-status-none" ? nil : MailSnapshotView.sampleIdentity
+        em.seedForSnapshot(record: record,
+                           published: name == "e2e-publish" ? MailSnapshotView.samplePublished : nil,
+                           fingerprint: record == nil ? nil : MailSnapshotView.sampleFingerprint,
+                           unlocked: name != "e2e-unlock" && record != nil,
+                           lookup: name == "e2e-recipients" ? MailSnapshotView.sampleLookup : [],
+                           lookupFor: name == "e2e-recipients"
+                               ? ["priya@havenworks.example", "tomas@fieldkit.example"] : [])
+        _e2e = State(initialValue: em)
     }
 
     private static func seededModel(_ name: String) -> MailboxModel {
@@ -169,6 +185,82 @@ struct MailSnapshotView: View {
         return seeded
     }
 
+    // ── the encryption seeds ─────────────────────────────────────────────────
+
+    /// The device identity the encryption frames are photographed with.
+    /// Invented like every seed here — it never appears in a live path — and
+    /// shaped exactly like `MailE2e.saveIdentity` writes it: passphrase-
+    /// protected records whose private material is opaque base64, because the
+    /// screens may show the public half and the fingerprint and NOTHING else.
+    /// The plaintext key does not exist in this file; that is the point of the
+    /// §27 pin over it. Decoded through the store's own parser, so a drift in
+    /// the container format fails the frame here rather than photographing an
+    /// empty branch.
+    fileprivate static let samplePublicKey = "bXNhbXBsZS1wdWJsaWMta2V5"
+    fileprivate static let sampleFingerprint =
+        "7C:0F:2A:91:B4:D8:3E:6C:05:AA:1F:BE:D2:48:67:90:13:EC:B6:24:FA:5D:71:09:8C:30:B7:E4:16:9F:A2:C8"
+
+    fileprivate static let sampleIdentity: MailE2e.Identity? = {
+        let json = """
+        {"format":"grapmail-e2e-identity/1","createdAt":"2026-08-02T10:00:00Z",
+         "encryption":{"format":"grapmail-e2e-protected-key/1","kdf":"PBKDF2-SHA256",
+           "kind":"X25519","publicKey":"\(samplePublicKey)","iterations":600000,
+           "salt":"c2VlZC1zYWx0","iv":"c2VlZC1pdg==","ct":"c2VlZC13cmFwcGVkLXByaXZhdGUtY3R8"},
+         "signing":{"format":"grapmail-e2e-protected-key/1","kdf":"PBKDF2-SHA256",
+           "kind":"Ed25519","publicKey":"\(samplePublicKey)","iterations":600000,
+           "salt":"c2VlZC1zYWx0","iv":"c2VlZC1pdg==","ct":"c2VlZC13cmFwcGVkLXNpZ25pbmctY3R8"}}
+        """
+        let obj = (try? JSONSerialization.jsonObject(with: Data(json.utf8))) as? [String: Any]
+        guard let raw = obj?["encryption"] as? [String: Any],
+              let enc = MailSnapshotView.protectedSeed(raw) else { return nil }
+        let sig = (obj?["signing"] as? [String: Any]).flatMap(MailSnapshotView.protectedSeed)
+        return MailE2e.Identity(encryption: enc, signing: sig,
+                                createdAt: obj?["createdAt"] as? String ?? "")
+    }()
+
+    private static func protectedSeed(_ obj: [String: Any]) -> MailE2e.ProtectedPrivateKey? {
+        guard obj["format"] as? String == "grapmail-e2e-protected-key/1",
+              obj["kdf"] as? String == "PBKDF2-SHA256",
+              let kind = obj["kind"] as? String,
+              let publicKey = obj["publicKey"] as? String,
+              let iterations = obj["iterations"] as? Int,
+              let salt = obj["salt"] as? String, let iv = obj["iv"] as? String,
+              let ct = obj["ct"] as? String else { return nil }
+        return MailE2e.ProtectedPrivateKey(kind: kind, publicKey: publicKey,
+                                           iterations: iterations, salt: salt, iv: iv, ct: ct)
+    }
+
+    /// The directory's published answer, built through the real decoder from
+    /// the route's own JSON shape. Its fingerprint is the seed the details
+    /// frame waits on, so publish and mismatch compose as populated.
+    fileprivate static let samplePublished: MailE2eKeys? = {
+        let json = """
+        {"userId":"p1",
+         "encryption":{"publicKey":"\(samplePublicKey)",
+           "fingerprint":"\(sampleFingerprint)","keyId":"7C0FB624FA5D7109"},
+         "signing":null,
+         "publishedAt":"2026-08-02T10:05:00Z","updatedAt":"2026-08-02T10:05:00Z"}
+        """
+        return try? JSONDecoder().decode(MailE2eKeys.self, from: Data(json.utf8))
+    }()
+
+    /// One found recipient and one refusal, so the lookup frame photographs
+    /// both branches the screen can show — the fingerprint to compare, and the
+    /// directory's own reason where there is no key. Decoded from the route's
+    /// shape, not hand-built.
+    fileprivate static let sampleLookup: [MailE2eLookupEntry] = {
+        let json = """
+        [{"status":"found","address":"priya@havenworks.example",
+          "signing":{"publicKey":"bm90LXJlYWwtc2lnbmluZy1wdWJ8",
+            "fingerprint":"9E:41:77:CA:0B:5D:2F:86:A3:C1:F0:64:18:9B:7A:DD:0C:E7:35:52:BF:81:6E:40:2D:A9:15:C3:FE:07:84:B1",
+            "keyId":"9E413552BF816E40"},
+          "reason":null,"domain":"havenworks.example"},
+         {"status":"unavailable","address":"tomas@fieldkit.example",
+          "signing":null,"reason":"no-key-published","domain":"fieldkit.example"}]
+        """
+        return (try? JSONDecoder().decode([MailE2eLookupEntry].self, from: Data(json.utf8))) ?? []
+    }()
+
     /// The label colours are the server's palette KEYS, not hex values: a hex is
     /// not something `grapmail-labels.ts` can answer with, because `normaliseColour`
     /// rejects it and stores `slate`. Sample data shaped like something the server
@@ -204,6 +296,7 @@ struct MailSnapshotView: View {
          "to":["you@grapmail.com"],"subject":"Q3 facilities invoice",
          "isRead":true,"isStarred":true,"hasAttachments":\(encrypted ? "false" : "true"),
          "isE2eEncrypted":\(encrypted),
+         \(encrypted ? "\"e2eEnvelope\":{\"v\":2,\"alg\":\"X25519+HKDF-SHA256+AES-256-GCM (multi-recipient)\",\"iv\":\"c2VlZC1pdg==\",\"ct\":\"c2VlZC1jdA==\",\"tag\":\"c2VlZC10YWc=\",\"recipients\":[{\"epk\":\"c2VlZC1lcGs=\",\"wrapIv\":\"c2VlZC13aXY=\",\"wrappedKey\":\"c2VlZC13aw==\",\"wrapTag\":\"c2VlZC13dA==\"}]}," : "")
          "createdAt":"2026-10-29T09:12:00Z",
          "bodyText":\(body.map { "\"\($0)\"" } ?? "null"),
          "attachments":[{"id":"a1","name":"invoice-q3.pdf","mimeType":"application/pdf",
@@ -336,17 +429,17 @@ struct MailSnapshotView: View {
                 )
             case "mail-thread":
                 return AnyView(
-                secondary(ThreadView(vm: model, id: "t-m1",
+                secondary(ThreadView(vm: model, e2e: e2e, id: "t-m1",
                                      isThread: true, onBack: {}, onReply: { _, _ in }))
                 )
             case "mail-thread-encrypted":
                 return AnyView(
-                secondary(ThreadView(vm: model, id: "t-m9",
+                secondary(ThreadView(vm: model, e2e: e2e, id: "t-m9",
                                      isThread: true, onBack: {}, onReply: { _, _ in }))
                 )
             case "mail-compose":
                 return AnyView(
-                secondary(ComposeView(vm: model, account: profile,
+                secondary(ComposeView(vm: model, account: profile, e2e: e2e,
                                       replyId: "", mode: "reply", onBack: {}))
                 )
             case "mail-send-receipt":
@@ -386,7 +479,7 @@ struct MailSnapshotView: View {
                                            onSecurity: {}, onScreener: {}, onLabels: {},
                                            onNotes: {}, onTasks: {}, onPrefs: {},
                                            onAddresses: {}, onConnections: {},
-                                           onProfile: {}, onPrivacy: {},
+                                           onProfile: {}, onPrivacy: {}, onEncryption: {},
                                            onHelp: {}, onSignOut: {}))
                 )
             // The eight account-record frames. One document seeds them all;
@@ -412,6 +505,35 @@ struct MailSnapshotView: View {
             case "mail-support":
                 return AnyView(secondary(SupportView(onBack: {}, onForgot: {},
                                                      onPhone: {}, onAddresses: {})))
+            // The encryption band (Phase 3). Nine frames over the seeds above:
+            // two of the three states of the hub, and one screen per action.
+            // The settled markers are the sentences themselves — each exists
+            // only once the right state has been seeded, so a frame that
+            // photographed the wrong state fails the walk rather than the eye.
+            case "e2e-status-none":
+                return AnyView(secondary(E2eStatusScreen(vm: e2e, onBack: {}, onSetup: {},
+                                                         onUnlock: {}, onDetails: {}, onPublish: {},
+                                                         onChangePassphrase: {}, onRemove: {},
+                                                         onRecipients: {})))
+            case "e2e-status-unlocked":
+                return AnyView(secondary(E2eStatusScreen(vm: e2e, onBack: {}, onSetup: {},
+                                                         onUnlock: {}, onDetails: {}, onPublish: {},
+                                                         onChangePassphrase: {}, onRemove: {},
+                                                         onRecipients: {})))
+            case "e2e-setup":
+                return AnyView(secondary(E2eSetupScreen(vm: e2e, onBack: {})))
+            case "e2e-unlock":
+                return AnyView(secondary(E2eUnlockScreen(vm: e2e, onBack: {})))
+            case "e2e-details":
+                return AnyView(secondary(E2eDetailsScreen(vm: e2e, onBack: {})))
+            case "e2e-publish":
+                return AnyView(secondary(E2ePublishScreen(vm: e2e, onBack: {})))
+            case "e2e-passphrase":
+                return AnyView(secondary(E2ePassphraseScreen(vm: e2e, onBack: {})))
+            case "e2e-remove":
+                return AnyView(secondary(E2eRemoveScreen(vm: e2e, onBack: {})))
+            case "e2e-recipients":
+                return AnyView(secondary(E2eRecipientsScreen(vm: e2e, onBack: {}, onCompose: {})))
             case "mail-screener":
                 return AnyView(
                 secondary(ScreenerView(vm: model, onBack: {}, onOpenQueue: {}))

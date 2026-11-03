@@ -959,13 +959,13 @@ SW_WALK = (ROOT / "ios/GrapMailUITests/ScreenshotWalkUITests.swift").read_text(e
 host_kt = set(re.findall(r'^\s+"([a-z0-9-]+)" ->', KT_HOST, re.M))
 host_sw = set(re.findall(r'case "([a-z0-9-]+)":', SW_HOST))
 launch_kt = set(re.findall(r'--es gmSnapshot "([a-z0-9-]+)"', KT_WALK)) \
-    | set(re.findall(r'"([a-z0-9-]+):\d\d-[a-z0-9-]+"', KT_WALK))
+    | set(re.findall(r'"([a-z0-9-]+):\d{2,3}-[a-z0-9-]+"', KT_WALK))
 # The Android walk launches most frames from its `spec` table (`"mail-empty:63-
 # mail-empty"`), and only the dark pass spells out `--es gmSnapshot "name"`. The
 # first version of this pin read only the explicit launches and reported 24 of 27
 # host screens as dead — a gate that cries wolf about 24 things is a gate that
 # gets widened until it says nothing, so both spellings count as a launch.
-launch_sw = set(re.findall(r'\("\d\d-[a-z0-9-]+", "([a-z0-9-]+)"', SW_WALK))
+launch_sw = set(re.findall(r'\("\d{2,3}-[a-z0-9-]+", "([a-z0-9-]+)"', SW_WALK))
 pin("Android's snapshot hosts were located", len(host_kt) >= 20)
 pin("iOS's snapshot hosts were located", len(host_sw) >= 20)
 pin("Both snapshot hosts can draw exactly the same mail screens", host_kt == host_sw)
@@ -981,11 +981,12 @@ arms_sw = len(re.findall(r'^\s+(?:case "[a-z0-9-]+"|default):', frame_sw, re.M))
 pin("iOS's snapshot switch returns exactly once per arm", arms_sw > 0 and
     arms_sw == len(re.findall(r"return AnyView\(", frame_sw)))
 for side, host, launched in (("Android", host_kt, launch_kt), ("iOS", host_sw, launch_sw)):
-    # `account-` joined `mail-` with the Phase-1 band: three of the eight new
-    # host names are launched as `account-*` snapshot frames, and a name-set
-    # check that only watches `mail-*` would let a dead or ghost account screen
-    # through on either side — the exact hole this section was written for.
-    band = ("mail-", "account-")
+    # `account-` joined `mail-` with the Phase-1 band and `e2e-` with Phase 3:
+    # screens launched as `NN-account-*` / `NN-e2e-*` would otherwise slip the
+    # dead/ghost check entirely -- a name-set check that only watches `mail-*`
+    # lets a dead or ghost screen through on either side, the exact hole this
+    # section was written for.
+    band = ("mail-", "account-", "e2e-")
     dead = {n for n in host if n.startswith(band)} - launched
     pin(f"{side}'s host defines no mail screen its walk never photographs", not dead)
     ghost = {n for n in launched if n.startswith(band)} - host
@@ -1497,6 +1498,171 @@ pin("attachment delete asks first and drops the cached row, both platforms",
 # on either client, because no `/send` parameter accepts one.
 pin("no scheduling field crept into either client",
     not re.search(r"sendAt|scheduledAt|scheduleAt", code_only(KT_API) + code_only(SW_APIC)))
+
+# -- 27. the encryption band -- the format is the contract, the states are the UI --
+#
+# Phase 3 put the web's `/mail/account/encryption` on both phones: eight
+# screens, the seal-at-send gate, the decrypt path in the thread, and a
+# passphrase-protected key store. Three things can rot here silently, and each
+# pin below is written so it fails the day it happens:
+#
+# 1. The ENVELOPE FORMAT is duplicated across three runtimes with no shared
+#    module. One drifted string -- an AAD, an HKDF info label, a DER prefix --
+#    and mail seals into bytes nothing can open, this app's own store included.
+# 2. The THREE STATES (no key / locked / unlocked) are the sector's honesty
+#    claim. A screen that offers an action against a locked key offers a
+#    failure; a softened no-recovery line lies exactly when it matters.
+# 3. The PRIVATE KEY must never exist in plaintext on disk, in a request, or
+#    on screen -- and ciphertext must never be shown as a body.
+KT_E2E = android("data/MailE2e.kt")
+SW_E2E = ios("MailE2e.swift")
+KT_E2EVM = android("logic/E2eViewModel.kt")
+SW_E2EVM = ios("E2eModel.swift")
+KT_E2ES = android("ui/screens/mail/E2eScreens.kt")
+SW_E2ES = ios("E2eViews.swift")
+KT_THREAD = android("ui/screens/mail/ThreadScreen.kt")
+SW_COMPOSE_TAG = "gm-compose-encrypt"
+
+# The frozen format strings, byte for byte, in both crypto modules. These are
+# the strings `envelope.ts` (server) and `mailE2e.ts` (browser) froze; a third
+# client that invents its own labels produces mail its own next launch cannot
+# read, which is the definition of a silent data-loss bug.
+for lit in ("grapmail-e2e-v1", "grapmail-e2e-v2-kek",
+            "grapmail-e2e-protected-key/1", "PBKDF2-SHA256",
+            "X25519+HKDF-SHA256+AES-256-GCM"):
+    pin(f"the format literal {lit!r} is byte-identical in both crypto modules",
+        lit in code_only(KT_E2E) and lit in code_only(SW_E2E))
+pin("both derive 32-byte keys with 600,000 PBKDF2 rounds",
+    "600_000" in code_only(KT_E2E) and "600_000" in code_only(SW_E2E)
+    and "derivePassphraseKey" in code_only(KT_E2E) and "derivePassphraseKey" in code_only(SW_E2E))
+# The X25519 SPKI prefix is RFC 8410's canonical DER, and the two platforms
+# reach it by different means: Android round-trips through the JCA's
+# `X509EncodedKeySpec` (which emits exactly that encoding), iOS hand-rolls the
+# DER header from the RFC. Fingerprints must agree between the two phones, so
+# each mechanism is pinned to the artefact it is required to produce.
+pin("Android canonicalises SPKI through the JCA's own X509EncodedKeySpec",
+    "X509EncodedKeySpec" in code_only(KT_E2E))
+pin("iOS hand-rolls the RFC 8410 X25519 SPKI prefix",
+    "0x2B, 0x65, 0x6E" in code_only(SW_E2E) and "0x30, 0x2A" in code_only(SW_E2E))
+
+# The identity file: same directory, same name scheme, same container format,
+# so a key written on one client is readable by the same client reinstalled --
+# and by neither platform is anything else ever written.
+pin("both stores name the identity file the same way",
+    "grapmail-e2e" in code_only(KT_E2E) and "grapmail-e2e" in code_only(SW_E2E)
+    and "identity-" in code_only(KT_E2E) and "identity-" in code_only(SW_E2E))
+
+# NO PLAINTEXT PRIVATE KEY, anywhere it would matter. The store keeps only
+# the protected container (format + kdf + opaque ct); the publish request
+# carries only public halves -- the server REFUSES a body with private
+# material (`grapmail-e2e.ts:151-169`), and a client that sent one would be
+# broken by design, not just wrong in review.
+pin("Android's publish request has no private field",
+    re.search(r"class MailE2ePublishRequest[\s\S]{0,300}?privateKey", KT_API) is None)
+pin("iOS's publish request has no private field",
+    re.search(r"struct MailE2ePublishRequest[\s\S]{0,300}?privateKey", SW_MAPI) is None)
+pin("the unlock session is in-memory only, on both platforms",
+    re.search(r"private var session: MailE2e\.Unlocked\?", KT_E2EVM) is not None
+    and re.search(r"private var session: MailE2e\.Unlocked\?", SW_E2EVM) is not None)
+for side, src in (("Android", KT_E2EVM), ("iOS", SW_E2EVM)):
+    seg = code_only(src)
+    pin(f"{side}'s lock clears the session rather than copying it",
+        re.search(r"session = (?:null|nil)", seg) is not None)
+
+# The passphrase never becomes display text: it rides into the crypto calls
+# and out again, and no screen may write it into a note, a receipt or a
+# filename. `state.note` is the only text these models can surface, so no
+# string literal may interpolate the passphrase variables into it.
+for side, src in (("Android", KT_E2EVM), ("iOS", SW_E2EVM)):
+    seg = code_only(src)
+    pin(f"{side}'s model never interpolates a passphrase into user text",
+        re.search(r'"[^"]*\$\{?(passphrase|oldPhrase|newPhrase)', seg) is None)
+
+# THREE STATES, KEPT APART, in the same words on both phones. The hub's
+# headline per state and the two hard warnings (no recovery; removal is
+# permanent and everywhere) are the sector's contract with the person.
+for line in ("Encryption is not set up on this device",
+             "Your key is locked",
+             "Your key is unlocked for this session",
+             "There is no way to recover a forgotten passphrase.",
+             "becomes unreadable — here and anywhere else, permanently",
+             "The key published for your account is NOT the key on this device",
+             "Nothing is wrong with your account"):
+    pin(f"the state sentence {line!r} ships identically on both platforms",
+        line in KT_E2ES and line in SW_E2ES)
+pin("the compose lock-line ships identically on both platforms",
+    "Unlock your key to encrypt — it locks when the app closes."
+    in code_only(KT_COMPOSE)
+    and "Unlock your key to encrypt — it locks when the app closes."
+    in code_only(SW_RDR))
+
+# A failed directory read is never drawn as "nothing is published" -- the
+# claim would send the person to publish twice, or to believe their key is
+# gone. Both publish screens keep the error as its own branch.
+for side, src in (("Android", KT_E2ES), ("iOS", SW_E2ES)):
+    pin(f"{side}'s publish screen branches on the failed read, not on absence",
+        "publishedError" in code_only(src) or "publishedError" in
+        code_only(android("logic/E2eViewModel.kt") if side == "Android" else ios("E2eModel.swift")))
+pin("the directory's four refusals keep four sentences, both platforms",
+    all(w in KT_E2ES for w in ("not an address the directory", "Not a GrapMail address",
+                               "no GrapMail account", "not published an encryption key"))
+    and all(w in SW_E2ES for w in ("not an address the directory", "Not a GrapMail address",
+                                   "no GrapMail account", "not published an encryption key")))
+
+# The compose gate and the thread decrypt: the encrypt row exists only with a
+# record, opens only unlocked, and the seal stops the send when the plan is
+# not "seal". In the thread, an encrypted row offers decrypt against the
+# ENVELOPE, and a flagged message without one says so instead of nothing.
+pin("compose's encrypt row is gated on a record and an unlock, both platforms",
+    SW_COMPOSE_TAG in code_only(KT_COMPOSE) and SW_COMPOSE_TAG in code_only(SW_RDR)
+    and "e2eState.record != null" in code_only(KT_COMPOSE)
+    and "e2e.state.record != nil" in code_only(SW_RDR)
+    and "unlocked" in code_only(KT_COMPOSE) and "unlocked" in code_only(SW_RDR))
+pin("a plain plan or a silent directory stops an encrypted send, both platforms",
+    "The directory did not answer, so nothing was encrypted" in code_only(KT_COMPOSE)
+    and "The directory did not answer, so nothing was encrypted" in code_only(SW_RDR)
+    and "cannot be encrypted. Turn encryption off" in code_only(KT_COMPOSE)
+    and "cannot be encrypted. Turn encryption off" in code_only(SW_RDR))
+pin("a sealed send carries the envelope and an empty bodyText, both platforms",
+    'bodyText = if (e2eEnvelope != null) "" else s.body' in code_only(KT_VM)
+    and 'bodyText: e2eEnvelope == nil ? compose.body : ""' in code_only(SW_VM))
+pin("the thread decrypts against the envelope and names the no-envelope case",
+    "gm-e2e-decrypt-open" in code_only(KT_THREAD) and "gm-e2e-decrypt-open" in code_only(SW_RDR)
+    and "No encrypted content came with this message." in code_only(KT_THREAD)
+    and "No encrypted content came with this message." in code_only(SW_RDR))
+pin("neither decrypt path ever shows the envelope as a body",
+    "e2eEnvelope?.toString()" in code_only(KT_THREAD)
+    and not re.search(r'Text\((envelope|e2eEnvelope)', code_only(SW_RDR)))
+
+# The encrypted notice no longer claims the key cannot open -- the decrypt
+# path exists now, and the copy that promised otherwise would be a stale lie
+# on both platforms at once.
+pin("the encrypted notice describes the decrypt path, not its absence",
+    "does not yet hold" not in KT_THREAD and "does not yet hold" not in SW_RDR
+    and "Only you and the sender can read this." in KT_THREAD
+    and "Only you and the sender can read this." in SW_RDR)
+
+# The nine frames photograph SEEDED states: the fingerprint, the published
+# fingerprint, both lookup branches. The values live in both hosts, and both
+# walks wait on the sentences the states alone draw.
+for seeded in ("7C:0F:2A:91:B4:D8:3E:6C:05:AA:1F:BE:D2:48:67:90:13:EC:B6:24:FA:5D:71:09:8C:30:B7:E4:16:9F:A2:C8",
+               "priya@havenworks.example", "no-key-published",
+               "grapmail-e2e-protected-key/1"):
+    pin(f"the encryption seed {repr(seeded)[:40]} exists in both hosts",
+        seeded in KT_HOST and seeded in SW_HOST)
+pin("Android waits on seeded content for the encryption band",
+    all(f'settled="{m}"' in KT_WALK for m in
+        ("Encryption is not set up on this device", "Your key is unlocked for this session",
+         "There is no way to recover a forgotten passphrase.",
+         "Published fingerprint", "Remove from this device", "priya@havenworks.example")))
+pin("iOS waits on seeded content for the encryption band",
+    all(f'"{m}",]' in SW_WALK or f': "{m}"' in SW_WALK for m in
+        ("Encryption is not set up on this device", "Your key is unlocked for this session",
+         "There is no way to recover a forgotten passphrase.",
+         "Published fingerprint", "Remove from this device", "priya@havenworks.example")))
+pin("the plaintext private key exists in neither snapshot host",
+    not re.search(r"MI[EHR][A-Za-z0-9+/=]{20,}", KT_HOST)
+    and not re.search(r"MI[EHR][A-Za-z0-9+/=]{20,}", SW_HOST))
 
 print()
 if failures:

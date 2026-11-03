@@ -170,8 +170,52 @@ struct MailMessageFull: Decodable, Identifiable {
         bodyHtml = c.lenientOpt(.bodyHtml)
         inReplyTo = c.lenientOpt(.inReplyTo)
         sizeBytes = c.lenientOpt(.sizeBytes)
-        e2eEnvelope = c.lenientOpt(.e2eEnvelope)
+        // The envelope is a JSON OBJECT on the wire — the server stores it
+        // verbatim and hands it back the same shape Android keeps as a
+        // `JsonObject`. Decoding it as a String would nil it on every real
+        // message and leave the decrypt UI with nothing to open, so the
+        // object is re-serialised for the crypto layer instead.
+        e2eEnvelope = Self.decodeEnvelope(c, forKey: .e2eEnvelope)
         attachments = c.lenient(.attachments, [])
+    }
+
+    private static func decodeEnvelope<K: CodingKey>(_ c: KeyedDecodingContainer<K>,
+                                                     forKey key: K) -> String? {
+        guard c.contains(key) else { return nil }
+        if let s = try? c.decode(String.self, forKey: key) { return s }
+        guard let obj = try? c.decode(JSONValue.self, forKey: key),
+              case .object(let dict) = obj,
+              let data = try? JSONSerialization.data(withJSONObject: dict) else { return nil }
+        return String(decoding: data, as: UTF8.self)
+    }
+
+    /// Any JSON, decoded losslessly so an object envelope survives the trip to
+    /// the string the crypto layer parses. A number or bool under the key is
+    /// not an envelope and stays nil — the flag alone then tells the truth
+    /// about an encrypted message whose body never arrived.
+    private enum JSONValue: Decodable {
+        case object([String: Any]), array([Any]), string(String),
+        number(Double), bool(Bool), null
+        init(from decoder: Decoder) throws {
+            let c = try decoder.singleValueContainer()
+            if c.decodeNil() { self = .null }
+            else if let b = try? c.decode(Bool.self) { self = .bool(b) }
+            else if let n = try? c.decode(Double.self) { self = .number(n) }
+            else if let s = try? c.decode(String.self) { self = .string(s) }
+            else if let a = try? c.decode([JSONValue].self) { self = .array(a.map(Self.raw)) }
+            else if let o = try? c.decode([String: JSONValue].self) { self = .object(o.mapValues(Self.raw)) }
+            else { throw DecodingError.dataCorruptedError(in: c, debugDescription: "Not JSON") }
+        }
+        private static func raw(_ v: JSONValue) -> Any {
+            switch v {
+            case .object(let d): return d
+            case .array(let a): return a
+            case .string(let s): return s
+            case .number(let n): return n
+            case .bool(let b): return b
+            case .null: return NSNull()
+            }
+        }
     }
 
     /// The thread view needs the same rule as the list: a message with no
@@ -1063,6 +1107,11 @@ struct MailSendRequest: Encodable {
      * In-Reply-To and the thread view shows them as new messages.
      */
     var inReplyTo: String? = nil
+    /// The sealed envelope, when the message is encrypted. `grapmail.ts:933-955`
+    /// sanitises it and stores the notice text in place of a body — the server
+    /// never sees plaintext, and this client never sends the body twice: with
+    /// an envelope present, `bodyText` is the empty string the route accepts.
+    var e2eEnvelope: String? = nil
 }
 
 struct MailDraftRequest: Encodable {

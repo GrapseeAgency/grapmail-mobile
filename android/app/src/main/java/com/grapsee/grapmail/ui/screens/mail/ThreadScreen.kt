@@ -49,6 +49,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.mutableStateMapOf
 import com.grapsee.grapmail.data.MailAction
+import com.grapsee.grapmail.ui.components.AppTextField
 import com.grapsee.grapmail.data.MailAttachmentDto
 import com.grapsee.grapmail.data.MailMessageFullDto
 import com.grapsee.grapmail.logic.MailboxViewModel
@@ -79,6 +80,7 @@ import com.grapsee.grapmail.ui.theme.LocalPalette
 @Composable
 fun ThreadScreen(
     vm: MailboxViewModel,
+    e2e: com.grapsee.grapmail.logic.E2eViewModel,
     threadId: String,
     /// A row without a `threadId` falls back to its own id, and the thread route
     /// answers that with a 404. The list knows which one it handed over, so the
@@ -145,6 +147,7 @@ fun ThreadScreen(
                     message = message,
                     expanded = index == thread.messages.lastIndex,
                     busy = busy == message.id,
+                    e2e = e2e,
                     onReply = { mode -> onReply(message, mode) },
                     onStar = {
                         busy = message.id
@@ -174,6 +177,7 @@ private fun ThreadMessageCard(
     message: MailMessageFullDto,
     expanded: Boolean,
     busy: Boolean,
+    e2e: com.grapsee.grapmail.logic.E2eViewModel,
     onReply: (String) -> Unit,
     onStar: () -> Unit,
     onDownload: (MailAttachmentDto) -> Unit,
@@ -232,8 +236,12 @@ private fun ThreadMessageCard(
         Spacer(Modifier.height(16.dp))
 
         // The encrypted branch is a state of this layout, not another screen.
-        if (message.isE2eEncrypted && message.bodyText.isNullOrBlank()) {
-            EncryptedNotice()
+        // The flag is the claim — the server sets `isE2eEncrypted` and stores
+        // its notice in place of the body, and the envelope is the ciphertext.
+        // The notice is never shown as if it were the message, and the
+        // ciphertext is never shown at all: only an opened body is.
+        if (message.isE2eEncrypted || message.e2eEnvelope != null) {
+            EncryptedBlock(message, e2e)
         } else {
             val text = message.bodyText
             if (text.isNullOrBlank()) {
@@ -314,6 +322,76 @@ private fun ThreadMessageCard(
     }
 }
 
+/**
+ * The encrypted message, as a state of the card. The notice is the server's
+ * own text; the decrypt path needs the passphrase every time — the private
+ * half is opened for one operation and kept nowhere. A wrong phrase, a
+ * message not sealed to this key, and a damaged envelope each get their own
+ * true sentence, and none of them ever shows ciphertext as a body.
+ */
+@Composable
+private fun EncryptedBlock(message: MailMessageFullDto, e2e: com.grapsee.grapmail.logic.E2eViewModel) {
+    val palette = LocalPalette.current
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    var showPhrase by remember { mutableStateOf(false) }
+    var phrase by remember { mutableStateOf("") }
+    var opened by remember(message.id) { mutableStateOf<String?>(null) }
+    var working by remember(message.id) { mutableStateOf(false) }
+    val envelope = message.e2eEnvelope?.toString()
+
+    EncryptedNotice()
+    if (opened != null) {
+        Spacer(Modifier.height(12.dp))
+        Text(opened!!, fontSize = 15.sp, color = palette.textPrimary, lineHeight = 22.sp,
+            modifier = Modifier.testTag("gm-e2e-opened-body"))
+    } else if (envelope != null) {
+        Spacer(Modifier.height(12.dp))
+        if (!showPhrase) {
+            Text("Decrypt with your passphrase", fontSize = 14.sp,
+                fontWeight = FontWeight.SemiBold, color = palette.primarySolid,
+                modifier = Modifier.clickable {
+                    scope.launch { e2e.load() }
+                    showPhrase = true
+                }.testTag("gm-e2e-decrypt-open").padding(vertical = 6.dp))
+        } else {
+            Column(Modifier.fillMaxWidth().testTag("gm-e2e-decrypt-panel")) {
+                Text("Your passphrase decrypts this message on this device. It is never sent " +
+                    "anywhere, and it is not kept after the message opens.",
+                    fontSize = 12.sp, color = palette.textTertiary)
+                Spacer(Modifier.height(8.dp))
+                AppTextField("Passphrase", phrase, { phrase = it }, isPassword = true)
+                Row(Modifier.padding(top = 8.dp)) {
+                    Text(if (working) "Opening…" else "Open", fontSize = 14.sp,
+                        fontWeight = FontWeight.SemiBold, color = palette.primarySolid,
+                        modifier = Modifier.clickable(enabled = !working && phrase.isNotEmpty()) {
+                            working = true
+                            scope.launch {
+                                opened = e2e.decrypt(envelope, phrase)
+                                working = false
+                                phrase = ""
+                                if (opened == null) showPhrase = true
+                            }
+                        }.padding(vertical = 6.dp))
+                    Spacer(Modifier.width(16.dp))
+                    Text("Cancel", fontSize = 14.sp, color = palette.textSecondary,
+                        modifier = Modifier.clickable { showPhrase = false }.padding(vertical = 6.dp))
+                }
+                e2e.state.value.note?.let {
+                    if (e2e.state.value.noteIsBad) {
+                        Text(it, fontSize = 12.sp, color = palette.error,
+                            modifier = Modifier.padding(top = 6.dp).testTag("gm-e2e-decrypt-error"))
+                    }
+                }
+            }
+        }
+    } else {
+        // Flagged encrypted with no envelope to open: say that, not nothing.
+        Spacer(Modifier.height(8.dp))
+        Text("No encrypted content came with this message.", fontSize = 12.sp,
+            color = palette.warnInk, modifier = Modifier.testTag("gm-e2e-no-envelope"))
+    }
+}
+
 @Composable
 private fun EncryptedNotice() {
     val palette = LocalPalette.current
@@ -330,9 +408,10 @@ private fun EncryptedNotice() {
         Spacer(Modifier.height(8.dp))
         Text(
             "Only you and the sender can read this. The server holds the sealed " +
-                "envelope and cannot open it, and this build does not yet hold a " +
-                "private key to open it either — so the body is not available here " +
-                "rather than empty.",
+                "envelope and cannot open it. Unlocking this device's key opens " +
+                "the body below — a wrong passphrase and a message not sealed " +
+                "to this key each say so, and the ciphertext is never shown as " +
+                "a body.",
             fontSize = 13.sp, color = palette.textSecondary, lineHeight = 19.sp,
         )
     }

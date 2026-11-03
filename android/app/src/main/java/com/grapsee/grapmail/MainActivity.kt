@@ -249,6 +249,19 @@ object Routes {
     const val ACCOUNT_PRIVACY = "mail/settings/privacy"
     const val MAIL_SUPPORT = "mail/support"
 
+    // ── encryption band ──────────────────────────────────────────────────────
+    // The web's `/mail/account/encryption` split into the screens a phone
+    // needs. They hang off MAIL_SETTINGS like the account band; every one
+    // reads and writes the device's key through `E2eViewModel`.
+    const val E2E_STATUS = "mail/encryption"
+    const val E2E_SETUP = "mail/encryption/setup"
+    const val E2E_UNLOCK = "mail/encryption/unlock"
+    const val E2E_DETAILS = "mail/encryption/details"
+    const val E2E_PUBLISH = "mail/encryption/publish"
+    const val E2E_PASSPHRASE = "mail/encryption/passphrase"
+    const val E2E_REMOVE = "mail/encryption/remove"
+    const val E2E_RECIPIENTS = "mail/encryption/recipients"
+
     fun mailThread(id: String, isThread: Boolean) =
         "mail/thread/${encode(id)}/${if (isThread) "1" else "0"}"
     fun mailContact(address: String) = "mail/contact/${encode(address)}"
@@ -284,6 +297,11 @@ fun GrapMailNav() {
     // the activity: the screens are eight views of one document, and eight
     // separate copies of it is eight chances to disagree about the same account.
     val profile: com.grapsee.grapmail.logic.ProfileViewModel = viewModel()
+    // The encryption sector's state: the device's identity, the in-memory
+    // unlock session, and the directory's published answer. One instance for
+    // the stack -- the status card and the compose lookup must never disagree
+    // about whether this device can seal.
+    val e2e: com.grapsee.grapmail.logic.E2eViewModel = viewModel()
     val scope = androidx.compose.runtime.rememberCoroutineScope()
 
     fun openSupport() {
@@ -368,7 +386,8 @@ fun GrapMailNav() {
     // offline, with closures that do nothing. No real launch carries the extra.
     val snapshot = (nav.context as? android.app.Activity)?.intent?.getStringExtra("gmSnapshot")
     if (snapshot != null) {
-        if (snapshot.startsWith("mail-") || snapshot.startsWith("account-")) MailSnapshotScreen(snapshot)
+        if (snapshot.startsWith("mail-") || snapshot.startsWith("account-") ||
+            snapshot.startsWith("e2e-")) MailSnapshotScreen(snapshot)
         else SecuritySnapshotScreen(snapshot)
         return
     }
@@ -831,6 +850,7 @@ fun GrapMailNav() {
             val isThread = entry.arguments?.getString("thread") != "0"
             ThreadScreen(
                 vm = mail,
+                e2e = e2e,
                 threadId = id,
                 isThread = isThread,
                 onBack = { nav.popBackStack() },
@@ -840,7 +860,7 @@ fun GrapMailNav() {
         composable(Routes.MAIL_COMPOSE) { entry ->
             val reply = entry.arguments?.getString("reply")?.let(android.net.Uri::decode) ?: ""
             val mode = entry.arguments?.getString("mode") ?: "reply"
-            ComposeScreen(vm = mail, profile = profile, replyId = reply, mode = mode,
+            ComposeScreen(vm = mail, profile = profile, e2e = e2e, replyId = reply, mode = mode,
                 onBack = { nav.popBackStack() })
         }
         composable(Routes.MAIL_LABELS) {
@@ -901,6 +921,7 @@ fun GrapMailNav() {
                 onConnections = { nav.navigate(Routes.MAIL_CONNECTIONS) },
                 onProfile = { nav.navigate(Routes.ACCOUNT_PROFILE) },
                 onPrivacy = { nav.navigate(Routes.ACCOUNT_PRIVACY) },
+                onEncryption = { nav.navigate(Routes.E2E_STATUS) },
                 onHelp = { nav.navigate(Routes.MAIL_SUPPORT) },
                 onSignOut = {
                     com.grapsee.grapmail.ui.screens.security.SecurityFlow.reset()
@@ -946,6 +967,48 @@ fun GrapMailNav() {
                 onPhone = { nav.navigate(Routes.PHONE_VERIFY) },
                 onAddresses = { nav.navigate(Routes.MAIL_ADDRESSES) },
             )
+        }
+        // ── encryption band destinations ──────────────────────────────────
+        composable(Routes.E2E_STATUS) {
+            com.grapsee.grapmail.ui.screens.mail.E2eStatusScreen(
+                vm = e2e, onBack = { nav.popBackStack() },
+                onSetup = { nav.navigate(Routes.E2E_SETUP) },
+                onUnlock = { nav.navigate(Routes.E2E_UNLOCK) },
+                onDetails = { nav.navigate(Routes.E2E_DETAILS) },
+                onPublish = { nav.navigate(Routes.E2E_PUBLISH) },
+                onChangePassphrase = { nav.navigate(Routes.E2E_PASSPHRASE) },
+                onRemove = { nav.navigate(Routes.E2E_REMOVE) },
+                onRecipients = { nav.navigate(Routes.E2E_RECIPIENTS) },
+            )
+        }
+        composable(Routes.E2E_SETUP) {
+            com.grapsee.grapmail.ui.screens.mail.E2eSetupScreen(vm = e2e,
+                onBack = { nav.popBackStack() })
+        }
+        composable(Routes.E2E_UNLOCK) {
+            com.grapsee.grapmail.ui.screens.mail.E2eUnlockScreen(vm = e2e,
+                onBack = { nav.popBackStack() })
+        }
+        composable(Routes.E2E_DETAILS) {
+            com.grapsee.grapmail.ui.screens.mail.E2eDetailsScreen(vm = e2e,
+                onBack = { nav.popBackStack() })
+        }
+        composable(Routes.E2E_PUBLISH) {
+            com.grapsee.grapmail.ui.screens.mail.E2ePublishScreen(vm = e2e,
+                onBack = { nav.popBackStack() })
+        }
+        composable(Routes.E2E_PASSPHRASE) {
+            com.grapsee.grapmail.ui.screens.mail.E2ePassphraseScreen(vm = e2e,
+                onBack = { nav.popBackStack() })
+        }
+        composable(Routes.E2E_REMOVE) {
+            com.grapsee.grapmail.ui.screens.mail.E2eRemoveScreen(vm = e2e,
+                onBack = { nav.popBackStack() })
+        }
+        composable(Routes.E2E_RECIPIENTS) {
+            com.grapsee.grapmail.ui.screens.mail.E2eRecipientsScreen(vm = e2e,
+                onBack = { nav.popBackStack() },
+                onCompose = { nav.navigate(Routes.MAIL_COMPOSE) })
         }
         composable(Routes.MAIL_SCREENER) {
             ScreenerScreen(

@@ -1301,6 +1301,14 @@ data class MailSendRequest(
      * their In-Reply-To and the thread view shows them as new messages.
      */
     val inReplyTo: String? = null,
+    /**
+     * The sealed envelope, when the message is encrypted. `grapmail.ts:933-955`
+     * sanitises it and stores the notice text in place of a body — the server
+     * never sees plaintext, and this client never sends the body twice: with
+     * an envelope present, `bodyText` is the empty string the route accepts
+     * (`!bodyText && !bodyHtml && !e2eEnvelope` is the only refusal).
+     */
+    val e2eEnvelope: String? = null,
 )
 
 @Serializable

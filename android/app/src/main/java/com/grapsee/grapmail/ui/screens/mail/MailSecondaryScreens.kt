@@ -564,6 +564,7 @@ fun MailSettingsScreen(
     onConnections: () -> Unit,
     onProfile: () -> Unit,
     onPrivacy: () -> Unit,
+    onEncryption: () -> Unit,
     onHelp: () -> Unit,
     onSignOut: () -> Unit,
 ) {
@@ -634,6 +635,8 @@ fun MailSettingsScreen(
                 "Name, birthday, photo", palette, onClick = onProfile)
             SettingRow(Icons.Rounded.Shield, "Data & privacy",
                 "What is kept, what you control", palette, onClick = onPrivacy)
+            SettingRow(Icons.Rounded.Lock, "Encryption",
+                "Your end-to-end key, on this device", palette, onClick = onEncryption)
 
             SectionLabel("Support", palette)
             SettingRow(Icons.Rounded.HelpOutline, "Help & Support",

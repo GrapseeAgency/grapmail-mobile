@@ -4,6 +4,17 @@ options:
   deploymentTarget:
     iOS: "16.0"
   createIntermediateGroups: true
+# swift-crypto is Apple's own package (the CryptoKit-compatible API surface).
+# It is here for one reason: CryptoKit itself has no X25519 key agreement and
+# no HKDF, and the GrapMail envelope is X25519+HKDF-SHA256+AES-256-GCM by
+# construction (`services/mail-service/src/e2e/envelope.ts`). Everything the
+# browser and Android already run, this platform must run byte-identically --
+# a key derivation that differs by one byte makes mail written on one device
+# undecryptable on every other, forever.
+packages:
+  Crypto:
+    url: https://github.com/apple/swift-crypto.git
+    from: 3.0.0
 settings:
   base:
     SWIFT_VERSION: "5.9"
@@ -17,6 +28,9 @@ targets:
     platform: iOS
     sources:
       - GrapMail
+    dependencies:
+      - package: Crypto
+        product: Crypto
     settings:
       base:
         GENERATE_INFOPLIST_FILE: YES

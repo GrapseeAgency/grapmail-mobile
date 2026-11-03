@@ -84,18 +84,26 @@ import com.grapsee.grapmail.ui.theme.LocalPalette
 fun ComposeScreen(
     vm: MailboxViewModel,
     profile: com.grapsee.grapmail.logic.ProfileViewModel,
+    e2e: com.grapsee.grapmail.logic.E2eViewModel,
     replyId: String = "",
     mode: String = "reply",
     onBack: () -> Unit,
 ) {
     val palette = LocalPalette.current
     val context = LocalContext.current
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
     val state by vm.compose.collectAsState()
     val profileState by profile.state.collectAsState()
+    val e2eState by e2e.state.collectAsState()
     val attached = remember { mutableStateListOf<MailAttachmentDto>() }
     var notice by remember { mutableStateOf<String?>(null) }
     var showCc by remember { mutableStateOf(false) }
     var showEmoji by remember { mutableStateOf(false) }
+    // The encryption choice. It can only be ON when this device holds an
+    // unlocked key -- a toggle that sealed with a locked key would fail on
+    // send, and a failure at send time is the worst place to learn the key
+    // was locked the whole time.
+    var encryptOn by remember { mutableStateOf(false) }
 
     // The signature the profile carries: the per-address override for the
     // address this account sends from first, then the default. Empty when the
@@ -107,6 +115,7 @@ fun ComposeScreen(
     } ?: "").trim()
 
     LaunchedEffect(Unit) { profile.load() }
+    LaunchedEffect(Unit) { e2e.load() }
 
     // A prepared compose (reply / reply-all / forward from the thread) builds
     // its fields from the full server row; a blank one gets the signature
@@ -164,7 +173,33 @@ fun ComposeScreen(
             Spacer(Modifier.weight(1f))
             Icon(Icons.Rounded.Send, "Send", tint = palette.primarySolid,
                 modifier = Modifier.size(22.dp).clip(CircleShape)
-                    .clickable(enabled = !state.sending) { vm.send() }
+                    .clickable(enabled = !state.sending) {
+                        if (!encryptOn) { vm.send(); return@clickable }
+                        // The seal path: ask the directory for the plan, and
+                        // only send encrypted when EVERY recipient has a key
+                        // and this device can open its own. A plan that says
+                        // "plain", a locked key, or no answer at all stops the
+                        // send with a sentence -- an encrypted message half
+                        // built is the failure mode this gate exists to stop.
+                        scope.launch {
+                            val recipients = (splitTo(state.to) + splitTo(state.cc) +
+                                splitTo(state.bcc)).distinct()
+                            val plan = vm.encryptionPlan(recipients)
+                            when {
+                                plan == null -> notice =
+                                    "The directory did not answer, so nothing was encrypted " +
+                                        "and nothing was sent. Try again."
+                                plan.first != "seal" -> notice =
+                                    "Not every recipient has a published key, so this message " +
+                                        "cannot be encrypted. Turn encryption off to send it " +
+                                        "unencrypted, or stop and wait for the recipients."
+                                else -> {
+                                    val envelope = e2e.seal(state.body, plan.second)
+                                    if (envelope != null) vm.send(envelope)
+                                }
+                            }
+                        }
+                    }
                     .padding(2.dp).testTag("mail-send"))
         }
 
@@ -208,6 +243,45 @@ fun ComposeScreen(
                 onValue = { vm.composeUpdate { s -> s.copy(subject = it) } }, tag = "mail-subject")
 
             Divider(palette)
+
+            // The encrypt row. The states are the web compose's own: a device
+            // with no key never sees the option; a locked key says what would
+            // fix it; only an unlocked key can flip it on. And when it is on,
+            // the person is told plainly that the body is sealed before it
+            // leaves the device -- the server will store a notice, not text.
+            if (e2eState.record != null) {
+                Row(
+                    Modifier.fillMaxWidth().padding(vertical = 8.dp)
+                        .clickable(enabled = e2eState.unlocked) { encryptOn = !encryptOn }
+                        .testTag("gm-compose-encrypt"),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(Icons.Rounded.Lock, null,
+                        tint = if (encryptOn) palette.primarySolid else palette.textTertiary,
+                        modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(10.dp))
+                    Text(if (encryptOn) "Encrypting this message" else "Encrypt this message",
+                        fontSize = 14.sp,
+                        color = if (encryptOn) palette.primarySolid else palette.textPrimary,
+                        modifier = Modifier.weight(1f))
+                    Box(Modifier.size(20.dp).clip(CircleShape)
+                        .border(1.5.dp, if (encryptOn) palette.primarySolid else palette.border,
+                            CircleShape)
+                        .background(if (encryptOn) palette.primarySolid else palette.card),
+                        contentAlignment = Alignment.Center) {
+                        if (encryptOn) Text("✓", color = palette.onPrimary, fontSize = 12.sp)
+                    }
+                }
+                if (!e2eState.unlocked) {
+                    Text("Unlock your key to encrypt — it locks when the app closes.",
+                        fontSize = 12.sp, color = palette.textTertiary)
+                } else if (encryptOn) {
+                    Text("Only the recipients' published keys can open this. The server will " +
+                        "store a notice, not your text.",
+                        fontSize = 12.sp, color = palette.textTertiary)
+                }
+                Spacer(Modifier.height(4.dp))
+            }
 
             BasicTextField(
                 value = state.body,

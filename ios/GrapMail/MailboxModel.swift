@@ -1203,11 +1203,24 @@ final class MailboxModel: ObservableObject {
 
     func resetCompose() { compose = ComposeState() }
 
+    /// The compose-time plan, asked by the send path: mode and the keys to
+    /// seal to. Nil when the directory did not answer — which the send treats
+    /// as "not encrypted", never as "encrypt anyway": the difference between
+    /// "the server said this cannot be encrypted" and "we could not ask"
+    /// decides whether the message goes plain or not at all. Mirror of
+    /// Android's `encryptionPlan`.
+    func encryptionPlan(addresses: [String]) async -> MailE2ePlan? {
+        guard let token else { return nil }
+        return try? await ApiClient.mailE2ePlan(token, addresses: addresses).plan
+    }
+
     /// Send. The receipt shows `status` and `deliveryError` as the server reported
     /// them — a message the queue has only accepted is not a delivered message,
     /// and saying otherwise is the exact dishonesty the send-status test exists to
-    /// pin.
-    func send() {
+    /// pin. With an envelope, the server stores its notice in place of the body:
+    /// `bodyText` goes empty, because a sealed message's plaintext never
+    /// travels — that is the whole claim the encrypt row makes.
+    func send(e2eEnvelope: String? = nil) {
         guard let token, !compose.sending else { return }
         // An empty To is refused here, not by the server: a message with no
         // recipient is not a send, and a receipt naming the server's 422 after
@@ -1224,7 +1237,8 @@ final class MailboxModel: ObservableObject {
         let req = MailSendRequest(
             to: Self.splitAddresses(compose.to), cc: Self.splitAddresses(compose.cc),
             bcc: Self.splitAddresses(compose.bcc), subject: compose.subject,
-            bodyText: compose.body, inReplyTo: compose.inReplyTo)
+            bodyText: e2eEnvelope == nil ? compose.body : "",
+            inReplyTo: compose.inReplyTo, e2eEnvelope: e2eEnvelope)
         Task { [weak self] in
             guard let self else { return }
             do {

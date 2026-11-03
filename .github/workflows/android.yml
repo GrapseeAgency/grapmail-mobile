@@ -150,8 +150,8 @@ jobs:
           # eight new frames are named `NN-account-*`, and a diff that only
           # watches `NN-mail-*` would let one platform drop or rename an
           # account screen invisibly — the exact hole this step exists for.
-          grep -oE '"[0-9]{2}-(mail|account)-[a-z-]+"' ios/GrapMailUITests/ScreenshotWalkUITests.swift | tr -d '"' | sort -u > ios-mail.txt
-          grep -oE '[0-9]{2}-(mail|account)-[a-z-]+' scripts/android-walk.sh | sort -u > and-mail.txt
+          grep -oE '"[0-9]{2,3}-(mail|account|e2e)-[a-z-]+"' ios/GrapMailUITests/ScreenshotWalkUITests.swift | tr -d '"' | sort -u > ios-mail.txt
+          grep -oE '[0-9]{2,3}-(mail|account|e2e)-[a-z-]+' scripts/android-walk.sh | sort -u > and-mail.txt
           echo "iOS: $(wc -l < ios-mail.txt)  Android: $(wc -l < and-mail.txt)"
           if ! diff -u and-mail.txt ios-mail.txt; then
             echo "::error::the two walks photograph different mailbox screens"

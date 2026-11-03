@@ -77,6 +77,11 @@ fun MailSnapshotScreen(name: String) {
     // model's own boot read from overwriting it with the CI account's real
     // (empty) notes list — the race the mailbox seeds already guard against.
     val profileVm = remember { com.grapsee.grapmail.logic.ProfileViewModel(app, snapshotMode = true) }
+    // The encryption sector's model, seeded the same way: the frames photograph
+    // a device that HAS a key (and one that does not), because the CI walk
+    // cannot create one — creating it is a passphrase-typed, six-hundred-
+    // thousand-iteration PBKDF2 write the read-only rule forbids guessing at.
+    val e2eVm = remember { com.grapsee.grapmail.logic.E2eViewModel(app, snapshotMode = true) }
     // The sheet below prints the scope line from the live state; collecting it
     // (not reading .value once) is what lets the seeded numbers recompose the
     // photograph instead of the initial empty state being what ships.
@@ -139,6 +144,20 @@ fun MailSnapshotScreen(name: String) {
             "account-connections", "account-profile", "account-privacy", "mail-support",
             "mail-compose" ->
                 profileVm.seed(sampleProfile())
+            // The encryption frames share one seeded device identity; the
+            // settled markers are values that exist only once it lands.
+            "e2e-status-none" -> e2eVm.seedForSnapshot(
+                record = null, published = null, fingerprint = null)
+            "e2e-status-unlocked", "e2e-details", "e2e-passphrase", "e2e-remove", "e2e-unlock" ->
+                e2eVm.seedForSnapshot(record = sampleIdentity,
+                    published = null, fingerprint = sampleFingerprint,
+                    unlocked = name != "e2e-unlock")
+            "e2e-publish" -> e2eVm.seedForSnapshot(record = sampleIdentity,
+                published = samplePublished, fingerprint = sampleFingerprint, unlocked = true)
+            "e2e-recipients" -> e2eVm.seedForSnapshot(record = sampleIdentity,
+                published = samplePublished, fingerprint = sampleFingerprint, unlocked = true,
+                lookup = sampleLookup,
+                lookupFor = listOf("priya@havenworks.example", "tomas@fieldkit.example"))
         }
     }
 
@@ -225,11 +244,11 @@ fun MailSnapshotScreen(name: String) {
             // exactly as every other control in this host is.
             "mail-labels" -> LabelsScreen(vm, onBack = {}, onCreate = {}, onEdit = { })
             "mail-label-create" -> LabelCreateScreen(vm, onDone = {})
-            "mail-thread" -> ThreadScreen(vm, threadId = "t-m1", isThread = true,
+            "mail-thread" -> ThreadScreen(vm, e2eVm, threadId = "t-m1", isThread = true,
                 onBack = {}, onReply = { _, _ -> })
-            "mail-thread-encrypted" -> ThreadScreen(vm, threadId = "t-m9", isThread = true,
+            "mail-thread-encrypted" -> ThreadScreen(vm, e2eVm, threadId = "t-m9", isThread = true,
                 onBack = {}, onReply = { _, _ -> })
-            "mail-compose" -> ComposeScreen(vm = vm, profile = profileVm, onBack = {})
+            "mail-compose" -> ComposeScreen(vm = vm, profile = profileVm, e2e = e2eVm, onBack = {})
             "mail-send-receipt" -> sheetHost {
                 // The live `SendReceipt` composable, with the strings a server
                 // would send standing in for a real send. This host used to draw
@@ -252,7 +271,7 @@ fun MailSnapshotScreen(name: String) {
             "mail-settings" -> MailSettingsScreen(vm, onBack = {}, onSecurity = {},
                 onScreener = {}, onLabels = {}, onNotes = {}, onTasks = {}, onPrefs = {},
                 onAddresses = {}, onConnections = {}, onProfile = {}, onPrivacy = {},
-                onHelp = {}, onSignOut = {})
+                onEncryption = {}, onHelp = {}, onSignOut = {})
             "mail-notes" -> NotesScreen(profileVm, onBack = {})
             "mail-tasks" -> TasksScreen(profileVm, onBack = {})
             "mail-settings-prefs" -> MailPrefsScreen(profileVm, onBack = {})
@@ -263,6 +282,22 @@ fun MailSnapshotScreen(name: String) {
                 onPhone = {}, onAddresses = {}, onPrefs = {}, onSupport = {})
             "mail-support" -> SupportScreen(profileVm, onBack = {}, onForgot = {},
                 onPhone = {}, onAddresses = {})
+            // The encryption band. Every frame renders the live screen over the
+            // seeded identity; the closures do nothing, as everywhere here.
+            "e2e-status-none" -> com.grapsee.grapmail.ui.screens.mail.E2eStatusScreen(
+                e2eVm, onBack = {}, onSetup = {}, onUnlock = {}, onDetails = {},
+                onPublish = {}, onChangePassphrase = {}, onRemove = {}, onRecipients = {})
+            "e2e-status-unlocked" -> com.grapsee.grapmail.ui.screens.mail.E2eStatusScreen(
+                e2eVm, onBack = {}, onSetup = {}, onUnlock = {}, onDetails = {},
+                onPublish = {}, onChangePassphrase = {}, onRemove = {}, onRecipients = {})
+            "e2e-setup" -> com.grapsee.grapmail.ui.screens.mail.E2eSetupScreen(e2eVm, onBack = {})
+            "e2e-unlock" -> com.grapsee.grapmail.ui.screens.mail.E2eUnlockScreen(e2eVm, onBack = {})
+            "e2e-details" -> com.grapsee.grapmail.ui.screens.mail.E2eDetailsScreen(e2eVm, onBack = {})
+            "e2e-publish" -> com.grapsee.grapmail.ui.screens.mail.E2ePublishScreen(e2eVm, onBack = {})
+            "e2e-passphrase" -> com.grapsee.grapmail.ui.screens.mail.E2ePassphraseScreen(e2eVm, onBack = {})
+            "e2e-remove" -> com.grapsee.grapmail.ui.screens.mail.E2eRemoveScreen(e2eVm, onBack = {})
+            "e2e-recipients" -> com.grapsee.grapmail.ui.screens.mail.E2eRecipientsScreen(
+                e2eVm, onBack = {}, onCompose = {})
             "mail-screener" -> ScreenerScreen(vm, onBack = {}, onOpenQueue = {})
             "mail-adv-search" -> sheetHost {
                 AdvancedSearchContent(mailboxState, vm, onDone = { })
@@ -382,6 +417,72 @@ private fun sampleProfile(): ProfileDto = ProfileDto(
     ),
 )
 
+/**
+ * The device identity the encryption frames are photographed with. Invented
+ * like every seed here — it never appears in a live path — and shaped exactly
+ * like `MailE2e.loadIdentity` answers: passphrase-protected records whose
+ * private material is opaque base64, each under the container format the
+ * store writes ("grapmail-e2e-protected-key/1") and PBKDF2-SHA256 at
+ * 600,000 rounds, because the screens may show the public
+ * half and the fingerprint and NOTHING else. The plaintext key does not exist
+ * in this file; that is the point of the §27 pin over it.
+ */
+private val sampleIdentity = com.grapsee.grapmail.data.MailE2e.Identity(
+    encryption = com.grapsee.grapmail.data.MailE2e.ProtectedPrivateKey(
+        kind = "X25519",
+        publicKey = "bXNhbXBsZS1wdWJsaWMteDI1NTE5LWtleS1mb3ItcGhvdG9ncmFwaHMtb25seQ==",
+        iterations = 600_000,
+        salt = "c2VlZC1zYWx0",
+        iv = "c2VlZC1pdg==",
+        ct = "c2VlZC13cmFwcGVkLXByaXZhdGUtY3R8",
+    ),
+    signing = com.grapsee.grapmail.data.MailE2e.ProtectedPrivateKey(
+        kind = "Ed25519",
+        publicKey = "bXNhbXBsZS1wdWJsaWMtZWQyNTUxOS1rZXktZm9yLXBob3RvZ3JhcGhzLW9ubHk=",
+        iterations = 600_000,
+        salt = "c2VlZC1zYWx0",
+        iv = "c2VlZC1pdg==",
+        ct = "c2VlZC13cmFwcGVkLXNpZ25pbmctY3R8",
+    ),
+    createdAt = "2026-08-02T10:00:00Z",
+)
+
+/** The fingerprint the frames wait on: seeded text, nothing the walk can
+ *  mistake for the empty branch. */
+private val sampleFingerprint =
+    "7C:0F:2A:91:B4:D8:3E:6C:05:AA:1F:BE:D2:48:67:90:13:EC:B6:24:FA:5D:71:09:8C:30:B7:E4:16:9F:A2:C8"
+
+private val samplePublished = com.grapsee.grapmail.data.MailE2eKeysDto(
+    userId = "p1",
+    encryption = com.grapsee.grapmail.data.MailE2eKeyDto(
+        publicKey = "bXNhbXBsZS1wdWJsaWMteDI1NTE5LWtleS1mb3ItcGhvdG9ncmFwaHMtb25seQ==",
+        fingerprint = sampleFingerprint,
+        keyId = "7C0FB624FA5D7109",
+    ),
+    signing = null,
+    publishedAt = "2026-08-02T10:05:00Z",
+    updatedAt = "2026-08-02T10:05:00Z",
+)
+
+/** One found recipient and one refusal, so the lookup frame photographs both
+ *  branches the screen can show — the fingerprint to compare, and the
+ *  directory's own reason where there is no key. */
+private val sampleLookup = listOf(
+    com.grapsee.grapmail.data.MailE2eLookupEntryDto(
+        status = "found", address = "priya@havenworks.example",
+        signing = com.grapsee.grapmail.data.MailE2eKeyDto(
+            publicKey = "bm90LXJlYWwtc2lnbmluZy1wdWJ8",
+            fingerprint = "9E:41:77:CA:0B:5D:2F:86:A3:C1:F0:64:18:9B:7A:DD:0C:E7:35:52:BF:81:6E:40:2D:A9:15:C3:FE:07:84:B1",
+            keyId = "9E413552BF816E40",
+        ),
+        reason = null, domain = "havenworks.example",
+    ),
+    com.grapsee.grapmail.data.MailE2eLookupEntryDto(
+        status = "unavailable", address = "tomas@fieldkit.example",
+        signing = null, reason = "no-key-published", domain = "fieldkit.example",
+    ),
+)
+
 /// The sample pages, in the same cache the live list reads. Without them the
 /// Contacts and Files screens can only ever photograph their empty branch, and
 /// the screen under review is the populated one.
@@ -420,6 +521,15 @@ private fun seedThread(vm: MailboxViewModel, id: String, encrypted: Boolean) {
             bodyText = if (encrypted) null else
                 "Attached is the invoice for the quarter, payable on receipt. " +
                     "The facilities line item moved again — see page two.",
+            // The encrypted frame carries a real-shaped envelope so the
+            // decrypt path is what the photograph shows -- and the walk can
+            // wait on "Decrypt with your passphrase" as proof the encrypted
+            // branch composed. The bytes are a valid v2 envelope shape with
+            // sample material; nothing here can be opened, and the screen
+            // never claims otherwise.
+            e2eEnvelope = if (encrypted) kotlinx.serialization.json.Json.parseToJsonElement(
+                """{"v":2,"alg":"X25519+HKDF-SHA256+AES-256-GCM (multi-recipient)","iv":"c2VlZC1pdg==","ct":"c2VlZC1jdA==","tag":"c2VlZC10YWc=","recipients":[{"epk":"c2VlZC1lcGs=","wrapIv":"c2VlZC13aXY=","wrappedKey":"c2VlZC13aw==","wrapTag":"c2VlZC13dA=="}]}"""
+            ) as? kotlinx.serialization.json.JsonObject else null,
             attachments = if (encrypted) emptyList() else listOf(
                 MailAttachmentDto(id = "a1", name = "invoice-q3.pdf",
                     mimeType = "application/pdf", sizeBytes = 1_415_732),

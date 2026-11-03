@@ -55,6 +55,13 @@ struct RootView: View {
         // child with no way back.
         case mailNotes, mailTasks, mailPrefs, mailAddresses, mailConnections
         case accountProfile, accountPrivacy, mailSupport
+        // ── encryption band ──────────────────────────────────────────────────
+        // The web client's `/mail/account/encryption`, split into the eight
+        // screens a phone needs. One model for the stack: the in-memory unlock
+        // session is the whole point of three of them, and two copies of it
+        // would be two answers to "is the key open right now".
+        case e2eStatus, e2eSetup, e2eUnlock, e2eDetails, e2ePublish
+        case e2eChangePassphrase, e2eRemove, e2eRecipients
     }
 
     /// One mailbox for the whole signed-in stack. The list, the thread, compose
@@ -69,6 +76,12 @@ struct RootView: View {
     /// same account. Mirror of Android's `profile: ProfileViewModel` in
     /// `GrapMailNav`.
     @StateObject private var account = ProfileModel()
+
+    /// The encryption sector's state: the device identity, the in-memory
+    /// unlock session, the directory's published answer. Mirror of Android's
+    /// `e2e: E2eViewModel` in `GrapMailNav` — one instance, because compose,
+    /// the thread and the eight screens must agree on whether the key is open.
+    @StateObject private var e2e = E2eModel()
 
     // A stored, unexpired session opens the app signed-in — the Keychain
     // token has to be read at launch, not just written.
@@ -122,7 +135,8 @@ struct RootView: View {
                 // ever carries the argument, and nothing here fetches or submits.
                 if let snapshot = SecuritySnapshot.requested() {
                     Group {
-                        if snapshot.hasPrefix("mail-") || snapshot.hasPrefix("account-") {
+                        if snapshot.hasPrefix("mail-") || snapshot.hasPrefix("account-")
+                            || snapshot.hasPrefix("e2e-") {
                             MailSnapshotView(name: snapshot)
                         } else {
                             SecuritySnapshotView(name: snapshot)
@@ -470,12 +484,12 @@ struct RootView: View {
                     )
                 case let .mailThread(id, isThread):
                     ThreadView(
-                        vm: mail, id: id, isThread: isThread,
+                        vm: mail, e2e: e2e, id: id, isThread: isThread,
                         onBack: { path.removeLast() },
                         onReply: { id, mode in path.append(.mailCompose(reply: id, mode: mode)) }
                     )
                 case let .mailCompose(reply, mode):
-                    ComposeView(vm: mail, account: account, replyId: reply, mode: mode,
+                    ComposeView(vm: mail, account: account, e2e: e2e, replyId: reply, mode: mode,
                                 onBack: { path.removeLast() })
                 case .mailLabels:
                     LabelsView(vm: mail,
@@ -519,6 +533,7 @@ struct RootView: View {
                         onConnections: { path.append(.mailConnections) },
                         onProfile: { path.append(.accountProfile) },
                         onPrivacy: { path.append(.accountPrivacy) },
+                        onEncryption: { path.append(.e2eStatus) },
                         onHelp: { path.append(.mailSupport) },
                         onSignOut: {
                             SessionStore.clear()
@@ -559,6 +574,44 @@ struct RootView: View {
                         onPhone: { path.append(.phoneVerify) },
                         onAddresses: { path.append(.mailAddresses) },
                     )
+                // ── encryption band ──────────────────────────────────────────
+                case .e2eStatus:
+                    E2eStatusScreen(vm: e2e, onBack: { path.removeLast() },
+                                    onSetup: { path.append(.e2eSetup) },
+                                    onUnlock: { path.append(.e2eUnlock) },
+                                    onDetails: { path.append(.e2eDetails) },
+                                    onPublish: { path.append(.e2ePublish) },
+                                    onChangePassphrase: { path.append(.e2eChangePassphrase) },
+                                    onRemove: { path.append(.e2eRemove) },
+                                    onRecipients: { path.append(.e2eRecipients) })
+                case .e2eSetup:
+                    E2eSetupScreen(vm: e2e, onBack: { path.removeLast() })
+                case .e2eUnlock:
+                    E2eUnlockScreen(vm: e2e, onBack: { path.removeLast() })
+                case .e2eDetails:
+                    E2eDetailsScreen(vm: e2e, onBack: { path.removeLast() })
+                case .e2ePublish:
+                    E2ePublishScreen(vm: e2e, onBack: { path.removeLast() })
+                case .e2eChangePassphrase:
+                    E2ePassphraseScreen(vm: e2e, onBack: { path.removeLast() })
+                case .e2eRemove:
+                    E2eRemoveScreen(vm: e2e, onBack: { path.removeLast() })
+                case .e2eRecipients:
+                    E2eRecipientsScreen(vm: e2e, onBack: { path.removeLast() },
+                                        onCompose: {
+                                            // Same door Android's lookup screen
+                                            // opens: back to compose, where the
+                                            // encrypt row reads the same session.
+                                            // Pop to the mailbox first -- the
+                                            // band sits under Settings -- then
+                                            // one fresh compose, so a stale
+                                            // reply-target compose is never
+                                            // reused for a new message.
+                                            while let last = path.last, last != .home {
+                                                path.removeLast()
+                                            }
+                                            path.append(.mailCompose(reply: "", mode: "reply"))
+                                        })
                 case .mailScreener:
                     ScreenerView(
                         vm: mail,

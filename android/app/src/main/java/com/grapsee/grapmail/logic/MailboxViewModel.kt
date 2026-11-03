@@ -1041,7 +1041,7 @@ class MailboxViewModel @JvmOverloads constructor(
      * and saying otherwise is the exact dishonesty the send-status test exists to
      * pin.
      */
-    fun send() {
+    fun send(e2eEnvelope: String? = null) {
         val s = _compose.value
         if (s.sending) return
         // An empty To is refused here, not by the server: a message with no
@@ -1059,7 +1059,13 @@ class MailboxViewModel @JvmOverloads constructor(
                 Api.mailSend(t, MailSendRequest(
                     to = splitAddresses(s.to), cc = splitAddresses(s.cc),
                     bcc = splitAddresses(s.bcc), subject = s.subject,
-                    bodyText = s.body, inReplyTo = s.inReplyTo,
+                    // With an envelope the plaintext does not travel: the
+                    // route stores its notice in place of a body, and a
+                    // client that sent both would leak exactly what the
+                    // envelope exists to keep private.
+                    bodyText = if (e2eEnvelope != null) "" else s.body,
+                    inReplyTo = s.inReplyTo,
+                    e2eEnvelope = e2eEnvelope,
                 ))
             }.onSuccess { r ->
                 _compose.update { it.copy(sending = false,
@@ -1787,6 +1793,19 @@ class MailboxViewModel @JvmOverloads constructor(
                     then(mailReason(e))
                 }
         }
+    }
+
+    /**
+     * The compose-time plan, asked synchronously by the send path: mode and
+     * the keys to seal to. Null when the directory did not answer — which the
+     * send treats as "not encrypted", never as "encrypt anyway": the
+     * difference between "the server said this cannot be encrypted" and "we
+     * could not ask" decides whether the message goes plain or not at all.
+     */
+    suspend fun encryptionPlan(addresses: List<String>): Pair<String, List<String>>? {
+        val t = token() ?: return null
+        return runCatching { Api.mailE2ePlan(t, addresses) }.getOrNull()
+            ?.plan?.let { it.mode to it.keys }
     }
 
     /** Who has a key, and what their fingerprint is — the verification read. */
