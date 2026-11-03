@@ -40,7 +40,6 @@ import com.grapsee.grapmail.data.MailStore
 import com.grapsee.grapmail.data.MailUnsubscribeDto
 import com.grapsee.grapmail.logic.MailboxViewModel
 import com.grapsee.grapmail.ui.components.SenderAvatar
-import com.grapsee.grapmail.ui.components.openExternally
 import com.grapsee.grapmail.ui.components.unsubscribeMailto
 import com.grapsee.grapmail.ui.components.unsubscribeTarget
 import com.grapsee.grapmail.ui.theme.LocalPalette

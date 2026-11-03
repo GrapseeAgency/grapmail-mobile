@@ -131,43 +131,73 @@ struct RootView: View {
 
     var body: some View {
         NavigationStack(path: $path) {
-            Group {
-                // Test-only hook: the UI test names one post-write confirmation
-                // screen at launch and the app renders it instead of the flow.
-                // Those screens only exist after a write the walk must not
-                // perform, so they are otherwise unreachable. No real launch
-                // ever carries the argument, and nothing here fetches or submits.
-                if let snapshot = SecuritySnapshot.requested() {
-                    Group {
-                        if snapshot.hasPrefix("mail-") || snapshot.hasPrefix("account-")
-                            || snapshot.hasPrefix("e2e-") {
-                            MailSnapshotView(name: snapshot)
-                        } else {
-                            SecuritySnapshotView(name: snapshot)
-                        }
-                    }
-                    // The dark frame the design review needs. XCUITest on this
-                    // runner has no appearance override, so the app applies it
-                    // from a launch argument no real launch carries — and only
-                    // inside the test-only branch, where it cannot affect a live
-                    // screen. The colours still resolve through GM's trait
-                    // lookup; this only changes which trait the system reports.
-                    .preferredColorScheme(
-                        ProcessInfo.processInfo.arguments.contains("-gmDark") ? .dark : nil)
-                } else {
-                    WelcomeView(
-                        onCreateAccount: { path.append(.stepName) },
-                        onSignIn: { path.append(.signIn) }
-                    )
+            // The launch content and the destination switch live in
+            // `rootContent` and `destination` below. The body of this view had
+            // grown past what the type-checker will resolve in one expression
+            // (CI named it "unable to type-check this expression in reasonable
+            // time"), and the repo has learned twice that the fix is the same:
+            // break the builder into functions. The Group the switch sat in
+            // erased the branch types already, so extracting changes nothing
+            // a person can see.
+            rootContent
+                .navigationDestination(for: Route.self) { route in
+                    destination(route)
                 }
+            // A dead token is discovered by the server, not by us: the first
+            // authenticated call that comes back 401 clears the Keychain and
+            // posts this. Without the handler the app stays on a signed-in
+            // screen whose every request fails, and the person has no way back
+            // in short of reinstalling. Anonymous 401s (wrong password at
+            // sign-in) never reach here — only a rejected bearer does.
+            .onReceive(NotificationCenter.default.publisher(for: .gmSessionExpired)) { _ in
+                guard path.last != .signIn else { return }
+                path = [.signIn]
             }
-            .navigationDestination(for: Route.self) { route in
-                // Every screen draws its own header with its own back control.
-                // Without this the system bar added a second, unguarded back
-                // button above it — and an unguarded way past screens that ask
-                // for confirmation before leaving.
+        }
+    }
+
+    /// The launch screen: the test-only snapshot host when the walk named
+    /// one, the signed-in-or-welcome root otherwise.
+    @ViewBuilder private var rootContent: some View {
+        Group {
+            // Test-only hook: the UI test names one post-write confirmation
+            // screen at launch and the app renders it instead of the flow.
+            // Those screens only exist after a write the walk must not
+            // perform, so they are otherwise unreachable. No real launch
+            // ever carries the argument, and nothing here fetches or submits.
+            if let snapshot = SecuritySnapshot.requested() {
                 Group {
-                switch route {
+                    if snapshot.hasPrefix("mail-") || snapshot.hasPrefix("account-")
+                        || snapshot.hasPrefix("e2e-") {
+                        MailSnapshotView(name: snapshot)
+                    } else {
+                        SecuritySnapshotView(name: snapshot)
+                    }
+                }
+                // The dark frame the design review needs. XCUITest on this
+                // runner has no appearance override, so the app applies it
+                // from a launch argument no real launch carries — and only
+                // inside the test-only branch, where it cannot affect a live
+                // screen. The colours still resolve through GM's trait
+                // lookup; this only changes which trait the system reports.
+                .preferredColorScheme(
+                    ProcessInfo.processInfo.arguments.contains("-gmDark") ? .dark : nil)
+            } else {
+                WelcomeView(
+                    onCreateAccount: { path.append(.stepName) },
+                    onSignIn: { path.append(.signIn) }
+                )
+            }
+        }
+    }
+
+    /// Every routed screen, one switch. Each screen draws its own header
+    /// with its own back control — without the hidden toolbar below the
+    /// system bar would add a second, unguarded back button above it, and
+    /// an unguarded way past screens that ask for confirmation first.
+    @ViewBuilder private func destination(_ route: Route) -> some View {
+        Group {
+            switch route {
                 case .welcome:
                     WelcomeView(
                         onCreateAccount: { path.append(.stepName) },
@@ -600,19 +630,8 @@ struct RootView: View {
                     )
                 }
                 }
-                .toolbar(.hidden, for: .navigationBar)
-                .navigationBarBackButtonHidden(true)
-            }
-            // A dead token is discovered by the server, not by us: the first
-            // authenticated call that comes back 401 clears the Keychain and
-            // posts this. Without the handler the app stays on a signed-in
-            // screen whose every request fails, and the person has no way back
-            // in short of reinstalling. Anonymous 401s (wrong password at
-            // sign-in) never reach here — only a rejected bearer does.
-            .onReceive(NotificationCenter.default.publisher(for: .gmSessionExpired)) { _ in
-                guard path.last != .signIn else { return }
-                path = [.signIn]
-            }
+            .toolbar(.hidden, for: .navigationBar)
+            .navigationBarBackButtonHidden(true)
         }
     }
 
