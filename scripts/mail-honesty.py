@@ -1794,7 +1794,9 @@ for seeded in ("The Weekly Draft", "noreply@digest.example.org",
                "https://lists.newsletter.example/unsub?id=7f3"):
     pin(f"the subscriptions seed {seeded!r} exists in both hosts", seeded in KT_HOST and seeded in SW_HOST)
 pin("the empty subscriptions frame seeds an empty read, not an unread cache",
-    'total = 0' in code_only(KT_HOST) and 'empty.total = 0' in code_only(SW_HOST))
+    'total: Int = 0' in KT_MDTO
+    and "MailInboxResponse(success = true, box = \"inbox\", messages = emptyList())" in KT_HOST
+    and 'empty.total = 0' in code_only(SW_HOST) and 'empty.messages = []' in code_only(SW_HOST))
 pin("both walks photograph both subscriptions frames with the same waits",
     all(f'settled="{m}"' in KT_WALK for m in ("The Weekly Draft",
                                               "No subscriptions detected."))

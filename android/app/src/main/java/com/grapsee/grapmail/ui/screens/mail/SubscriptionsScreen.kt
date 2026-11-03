@@ -40,6 +40,7 @@ import com.grapsee.grapmail.data.MailStore
 import com.grapsee.grapmail.data.MailUnsubscribeDto
 import com.grapsee.grapmail.logic.MailboxViewModel
 import com.grapsee.grapmail.ui.components.SenderAvatar
+import com.grapsee.grapmail.ui.components.openExternally
 import com.grapsee.grapmail.ui.components.unsubscribeMailto
 import com.grapsee.grapmail.ui.components.unsubscribeTarget
 import com.grapsee.grapmail.ui.theme.LocalPalette
@@ -287,8 +288,7 @@ fun SubscriptionsScreen(vm: MailboxViewModel, onBack: () -> Unit) {
                         sender = s.address,
                         url = url,
                         onOpen = {
-                            val outcome = com.grapsee.grapmail.ui.components
-                                .openExternally(context, url)
+                            val outcome = openExternally(context, url)
                             gone = gone + s.address
                             note = outcome + " The row is removed here because this device " +
                                 "cannot see what the page said."
@@ -338,7 +338,7 @@ private fun SubscriptionRowLine(
         Modifier.fillMaxWidth().padding(vertical = 14.dp).testTag("gm-subs-row"),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        SenderAvatar(display = s.name, address = s.address, size = 38)
+        SenderAvatar(display = s.name, address = s.address, size = 38.dp)
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
             Text(s.name, fontSize = 14.sp, color = palette.textPrimary, maxLines = 1)

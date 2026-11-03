@@ -50,7 +50,7 @@ data class MailPersonDto(
  * its fallback: an older row may still hold the comma-separated bracket list,
  * and the existing header parser is honest about that shape.
  */
-@Serializable(with = MailUnsubscribeDtoSerializer::class)
+@Serializable(with = MailUnsubscribeSerializer::class)
 data class MailUnsubscribeDto(
     val offers: List<MailUnsubscribeOfferDto> = emptyList(),
     val oneClickAdvertised: Boolean = false,
@@ -60,24 +60,35 @@ data class MailUnsubscribeDto(
 @Serializable
 data class MailUnsubscribeOfferDto(val url: String = "", val oneClick: Boolean = false)
 
-object MailUnsubscribeDtoSerializer : kotlinx.serialization.json.JsonSerializer<MailUnsubscribeDto>() {
-    // A plain @Serializable shadow of the same shape: the custom serializer
-    // must not reach for `MailUnsubscribeDto.serializer()` (the plugin makes
-    // that THIS object), so the boring field-by-field half is generated
-    // elsewhere and mapped in one line each way.
-    @Serializable private data class Wire(
-        val offers: List<MailUnsubscribeOfferDto> = emptyList(),
-        val oneClickAdvertised: Boolean = false,
-        val raw: String? = null,
-    )
+// A plain @Serializable shadow of the same shape: the custom reader below
+// must not reach for `MailUnsubscribeDto.serializer()` (the plugin makes
+// that THIS object), so the boring field-by-field half is generated here
+// and reused for the descriptor and the write path. (An `object` cannot use
+// `by` delegation -- that syntax belongs to class constructors -- so the
+// three members are spelled out and forward to the Wire.)
+@Serializable
+private data class MailUnsubscribeWire(
+    val offers: List<MailUnsubscribeOfferDto> = emptyList(),
+    val oneClickAdvertised: Boolean = false,
+    val raw: String? = null,
+)
 
-    override fun serialize(encoder: kotlinx.serialization.json.JsonEncoder, value: MailUnsubscribeDto) {
-        encoder.encodeSerializableValue(Wire.serializer(),
-            Wire(value.offers, value.oneClickAdvertised, value.raw))
+private fun MailUnsubscribeWire.toDto() =
+    MailUnsubscribeDto(offers = offers, oneClickAdvertised = oneClickAdvertised, raw = raw)
+
+private object MailUnsubscribeSerializer : kotlinx.serialization.KSerializer<MailUnsubscribeDto> {
+    private val wire = MailUnsubscribeWire.serializer()
+    override val descriptor get() = wire.descriptor
+
+    override fun serialize(encoder: kotlinx.serialization.encoding.Encoder, value: MailUnsubscribeDto) {
+        encoder.encodeSerializableValue(wire,
+            MailUnsubscribeWire(value.offers, value.oneClickAdvertised, value.raw))
     }
 
-    override fun deserialize(decoder: kotlinx.serialization.json.JsonDecoder): MailUnsubscribeDto {
-        val el = decoder.decodeJsonElement()
+    override fun deserialize(decoder: kotlinx.serialization.encoding.Decoder): MailUnsubscribeDto {
+        val jsonDecoder = decoder as? kotlinx.serialization.json.JsonDecoder
+            ?: return wire.deserialize(decoder).toDto()
+        val el = jsonDecoder.decodeJsonElement()
         return when (el) {
             is kotlinx.serialization.json.JsonObject -> MailUnsubscribeDto(
                 offers = (el["offers"] as? kotlinx.serialization.json.JsonArray)
@@ -94,8 +105,8 @@ object MailUnsubscribeDtoSerializer : kotlinx.serialization.json.JsonSerializer<
                     (el["oneClickAdvertised"] as? kotlinx.serialization.json.JsonPrimitive)?.content == "true",
             )
             // A bare string is the legacy header, kept parseable rather than
-            // dropped: `null` under the old shape, this under the new one, and
-            // `parseUnsubscribe` reads the header when there is no offer list.
+            // dropped: null under the old wire, this under the new one, and
+            // `unsubscribeTarget` reads the header when there is no offer list.
             is kotlinx.serialization.json.JsonPrimitive ->
                 if (el.isString) MailUnsubscribeDto(raw = el.content) else MailUnsubscribeDto()
             else -> MailUnsubscribeDto()

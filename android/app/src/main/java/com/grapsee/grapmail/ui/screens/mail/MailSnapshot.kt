@@ -28,6 +28,8 @@ import androidx.compose.ui.unit.sp
 import com.grapsee.grapmail.data.MailAttachmentDto
 import com.grapsee.grapmail.data.MailBox
 import com.grapsee.grapmail.data.MailFilter
+import com.grapsee.grapmail.data.MailUnsubscribeDto
+import com.grapsee.grapmail.data.MailUnsubscribeOfferDto
 import com.grapsee.grapmail.data.MailLabelDto
 import com.grapsee.grapmail.data.MailInboxResponse
 import com.grapsee.grapmail.data.MailMessageDto
@@ -575,7 +577,7 @@ private suspend fun seedCache() {
 /// frame proving the empty branch must not stand in the failed one.
 private suspend fun seedEmptyInbox() {
     MailStore.putPage(MailBox.Inbox, null,
-        MailInboxResponse(success = true, box = "inbox", total = 0, messages = emptyList()),
+        MailInboxResponse(success = true, box = "inbox", messages = emptyList()),
         replace = true)
 }
 

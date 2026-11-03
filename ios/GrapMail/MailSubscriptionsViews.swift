@@ -22,14 +22,17 @@ import SwiftUI
 /// a button that would lie.
 
 /// One detected subscription. Mirrors the web's `Subscription` and Android's
-/// `SubscriptionRow`.
-struct SubscriptionRowData {
+/// `SubscriptionRow`. `Identifiable` because the confirmation is presented as
+/// `.sheet(item:)` — the row the sheet belongs to is the row's identity, and
+/// the address is the key detection grouped by.
+struct SubscriptionRowData: Identifiable {
     let address: String
     var name: String
     var count: Int
     var lastAt: String
     var frequency: String
     var unsubscribe: MailUnsubscribe?
+    var id: String { address }
 }
 
 private let serviceLocalPattern =
@@ -258,7 +261,7 @@ struct SubscriptionsView: View {
                 .foregroundColor(GM.textSecondary)
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.vertical, 6)
-            ForEach(subs, id: \.address) { s in row(s) }
+            ForEach(subs) { s in row(s) }
             Text("This screen grouped the \(scopeCount) incoming messages the app has "
                  + "loaded; a sender whose mail is not on this device is not on this list.")
                 .font(.system(size: 12)).lineSpacing(4)

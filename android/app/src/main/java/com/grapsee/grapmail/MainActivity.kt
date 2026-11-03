@@ -923,7 +923,6 @@ fun GrapMailNav() {
                 onPrefs = { nav.navigate(Routes.MAIL_PREFS) },
                 onAddresses = { nav.navigate(Routes.MAIL_ADDRESSES) },
                 onConnections = { nav.navigate(Routes.MAIL_CONNECTIONS) },
-                onSubscriptions = { nav.navigate(Routes.MAIL_SUBSCRIPTIONS) },
                 onProfile = { nav.navigate(Routes.ACCOUNT_PROFILE) },
                 onPrivacy = { nav.navigate(Routes.ACCOUNT_PRIVACY) },
                 onEncryption = { nav.navigate(Routes.E2E_STATUS) },
