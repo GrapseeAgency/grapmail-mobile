@@ -2324,8 +2324,17 @@ pin("compose states its subject and body the same way on both platforms",
     'placeholder = "Add a subject"' in code_only(android("ui/screens/mail/ComposeScreen.kt"))
     and 'placeholder: "Add a subject"' in code_only(SW_RDR)
     and "heightIn(min = 240.dp)" in code_only(android("ui/screens/mail/ComposeScreen.kt"))
-    and ".frame(minHeight: 240)" in code_only(SW_RDR)
+    and "minHeight: 240, maxHeight: .infinity" in code_only(SW_RDR)
     and 'placeholder = "Subject",' not in code_only(android("ui/screens/mail/ComposeScreen.kt")))
+
+# The frame that followed proved the floor alone was not enough: a 240dp
+# body inside a scrollable column left the whole lower half of the screen
+# empty on both platforms (frame 76, both artifact sets). The body must
+# GROW to the pinned action bar. Remove either growth and the dead zone
+# the audit exists to kill comes straight back.
+pin("the compose body grows to the action bar — no bottom dead zone",
+    "Modifier.weight(1f, fill = false)" in code_only(android("ui/screens/mail/ComposeScreen.kt"))
+    and "minHeight: 240, maxHeight: .infinity" in code_only(SW_RDR))
 
 # Frame 62's photograph caught what no marker could: the drawer's Subscriptions
 # row — the only phone door to that screen — sat below an unmarked fold. The

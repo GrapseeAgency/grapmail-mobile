@@ -491,32 +491,43 @@ struct ComposeView: View {
     }
 
     var body: some View {
+        // One language with Android's compose and with Gmail/Apple Mail:
+        // fields on top, the body filling everything down to a pinned action
+        // bar. The ScrollView this replaces floored the body at 240pt and
+        // left the whole lower half of frame 76 empty -- the top-heavy
+        // dead-zone layout the design audit set out to remove.
         VStack(spacing: 0) {
             header
-            ScrollView {
-                VStack(alignment: .leading, spacing: 0) {
-                    fields
-                    suggestions
-                    bodyEditor
-                    actions
-                    if let notice {
-                        Text(notice)
-                            .font(.system(size: 13)).foregroundColor(GM.textSecondary)
-                            .padding(.top, 10)
-                    }
-                    if let status = vm.compose.resultStatus {
-                        SendReceipt(status: status,
-                                    detail: vm.compose.result,
-                                    error: vm.compose.error)
-                            .padding(.top, 12)
-                    } else if let error = vm.compose.error {
-                        Text(error).font(.system(size: 13)).foregroundColor(GM.error)
-                            .padding(.top, 12)
-                    }
-                }
-                .padding(.horizontal, 16)
+            VStack(alignment: .leading, spacing: 0) {
+                fields
+                suggestions
+                bodyEditor
             }
+            .padding(.horizontal, 16)
+            .frame(maxWidth: .infinity)
+            if let notice {
+                ScrollView(.vertical, showsIndicators: false) {
+                    Text(notice)
+                        .font(.system(size: 13)).foregroundColor(GM.textSecondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .frame(maxHeight: 60)
+                .padding(.top, 10)
+            }
+            if let status = vm.compose.resultStatus {
+                SendReceipt(status: status,
+                            detail: vm.compose.result,
+                            error: vm.compose.error)
+                    .padding(.top, 12)
+                    .padding(.horizontal, 16)
+            } else if let error = vm.compose.error {
+                Text(error).font(.system(size: 13)).foregroundColor(GM.error)
+                    .padding(.top, 12)
+                    .padding(.horizontal, 16)
+            }
+            actions
         }
+        .frame(maxHeight: .infinity, alignment: .top)
         .background(GM.bg)
         .fileImporter(isPresented: $picking,
                       allowedContentTypes: [.data, .image, .pdf],
@@ -692,7 +703,9 @@ struct ComposeView: View {
                 .font(.system(size: 15))
                 .foregroundColor(GM.textPrimary)
                 .scrollContentBackground(.hidden)
-                .frame(minHeight: 240)
+                // Grows into everything the fields and the pinned bar leave
+                // over; 240 is the floor, no longer the ceiling.
+                .frame(minHeight: 240, maxHeight: .infinity)
                 // The identifier names the signed state, not the field: frame
                 // 76's settled marker must flip when the signature lands, the
                 // same mechanism as Android's `gm-signed-body` testTag.

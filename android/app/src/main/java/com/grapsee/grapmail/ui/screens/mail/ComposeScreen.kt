@@ -19,12 +19,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.AttachFile
 import androidx.compose.material.icons.rounded.Close
@@ -205,7 +203,13 @@ fun ComposeScreen(
                     .padding(2.dp).testTag("mail-send"))
         }
 
-        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp)) {
+        // Fields on top, the body filling everything between them and the
+        // pinned action bar: the compose idiom Gmail and Apple Mail ship.
+        // The scrollable Column this replaces left the body at a 240dp floor
+        // with a dead zone under it -- frame 76's photograph showed the whole
+        // lower half of the screen empty, the exact top-heavy layout the
+        // design audit set out to remove. No outer scroll: the body grows.
+        Column(Modifier.fillMaxSize().padding(horizontal = 16.dp)) {
 
             FieldRow(label = "To", value = state.to, placeholder = "Search contacts or type email…",
                 onValue = { vm.composeUpdate { s -> s.copy(to = it) } },
@@ -294,7 +298,8 @@ fun ComposeScreen(
                 // GrapMail"), and an exact-match wait on the signature alone
                 // could never fire. A testTag flips with the signature landing
                 // -- the same mechanism the bottom sheets are photographed by.
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.weight(1f, fill = false)
+                    .fillMaxWidth()
                     .testTag(if (signature.isNotBlank() && state.body.contains(signature))
                         "gm-signed-body" else "mail-body-field")
                     .padding(vertical = 14.dp)
