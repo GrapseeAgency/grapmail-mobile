@@ -94,20 +94,32 @@ private struct E2eButton: View {
     let text: String
     let enabled: Bool
     var quiet = false
+    /// false for buttons that sit in a Row beside a weighted field: a
+    /// maxWidth .infinity child claims the whole row before the field is
+    /// measured, and the recipients screen's address field was being
+    /// squeezed to zero width by its own Check button.
+    var fill = true
+    /// Red for the irreversible (Material/HIG): deleting the private key is
+    /// not the same kind of press as "Lock now" and must not wear its face.
+    var destructive = false
     var marker: String? = nil
     let onClick: () -> Void
 
     var body: some View {
         Text(text)
             .font(.system(size: 14, weight: .semibold))
-            .foregroundColor(quiet ? (enabled ? GM.textPrimary : GM.textTertiary)
-                                   : .white)
-            .frame(maxWidth: .infinity)
+            .foregroundColor(destructive ? (enabled ? .white : GM.textTertiary)
+                           : quiet ? (enabled ? GM.textPrimary : GM.textTertiary)
+                           : .white)
+            .frame(maxWidth: fill ? .infinity : nil)
             .padding(.vertical, 13)
+            .padding(.horizontal, fill ? 0 : 22)
             .background(RoundedRectangle(cornerRadius: 24, style: .continuous)
-                .fill(quiet ? GM.card : (enabled ? GM.primarySolid : GM.buttonDisabled))
+                .fill(destructive ? (enabled ? GM.error : GM.buttonDisabled)
+                                  : quiet ? GM.card : (enabled ? GM.primarySolid : GM.buttonDisabled))
                 .overlay(RoundedRectangle(cornerRadius: 24, style: .continuous)
-                    .strokeBorder(quiet ? GM.border : GM.primarySolid, lineWidth: 1)))
+                    .strokeBorder(destructive ? GM.error : quiet ? GM.border : GM.primarySolid,
+                                  lineWidth: 1)))
             .contentShape(Rectangle())
             .onTapGesture { if enabled { onClick() } }
             // No shared fallback identifier: two buttons answering to one name
@@ -115,6 +127,17 @@ private struct E2eButton: View {
             // its own; Android's `tag =` on the same buttons is the twin.
             .modifier(E2eMarker(id: marker))
     }
+}
+
+/// The fingerprint eight byte-groups to a line, so a wrap never lands
+/// mid-pair ("...C:05:" over "AA:..." read as a rendering fault on three
+/// screens). Android's `fingerprintBlock` is the twin.
+func e2eFingerprintBlock(_ fp: String) -> String {
+    let groups = fp.split(separator: ":", omittingEmptySubsequences: false).map(String.init)
+    guard groups.count > 8 else { return fp }
+    return stride(from: 0, to: groups.count, by: 8).map {
+        groups[$0..<min($0 + 8, groups.count)].joined(separator: ":")
+    }.joined(separator: "\n")
 }
 
 private struct E2eLede: View {
@@ -148,9 +171,10 @@ struct E2eStatusScreen: View {
 
     var body: some View {
         MailScaffold(title: "Encryption", onBack: onBack) {
+            GeometryReader { g in
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
-                    Spacer().frame(height: 8)
+                    Spacer(minLength: 0)
                     switch vm.state.available {
                     case nil:
                         Text("Checking this device…")
@@ -203,7 +227,7 @@ struct E2eStatusScreen: View {
                         }
                         if vm.state.record != nil {
                             Spacer().frame(height: 14)
-                            E2eRow(label: "Fingerprint", value: vm.state.fingerprint ?? "-")
+                            E2eRow(label: "Fingerprint", value: e2eFingerprintBlock(vm.state.fingerprint ?? "-"))
                             Spacer().frame(height: 8)
                             E2eButton(text: "Key details", enabled: true, quiet: true,
                                       marker: "gm-e2e-details-open", onClick: onDetails)
@@ -224,8 +248,11 @@ struct E2eStatusScreen: View {
                         }
                     }
                     Spacer().frame(height: 24)
+                    Spacer(minLength: 0)
                 }
+                .frame(minHeight: g.size.height)
                 .padding(.horizontal, 20)
+            }
             }
         }
         .task { vm.load() }
@@ -365,11 +392,12 @@ struct E2eDetailsScreen: View {
     var body: some View {
         MailScaffold(title: "This device's key", onBack: onBack) {
             VStack(alignment: .leading, spacing: 0) {
+                Spacer(minLength: 0)
                 E2eLede("Read the fingerprint aloud, or send it through another channel, and have the "
                         + "other person confirm it. If the two do not match, the key you have is not theirs.")
                 Spacer().frame(height: 10)
-                E2eRow(label: "Fingerprint", value: vm.state.fingerprint ?? "-")
-                E2eRow(label: "Created", value: vm.state.record?.createdAt ?? "-")
+                E2eRow(label: "Fingerprint", value: e2eFingerprintBlock(vm.state.fingerprint ?? "-"))
+                E2eRow(label: "Created", value: MailTime.full(vm.state.record?.createdAt) ?? "-")
                 E2eRow(label: "Signing key",
                        value: vm.state.record?.signing != nil
                               ? "Yes: recipients can verify it was you" : "None",
@@ -379,7 +407,7 @@ struct E2eDetailsScreen: View {
                     .font(.system(size: 12)).lineSpacing(4)
                     .foregroundColor(GM.textTertiary)
                     .fixedSize(horizontal: false, vertical: true)
-                Spacer()
+                Spacer(minLength: 0)
             }
             .padding(.horizontal, 20)
         }
@@ -394,8 +422,10 @@ struct E2ePublishScreen: View {
 
     var body: some View {
         MailScaffold(title: "Who can find your key", onBack: onBack) {
+            GeometryReader { g in
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
+                    Spacer(minLength: 0)
                     if let note = vm.state.note {
                         E2eNote(text: note, bad: vm.state.noteIsBad)
                         Spacer().frame(height: 10)
@@ -413,8 +443,8 @@ struct E2ePublishScreen: View {
                         E2eLede("Your public key is published, so anyone sending you mail can encrypt to "
                                 + "it. Your private key is not published and never will be.")
                         Spacer().frame(height: 8)
-                        E2eRow(label: "Published fingerprint", value: p.encryption?.fingerprint ?? "-")
-                        E2eRow(label: "Updated", value: p.updatedAt ?? p.publishedAt ?? "-")
+                        E2eRow(label: "Published fingerprint", value: e2eFingerprintBlock(p.encryption?.fingerprint ?? "-"))
+                        E2eRow(label: "Updated", value: MailTime.full(p.updatedAt ?? p.publishedAt) ?? "-")
                         // The condition is a function call, not a local `let`:
                         // a ViewBuilder branch takes expressions, and the
                         // status screen already learned that from CI. The
@@ -446,8 +476,11 @@ struct E2ePublishScreen: View {
                         }
                     }
                     Spacer().frame(height: 24)
+                    Spacer(minLength: 0)
                 }
+                .frame(minHeight: g.size.height)
                 .padding(.horizontal, 20)
+            }
             }
         }
         .task { vm.loadPublished() }
@@ -512,6 +545,7 @@ struct E2eRemoveScreen: View {
     var body: some View {
         MailScaffold(title: "Remove the key from this device", onBack: onBack) {
             VStack(alignment: .leading, spacing: 0) {
+                Spacer(minLength: 0)
                 if let note = vm.state.note {
                     E2eNote(text: note, bad: vm.state.noteIsBad)
                     Spacer().frame(height: 10)
@@ -528,7 +562,7 @@ struct E2eRemoveScreen: View {
                               onClick: { confirmRemove = true })
                 } else {
                     E2eButton(text: vm.state.busy ? "Removing…" : "Yes, delete the key from this device",
-                              enabled: !vm.state.busy, marker: "gm-e2e-remove-confirm",
+                              enabled: !vm.state.busy, destructive: true, marker: "gm-e2e-remove-confirm",
                               onClick: { vm.removeKey(); confirmRemove = false; onBack() })
                     Spacer().frame(height: 8)
                     E2eButton(text: "Keep it", enabled: true, quiet: true,
@@ -568,7 +602,7 @@ struct E2eRecipientsScreen: View {
                             .frame(maxWidth: .infinity)
                         E2eButton(text: "Check",
                                   enabled: !vm.state.busy && !draft.trimmed.isEmpty,
-                                  marker: "gm-e2e-lookup-submit",
+                                  fill: false, marker: "gm-e2e-lookup-submit",
                                   onClick: { vm.lookup(addresses: [draft.trimmed]); draft = "" })
                             .fixedSize()
                     }
@@ -607,7 +641,7 @@ struct E2eRecipientsScreen: View {
                     .foregroundColor(e.status == "found" ? GM.success : GM.warnInk)
             }
             if e.status == "found", e.signing != nil {
-                Text("Signing fingerprint \(e.signing?.fingerprint ?? "-")")
+                Text("Signing fingerprint \(e2eFingerprintBlock(e.signing?.fingerprint ?? "-"))")
                     .font(.system(size: 12, design: .monospaced))
                     .foregroundColor(GM.textSecondary)
             } else if e.status != "found" {

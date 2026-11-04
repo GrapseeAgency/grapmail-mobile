@@ -240,8 +240,8 @@ struct SubscriptionsView: View {
         } else if subs.isEmpty {
             VStack(alignment: .leading, spacing: 0) {
                 Text("No subscriptions detected.")
-                    .font(.system(size: 15)).foregroundColor(GM.textPrimary)
-                    .padding(.vertical, 6)
+                    .font(.system(size: 17, weight: .semibold)).foregroundColor(GM.textPrimary)
+                    .padding(.top, 48).padding(.bottom, 10)
                 Text("This screen reads the incoming inbox mail the app has loaded on this "
                      + "device — \(scopeCount) messages — and groups the senders that keep "
                      + "mailing you. A sender counts with two messages when they offer an "

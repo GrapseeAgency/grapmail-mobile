@@ -3,6 +3,7 @@ package com.grapsee.grapmail.ui.screens.mail
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
@@ -42,6 +43,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.grapsee.grapmail.logic.E2eViewModel
 import com.grapsee.grapmail.ui.components.AppTextField
+import com.grapsee.grapmail.ui.components.absoluteDateTimeOrRaw
 import com.grapsee.grapmail.ui.theme.LocalPalette
 
 /**
@@ -102,18 +104,38 @@ private fun E2eRow(label: String, value: String, mono: Boolean = true) {
     }
 }
 
+/**
+ * The fingerprint the way it reads: eight byte-groups to a line, so a wrap
+ * never lands mid-pair. The old single Text broke wherever the width ran out
+ * ("...C:05:" over "AA:...") and read as a rendering fault on three screens.
+ */
+private fun fingerprintBlock(fp: String): String =
+    fp.split(":").chunked(8).joinToString("\n") { it.joinToString(":") }
+
 @Composable
 private fun E2eButton(text: String, enabled: Boolean, quiet: Boolean = false,
+                      fill: Boolean = true, destructive: Boolean = false,
                       tag: String? = null, onClick: () -> Unit) {
     val palette = LocalPalette.current
+    // `fill = false` exists because a fillMaxWidth child inside a Row eats the
+    // whole width before a weighted sibling is measured: the recipients
+    // screen's address field was being squeezed to zero and only its Check
+    // button showed. `destructive` carries the error colour: an action that
+    // permanently deletes a private key must not wear the same face as
+    // "Lock now" (Material/HIG both reserve red for the irreversible).
     Text(text, fontSize = 14.sp, fontWeight = FontWeight.SemiBold,
-        color = if (quiet) { if (enabled) palette.textPrimary else palette.textTertiary }
-        else palette.onPrimary,
+        color = when {
+            destructive -> if (enabled) palette.onPrimary else palette.textTertiary
+            quiet -> if (enabled) palette.textPrimary else palette.textTertiary
+            else -> palette.onPrimary
+        },
         textAlign = TextAlign.Center,
-        modifier = Modifier.fillMaxWidth()
+        modifier = (if (fill) Modifier.fillMaxWidth() else Modifier)
             .clip(RoundedCornerShape(24.dp))
-            .background(if (quiet) palette.card else if (enabled) palette.primarySolid else palette.buttonDisabled)
-            .border(1.dp, if (quiet) palette.border else palette.primarySolid, RoundedCornerShape(24.dp))
+            .background(if (destructive) { if (enabled) palette.error else palette.buttonDisabled }
+                        else if (quiet) palette.card
+                        else if (enabled) palette.primarySolid else palette.buttonDisabled)
+            .border(1.dp, if (destructive) palette.error else if (quiet) palette.border else palette.primarySolid, RoundedCornerShape(24.dp))
             .clickable(enabled = enabled, onClick = onClick)
             .padding(vertical = 13.dp)
             .then(if (tag != null) Modifier.testTag(tag) else Modifier))
@@ -142,7 +164,9 @@ fun E2eStatusScreen(vm: E2eViewModel, onBack: () -> Unit, onSetup: () -> Unit,
     val state by vm.state.collectAsState()
     LaunchedEffect(Unit) { vm.load() }
     MailScaffold("Encryption", onBack) {
-        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp)) {
+        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp),
+            verticalArrangement = Arrangement.Center,
+        ) {
             Spacer(Modifier.height(8.dp))
             when (state.available) {
                 null -> Text("Checking this device…", fontSize = 14.sp, color = palette.textTertiary,
@@ -196,7 +220,7 @@ fun E2eStatusScreen(vm: E2eViewModel, onBack: () -> Unit, onSetup: () -> Unit,
                     }
                     if (state.record != null) {
                         Spacer(Modifier.height(14.dp))
-                        E2eRow("Fingerprint", state.fingerprint ?: "-")
+                        E2eRow("Fingerprint", fingerprintBlock(state.fingerprint ?: "-"))
                         Spacer(Modifier.height(8.dp))
                         E2eButton("Key details", enabled = true, quiet = true,
                             tag = "gm-e2e-details-open", onClick = onDetails)
@@ -303,12 +327,14 @@ fun E2eDetailsScreen(vm: E2eViewModel, onBack: () -> Unit) {
     val palette = LocalPalette.current
     val state by vm.state.collectAsState()
     MailScaffold("This device's key", onBack) {
-        Column(Modifier.fillMaxSize().padding(horizontal = 20.dp)) {
+        Column(Modifier.fillMaxSize().padding(horizontal = 20.dp),
+            verticalArrangement = Arrangement.Center,
+        ) {
             E2eLede("Read the fingerprint aloud, or send it through another channel, and have the " +
                 "other person confirm it. If the two do not match, the key you have is not theirs.")
             Spacer(Modifier.height(10.dp))
-            E2eRow("Fingerprint", state.fingerprint ?: "-")
-            E2eRow("Created", state.record?.createdAt ?: "-")
+            E2eRow("Fingerprint", fingerprintBlock(state.fingerprint ?: "-"))
+            E2eRow("Created", state.record?.createdAt?.let { absoluteDateTimeOrRaw(it) } ?: "-")
             E2eRow("Signing key", if (state.record?.signing != null)
                 "Yes: recipients can verify it was you" else "None", mono = false)
             Spacer(Modifier.height(12.dp))
@@ -326,7 +352,9 @@ fun E2ePublishScreen(vm: E2eViewModel, onBack: () -> Unit) {
     val state by vm.state.collectAsState()
     LaunchedEffect(Unit) { vm.loadPublished() }
     MailScaffold("Who can find your key", onBack) {
-        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp)) {
+        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp),
+            verticalArrangement = Arrangement.Center,
+        ) {
             state.note?.let { E2eNote(it, state.noteIsBad); Spacer(Modifier.height(10.dp)) }
             if (!state.publishedLoaded) {
                 Text("Checking…", fontSize = 13.sp, color = palette.textTertiary,
@@ -341,8 +369,8 @@ fun E2ePublishScreen(vm: E2eViewModel, onBack: () -> Unit) {
                     E2eLede("Your public key is published, so anyone sending you mail can encrypt to " +
                         "it. Your private key is not published and never will be.")
                     Spacer(Modifier.height(8.dp))
-                    E2eRow("Published fingerprint", p.encryption?.fingerprint ?: "-")
-                    E2eRow("Updated", p.updatedAt ?: p.publishedAt ?: "-")
+                    E2eRow("Published fingerprint", fingerprintBlock(p.encryption?.fingerprint ?: "-"))
+                    E2eRow("Updated", (p.updatedAt ?: p.publishedAt)?.let { absoluteDateTimeOrRaw(it) } ?: "-")
                     val mismatch = state.fingerprint != null && p.encryption?.fingerprint != null &&
                         p.encryption?.fingerprint != state.fingerprint
                     if (mismatch) {
@@ -412,7 +440,9 @@ fun E2eRemoveScreen(vm: E2eViewModel, onBack: () -> Unit) {
     val state by vm.state.collectAsState()
     var confirmRemove by remember { mutableStateOf(false) }
     MailScaffold("Remove the key from this device", onBack) {
-        Column(Modifier.fillMaxSize().padding(horizontal = 20.dp)) {
+        Column(Modifier.fillMaxSize().padding(horizontal = 20.dp),
+            verticalArrangement = Arrangement.Center,
+        ) {
             state.note?.let { E2eNote(it, state.noteIsBad); Spacer(Modifier.height(10.dp)) }
             // The warning is the consequence, stated before the tap, in the
             // web's own words. Not a scare line: permanent and everywhere.
@@ -425,7 +455,7 @@ fun E2eRemoveScreen(vm: E2eViewModel, onBack: () -> Unit) {
                     tag = "gm-e2e-remove-start", onClick = { confirmRemove = true })
             } else {
                 E2eButton(if (state.busy) "Removing…" else "Yes, delete the key from this device",
-                    enabled = !state.busy, tag = "gm-e2e-remove-confirm",
+                    enabled = !state.busy, destructive = true, tag = "gm-e2e-remove-confirm",
                     onClick = { vm.removeKey(); confirmRemove = false; onBack() })
                 Spacer(Modifier.height(8.dp))
                 E2eButton("Keep it", enabled = true, quiet = true,
@@ -460,7 +490,7 @@ fun E2eRecipientsScreen(vm: E2eViewModel, onBack: () -> Unit, onCompose: () -> U
                     AppTextField("", draft, { draft = it }, hint = "someone@example.com")
                 }
                 Spacer(Modifier.width(10.dp))
-                E2eButton("Check", enabled = !state.busy && draft.isNotBlank(),
+                E2eButton("Check", enabled = !state.busy && draft.isNotBlank(), fill = false,
                     tag = "gm-e2e-lookup-submit",
                     onClick = { vm.lookup(listOf(draft.trim())); draft = "" })
             }
@@ -478,7 +508,7 @@ fun E2eRecipientsScreen(vm: E2eViewModel, onBack: () -> Unit, onCompose: () -> U
                                 color = if (e.status == "found") palette.success else palette.warnInk)
                         }
                         if (e.status == "found" && e.signing != null) {
-                            Text("Signing fingerprint ${e.signing?.fingerprint ?: "-"}",
+                            Text("Signing fingerprint ${fingerprintBlock(e.signing?.fingerprint ?: "-")}",
                                 fontSize = 12.sp, fontFamily = FontFamily.Monospace,
                                 color = palette.textSecondary)
                         } else if (e.status != "found") {

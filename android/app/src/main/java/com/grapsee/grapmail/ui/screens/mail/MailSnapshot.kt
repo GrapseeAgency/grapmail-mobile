@@ -653,7 +653,12 @@ private fun listFrame(
     // this screen is the one place that already knows exactly what it wants to
     // draw. The components are the live ones, so the photograph is of them.
     Column(Modifier.fillMaxSize()) {
-        MailGreeting("Amira Rahman", "amira@grapmail.com")
+        // The live home wraps the greeting in a 16dp padded column; the frame
+        // drew it flush to the screen edge -- the photograph contradicted the
+        // screen it claims to show. Same padding, same component.
+        Column(Modifier.padding(horizontal = 16.dp)) {
+            MailGreeting("Amira Rahman", "amira@grapmail.com")
+        }
         Box(Modifier.fillMaxWidth().weight(1f)) {
             MailStateBlock(
                 loading = loading,

@@ -304,7 +304,9 @@ fun MailPrefsScreen(vm: ProfileViewModel, onBack: () -> Unit) {
             SectionLabel("Signature", palette)
             Text("Appended to what you send, on every address you write from unless an override " +
                 "says otherwise.", fontSize = 12.sp, color = palette.textTertiary)
-            Box(Modifier.fillMaxWidth().heightIn(min = 80.dp).padding(vertical = 10.dp)
+            Box(Modifier.fillMaxWidth().heightIn(min = 80.dp)
+                .border(1.dp, palette.border, RoundedCornerShape(12.dp))
+                .padding(12.dp)
                 .testTag("gm-signature-field")) {
                 BasicTextField(signature, { signature = it },
                     textStyle = TextStyle(fontSize = 15.sp, color = palette.textPrimary,
@@ -340,6 +342,8 @@ fun MailPrefsScreen(vm: ProfileViewModel, onBack: () -> Unit) {
                 Text(address, fontSize = 12.sp, fontWeight = FontWeight.Medium,
                     color = palette.textSecondary, modifier = Modifier.padding(top = 10.dp))
                 Box(Modifier.fillMaxWidth().heightIn(min = 60.dp).padding(top = 4.dp)
+                    .border(1.dp, palette.border, RoundedCornerShape(12.dp))
+                    .padding(12.dp)
                     .semantics { contentDescription = "Signature for $address" }
                     .testTag("gm-sig-override-field")) {
                     BasicTextField(overrides[address] ?: "",
