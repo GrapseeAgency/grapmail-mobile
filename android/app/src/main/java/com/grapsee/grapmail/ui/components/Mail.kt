@@ -24,7 +24,9 @@ import androidx.compose.material.icons.rounded.AttachFile
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.Delete
+import androidx.compose.material.icons.rounded.DoneAll
 import androidx.compose.material.icons.rounded.Label
+import androidx.compose.material.icons.rounded.MarkunreadMailbox
 import androidx.compose.material.icons.rounded.Mail
 import androidx.compose.material.icons.rounded.Menu
 import androidx.compose.material.icons.rounded.MoreVert
@@ -615,6 +617,13 @@ fun SelectionToolbar(
     onDelete: () -> Unit,
     onMove: () -> Unit,
     onLabel: () -> Unit,
+    /// Selection-scoped read state, the same pair the web's bulk bar carries
+    /// ("Mark read" / "Mark unread", page.tsx:2646-2647). The actions and the
+    /// local flag writes existed all along; the buttons were never drawn, so
+    /// mail the server marked unread with no open could never be marked back,
+    /// and read mail could never go back to the unread count.
+    onMarkRead: () -> Unit,
+    onMarkUnread: () -> Unit,
     onMore: () -> Unit,
     /**
      * The "Sender" action, offered only while the screener queue is open. Left
@@ -642,6 +651,8 @@ fun SelectionToolbar(
             ToolAction(Icons.Rounded.Delete, "Delete", onDelete)
             ToolAction(Icons.Rounded.MoveToInbox, "Move", onMove)
             ToolAction(Icons.Rounded.Label, "Label", onLabel)
+            ToolAction(Icons.Rounded.DoneAll, "Mark read", onMarkRead)
+            ToolAction(Icons.Rounded.MarkunreadMailbox, "Mark unread", onMarkUnread)
             onSender?.let { ToolAction(Icons.Rounded.PersonAddAlt1, "Sender", it) }
             ToolAction(Icons.Rounded.MoreVert, "More", onMore)
         }

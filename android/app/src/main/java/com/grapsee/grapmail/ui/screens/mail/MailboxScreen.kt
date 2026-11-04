@@ -217,6 +217,8 @@ fun MailboxScreen(
                         // first open is the only time the question can be unanswered
                         // — which the sheet says instead of guessing.
                         onLabel = { vm.ensureAssignments(); showLabelSheet = true },
+                        onMarkRead = { vm.act(com.grapsee.grapmail.data.MailAction.Read) },
+                        onMarkUnread = { vm.act(com.grapsee.grapmail.data.MailAction.Unread) },
                         onMore = { showSnoozeSheet = true },
                         // Only the queue can decide a sender. Every other box's
                         // mail has already been delivered, so the sheet's four

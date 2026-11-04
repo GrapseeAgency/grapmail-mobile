@@ -121,6 +121,8 @@ struct MailboxView: View {
                 onDelete: { sheet = .permanent },
                 onMove: { sheet = .move },
                 onLabel: { vm.ensureAssignments(); sheet = .label },
+                onMarkRead: { vm.act(.read) },
+                onMarkUnread: { vm.act(.unread) },
                 onMore: { sheet = .snooze },
                 // Only the queue offers this. Deciding a sender is a rule about
                 // their next message, which means nothing for a box whose mail

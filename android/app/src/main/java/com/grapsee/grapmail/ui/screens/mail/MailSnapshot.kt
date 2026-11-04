@@ -687,7 +687,7 @@ private fun listFrame(
 private fun selectionFrame() {
     Column(Modifier.fillMaxSize()) {
         SelectionToolbar(count = 2, onClose = {}, onArchive = {}, onDelete = {},
-            onMove = {}, onLabel = {}, onMore = {})
+            onMove = {}, onLabel = {}, onMarkRead = {}, onMarkUnread = {}, onMore = {})
         rows.take(3).forEachIndexed { i, row ->
             MessageRow(message = row, selected = i < 2, onSelect = {}, onOpen = {},
                 onStar = {}, selecting = true)

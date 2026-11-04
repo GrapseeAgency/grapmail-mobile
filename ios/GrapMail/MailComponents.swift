@@ -406,6 +406,11 @@ struct SelectionToolbar: View {
     let onDelete: () -> Void
     let onMove: () -> Void
     let onLabel: () -> Void
+    /// Selection-scoped read state, the web's bulk-bar pair. The model's act()
+    /// and applyLocally already handled `.read`/`.unread` — only the buttons
+    /// were missing, which made the unread count a one-way number.
+    let onMarkRead: () -> Void
+    let onMarkUnread: () -> Void
     let onMore: () -> Void
     /// The "Sender" action, offered only while the screener queue is open — the
     /// same rule Android applies in `Mail.kt`. Every other box's mail has already
@@ -432,6 +437,8 @@ struct SelectionToolbar: View {
                 ToolAction(icon: "trash", label: "Delete", onClick: onDelete)
                 ToolAction(icon: "arrow.right.doc.on.clipboard", label: "Move", onClick: onMove)
                 ToolAction(icon: "tag", label: "Label", onClick: onLabel)
+                ToolAction(icon: "envelope.open", label: "Mark read", onClick: onMarkRead)
+                ToolAction(icon: "envelope.badge", label: "Mark unread", onClick: onMarkUnread)
                 if let onSender {
                     ToolAction(icon: "person.badge.plus", label: "Sender", onClick: onSender)
                 }

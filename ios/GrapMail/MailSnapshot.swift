@@ -703,7 +703,8 @@ struct MailSnapshotView: View {
     private var selectionFrame: some View {
         VStack(spacing: 0) {
             SelectionToolbar(count: 2, onClose: {}, onArchive: {}, onDelete: {},
-                             onMove: {}, onLabel: {}, onMore: {})
+                             onMove: {}, onLabel: {}, onMarkRead: {},
+                             onMarkUnread: {}, onMore: {})
             MessageRow(message: Self.rows[0], selecting: true, selected: true,
                        onSelect: {}, onOpen: {}, onStar: {})
             MessageRow(message: Self.rows[1], selecting: true, selected: true,

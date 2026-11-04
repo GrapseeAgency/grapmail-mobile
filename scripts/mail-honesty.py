@@ -2290,6 +2290,32 @@ pin("the new signature fields speak to TalkBack and VoiceOver",
     'contentDescription = "Signature for $address"' in code_only(KT_ACCT)
     and 'accessibilityLabel("Signature for \\(address)")' in code_only(SW_ACCT))
 
+# ── 34. the behavior audit opens with the read/unread pair (§34) ────────────
+# The plan's Phase-2 line claimed "per-row + selection read/unread already
+# exist". They did not: the actions, the wire values and the local flag
+# writes were all in place on both platforms, and the toolbar buttons were
+# never drawn — so the unread count was a one-way number and the web's own
+# "Mark read"/"Mark unread" pair (page.tsx:2646-2647) had no phone twin.
+# The web also records the exact opposite-behavior bug this class produces:
+# a "Mark unread" that sent /read. Pin the affordance AND the polarity.
+KT_MAIL_C2 = android("ui/components/Mail.kt")
+SW_BOXV = ios("MailboxView.swift")
+pin("the selection toolbar offers Mark read and Mark unread on both platforms",
+    'ToolAction(Icons.Rounded.DoneAll, "Mark read", onMarkRead)' in code_only(KT_MAIL_C)
+    and 'ToolAction(Icons.Rounded.MarkunreadMailbox, "Mark unread", onMarkUnread)' in code_only(KT_MAIL_C)
+    and 'label: "Mark read", onClick: onMarkRead' in code_only(SW_MAIL_C)
+    and 'label: "Mark unread", onClick: onMarkUnread' in code_only(SW_MAIL_C))
+pin("the read/unread buttons dispatch their own action, not the other's",
+    # Polarity, pinned at the call sites: Mark read -> MailAction.Read,
+    # Mark unread -> MailAction.Unread. Swap either one and this fails --
+    # which is precisely the bug the web's comment says it shipped once.
+    'onMarkRead = { vm.act(com.grapsee.grapmail.data.MailAction.Read) }' in code_only(KT_BOX)
+    and 'onMarkUnread = { vm.act(com.grapsee.grapmail.data.MailAction.Unread) }' in code_only(KT_BOX)
+    and "onMarkRead: { vm.act(.read) }" in code_only(SW_BOXV)
+    and "onMarkUnread: { vm.act(.unread) }" in code_only(SW_BOXV))
+pin("selection read/unread stays selection-scoped — no whole-box claim",
+    "markAllRead" not in code_only(KT_VM) and "markAllRead" not in code_only(SW_VM))
+
 print()
 if failures:
     print(f"mail-honesty: {len(failures)} pin(s) broken")
