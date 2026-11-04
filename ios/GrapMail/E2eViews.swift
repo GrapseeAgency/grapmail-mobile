@@ -391,8 +391,10 @@ struct E2eDetailsScreen: View {
 
     var body: some View {
         MailScaffold(title: "This device's key", onBack: onBack) {
+            // Top-anchored like every other detail screen; the flexible
+            // Spacers this drops centered the record and left a dead band
+            // under the toolbar -- frame 104, the mirror of Android's fix.
             VStack(alignment: .leading, spacing: 0) {
-                Spacer(minLength: 0)
                 E2eLede("Read the fingerprint aloud, or send it through another channel, and have the "
                         + "other person confirm it. If the two do not match, the key you have is not theirs.")
                 Spacer().frame(height: 10)
@@ -407,7 +409,6 @@ struct E2eDetailsScreen: View {
                     .font(.system(size: 12)).lineSpacing(4)
                     .foregroundColor(GM.textTertiary)
                     .fixedSize(horizontal: false, vertical: true)
-                Spacer(minLength: 0)
             }
             .padding(.horizontal, 20)
         }
@@ -545,7 +546,6 @@ struct E2eRemoveScreen: View {
     var body: some View {
         MailScaffold(title: "Remove the key from this device", onBack: onBack) {
             VStack(alignment: .leading, spacing: 0) {
-                Spacer(minLength: 0)
                 if let note = vm.state.note {
                     E2eNote(text: note, bad: vm.state.noteIsBad)
                     Spacer().frame(height: 10)
@@ -569,7 +569,9 @@ struct E2eRemoveScreen: View {
                               marker: "gm-e2e-remove-keep",
                               onClick: { confirmRemove = false })
                 }
-                Spacer()
+                // No trailing flexible Spacer: it sank the buttons to the
+                // screen bottom, far from the warning that justifies them.
+                Spacer().frame(height: 24)
             }
             .padding(.horizontal, 20)
         }

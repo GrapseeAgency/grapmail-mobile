@@ -2336,6 +2336,18 @@ pin("the compose body grows to the action bar — no bottom dead zone",
     "Modifier.weight(1f, fill = false)" in code_only(android("ui/screens/mail/ComposeScreen.kt"))
     and "minHeight: 240, maxHeight: .infinity" in code_only(SW_RDR))
 
+# The other half of the centering audit: batch 1 centered the short STATUS
+# screens (frame 100 proved the bottom-empty class), but frame 104 showed
+# the same Arrangement.Center stranding the key RECORD — a scannable table —
+# in the screen's middle under a dead toolbar band. Detail and action screens
+# are top-anchored on both platforms; the status card keeps its centering.
+pin("the key record and the remove action read top-down, not centered",
+    "Arrangement.Center" not in body_of(code_only(KT_E2ES), "fun E2eDetailsScreen")
+    and "Arrangement.Center" not in body_of(code_only(KT_E2ES), "fun E2eRemoveScreen")
+    and "Spacer(minLength: 0)" not in body_of(code_only(SW_E2ES), "struct E2eDetailsScreen")
+    and "Spacer(minLength: 0)" not in body_of(code_only(SW_E2ES), "struct E2eRemoveScreen")
+    and "Arrangement.Center" in body_of(code_only(KT_E2ES), "fun E2eStatusScreen"))
+
 # Frame 62's photograph caught what no marker could: the drawer's Subscriptions
 # row — the only phone door to that screen — sat below an unmarked fold. The
 # sections are ordered Mail-before-Queue on both platforms now, and this pin

@@ -331,8 +331,12 @@ fun E2eDetailsScreen(vm: E2eViewModel, onBack: () -> Unit) {
     val palette = LocalPalette.current
     val state by vm.state.collectAsState()
     MailScaffold("This device's key", onBack) {
-        Column(Modifier.fillMaxSize().padding(horizontal = 20.dp),
-            verticalArrangement = Arrangement.Center,
+        // Top-anchored like every other detail screen (subscriptions, the
+        // connection page): Arrangement.Center stranded the whole record in
+        // the screen's middle with a dead band under the toolbar -- frame
+        // 104's photograph. Centering belongs to status cards, not tables.
+        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())
+            .padding(horizontal = 20.dp),
         ) {
             E2eLede("Read the fingerprint aloud, or send it through another channel, and have the " +
                 "other person confirm it. If the two do not match, the key you have is not theirs.")
@@ -444,8 +448,8 @@ fun E2eRemoveScreen(vm: E2eViewModel, onBack: () -> Unit) {
     val state by vm.state.collectAsState()
     var confirmRemove by remember { mutableStateOf(false) }
     MailScaffold("Remove the key from this device", onBack) {
-        Column(Modifier.fillMaxSize().padding(horizontal = 20.dp),
-            verticalArrangement = Arrangement.Center,
+        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())
+            .padding(horizontal = 20.dp),
         ) {
             state.note?.let { E2eNote(it, state.noteIsBad); Spacer(Modifier.height(10.dp)) }
             // The warning is the consequence, stated before the tap, in the
