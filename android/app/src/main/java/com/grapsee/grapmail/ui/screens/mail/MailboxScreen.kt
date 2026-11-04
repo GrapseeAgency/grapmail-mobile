@@ -7,6 +7,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -601,7 +602,15 @@ private fun LabelStrip(s: MailboxViewModel.MailboxUiState) {
 @Composable
 private fun BoxTabRow(s: MailboxViewModel.MailboxUiState, onSelect: (MailBox) -> Unit) {
     val counts = drawerCounts(s)
-    Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp).testTag("mail-box-tabs"),
+    // Scrollable tabs, the Material answer to a tab bar wider than the
+    // screen. The fixed Row this replaces measured every label against an
+    // equal slice of width: on the 1080px phone "Inbox" wrapped to
+    // "In/bo/x" and Starred/Archive broke mid-word, and on the narrow
+    // walk device four of the five boxes fell off the row entirely --
+    // doors that exist must stay reachable at every width.
+    Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp)
+            .horizontalScroll(rememberScrollState())
+            .testTag("mail-box-tabs"),
         horizontalArrangement = Arrangement.spacedBy(2.dp)) {
         MailBox.tabOrder.forEach { box ->
             BoxTab(box.title, counts[box], box == s.box, onClick = { onSelect(box) })

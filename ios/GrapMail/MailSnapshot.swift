@@ -639,12 +639,19 @@ struct MailSnapshotView: View {
             // are drawn by the same GMUndoBanner the live screen raises.
             case "mail-undo":
                 return AnyView(
+                // The frame owns no scaffold, so it owes its own safe-area
+                // inset: without it the banner and greeting drew THROUGH the
+                // status bar -- frame 99's photograph put the clock inside
+                // "Good evening".
                 VStack(spacing: 0) {
                     GMUndoBanner(note: "Archived 2 messages", marker: "mail-undo",
                                  onUndo: {}, onDone: {})
                     listFrame(rows: Self.rows, loading: false, failed: false,
                               noMailbox: false, box: .inbox)
                 }
+                .padding(.top, max(UIApplication.shared
+                    .connectedScenes.compactMap { $0 as? UIWindowScene }
+                    .flatMap { $0.windows }.first?.safeAreaInsets.top ?? 0, 44))
                 )
             default:
                 return AnyView(

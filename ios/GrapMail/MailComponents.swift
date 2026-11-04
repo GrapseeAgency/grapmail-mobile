@@ -344,12 +344,19 @@ struct BoxTab: View {
                     Text(title)
                         .font(.system(size: 14, weight: active ? .semibold : .regular))
                         .foregroundColor(active ? GM.primarySolid : GM.textSecondary)
+                        // One line at the label's natural width: a horizontal
+                        // ScrollView compresses Text otherwise, and the old
+                        // fixed row wrapped every box name mid-word.
+                        .fixedSize()
                     CountBadge(count: count)
                 }
                 Rectangle()
                     .fill(active ? GM.primarySolid : Color.clear)
                     .frame(height: 2)
             }
+            // The whole tab at natural size: inside the scrollable row the
+            // fill-first underline would otherwise collapse to nothing.
+            .fixedSize(horizontal: true, vertical: false)
             .padding(.horizontal, 14).padding(.vertical, 10)
         }
         .buttonStyle(.plain)

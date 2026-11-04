@@ -172,14 +172,20 @@ struct BoxTabRow: View {
     let onSelect: (MailBox) -> Void
 
     var body: some View {
-        HStack(spacing: 2) {
-            ForEach(MailBox.tabOrder) { box in
-                BoxTab(title: box.title,
-                       count: drawerCounts(state)[box] ?? nil,
-                       active: box == state.box) { onSelect(box) }
+        // Scrollable tabs, the same cure as Android's row: in the fixed
+        // HStack five labels shared the phone width equally and every word
+        // broke mid-spelling -- frame 60 photographed "In/bo/x" and
+        // "Starre/d". Labels stay one line and the row scrolls.
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 2) {
+                ForEach(MailBox.tabOrder) { box in
+                    BoxTab(title: box.title,
+                           count: drawerCounts(state)[box] ?? nil,
+                           active: box == state.box) { onSelect(box) }
+                }
             }
+            .padding(.horizontal, 8)
         }
-        .padding(.horizontal, 8)
         .accessibilityIdentifier("mail-box-tabs")
     }
 }

@@ -2348,6 +2348,19 @@ pin("the key record and the remove action read top-down, not centered",
     and "Spacer(minLength: 0)" not in body_of(code_only(SW_E2ES), "struct E2eRemoveScreen")
     and "Arrangement.Center" in body_of(code_only(KT_E2ES), "fun E2eStatusScreen"))
 
+# Frames 60 and 99, iOS artifact: the fixed tab row shared the phone width
+# between five labels and broke every word mid-spelling ("In/bo/x"), and
+# the scaffold-less undo frame drew its banner THROUGH the status bar. The
+# five boxes are doors that exist; they stay one-line, scrollable, and
+# below the clock at every width the walk runs.
+pin("the box tabs stay one-line and scrollable at every device width",
+    "ScrollView(.horizontal" in body_of(code_only(SW_CHROME), "struct BoxTabRow")
+    and ".fixedSize(horizontal: true, vertical: false)" in body_of(code_only(SW_COMPS), "struct BoxTab")
+    and "softWrap = false" in body_of(code_only(KT_MAIL_C2), "fun BoxTab(")
+    and "horizontalScroll" in body_of(code_only(KT_BOX), "fun BoxTabRow"))
+pin("the undo frame sits below the status bar it once drew through",
+    "safeAreaInsets.top" in body_of(code_only(ios("MailSnapshot.swift")), 'case "mail-undo"'))
+
 # Frame 62's photograph caught what no marker could: the drawer's Subscriptions
 # row — the only phone door to that screen — sat below an unmarked fold. The
 # sections are ordered Mail-before-Queue on both platforms now, and this pin

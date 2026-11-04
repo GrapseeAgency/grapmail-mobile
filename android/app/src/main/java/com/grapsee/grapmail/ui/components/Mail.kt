@@ -555,6 +555,9 @@ fun BoxTab(title: String, count: Int?, active: Boolean, onClick: () -> Unit, mod
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(title, fontSize = 14.sp,
                 fontWeight = if (active) FontWeight.SemiBold else FontWeight.Normal,
+                // One line, always: inside a scrollable tab row a wrapping
+                // label is the bug, not the fallback.
+                softWrap = false, maxLines = 1,
                 color = if (active) palette.primarySolid else palette.textSecondary)
             if (count != null) {
                 Spacer(Modifier.width(6.dp))
