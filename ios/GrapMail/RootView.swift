@@ -722,9 +722,15 @@ struct RootView: View {
             // is the loud half of the trade: debug builds stop with the
             // route named, and `mail-honesty.py` §33 diffs every `Route` case
             // against the dispatch lines, so CI catches what a release build
-            // would otherwise hide.
-            assertionFailure("Route \(route) is dispatched by no sector — add it")
-            EmptyView()
+            // would otherwise hide. The assertion lives INSIDE onAppear
+            // because a ViewBuilder body takes expressions, and a bare
+            // statement here is the exact error CI has now named twice
+            // ("'buildExpression' is unavailable") — this repo's own compiler
+            // lesson, re-applied by the person who wrote it and still
+            // tripped over it.
+            EmptyView().onAppear {
+                assertionFailure("Route \(route) is dispatched by no sector — add it")
+            }
         }
     }
 
