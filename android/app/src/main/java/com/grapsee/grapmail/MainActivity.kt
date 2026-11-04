@@ -346,6 +346,11 @@ fun GrapMailNav() {
             e2e.clearForSignOut()
             SessionStore.clear(nav.context.applicationContext)
             backToSignIn()
+            // The flow replays its one pending signal to a fresh subscriber;
+            // we have just acted on it, so take it out of the cache — the
+            // next subscribe (a recomposition, a config change) must not
+            // re-fire an expiry that is already answered.
+            SessionEvents.resetExpired()
         }
     }
 

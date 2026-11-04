@@ -147,6 +147,15 @@ struct RootView: View {
                 .navigationDestination(for: Route.self) { route in
                     destination(route)
                 }
+            // The bar rule lives at the stack, not at the destinations: the
+            // screens draw their own headers, and `.toolbar(.hidden)` applied
+            // only inside `destination` left the ROOT — the welcome screen and
+            // every snapshot-host frame — under a live bar the routed screens
+            // had dropped. One empty strip at the top of a 90-frame design
+            // review is the difference between "the app has no system chrome"
+            // and a photograph set that contradicts itself screen by screen.
+            .toolbar(.hidden, for: .navigationBar)
+            .navigationBarBackButtonHidden(true)
             // A dead token is discovered by the server, not by us: the first
             // authenticated call that comes back 401 clears the Keychain and
             // posts this. Without the handler the app stays on a signed-in
@@ -706,6 +715,15 @@ struct RootView: View {
                         onOpenQueue: { mail.open(.screener); backToHome() }
                     )
         @unknown default:
+            // The pre-split switch was exhaustive, so adding a Route without a
+            // destination was a COMPILE error; the sector switches need a
+            // `default:` to keep the type-checker in time, and that trade
+            // quietly turns the same mistake back into a blank screen. This
+            // is the loud half of the trade: debug builds stop with the
+            // route named, and `mail-honesty.py` §33 diffs every `Route` case
+            // against the dispatch lines, so CI catches what a release build
+            // would otherwise hide.
+            assertionFailure("Route \(route) is dispatched by no sector — add it")
             EmptyView()
         }
     }

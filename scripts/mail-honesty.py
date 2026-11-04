@@ -1330,12 +1330,16 @@ pin("neither platform's account screens edit vacation or forwarding",
                   code_only(KT_ACCT) + code_only(SW_ACCT)))
 
 # The settings surface edits ONLY fields with a verified enforcement point:
-# the signature the compose appends, the density the list draws, the locale
-# every timestamp renders in, and the two sender lists the screener reads.
-pin("the prefs screen's writes name exactly the five enforced keys",
+# the signature the compose appends, the per-address overrides compose prefers,
+# the density the list draws, the locale every timestamp renders in, and the
+# two sender lists the screener reads. notes/tasks join the set with their own
+# screens (§25); `signatures` joined when the prefs editor for it shipped —
+# compose had been reading the key since day one with no way to write it.
+pin("the prefs screen's writes name exactly the enforced keys",
     {m.group(1) for m in re.finditer(r"ProfileSettingsPatch\(\s*([A-Za-z]+) =",
                                       code_only(KT_ACCT))} ==
-    {"signature", "density", "locale", "safeSenders", "blockedSenders", "notes", "tasks"}
+    {"signature", "density", "locale", "signatures", "safeSenders",
+     "blockedSenders", "notes", "tasks"}
     and len({m.group(1) for m in re.finditer(
         r"ProfileSettingsPatch\(\s*([A-Za-z]+) =", code_only(KT_ACCT))}) >= 5)
 
@@ -2162,6 +2166,129 @@ _m = re.search(r'versionName = "([^"]+)"', GRADLE)
 _p = re.search(r'MARKETING_VERSION: "([^"]+)"', PYML)
 pin("both apps self-report the same marketing version",
     _m is not None and _p is not None and _m.group(1) == _p.group(1))
+
+# ── 33. the second review round, pinned (§33) ───────────────────────────
+# Completeness, correctness and impact each re-read the session with fresh
+# eyes and found what the first round's fixes had not covered: a promised
+# feature with no editor, an excluded feature shipped as dead code, an
+# identity file named after a credential that rotates, a server field both
+# decoders dropped, a nav bar hidden everywhere except the root, a signal
+# that could be emitted into nobody, and a dispatch default that made a
+# forgotten route a blank screen instead of a build error. Each is pinned
+# so the CLASS closes, not the instance.
+
+KT_SES = android("data/SessionEvents.kt")
+
+# 1. The plan EXCLUDED bulk mark-all-read (no bulk endpoint); Android had
+# shipped a silent per-row loop as dead code, violating ground rules 1 and
+# 6. The exclusion now has the pin its siblings have.
+pin("neither app carries a mark-all-read entry point",
+    "markAllRead" not in code_only(KT_VM)
+    and "markAllRead" not in code_only(SW_VM)
+    and "Mark all read" not in rendered(KT_BOX) + rendered(SW_BOX))
+
+# 2. The prefs screen's own sentence ("unless an override says otherwise")
+# promised per-address signatures compose would read; compose DID read them;
+# nothing let anyone write one. Editor and reader, pinned as a pair.
+pin("the per-address signature override is edited AND read on both platforms",
+    'signatures = toSave' in code_only(KT_ACCT)
+    and 'ProfileSettingsPatch(signatures: overridesToSave)' in code_only(SW_ACCT)
+    and 's.signatures[it]' in code_only(KT_COMPOSE)
+    and 's.signatures[$0]' in code_only(SW_RDR))
+pin("the per-address section speaks one sentence on both platforms",
+    "When you send as an alias, this is what gets added" in rendered(KT_ACCT)
+    and "When you send as an alias, this is what gets added" in rendered(SW_ACCT))
+
+# 3. The identity file is named after the address, never the rotating token,
+# and the remove path clears both spellings so a migration cannot resurrect
+# a deleted key.
+pin("the E2E identity file is keyed by the stable address on both platforms",
+    'SessionStore.address(getApplication()) ?: token()' in code_only(KT_E2EVM)
+    and 'SessionStore.address ?? token' in code_only(SW_E2EVM))
+pin("removing the key clears both the stable and the legacy token name",
+    code_only(KT_E2EVM).count("clearIdentity") >= 2
+    and len(re.findall(r"clearIdentity", body_of(code_only(KT_E2EVM), "fun removeKey"))) == 2
+    and len(re.findall(r"clearIdentity", body_of(code_only(SW_E2EVM), "func removeKey"))) == 2
+    and code_only(SW_E2EVM).count("clearIdentity") >= 3)
+
+# 4. The server stores the mailto door in `mailtoOneClick` OUTSIDE the https-
+# only offers list; both decoders used to drop it, making the subscriptions
+# row's email handoff dead on every real message. Field + read + seed, both
+# platforms — the seed carries it because a branch no frame photographs is a
+# branch that regrows.
+pin("the mailtoOneClick field is decoded, read and seeded on both platforms",
+    # Not just the field declaration — the serializer must READ the key off
+    # the wire. A mutation that kept `val mailtoOneClick` but dropped the
+    # `el["mailtoOneClick"]` lookup (so the field is always null) walked
+    # through the first version of this pin; the read is named now.
+    "val mailtoOneClick: String? = null" in code_only(KT_MDTO)
+    and 'el["mailtoOneClick"]' in code_only(KT_MDTO)
+    and "u?.mailtoOneClick?.let" in code_only(KT_MAIL_C)
+    and "case offers, oneClickAdvertised, mailtoOneClick, raw" in code_only(SW_MAIL_C)
+    and "u.mailtoOneClick" in code_only(SW_MAIL_C)
+    and 'mailtoOneClick = "mailto:leave@newsletter.example"' in code_only(KT_HOST)
+    and '"mailtoOneClick":"mailto:leave@newsletter.example"' in code_only(SW_HOST))
+
+# 5. The navigation bar hides at the STACK, so the root and the snapshot
+# host stop wearing a bar the routed screens dropped (the design set was
+# internally inconsistent until this moved).
+pin("iOS hides the system bar once at the stack, not per destination",
+    code_only(SW_ROOT).count(".toolbar(.hidden, for: .navigationBar)") >= 2)
+
+# 6. The expiry signal survives a missing subscriber (replay 1) and is
+# retired by the one that handled it.
+pin("the 401 signal is sticky until acted and then reset",
+    "replay = 1" in code_only(KT_SES)
+    and "resetReplayCache()" in code_only(KT_SES)
+    and "SessionEvents.resetExpired()" in code_only(KT_MAIN))
+
+# 7. The sector-split `default:` traded the compiler's exhaustiveness for
+# type-check speed; this pin takes the check back at the gate. Every case in
+# `enum Route` must appear in a case label somewhere in RootView -- a route
+# added without a destination fails here instead of drawing blank.
+enum_block = re.search(r"enum Route: Hashable \{([\s\S]*?)\n    \}", SW_ROOT)
+route_cases: list[str] = []
+if enum_block:
+    for line in enum_block.group(1).splitlines():
+        m = re.match(r"\s*case\s+(.+)", line)
+        if not m:
+            continue
+        # Split on commas that sit OUTSIDE parameter parentheses:
+        # `case secRevoke(id: String, device: String)` declares ONE route;
+        # a naive comma split read "device" and "String" as case names and
+        # the pin failed on payload labels, not on anything real.
+        depth = 0
+        parts, cur = [], ""
+        for ch in m.group(1):
+            if ch == "(":
+                depth += 1
+            elif ch == ")":
+                depth -= 1
+            if ch == "," and depth == 0:
+                parts.append(cur); cur = ""
+            else:
+                cur += ch
+        parts.append(cur)
+        for part in parts:
+            name = re.match(r"\s*(\w+)", part)
+            if name:
+                route_cases.append(name.group(1))
+# The declarations themselves are not dispatches: search the file with the
+# enum block removed, so `case welcome, signIn` inside the enum cannot answer
+# for a route no switch actually handles.
+_dispatch = SW_ROOT.replace(enum_block.group(0), "") if enum_block else ""
+_missing = [n for n in route_cases
+            if not re.search(r"case\s+(?:let\s+)?\.%s\b" % n, _dispatch)
+            and not re.search(r",\s*\.%s\b" % n, _dispatch)
+            and not re.search(r"^\s+\.%s\b" % n, _dispatch, re.M)]
+pin("every Route case is dispatched by some sector switch",
+    enum_block is not None and len(route_cases) >= 60 and not _missing)
+
+pin("the release job's ceiling covers its own full walk",
+    "timeout-minutes: 150" in WF_TEXT and "timeout-minutes: 120" in WF_TEXT)
+pin("the new signature fields speak to TalkBack and VoiceOver",
+    'contentDescription = "Signature for $address"' in code_only(KT_ACCT)
+    and 'accessibilityLabel("Signature for \\(address)")' in code_only(SW_ACCT))
 
 print()
 if failures:

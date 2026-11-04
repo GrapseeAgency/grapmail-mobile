@@ -572,9 +572,17 @@ struct MailUnsubscribeOffer: Decodable {
 struct MailUnsubscribe: Decodable {
     var offers: [MailUnsubscribeOffer] = []
     var oneClickAdvertised = false
+    /// The parsed record's mailto door. The server filters `offers` to HTTPS
+    /// before storing (`grapmail.ts:271`), so this field is the ONLY place a
+    /// mailto offer can arrive — dropping it at decode made the row's email
+    /// handoff a dead control on every real message. Android's twin decodes
+    /// the same key.
+    var mailtoOneClick: String?
     var raw: String?
 
-    private enum CodingKeys: String, CodingKey { case offers, oneClickAdvertised, raw }
+    private enum CodingKeys: String, CodingKey {
+        case offers, oneClickAdvertised, mailtoOneClick, raw
+    }
     init(from decoder: Decoder) throws {
         // The wire is EITHER the parsed record (an object) or the legacy
         // header text (a string); a number or null under the key is no offer
@@ -590,11 +598,16 @@ struct MailUnsubscribe: Decodable {
         if let c = try? decoder.container(keyedBy: CodingKeys.self) {
             offers = c.lenient(.offers, [])
             oneClickAdvertised = c.lenient(.oneClickAdvertised, false)
+            // JSON null is "no door": decodeIfPresent answers nil for both
+            // an absent key and an explicit null, which is exactly right.
+            mailtoOneClick = try? c.decodeIfPresent(String.self, forKey: .mailtoOneClick)
         }
     }
-    init(offers: [MailUnsubscribeOffer], oneClickAdvertised: Bool, raw: String?) {
+    init(offers: [MailUnsubscribeOffer], oneClickAdvertised: Bool,
+         mailtoOneClick: String? = nil, raw: String?) {
         self.offers = offers
         self.oneClickAdvertised = oneClickAdvertised
+        self.mailtoOneClick = mailtoOneClick
         self.raw = raw
     }
 }
@@ -660,8 +673,12 @@ func unsubscribeTarget(_ u: MailUnsubscribe?) -> String? {
 /// subscriptions row says which one it is doing.
 func unsubscribeMailto(_ u: MailUnsubscribe?) -> String? {
     guard let u else { return nil }
-    if let offer = u.offers.first(where: { $0.url.lowercased().hasPrefix("mailto:") }) {
-        return String(offer.url.dropFirst("mailto:".count))
+    // The parsed record's own mailto field — `sanitiseUnsubscribe` filters
+    // the offers list to https before storing, so scanning offers for a
+    // mailto: prefix could never answer on a real message. Android's
+    // `unsubscribeMailto` reads the same field.
+    if let m = u.mailtoOneClick {
+        return m.lowercased().hasPrefix("mailto:") ? String(m.dropFirst(7)) : m
     }
     if let raw = u.raw, let re = try? NSRegularExpression(pattern: "<([^>]+)>") {
         let ns = raw as NSString

@@ -38,13 +38,19 @@ data class MailPersonDto(
 
 /**
  * The sender's List-Unsubscribe offer, as the mail service PARSES it —
- * `{ offers: [{ url, oneClick }], oneClickAdvertised }` (the shape the web
+ * `{ offers: [{ url, oneClick }], oneClickAdvertised, mailtoOneClick }` (the
+ * shape `sanitiseUnsubscribe` stores, `grapmail.ts:261-287`, and the web
  * client's `normalizeUnsubscribe` reads, `src/app/lib/subscriptions.ts:61-81`).
  *
  * It was decoded as a raw header String here, and the server does not send
  * one: a String field nils the object on every real message, which is how the
  * unsubscribe door stays closed on mail that offers it — the same defect
  * class `e2eEnvelope` was caught in, one shape-drift, one silent absence.
+ *
+ * The offers list is HTTPS-ONLY at the server (the same regex the web applies
+ * before storing), so the mailto door lives in its own `mailtoOneClick`
+ * field — dropping it at decode made the row's email handoff a dead control
+ * on every real message.
  *
  * `raw` carries the legacy header form for the same reason the browser keeps
  * its fallback: an older row may still hold the comma-separated bracket list,
@@ -54,6 +60,7 @@ data class MailPersonDto(
 data class MailUnsubscribeDto(
     val offers: List<MailUnsubscribeOfferDto> = emptyList(),
     val oneClickAdvertised: Boolean = false,
+    val mailtoOneClick: String? = null,
     val raw: String? = null,
 )
 
@@ -70,11 +77,13 @@ data class MailUnsubscribeOfferDto(val url: String = "", val oneClick: Boolean =
 private data class MailUnsubscribeWire(
     val offers: List<MailUnsubscribeOfferDto> = emptyList(),
     val oneClickAdvertised: Boolean = false,
+    val mailtoOneClick: String? = null,
     val raw: String? = null,
 )
 
 private fun MailUnsubscribeWire.toDto() =
-    MailUnsubscribeDto(offers = offers, oneClickAdvertised = oneClickAdvertised, raw = raw)
+    MailUnsubscribeDto(offers = offers, oneClickAdvertised = oneClickAdvertised,
+        mailtoOneClick = mailtoOneClick, raw = raw)
 
 private object MailUnsubscribeSerializer : kotlinx.serialization.KSerializer<MailUnsubscribeDto> {
     private val wire = MailUnsubscribeWire.serializer()
@@ -82,7 +91,7 @@ private object MailUnsubscribeSerializer : kotlinx.serialization.KSerializer<Mai
 
     override fun serialize(encoder: kotlinx.serialization.encoding.Encoder, value: MailUnsubscribeDto) {
         encoder.encodeSerializableValue(wire,
-            MailUnsubscribeWire(value.offers, value.oneClickAdvertised, value.raw))
+            MailUnsubscribeWire(value.offers, value.oneClickAdvertised, value.mailtoOneClick, value.raw))
     }
 
     override fun deserialize(decoder: kotlinx.serialization.encoding.Decoder): MailUnsubscribeDto {
@@ -103,6 +112,13 @@ private object MailUnsubscribeSerializer : kotlinx.serialization.KSerializer<Mai
                     } ?: emptyList(),
                 oneClickAdvertised =
                     (el["oneClickAdvertised"] as? kotlinx.serialization.json.JsonPrimitive)?.content == "true",
+                // JSON null under the key is "no mailto door", not the string
+                // "null": a JsonPrimitive's `content` answers "null" for
+                // either, so the isString test is what keeps them apart.
+                mailtoOneClick = (el["mailtoOneClick"] as?
+                    kotlinx.serialization.json.JsonPrimitive)?.let {
+                    if (it.isString) it.content else null
+                },
             )
             // A bare string is the legacy header, kept parseable rather than
             // dropped: null under the old wire, this under the new one, and

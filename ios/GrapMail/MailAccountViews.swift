@@ -301,8 +301,29 @@ struct MailPrefsView: View {
     @State private var timezone = ""
     @State private var safeDraft = ""
     @State private var blockedDraft = ""
+    /// The per-address overrides being edited, seeded from the profile. The
+    /// web's `Signature per address` section is the reference: one box per
+    /// address the account can send as, empty means "use the main one".
+    @State private var overrides: [String: String] = [:]
 
     private var s: ProfileSettings? { vm.state.profile?.settings }
+
+    /// Every address compose can send as: the primary plus the aliases the
+    /// profile carries — the same list the Addresses screen renders, because
+    /// eight views of one document must not disagree about its contents.
+    private var signatureAddresses: [String] {
+        ([vm.state.profile?.address ?? ""] +
+         (vm.state.profile?.aliases ?? []).map { $0.address }).filter { !$0.isEmpty }
+    }
+
+    /// The map a Save would write: blanks left out, because an empty entry
+    /// stored is not the same as no entry — compose treats both the same, but
+    /// the profile should not accumulate keys for "nothing".
+    private var overridesToSave: [String: String] {
+        overrides.filter { !$0.value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+    }
+
+    private var overridesDirty: Bool { overridesToSave != (s?.signatures ?? [:]) }
 
     var body: some View {
         MailScaffold(title: "Mail settings", onBack: onBack) {
@@ -327,6 +348,7 @@ struct MailPrefsView: View {
             signature = s?.signature ?? ""
             language = s?.locale.language ?? ""
             timezone = s?.locale.timezone ?? ""
+            overrides = s?.signatures ?? [:]
         }
     }
 
@@ -354,6 +376,53 @@ struct MailPrefsView: View {
             .disabled(signature == s?.signature || vm.state.busy)
             .buttonStyle(.plain)
             .accessibilityIdentifier("gm-save-signature")
+
+            // The web's "Signature per address" section, same promise in the
+            // lead line: compose reads `signatures[address]` for every send,
+            // so a phone that only edited the default would offer an override
+            // it never let anyone set — the sentence here and the compose
+            // behaviour used to disagree until this section landed.
+            AccountSectionLabel(text: "Signature per address")
+            Text("When you send as an alias, this is what gets added, so an alias " +
+                 "does not sign like your personal address. Leave one empty and " +
+                 "that address uses the main signature above.")
+                .font(.system(size: 12)).foregroundColor(GM.textTertiary)
+            ForEach(signatureAddresses, id: \.self) { address in
+                Text(address)
+                    .font(.system(size: 12, weight: .medium)).foregroundColor(GM.textSecondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.top, 10)
+                TextEditor(text: Binding(
+                    get: { overrides[address] ?? "" },
+                    set: { overrides[address] = $0 }
+                ))
+                .font(.system(size: 14))
+                .frame(minHeight: 60)
+                .padding(6)
+                .overlay(alignment: .topLeading) {
+                    if (overrides[address] ?? "").isEmpty {
+                        Text("Uses the main signature")
+                            .font(.system(size: 14)).foregroundColor(GM.textTertiary)
+                            .padding(.leading, 12).padding(.top, 12)
+                            .allowsHitTesting(false)
+                    }
+                }
+                .overlay(RoundedRectangle(cornerRadius: GMShape.input)
+                    .strokeBorder(GM.border))
+                .accessibilityLabel("Signature for \(address)")
+                .accessibilityIdentifier("gm-sig-override-\(address)")
+            }
+            Button {
+                vm.saveSettings(ProfileSettingsPatch(signatures: overridesToSave))
+            } label: {
+                Text("Save per-address signatures")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(overridesDirty ? GM.primarySolid : GM.textTertiary)
+                    .padding(.vertical, 8)
+            }
+            .disabled(!overridesDirty || vm.state.busy)
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("gm-save-signatures")
 
             AccountSectionLabel(text: "List density")
             AccountRadioRow(title: "Comfortable — the roomier list",

@@ -48,6 +48,8 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.foundation.Image
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -279,6 +281,10 @@ fun MailPrefsScreen(vm: ProfileViewModel, onBack: () -> Unit) {
     var timezone by remember(s?.locale) { mutableStateOf(s?.locale?.timezone ?: "") }
     var blockedDraft by remember { mutableStateOf("") }
     var safeDraft by remember { mutableStateOf("") }
+    // The per-address overrides being edited, seeded from the profile. The
+    // web's "Signature per address" section is the reference: one box per
+    // address compose can send as, empty means "use the main one".
+    var overrides by remember(s?.signatures) { mutableStateOf(s?.signatures ?: emptyMap()) }
     LaunchedEffect(Unit) { vm.load() }
     MailScaffold("Mail settings", onBack) {
         Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())
@@ -315,6 +321,49 @@ fun MailPrefsScreen(vm: ProfileViewModel, onBack: () -> Unit) {
                 color = if (signature != s.signature) palette.primarySolid else palette.textTertiary,
                 modifier = Modifier.clickable(enabled = signature != s.signature && !state.busy) {
                     vm.saveSettings(ProfileSettingsPatch(signature = signature))
+                }.padding(vertical = 8.dp))
+
+            // Compose reads `signatures[address]` for every send, so a phone
+            // that only edited the default offered an override it never let
+            // anyone set — the promise in the line above and the behaviour
+            // disagreed until this section landed. The address list is the
+            // profile's own (primary + aliases), the same source the Addresses
+            // screen renders, so the two can never disagree about the account.
+            SectionLabel("Signature per address", palette)
+            Text("When you send as an alias, this is what gets added, so an alias does " +
+                "not sign like your personal address. Leave one empty and that address " +
+                "uses the main signature above.", fontSize = 12.sp, color = palette.textTertiary)
+            val signatureAddresses =
+                listOfNotNull(state.profile?.address?.takeIf { it.isNotBlank() }) +
+                    (state.profile?.aliases ?: emptyList()).map { it.address }
+            signatureAddresses.forEach { address ->
+                Text(address, fontSize = 12.sp, fontWeight = FontWeight.Medium,
+                    color = palette.textSecondary, modifier = Modifier.padding(top = 10.dp))
+                Box(Modifier.fillMaxWidth().heightIn(min = 60.dp).padding(top = 4.dp)
+                    .semantics { contentDescription = "Signature for $address" }
+                    .testTag("gm-sig-override-field")) {
+                    BasicTextField(overrides[address] ?: "",
+                        { v -> overrides = overrides + (address to v) },
+                        textStyle = TextStyle(fontSize = 14.sp, color = palette.textPrimary,
+                            lineHeight = 20.sp),
+                        cursorBrush = SolidColor(palette.primarySolid),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
+                        decorationBox = { inner ->
+                            if (overrides[address].isNullOrEmpty()) Text("Uses the main signature",
+                                fontSize = 14.sp, color = palette.textTertiary)
+                            inner()
+                        })
+                }
+            }
+            // Blanks are dropped, not stored: an empty entry and no entry read
+            // the same at compose, but the profile should not accumulate keys
+            // for nothing.
+            val toSave = overrides.filterValues { it.isNotBlank() }
+            val dirty = toSave != s.signatures
+            Text("Save per-address signatures", fontSize = 14.sp, fontWeight = FontWeight.SemiBold,
+                color = if (dirty) palette.primarySolid else palette.textTertiary,
+                modifier = Modifier.clickable(enabled = dirty && !state.busy) {
+                    vm.saveSettings(ProfileSettingsPatch(signatures = toSave))
                 }.padding(vertical = 8.dp))
 
             SectionLabel("List density", palette)

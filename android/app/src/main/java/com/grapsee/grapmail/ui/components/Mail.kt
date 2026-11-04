@@ -174,13 +174,16 @@ fun unsubscribeTarget(u: com.grapsee.grapmail.data.MailUnsubscribeDto?): String?
 
 /** The sender's mailto: offer, kept apart from the web target: opening a
  *  compose window addressed to it is a different handoff, and the
- *  subscriptions row says which one it is doing. */
+ *  subscriptions row says which one it is doing. The server's parsed record
+ *  keeps the mailto door in `mailtoOneClick` — `sanitiseUnsubscribe` filters
+ *  the offers list to https before storing (grapmail.ts:271), so scanning
+ *  offers for a mailto: prefix could never answer on a real message, and the
+ *  field being dropped at decode made this handoff a dead control. */
 fun unsubscribeMailto(u: com.grapsee.grapmail.data.MailUnsubscribeDto?): String? {
-    u?.offers?.firstOrNull { it.url.startsWith("mailto:", ignoreCase = true) }
-        // drop(7), not removePrefix: the test above is ignoreCase, and the
-        // case-SENSITIVE removePrefix left "MAILTO:list@x" whole — that then
-        // embedded into mailto:MAILTO:list@x and drafted a corrupt recipient.
-        ?.let { return stripMailto(it.url) }
+    u?.mailtoOneClick?.let { return stripMailto(it) }
+    // Legacy rows carry the raw bracket list instead of the parsed record;
+    // the mailto half lives inside that string, and this parse mirrors the
+    // web's fallback for exactly that shape.
     val fromHeader = u?.raw?.let { raw ->
         Regex("<([^>]+)>").findAll(raw).map { m -> m.groupValues[1].trim() }
             .firstOrNull { it.startsWith("mailto:", ignoreCase = true) }

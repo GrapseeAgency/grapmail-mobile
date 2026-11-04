@@ -185,7 +185,14 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/v')
     needs: build-test-screenshot
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    # 90 was set when this job built, proved and published. The release page
+    # grew a FULL walk of the release APK on an emulator — the same script the
+    # debug legs need a 120-minute ceiling for, and this job also spends time
+    # on R8, signing and the badging proofs first. A ceiling the walk has
+    # demonstrably outgrown on a loaded runner would kill the publish step
+    # that sits AFTER it: the tag ships nothing. 150 is the debug ceiling
+    # plus the build/verify overhead, headroom over the worst documented run.
+    timeout-minutes: 150
     permissions:
       contents: write
     steps:

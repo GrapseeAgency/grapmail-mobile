@@ -1844,46 +1844,5 @@ class MailboxViewModel @JvmOverloads constructor(
                 }
         }
     }
-
-    // ── bulk read ───────────────────────────────────────────────────────────
-
-    /**
-     * Mark the unread mail in this box read.
-     *
-     * There is no bulk endpoint — `PATCH /message/:id/:action` is per message and
-     * no route takes a list — so this is a loop of real writes over the unread rows
-     * the app has fetched, and the receipt names that set. Saying "all read" while
-     * a server-side box holds 4,000 messages the client never fetched would be a
-     * claim the code cannot support, which is why the line reports the number it
-     * actually changed.
-     */
-    fun markAllRead(then: (String) -> Unit) {
-        val unread = _state.value.rows.filterNot { it.isRead }.map { it.id }
-        if (unread.isEmpty()) { then("Nothing unread in what is loaded."); return }
-        viewModelScope.launch {
-            val t = token() ?: run { then("Sign in again."); return@launch }
-            _state.update { it.copy(busy = true) }
-            var failure: String? = null
-            var done = 0
-            for (id in unread) {
-                try {
-                    Api.mailAction(t, id, MailAction.Read, null)
-                    MailStore.patchFlags(id, read = true)
-                    done++
-                } catch (e: kotlinx.coroutines.CancellationException) {
-                    throw e
-                } catch (e: Exception) {
-                    failure = mailReason(e)
-                }
-            }
-            _state.update { it.copy(busy = false, staleError = failure) }
-            reproject()
-            then(when {
-                failure != null && done == 0 -> failure!!
-                failure != null -> "$done of ${unread.size} marked read. $failure"
-                else -> "Marked $done read."
-            })
-        }
-    }
 }
 

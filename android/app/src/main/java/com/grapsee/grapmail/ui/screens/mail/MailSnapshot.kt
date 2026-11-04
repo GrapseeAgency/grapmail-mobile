@@ -382,9 +382,14 @@ private fun msg(
 private val newsletterUnsub = MailUnsubscribeDto(
     offers = listOf(
         MailUnsubscribeOfferDto("https://lists.newsletter.example/unsub?id=7f3", false),
-        MailUnsubscribeOfferDto("mailto:leave@newsletter.example", false),
     ),
     oneClickAdvertised = false,
+    // The mailto door lives in its own field, exactly as `sanitiseUnsubscribe`
+    // stores it: the server filters the offers list to https (grapmail.ts:
+    // 271), so an offer of class mailto never reaches the wire. The seed used
+    // to invent one and the row's branch proved against a shape the server
+    // cannot produce.
+    mailtoOneClick = "mailto:leave@newsletter.example",
     raw = null,
 )
 

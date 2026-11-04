@@ -51,6 +51,30 @@ final class E2eModel: ObservableObject {
 
     private var token: String? { SessionStore.token }
 
+    /// The identity file's stable name: the account's ADDRESS, not the bearer
+    /// token. The token is reissued at every sign-in, and `MailE2e` names the
+    /// file by a digest of whatever key it is handed — keying it by the token
+    /// meant the first rotation orphaned a real key behind a stale filename:
+    /// the person sees "Encryption is not set up on this device" while the
+    /// protected record sits unreachable on disk, and mail sealed to the key
+    /// cannot open. Android's twin names the same rule.
+    private var identityKey: String? { SessionStore.address ?? token }
+
+    /// Read the identity file, migrating the old token-keyed name if needed:
+    /// v0.3.0 builds wrote under the token digest. Found under the old name
+    /// only? Copy it to the stable name and drop the old file, so "Remove the
+    /// key" can never leave a resurrectable copy behind.
+    private func loadIdentityFile() -> MailE2e.Identity? {
+        guard let k = identityKey else { return nil }
+        if let fresh = MailE2e.loadIdentity(accountKey: k) { return fresh }
+        guard let legacy = token, legacy != k,
+              let old = MailE2e.loadIdentity(accountKey: legacy) else { return nil }
+        if MailE2e.saveIdentity(accountKey: k, identity: old) {
+            MailE2e.clearIdentity(accountKey: legacy)
+        }
+        return old
+    }
+
     func load() {
         guard !snapshotSeeded else { return }
         state.available = MailE2e.available()
@@ -61,8 +85,8 @@ final class E2eModel: ObservableObject {
     }
 
     func refreshLocal() {
-        guard !snapshotSeeded, let t = token else { return }
-        let record = MailE2e.loadIdentity(accountKey: t)
+        guard !snapshotSeeded else { return }
+        let record = loadIdentityFile()
         state.record = record
         state.fingerprint = record.flatMap {
             MailE2e.fingerprint(publicKeyB64: $0.encryption.publicKey)
@@ -92,7 +116,7 @@ final class E2eModel: ObservableObject {
     }
 
     func setup(passphrase: String, confirm: String, publishOnSetup: Bool) {
-        guard !snapshotSeeded, let t = token else { return }
+        guard !snapshotSeeded, let t = identityKey else { return }
         if passphrase.utf16.count < MailE2e.minPassphraseLength {
             note("Use at least \(MailE2e.minPassphraseLength) characters for the passphrase.", bad: true)
             return
@@ -233,7 +257,7 @@ final class E2eModel: ObservableObject {
     }
 
     func changePassphrase(oldPhrase: String, newPhrase: String) {
-        guard !snapshotSeeded, let t = token, let record = state.record else { return }
+        guard !snapshotSeeded, let t = identityKey, let record = state.record else { return }
         if newPhrase.utf16.count < MailE2e.minPassphraseLength {
             note("Use at least \(MailE2e.minPassphraseLength) characters for the new passphrase.",
                  bad: true)
@@ -271,9 +295,13 @@ final class E2eModel: ObservableObject {
     }
 
     func removeKey() {
-        guard !snapshotSeeded, let t = token else { return }
+        guard !snapshotSeeded else { return }
         state.busy = true
-        MailE2e.clearIdentity(accountKey: t)
+        // Both names: the stable one, and the token-keyed one a v0.3.0 build
+        // may still have on disk. "Remove the key from this device" that left
+        // a copy for the migration to resurrect would be a lie.
+        if let k = identityKey { MailE2e.clearIdentity(accountKey: k) }
+        if let t = token { MailE2e.clearIdentity(accountKey: t) }
         session = nil
         state.record = nil
         state.unlocked = false

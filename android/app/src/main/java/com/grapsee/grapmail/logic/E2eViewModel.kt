@@ -83,6 +83,38 @@ class E2eViewModel @JvmOverloads constructor(
 
     private suspend fun token(): String? = SessionStore.token(getApplication())
 
+    /**
+     * The identity file's stable name: the account's ADDRESS, not the bearer
+     * token. The token is reissued at every sign-in, and `MailE2e` names the
+     * file by a digest of whatever key it is handed — keying it by the token
+     * meant the first rotation orphaned a real key behind a stale filename:
+     * the person sees "not set up" while the protected record sits unreachable
+     * on disk. iOS's `identityKey` names the same rule.
+     */
+    private suspend fun identityKey(): String? =
+        SessionStore.address(getApplication()) ?: token()
+
+    /**
+     * Read the identity file, migrating the old token-keyed name if needed:
+     * v0.3.0 builds wrote under the token digest. Found under the old name
+     * only? Copy it to the stable name and drop the old file, so "Remove the
+     * key" can never leave a resurrectable copy behind.
+     */
+    private suspend fun loadIdentityFile(): MailE2e.Identity? {
+        val k = identityKey() ?: return null
+        withContext(Dispatchers.IO) { MailE2e.loadIdentity(getApplication(), k) }?.let { return it }
+        val legacy = token() ?: return null
+        if (legacy == k) return null
+        val old = withContext(Dispatchers.IO) { MailE2e.loadIdentity(getApplication(), legacy) }
+            ?: return null
+        withContext(Dispatchers.IO) {
+            if (MailE2e.saveIdentity(getApplication(), k, old)) {
+                MailE2e.clearIdentity(getApplication(), legacy)
+            }
+        }
+        return old
+    }
+
     /** Snapshot host: the frame owns the state; nothing probes or fetches. */
     fun seedForSnapshot(record: MailE2e.Identity?, published: MailE2eKeysDto?,
                         fingerprint: String?, unlocked: Boolean = false,
@@ -111,10 +143,7 @@ class E2eViewModel @JvmOverloads constructor(
     /** Re-read what this device holds. Storage is the truth; a cached copy is
      *  one more thing that can disagree with what compose will actually use. */
     private suspend fun refreshLocal() {
-        val t = token() ?: return
-        val record = withContext(Dispatchers.IO) {
-            MailE2e.loadIdentity(getApplication(), t)
-        }
+        val record = loadIdentityFile()
         val fp = record?.let {
             runCatching {
                 withContext(Dispatchers.Default) { MailE2e.fingerprint(it.encryption.publicKey) }
@@ -161,7 +190,7 @@ class E2eViewModel @JvmOverloads constructor(
     fun setup(passphrase: String, confirm: String, publishOnSetup: Boolean) {
         if (snapshotMode) return
         viewModelScope.launch {
-            val t = token() ?: return@launch
+            val t = identityKey() ?: return@launch
             if (passphrase.length < MailE2e.MIN_PASSPHRASE_LENGTH) {
                 note("Use at least ${MailE2e.MIN_PASSPHRASE_LENGTH} characters for the passphrase.", true)
                 return@launch
@@ -296,7 +325,7 @@ class E2eViewModel @JvmOverloads constructor(
     fun changePassphrase(oldPhrase: String, newPhrase: String) {
         if (snapshotMode) return
         viewModelScope.launch {
-            val t = token() ?: return@launch
+            val t = identityKey() ?: return@launch
             val record = _state.value.record ?: return@launch
             if (newPhrase.length < MailE2e.MIN_PASSPHRASE_LENGTH) {
                 note("Use at least ${MailE2e.MIN_PASSPHRASE_LENGTH} characters for the new passphrase.", true)
@@ -339,9 +368,15 @@ class E2eViewModel @JvmOverloads constructor(
     fun removeKey() {
         if (snapshotMode) return
         viewModelScope.launch {
-            val t = token() ?: return@launch
+            val k = identityKey() ?: return@launch
             _state.update { it.copy(busy = true) }
-            withContext(Dispatchers.IO) { MailE2e.clearIdentity(getApplication(), t) }
+            // Both names: the stable one, and the token-keyed one a v0.3.0
+            // build may still have on disk. "Remove the key from this device"
+            // that left a copy for the migration to resurrect would be a lie.
+            withContext(Dispatchers.IO) {
+                MailE2e.clearIdentity(getApplication(), k)
+                token()?.let { MailE2e.clearIdentity(getApplication(), it) }
+            }
             session = null
             _state.update {
                 it.copy(busy = false, record = null, unlocked = false, fingerprint = null)

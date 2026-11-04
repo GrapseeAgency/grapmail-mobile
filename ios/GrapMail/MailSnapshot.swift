@@ -155,9 +155,9 @@ struct MailSnapshotView: View {
     /// overstate what the sender advertised.
     fileprivate static let newsletterUnsub: MailUnsubscribe? = {
         let json = """
-        {"offers":[{"url":"https://lists.newsletter.example/unsub?id=7f3","oneClick":false},
-                    {"url":"mailto:leave@newsletter.example","oneClick":false}],
-         "oneClickAdvertised":false}
+        {"offers":[{"url":"https://lists.newsletter.example/unsub?id=7f3","oneClick":false}],
+         "oneClickAdvertised":false,
+         "mailtoOneClick":"mailto:leave@newsletter.example"}
         """
         return try? JSONDecoder().decode(MailUnsubscribe.self, from: Data(json.utf8))
     }()
