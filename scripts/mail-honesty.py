@@ -1082,7 +1082,7 @@ for side, src in (("Android", KT_MAIL_C), ("iOS", SW_CHROME)):
     pin(f"{side}'s label strip names the assignment sweep a filter would need",
         "/labels/assignments" in src)
 
-# -- 22. the sources at least parse as sources ----------------------------------
+# -- 21. the sources at least parse as sources ----------------------------------
 #
 # Neither app can be compiled on this host, so a missing brace reaches CI and
 # costs a runner session to discover — the Android walk alone is two hours. This
@@ -1624,8 +1624,8 @@ pin("a plain plan or a silent directory stops an encrypted send, both platforms"
     and "cannot be encrypted. Turn encryption off" in code_only(KT_COMPOSE)
     and "cannot be encrypted. Turn encryption off" in code_only(SW_RDR))
 pin("a sealed send carries the envelope and an empty bodyText, both platforms",
-    'bodyText = if (e2eEnvelope != null) "" else s.body' in code_only(KT_VM)
-    and 'bodyText: e2eEnvelope == nil ? compose.body : ""' in code_only(SW_VM))
+    'bodyText = if (envelope != null) "" else s.body' in code_only(KT_VM)
+    and 'bodyText: envelopeJson == nil ? compose.body : ""' in code_only(SW_VM))
 pin("the thread decrypts against the envelope and names the no-envelope case",
     "gm-e2e-decrypt-open" in code_only(KT_THREAD) and "gm-e2e-decrypt-open" in code_only(SW_RDR)
     and "No encrypted content came with this message." in code_only(KT_THREAD)
@@ -1730,8 +1730,12 @@ pin("both clients decode the parsed unsubscribe record, not a header string",
     and "val unsubscribe: MailUnsubscribeDto? = null" in KT_MDTO)
 pin("the web's offer URLs win over the legacy header, both platforms",
     "fun unsubscribeTarget" in KT_MAIL and "func unsubscribeTarget" in SW_COMPS
-    and "https://" in KT_MAIL[KT_MAIL.find("fun unsubscribeTarget"):][:400]
-    and "https://" in SW_COMPS[SW_COMPS.find("func unsubscribeTarget"):][:400])
+    # The first version sliced a fixed 400 chars of RAW file after the def —
+    # a window that a doc comment could silently push the https test out of,
+    # failing on prose rather than behaviour. It reads the member's own
+    # code-only body now, same spellings §32's handoff pin checks.
+    and 'startsWith("https://' in body_of(code_only(KT_MAIL_C), "fun unsubscribeTarget")
+    and 'hasPrefix("https://' in body_of(code_only(SW_MAIL_C), "func unsubscribeTarget("))
 pin("the thread opens the door the target helper names, both platforms",
     "unsubscribeTarget(message.unsubscribe)" in code_only(KT_THREAD)
     and "unsubscribeTarget(message.unsubscribe)" in code_only(SW_RDR))
@@ -1750,9 +1754,19 @@ pin("both apply the web's two-or-three threshold rule",
     "p.count >= 2" in code_only(KT_SUBS) and "p.count >= 3" in code_only(KT_SUBS)
     and "b.count >= 2" in code_only(SW_SUBS) and "b.count >= 3" in code_only(SW_SUBS))
 pin("subscriptions are read from INCOMING mail only, both platforms",
-    'in" || m.direction' in code_only(KT_SUBS).replace("in\" || it.direction", "")
-    or ('direction' in code_only(KT_SUBS) and 'inbound' in code_only(KT_SUBS)
-        and 'direction' in code_only(SW_SUBS) and 'inbound' in code_only(SW_SUBS)))
+    'setOf("in", "inbound")' in body_of(code_only(KT_SUBS), "fun detectSubscriptions")
+    and 'direction == "in" || direction == "inbound"' in body_of(code_only(SW_SUBS), "func detectSubscriptions")
+    and slice_found(code_only(KT_SUBS), "fun detectSubscriptions")
+    and slice_found(code_only(SW_SUBS), "func detectSubscriptions"))
+# (This pin has been dead twice. First version: it searched the Kotlin file
+# for a Swift-shaped expression Kotlin never had -- a dead False branch over
+# an `or` that only asked two words to appear SOMEWHERE. Second version fixed
+# the spellings but still looked at whole files, and the mutation probe
+# caught that too: deleting the detector's filter line stayed green because
+# the scope-count filter elsewhere in the same file held the same words. A
+# rule about WHO counts messages belongs in the body of the function that
+# counts them -- hence body_of, and slice_found so a renamed function fails
+# out loud rather than as a vacuous absence.)
 
 # THE ACTION IS A HANDOFF. No client may POST to a sender's URL: the web does
 # it from ITS server behind the SSRF guard, and the plan says a gateway route
@@ -2057,6 +2071,97 @@ pin("the decorative icons are the four reviewed ones — no new silent icon",
 pin("the unsubscribe action is a word, not an icon, on both platforms",
     re.search(r'Text\(\s*"Unsubscribe"', code_only(KT_SUBS)) is not None
     and 'Text("Unsubscribe")' in code_only(SW_SUBS))
+
+# ── 32. the three-perspective review, pinned (§32) ──────────────────────
+# A review of this session's own work found four real defects the walking
+# frames could not see, because every one of them lives in code the snapshot
+# host never executes: the envelope's WIRE type (sealed send only runs against
+# the live route), the derivation's THREAD (the walk's seeded state skips it),
+# the error's LOCALIZED TEXT (failure states draw from seeds), and the
+# SIGN-OUT lifetime (a walk never signs out mid-frame). Each fix below is
+# pinned so the class, not just the instance, is closed.
+
+KT_E2EVM = android("logic/E2eViewModel.kt")
+
+# 1. THE WIRE. sanitiseE2eEnvelope (grapmail-e2e.ts:129-130) drops any
+# envelope that is not a JSON object; a String here was a silently-dead
+# sealed send. Slice-scoped, so the read side's legitimate `e2eEnvelope`
+# decodes elsewhere in the same files cannot satisfy it.
+KT_SEND_B = body_of(code_only(KT_API), "data class MailSendRequest")
+SW_SEND_B = body_of(code_only(SW_API), "struct MailSendRequest")
+pin("the sealed send puts the envelope on the wire as an OBJECT, both platforms",
+    slice_found(KT_API, "data class MailSendRequest")
+    and slice_found(SW_API, "struct MailSendRequest")
+    and "val e2eEnvelope: JsonObject? = null" in KT_SEND_B
+    and "var e2eEnvelope: RawJSON? = nil" in SW_SEND_B
+    and "e2eEnvelope: String?" not in KT_SEND_B
+    and "e2eEnvelope: String?" not in SW_SEND_B)
+# An unparseable envelope refuses the send; it must never degrade into a
+# plaintext one -- that is the leak the envelope exists to prevent.
+pin("an unparseable envelope refuses the send whole, both platforms",
+    "could not be prepared — nothing was sent." in code_only(KT_VM)
+    and "could not be prepared — nothing was sent." in code_only(SW_VM))
+
+# 2. THE THREAD. Every 600k-round derivation runs inside Task.detached; the
+# per-function slices are checked so one detached call cannot cover five
+# functions by sitting anywhere in the file.
+pin("iOS derives every passphrase off the main actor",
+    all("Task.detached" in body_of(code_only(SW_E2EVM), h)
+        for h in ("func setup(", "func unlock(passphrase:", "func changePassphrase(",
+                  "func seal(", "func decrypt("))
+    and all(slice_found(code_only(SW_E2EVM), h) for h in ("func setup(", "func changePassphrase(")))
+pin("Android derives off the main thread too",
+    KT_E2EVM.count("Dispatchers.Default") >= 3)
+
+# 3. THE SENTENCE. E2eError carries LocalizedError so localizedDescription
+# is the crafted line, describe() passes it through, and no call site reads
+# the raw property any more (the pin that used to be here checked the
+# sentence literals and passed while the getter mangled them).
+pin("crypto failures reach the screen as their own sentences, both platforms",
+    "Error, LocalizedError" in code_only(SW_E2E)
+    and "error as? MailE2e.E2eError" in code_only(SW_E2EVM)
+    and "note(error.localizedDescription" not in code_only(SW_E2EVM)
+    # Android's twin of the same rule: Throwable.message IS the crafted
+    # sentence there, and the model reads it -- pinning the read proves the
+    # sentence survives to the note on that platform.
+    and "exceptionOrNull()?.message" in code_only(KT_E2EVM))
+
+# 4. THE LIFETIME. Sign-out and expiry clear the unlocked session on both
+# platforms; three call sites each (drawer door, settings door, expiry).
+pin("sign-out drops the unlocked key on both platforms",
+    "func clearForSignOut" in code_only(SW_E2EVM)
+    and "fun clearForSignOut" in code_only(KT_E2EVM)
+    and code_only(SW_ROOT).count("clearForSignOut") >= 3
+    and code_only(KT_MAIN).count("clearForSignOut") >= 3)
+
+# 5. THE HANDOFF, HTTPS-ONLY. The web's normalizeUnsubscribe admits /^https:
+# /\//i and nothing else; both phones had an http:// branch that claimed to
+# copy it. A sender-chosen plain-http page one tap from the browser is the
+# interceptable-door class the SSRF guard on the web's own route exists to
+# close; the phones close it by not offering the door.
+pin("unsubscribe offers open only https targets, both platforms",
+    'startsWith("http://"' not in body_of(code_only(KT_MAIL_C), "fun unsubscribeTarget")
+    and 'hasPrefix("http://")' not in body_of(code_only(SW_MAIL_C), "func unsubscribeTarget(")
+    and 'startsWith("https://", ignoreCase = true)' in body_of(code_only(KT_MAIL_C), "fun unsubscribeTarget")
+    and slice_found(code_only(KT_MAIL_C), "fun unsubscribeTarget")
+    and slice_found(code_only(SW_MAIL_C), "func unsubscribeTarget("))
+# A mailto: whose case the strip missed used to ride into the draft whole
+# ("mailto:MAILTO:list@x"); and an unbuildable mailto URL must be said, not
+# swallowed. Both live in the subscriptions sector now.
+pin("the mailto strip is case-proof and its failure is spoken",
+    'while (t.startsWith("mailto:", ignoreCase = true))' in code_only(KT_MAIL_C)
+    and "could not be opened, so nothing was drafted" in code_only(SW_SUBS))
+
+# 6. THE VERSION. One release, two apps: whatever the gradle build calls
+# itself, the Xcode project must answer the same -- the tag gate proved the
+# Android half right by failing a disagreeing tag; nothing yet proves iOS's
+# half, so this pin is the proof until a badging step exists.
+GRADLE = (ROOT / "android/app/build.gradle.kts").read_text(encoding="utf-8")
+PYML = (ROOT / "ios/project.yml").read_text(encoding="utf-8")
+_m = re.search(r'versionName = "([^"]+)"', GRADLE)
+_p = re.search(r'MARKETING_VERSION: "([^"]+)"', PYML)
+pin("both apps self-report the same marketing version",
+    _m is not None and _p is not None and _m.group(1) == _p.group(1))
 
 print()
 if failures:

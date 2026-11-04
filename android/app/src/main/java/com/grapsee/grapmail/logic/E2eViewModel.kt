@@ -279,6 +279,18 @@ class E2eViewModel @JvmOverloads constructor(
         note("Locked.", false)
     }
 
+    /** Sign-out and session expiry go through this. The doc on `session`
+     *  always promised "cleared by lock, SIGN-OUT, and process death", but
+     *  no code ever did the sign-out leg: this ViewModel is activity-scoped,
+     *  so it survives the navigate-to-WELCOME, and the next account signed
+     *  in on this device would find the previous person's plaintext private
+     *  halves still here — unlocked and ready to seal mail with a stranger's
+     *  key. This is that promised leg, finally true. */
+    fun clearForSignOut() {
+        session = null
+        _state.value = State()
+    }
+
     /** Re-wrap the SAME key under a new passphrase. The key does not change,
      *  so mail already encrypted to it stays readable — the note says so. */
     fun changePassphrase(oldPhrase: String, newPhrase: String) {

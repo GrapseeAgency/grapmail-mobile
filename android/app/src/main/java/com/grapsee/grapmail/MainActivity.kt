@@ -340,6 +340,10 @@ fun GrapMailNav() {
     // that does not require reinstalling the app.
     LaunchedEffect(Unit) {
         SessionEvents.expired.collect {
+            // The activity-scoped E2E view model outlives the nav graph: a
+            // dead token must drop the unlocked private halves exactly like
+            // a deliberate sign-out, or the next account inherits them.
+            e2e.clearForSignOut()
             SessionStore.clear(nav.context.applicationContext)
             backToSignIn()
         }
@@ -841,6 +845,7 @@ fun GrapMailNav() {
                     // account on this device never opens a list of somebody else's
                     // messages.
                     com.grapsee.grapmail.ui.screens.security.SecurityFlow.reset()
+                    e2e.clearForSignOut()
                     scope.launch { SessionStore.clear(nav.context.applicationContext) }
                     nav.navigate(Routes.WELCOME) { popUpTo(0) { inclusive = true } }
                 },
@@ -930,6 +935,7 @@ fun GrapMailNav() {
                 onHelp = { nav.navigate(Routes.MAIL_SUPPORT) },
                 onSignOut = {
                     com.grapsee.grapmail.ui.screens.security.SecurityFlow.reset()
+                    e2e.clearForSignOut()
                     scope.launch { SessionStore.clear(nav.context.applicationContext) }
                     nav.navigate(Routes.WELCOME) { popUpTo(0) { inclusive = true } }
                 },

@@ -318,7 +318,13 @@ struct SubscriptionsView: View {
     /// device's mail composer answers that; this app is not it, and it says
     /// what it opened rather than claiming the letter went.
     private func mailtoHandoff(_ addr: String) {
-        guard let url = URL(string: "mailto:\(addr)?subject=unsubscribe") else { return }
+        guard let url = URL(string: "mailto:\(addr)?subject=unsubscribe") else {
+            // The address is sender-controlled; an unbuildable URL must be
+            // SAID, not swallowed — a tap that silently does nothing reads as
+            // a broken button, and this screen's rule is it says what opened.
+            note = "That unsubscribe address could not be opened, so nothing was drafted."
+            return
+        }
         UIApplication.shared.open(url, options: [:]) { accepted in
             note = accepted
                 ? "The device opened a draft to the sender's unsubscribe address. "

@@ -24,3 +24,4 @@ Thumbs.db
 !assets/
 !design/
 screenshots-*/
+__pycache__/

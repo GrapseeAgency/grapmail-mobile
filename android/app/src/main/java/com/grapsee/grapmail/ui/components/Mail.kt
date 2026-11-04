@@ -162,8 +162,12 @@ fun parseUnsubscribe(raw: String?): String? {
 fun unsubscribeTarget(u: com.grapsee.grapmail.data.MailUnsubscribeDto?): String? {
     if (u == null) return null
     u.offers.firstOrNull {
-        it.url.startsWith("https://", ignoreCase = true) ||
-            it.url.startsWith("http://", ignoreCase = true)
+        // HTTPS only, exactly as the web's normalizeUnsubscribe: its test is
+        // /^https:\/\//i (subscriptions.ts:74) and a plain-http offer is no
+        // door there. Handing a sender-chained http:// page one tap from the
+        // browser puts it in front of a network attacker; the old branch here
+        // claimed the web took http too — it never did.
+        it.url.startsWith("https://", ignoreCase = true)
     }?.let { return it.url }
     return parseUnsubscribe(u.raw)
 }
@@ -173,12 +177,22 @@ fun unsubscribeTarget(u: com.grapsee.grapmail.data.MailUnsubscribeDto?): String?
  *  subscriptions row says which one it is doing. */
 fun unsubscribeMailto(u: com.grapsee.grapmail.data.MailUnsubscribeDto?): String? {
     u?.offers?.firstOrNull { it.url.startsWith("mailto:", ignoreCase = true) }
-        ?.let { return it.url.removePrefix("mailto:").removePrefix("mailto:") }
+        // drop(7), not removePrefix: the test above is ignoreCase, and the
+        // case-SENSITIVE removePrefix left "MAILTO:list@x" whole — that then
+        // embedded into mailto:MAILTO:list@x and drafted a corrupt recipient.
+        ?.let { return stripMailto(it.url) }
     val fromHeader = u?.raw?.let { raw ->
         Regex("<([^>]+)>").findAll(raw).map { m -> m.groupValues[1].trim() }
             .firstOrNull { it.startsWith("mailto:", ignoreCase = true) }
     }
-    return fromHeader?.removePrefix("mailto:")?.removePrefix("mailto:")
+    return fromHeader?.let { stripMailto(it) }
+}
+
+/** Every leading mailto:, any case — a sender can write MAILTO: or Mailto:. */
+private fun stripMailto(url: String): String {
+    var t = url
+    while (t.startsWith("mailto:", ignoreCase = true)) t = t.substring(7)
+    return t
 }
 
 /**

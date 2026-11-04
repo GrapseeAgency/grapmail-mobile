@@ -638,16 +638,20 @@ func parseUnsubscribe(_ raw: String?) -> String? {
 }
 
 /// The address a tap on "Unsubscribe" opens, from the server's parsed offer:
-/// the first http(s) offer wins, exactly as the web's `normalizeUnsubscribe`
-/// takes its `http`; with no offer list the legacy header string still parses
+/// the first HTTPS offer wins, exactly as the web's `normalizeUnsubscribe`
+/// does — `subscriptions.ts:74` tests `/^https:\/\//i` and nothing else, so a
+/// plain-http offer is no door on any Grapsee client. Handing the person a
+/// `http://` page would put a sender-chosen, interceptable site one tap from
+/// their browser; the claim in the old comment here was wrong about the web
+/// it cited. With no https offer the legacy header string still parses
 /// through `parseUnsubscribe`. nil means no door — the thread shows no
 /// unsubscribe control, and the subscriptions row says nothing was offered.
 /// Android's `unsubscribeTarget` applies the same rules.
 func unsubscribeTarget(_ u: MailUnsubscribe?) -> String? {
     guard let u else { return nil }
-    if let offer = u.offers.first(where: {
-        $0.url.lowercased().hasPrefix("https://") || $0.url.lowercased().hasPrefix("http://")
-    }) { return offer.url }
+    if let offer = u.offers.first(where: { $0.url.lowercased().hasPrefix("https://") }) {
+        return offer.url
+    }
     return parseUnsubscribe(u.raw)
 }
 

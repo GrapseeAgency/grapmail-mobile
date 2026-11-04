@@ -102,18 +102,33 @@ final class E2eModel: ObservableObject {
             return
         }
         state.busy = true
+        // Both the identity generation and the first unlock sit behind
+        // Task.detached, exactly as seal() and decrypt() do: setup derives up
+        // to FOUR 600,000-round PBKDF2 blocks, and a plain Task inherits this
+        // class's @MainActor — on the main thread that is tens of seconds of
+        // freeze per press and a watchdog candidate. attempt is nonisolated
+        // precisely so the work stays where detached puts it. The outer Task
+        // is what makes the await legal: setup() is called from a button.
         Task {
-            let made = E2eModel.attempt { try MailE2e.generateIdentity(accountKey: t, passphrase: passphrase) }
+            let made = await Task.detached {
+                E2eModel.attempt {
+                    let identity = try MailE2e.generateIdentity(accountKey: t, passphrase: passphrase)
+                    return (identity, try MailE2e.unlock(identity, passphrase: passphrase))
+                }
+            }.value
             switch made {
             case .failure(let error):
                 state.busy = false
-                note(error.localizedDescription, bad: true)
-                return
-            case .success(let identity):
-                session = try? MailE2e.unlock(identity, passphrase: passphrase)
+                note(Self.describe(error), bad: true)
+            case .success(let (identity, opened)):
+                // The generation just proved the passphrase, so the same phrase
+                // must open the fresh key; if that second step ever fails it is
+                // said, not swallowed — "Encryption is on" with a locked key and
+                // no reason would be a lie by omission.
+                session = opened
                 state.record = identity
                 state.fingerprint = MailE2e.fingerprint(publicKeyB64: identity.encryption.publicKey)
-                state.unlocked = session != nil
+                state.unlocked = true
                 if publishOnSetup {
                     await publishNow()
                 } else {
@@ -179,7 +194,11 @@ final class E2eModel: ObservableObject {
         guard !snapshotSeeded, let record = state.record else { return }
         state.busy = true
         Task {
-            let opened = E2eModel.attempt { try MailE2e.unlock(record, passphrase: passphrase) }
+            // Two 600k-round derivations per press: off the main actor, same
+            // reason as setup().
+            let opened = await Task.detached {
+                E2eModel.attempt { try MailE2e.unlock(record, passphrase: passphrase) }
+            }.value
             state.busy = false
             switch opened {
             case .success(let s):
@@ -187,7 +206,7 @@ final class E2eModel: ObservableObject {
                 state.unlocked = true
                 note("Unlocked for this session. It locks again when the app is closed.", bad: false)
             case .failure(let error):
-                note(error.localizedDescription, bad: true)
+                note(Self.describe(error), bad: true)
             }
         }
     }
@@ -199,6 +218,20 @@ final class E2eModel: ObservableObject {
         note("Locked.", bad: false)
     }
 
+    /// Sign-out and session expiry go through this. The file's own contract —
+    /// "never written to disk, never logged, cleared on lock, SIGN-OUT and
+    /// process death" — had the sign-out leg missing: the model is a
+    /// @StateObject on the root view, so path.removeAll() leaves it alive,
+    /// and the next account to sign in on the same device would find the
+    /// previous person's plaintext private halves still in `session` and its
+    /// record in `state` — unlocked, fingerprinted, and ready to seal mail
+    /// with a stranger's key. A clear the UI forgets to call is a leak; this
+    /// is called from every sign-out door and from the expiry handler.
+    func clearForSignOut() {
+        session = nil
+        state = State()
+    }
+
     func changePassphrase(oldPhrase: String, newPhrase: String) {
         guard !snapshotSeeded, let t = token, let record = state.record else { return }
         if newPhrase.count < MailE2e.minPassphraseLength {
@@ -208,19 +241,23 @@ final class E2eModel: ObservableObject {
         }
         state.busy = true
         Task {
-            let done = E2eModel.attempt {
-                let reEnc = try MailE2e.changePassphrase(record.encryption,
-                                                         oldPassphrase: oldPhrase,
-                                                         newPassphrase: newPhrase)
-                let reSign = try record.signing.map {
-                    try MailE2e.changePassphrase($0, oldPassphrase: oldPhrase, newPassphrase: newPhrase)
+            // Four 600k-round derivations (unwrap old, wrap new, twice over):
+            // detached for the same reason as setup() and unlock().
+            let done = await Task.detached {
+                E2eModel.attempt {
+                    let reEnc = try MailE2e.changePassphrase(record.encryption,
+                                                             oldPassphrase: oldPhrase,
+                                                             newPassphrase: newPhrase)
+                    let reSign = try record.signing.map {
+                        try MailE2e.changePassphrase($0, oldPassphrase: oldPhrase, newPassphrase: newPhrase)
+                    }
+                    guard MailE2e.saveIdentity(accountKey: t,
+                          identity: MailE2e.Identity(encryption: reEnc, signing: reSign,
+                                                    createdAt: record.createdAt)) else {
+                        throw MailE2e.E2eError(text: "This device would not store the updated key.")
+                    }
                 }
-                guard MailE2e.saveIdentity(accountKey: t,
-                      identity: MailE2e.Identity(encryption: reEnc, signing: reSign,
-                                                createdAt: record.createdAt)) else {
-                    throw MailE2e.E2eError(text: "This device would not store the updated key.")
-                }
-            }
+            }.value
             state.busy = false
             switch done {
             case .success:
@@ -228,7 +265,7 @@ final class E2eModel: ObservableObject {
                 note("Passphrase changed. The key itself is unchanged, so old messages still open.",
                      bad: false)
             case .failure(let error):
-                note(error.localizedDescription, bad: true)
+                note(Self.describe(error), bad: true)
             }
         }
     }
@@ -285,7 +322,7 @@ final class E2eModel: ObservableObject {
         case .success(let envelope):
             return MailE2e.envelopeJson(envelope)
         case .failure(let error):
-            note(error.localizedDescription, bad: true)
+            note(Self.describe(error), bad: true)
             return nil
         }
     }
@@ -308,7 +345,7 @@ final class E2eModel: ObservableObject {
         switch result {
         case .success(let plain): return plain
         case .failure(let error):
-            note(error.localizedDescription, bad: true)
+            note(Self.describe(error), bad: true)
             return nil
         }
     }
@@ -331,6 +368,11 @@ final class E2eModel: ObservableObject {
     private nonisolated static func describe(_ error: Error) -> String {
         if let api = error as? ApiError, case let .http(_, _, message) = api,
            !message.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return message }
+        // The module's own sentences are the whole point of crafting them:
+        // "That passphrase did not unlock this key." must survive to the
+        // screen, where the generic line below is only for errors with no
+        // message of their own.
+        if let e2e = error as? MailE2e.E2eError { return e2e.text }
         return "That did not go through."
     }
 }

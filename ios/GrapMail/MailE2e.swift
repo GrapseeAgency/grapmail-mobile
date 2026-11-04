@@ -78,7 +78,16 @@ enum MailE2e {
         kind == "Ed25519" ? pkcs8PrefixEd25519 : pkcs8PrefixX25519
     }
 
-    struct E2eError: Error, CustomStringConvertible { let text: String; var description: String { text } }
+    /// LocalizedError, not just CustomStringConvertible: the models surface
+    /// failures through `localizedDescription`, and Foundation does NOT consult
+    /// CustomStringConvertible for it — without errorDescription the crafted
+    /// sentence ("That passphrase did not unlock this key.") renders as
+    /// "The operation couldn't be completed. (…E2eError error 0.)".
+    struct E2eError: Error, LocalizedError, CustomStringConvertible {
+        let text: String
+        var description: String { text }
+        var errorDescription: String? { text }
+    }
 
     private static func stripPrefix(_ der: Data, _ prefix: Data, _ what: String) throws -> Data {
         guard der.count == prefix.count + 32, der.prefix(prefix.count) == prefix else {

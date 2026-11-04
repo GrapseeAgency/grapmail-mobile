@@ -4,6 +4,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.MultipartBody
 import okhttp3.OkHttpClient
@@ -1307,8 +1308,15 @@ data class MailSendRequest(
      * never sees plaintext, and this client never sends the body twice: with
      * an envelope present, `bodyText` is the empty string the route accepts
      * (`!bodyText && !bodyHtml && !e2eEnvelope` is the only refusal).
+     *
+     * JsonObject?, never String?: `sanitiseE2eEnvelope` (grapmail-e2e.ts:
+     * 129-130) returns undefined for anything that is not `typeof raw ===
+     * 'object'`, so a quoted string on this key is a silently dropped
+     * envelope — and the dropped envelope then 400s on the deliberate empty
+     * body of a sealed send. The web sends the object itself (page.tsx:
+     * 1846 `e2eEnvelope: seal.envelope`); this is the same shape.
      */
-    val e2eEnvelope: String? = null,
+    val e2eEnvelope: JsonObject? = null,
 )
 
 @Serializable

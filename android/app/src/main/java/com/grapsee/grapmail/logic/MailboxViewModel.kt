@@ -18,6 +18,8 @@ import com.grapsee.grapmail.data.MailLabelDto
 import com.grapsee.grapmail.data.MailMessageDto
 import com.grapsee.grapmail.data.MailMessageFullDto
 import com.grapsee.grapmail.data.MailSendRequest
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
 import com.grapsee.grapmail.data.MailSenderScope
 import com.grapsee.grapmail.data.MailSort
 import com.grapsee.grapmail.data.MailStore
@@ -1054,6 +1056,20 @@ class MailboxViewModel @JvmOverloads constructor(
         }
         viewModelScope.launch {
             val t = token() ?: run { _compose.update { it.copy(error = "Sign in again.") }; return@launch }
+            // The envelope goes on the wire as the JSON OBJECT the route
+            // parses — a string is silently dropped by sanitiseE2eEnvelope
+            // and the sealed send would then 400 on its deliberate empty
+            // body. Unparseable text refuses the send whole: the alternative
+            // reading of "no envelope" would send the plaintext the envelope
+            // exists to keep private.
+            val envelope = e2eEnvelope?.let {
+                try { Json.parseToJsonElement(it).jsonObject }
+                catch (e: Exception) {
+                    _compose.update { s -> s.copy(error = "The encrypted envelope could not be prepared — nothing was sent.") }
+                    null
+                }
+            }
+            if (e2eEnvelope != null && envelope == null) return@launch
             _compose.update { it.copy(sending = true, error = null, result = null, resultStatus = null) }
             runCatching {
                 Api.mailSend(t, MailSendRequest(
@@ -1063,9 +1079,9 @@ class MailboxViewModel @JvmOverloads constructor(
                     // route stores its notice in place of a body, and a
                     // client that sent both would leak exactly what the
                     // envelope exists to keep private.
-                    bodyText = if (e2eEnvelope != null) "" else s.body,
+                    bodyText = if (envelope != null) "" else s.body,
                     inReplyTo = s.inReplyTo,
-                    e2eEnvelope = e2eEnvelope,
+                    e2eEnvelope = envelope,
                 ))
             }.onSuccess { r ->
                 _compose.update { it.copy(sending = false,

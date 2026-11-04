@@ -1234,11 +1234,25 @@ final class MailboxModel: ObservableObject {
         compose.error = nil
         compose.result = nil
         compose.resultStatus = nil
+        // The envelope goes on the wire as the JSON OBJECT the route parses —
+        // a string is silently dropped by sanitiseE2eEnvelope and the sealed
+        // send would then 400 on its deliberate empty body (and worse: any
+        // "fallback" to plaintext here would leak exactly what the envelope
+        // exists to keep private). Unparseable text refuses the send whole.
+        var envelopeJson: RawJSON? = nil
+        if let env = e2eEnvelope {
+            guard let parsed = RawJSON(object: env) else {
+                compose.sending = false
+                compose.error = "The encrypted envelope could not be prepared — nothing was sent."
+                return
+            }
+            envelopeJson = parsed
+        }
         let req = MailSendRequest(
             to: Self.splitAddresses(compose.to), cc: Self.splitAddresses(compose.cc),
             bcc: Self.splitAddresses(compose.bcc), subject: compose.subject,
-            bodyText: e2eEnvelope == nil ? compose.body : "",
-            inReplyTo: compose.inReplyTo, e2eEnvelope: e2eEnvelope)
+            bodyText: envelopeJson == nil ? compose.body : "",
+            inReplyTo: compose.inReplyTo, e2eEnvelope: envelopeJson)
         Task { [weak self] in
             guard let self else { return }
             do {

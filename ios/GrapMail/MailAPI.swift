@@ -1085,6 +1085,74 @@ enum MailFilter: String, CaseIterable, Identifiable {
 
 // ── request bodies ───────────────────────────────────────────────────────────
 
+/// A JSON tree carried as text and re-emitted as a real JSON value on encode.
+/// The sealed envelope lives in the compose model as the exact string the
+/// encryptor produced (byte-stable, testable, never rebuilt field by field),
+/// but the wire is not allowed to see it as a string: `grapmail-e2e.ts:129-130`
+/// returns undefined for any `e2eEnvelope` where `typeof raw !== 'object'`,
+/// and the web client — the existing contract — sends the object itself
+/// (`page.tsx:1846` `e2eEnvelope: seal.envelope`). A string on the wire is a
+/// dropped envelope plus a 400 for the blank body the sealed send
+/// deliberately leaves behind. This type is the one place the text form is
+/// allowed to become JSON again.
+enum RawJSONValue: Encodable {
+    case object([String: RawJSONValue]), array([RawJSONValue]), string(String),
+    number(Double), bool(Bool), null
+
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.singleValueContainer()
+        switch self {
+        case .object(let d): try c.encode(d)
+        case .array(let a): try c.encode(a)
+        case .string(let s): try c.encode(s)
+        case .number(let n): try c.encode(n)
+        case .bool(let b): try c.encode(b)
+        case .null: try c.encodeNil()
+        }
+    }
+}
+
+struct RawJSON: Encodable {
+    private let value: RawJSONValue
+
+    /// nil when the text is not a JSON object: an unparseable envelope must
+    /// never degrade into a plaintext send, so the caller checks the result
+    /// and refuses the send outright.
+    init?(object jsonText: String) {
+        guard let data = jsonText.data(using: .utf8),
+              case let .object(d)? = RawJSON.convert(jsonSerialization: data),
+              !d.isEmpty else { return nil }
+        value = .object(d)
+    }
+
+    private static func convert(jsonSerialization data: Data) -> RawJSONValue? {
+        (try? JSONSerialization.jsonObject(with: data)).flatMap(convert(_:))
+    }
+
+    private static func convert(_ any: Any) -> RawJSONValue? {
+        if any is NSNull { return .null }
+        if let s = any as? String { return .string(s) }
+        if let n = any as? NSNumber {
+            // JSON booleans arrive as __NSCFBoolean; every NSNumber answers to
+            // as? Bool, so the CF type is the only honest discriminator.
+            if CFGetTypeID(n) == CFBooleanGetTypeID() { return .bool(n.boolValue) }
+            return .number(n.doubleValue)
+        }
+        if let a = any as? [Any] {
+            let items = a.compactMap(convert(_:))
+            return items.count == a.count ? .array(items) : nil
+        }
+        if let d = any as? [String: Any] {
+            var out: [String: RawJSONValue] = [:]
+            for (k, v) in d { guard let cv = convert(v) else { return nil }; out[k] = cv }
+            return .object(out)
+        }
+        return nil
+    }
+
+    func encode(to encoder: Encoder) throws { try value.encode(to: encoder) }
+}
+
 /// Field names are the keys the handlers destructure, not the app's vocabulary.
 /// `MailLabelCreateRequest.colour` is spelled the way `grapmail-labels.ts:105`
 /// reads it: sending `color` creates the label with no colour and returns 200,
@@ -1112,7 +1180,12 @@ struct MailSendRequest: Encodable {
     /// sanitises it and stores the notice text in place of a body — the server
     /// never sees plaintext, and this client never sends the body twice: with
     /// an envelope present, `bodyText` is the empty string the route accepts.
-    var e2eEnvelope: String? = nil
+    /// The type is an OBJECT on the wire, never a quoted string:
+    /// `sanitiseE2eEnvelope` (grapmail-e2e.ts:129-130) drops anything that is
+    /// not `typeof raw === 'object'`, and the dropped envelope then trips the
+    /// route's `!bodyText && !bodyHtml && !e2eEnvelope` refusal — the web's
+    /// `e2eEnvelope: seal.envelope` is the contract this mirrors.
+    var e2eEnvelope: RawJSON? = nil
 }
 
 struct MailDraftRequest: Encodable {

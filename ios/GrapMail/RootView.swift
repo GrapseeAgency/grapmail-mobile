@@ -155,6 +155,10 @@ struct RootView: View {
             // sign-in) never reach here — only a rejected bearer does.
             .onReceive(NotificationCenter.default.publisher(for: .gmSessionExpired)) { _ in
                 guard path.last != .signIn else { return }
+                // A dead token strands the unlocked private halves in this
+                // stack otherwise: the model outlives path rewrites, so the
+                // expiry route clears it exactly like a deliberate sign-out.
+                e2e.clearForSignOut()
                 path = [.signIn]
             }
         }
@@ -579,6 +583,7 @@ struct RootView: View {
                         onContacts: { path.append(.mailContacts) },
                         onFiles: { path.append(.mailFiles) },
                         onSignOut: {
+                            e2e.clearForSignOut()
                             SessionStore.clear()
                             path.removeAll()
                         }
@@ -638,6 +643,7 @@ struct RootView: View {
                         onEncryption: { path.append(.e2eStatus) },
                         onHelp: { path.append(.mailSupport) },
                         onSignOut: {
+                            e2e.clearForSignOut()
                             SessionStore.clear()
                             path.removeAll()
                         }

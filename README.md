@@ -465,7 +465,8 @@ All Mail carry no badge — the same call the web client already makes
 `77-mail-contacts`, `78-mail-files`, `79-mail-attachment-preview`,
 `80-mail-settings`, `81-mail-screener`, `82-mail-send-receipt`,
 `83-mail-assign-label-sheet`, `84-mail-snooze-sheet`, `85-mail-contact-detail`,
-`86-mail-sender-sheet`.
+`86-mail-sender-sheet`, `87-mail-unsubscribe`, `88-mail-thread-dark`,
+`89-mail-labels-dark`.
 
 Contacts is derived from `?box=inbox` + `?box=sent` (there is no contacts
 endpoint), and Files is aggregated from message pages (`GET /attachments/:id`

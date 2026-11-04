@@ -246,11 +246,14 @@ jobs:
           set -eu
           AAB=android/app/build/outputs/bundle/release/app-release.aab
           [ -f "$AAB" ] || { echo "::error::no $AAB — bundleRelease did not run"; exit 1; }
-          unzip -l "$AAB" | grep -q "^.*BUNDLE-METADATA/" || \
-            unzip -l "$AAB" | grep -q "base/manifest/AndroidManifest.xml" || \
-            { echo "::error::$AAB is not a bundle structure"; unzip -l "$AAB" | head -20 >&2; exit 1; }
-          unzip -l "$AAB" | grep -q "base/manifest/AndroidManifest.xml" \
-            || { echo "::error::bundle has no base manifest"; exit 1; }
+          # `unzip -l | grep -q` under this job's `set -eu -o pipefail` is a
+          # false-red trap: grep -q exits on the first match, unzip then dies
+          # of SIGPIPE (141) on a long listing, pipefail propagates it, and a
+          # perfectly valid bundle is declared "not a bundle structure".
+          # Capture the listing once, grep the file.
+          unzip -l "$AAB" > /tmp/aab-list.txt
+          grep -q "base/manifest/AndroidManifest.xml" /tmp/aab-list.txt \
+            || { echo "::error::$AAB has no base manifest"; head -20 /tmp/aab-list.txt >&2; exit 1; }
           unzip -p "$AAB" com/android/tools/bundleBuilder/bundle-metadata.textproto 2>/dev/null | head -3 || true
           echo "AAB present with a base manifest: $(stat -c %s "$AAB") bytes"
 
