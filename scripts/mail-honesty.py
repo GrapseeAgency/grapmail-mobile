@@ -2348,6 +2348,14 @@ pin("the labels header shows its count beside a button that shares the row",
     'OutlineButton("New label", onClick = onCreate, fill = false' in code_only(android("ui/screens/mail/MailSecondaryScreens.kt"))
     and r'\(vm.labelState.labels.count) label' in code_only(SW_SECOND))
 
+# Frame 108's photograph: the recipients "Check" button rendered as a clipped
+# circle. A fill=false E2e button carries no intrinsic horizontal padding, so
+# the 24dp corner shape ate the short label. Both platforms now inset a
+# non-filling button by 22dp; drop either inset and the clip comes back.
+pin("a non-filling E2E button keeps its label outside the corner radius",
+    ".padding(horizontal = if (fill) 0.dp else 22.dp)" in code_only(KT_E2ES)
+    and ".padding(.horizontal, fill ? 0 : 22)" in code_only(SW_E2ES))
+
 print()
 if failures:
     print(f"mail-honesty: {len(failures)} pin(s) broken")

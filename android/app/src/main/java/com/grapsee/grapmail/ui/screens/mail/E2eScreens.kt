@@ -138,6 +138,10 @@ private fun E2eButton(text: String, enabled: Boolean, quiet: Boolean = false,
             .border(1.dp, if (destructive) palette.error else if (quiet) palette.border else palette.primarySolid, RoundedCornerShape(24.dp))
             .clickable(enabled = enabled, onClick = onClick)
             .padding(vertical = 13.dp)
+            // A non-filling button has no intrinsic horizontal padding, so a
+            // short label like "Check" was clipped to a circle by the 24dp
+            // corner shape. The iOS twin carries the same conditional inset.
+            .padding(horizontal = if (fill) 0.dp else 22.dp)
             .then(if (tag != null) Modifier.testTag(tag) else Modifier))
 }
 

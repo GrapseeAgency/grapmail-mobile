@@ -47,8 +47,11 @@ android {
         // 0.3.0, this file still said 0.2.1, and the badging check refused to
         // publish a release page describing a build it could not name. The
         // disagreement was real; the tag was moved to the commit that fixes it.
-        versionCode = 5
-        versionName = "0.3.1"
+        // 0.3.2 is the design-and-behavior release: the frame-audit fixes (empty
+        // states, centering, destructive colours, toolbar pair), the compose
+        // parity, and the non-filling button inset that un-clipped "Check".
+        versionCode = 6
+        versionName = "0.3.2"
         // Real account API — same contract the website uses.
         buildConfigField("String", "API_BASE", "\"https://grapsee.com/api\"")
     }
