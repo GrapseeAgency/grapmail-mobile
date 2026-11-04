@@ -93,7 +93,7 @@ final class E2eModel: ObservableObject {
 
     func setup(passphrase: String, confirm: String, publishOnSetup: Bool) {
         guard !snapshotSeeded, let t = token else { return }
-        if passphrase.count < MailE2e.minPassphraseLength {
+        if passphrase.utf16.count < MailE2e.minPassphraseLength {
             note("Use at least \(MailE2e.minPassphraseLength) characters for the passphrase.", bad: true)
             return
         }
@@ -234,7 +234,7 @@ final class E2eModel: ObservableObject {
 
     func changePassphrase(oldPhrase: String, newPhrase: String) {
         guard !snapshotSeeded, let t = token, let record = state.record else { return }
-        if newPhrase.count < MailE2e.minPassphraseLength {
+        if newPhrase.utf16.count < MailE2e.minPassphraseLength {
             note("Use at least \(MailE2e.minPassphraseLength) characters for the new passphrase.",
                  bad: true)
             return

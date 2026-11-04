@@ -66,7 +66,15 @@ jobs:
             fi
           done
           echo "device=pixel_4a" >> "$GITHUB_OUTPUT"
-          echo "no compact profile in this SDK — using pixel_4a (width coverage is weak)"
+          # The last resort stays green — a removed SDK profile is an infra
+          # event, not an app defect, and killing three device legs over it
+          # teaches nobody anything — but it may not stay SILENT: 393dp
+          # beside 411dp proves no small-phone width, and the release gate's
+          # claim depends on this leg actually being the small phone. The
+          # annotation and the run summary are the loud part; the release
+          # body tells readers to check the device matrix log.
+          echo "::warning title=compact-fallback::no nexus_4/nexus_s in this SDK — the small-phone gate ran on pixel_4a (~393dp, close to pixel_6)"
+          echo "Small-phone gate degraded to pixel_4a — width coverage weak, see walk log." >> "$GITHUB_STEP_SUMMARY"
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
@@ -209,8 +217,14 @@ jobs:
           # not be made silently by a CI file.
           KS=/tmp/ci-release.keystore
           PW=$(openssl rand -hex 24)
-          keytool -genkeypair -v -keystore "$KS" -storepass "$PW" \
-            -keypass "$PW" -alias grapmail-ci -keyalg RSA -keysize 2048 \
+          export CI_KEYSTORE_PASSWORD="$PW"
+          # :env, not argv — a password in a command line is visible to any
+          # process list reader for the keytool's short life, and the one-word
+          # change removes that habit from the recipe in case this step is
+          # ever edited toward a real distribution key. gradle reads the same
+          # export below, so nothing else moves.
+          keytool -genkeypair -v -keystore "$KS" -storepass:env CI_KEYSTORE_PASSWORD \
+            -keypass:env CI_KEYSTORE_PASSWORD -alias grapmail-ci -keyalg RSA -keysize 2048 \
             -validity 3650 \
             -dname "CN=GrapMail CI test signature (not the distribution key), OU=ephemeral, O=Grapsee, C=US" >&2
           # `export`, not `$GITHUB_ENV`. The first attempt wrote these to

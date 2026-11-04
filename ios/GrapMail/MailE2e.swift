@@ -45,6 +45,11 @@ enum MailE2e {
     static let protectedKeyFormat = "grapmail-e2e-protected-key/1"
     static let kdfName = "PBKDF2-SHA256"
     static let pbkdf2Iterations = 600_000
+    // Measured in UTF-16 units on all three clients: the web's
+    // `passphrase.length` (mailE2e.ts:830) and Kotlin's `passphrase.length`
+    // count UTF-16, so every iOS check reads `.utf16.count` — a grapheme
+    // `.count` would let a decomposed-accent or emoji passphrase pass setup
+    // in the browser and be refused on the phone for the same bytes.
     static let minPassphraseLength = 8
     static let kdfSaltBytes = 16
 
@@ -470,7 +475,7 @@ enum MailE2e {
 
     static func protectPrivateKey(privateKeyB64: String, passphrase: String, kind: String,
                                   publicKey: String, iterations: Int = pbkdf2Iterations) throws -> ProtectedPrivateKey {
-        if passphrase.count < minPassphraseLength {
+        if passphrase.utf16.count < minPassphraseLength {
             throw E2eError(text: "Use at least \(minPassphraseLength) characters for the passphrase.")
         }
         guard let der = unb64(privateKeyB64) else { throw E2eError(text: "This key record is damaged.") }
@@ -593,7 +598,7 @@ enum MailE2e {
     /// can publish again, rather than a published key nobody holds the half
     /// for.
     static func generateIdentity(accountKey: String, passphrase: String) throws -> Identity {
-        if passphrase.count < minPassphraseLength {
+        if passphrase.utf16.count < minPassphraseLength {
             throw E2eError(text: "Use at least \(minPassphraseLength) characters for the passphrase.")
         }
         let encryption = try generateKeyPair(kind: "X25519")
