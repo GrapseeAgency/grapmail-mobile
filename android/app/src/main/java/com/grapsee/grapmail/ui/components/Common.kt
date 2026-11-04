@@ -134,11 +134,18 @@ fun OutlineButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     trailing: @Composable (() -> Unit)? = null,
+    /// false for buttons that share a Row with a weighted sibling. The
+    /// hardcoded fillMaxWidth measured the button against the WHOLE row
+    /// before the weighted text got any of it — the labels screen's
+    /// "3 labels" count rendered at zero width, and frame 72's photograph
+    /// showed a button floating with no count beside it. Same measurement
+    /// collision the recipients screen's Check button had; same cure.
+    fill: Boolean = true,
 ) {
     val palette = LocalPalette.current
     androidx.compose.material3.OutlinedButton(
         onClick = onClick,
-        modifier = modifier.fillMaxWidth().heightIn(min = 54.dp),
+        modifier = (if (fill) modifier.fillMaxWidth() else modifier).heightIn(min = 54.dp),
         shape = RoundedCornerShape(16.dp),
         border = androidx.compose.foundation.BorderStroke(1.5.dp, palette.border),
     ) {

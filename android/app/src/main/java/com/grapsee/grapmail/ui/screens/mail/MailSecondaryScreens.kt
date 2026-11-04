@@ -146,7 +146,7 @@ fun LabelsScreen(vm: MailboxViewModel, onBack: () -> Unit, onCreate: () -> Unit,
                 verticalAlignment = Alignment.CenterVertically) {
                 Text("${state.labels.size} label${if (state.labels.size == 1) "" else "s"}",
                     fontSize = 13.sp, color = palette.textSecondary, modifier = Modifier.weight(1f))
-                OutlineButton("New label", onClick = onCreate,
+                OutlineButton("New label", onClick = onCreate, fill = false,
                     trailing = { Icon(Icons.Rounded.Add, null, tint = palette.primarySolid,
                         modifier = Modifier.size(16.dp)) })
             }

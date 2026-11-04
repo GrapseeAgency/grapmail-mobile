@@ -2341,6 +2341,13 @@ pin("the drawer offers Subscriptions above the fold the old order buried",
     and code_only(KT_CHROME).count('DrawerSection("Mail")') == 1
     and code_only(ios("MailChrome.swift")).count('section("Mail")') == 1)
 
+# The labels header is count + button on both platforms; Android's copy once
+# squeezed its own count to zero width with a fillMaxWidth button (frame 72
+# proved it from the photograph). The pin keeps the pair visible together.
+pin("the labels header shows its count beside a button that shares the row",
+    'OutlineButton("New label", onClick = onCreate, fill = false' in code_only(android("ui/screens/mail/MailSecondaryScreens.kt"))
+    and '\(vm.labelState.labels.count) label' in code_only(SW_SECOND))
+
 print()
 if failures:
     print(f"mail-honesty: {len(failures)} pin(s) broken")
