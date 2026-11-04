@@ -47,8 +47,8 @@ android {
         // 0.3.0, this file still said 0.2.1, and the badging check refused to
         // publish a release page describing a build it could not name. The
         // disagreement was real; the tag was moved to the commit that fixes it.
-        versionCode = 4
-        versionName = "0.3.0"
+        versionCode = 5
+        versionName = "0.3.1"
         // Real account API — same contract the website uses.
         buildConfigField("String", "API_BASE", "\"https://grapsee.com/api\"")
     }
