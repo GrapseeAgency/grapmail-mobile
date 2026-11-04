@@ -780,13 +780,6 @@ internal fun MailDrawer(
             DrawerRow(b.title, iconFor(b), counts[b], selected = b == box) { onBox(b) }
         }
 
-        Spacer(Modifier.height(14.dp))
-        DrawerSection("Queue")
-        DrawerRow("Pending approval", Icons.Rounded.Lock, null, selected = false) { onScreener() }
-
-        Spacer(Modifier.height(14.dp))
-        DrawerSection("Labels")
-        DrawerRow("Manage labels", Icons.Rounded.Label, null, selected = false) { onLabels() }
 
         Spacer(Modifier.height(14.dp))
         // The web account shell's Subscriptions page, on the phone. The word
@@ -797,6 +790,19 @@ internal fun MailDrawer(
         DrawerRow("Subscriptions", Icons.Rounded.MailOutline, null, selected = false) {
             onSubscriptions()
         }
+
+        Spacer(Modifier.height(14.dp))
+        // Queue and Labels follow the Mail section deliberately: frame 62
+        // caught Subscriptions sitting below an unmarked fold, invisible in
+        // the drawer that is its only phone entry. Manage labels keeps a
+        // second door (the home's label strip), Pending approval keeps the
+        // Settings row -- these two survive the fold; Subscriptions must not.
+        DrawerSection("Queue")
+        DrawerRow("Pending approval", Icons.Rounded.Lock, null, selected = false) { onScreener() }
+
+        Spacer(Modifier.height(14.dp))
+        DrawerSection("Labels")
+        DrawerRow("Manage labels", Icons.Rounded.Label, null, selected = false) { onLabels() }
         }
 
         // No spacer here. This one carried `weight(1f)` from the layout that

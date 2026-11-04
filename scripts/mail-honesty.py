@@ -2327,6 +2327,20 @@ pin("compose states its subject and body the same way on both platforms",
     and ".frame(minHeight: 240)" in code_only(SW_RDR)
     and 'placeholder = "Subject",' not in code_only(android("ui/screens/mail/ComposeScreen.kt")))
 
+# Frame 62's photograph caught what no marker could: the drawer's Subscriptions
+# row — the only phone door to that screen — sat below an unmarked fold. The
+# sections are ordered Mail-before-Queue on both platforms now, and this pin
+# keeps the fold's victim above it.
+KT_CHROME = android("ui/screens/mail/MailboxScreen.kt")
+def _before_(src, first, second):
+    a, b = src.find(first), src.find(second)
+    return a >= 0 and b >= 0 and a < b
+pin("the drawer offers Subscriptions above the fold the old order buried",
+    _before_(code_only(KT_CHROME), 'DrawerSection("Mail")', 'DrawerSection("Queue")')
+    and _before_(code_only(ios("MailChrome.swift")), 'section("Mail")', 'section("Queue")')
+    and code_only(KT_CHROME).count('DrawerSection("Mail")') == 1
+    and code_only(ios("MailChrome.swift")).count('section("Mail")') == 1)
+
 print()
 if failures:
     print(f"mail-honesty: {len(failures)} pin(s) broken")

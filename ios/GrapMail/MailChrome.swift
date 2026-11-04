@@ -49,6 +49,19 @@ struct MailDrawer: View {
                             }
                         }
 
+                        // The web account shell's Subscriptions page, on the
+                        // phone. The section sits directly under the boxes on
+                        // both platforms on purpose: frame 62's Android photo
+                        // caught Subscriptions below an unmarked fold, and a
+                        // feature whose only phone door is invisible is a
+                        // feature that does not exist.
+                        section("Mail")
+                        DrawerRow(label: "Subscriptions", icon: "envelope",
+                                  count: nil, selected: false, onClick: onSubscriptions)
+
+                        // Queue and Labels follow the Mail section on both
+                        // platforms; both keep a second door (Settings rows,
+                        // the home's label strip) that Subscriptions lacks.
                         section("Queue")
                         DrawerRow(label: "Pending approval", icon: "lock", count: nil,
                                   selected: false, onClick: onScreener)
@@ -56,14 +69,6 @@ struct MailDrawer: View {
                         section("Labels")
                         DrawerRow(label: "Manage labels", icon: "tag", count: nil,
                                   selected: false, onClick: onLabels)
-
-                        // The web account shell's Subscriptions page, on the
-                        // phone. Android's drawer names the same row; the
-                        // screen itself states its scope, so the row does not
-                        // have to.
-                        section("Mail")
-                        DrawerRow(label: "Subscriptions", icon: "envelope",
-                                  count: nil, selected: false, onClick: onSubscriptions)
                     }
                 }
 
