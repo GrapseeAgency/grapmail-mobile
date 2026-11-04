@@ -2346,7 +2346,7 @@ pin("the drawer offers Subscriptions above the fold the old order buried",
 # proved it from the photograph). The pin keeps the pair visible together.
 pin("the labels header shows its count beside a button that shares the row",
     'OutlineButton("New label", onClick = onCreate, fill = false' in code_only(android("ui/screens/mail/MailSecondaryScreens.kt"))
-    and '\(vm.labelState.labels.count) label' in code_only(SW_SECOND))
+    and r'\(vm.labelState.labels.count) label' in code_only(SW_SECOND))
 
 print()
 if failures:
