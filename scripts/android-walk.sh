@@ -646,7 +646,7 @@ for spec in "two-factor-on:40-sec-two-factor-on" \
     e2e-status-unlocked) settled="Your key is unlocked for this session" ;;
     e2e-setup) settled="There is no way to recover a forgotten passphrase." ;;
     e2e-unlock) settled="Your passphrase decrypts the key on this device. It is never sent anywhere." ;;
-    e2e-details) settled="7C:0F:2A:91:B4:D8:3E:6C:05:AA:1F:BE:D2:48:67:90:13:EC:B6:24:FA:5D:71:09:8C:30:B7:E4:16:9F:A2:C8" ;;
+    e2e-details) settled="Signing key" ;; # design batch reflowed the fingerprint into grouped lines; the exact-match wait now names the row label only the details screen draws (the block itself is proven by the photograph and the §27 seed pins)
     e2e-publish) settled="Published fingerprint" ;;
     # The headline, not the lede: iOS's harness caps string identifiers at
     # 128 characters and the full re-lock sentence is longer, so both walks

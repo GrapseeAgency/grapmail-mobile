@@ -511,7 +511,7 @@ final class ScreenshotWalkUITests: XCTestCase {
             "e2e-status-unlocked": "Your key is unlocked for this session",
             "e2e-setup": "There is no way to recover a forgotten passphrase.",
             "e2e-unlock": "Your passphrase decrypts the key on this device. It is never sent anywhere.",
-            "e2e-details": "7C:0F:2A:91:B4:D8:3E:6C:05:AA:1F:BE:D2:48:67:90:13:EC:B6:24:FA:5D:71:09:8C:30:B7:E4:16:9F:A2:C8",
+            "e2e-details": "Signing key",
             "e2e-publish": "Published fingerprint",
             // The frame's own headline, not its lede: XCUITest refuses string
             // identifiers over 128 characters, and the full re-lock sentence
