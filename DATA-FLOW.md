@@ -55,6 +55,31 @@ and any message body that was encrypted for send.
 | E2E identity file (app-support dir; iOS `.completeFileProtection`, Android Keystore-free because the record is already passphrase-encrypted) | `grapmail-e2e-protected-key/1` container: public half in clear, private half AES-GCM under PBKDF2-SHA256 @ 600,000 | ciphertext at rest; plaintext halves exist only in process memory |
 | Saved attachments (Documents / app files) | only files the user chose to save | user-initiated |
 
+## Route coverage, audited in both directions
+
+Forward (every mobile screen maps to a route) is enforced by
+`scripts/mail-honesty.py` and `scripts/api-parity.py`. The reverse audit was
+run against the backend's own mounted surfaces:
+
+- `grapmail*.ts` route files mount 31 method+path surfaces. 28 are client
+  mailbox/auth surface and every one is referenced by the phone clients —
+  confirmed by grep of `data/Api.kt` + `MailAPI.swift` + `APIClient.swift`,
+  with api-parity proving both platforms call the same set, not just one.
+- The three exceptions are not client surface by design: `POST /ingest` is
+  the MTA's queue-drain entry (a server call, never a UI call), and
+  `POST /transactional` + `GET /transactional/senders` carry their own
+  rationale in `grapmail-transactional.ts` — a service credential for
+  Grapsee products' own sends, whose caller is the web backend's
+  `src/app/lib/mailOutbox.ts`, "a separate concern with a separate caller".
+  A phone app must not hold that credential, so no screen was built for it.
+- `auth-account-profile.ts`: all 14 mounted routes are referenced by both
+  clients (one grep hit, `c.get('sessionId')`, is a Hono context read, not
+  a route).
+
+Conclusion: there is no mail or account endpoint the product exposes to
+users that either app fails to reach, and no app call reaches anything the
+backend does not mount.
+
 ## Account deletion (Play requirement status — honest)
 
 There is **no account-delete endpoint on either backend store**, and both
