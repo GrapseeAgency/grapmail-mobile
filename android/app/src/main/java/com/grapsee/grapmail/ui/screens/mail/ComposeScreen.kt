@@ -241,7 +241,7 @@ fun ComposeScreen(
 
             Divider(palette)
 
-            FieldRow(label = "Subject", value = state.subject, placeholder = "Subject",
+            FieldRow(label = "Subject", value = state.subject, placeholder = "Add a subject",
                 onValue = { vm.composeUpdate { s -> s.copy(subject = it) } }, tag = "mail-subject")
 
             Divider(palette)
@@ -298,7 +298,7 @@ fun ComposeScreen(
                     .testTag(if (signature.isNotBlank() && state.body.contains(signature))
                         "gm-signed-body" else "mail-body-field")
                     .padding(vertical = 14.dp)
-                    .heightIn(min = 160.dp),
+                    .heightIn(min = 240.dp),
                 textStyle = TextStyle(fontSize = 15.sp, color = palette.textPrimary, lineHeight = 22.sp),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
                 decorationBox = { inner ->

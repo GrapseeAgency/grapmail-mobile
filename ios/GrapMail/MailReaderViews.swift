@@ -594,8 +594,8 @@ struct ComposeView: View {
             .padding(.vertical, 4)
         }
         if showCc {
-            field(label: "Cc", key: \MailboxModel.ComposeState.cc, placeholder: "Cc", tag: "mail-cc")
-            field(label: "Bcc", key: \MailboxModel.ComposeState.bcc, placeholder: "Bcc", tag: "mail-bcc")
+            field(label: "Cc", key: \MailboxModel.ComposeState.cc, placeholder: "Addresses", tag: "mail-cc")
+            field(label: "Bcc", key: \MailboxModel.ComposeState.bcc, placeholder: "Addresses", tag: "mail-bcc")
         }
         field(label: "Subject", key: \MailboxModel.ComposeState.subject, placeholder: "Add a subject", tag: "mail-subject")
         Divider().overlay(GM.border)
@@ -692,7 +692,7 @@ struct ComposeView: View {
                 .font(.system(size: 15))
                 .foregroundColor(GM.textPrimary)
                 .scrollContentBackground(.hidden)
-                .frame(minHeight: 180)
+                .frame(minHeight: 240)
                 // The identifier names the signed state, not the field: frame
                 // 76's settled marker must flip when the signature lands, the
                 // same mechanism as Android's `gm-signed-body` testTag.

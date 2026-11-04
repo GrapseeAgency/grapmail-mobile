@@ -2316,6 +2316,17 @@ pin("the read/unread buttons dispatch their own action, not the other's",
 pin("selection read/unread stays selection-scoped — no whole-box claim",
     "markAllRead" not in code_only(KT_VM) and "markAllRead" not in code_only(SW_VM))
 
+# The compose parity the frame showed: Android's Subject row read
+# "Subject / Subject" (label and placeholder the same word) while iOS
+# already said "Add a subject"; the body floors were 160 and 180 on a
+# screen whose whole point is the message. One language, one floor.
+pin("compose states its subject and body the same way on both platforms",
+    'placeholder = "Add a subject"' in code_only(android("ui/screens/mail/ComposeScreen.kt"))
+    and 'placeholder: "Add a subject"' in code_only(SW_RDR)
+    and "heightIn(min = 240.dp)" in code_only(android("ui/screens/mail/ComposeScreen.kt"))
+    and ".frame(minHeight: 240)" in code_only(SW_RDR)
+    and 'placeholder = "Subject",' not in code_only(android("ui/screens/mail/ComposeScreen.kt")))
+
 print()
 if failures:
     print(f"mail-honesty: {len(failures)} pin(s) broken")
