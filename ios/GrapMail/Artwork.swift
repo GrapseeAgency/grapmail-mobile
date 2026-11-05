@@ -46,10 +46,12 @@ private struct ArtScene: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
-        // The interval is spelled as a Double on both branches: a bare `3600`
-        // is an Int literal, and the mixed ternary is what stopped
-        // TimelineView's Content inference.
-        let interval: Double = reduceMotion ? 3600.0 : 1.0 / 30.0
+        // ~12 Hz, not display refresh: the scenes are slow sine cycles, and
+        // an always-animating illustration on every account screen measured
+        // costly enough on the CI simulator to push a walk leg past its
+        // timeout. The interval is spelled Double on both branches — a bare
+        // Int literal there is what stopped TimelineView's inference.
+        let interval: Double = reduceMotion ? 3600.0 : 1.0 / 12.0
         TimelineView(.animation(minimumInterval: interval, paused: false)) { timeline in
             Canvas { ctx, size in
                 let t: Double = reduceMotion ? 0.0

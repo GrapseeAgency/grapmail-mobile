@@ -2458,7 +2458,7 @@ pin("the artwork draws path data, not pixels, on both platforms",
     and "linearGradient" in code_only(SW_ART))
 
 pin("the artwork animates programmatically and honors reduced motion",
-    "withFrameNanos" in code_only(KT_ARTP)
+    "delay(80)" in code_only(KT_ARTP)
     and "ANIMATOR_DURATION_SCALE" in code_only(KT_ARTP)
     and "TimelineView(.animation" in code_only(SW_ART)
     and "accessibilityReduceMotion" in code_only(SW_ART))

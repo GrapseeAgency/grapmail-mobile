@@ -4,9 +4,9 @@ import android.provider.Settings
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.State
-import androidx.compose.runtime.withFrameNanos
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableFloatStateOf
+import kotlinx.coroutines.delay
 import androidx.compose.ui.composed
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
@@ -51,6 +51,13 @@ import kotlin.math.sin
  * from one gate instead of each caller remembering to check. The clock is
  * one shared value per composition, not per-primitive timers: 20 animated
  * shapes on a screen must not schedule 20 frame loops.
+ *
+ * The clock ticks at ~12 Hz, not at display refresh. The scenes are slow
+ * sine cycles (2-4s periods), so 60 redraws a second buys nothing a viewer
+ * can see, and an always-animating illustration on every account screen
+ * measured costly enough on the CI simulator to push a walk leg past its
+ * timeout. Twelve frames a second keeps the motion smooth and leaves the
+ * main thread free for the tap that follows.
  */
 @Composable
 fun rememberArtClock(): State<Float> {
@@ -66,9 +73,8 @@ fun rememberArtClock(): State<Float> {
         LaunchedEffect(Unit) {
             val start = System.nanoTime()
             while (true) {
-                withFrameNanos { now ->
-                    t.floatValue = (now - start) / 1_000_000_000f
-                }
+                delay(80)
+                t.floatValue = (System.nanoTime() - start) / 1_000_000_000f
             }
         }
     }
