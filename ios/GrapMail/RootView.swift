@@ -582,10 +582,12 @@ struct RootView: View {
                         onThread: { id, isThread in
                             path.append(.mailThread(id: id, isThread: isThread))
                         },
-                        onCompose: { path.append(.mailCompose(reply: "", mode: "reply")) },
                         // A draft is the person's own unfinished mail; the
                         // only useful tap is the one that lets them finish it.
+                        // Declared before onCompose because Swift requires
+                        // call order to match the struct's property order.
                         onDraft: { id in path.append(.mailCompose(reply: id, mode: "draft")) },
+                        onCompose: { path.append(.mailCompose(reply: "", mode: "reply")) },
                         onLabels: { path.append(.mailLabels) },
                         onScreener: { path.append(.mailScreener) },
                         onSubscriptions: { path.append(.mailSubscriptions) },
