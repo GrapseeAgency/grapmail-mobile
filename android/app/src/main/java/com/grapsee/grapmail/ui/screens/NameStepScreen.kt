@@ -39,7 +39,6 @@ import com.grapsee.grapmail.logic.SignUpViewModel
 import com.grapsee.grapmail.logic.Validators
 import com.grapsee.grapmail.ui.components.AppTextField
 import com.grapsee.grapmail.ui.components.GradientButton
-import com.grapsee.grapmail.ui.components.illRes
 import com.grapsee.grapmail.ui.theme.LocalPalette
 
 /**
@@ -81,12 +80,12 @@ fun NameStepScreen(vm: SignUpViewModel, onBack: () -> Unit, onSignIn: () -> Unit
             )
         },
     ) {
-        Image(
-            painter = painterResource(illRes("step1_name")),
-            contentDescription = null,
-            // No hardcoded aspect ratio: the re-cropped artwork has its own
-            // intrinsic size, and Image preserves it.
-            modifier = Modifier.fillMaxWidth(0.92f),
+        com.grapsee.grapmail.ui.artwork.Artwork(
+            "step1_name",
+            // The vector scene owns its own proportions now: the aspect
+            // ratio is declared, not inherited from a cropped raster's
+            // intrinsic size.
+            modifier = Modifier.fillMaxWidth(0.92f).aspectRatio(2f),
         )
         Spacer(Modifier.height(24.dp))
 

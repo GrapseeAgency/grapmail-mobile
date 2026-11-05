@@ -15,6 +15,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -39,7 +42,6 @@ import androidx.compose.ui.unit.sp
 import com.grapsee.grapmail.logic.SignUpViewModel
 import com.grapsee.grapmail.ui.components.GradientButton
 import com.grapsee.grapmail.ui.components.PuzzleSlider
-import com.grapsee.grapmail.ui.components.illRes
 import com.grapsee.grapmail.ui.theme.H1
 import com.grapsee.grapmail.ui.theme.LocalPalette
 
@@ -83,10 +85,10 @@ fun HumanVerifyScreen(vm: SignUpViewModel, onBack: () -> Unit, onDone: () -> Uni
             }
 
             Spacer(Modifier.height(6.dp))
-            Image(
-                painter = painterResource(illRes("verify")),
-                contentDescription = "Human verification",
-                modifier = Modifier.fillMaxWidth(0.82f),
+            com.grapsee.grapmail.ui.artwork.Artwork(
+                "verify",
+                modifier = Modifier.fillMaxWidth(0.82f).aspectRatio(2f)
+                    .semantics { contentDescription = "Human verification" },
             )
 
             Spacer(Modifier.height(8.dp))

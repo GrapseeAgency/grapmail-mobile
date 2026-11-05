@@ -33,10 +33,7 @@ struct HumanVerifyView: View {
 
             ScrollView {
                 VStack(spacing: 0) {
-                    Image("ill_verify")
-                        .resizable()
-                        .aspectRatio(contentMode: .fit)
-                        .frame(maxWidth: .infinity)
+                    Art.fill("verify")
                         .padding(.horizontal, 30)
 
                     Text("ACCOUNT PROTECTION")
@@ -147,10 +144,7 @@ struct AccountCreatedView: View {
             Spacer(minLength: 36)
             Wordmark()
 
-            Image("ill_created_a")
-                .resizable()
-                .aspectRatio(contentMode: .fit)
-                .frame(maxWidth: .infinity)
+            Art.fill("created_a")
                 .padding(.horizontal, 40)
                 .padding(.top, 14)
 
@@ -273,10 +267,7 @@ struct AccountCreatedAltView: View {
                 Spacer()
             }
 
-            Image("ill_created_b")
-                .resizable()
-                .aspectRatio(contentMode: .fit)
-                .frame(maxWidth: .infinity)
+            Art.fill("created_b")
                 .padding(.horizontal, 44)
                 .padding(.top, 12)
 

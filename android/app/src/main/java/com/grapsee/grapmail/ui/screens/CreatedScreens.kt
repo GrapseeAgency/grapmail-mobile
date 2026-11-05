@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -44,7 +45,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.grapsee.grapmail.ui.components.GradientButton
 import com.grapsee.grapmail.ui.components.OutlineButton
-import com.grapsee.grapmail.ui.components.illRes
 import com.grapsee.grapmail.ui.theme.H1
 import com.grapsee.grapmail.ui.theme.LocalPalette
 
@@ -73,10 +73,9 @@ fun AccountCreatedScreen(
         com.grapsee.grapmail.ui.components.GrapMailLogo(40.dp, wordmark = true)
 
         Spacer(Modifier.height(18.dp))
-        Image(
-            painter = painterResource(illRes("created_a")),
-            contentDescription = null,
-            modifier = Modifier.fillMaxWidth(0.74f),
+        com.grapsee.grapmail.ui.artwork.Artwork(
+            "created_a",
+            modifier = Modifier.fillMaxWidth(0.74f).aspectRatio(2f),
         )
 
         Spacer(Modifier.height(10.dp))
@@ -183,10 +182,9 @@ fun AccountCreatedAltScreen(
         com.grapsee.grapmail.ui.components.GrapMailLogo(40.dp, wordmark = true)
 
         Spacer(Modifier.height(16.dp))
-        Image(
-            painter = painterResource(illRes("created_b")),
-            contentDescription = null,
-            modifier = Modifier.fillMaxWidth(0.72f),
+        com.grapsee.grapmail.ui.artwork.Artwork(
+            "created_b",
+            modifier = Modifier.fillMaxWidth(0.72f).aspectRatio(2f),
         )
 
         Spacer(Modifier.height(8.dp))

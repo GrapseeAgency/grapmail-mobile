@@ -23,12 +23,10 @@ struct NameStepView: View {
             onBack: onBack,
             onSignIn: onSignIn,
             bodyContent: {
-                Image("ill_step1_name")
-                    .resizable()
-                    .aspectRatio(contentMode: .fit)
-                    .frame(maxWidth: .infinity)
-                    // No fixed height: the artwork keeps its intrinsic ratio
-                    // and scales with the (centered, capped) form width.
+                Art.fill("step1_name")
+                    // The vector scene owns its proportions: the field is
+                    // declared, not inherited from a cropped raster's
+                    // intrinsic size.
 
                 VStack(alignment: .leading, spacing: 18) {
                     VStack(alignment: .leading, spacing: 8) {

@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -29,7 +30,6 @@ import androidx.compose.ui.unit.sp
 import com.grapsee.grapmail.ui.components.GrapMailLogo
 import com.grapsee.grapmail.ui.components.GradientButton
 import com.grapsee.grapmail.ui.components.OutlineButton
-import com.grapsee.grapmail.ui.components.illRes
 import com.grapsee.grapmail.ui.theme.H1
 import com.grapsee.grapmail.ui.theme.LocalPalette
 
@@ -72,10 +72,9 @@ fun WelcomeScreen(onCreateAccount: () -> Unit, onSignIn: () -> Unit) {
         )
 
         Spacer(Modifier.height(18.dp))
-        Image(
-            painter = painterResource(illRes("welcome")),
-            contentDescription = null,
-            modifier = Modifier.fillMaxWidth(0.86f),
+        com.grapsee.grapmail.ui.artwork.Artwork(
+            "welcome",
+            modifier = Modifier.fillMaxWidth(0.86f).aspectRatio(2f),
         )
 
         Spacer(Modifier.height(48.dp))

@@ -114,10 +114,14 @@ fun AccountScreen(
                 if (illustration != null) {
                     Spacer(Modifier.height(if (tight) 2.dp else 4.dp))
                     Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                        androidx.compose.foundation.Image(
-                            painter = androidx.compose.ui.res.painterResource(illRes(illustration)),
-                            contentDescription = null,
-                            modifier = Modifier.width((if (tight) illustrationWidth * 3 / 4 else illustrationWidth).dp),
+                        // Code-drawn vector scene, not a cropped PNG: the
+                        // artwork scales with the width it is given instead
+                        // of letterboxing a fixed 460x233 raster.
+                        com.grapsee.grapmail.ui.artwork.Artwork(
+                            illustration,
+                            modifier = Modifier
+                                .width((if (tight) illustrationWidth * 3 / 4 else illustrationWidth).dp)
+                                .aspectRatio(2f),
                         )
                     }
                     Spacer(Modifier.height(if (tight) 10.dp else 18.dp))

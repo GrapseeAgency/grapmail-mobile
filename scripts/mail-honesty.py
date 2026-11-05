@@ -2415,6 +2415,83 @@ pin("a non-filling E2E button keeps its label outside the corner radius",
     ".padding(horizontal = if (fill) 0.dp else 22.dp)" in code_only(KT_E2ES)
     and ".padding(.horizontal, fill ? 0 : 22)" in code_only(SW_E2ES))
 
+
+# ── 35. the artwork is drawn, not cropped (§35) ──────────────────────────────
+# The founder's complaint in one line: "you are just cropping everything from
+# my reference". The repo's own recorded convention says the opposite —
+# illustration is vector shape code with programmatic motion. The account and
+# security flows shipped ~50 raster PNGs on Android and 42 imagesets on iOS,
+# paired `_dark` crops standing in for theming, one of them a literal
+# landscape photograph behind the puzzle slider. These pins are what keeps
+# the crop habit from coming back: they forbid the raster read paths, demand
+# the vector files draw real path data, require the motion to honor the
+# system's reduced-motion switch, and check the deleted assets stay deleted.
+KT_ART = android("ui/artwork/Artwork.kt")
+KT_ARTP = android("ui/artwork/ArtPrimitives.kt")
+SW_ART = ios("Artwork.swift")
+KT_UI_ALL = "\n".join(android(p) for p in (
+    "ui/components/Account.kt", "ui/components/PuzzleSlider.kt",
+    "ui/screens/WelcomeScreen.kt", "ui/screens/NameStepScreen.kt",
+    "ui/screens/HumanVerifyScreen.kt", "ui/screens/CreatedScreens.kt"))
+SW_UI_ALL = "\n".join(ios(p) for p in (
+    "AccountComponents.swift", "AuthScreens.swift", "FinishScreens.swift",
+    "WizardSteps.swift", "PuzzleSlider.swift"))
+
+pin("no UI screen reads an illustration raster anymore",
+    "painterResource(illRes" not in code_only(KT_UI_ALL)
+    and 'Image("ill_' not in code_only(SW_UI_ALL)
+    and 'Image(illustration)' not in code_only(SW_UI_ALL)
+    and 'Image("puzzle_photo")' not in code_only(SW_UI_ALL)
+    and "Artwork(" in code_only(KT_UI_ALL)
+    and ("Art.view(" in code_only(SW_UI_ALL) or "Art.fill(" in code_only(SW_UI_ALL)))
+
+pin("the illustration mapper and its raster assets are gone, not shadowed",
+    not (ROOT / "android/app/src/main/java/com/grapsee/grapmail/ui/components/IllRes.kt").exists()
+    and not (ROOT / "android/app/src/main/res/drawable-nodpi").exists()
+    and not list((ROOT / "ios/GrapMail/Assets.xcassets").glob("ill_*.imageset"))
+    and not list((ROOT / "ios/GrapMail/Assets.xcassets").glob("puzzle_photo.imageset")))
+
+pin("the artwork draws path data, not pixels, on both platforms",
+    "Path().apply" in code_only(KT_ARTP) and "Brush.linearGradient" in code_only(KT_ARTP)
+    and "Path(roundedRect:" in code_only(SW_ART)
+    and "GraphicsContext.Shading" in code_only(SW_ART)
+    and "linearGradient" in code_only(SW_ART))
+
+pin("the artwork animates programmatically and honors reduced motion",
+    "withFrameNanos" in code_only(KT_ARTP)
+    and "ANIMATOR_DURATION_SCALE" in code_only(KT_ARTP)
+    and "TimelineView(.animation" in code_only(SW_ART)
+    and "accessibilityReduceMotion" in code_only(SW_ART))
+
+# The old illRes table named every scene; the dispatch must still answer each
+# one, or a screen silently photographs the fallback while believing it drew
+# its own artwork. The names are checked against the deleted mapper's list.
+_ART_NAMES = [
+    "welcome", "hero", "step1_name", "verify", "created_a", "created_b", "puzzle",
+    "account-2fa", "account-backup", "account-forgot", "account-recovery-code",
+    "account-new-password", "account-reset-ok", "account-pending",
+    "account-find-address", "account-address-found", "account-phone", "account-phone-ok",
+    "ill_sec_hub", "ill_sec_hub_secure", "ill_sec_secure", "ill_sec_2fa", "ill_sec_2fa_on",
+    "ill_sec_2fa_off", "ill_sec_2fa_off_confirm", "ill_sec_password",
+    "ill_sec_password_confirm", "ill_sec_password_ok", "ill_sec_password_after",
+    "ill_sec_password_updated", "ill_sec_phone", "ill_sec_backup_generate",
+    "ill_sec_backup_saved", "ill_sec_signout_all", "ill_sec_signout_all_ok",
+    "ill_sec_sessions", "ill_sec_session_revoke", "ill_sec_session_revoked",
+    "ill_sec_revoke_confirm", "ill_sec_revoked_suspicious", "ill_sec_activity", "ill_sec_alert",
+]
+pin("every scene name the raster table answered for still dispatches on both platforms",
+    all(f'"{n}"' in code_only(KT_ART) for n in _ART_NAMES)
+    and all(f'"{n}"' in code_only(SW_ART) for n in _ART_NAMES))
+
+# Dark mode was a second PNG per scene (`ill_*_dark.png`); the vector scenes
+# read the live palette instead, so a dark frame is the same code with the
+# dark traits. A hardcoded artwork color would silently break that.
+pin("the artwork takes its colors from the palette, not from literals",
+    "LocalPalette.current" in code_only(KT_ART)
+    and "GM.primaryTop" in code_only(SW_ART)
+    and "0xFF206BFD" not in code_only(KT_ART)
+    and "0x206BFD" not in code_only(SW_ART))
+
 print()
 if failures:
     print(f"mail-honesty: {len(failures)} pin(s) broken")

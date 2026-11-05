@@ -38,10 +38,9 @@ struct WelcomeView: View {
 
                     // The clean envelope artwork — ill_hero carried the
                     // headline and subcopy baked in, duplicating the text.
-                    Image("ill_welcome")
-                        .resizable()
-                        .aspectRatio(contentMode: .fit)
-                        .frame(maxWidth: 300)
+                    // Now drawn: no raster, no baked words, no second dark
+                    // crop.
+                    Art.view("welcome", width: 300)
                         .padding(.top, 18)
 
                     Spacer(minLength: 10)

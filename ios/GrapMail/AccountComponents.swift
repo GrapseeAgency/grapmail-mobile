@@ -52,10 +52,11 @@ struct AccountScreen<Content: View, Footer: View>: View {
                         if let illustration {
                             HStack {
                                 Spacer()
-                                Image(illustration)
-                                    .resizable()
-                                    .scaledToFit()
-                                    .frame(width: tight ? illustrationWidth * 0.75 : illustrationWidth)
+                                // Code-drawn vector scene, not a cropped PNG:
+                                // it scales with the width it is given and
+                                // dark mode is the same code, not a second
+                                // `_dark` image.
+                                Art.view(illustration, width: tight ? illustrationWidth * 0.75 : illustrationWidth)
                                 Spacer()
                             }
                             .padding(.top, tight ? 2 : 4)

@@ -104,11 +104,9 @@ fun PuzzleSlider(
                 .aspectRatio(2.9f)
                 .clip(RoundedCornerShape(14.dp))
         ) {
-            Image(
-                painter = painterResource(illRes("puzzle")),
-                contentDescription = null,
-                modifier = Modifier.fillMaxWidth(),
-                contentScale = ContentScale.Crop,
+            com.grapsee.grapmail.ui.artwork.Artwork(
+                "puzzle",
+                modifier = Modifier.fillMaxSize(),
             )
             Canvas(Modifier.matchParentSize()) {
                 val side = size.height * 0.62f

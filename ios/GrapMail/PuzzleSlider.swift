@@ -43,11 +43,12 @@ struct PuzzleSlider: View {
     private var photoStrip: some View {
         GeometryReader { geo in
             ZStack {
-                Image("puzzle_photo")
-                    .resizable()
-                    .aspectRatio(contentMode: .fill)
-                    .frame(width: geo.size.width, height: 132)
-                    .clipped()
+                // The vector mountain scene, not the landscape photograph
+                // that shipped here: a photo of someone's lake says nothing
+                // about GrapMail, cannot be themed for dark mode, and is the
+                // clearest example of the crop-from-reference habit. The
+                // scene draws in brand blues and belongs to the product.
+                Art.sized("puzzle", width: geo.size.width, height: 132)
                 PuzzlePieceShape()
                     .fill(Color.black.opacity(0.55))
                     .frame(width: notchSide, height: notchSide)
