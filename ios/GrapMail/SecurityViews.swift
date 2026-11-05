@@ -791,7 +791,10 @@ struct BackupCodesSavedView: View {
                     .font(.system(size: 16, weight: .semibold))
                     .foregroundColor(.white)
                     .frame(maxWidth: .infinity)
-                    .frame(minHeight: 54)
+                    // Capped, not floored: a bare floor grows into any
+                    // leftover a parent stack hands out (frame 76's Send
+                    // block, same class). 54 is the design's height.
+                    .frame(minHeight: 54, maxHeight: 54)
                     .background(RoundedRectangle(cornerRadius: GMShape.button, style: .continuous).fill(GM.primarySolid))
                 }
                 GradientButton(title: "Done", enabled: confirmed, action: onDone)

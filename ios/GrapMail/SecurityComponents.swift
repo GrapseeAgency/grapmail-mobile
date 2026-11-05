@@ -158,7 +158,9 @@ struct DestructiveActionButton: View {
                         .foregroundColor(.white)
                 }
             }
-            .frame(minHeight: 54)
+            // Exact 54, the same greedy-floor cure as Components.swift's
+            // buttons: a floor grows into any leftover a parent hands out.
+            .frame(height: 54)
             .frame(maxWidth: .infinity)
         }
         .buttonStyle(PressScaleStyle())

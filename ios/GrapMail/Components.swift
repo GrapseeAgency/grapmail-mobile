@@ -126,7 +126,13 @@ struct GradientButton: View {
                     }
                 }
             }
-            .frame(minHeight: 54)
+            // Exact 54, not a floor: `minHeight` alone is a greedy frame --
+            // handed leftover height by a VStack (the compose action bar sits
+            // under a growing editor) it grew the Send button to a 700pt
+            // block, frame 76's re-photograph. Android's twin measures to
+            // exactly 54dp under the same parent; parity is now the number
+            // itself, not the wish.
+            .frame(height: 54)
             .frame(maxWidth: .infinity)
         }
         .buttonStyle(PressScaleStyle())
@@ -155,7 +161,7 @@ struct OutlineActionButton: View {
                     .foregroundColor(GM.textPrimary)
                 trailing
             }
-            .frame(minHeight: 54)
+            .frame(height: 54)
             .frame(maxWidth: .infinity)
             .background(
                 RoundedRectangle(cornerRadius: GMShape.button, style: .continuous)

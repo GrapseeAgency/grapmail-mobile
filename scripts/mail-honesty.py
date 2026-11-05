@@ -2341,6 +2341,18 @@ pin("the compose body grows to the action bar — no bottom dead zone",
     and "bodyEditor.frame(height: max(240, g.size.height))" in code_only(SW_RDR)
     and "maxHeight: .infinity" not in body_of(code_only(SW_RDR), "private var bodyEditor"))
 
+# The Send block was the third shape of the same fault: a bare
+# `minHeight: 54` is a GREEDY floor -- measure nil at the top, grow into
+# every point handed out below. Under a growing editor that inflated the
+# button to 700pt; Android's twin measures EXACTLY 54dp. The shared
+# buttons now state the exact height, and no button in the family may
+# carry the grow-into-leftover spelling again.
+pin("iOS buttons carry an exact 54 height, never a greedy floor",
+    ".frame(height: 54)" in body_of(code_only(ios("Components.swift")), "struct GradientButton")
+    and ".frame(height: 54)" in body_of(code_only(ios("Components.swift")), "struct OutlineActionButton")
+    and ".frame(height: 54)" in body_of(code_only(ios("SecurityComponents.swift")), "struct DestructiveActionButton")
+    and "minHeight: 54, maxHeight: 54" in code_only(ios("SecurityViews.swift")))
+
 # The other half of the centering audit: batch 1 centered the short STATUS
 # screens (frame 100 proved the bottom-empty class), but frame 104 showed
 # the same Arrangement.Center stranding the key RECORD — a scannable table —
