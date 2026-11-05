@@ -501,7 +501,15 @@ struct ComposeView: View {
             VStack(alignment: .leading, spacing: 0) {
                 fields
                 suggestions
-                bodyEditor
+                // GeometryReader, not the editor's own maxHeight: .infinity.
+                // The infinity proposal is greedy -- a VStack handed it also
+                // PROPOSED the leftover to its siblings, and frame 76's
+                // re-photograph showed the Send button grown to a 700pt blue
+                // block. Inside the reader the editor gets an exact height
+                // and everyone else keeps their own.
+                GeometryReader { g in
+                    bodyEditor.frame(height: max(240, g.size.height))
+                }
             }
             .padding(.horizontal, 16)
             .frame(maxWidth: .infinity)
@@ -703,9 +711,10 @@ struct ComposeView: View {
                 .font(.system(size: 15))
                 .foregroundColor(GM.textPrimary)
                 .scrollContentBackground(.hidden)
-                // Grows into everything the fields and the pinned bar leave
-                // over; 240 is the floor, no longer the ceiling.
-                .frame(minHeight: 240, maxHeight: .infinity)
+                // The floor only: the GeometryReader above hands this editor
+                // its exact grown height, so it never proposes infinity to
+                // the stack and inflate a sibling.
+                .frame(minHeight: 240)
                 // The identifier names the signed state, not the field: frame
                 // 76's settled marker must flip when the signature lands, the
                 // same mechanism as Android's `gm-signed-body` testTag.

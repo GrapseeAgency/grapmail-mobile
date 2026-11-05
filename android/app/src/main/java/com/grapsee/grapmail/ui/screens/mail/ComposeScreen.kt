@@ -289,32 +289,37 @@ fun ComposeScreen(
                 Spacer(Modifier.height(4.dp))
             }
 
-            BasicTextField(
-                value = state.body,
-                onValueChange = { vm.composeUpdate { s -> s.copy(body = it) } },
-                // The tag names the signed state because the walk needs a
-                // settled marker that is not the field's text: the body's
-                // uiautomator text is the WHOLE value ("-- \\nSent with
-                // GrapMail"), and an exact-match wait on the signature alone
-                // could never fire. A testTag flips with the signature landing
-                // -- the same mechanism the bottom sheets are photographed by.
-                modifier = Modifier.weight(1f, fill = false)
-                    .fillMaxWidth()
-                    .testTag(if (signature.isNotBlank() && state.body.contains(signature))
-                        "gm-signed-body" else "mail-body-field")
-                    .padding(vertical = 14.dp)
-                    .heightIn(min = 240.dp),
-                textStyle = TextStyle(fontSize = 15.sp, color = palette.textPrimary, lineHeight = 22.sp),
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
-                decorationBox = { inner ->
-                    Box {
-                        if (state.body.isEmpty()) {
-                            Text("Write your message…", fontSize = 15.sp, color = palette.textTertiary)
+            // The growth lives on a Box the field fills, not on the field's
+            // own modifier: a weighted child beside the scroll floor proved
+            // fragile in frame 76's photograph (the bar floated mid-screen).
+            // The Box takes the leftover height, unconditionally; the text
+            // paints inside it at the same insets as before.
+            Box(Modifier.weight(1f).heightIn(min = 240.dp)) {
+                BasicTextField(
+                    value = state.body,
+                    onValueChange = { vm.composeUpdate { s -> s.copy(body = it) } },
+                    // The tag names the signed state because the walk needs a
+                    // settled marker that is not the field's text: the body's
+                    // uiautomator text is the WHOLE value ("-- \\nSent with
+                    // GrapMail"), and an exact-match wait on the signature alone
+                    // could never fire. A testTag flips with the signature landing
+                    // -- the same mechanism the bottom sheets are photographed by.
+                    modifier = Modifier.fillMaxSize()
+                        .testTag(if (signature.isNotBlank() && state.body.contains(signature))
+                            "gm-signed-body" else "mail-body-field")
+                        .padding(vertical = 14.dp),
+                    textStyle = TextStyle(fontSize = 15.sp, color = palette.textPrimary, lineHeight = 22.sp),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
+                    decorationBox = { inner ->
+                        Box {
+                            if (state.body.isEmpty()) {
+                                Text("Write your message…", fontSize = 15.sp, color = palette.textTertiary)
+                            }
+                            inner()
                         }
-                        inner()
-                    }
-                },
-            )
+                    },
+                )
+            }
 
             if (attached.isNotEmpty()) {
                 attached.forEach { a ->

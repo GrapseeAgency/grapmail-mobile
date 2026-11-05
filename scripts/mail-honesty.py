@@ -2324,17 +2324,22 @@ pin("compose states its subject and body the same way on both platforms",
     'placeholder = "Add a subject"' in code_only(android("ui/screens/mail/ComposeScreen.kt"))
     and 'placeholder: "Add a subject"' in code_only(SW_RDR)
     and "heightIn(min = 240.dp)" in code_only(android("ui/screens/mail/ComposeScreen.kt"))
-    and "minHeight: 240, maxHeight: .infinity" in code_only(SW_RDR)
+    and "minHeight: 240" in code_only(SW_RDR)
     and 'placeholder = "Subject",' not in code_only(android("ui/screens/mail/ComposeScreen.kt")))
 
 # The frame that followed proved the floor alone was not enough: a 240dp
 # body inside a scrollable column left the whole lower half of the screen
 # empty on both platforms (frame 76, both artifact sets). The body must
 # GROW to the pinned action bar. Remove either growth and the dead zone
-# the audit exists to kill comes straight back.
+# the audit exists to kill comes straight back. The second re-photograph
+# then caught the greedy cure: an infinity-proposed editor handed the
+# leftover to every sibling and the Send button grew to a 700pt block,
+# so the growth is pinned at the exact-height GeometryReader and the
+# infinity proposal is pinned OUT of the editor.
 pin("the compose body grows to the action bar — no bottom dead zone",
-    "Modifier.weight(1f, fill = false)" in code_only(android("ui/screens/mail/ComposeScreen.kt"))
-    and "minHeight: 240, maxHeight: .infinity" in code_only(SW_RDR))
+    "Box(Modifier.weight(1f).heightIn(min = 240.dp))" in code_only(android("ui/screens/mail/ComposeScreen.kt"))
+    and "bodyEditor.frame(height: max(240, g.size.height))" in code_only(SW_RDR)
+    and "maxHeight: .infinity" not in body_of(code_only(SW_RDR), "private var bodyEditor"))
 
 # The other half of the centering audit: batch 1 centered the short STATUS
 # screens (frame 100 proved the bottom-empty class), but frame 104 showed
