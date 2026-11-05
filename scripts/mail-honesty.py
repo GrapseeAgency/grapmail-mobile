@@ -2376,7 +2376,8 @@ pin("the box tabs stay one-line and scrollable at every device width",
     and "softWrap = false" in body_of(code_only(KT_MAIL_C2), "fun BoxTab(")
     and "horizontalScroll" in body_of(code_only(KT_BOX), "fun BoxTabRow"))
 pin("the undo frame sits below the status bar it once drew through",
-    "safeAreaInsets.top" in body_of(code_only(ios("MailSnapshot.swift")), 'case "mail-undo"'))
+    "safeAreaInsets.top" in body_of(code_only(ios("MailSnapshot.swift")), 'case "mail-undo"')
+    and "alignment: .top" in body_of(code_only(ios("MailSnapshot.swift")), 'case "mail-undo"'))
 
 # Frame 62's photograph caught what no marker could: the drawer's Subscriptions
 # row — the only phone door to that screen — sat below an unmarked fold. The

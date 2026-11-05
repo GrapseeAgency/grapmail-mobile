@@ -649,6 +649,13 @@ struct MailSnapshotView: View {
                     listFrame(rows: Self.rows, loading: false, failed: false,
                               noMailbox: false, box: .inbox)
                 }
+                // Top-anchored, and that alignment is load-bearing: the
+                // seeded list is TALLER than the window, a plain VStack
+                // centers overflowing content, and the banner plus the
+                // inset fell off the top of the photograph -- frame 99
+                // showed the greeting under the clock with no banner at
+                // all. The top of the stack must be the top of the screen.
+                .frame(maxHeight: .infinity, alignment: .top)
                 .padding(.top, max(UIApplication.shared
                     .connectedScenes.compactMap { $0 as? UIWindowScene }
                     .flatMap { $0.windows }.first?.safeAreaInsets.top ?? 0, 44))
