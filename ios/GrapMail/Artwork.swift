@@ -45,14 +45,15 @@ private struct ArtScene: View {
     let name: String
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
+    // DIAGNOSTIC (W1): `paused: true` stops the timeline ticking while the
+    // view keeps its exact shape, to separate two explanations for the walk
+    // dying at '2FA enable (gate leg)' on every commit that renders artwork:
+    // the animation invalidating the hub's content under the walk's tap,
+    // versus the Canvas being present at all. Passes → motion is the cause
+    // and returns scoped. Fails → the drawing is.
     var body: some View {
-        // ~12 Hz, not display refresh: the scenes are slow sine cycles, and
-        // an always-animating illustration on every account screen measured
-        // costly enough on the CI simulator to push a walk leg past its
-        // timeout. The interval is spelled Double on both branches — a bare
-        // Int literal there is what stopped TimelineView's inference.
         let interval: Double = reduceMotion ? 3600.0 : 1.0 / 12.0
-        TimelineView(.animation(minimumInterval: interval, paused: false)) { timeline in
+        TimelineView(.animation(minimumInterval: interval, paused: true)) { timeline in
             Canvas { ctx, size in
                 let t: Double = reduceMotion ? 0.0
                     : timeline.date.timeIntervalSinceReferenceDate
