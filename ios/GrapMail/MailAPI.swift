@@ -1375,6 +1375,17 @@ extension ApiClient {
             method: "DELETE", bearer: token) as MailSendResponse
     }
 
+    /// Remove one message row by id. Same DELETE route as above; this
+    /// wrapper exists so the CALLER'S INTENT is named — a draft that was
+    /// just sent is not mail being destroyed, it is the copy the person
+    /// already replaced. Send-then-delete, never the reverse: deleting
+    /// first would lose the mail if the send fails.
+    static func mailDeleteMessage(token: String, id: String) async throws {
+        _ = try await request(
+            "\(mailBase)/message/\(id.percentEncodedPath())",
+            method: "DELETE", bearer: token) as MailSendResponse
+    }
+
     static func mailSend(token: String, _ req: MailSendRequest) async throws -> MailSendResponse {
         try await request("\(mailBase)/send", method: "POST",
                           body: try encoder.encode(req), bearer: token)

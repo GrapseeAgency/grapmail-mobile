@@ -928,6 +928,10 @@ class MailboxViewModel @JvmOverloads constructor(
         val to: String = "", val cc: String = "", val bcc: String = "",
         val subject: String = "", val body: String = "",
         val inReplyTo: String? = null,
+        /** The draft row this compose was opened FROM. Non-empty means the
+         *  person is continuing a saved message, and a successful send
+         *  deletes it — see [send]. */
+        val draftId: String = "",
         val sending: Boolean = false,
         /** The server's own verdict, shown verbatim. Never a local "Sent". */
         val result: String? = null,
@@ -965,6 +969,27 @@ class MailboxViewModel @JvmOverloads constructor(
             val me = _state.value.accountAddress?.lowercase()
             val quoted = quoteOf(full)
             when (mode) {
+                // A draft is not a reply: the row IS the person's own
+                // half-written message, so it loads verbatim — no quote
+                // block, no "Re:", no second signature (the draft already
+                // carries the one they saved). This is the leg the app was
+                // missing: tapping a draft used to open a read-only thread,
+                // so a saved message could never be finished or sent.
+                "draft" -> _compose.update { it.copy(
+                    to = full.to.joinToString(", "),
+                    cc = full.cc.joinToString(", "),
+                    // No bcc: the message DTO has no bcc field, because the
+                    // route strips it before storing — a draft's hidden
+                    // recipients are genuinely not recoverable, so the
+                    // composer leaves the field empty rather than showing
+                    // a list it invented. The person re-adds them; sending
+                    // to a Bcc they cannot see would be the worse error.
+                    subject = full.subject ?: "",
+                    body = full.bodyText ?: "",
+                    inReplyTo = full.inReplyTo,
+                    draftId = full.id,
+                    result = null, resultStatus = null, error = null,
+                ) }
                 "all" -> {
                     val others = (listOfNotNull(full.from?.address) + full.to + full.cc)
                         .map { it.trim() }.filter { it.isNotEmpty() }
@@ -1089,6 +1114,21 @@ class MailboxViewModel @JvmOverloads constructor(
                     error = r.deliveryError ?: r.error) }
                 MailStore.invalidate(MailBox.Sent)
                 MailStore.invalidate(MailBox.Inbox)
+                // A draft that was just sent is no longer a draft. The order
+                // is the whole point: the delete runs only AFTER the server
+                // accepted the message, so a failed send leaves the draft
+                // exactly where it was. Deleting first would trade a
+                // half-written mail for an error message.
+                val sent = r.status == "sent" || r.status == "queued"
+                if (s.draftId.isNotEmpty() && sent) {
+                    runCatching { Api.mailDeleteMessage(t, s.draftId) }
+                        .onSuccess { MailStore.invalidate(MailBox.Drafts) }
+                        // The mail IS sent. A draft row that outlives its
+                        // send is a stale copy, not a lost message, so this
+                        // says nothing and does not fail the receipt.
+                        .onFailure { }
+                    _compose.update { it.copy(draftId = "") }
+                }
                 load(replace = true)
             }.onFailure { e ->
                 _compose.update { it.copy(sending = false,

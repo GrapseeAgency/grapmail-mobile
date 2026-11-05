@@ -139,6 +139,10 @@ final class MailboxModel: ObservableObject {
         var subject = ""
         var body = ""
         var inReplyTo: String?
+        /// The draft row this compose was opened FROM. Non-empty means the
+        /// person is continuing a saved message, and a successful send
+        /// deletes it — see [send].
+        var draftId = ""
         var sending = false
         /// The server's own verdict, shown verbatim. Never a local "Sent".
         var result: String?
@@ -1135,6 +1139,27 @@ final class MailboxModel: ObservableObject {
             let quoted = Self.quoteOf(m)
             let sig = Self.signatureBlock(signature)
             switch mode {
+            // A draft is not a reply: the row IS the person's own
+            // half-written message, so it loads verbatim — no quote block,
+            // no "Re:", no second signature (the draft already carries the
+            // one they saved). This is the leg the app was missing: tapping
+            // a draft opened a read-only thread, so a saved message could
+            // never be finished or sent.
+            case "draft":
+                self.compose.to = m.to.joined(separator: ", ")
+                self.compose.cc = m.cc.joined(separator: ", ")
+                // No bcc: the message DTO has no bcc field, because the
+                // route strips it before storing — a draft's hidden
+                // recipients are genuinely not recoverable, so the composer
+                // leaves the field empty rather than showing a list it
+                // invented.
+                self.compose.subject = m.subject ?? ""
+                self.compose.body = m.bodyText ?? ""
+                self.compose.inReplyTo = m.inReplyTo
+                self.compose.draftId = m.id
+                self.compose.result = nil
+                self.compose.resultStatus = nil
+                self.compose.error = nil
             case "all":
                 var seen = Set<String>()
                 let others = ([m.from?.address].compactMap { $0 } + m.to + m.cc)
@@ -1263,6 +1288,22 @@ final class MailboxModel: ObservableObject {
                 self.compose.error = r.deliveryError ?? r.error
                 await MailStore.shared.invalidate(.sent)
                 await MailStore.shared.invalidate(.inbox)
+                // A draft that was just sent is no longer a draft. The
+                // order is the whole point: the delete runs only AFTER the
+                // server accepted the message, so a failed send leaves the
+                // draft exactly where it was. Deleting first would trade a
+                // half-written mail for an error message.
+                let draft = self.compose.draftId
+                let sent = r.status == "sent" || r.status == "queued"
+                if !draft.isEmpty && sent {
+                    self.compose.draftId = ""
+                    // The mail IS sent. A draft row that outlives its send
+                    // is a stale copy, not a lost message, so a failed
+                    // cleanup stays silent and does not touch the receipt.
+                    if (try? await ApiClient.mailDeleteMessage(token: token, id: draft)) != nil {
+                        await MailStore.shared.invalidate(.drafts)
+                    }
+                }
                 self.load(replace: true)
             } catch {
                 self.compose.sending = false

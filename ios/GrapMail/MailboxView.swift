@@ -21,6 +21,8 @@ struct MailboxView: View {
     /// id answers 404, so a row without a thread must open through the message
     /// route or the tap does nothing useful.
     let onThread: (String, Bool) -> Void
+    /// A draft row opens the composer on its own text, not the reader.
+    let onDraft: (String) -> Void
     let onCompose: () -> Void
     let onLabels: () -> Void
     let onScreener: () -> Void
@@ -271,7 +273,15 @@ struct MailboxView: View {
                     selecting: !vm.state.selection.isEmpty,
                     selected: vm.state.selection.contains(row.id),
                     onSelect: { vm.toggleSelect(row.id) },
-                    onOpen: { onThread(row.threadId ?? row.id, row.threadId != nil) },
+                    onOpen: {
+                        // Drafts are the person's own unfinished mail:
+                        // tapping one continues it in the composer. Opening
+                        // the reader instead — what this did — shows a
+                        // message you cannot edit or send, which is a draft
+                        // that does not draft.
+                        if vm.state.box == .drafts { onDraft(row.id) }
+                        else { onThread(row.threadId ?? row.id, row.threadId != nil) }
+                    },
                     onStar: { vm.actOn(row.id, row.isStarred ? .unstar : .star) }
                 )
                 .listRowInsets(EdgeInsets())

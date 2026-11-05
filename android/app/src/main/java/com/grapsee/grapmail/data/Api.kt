@@ -993,6 +993,21 @@ object Api {
         if (status >= 400) fail(status, body)
     }
 
+    /**
+     * Remove one message row by id. The route is the same DELETE the Trash
+     * action uses; this wrapper exists so the CALLER'S INTENT is named: a
+     * draft that was just sent is not mail being destroyed, it is the copy
+     * the person already replaced. Sending a draft posts a new message and
+     * leaves the draft row behind, so a resumed-and-sent draft would
+     * otherwise pile up stale copies in Drafts forever, and the honest
+     * order is send-then-delete — delete-first would lose the mail if the
+     * send fails.
+     */
+    suspend fun mailDeleteMessage(token: String, id: String) {
+        val (status, body) = execute(authed("$MAIL/message/${enc(id)}", token).delete().build())
+        if (status >= 400) fail(status, body)
+    }
+
     suspend fun mailSend(token: String, req: MailSendRequest): MailSendResponse {
         val r = authed("$MAIL/send", token).post(postBody(
             json.encodeToString(MailSendRequest.serializer(), req))).build()

@@ -583,6 +583,9 @@ struct RootView: View {
                             path.append(.mailThread(id: id, isThread: isThread))
                         },
                         onCompose: { path.append(.mailCompose(reply: "", mode: "reply")) },
+                        // A draft is the person's own unfinished mail; the
+                        // only useful tap is the one that lets them finish it.
+                        onDraft: { id in path.append(.mailCompose(reply: id, mode: "draft")) },
                         onLabels: { path.append(.mailLabels) },
                         onScreener: { path.append(.mailScreener) },
                         onSubscriptions: { path.append(.mailSubscriptions) },

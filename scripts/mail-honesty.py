@@ -2505,6 +2505,41 @@ pin("the artwork takes its colors from the palette, not from literals",
     and "0xFF206BFD" not in code_only(KT_ART)
     and "0x206BFD" not in code_only(SW_ART))
 
+# ── 36. a draft that cannot be finished is not a draft (§36) ─────────────────
+# Tapping a draft opened the READ-ONLY thread on both platforms: the person
+# saw their own half-written mail with no way to edit it or send it. Every
+# mail client opens a draft in the composer; this is the core affordance the
+# app was missing, and the cleanup after sending is the half that keeps the
+# Drafts box honest.
+pin("a draft row opens the composer, never the reader",
+    "state.box == MailBox.Drafts" in code_only(KT_BOX)
+    and "onOpenDraft(row.id)" in code_only(KT_BOX)
+    and "onOpenDraft: (id: String) -> Unit" in code_only(KT_BOX)
+    and 'mode: "draft"' in code_only(ios("RootView.swift"))
+    and "vm.state.box == .drafts" in code_only(ios("MailboxView.swift"))
+    and "onDraft(row.id)" in code_only(ios("MailboxView.swift")))
+
+pin("the draft loads as the person's own text, not as a reply",
+    # No quote block, no "Re:", no second signature: the draft already has
+    # whatever they saved, and re-quoting it would corrupt the mail.
+    '"draft" -> _compose.update' in code_only(KT_VM)
+    and 'case "draft":' in code_only(SW_VM)
+    and "draftId = full.id" in code_only(KT_VM)
+    and "self.compose.draftId = m.id" in code_only(SW_VM))
+
+# The order is the safety property: delete AFTER a confirmed send. A client
+# that deleted first would answer a failed send by destroying the only copy
+# of the person's unfinished message.
+pin("the sent draft is deleted only after the server accepted the send",
+    'val sent = r.status == "sent" || r.status == "queued"' in code_only(KT_VM)
+    and 'if (s.draftId.isNotEmpty() && sent)' in code_only(KT_VM)
+    and "let sent = r.status == \"sent\" || r.status == \"queued\"" in code_only(SW_VM)
+    and "if !draft.isEmpty && sent" in code_only(SW_VM))
+
+pin("the draft cleanup is its own named call, not the Trash destroyer",
+    "suspend fun mailDeleteMessage" in code_only(android("data/Api.kt"))
+    and "static func mailDeleteMessage" in code_only(ios("MailAPI.swift")))
+
 print()
 if failures:
     print(f"mail-honesty: {len(failures)} pin(s) broken")

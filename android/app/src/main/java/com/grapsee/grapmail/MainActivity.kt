@@ -834,6 +834,10 @@ fun GrapMailNav() {
                     nav.navigate(Routes.mailThread(id, isThread))
                 },
                 onCompose = { nav.navigate(Routes.MAIL_COMPOSE) },
+                // A draft opens in the composer, not the reader: the row is
+                // the person's own unfinished mail, and the only useful tap
+                // is the one that lets them finish it.
+                onOpenDraft = { id -> nav.navigate(Routes.mailCompose(id, "draft")) },
                 onSettings = { nav.navigate(Routes.MAIL_SETTINGS) },
                 onSecurity = { nav.navigate(Routes.SECURITY) },
                 onHelp = { openSupport() },

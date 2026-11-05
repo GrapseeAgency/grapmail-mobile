@@ -125,6 +125,8 @@ fun MailboxScreen(
     vm: MailboxViewModel,
     onOpenThread: (id: String, isThread: Boolean) -> Unit,
     onCompose: () -> Unit,
+    /** A draft row opens the composer on its own text, not the reader. */
+    onOpenDraft: (id: String) -> Unit,
     onSettings: () -> Unit,
     onSecurity: () -> Unit,
     onHelp: () -> Unit,
@@ -357,8 +359,20 @@ fun MailboxScreen(
                                         selected = state.selection.contains(row.id),
                                         onSelect = { vm.toggleSelect(row.id) },
                                         onOpen = {
-                                            val tid = row.threadId
-                                            onOpenThread(tid ?: row.id, tid != null)
+                                            // Drafts are the person's own
+                                            // unfinished mail: tapping one
+                                            // continues it in the composer.
+                                            // Opening the reader instead —
+                                            // what this did — shows a
+                                            // message you cannot edit or
+                                            // send, which is a draft that
+                                            // does not draft.
+                                            if (state.box == MailBox.Drafts) {
+                                                onOpenDraft(row.id)
+                                            } else {
+                                                val tid = row.threadId
+                                                onOpenThread(tid ?: row.id, tid != null)
+                                            }
                                         },
                                         onStar = {
                                             vm.actOn(row.id,
