@@ -383,8 +383,11 @@ jobs:
 
             * Built, installed and **live-walked on a real Android 34 emulator** by this
               workflow: the full signup → sign-in → security → recovery → mailbox flow,
-              every screen photographed from the running app. The screenshots attached
-              here are from *this* APK, not from the debug build.
+              every screen photographed from the running app. The screenshots are
+              attached to THIS RUN as CI artifacts (`screenshots-release`,
+              `android-screenshots-*`); the release page itself carries only the two
+              installable files — the founder's rule, so the page stays a download
+              point and not a gallery.
             * The same walk on three device profiles (phone, small phone, tablet) passed
               on the debug variant in the run above.
             * `scripts/api-parity.py` — the two platforms' mail API surfaces match, and
@@ -411,6 +414,5 @@ jobs:
           files: |
             android/app/build/outputs/apk/release/app-release.apk
             android/app/build/outputs/bundle/release/app-release.aab
-            screenshots-release/*.png
           prerelease: false
           make_latest: "true"

@@ -1925,6 +1925,13 @@ pin("the data-flow doc names every on-device store the code writes",
                              "grapmail-e2e-protected-key/1", "MailStore")))
 pin("the release job builds and proves the AAB beside the APK",
     "./gradlew assembleRelease bundleRelease" in WF_TEXT and "app-release.aab" in WF_TEXT)
+pin("the release page carries only the two installable files — no screenshot gallery",
+    # The founder's rule, pinned at the workflow: the release `files:` list is
+    # exactly the APK and the AAB. Screenshots stay CI artifacts on the run.
+    # Add `*.png` back to that list and this breaks.
+    ".png" not in body_of(WF_TEXT, "files: |")
+    and "app-release.apk" in body_of(WF_TEXT, "files: |")
+    and "app-release.aab" in body_of(WF_TEXT, "files: |"))
 
 # The manifest is a plist Apple parses at upload time — a structure error or a
 # reason code off Apple's list is an email from App Review two weeks after the
