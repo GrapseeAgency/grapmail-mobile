@@ -639,26 +639,23 @@ struct MailSnapshotView: View {
             // are drawn by the same GMUndoBanner the live screen raises.
             case "mail-undo":
                 return AnyView(
-                // The frame owns no scaffold, so it owes its own safe-area
-                // inset: without it the banner and greeting drew THROUGH the
-                // status bar -- frame 99's photograph put the clock inside
-                // "Good evening".
-                VStack(spacing: 0) {
-                    GMUndoBanner(note: "Archived 2 messages", marker: "mail-undo",
-                                 onUndo: {}, onDone: {})
-                    listFrame(rows: Self.rows, loading: false, failed: false,
-                              noMailbox: false, box: .inbox)
+                // A ScrollView, not a VStack: the test host has no
+                // NavigationStack, so the window extends behind the status
+                // bar and UIApplication's safeAreaInsets reports 0 during
+                // early XCUITest launch (the diagnostic at abf0a9f proved
+                // the element renders at y<300 but the inset never applied).
+                // A ScrollView gets its content inset from the environment
+                // safe area, which SwiftUI sets correctly even in a bare
+                // host: the banner draws below the clock without manual
+                // arithmetic.
+                ScrollView(.vertical, showsIndicators: false) {
+                    VStack(spacing: 0) {
+                        GMUndoBanner(note: "Archived 2 messages", marker: "mail-undo",
+                                     onUndo: {}, onDone: {})
+                        listFrame(rows: Self.rows, loading: false, failed: false,
+                                  noMailbox: false, box: .inbox)
+                    }
                 }
-                // Top-anchored, and that alignment is load-bearing: the
-                // seeded list is TALLER than the window, a plain VStack
-                // centers overflowing content, and the banner plus the
-                // inset fell off the top of the photograph -- frame 99
-                // showed the greeting under the clock with no banner at
-                // all. The top of the stack must be the top of the screen.
-                .frame(maxHeight: .infinity, alignment: .top)
-                .padding(.top, max(UIApplication.shared
-                    .connectedScenes.compactMap { $0 as? UIWindowScene }
-                    .flatMap { $0.windows }.first?.safeAreaInsets.top ?? 0, 44))
                 )
             default:
                 return AnyView(

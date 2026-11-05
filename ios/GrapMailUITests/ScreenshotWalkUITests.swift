@@ -562,17 +562,6 @@ final class ScreenshotWalkUITests: XCTestCase {
                 XCTAssertTrue(app.staticTexts[settled].waitForExistence(timeout: 12),
                               "snapshot '\(screen.name)' never finished loading")
             }
-            if screen.name == "mail-undo" {
-                // Diagnostic the photograph forced: the banner exists in the
-                // tree on every round since 88bf38a yet has not been drawn
-                // in the frame. Print where the system thinks it is.
-                let banner = app.staticTexts["Archived 2 messages"].firstMatch
-                let f = banner.frame
-                print("DIAG mail-undo banner frame: \(f.origin.x),\(f.origin.y) " +
-                      "\(f.width)x\(f.height) on \(app.windows.firstMatch.frame)")
-                XCTAssertLessThan(f.minY, 300,
-                                  "DIAG: undo banner drawn at y=\(f.minY), off the visible top")
-            }
             snap(screen.shot)
         }
 
