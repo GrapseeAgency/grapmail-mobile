@@ -420,7 +420,8 @@ fun DrawScope.drawBell(cx: Float, cy: Float, r: Float, color: Color, stroke: Flo
 /** Globe glyph: circle + meridians. */
 fun DrawScope.drawGlobe(cx: Float, cy: Float, r: Float, color: Color, stroke: Float) {
     drawCircle(color, radius = r, center = Offset(cx, cy), style = Stroke(width = stroke))
-    drawOval(color, Rect(cx - r * 0.45f, cy - r, cx + r * 0.45f, cy + r),
+    // drawOval takes topLeft + size, not a Rect.
+    drawOval(color, Offset(cx - r * 0.45f, cy - r), Size(r * 0.9f, r * 2f),
         style = Stroke(width = stroke * 0.7f))
     drawLine(color, Offset(cx - r, cy), Offset(cx + r, cy), stroke * 0.7f)
 }
