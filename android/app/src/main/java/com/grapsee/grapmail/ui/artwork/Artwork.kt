@@ -7,6 +7,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.CornerRadius
 import com.grapsee.grapmail.ui.theme.LocalPalette
 import com.grapsee.grapmail.ui.theme.Palette
 
@@ -187,7 +188,7 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.sceneCode(
         val a = 0.4f + 0.6f * artPulse(t, 2.4f, i * 0.3f)
         drawRoundRect(p.primarySolid.copy(alpha = a),
             Offset(w * x - w * 0.03f, h * 0.46f), Size(w * 0.06f, h * 0.10f),
-            cornerRadiusX = w * 0.015f, cornerRadiusY = w * 0.015f)
+            cornerRadius = CornerRadius(w * 0.015f, w * 0.015f))
     }
 }
 
@@ -230,10 +231,10 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.scenePhone(
     val cx = w * 0.42f
     val cy = h * 0.50f
     drawRoundRect(p.card, Offset(cx - pw / 2, cy - ph / 2), Size(pw, ph),
-        cornerRadiusX = pw * 0.18f, cornerRadiusY = pw * 0.18f)
+        cornerRadius = CornerRadius(pw * 0.18f, pw * 0.18f))
     drawRoundRect(brandBrush(pw, ph, p.primaryTop, p.primaryBottom),
         Offset(cx - pw * 0.4f, cy - ph * 0.42f), Size(pw * 0.8f, ph * 0.84f),
-        cornerRadiusX = pw * 0.1f, cornerRadiusY = pw * 0.1f)
+        cornerRadius = CornerRadius(pw * 0.1f, pw * 0.1f))
     if (ok) {
         drawCheck(cx, cy, pw * 0.2f, Color.White, pw * 0.08f)
         drawChip(w * 0.72f, h * 0.36f, w * 0.20f, h * 0.18f, p.card, p.successInk, "check", t)
@@ -252,7 +253,7 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawCode(
         drawRoundRect(Color.White.copy(alpha = a),
             Offset(cx + dx * pw - pw * 0.06f, cy - pw * 0.1f),
             Size(pw * 0.12f, pw * 0.2f),
-            cornerRadiusX = pw * 0.03f, cornerRadiusY = pw * 0.03f)
+            cornerRadius = CornerRadius(pw * 0.03f, pw * 0.03f))
     }
 }
 

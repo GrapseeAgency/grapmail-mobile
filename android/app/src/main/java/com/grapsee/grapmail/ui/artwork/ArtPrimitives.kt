@@ -14,6 +14,7 @@ import androidx.compose.ui.geometry.RoundRect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.CornerRadius
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.StrokeCap
@@ -152,7 +153,7 @@ fun DrawScope.drawConfetti(colors: List<Color>, t: Float) {
         val s = 0.022f * h
         if (i % 2 == 0) {
             drawRoundRect(c, Offset(x * w - s / 2, (y * h + drift * h) - s / 2),
-                Size(s, s), cornerRadiusX = s / 3, cornerRadiusY = s / 3)
+                Size(s, s), cornerRadius = CornerRadius(s / 3, s / 3))
         } else {
             drawCircle(c, radius = s / 2, center = Offset(x * w, y * h + drift * h))
         }
@@ -189,13 +190,13 @@ fun DrawScope.drawEnvelope(
         val lw = w * 0.62f
         val lh = h * 0.66f
         drawRoundRect(letterColor, Offset(cx - lw / 2, cy - h / 2 - lh * 0.55f + lift),
-            Size(lw, lh), cornerRadiusX = lw * 0.08f, cornerRadiusY = lw * 0.08f)
+            Size(lw, lh), cornerRadius = CornerRadius(lw * 0.08f, lw * 0.08f))
         val lineC = ink.copy(alpha = 0.35f)
         for (i in 0 until 2) {
             drawRoundRect(lineC,
                 Offset(cx - lw * 0.36f, cy - h / 2 - lh * 0.30f + lift + i * lh * 0.22f),
                 Size(lw * (0.72f - i * 0.18f), lh * 0.09f),
-                cornerRadiusX = lh * 0.045f, cornerRadiusY = lh * 0.045f)
+                cornerRadius = CornerRadius(lh * 0.045f, lh * 0.045f))
         }
     }
     drawPath(body, brandBrush(w, h, top, bottom))
@@ -254,7 +255,7 @@ fun DrawScope.drawShield(
             val lw = w * 0.34f
             val lh = h * 0.26f
             drawRoundRect(ink, Offset(cx - lw / 2, cy - lh * 0.1f + bob),
-                Size(lw, lh), cornerRadiusX = lw * 0.18f, cornerRadiusY = lw * 0.18f)
+                Size(lw, lh), cornerRadius = CornerRadius(lw * 0.18f, lw * 0.18f))
             val arc = Path().apply {
                 addRoundRect(RoundRect(Rect(cx - lw * 0.32f, cy - lh * 0.75f + bob,
                     cx + lw * 0.32f, cy + lh * 0.25f + bob), lw * 0.5f, lw * 0.5f))
@@ -274,7 +275,7 @@ fun DrawScope.drawShield(
         }
         "alert" -> {
             drawRoundRect(ink, Offset(cx - w * 0.035f, cy - h * 0.16f + bob),
-                Size(w * 0.07f, h * 0.22f), cornerRadiusX = w * 0.035f, cornerRadiusY = w * 0.035f)
+                Size(w * 0.07f, h * 0.22f), cornerRadius = CornerRadius(w * 0.035f, w * 0.035f))
             drawCircle(ink, radius = w * 0.045f, center = Offset(cx, cy + h * 0.14f + bob))
         }
     }
@@ -315,21 +316,21 @@ fun DrawScope.drawDevices(
     val lw = w * 0.62f
     val lh = h * 0.52f
     drawRoundRect(cardColor, Offset(cx - lw / 2, cy - lh / 2 + bob), Size(lw, lh),
-        cornerRadiusX = lw * 0.05f, cornerRadiusY = lw * 0.05f)
+        cornerRadius = CornerRadius(lw * 0.05f, lw * 0.05f))
     drawRoundRect(brandBrush(lw, lh, top, bottom),
         Offset(cx - lw * 0.46f, cy - lh * 0.44f + bob), Size(lw * 0.92f, lh * 0.88f),
-        cornerRadiusX = lw * 0.03f, cornerRadiusY = lw * 0.03f)
+        cornerRadius = CornerRadius(lw * 0.03f, lw * 0.03f))
     drawRoundRect(cardColor, Offset(cx - lw * 0.62f, cy + lh / 2 + bob),
-        Size(lw * 1.24f, lh * 0.10f), cornerRadiusX = lh * 0.05f, cornerRadiusY = lh * 0.05f)
+        Size(lw * 1.24f, lh * 0.10f), cornerRadius = CornerRadius(lh * 0.05f, lh * 0.05f))
     val pw = w * 0.2f
     val ph = h * 0.44f
     val px = cx + lw * 0.62f
     val py = cy + h * 0.1f - bob
     drawRoundRect(cardColor, Offset(px - pw / 2, py - ph / 2), Size(pw, ph),
-        cornerRadiusX = pw * 0.18f, cornerRadiusY = pw * 0.18f)
+        cornerRadius = CornerRadius(pw * 0.18f, pw * 0.18f))
     drawRoundRect(brandBrush(pw, ph, top, bottom),
         Offset(px - pw * 0.4f, py - ph * 0.42f), Size(pw * 0.8f, ph * 0.84f),
-        cornerRadiusX = pw * 0.1f, cornerRadiusY = pw * 0.1f)
+        cornerRadius = CornerRadius(pw * 0.1f, pw * 0.1f))
     if (checkOn) {
         drawCheck(cx, cy + bob, lw * 0.13f, ink, lw * 0.05f)
         drawCheck(px, py, pw * 0.16f, ink, pw * 0.07f)
@@ -338,7 +339,7 @@ fun DrawScope.drawDevices(
     drawCircle(cardColor, radius = sw, center = Offset(cx - lw * 0.85f, cy + h * 0.18f + bob))
     drawRoundRect(brandBrush(sw, sw, top, bottom),
         Offset(cx - lw * 0.85f - sw * 0.4f, cy + h * 0.18f + bob - sw * 0.55f),
-        Size(sw * 0.8f, sw * 1.1f), cornerRadiusX = sw * 0.16f, cornerRadiusY = sw * 0.16f)
+        Size(sw * 0.8f, sw * 1.1f), cornerRadius = CornerRadius(sw * 0.16f, sw * 0.16f))
 }
 
 /** Person bust: the identity/name scene. */
@@ -361,11 +362,11 @@ fun DrawScope.drawPerson(cx: Float, cy: Float, s: Float, skin: Color, shirt: Col
 fun DrawScope.drawCard(cx: Float, cy: Float, w: Float, h: Float, bg: Color, line: Color, t: Float) {
     val bob = artFloat(t, 0.02f * h, period = 3.9f, phase = 1.1f)
     drawRoundRect(bg, Offset(cx - w / 2, cy - h / 2 + bob), Size(w, h),
-        cornerRadiusX = w * 0.10f, cornerRadiusY = w * 0.10f)
+        cornerRadius = CornerRadius(w * 0.10f, w * 0.10f))
     for (i in 0 until 2) {
         drawRoundRect(line, Offset(cx - w * 0.34f, cy - h * 0.22f + bob + i * h * 0.3f),
             Size(w * (0.68f - i * 0.2f), h * 0.12f),
-            cornerRadiusX = h * 0.06f, cornerRadiusY = h * 0.06f)
+            cornerRadius = CornerRadius(h * 0.06f, h * 0.06f))
     }
 }
 
@@ -373,7 +374,7 @@ fun DrawScope.drawCard(cx: Float, cy: Float, w: Float, h: Float, bg: Color, line
 fun DrawScope.drawChip(cx: Float, cy: Float, w: Float, h: Float, bg: Color, ink: Color, glyph: String, t: Float) {
     val bob = artFloat(t, 0.015f * h, period = 3.3f, phase = 0.4f)
     drawRoundRect(bg, Offset(cx - w / 2, cy - h / 2 + bob), Size(w, h),
-        cornerRadiusX = h * 0.5f, cornerRadiusY = h * 0.5f)
+        cornerRadius = CornerRadius(h * 0.5f, h * 0.5f))
     val gx = cx - w * 0.3f
     when (glyph) {
         "check" -> {
@@ -384,7 +385,7 @@ fun DrawScope.drawChip(cx: Float, cy: Float, w: Float, h: Float, bg: Color, ink:
         else -> drawCircle(ink, radius = h * 0.22f, center = Offset(gx, cy + bob))
     }
     drawRoundRect(ink.copy(alpha = 0.55f), Offset(cx - w * 0.08f, cy - h * 0.06f + bob),
-        Size(w * 0.4f, h * 0.12f), cornerRadiusX = h * 0.06f, cornerRadiusY = h * 0.06f)
+        Size(w * 0.4f, h * 0.12f), cornerRadius = CornerRadius(h * 0.06f, h * 0.06f))
 }
 
 /** Key glyph: circle bow + shaft + teeth. */
@@ -430,7 +431,7 @@ fun DrawScope.drawList(cx: Float, cy: Float, w: Float, h: Float, color: Color, s
         val y = cy - h / 2 + h * (0.15f + i * 0.35f)
         drawCircle(color, radius = stroke * 0.9f, center = Offset(cx - w / 2, y))
         drawRoundRect(color, Offset(cx - w * 0.28f, y - stroke * 0.5f),
-            Size(w * 0.78f, stroke), cornerRadiusX = stroke * 0.5f, cornerRadiusY = stroke * 0.5f)
+            Size(w * 0.78f, stroke), cornerRadius = CornerRadius(stroke * 0.5f, stroke * 0.5f))
     }
 }
 
@@ -488,7 +489,7 @@ fun DrawScope.drawAlert(cx: Float, cy: Float, r: Float, color: Color, stroke: Fl
     drawCircle(color.copy(alpha = 0.25f), radius = r * 1.3f * pulse, center = Offset(cx, cy))
     drawCircle(color, radius = r * pulse, center = Offset(cx, cy), style = Stroke(width = stroke))
     drawRoundRect(color, Offset(cx - stroke * 0.6f, cy - r * 0.5f),
-        Size(stroke * 1.2f, r * 0.8f), cornerRadiusX = stroke * 0.6f, cornerRadiusY = stroke * 0.6f)
+        Size(stroke * 1.2f, r * 0.8f), cornerRadius = CornerRadius(stroke * 0.6f, stroke * 0.6f))
     drawCircle(color, radius = stroke * 0.8f, center = Offset(cx, cy + r * 0.5f))
 }
 

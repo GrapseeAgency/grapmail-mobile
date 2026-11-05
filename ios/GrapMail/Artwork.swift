@@ -46,8 +46,11 @@ private struct ArtScene: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
-        TimelineView(.animation(minimumInterval: reduceMotion ? 3600 : 1.0 / 30.0,
-                                paused: false)) { timeline in
+        // The interval is spelled as a Double on both branches: a bare `3600`
+        // is an Int literal, and the mixed ternary is what stopped
+        // TimelineView's Content inference.
+        let interval: Double = reduceMotion ? 3600.0 : 1.0 / 30.0
+        TimelineView(.animation(minimumInterval: interval, paused: false)) { timeline in
             Canvas { ctx, size in
                 let t: Double = reduceMotion ? 0.0
                     : timeline.date.timeIntervalSinceReferenceDate
