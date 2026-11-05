@@ -76,11 +76,11 @@ fun rememberArtClock(): State<Float> {
 
 /** Sine wave in [0,1] over a period, phase-shifted per element. */
 fun artPulse(t: Float, period: Float = 2.4f, phase: Float = 0f): Float =
-    0.5f + 0.5f * sin(2.0 * PI * ((t + phase) / period).toFloat())
+    (0.5 + 0.5 * sin(2.0 * PI * ((t + phase) / period).toDouble())).toFloat()
 
 /** Smooth vertical float offset in dp-ish units for a scene height h. */
 fun artFloat(t: Float, amp: Float, period: Float = 3.2f, phase: Float = 0f): Float =
-    amp * sin(2.0 * PI * ((t + phase) / period).toFloat())
+    (amp.toDouble() * sin(2.0 * PI * ((t + phase) / period).toDouble())).toFloat()
 
 /** The brand blue gradient, top-left to bottom-right, as the PNGs had it. */
 fun brandBrush(w: Float, h: Float, top: Color, bottom: Color): Brush =
@@ -232,7 +232,7 @@ fun DrawScope.drawCheck(cx: Float, cy: Float, r: Float, color: Color, stroke: Fl
 /** Shield with one of the three glyphs the flows use: lock, check, person. */
 fun DrawScope.drawShield(
     cx: Float, cy: Float, w: Float, h: Float,
-    top: Color, bottom: Color, glyph: String, ink: Color, t: Float,
+    top: Color, bottom: Color, ink: Color, glyph: String, t: Float,
 ) {
     val bob = artFloat(t, 0.02f * h, period = 3.8f)
     val shield = Path().apply {

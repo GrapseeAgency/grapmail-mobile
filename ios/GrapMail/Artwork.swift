@@ -49,8 +49,9 @@ private struct ArtScene: View {
         TimelineView(.animation(minimumInterval: reduceMotion ? 3600 : 1.0 / 30.0,
                                 paused: false)) { timeline in
             Canvas { ctx, size in
-                let t = reduceMotion ? 0 : timeline.date.timeIntervalSinceReferenceDate
-                    .truncatingRemainder(dividingBy: 1000)
+                let t: Double = reduceMotion ? 0.0
+                    : timeline.date.timeIntervalSinceReferenceDate
+                        .truncatingRemainder(dividingBy: 1000)
                 ArtDraw.scene(name, ctx, size, t, palette: ArtPalette.current)
             }
         }
@@ -295,7 +296,7 @@ private enum ArtDraw {
     // ── hero objects ─────────────────────────────────────────────────────
 
     static func envelope(_ ctx: GraphicsContext, _ c: CGPoint, _ w: CGFloat, _ h: CGFloat,
-                         _ pal: ArtPalette, _ t: Double, letter: Bool, check: Bool, size: CGSize) {
+                         _ pal: ArtPalette, _ t: Double, letter: Bool, showCheck: Bool, size: CGSize) {
         let lift = floatY(t, 0.03 * Double(h), 3.6)
         let body = CGRect(x: c.x - w / 2, y: c.y - h / 2, width: w, height: h)
         if letter {
@@ -318,7 +319,7 @@ private enum ArtDraw {
         flap.closeSubpath()
         ctx.fill(flap, with: .color(.white.opacity(0.18)))
         ctx.stroke(flap, with: .color(pal.bottom), lineWidth: w * 0.012)
-        if check {
+        if showCheck {
             let bx = c.x + w * 0.42, by = c.y + h * 0.40
             let br = w * 0.14 * CGFloat(1 + 0.06 * pulse(t, 2.2, 0.3))
             ctx.fill(Path(ellipseIn: CGRect(x: bx - br, y: by - br, width: br * 2, height: br * 2)),
@@ -525,7 +526,7 @@ private enum ArtDraw {
             blobs(ctx, size, pal.infoFill, t)
             sparkles(ctx, size, pal.solid, t)
             envelope(ctx, CGPoint(x: w * 0.46, y: h * 0.55), w * 0.42, h * 0.52, pal, t,
-                     letter: true, check: false, size: size)
+                     letter: true, showCheck: false, size: size)
             shield(ctx, CGPoint(x: w * 0.16, y: h * 0.30), w * 0.16, h * 0.34, pal, "lock", t, size: size)
             paperPlane(ctx, CGPoint(x: w * 0.84, y: h * 0.22), w * 0.06, pal, t, size: size)
         case "step1_name":
@@ -546,12 +547,12 @@ private enum ArtDraw {
             blobs(ctx, size, pal.infoFill, t)
             confetti(ctx, size, [pal.solid, pal.successInk, pal.star, pal.danger.opacity(0.7)], t)
             envelope(ctx, CGPoint(x: w * 0.48, y: h * 0.50), w * 0.40, h * 0.50, pal, t,
-                     letter: false, check: true, size: size)
+                     letter: false, showCheck: true, size: size)
         case "created_b":
             blobs(ctx, size, pal.infoFill, t)
             sparkles(ctx, size, pal.solid, t)
             envelope(ctx, CGPoint(x: w * 0.48, y: h * 0.50), w * 0.40, h * 0.50, pal, t,
-                     letter: false, check: true, size: size)
+                     letter: false, showCheck: true, size: size)
         case "puzzle":
             puzzleScene(ctx, size, pal, t)
         case "account-2fa", "ill_sec_hub_secure", "ill_sec_secure":
@@ -590,7 +591,7 @@ private enum ArtDraw {
         case "account-pending":
             blobs(ctx, size, pal.infoFill, t)
             envelope(ctx, CGPoint(x: w * 0.44, y: h * 0.52), w * 0.34, h * 0.42, pal, t,
-                     letter: true, check: false, size: size)
+                     letter: true, showCheck: false, size: size)
             clock(ctx, CGPoint(x: w * 0.72, y: h * 0.34), h * 0.12, pal.warnInk, h * 0.022, t)
         case "account-find-address":
             findScene(ctx, size, pal, t, found: false)
