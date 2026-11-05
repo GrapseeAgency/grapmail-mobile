@@ -2463,6 +2463,19 @@ pin("the artwork animates programmatically and honors reduced motion",
     and "TimelineView(.animation" in code_only(SW_ART)
     and "accessibilityReduceMotion" in code_only(SW_ART))
 
+# The entrance ENDS. This is not taste: a timeline that ticks forever
+# re-invalidates the enclosing scroll content, and on the CI simulator that
+# silently stopped the security hub's 2FA switch taking the walk's tap —
+# 'missing: 2FA enable (gate leg)' on every artwork commit until the
+# timeline was paused, which is how it was proven. Revert either platform
+# to an endless loop and the walk breaks again, so the settle is pinned.
+pin("the artwork settles instead of animating forever",
+    "artSettleSeconds" in code_only(KT_ARTP)
+    and "coerceAtMost(artSettleSeconds)" in code_only(KT_ARTP)
+    and "if (elapsed >= artSettleSeconds) break" in code_only(KT_ARTP)
+    and "paused: settled || reduceMotion" in code_only(SW_ART)
+    and "settled = true" in code_only(SW_ART))
+
 # The old illRes table named every scene; the dispatch must still answer each
 # one, or a screen silently photographs the fallback while believing it drew
 # its own artwork. The names are checked against the deleted mapper's list.

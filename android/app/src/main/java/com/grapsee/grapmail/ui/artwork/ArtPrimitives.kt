@@ -43,8 +43,8 @@ import kotlin.math.sin
  */
 
 /**
- * A monotonic animation clock in seconds, paused at zero when the device
- * asks for no motion.
+ * A monotonic animation clock in seconds that RUNS THE ENTRANCE and then
+ * stops.
  *
  * `windowAnimationScale == 0` is the system's own reduced-motion switch on
  * Android; honoring it here means every scene in the app stops animating
@@ -52,13 +52,18 @@ import kotlin.math.sin
  * one shared value per composition, not per-primitive timers: 20 animated
  * shapes on a screen must not schedule 20 frame loops.
  *
- * The clock ticks at ~12 Hz, not at display refresh. The scenes are slow
- * sine cycles (2-4s periods), so 60 redraws a second buys nothing a viewer
- * can see, and an always-animating illustration on every account screen
- * measured costly enough on the CI simulator to push a walk leg past its
- * timeout. Twelve frames a second keeps the motion smooth and leaves the
- * main thread free for the tap that follows.
+ * It ramps to [artSettleSeconds] and holds there. It used to run forever,
+ * and that was not a style choice with a style cost: a timeline that never
+ * settles re-invalidates the enclosing scroll content continuously, and on
+ * the CI simulator that made the security hub's 2FA switch stop taking the
+ * walk's tap ('missing: 2FA enable (gate leg)' on every artwork commit,
+ * gone the moment the timeline was paused — proven, not guessed). The
+ * reference SVGs animate an entrance (lineIn, draw, dotpop) and then hold;
+ * so does this. Motion that ends is the correct shape for artwork sitting
+ * above interactive controls.
  */
+const val artSettleSeconds = 3.2f
+
 @Composable
 fun rememberArtClock(): State<Float> {
     val context = LocalContext.current
@@ -74,7 +79,9 @@ fun rememberArtClock(): State<Float> {
             val start = System.nanoTime()
             while (true) {
                 delay(80)
-                t.floatValue = (System.nanoTime() - start) / 1_000_000_000f
+                val elapsed = (System.nanoTime() - start) / 1_000_000_000f
+                t.floatValue = elapsed.coerceAtMost(artSettleSeconds)
+                if (elapsed >= artSettleSeconds) break
             }
         }
     }

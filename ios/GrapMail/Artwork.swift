@@ -12,6 +12,11 @@ import SwiftUI
 /// coordinates are fractions of the canvas, so one `Art("welcome")` is
 /// correct at 150pt and 460pt and sharp on every display density.
 enum Art {
+    /// How long the entrance animation runs before the scene holds. Matches
+    /// Android's `artSettleSeconds`; the reference SVG cycles are 2-4s, so
+    /// this covers a full arrival of every element.
+    static let settleSeconds: Double = 3.2
+
     /// A scene at a fixed width, 2:1 like the artwork it replaces.
     /// Unknown names fall back to the welcome scene, the same default
     /// `illRes` had.
@@ -44,21 +49,30 @@ enum Art {
 private struct ArtScene: View {
     let name: String
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var settled = false
 
-    // DIAGNOSTIC (W1): `paused: true` stops the timeline ticking while the
-    // view keeps its exact shape, to separate two explanations for the walk
-    // dying at '2FA enable (gate leg)' on every commit that renders artwork:
-    // the animation invalidating the hub's content under the walk's tap,
-    // versus the Canvas being present at all. Passes → motion is the cause
-    // and returns scoped. Fails → the drawing is.
+    // The entrance runs, then the timeline pauses for good. An endless
+    // timeline re-invalidated the enclosing scroll content and, on the CI
+    // simulator, stopped the security hub's 2FA switch taking the walk's
+    // tap — 'missing: 2FA enable (gate leg)' on every artwork commit,
+    // gone the instant the timeline was paused. Pausing after the entrance
+    // keeps the motion the reference SVGs actually have (lineIn, draw,
+    // dotpop: they arrive, then hold) and gives back the steady-state
+    // invalidation for free.
     var body: some View {
-        let interval: Double = reduceMotion ? 3600.0 : 1.0 / 12.0
-        TimelineView(.animation(minimumInterval: interval, paused: true)) { timeline in
+        TimelineView(.animation(minimumInterval: 1.0 / 12.0, paused: settled || reduceMotion)) { timeline in
             Canvas { ctx, size in
-                let t: Double = reduceMotion ? 0.0
+                let raw = reduceMotion ? 0.0
                     : timeline.date.timeIntervalSinceReferenceDate
                         .truncatingRemainder(dividingBy: 1000)
+                let t: Double = min(raw, Art.settleSeconds)
                 ArtDraw.scene(name, ctx, size, t, pal: ArtPalette.current)
+            }
+        }
+        .onAppear {
+            guard !reduceMotion else { settled = true; return }
+            DispatchQueue.main.asyncAfter(deadline: .now() + Art.settleSeconds + 0.2) {
+                settled = true
             }
         }
     }
