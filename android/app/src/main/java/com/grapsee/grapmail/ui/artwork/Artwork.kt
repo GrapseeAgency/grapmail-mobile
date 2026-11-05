@@ -7,7 +7,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.CornerRadius
+import androidx.compose.ui.geometry.CornerRadius
 import com.grapsee.grapmail.ui.theme.LocalPalette
 import com.grapsee.grapmail.ui.theme.Palette
 

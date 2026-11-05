@@ -55,7 +55,7 @@ private struct ArtScene: View {
                 let t: Double = reduceMotion ? 0.0
                     : timeline.date.timeIntervalSinceReferenceDate
                         .truncatingRemainder(dividingBy: 1000)
-                ArtDraw.scene(name, ctx, size, t, palette: ArtPalette.current)
+                ArtDraw.scene(name, ctx, size, t, pal: ArtPalette.current)
             }
         }
     }
