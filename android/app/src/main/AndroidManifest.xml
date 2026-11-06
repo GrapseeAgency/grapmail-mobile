@@ -22,5 +22,24 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+        <!--
+            The authority an attachment is handed out under when the person
+            chooses "Open". Without this the app could only ever say "saved to
+            a path", because ACTION_VIEW on a file:// URI is rejected outright
+            on modern Android (FileUriExposedException) — which is exactly why
+            the affordance was left unfinished. Granting read permission per
+            URI, and exposing only the attachment cache directory (see
+            res/xml/file_paths.xml), keeps the handoff to one file the person
+            just chose.
+        -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
     </application>
 </manifest>

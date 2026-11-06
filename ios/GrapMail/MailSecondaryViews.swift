@@ -445,6 +445,10 @@ struct AttachmentPreviewView: View {
     @State private var entry: MailboxModel.FileEntry?
     @State private var outcome: String?
     @State private var saving = false
+    @State private var opening = false
+    /// Set once the file is fetched into the cache; presenting on this rather
+    /// than a Bool means QuickLook can never open with nothing to show.
+    @State private var previewURL: IdentifiableURL?
     // The delete is a two-step: the button asks, the panel confirms, and only
     // then does the route see it. `DELETE /attachments/:id` takes the file out
     // of the message for good; the body cache is dropped on success, so the
@@ -491,6 +495,31 @@ struct AttachmentPreviewView: View {
                                 outcome = r
                             }
                         }
+                        .padding(.top, 10)
+                        // The other half of the affordance. Saving to a path
+                        // the person cannot reach from inside the app is only
+                        // useful if they can then open the file — reading it
+                        // is the point of an attachment. QuickLook's own
+                        // toolbar carries the share button, so handing the
+                        // file to another app arrives with the preview rather
+                        // than as a second half-wired path.
+                        Button {
+                            opening = true
+                            vm.prepareAttachment(a) { url, error in
+                                opening = false
+                                if let url { previewURL = IdentifiableURL(url: url) }
+                                else { outcome = error ?? "This attachment could not be opened." }
+                            }
+                        } label: {
+                            Text(opening ? "Opening…" : "Open in another app")
+                                .font(.system(size: 15, weight: .medium))
+                                .foregroundColor(GM.primarySolid)
+                                .padding(.vertical, 14).padding(.horizontal, 18)
+                                .frame(maxWidth: .infinity)
+                                .background(Capsule().stroke(GM.border, lineWidth: 1.5))
+                        }
+                        .disabled(opening || saving)
+                        .accessibilityIdentifier("mail-attachment-open")
                         .padding(.top, 10)
                         if !confirmDelete {
                             Button {
@@ -546,6 +575,13 @@ struct AttachmentPreviewView: View {
         }
         .task {
             entry = await vm.files().first { $0.attachment.id == attachmentId }
+        }
+        // Presented on the URL itself, not a Bool: QuickLook is only ever
+        // opened with a file that actually arrived, and dismissing clears it
+        // so a second tap re-fetches rather than replaying a stale copy.
+        .sheet(item: $previewURL) { item in
+            QuickLookPresenter(url: item.url)
+                .ignoresSafeArea()
         }
     }
 }

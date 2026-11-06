@@ -1198,6 +1198,64 @@ class MailboxViewModel @JvmOverloads constructor(
         }
     }
 
+    /**
+     * Open an attachment in another app.
+     *
+     * This is the half `downloadAttachment` deliberately left undone — it said
+     * "saved to a path" and stopped, because handing a `file://` URI to
+     * ACTION_VIEW is rejected outright on modern Android. With a FileProvider
+     * declared in the manifest the handoff works: the bytes go into the
+     * attachment cache directory the provider exposes, the URI carries a
+     * per-grant read permission, and the MIME type comes from the server's own
+     * field rather than a guessed extension.
+     *
+     * Two honest limits: a file the person never saved is downloaded first
+     * (nothing is invented about its contents), and when no app on the device
+     * claims that type the message says so — "Nothing on this device can open
+     * this" — instead of failing silently or pretending the open happened.
+     */
+    fun openAttachment(a: MailAttachmentDto, then: (String) -> Unit) {
+        viewModelScope.launch {
+            val t = token() ?: run { then("Sign in again to open this."); return@launch }
+            val bytes = runCatching { Api.mailAttachmentBytes(t, a.id) }
+                .getOrElse { e ->
+                    then((e as? ApiException)?.message ?: "This attachment could not be downloaded.")
+                    return@launch
+                }
+            val app = getApplication<android.app.Application>()
+            val outcome = runCatching {
+                val dir = java.io.File(app.cacheDir, "attachments").apply { mkdirs() }
+                val safe = (a.name ?: "attachment").replace(Regex("[^A-Za-z0-9._-]"), "_")
+                val file = java.io.File(dir, safe)
+                file.writeBytes(bytes)
+                val uri = androidx.core.content.FileProvider.getUriForFile(
+                    app, "${app.packageName}.fileprovider", file)
+                // The server's own type wins; a filename extension is a guess
+                // about a file the server described differently.
+                val mime = a.mimeType?.takeIf { it.isNotBlank() } ?: "*/*"
+                val intent = android.content.Intent(android.content.Intent.ACTION_VIEW)
+                    .setDataAndType(uri, mime)
+                    .addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                val chooser = android.content.Intent.createChooser(intent, null)
+                    .addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                // Asked by trying, not by resolveActivity: from API 30 a
+                // visibility query returns null for apps this one cannot see,
+                // which would say "nothing can open this" on a phone that has
+                // a viewer installed. The exception is the honest answer.
+                try {
+                    app.startActivity(chooser)
+                    "Opened."
+                } catch (e: android.content.ActivityNotFoundException) {
+                    "Nothing on this device can open a $mime file. Save it with " +
+                        "Save to this device and open it from Files."
+                }
+            }.getOrElse {
+                "This attachment could not be handed to another app."
+            }
+            then(outcome)
+        }
+    }
+
     // ── people ───────────────────────────────────────────────────────────────
 
     /**

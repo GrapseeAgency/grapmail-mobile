@@ -462,6 +462,7 @@ fun AttachmentPreviewScreen(vm: MailboxViewModel, attachmentId: String, onBack: 
     var entry by remember { mutableStateOf<MailboxViewModel.FileEntry?>(null) }
     var outcome by remember { mutableStateOf<String?>(null) }
     var saving by remember { mutableStateOf(false) }
+    var opening by remember { mutableStateOf(false) }
     // The delete is a two-step: the button asks, the panel confirms, and only
     // then does the route see it. `DELETE /attachments/:id` takes the file out
     // of the message for good -- the body cache is dropped on success, so the
@@ -511,6 +512,18 @@ fun AttachmentPreviewScreen(vm: MailboxViewModel, attachmentId: String, onBack: 
                 saving = true
                 vm.downloadAttachment(a) { r -> saving = false; outcome = r }
             }, enabled = !saving)
+            // The other half of the affordance: saving to a path nobody can
+            // reach from inside the app is only useful if the person can then
+            // open the file. Handing it to a viewer is the point of an
+            // attachment.
+            Spacer(Modifier.height(12.dp))
+            OutlineButton(if (opening) "Opening…" else "Open in another app",
+                onClick = {
+                    opening = true
+                    vm.openAttachment(a) { r -> opening = false; outcome = r }
+                },
+                modifier = Modifier.testTag("mail-attachment-open"),
+            )
             Spacer(Modifier.height(12.dp))
             if (!confirmDelete) {
                 Text("Remove from this message", fontSize = 14.sp,

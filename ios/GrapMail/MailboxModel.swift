@@ -1032,6 +1032,37 @@ final class MailboxModel: ObservableObject {
         }
     }
 
+    /// Fetch an attachment into the app's cache and hand back its URL, so the
+    /// preview screen can open it in QuickLook or share it.
+    ///
+    /// This is the half `downloadAttachment` left undone: it wrote a file and
+    /// reported a sentence, which meant a person could save a PDF and then had
+    /// no way from inside the app to read it. The cache directory is the right
+    /// place for a handoff — QuickLook and the share sheet both read a file
+    /// URL, and nothing here claims to be the person's archive the way the
+    /// Documents save does.
+    ///
+    /// A failure returns nil and the caller says so; an empty preview is not
+    /// the same as a preview of nothing.
+    func prepareAttachment(_ a: MailAttachment, then: @escaping (URL?, String?) -> Void) {
+        guard let token else { then(nil, "Sign in again to open this."); return }
+        Task {
+            do {
+                let bytes = try await ApiClient.mailAttachmentBytes(token: token, id: a.id)
+                let raw = a.name ?? "attachment"
+                let name = String(raw.map { ch in
+                    (ch.isLetter || ch.isNumber || ch == "." || ch == "_" || ch == "-") ? ch : "_"
+                })
+                let dir = FileManager.default.temporaryDirectory
+                let url = dir.appendingPathComponent(name.isEmpty ? "attachment" : name)
+                try bytes.write(to: url)
+                then(url, nil)
+            } catch {
+                then(nil, Self.describe(error))
+            }
+        }
+    }
+
     /// Upload bytes picked by the compose screen. The route answers with the row
     /// it wrote, and the returned id is what a send carries — an attachment that
     /// was never uploaded is a filename the recipient cannot open.

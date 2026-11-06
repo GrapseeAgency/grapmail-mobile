@@ -2558,6 +2558,48 @@ pin("the draft cleanup is its own named call, not the Trash destroyer",
     "suspend fun mailDeleteMessage" in code_only(android("data/Api.kt"))
     and "static func mailDeleteMessage" in code_only(ios("MailAPI.swift")))
 
+# ── 37. an attachment you cannot read is only half an attachment (§37) ───────
+# The preview screen could save a file and print the path it chose. The code
+# said so out loud — "Opening it is deliberately not attempted here" — and
+# called it the sector's one unfinished affordance. A person who saves a PDF
+# to open it in the app that reads PDFs has not finished anything.
+KT_ATTACH = android("logic/MailboxViewModel.kt")
+SW_ATTACH = ios("MailboxModel.swift")
+KT_ATTACH_UI = android("ui/screens/mail/MailSecondaryScreens.kt")
+SW_ATTACH_UI = ios("MailSecondaryViews.swift")
+
+pin("the attachment handoff is wired on both platforms",
+    "fun openAttachment(a: MailAttachmentDto" in code_only(KT_ATTACH)
+    and "func prepareAttachment(_ a: MailAttachment" in code_only(SW_ATTACH)
+    and 'vm.openAttachment(a)' in code_only(KT_ATTACH_UI)
+    and 'vm.prepareAttachment(a)' in code_only(SW_ATTACH_UI)
+    and 'FileProvider.getUriForFile' in code_only(KT_ATTACH)
+    and "QuickLookPresenter" in code_only(SW_ATTACH_UI))
+
+# ACTION_VIEW on a file:// URI is rejected outright on modern Android — a
+# FileUriExposedException, which is precisely why the affordance was left
+# undone. The provider and its declared paths are what make the handoff
+# legal, so both must exist beside the call.
+pin("Android's handoff goes through a declared FileProvider, not a file URI",
+    "androidx.core.content.FileProvider" in (ROOT / "android/app/src/main/AndroidManifest.xml").read_text(encoding="utf-8")
+    and (ROOT / "android/app/src/main/res/xml/file_paths.xml").exists()
+    and "Uri.fromFile" not in code_only(KT_ATTACH))
+
+# The honest failure: no viewer on the device is a real state, and it gets
+# said. A silent no-op after a tap is the opposite-behavior class — the
+# button appears to do nothing, which reads as a broken app.
+pin("a missing viewer is reported rather than swallowed",
+    "ActivityNotFoundException" in code_only(KT_ATTACH)
+    and "Nothing on this device can open" in code_only(KT_ATTACH)
+    and "This attachment could not be opened." in code_only(SW_ATTACH_UI))
+
+# One affordance, one name, on both platforms — the same rule the other
+# interactive screens follow, so a walk or an assistive reader finds the
+# control under the same name wherever the mail is opened.
+pin("the open control answers to the same identifier on both platforms",
+    'testTag("mail-attachment-open")' in code_only(KT_ATTACH_UI)
+    and 'accessibilityIdentifier("mail-attachment-open")' in code_only(SW_ATTACH_UI))
+
 print()
 if failures:
     print(f"mail-honesty: {len(failures)} pin(s) broken")

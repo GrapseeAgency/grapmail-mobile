@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    The FileProvider's shared roots for opening an attachment in another app.
+
+    Only `attachment_cache` is exposed, and only that directory: the app's own
+    external files dir holds every attachment the person has saved, and a
+    provider rooted there would let any app that receives a URI walk the whole
+    mailbox's files by guessing names. A cache subdir created per open is the
+    smallest surface that still lets a viewer read the one file it was handed.
+-->
+<paths>
+    <cache-path
+        name="attachment_cache"
+        path="attachments/" />
+</paths>
