@@ -82,10 +82,12 @@ fun NameStepScreen(vm: SignUpViewModel, onBack: () -> Unit, onSignIn: () -> Unit
     ) {
         com.grapsee.grapmail.ui.artwork.Artwork(
             "step1_name",
-            // The vector scene owns its own proportions now: the aspect
-            // ratio is declared, not inherited from a cropped raster's
-            // intrinsic size.
-            modifier = Modifier.fillMaxWidth(0.92f).aspectRatio(2f),
+            // Bounded, and the bound is load-bearing: at 0.92 of the screen
+            // width the 2:1 scene stood far taller than the PNG it replaced,
+            // and on the smallest walk device that pushed the screen's own
+            // action below the fold. A decorative illustration does not get
+            // to move a control out of reach.
+            modifier = Modifier.width(200.dp).aspectRatio(2f),
         )
         Spacer(Modifier.height(24.dp))
 

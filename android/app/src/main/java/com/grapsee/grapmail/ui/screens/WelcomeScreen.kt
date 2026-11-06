@@ -74,7 +74,9 @@ fun WelcomeScreen(onCreateAccount: () -> Unit, onSignIn: () -> Unit) {
         Spacer(Modifier.height(18.dp))
         com.grapsee.grapmail.ui.artwork.Artwork(
             "welcome",
-            modifier = Modifier.fillMaxWidth(0.86f).aspectRatio(2f),
+            // Bounded: the scene must never grow tall enough to push the
+            // Create Account button off a short screen.
+            modifier = Modifier.width(200.dp).aspectRatio(2f),
         )
 
         Spacer(Modifier.height(48.dp))

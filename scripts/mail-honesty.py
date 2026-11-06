@@ -2476,6 +2476,24 @@ pin("the artwork settles instead of animating forever",
     and "paused: settled || reduceMotion" in code_only(SW_ART)
     and "settled = true" in code_only(SW_ART))
 
+# The artwork's SIZE is a behavior constraint, not a taste question. Left at
+# a fraction of screen width with a 2:1 ratio, the drawn scene stood far
+# taller than the PNG it replaced; on the smallest walk device that pushed
+# "Skip for now" down onto the puzzle slider, so the walk's tap dragged the
+# slider instead ("Almost — try again"), verification never completed, and
+# every frame after it failed. A decorative illustration must never be able
+# to move an action out of reach: the call sites carry a bounded width, and
+# the iOS fill helper caps the height.
+_ART_SITES = [android(p) for p in (
+    "ui/screens/HumanVerifyScreen.kt", "ui/screens/CreatedScreens.kt",
+    "ui/screens/NameStepScreen.kt", "ui/screens/WelcomeScreen.kt")]
+pin("artwork call sites are bounded, never a screen-width fraction",
+    all("fillMaxWidth(0." not in code_only(s) or "Artwork(" not in code_only(s)
+        for s in _ART_SITES)
+    and all("aspectRatio(2f)" in code_only(s) for s in _ART_SITES)
+    and "Modifier.width(180.dp).aspectRatio(2f)" in code_only(_ART_SITES[0])
+    and ".frame(maxHeight: 200)" in code_only(SW_ART))
+
 # The old illRes table named every scene; the dispatch must still answer each
 # one, or a screen silently photographs the fallback while believing it drew
 # its own artwork. The names are checked against the deleted mapper's list.

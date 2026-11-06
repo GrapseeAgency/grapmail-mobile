@@ -87,7 +87,15 @@ fun HumanVerifyScreen(vm: SignUpViewModel, onBack: () -> Unit, onDone: () -> Uni
             Spacer(Modifier.height(6.dp))
             com.grapsee.grapmail.ui.artwork.Artwork(
                 "verify",
-                modifier = Modifier.fillMaxWidth(0.82f).aspectRatio(2f)
+                // Bounded, and the bound is load-bearing. The first version
+                // stretched this to 0.82 of the screen width at 2:1, which on
+                // the smallest walk device made the scene twice as tall as
+                // the PNG it replaced and pushed "Skip for now" below the
+                // fold — the walk's tap then landed on the puzzle slider
+                // instead ("Almost — try again"), verification never ended,
+                // and every screen after it failed. A decorative
+                // illustration does not get to move an action out of reach.
+                modifier = Modifier.width(180.dp).aspectRatio(2f)
                     .semantics { contentDescription = "Human verification" },
             )
 

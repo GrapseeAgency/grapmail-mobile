@@ -29,10 +29,19 @@ enum Art {
     /// A scene that takes whatever width the layout offers and keeps the
     /// 2:1 field — the shape the old `Image(…).resizable()
     /// .aspectRatio(.fit)` call sites had, without the raster.
+    ///
+    /// The height cap is the safety half: at 2:1 an uncapped fill on a wide
+    /// or short screen grows tall enough to push the screen's own action
+    /// below the fold, which is exactly how Android's compact walk broke
+    /// (the skip button moved onto the puzzle slider, verification never
+    /// ended, and every frame after it failed). 200pt is what the current
+    /// device already renders, so this only bites on screens where the
+    /// uncapped version would have been a regression.
     static func fill(_ name: String) -> some View {
         ArtScene(name: name)
             .aspectRatio(2, contentMode: .fit)
             .frame(maxWidth: .infinity)
+            .frame(maxHeight: 200)
             .accessibilityHidden(true)
     }
 

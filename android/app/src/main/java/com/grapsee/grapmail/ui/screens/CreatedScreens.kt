@@ -75,7 +75,9 @@ fun AccountCreatedScreen(
         Spacer(Modifier.height(18.dp))
         com.grapsee.grapmail.ui.artwork.Artwork(
             "created_a",
-            modifier = Modifier.fillMaxWidth(0.74f).aspectRatio(2f),
+            // Bounded so the scene can never push the action below the fold
+            // on a short device — the same regression the verify screen had.
+            modifier = Modifier.width(180.dp).aspectRatio(2f),
         )
 
         Spacer(Modifier.height(10.dp))
@@ -184,7 +186,8 @@ fun AccountCreatedAltScreen(
         Spacer(Modifier.height(16.dp))
         com.grapsee.grapmail.ui.artwork.Artwork(
             "created_b",
-            modifier = Modifier.fillMaxWidth(0.72f).aspectRatio(2f),
+            // Bounded — same reason as created_a.
+            modifier = Modifier.width(180.dp).aspectRatio(2f),
         )
 
         Spacer(Modifier.height(8.dp))
