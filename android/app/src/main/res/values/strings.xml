@@ -1,4 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">GrapMail</string>
+    <string name="shortcut_compose_short">Compose mail</string>
+    <string name="shortcut_compose_long">Write a new GrapMail message</string>
+    <string name="notif_channel_new_mail">New mail</string>
+    <string name="notif_channel_new_mail_desc">
+        Tells you when a background check found messages you have not read yet.
+        GrapMail has no push service, so these come from the app asking the
+        server itself, when the system wakes it.
+    </string>
 </resources>

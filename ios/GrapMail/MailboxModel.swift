@@ -550,6 +550,19 @@ final class MailboxModel: ObservableObject {
             self.state.busy = false
             self.state.selection = []
             self.state.staleError = failure
+            // The feel follows the fact: the mail moved only where the server
+            // accepted it, so a refused filing gets the error tap and not the
+            // success one. A haptic that fires on a tap that changed nothing is
+            // the same lie as a banner that says "Archived" over mail still in
+            // the inbox.
+            if failure == nil {
+                switch action {
+                case .star, .unstar, .read, .unread: GMHaptics.marking()
+                default: GMHaptics.filing()
+                }
+            } else {
+                GMHaptics.failure()
+            }
             // Only the messages the server accepted get an undo: offering one for a
             // message whose snooze failed would unsnooze mail still in the inbox and
             // report it as postponed.
@@ -723,8 +736,14 @@ final class MailboxModel: ObservableObject {
                     self.state.undoInverse = inv
                     self.state.undoNote = action.pastLine(1)
                 }
+                // Same rule as the bulk path: the tap lands with the write.
+                switch action {
+                case .star, .unstar, .read, .unread: GMHaptics.marking()
+                default: GMHaptics.filing()
+                }
                 self.reproject()
             } catch {
+                GMHaptics.failure()
                 self.state.staleError = Self.describe(error)
             }
         }
@@ -1183,8 +1202,10 @@ final class MailboxModel: ObservableObject {
                     self.thread.messages[idx].isRead = false
                 }
                 self.reproject()
+                GMHaptics.marking()
                 onOutcome(nil)
             } catch {
+                GMHaptics.failure()
                 onOutcome(Self.describe(error))
             }
         }
@@ -1419,7 +1440,14 @@ final class MailboxModel: ObservableObject {
                     }
                 }
                 self.load(replace: true)
+                // The success tap is for the server's answer, not for the
+                // button: a send the relay has only QUEUED gets the same tap a
+                // delivered one would, and the receipt already says those are
+                // different claims in words. A refused send gets the error tap.
+                if sent || r.status == "delivered" { GMHaptics.success() }
+                else { GMHaptics.failure() }
             } catch {
+                GMHaptics.failure()
                 self.compose.sending = false
                 self.compose.error = Self.describe(error)
             }

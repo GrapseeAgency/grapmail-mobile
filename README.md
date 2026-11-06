@@ -453,6 +453,67 @@ each was the kind that reads as a finished app while the person does the work:
   type, a web view in the print path, a filling button, a renamed frame — and
   requires the gate to refuse all seventeen.
 
+### The platform batch — the app is installed on a device
+
+The audit's third complaint was "native app has certain rules", and the evidence
+was that every one of those rules was missing. Each item below is pinned as
+**§39** and mutation-proved by `scripts/mutate-39.py` (19 seeded regressions,
+all refused), because none of it is visible to a screenshot gate: a blank
+starting window photographs the same as a branded one, and a notification that
+can never be posted runs its code perfectly.
+
+- **The iOS app icon had no file.** The catalog entry existed —
+  `idiom/platform/size`, no `filename` — so the app installed with the system
+  placeholder and nothing in CI could see it. The mark is the same two paths the
+  Android adaptive foreground draws, rasterized once to 1024 (icons are the
+  documented exception to the vector rule: iOS will not take a vector), on the
+  brand blue, opaque as the store requires.
+- **Branded launch, both platforms.** Android had no splash at all: the window
+  between the tap and the first composed frame was the system's blank default.
+  Now `core-splashscreen` with a theme that declares the vector mark, installed
+  *before* `super.onCreate` — the library's own rule, and the pin measures it on
+  the `onCreate` body rather than with a `.index()` that would crash the gate
+  instead of failing the pin. iOS moves off `UILaunchScreen_Generation` (which
+  synthesizes an empty screen) to a real `UILaunchScreen` dictionary with the
+  brand image and background.
+- **Haptics belong to the write, not to the tap.** Filing gets a medium impact,
+  starring and the read flag a light one, a send the server accepted a success,
+  and anything refused an error. Android's model *emits* the event and the root
+  plays it, because a `performHapticFeedback` in a button's `onClick` feels
+  identical whether the write worked — the same lie as a banner that says
+  "Archived" over mail still in the inbox.
+- **New-mail notifications are polling, and say so.** There is no push service
+  in this backend, so the honest equivalent is `BGAppRefreshTask` / a
+  `WorkManager` periodic read of `GET /stats` — the same call the badge already
+  uses. The line gives both numbers ("3 new messages", "12 unread in the
+  inbox") and never claims delivery: the relay's queue is not the recipient's
+  inbox. It stays silent when nothing can be said — signed out, the read
+  refused, a first read with no previous number to compare against, a count that
+  did not rise. iOS resubmits its next window before doing the work, or the poll
+  stops forever.
+- **The permission is asked for, checked, and never assumed.** Both platforms
+  put the ask on a Settings row that reports the system's real answer rather
+  than a remembered one, and the poster re-checks the grant before posting.
+  Without that row the Android worker could run its read correctly forever and
+  never be allowed to say so.
+- **Offline is a device fact, not an inference from a failed request.**
+  `registerDefaultNetworkCallback` / `NWPathMonitor`, read at launch and on
+  every change, unregistered when the model dies. `null` draws nothing:
+  "offline" before the first reading lands is a claim about a network nobody
+  checked. The chip says "No network right now — showing the last loaded mail",
+  which is what the cached list actually is.
+- **"Compose mail" from the home screen**, both platforms, and it never lands on
+  a composer that cannot send: signed out it means sign-in. The request is
+  consumed on the way out, so it cannot replay on the next launch.
+- **Predictive back** opted in on Android.
+- **What is deliberately NOT shipped.** `/.well-known/assetlinks.json` and
+  `apple-app-site-association` both answer **404** today, so there is no
+  `autoVerify` intent filter and no `associated-domains` entitlement — a deep
+  link whose verification file is missing does not degrade, it silently stops
+  opening the app, and the app looks broken where nobody can debug it. And no
+  push: no `remote-notification` background mode, no FCM dependency. Both
+  absences are pinned, so a half-verified surface cannot be added by accident.
+
 ### Which backend, and the two halves of it
 
 | Surface | Where it actually lives | State |

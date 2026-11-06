@@ -11,6 +11,10 @@ import Combine
 struct RootView: View {
     @StateObject private var model = SignUpModel()
     @StateObject private var recovery = RecoveryModel()
+    /// The home-screen shortcut's parked request. Observed, not owned: it is
+    /// filled by the app delegate before any view exists, so the singleton is
+    /// its home and this view is one of its readers.
+    @ObservedObject private var shortcuts = ShortcutRouter.shared
 
     enum Route: Hashable {
         case welcome, signIn
@@ -169,6 +173,28 @@ struct RootView: View {
                 // expiry route clears it exactly like a deliberate sign-out.
                 e2e.clearForSignOut()
                 path = [.signIn]
+            }
+            // A long-press on the icon that says "Compose mail" has to land in
+            // the composer. The delegate parks the request until a stack exists
+            // that can act on it, and it is consumed here once -- a pending
+            // request replayed on the next launch would open a composer nobody
+            // asked for. Signed out, the honest route to writing a mail is
+            // sign-in, not a composer whose every send would fail.
+            .onChange(of: shortcuts.pendingCompose) { pending in
+                guard pending else { return }
+                shortcuts.consume()
+                guard SessionStore.hasValidSession else {
+                    path = [.signIn]
+                    return
+                }
+                if path.last != .home { path = [.home] }
+                path.append(.mailCompose(reply: "", mode: "reply"))
+            }
+            // The background poll is scheduled whenever this app goes away:
+            // that is the moment the next read has to be asked for, and the
+            // system owns the interval from here.
+            .onReceive(NotificationCenter.default.publisher(for: UIApplication.didEnterBackgroundNotification)) { _ in
+                MailPoll.scheduleNext()
             }
         }
     }

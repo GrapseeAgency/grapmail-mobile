@@ -17,6 +17,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.testTagsAsResourceId
 import androidx.compose.ui.unit.dp
 import androidx.activity.ComponentActivity
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
@@ -107,9 +108,30 @@ import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalComposeUiApi::class)
 class MainActivity : ComponentActivity() {
+    /**
+     * The home-screen "Compose mail" request, held here because the intent that
+     * carries it arrives before any composable exists to act on it.
+     *
+     * It is a request, not a route: the navigation graph may not have a start
+     * destination yet when it lands, and a shortcut that cold-starts the app
+     * signed-out must not open a composer whose every send would fail. The
+     * graph consumes it once the start destination is real, and consumes means
+     * clearing it — a pending request left set would replay on the next
+     * recomposition and open a composer nobody asked for.
+     */
+    private val composeRequest = androidx.compose.runtime.mutableStateOf(false)
+
     override fun onCreate(savedInstanceState: Bundle?) {
+        // The system splash, before the window content exists at all. The
+        // library's own rule: installing after `super.onCreate` has the system
+        // draw its blank starting window instead, which is the thing the splash
+        // is here to replace. It is an extension on Activity imported from the
+        // companion — `SplashScreen.installSplashScreen(this)` is not a call
+        // this library has.
+        installSplashScreen()
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        takeComposeRequest(intent)
         setContent {
             GrapMailTheme {
                 // Edge-to-edge with the design's background behind the system
@@ -151,10 +173,34 @@ class MainActivity : ComponentActivity() {
                             .fillMaxSize()
                             .windowInsetsPadding(WindowInsets.systemBars.union(WindowInsets.displayCutout))
                             .widthIn(max = 520.dp)
-                    ) { GrapMailNav() }
+                    ) {
+                        GrapMailNav(
+                            composeRequest = composeRequest.value,
+                            onComposeRequestConsumed = { composeRequest.value = false },
+                        )
+                    }
                 }
             }
         }
+    }
+
+    override fun onNewIntent(intent: android.content.Intent) {
+        super.onNewIntent(intent)
+        // The shortcut can arrive into a live activity. Set it as the current
+        // intent so a configuration change replays the same request the person
+        // actually made rather than the launch that happened first.
+        setIntent(intent)
+        takeComposeRequest(intent)
+    }
+
+    private fun takeComposeRequest(intent: android.content.Intent?) {
+        if (intent?.action == COMPOSE_ACTION) composeRequest.value = true
+    }
+
+    companion object {
+        /** The action `res/xml/shortcuts.xml` fires. Declared once, matched in
+         *  the manifest's intent filter and here. */
+        const val COMPOSE_ACTION = "com.grapsee.grapmail.COMPOSE"
     }
 }
 
@@ -288,7 +334,10 @@ object Routes {
 }
 
 @Composable
-fun GrapMailNav() {
+fun GrapMailNav(
+    composeRequest: Boolean = false,
+    onComposeRequestConsumed: () -> Unit = {},
+) {
     val nav = rememberNavController()
     val vm: SignUpViewModel = viewModel()
     val flow: AccountFlowViewModel = viewModel()
@@ -332,6 +381,47 @@ fun GrapMailNav() {
         startDest = if (valid) Routes.HOME else Routes.WELCOME
     }
     val dest = startDest ?: return
+
+    // The home-screen shortcut, once the graph actually has a start
+    // destination. Signed in, it means the composer; signed out, it means
+    // sign-in, because a blank composer that cannot send is a screen that
+    // pretends. Consumed on the way out either way.
+    LaunchedEffect(composeRequest, dest) {
+        if (!composeRequest) return@LaunchedEffect
+        onComposeRequestConsumed()
+        if (dest == Routes.HOME) {
+            nav.navigate(Routes.mailCompose("", "reply"))
+        } else {
+            nav.navigate(Routes.SIGN_IN) { popUpTo(Routes.WELCOME) }
+        }
+    }
+
+    // The device's feel of an action landing. The model publishes the result
+    // (see `GMHaptics`) and it is played here, on the view Compose actually
+    // owns, because `performHapticFeedback` needs one. The constants degrade
+    // honestly: CONFIRM and REJECT are Android 11+, and below that the nearest
+    // long-standing tap is used rather than nothing — the event happened, and
+    // a device that cannot play it should stay quiet rather than play a lie.
+    val hapticView = androidx.compose.ui.platform.LocalView.current
+    LaunchedEffect(Unit) {
+        com.grapsee.grapmail.logic.GMHaptics.events.collect { event ->
+            val constant = when (event) {
+                com.grapsee.grapmail.logic.GMHaptics.Event.Filing ->
+                    android.view.HapticFeedbackConstants.KEYBOARD_TAP
+                com.grapsee.grapmail.logic.GMHaptics.Event.Marking ->
+                    android.view.HapticFeedbackConstants.VIRTUAL_KEY
+                com.grapsee.grapmail.logic.GMHaptics.Event.Success ->
+                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R)
+                        android.view.HapticFeedbackConstants.CONFIRM
+                    else android.view.HapticFeedbackConstants.KEYBOARD_TAP
+                com.grapsee.grapmail.logic.GMHaptics.Event.Failure ->
+                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R)
+                        android.view.HapticFeedbackConstants.REJECT
+                    else android.view.HapticFeedbackConstants.LONG_PRESS
+            }
+            hapticView.performHapticFeedback(constant)
+        }
+    }
 
     // A dead token is discovered by the server, never by us: the stored copy
     // still looks valid, so hasValidSession keeps saying yes while every screen

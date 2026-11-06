@@ -1,4 +1,5 @@
 import SwiftUI
+import UserNotifications
 
 /// The shared shell for the eight screens that hang off the mailbox: labels,
 /// label create, contacts, contact detail, files, attachment preview, settings,
@@ -608,6 +609,50 @@ struct MailSettingsView: View {
     let onHelp: () -> Void
     let onSignOut: () -> Void
 
+    /// The system's own answer about alerts for this app, read when the screen
+    /// appears — never assumed, never remembered from a previous visit.
+    @State private var notificationStatus: UNAuthorizationStatus? = nil
+
+    /// The row's words, straight from that reading. `nil` means the read has
+    /// not landed, and "Checking…" is the only honest thing to print for it.
+    private var notificationValue: String {
+        switch notificationStatus {
+        case nil: return "Checking this device's setting"
+        case .authorized, .provisional:
+            return "On — GrapMail checks for new mail when iOS wakes it"
+        case .denied:
+            return "Off — turn it on in Settings › GrapMail › Notifications"
+        case .notDetermined:
+            return "Not asked yet — tap to allow new-mail alerts"
+        default:
+            return "Not allowed to alert from this device"
+        }
+    }
+
+    private func readNotificationStatus() {
+        UNUserNotificationCenter.current().getNotificationSettings { settings in
+            let status = settings.authorizationStatus
+            Task { @MainActor in notificationStatus = status }
+        }
+    }
+
+    private func askNotifications() {
+        switch notificationStatus {
+        case .notDetermined:
+            UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .badge, .sound]) { _, _ in
+                readNotificationStatus()
+            }
+        case .denied, .authorized, .provisional, .none:
+            // The system will not show a second prompt after an answer, so the
+            // row opens the app's Settings pane instead of pretending.
+            if let url = URL(string: UIApplication.openSettingsURLString) {
+                UIApplication.shared.open(url)
+            }
+        default:
+            break
+        }
+    }
+
     var body: some View {
         MailScaffold(title: "Settings", onBack: onBack) {
             ScrollView {
@@ -675,6 +720,21 @@ struct MailSettingsView: View {
                                value: "The list beside the mailbox", onClick: onTasks)
 
                     SectionLabel(text: "This account")
+                    // New-mail alerts are local polling, not push: there is no
+                    // push service in this backend, so the honest description of
+                    // this row is what the app actually does — iOS wakes it, it
+                    // asks `GET /stats`, and it says what arrived since the last
+                    // read. The value line reports the system's real
+                    // authorization state, read when this screen appears, and a
+                    // tap asks once. Denied is said as denied with the way out,
+                    // because a row that reads "On" after a refusal is a control
+                    // wired to nothing — and the ask is here rather than at
+                    // launch, so nobody is interrupted by an app they have not
+                    // used yet.
+                    SettingRow(icon: "bell", title: "New mail notifications",
+                               value: notificationValue,
+                               onClick: { askNotifications() })
+                        .accessibilityIdentifier("mail-notifications-row")
                     SettingRow(icon: "person", title: "Personal info",
                                value: "Name, birthday, photo", onClick: onProfile)
                     SettingRow(icon: "checkmark.shield", title: "Data & privacy",
@@ -697,7 +757,13 @@ struct MailSettingsView: View {
                 .padding(.bottom, 30)
             }
         }
-        .task { vm.loadAliases() }
+        .task {
+            vm.loadAliases()
+            // The notification row reports the system's answer, so it reads it
+            // when the screen appears rather than carrying a remembered value
+            // the person may have changed in Settings since.
+            readNotificationStatus()
+        }
     }
 }
 

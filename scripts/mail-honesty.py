@@ -2835,6 +2835,246 @@ pin("the thread frames seed the rows the stepper counts",
     "seedRows(vm)" in code_only(KT_SNAP)
     and "s.rows = MailSnapshotView.rows" in code_only(SW_SNAP))
 
+# ── 39. the app is installed on a device, not rendered in a simulator (§39) ──
+# The audit's third complaint was "native app has certain rules", and the
+# evidence was that every one of those rules was missing: no icon file at all in
+# the iOS catalog, no splash, no haptics on the actions that matter, no
+# shortcut, no background read, and one reference to offline in the whole
+# repository. Each item below is pinned because the failure mode is invisible to
+# a screenshot gate — a blank starting window photographs the same as a branded
+# one, and a notification that can never be posted runs its code perfectly.
+YML = (ROOT / "ios/project.yml").read_text(encoding="utf-8")
+KT_MANIFEST = (ROOT / "android/app/src/main/AndroidManifest.xml").read_text(encoding="utf-8")
+KT_GRADLE = (ROOT / "android/app/build.gradle.kts").read_text(encoding="utf-8")
+KT_APP = android("GrapMailApp.kt")
+KT_POLL = android("logic/MailPollWorker.kt")
+KT_NOTIF = android("logic/Notifications.kt")
+KT_HAPTIC = android("logic/GMHaptics.kt")
+KT_BOX_UI = android("ui/screens/mail/MailboxScreen.kt")
+KT_SEC_UI = android("ui/screens/mail/MailSecondaryScreens.kt")
+SW_INT = ios("AppIntegration.swift")
+SW_APP = ios("GrapMailApp.swift")
+SW_ROOT = ios("RootView.swift")
+SW_BOX = ios("MailboxView.swift")
+SW_SEC = ios("MailSecondaryViews.swift")
+SW_MODEL = ios("MailboxModel.swift")
+
+# ── the icon and the launch window ──────────────────────────────────────────
+def splash_before_super(kotlin: str) -> bool:
+    """True when `installSplashScreen()` is called ahead of `super.onCreate`.
+
+    Written as a function rather than an inline `.index()` comparison because a
+    missing call must FAIL the pin, not raise: `.index()` on an absent
+    substring throws a ValueError, the gate dies before printing anything, and
+    the section goes quiet while still looking like a broken script.
+    """
+    body = re.search(r"override fun onCreate\(savedInstanceState: Bundle\?\) \{(.*?)\n    \}",
+                    kotlin, re.S)
+    if body is None:
+        return False
+    text = body.group(1)
+    splash = text.find("installSplashScreen()")
+    super_call = text.find("super.onCreate(savedInstanceState)")
+    return splash != -1 and super_call != -1 and splash < super_call
+
+
+# The catalog entry existed with NO filename: the app installed with the generic
+# placeholder and no CI step could see it, because nothing in a screenshot walk
+# photographs the home screen. An icon set that names a file is the only proof
+# the icon is real.
+ICON_SET = ROOT / "ios/GrapMail/Assets.xcassets/AppIcon.appiconset"
+icon_json = (ICON_SET / "Contents.json").read_text(encoding="utf-8")
+pin("the iOS app icon points at a file that exists",
+    '"filename"' in icon_json
+    and (ICON_SET / "AppIcon-1024.png").exists()
+    and (ICON_SET / "AppIcon-1024.png").stat().st_size > 4096)
+
+pin("the iOS launch screen is branded, not the system default",
+    "UILaunchScreen:" in YML and "UIImageName: LaunchBrand" in YML
+    and "UIColorName: LaunchBackground" in YML
+    and (ROOT / "ios/GrapMail/Assets.xcassets/LaunchBrand.imageset/LaunchBrand.png").exists()
+    and (ROOT / "ios/GrapMail/Assets.xcassets/LaunchBackground.colorset/Contents.json").exists()
+    and "INFOPLIST_KEY_UILaunchScreen_Generation" not in YML)
+
+pin("Android's splash theme is installed before the window content exists",
+    'androidx.core:core-splashscreen' in KT_GRADLE
+    and "Theme.GrapMail.Splash" in (ROOT / "android/app/src/main/res/values/themes.xml")
+        .read_text(encoding="utf-8")
+    and "@drawable/splash_logo" in (ROOT / "android/app/src/main/res/values/themes.xml")
+        .read_text(encoding="utf-8")
+    and "androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen" in code_only(KT_MAIN)
+    # The order is the whole rule: installed after `super.onCreate`, the system
+    # has already drawn its own starting window and the splash never appears.
+    # Measured on the onCreate body, and written so a MISSING call fails the pin
+    # rather than crashing the gate — a Python ValueError here would abort the
+    # run before any other pin reported, which is how a section goes quiet.
+    and splash_before_super(code_only(KT_MAIN))
+    # The theme the manifest points at is what the system draws the splash
+    # from; installing the library under a theme that does not declare it shows
+    # the blank window and nothing says so.
+    and 'android:theme="@style/Theme.GrapMail.Splash"' in KT_MANIFEST)
+
+# One mark, three surfaces: the launcher, the splash and the iOS launch screen
+# are the same two paths, so the brand does not change shape between them.
+pin("the launcher, splash and launch screen draw one mark, in vector",
+    (ROOT / "android/app/src/main/res/drawable/splash_logo.xml").exists()
+    and "<vector" in (ROOT / "android/app/src/main/res/drawable/splash_logo.xml")
+        .read_text(encoding="utf-8")
+    and "M30.8,42.4 L54,58 L77.2,42.4" in
+        (ROOT / "android/app/src/main/res/drawable/ic_launcher_foreground.xml")
+            .read_text(encoding="utf-8"))
+
+# ── haptics that belong to the result ───────────────────────────────────────
+pin("filing, starring and sending all have a feel, on both platforms",
+    "GMHaptics.filing()" in code_only(SW_MODEL)
+    and "GMHaptics.marking()" in code_only(SW_MODEL)
+    and "GMHaptics.success()" in code_only(SW_MODEL)
+    and "GMHaptics.failure()" in code_only(SW_MODEL)
+    and "GMHaptics.filing()" in code_only(KT_VM)
+    and "GMHaptics.marking()" in code_only(KT_VM)
+    and "GMHaptics.success()" in code_only(KT_VM)
+    and "GMHaptics.failure()" in code_only(KT_VM))
+
+# The rule, not just the call: Android's model emits and the view plays, so a
+# haptic cannot fire on a tap the server refused. A `performHapticFeedback` in a
+# button's own onClick is decoration — it feels identical whether the write
+# worked or not, which is the one thing a haptic must never be.
+pin("the feel is attached to the write, never to the tap",
+    "object GMHaptics" in code_only(KT_HAPTIC)
+    and "MutableSharedFlow" in code_only(KT_HAPTIC)
+    and "GMHaptics.events.collect" in code_only(KT_MAIN)
+    and "performHapticFeedback" in code_only(KT_MAIN)
+    and "performHapticFeedback" not in code_only(KT_BOX_UI)
+    and "GMHaptics" not in code_only(KT_BOX_UI))
+
+# ── the background read ─────────────────────────────────────────────────────
+pin("the new-mail read is registered on both platforms",
+    "BGTaskScheduler.shared.register" in code_only(SW_INT)
+    # Registered and RE-ASKED FOR: a refresh handler that completes without
+    # submitting the next request leaves the app never polling again, and the
+    # person sees silence under a row that says "On".
+    and "BGTaskScheduler.shared.submit" in code_only(SW_INT)
+    and "MailPoll.scheduleNext()" in code_only(SW_INT)
+    and "UIBackgroundModes" in YML and "- fetch" in YML
+    and "BGAppRefreshTaskRequest" in code_only(SW_INT)
+    and "androidx.work:work-runtime-ktx" in KT_GRADLE
+    and "PeriodicWorkRequestBuilder<MailPollWorker>" in code_only(KT_APP)
+    and "enqueueUniquePeriodicWork" in code_only(KT_APP)
+    and "ExistingPeriodicWorkPolicy.KEEP" in code_only(KT_APP))
+
+# Both read the same endpoint the mailbox badge already uses. Nothing here
+# invents a source of truth: `GET /stats` is the answer, and a count that came
+# from anywhere else would be a second, contradictory tally.
+pin("the poll asks the server's own unread count, nothing else",
+    "ApiClient.mailStats(token)" in code_only(SW_INT)
+    and "Api.mailStats(token)" in code_only(KT_POLL)
+    and "inbox?.unread" in code_only(SW_INT)
+    and "stats.inbox?.unread" in code_only(KT_POLL))
+
+# The silence rules. A first read has no previous number, so no difference can
+# be named; a refused read saw nothing; and a count that did not rise saw no
+# arrivals. Announcing on any of those would tell the person the mailbox grew
+# when all that happened is that the app looked at it.
+pin("a poll that cannot name a difference says nothing",
+    "guard didSee, count > previous else { return false }" in code_only(SW_INT)
+    and "if (!hadPrevious || unread <= previous) return Result.success()" in code_only(KT_POLL))
+
+# Both say what the notification is evidence of, in the same two numbers, and
+# neither claims delivery — the relay's queue is not the recipient's inbox.
+for side, src in (("Android", KT_NOTIF), ("iOS", SW_INT)):
+    pin(f"{side} announces arrivals as a comparison, never as delivery",
+        "unread in the inbox" in code_only(src)
+        and "new message" in code_only(src)
+        and "delivered" not in code_only(src).lower())
+
+# The permission is the person's, asked for on a tap in Settings and checked
+# again before posting. An app that posts into a denied channel has a feature
+# that exists only in its source file.
+pin("the notification permission is asked, checked, and never assumed",
+    "requestAuthorization" in code_only(SW_SEC)
+    and "UNAuthorizationStatus" in code_only(SW_SEC)
+    and "RequestPermission()" in code_only(KT_SEC_UI)
+    and "POST_NOTIFICATIONS" in KT_MANIFEST
+    and "if (!allowed(context)) return false" in code_only(KT_NOTIF)
+    and "notificationSettings()" in code_only(SW_INT))
+
+# ── offline ─────────────────────────────────────────────────────────────────
+pin("both devices watch the network rather than infer it from a failure",
+    "registerDefaultNetworkCallback" in code_only(KT_VM)
+    and "NWPathMonitor" in code_only(SW_INT)
+    and "state.online == false" in code_only(KT_BOX_UI)
+    and "network.online == false" in code_only(SW_BOX))
+
+# `null` is not `false`. Before the first reading lands there is no answer to
+# give, and a banner that says "offline" about a network nobody checked is the
+# same class of claim as a badge that reads 0 because the server was silent.
+pin("no offline claim is made before the device has answered",
+    "val online: Boolean? = null" in code_only(KT_VM)
+    and "@Published private(set) var online: Bool?" in code_only(SW_INT)
+    and "online: Bool? = nil" not in code_only(SW_INT))
+
+pin("the connectivity callback does not outlive the screen that registered it",
+    "unregisterNetworkCallback" in code_only(KT_VM)
+    and "monitor.cancel()" in code_only(SW_INT))
+
+# ── the home-screen shortcut ────────────────────────────────────────────────
+pin("Compose mail is reachable from the home screen, both platforms",
+    "UIApplicationShortcutItems" in YML
+    and "com.grapsee.grapmail.compose" in YML
+    and "performActionFor shortcutItem" in code_only(SW_INT)
+    and "ShortcutRouter" in code_only(SW_ROOT)
+    and (ROOT / "android/app/src/main/res/xml/shortcuts.xml").exists()
+    and 'android:name="android.app.shortcuts"' in KT_MANIFEST
+    and "COMPOSE_ACTION" in code_only(KT_MAIN))
+
+# A shortcut pressed while signed out goes to sign-in on both platforms. Landing
+# on a composer that cannot send is a screen that pretends to work.
+#
+# Scoped to the shortcut's own effect, not counted across the file: MainActivity
+# navigates to sign-in from half a dozen places, so a global "contains SIGN_IN"
+# check stayed green when the mutation replaced exactly the one branch that
+# decides what a shortcut means.
+kt_shortcut_block = re.search(
+    r"LaunchedEffect\(composeRequest, dest\) \{(.*?)\n    \}", code_only(KT_MAIN), re.S)
+pin("the shortcut never lands on a composer that cannot send",
+    kt_shortcut_block is not None
+    and "Routes.SIGN_IN" in kt_shortcut_block.group(1)
+    and "dest == Routes.HOME" in kt_shortcut_block.group(1)
+    and "guard SessionStore.hasValidSession else {" in code_only(SW_ROOT)
+    and ".signIn]" in code_only(SW_ROOT))
+
+# Consumed, not remembered. A pending request that survives its own navigation
+# replays on the next recomposition or launch and opens a composer nobody asked
+# for -- the same class of bug as a replayed session-expiry signal.
+pin("a shortcut request is answered exactly once",
+    "onComposeRequestConsumed()" in (kt_shortcut_block.group(1) if kt_shortcut_block else "")
+    and "shortcuts.consume()" in code_only(SW_ROOT)
+    and "func consume()" in code_only(SW_INT))
+
+# ── predictive back ─────────────────────────────────────────────────────────
+pin("Android is opted into predictive back",
+    'android:enableOnBackInvokedCallback="true"' in KT_MANIFEST)
+
+# ── what is NOT shipped, pinned so it cannot sneak in half-done ─────────────
+# `https://grapsee.com/.well-known/assetlinks.json` and
+# `apple-app-site-association` both answer 404 today. An App Link or a Universal
+# Link whose verification file is missing does not degrade — it silently stops
+# opening the app from web links, and the app looks broken in the one place a
+# person cannot debug it. The rule is endpoint-or-it-doesn't-exist, applied to
+# the platform's own verification: no autoVerify filter, no associated-domains
+# entitlement, until those two URLs serve real files. The same reasoning keeps
+# push out: there is no push service in this backend, so `remote-notification`
+# and any FCM/APNs dependency would be a promise nothing can answer.
+pin("no half-verified deep-link surface is shipped while the backend 404s",
+    "autoVerify" not in KT_MANIFEST
+    and "associated-domains" not in YML
+    and "applinks:" not in YML)
+
+pin("no push is claimed where there is no push service",
+    "remote-notification" not in YML
+    and "firebase" not in KT_GRADLE.lower()
+    and "FCM" not in code_only(KT_POLL) and "APNs" not in code_only(SW_INT))
+
 print()
 if failures:
     print(f"mail-honesty: {len(failures)} pin(s) broken")

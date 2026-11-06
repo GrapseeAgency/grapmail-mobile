@@ -105,3 +105,35 @@ route when it lands.
   contacts outside mail addresses, diagnostics beyond what HTTP logs hold.
 - **Required-reason APIs:** UserDefaults CA92.1, file-picker security scope
   C617.1 — exactly the two the binary uses, per `PrivacyInfo.xcprivacy`.
+
+## New-mail notifications: polling, and what it is evidence of
+
+There is **no push service in this backend**. No FCM project, no APNs key or
+token, no device-token registration route — nothing that could let a server
+wake this app. So a new-mail alert is not a delivery signal; it is a report of a
+read the device made itself.
+
+| Step | Where | What it does |
+| --- | --- | --- |
+| Schedule | iOS `MailPoll.scheduleNext()` (`BGAppRefreshTaskRequest`), Android `GrapMailApp` (`WorkManager` unique periodic, 30 min floor, connected) | asks the system for a future window; the system owns when it actually runs |
+| Read | `GET /grapmail/stats` → `inbox.unread` | the same call the mailbox badge already uses — no second source of truth |
+| Compare | stored previous count (`UserDefaults` / `SharedPreferences`) | the notification's "N new" is the difference between two reads this device made |
+| Say | `UNUserNotificationCenter` / channel `grapmail-new-mail` | "3 new messages · 12 unread in the inbox", after checking the permission |
+
+**When it stays silent** — and each of these is a lie it would otherwise tell:
+
+- *signed out* — there is no mailbox to report on;
+- *the read refused* — nothing was seen, and "no new mail" is a claim about an
+  answer the server did not give;
+- *first read ever* — there is no previous number, so no difference exists to
+  name;
+- *the count did not rise* — nothing arrived that this device does not know;
+- *the permission is not held* — checked before posting, and the Settings row
+  reports the real state rather than a remembered one.
+
+**Interval honesty.** 30 minutes is WorkManager's minimum and
+`BGAppRefreshTask`'s request is a *hint* the system may delay further for
+battery and usage patterns. No screen says "every 15 minutes" and no string
+promises a minute at all; the channel description says what actually happens.
+The notification never says "delivered" either — the relay's queue is not the
+recipient's inbox, and §39 pins that word out of both notification builders.

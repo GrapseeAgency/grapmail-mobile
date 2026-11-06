@@ -256,6 +256,28 @@ fun MailboxScreen(
                     BoxTabRow(state, onSelect = { vm.open(it) })
                 }
 
+                // The device's own path to the network, read before asking
+                // rather than after a failure. The chip below can only report a
+                // refresh that was refused; this says why, while the list is
+                // still on screen, so a list that has not moved for ten minutes
+                // is not mistaken for a quiet inbox. `null` — no reading yet —
+                // draws nothing: "offline" before the callback has spoken is a
+                // claim about a network nobody checked. iOS's `offlineBanner`
+                // is the same statement in the same place.
+                if (state.online == false) {
+                    Row(
+                        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp)
+                            .clip(RoundedCornerShape(10.dp)).background(palette.warnChipBg)
+                            .padding(horizontal = 12.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text("No network right now — showing the last loaded mail.",
+                            fontSize = 12.sp, color = palette.warnInk,
+                            maxLines = 2, overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f).testTag("mail-offline"))
+                    }
+                }
+
                 // A refresh that failed over a populated list says so here rather
                 // than replacing the list with an error screen.
                 if (state.staleError != null && state.hasRows) {

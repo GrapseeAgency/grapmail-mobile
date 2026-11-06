@@ -114,6 +114,18 @@ class MailboxViewModel @JvmOverloads constructor(
         val fatal: String? = null,
         /** True when the server said this account has no mailbox at all. */
         val noMailbox: Boolean = false,
+        /**
+         * Whether this device has a path to the network, as the system last
+         * said. `null` means no reading has landed yet — which draws no banner,
+         * because "offline" before the callback has spoken is a claim about a
+         * network nobody checked.
+         *
+         * The stale-list chip can only report a refresh that was refused. This
+         * says why, while the list is still on screen, so a list that has not
+         * moved for ten minutes is not mistaken for a quiet inbox. iOS reads
+         * the same fact through `NWPathMonitor` (`AppIntegration.swift`).
+         */
+        val online: Boolean? = null,
         val selection: Set<String> = emptySet(),
         val labels: List<MailLabelDto> = emptyList(),
         /**
@@ -270,7 +282,77 @@ class MailboxViewModel @JvmOverloads constructor(
     private suspend fun token(): String? =
         SessionStore.token(getApplication())
 
+    /**
+     * The device's own connectivity, watched rather than inferred.
+     *
+     * A failed refresh already says the list may be stale. What it cannot say
+     * is *why*, and the difference matters to a person looking at a list that
+     * has not moved: the network went away, or the server is refusing. So the
+     * system is asked directly, once, at the same time the mailbox starts, and
+     * every change afterwards arrives through the callback.
+     *
+     * `registerDefaultNetworkCallback` is the API for exactly this question —
+     * it tracks the network the device would actually use, rather than any one
+     * transport. The first reading comes from the current network rather than
+     * waiting for a change that may never happen: a mailbox opened on a device
+     * that has been offline for an hour should say so on its first frame, not
+     * after the next transition.
+     */
+    private fun watchNetwork() {
+        val manager = getApplication<android.app.Application>()
+            .getSystemService(android.content.Context.CONNECTIVITY_SERVICE)
+            as? android.net.ConnectivityManager ?: return
+        val active = manager.activeNetwork
+            ?.let { manager.getNetworkCapabilities(it) }
+            ?.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_INTERNET)
+        _state.update { it.copy(online = active) }
+        val callback = object : android.net.ConnectivityManager.NetworkCallback() {
+            override fun onAvailable(network: android.net.Network) {
+                _state.update { it.copy(online = true) }
+            }
+
+            override fun onLost(network: android.net.Network) {
+                // The default callback reports the network the device would use
+                // now. A loss that leaves another one standing (wifi off, cell
+                // on) is answered by the capabilities of what is active, not by
+                // a flat "offline" — saying offline while mail is still flowing
+                // is worse than saying nothing.
+                val still = manager.activeNetwork
+                    ?.let { manager.getNetworkCapabilities(it) }
+                    ?.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_INTERNET)
+                _state.update { it.copy(online = still == true) }
+            }
+
+            override fun onCapabilitiesChanged(
+                network: android.net.Network,
+                capabilities: android.net.NetworkCapabilities,
+            ) {
+                _state.update {
+                    it.copy(online = capabilities
+                        .hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_INTERNET))
+                }
+            }
+        }
+        runCatching { manager.registerDefaultNetworkCallback(callback) }
+            .onSuccess { networkCallback = callback }
+    }
+
+    private var networkCallback: android.net.ConnectivityManager.NetworkCallback? = null
+
+    override fun onCleared() {
+        // The callback outlives no view model: a leaked registration keeps a
+        // mailbox's state object reachable after the screen that owned it is
+        // gone, and every later connectivity change would write into it.
+        val manager = getApplication<android.app.Application>()
+            .getSystemService(android.content.Context.CONNECTIVITY_SERVICE)
+            as? android.net.ConnectivityManager
+        (networkCallback?.let { cb -> manager?.runCatching { unregisterNetworkCallback(cb) } })
+        networkCallback = null
+        super.onCleared()
+    }
+
     init {
+        watchNetwork()
         viewModelScope.launch {
             if (snapshotMode) return@launch
             val t = token() ?: return@launch
@@ -531,6 +613,17 @@ class MailboxViewModel @JvmOverloads constructor(
                     .onFailure { failure = it.message ?: "That action didn't go through." }
             }
             _state.update { it.copy(busy = false, selection = emptySet(), staleError = failure) }
+            // Same rule as the undo below, and the same rule iOS's `act`
+            // learned: the tap belongs to the write. A partial failure is a
+            // failure — some mail did not move, and a success buzz would say it
+            // all did.
+            if (failure == null) {
+                when (action) {
+                    MailAction.Star, MailAction.Unstar,
+                    MailAction.Read, MailAction.Unread -> GMHaptics.marking()
+                    else -> GMHaptics.filing()
+                }
+            } else GMHaptics.failure()
             if (action == MailAction.Snooze) {
                 // Only the messages the server accepted get an undo. Offering one
                 // for a message whose snooze failed would unsnooze mail that is
@@ -709,8 +802,17 @@ class MailboxViewModel @JvmOverloads constructor(
                             undoNote = action.pastLine(1),
                         )
                     }
+                    // The swipe is the most common filing there is, and it is
+                    // the one the person cannot see land (the row leaves the
+                    // screen), so the tap is the only feedback there is.
+                    when (action) {
+                        MailAction.Star, MailAction.Unstar,
+                        MailAction.Read, MailAction.Unread -> GMHaptics.marking()
+                        else -> GMHaptics.filing()
+                    }
                 }
                 .onFailure {
+                    GMHaptics.failure()
                     _state.update { s ->
                         s.copy(staleError = (it as? ApiException)?.message
                             ?: "That action didn't go through.")
@@ -1142,9 +1244,15 @@ class MailboxViewModel @JvmOverloads constructor(
                     _compose.update { it.copy(draftId = "") }
                 }
                 load(replace = true)
+                // The feel follows the answer. A send the relay has only
+                // QUEUED gets the same tap a delivered one would, and the
+                // receipt already says in words that those are different
+                // claims; a refused send gets the failure tap.
+                if (sent) GMHaptics.success() else GMHaptics.failure()
             }.onFailure { e ->
                 _compose.update { it.copy(sending = false,
                     error = e.message ?: "The message could not be sent.") }
+                GMHaptics.failure()
             }
         }
     }
@@ -1439,9 +1547,11 @@ class MailboxViewModel @JvmOverloads constructor(
                         })
                     }
                     reproject()
+                    GMHaptics.marking()
                     onOutcome(null)
                 }
                 .onFailure {
+                    GMHaptics.failure()
                     onOutcome((it as? ApiException)?.message
                         ?: "That action didn't go through.")
                 }

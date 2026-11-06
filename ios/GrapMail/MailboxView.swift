@@ -16,6 +16,11 @@ struct MailboxView: View {
     /// the same mailbox the list is showing. A model per screen would mean a
     /// list that forgets what a thread just read.
     @ObservedObject var vm: MailboxModel
+    /// The device's connectivity, read from the shared monitor rather than
+    /// owned here: the monitor starts with the app, before any screen exists,
+    /// so the first mailbox draw already knows whether it is asking over a
+    /// path that works.
+    @ObservedObject private var network = NetworkMonitor.shared
     /// The thread route carries either a thread id or, when a message has none,
     /// its own id — and says which it is. Asking the thread route for a message
     /// id answers 404, so a row without a thread must open through the message
@@ -92,6 +97,7 @@ struct MailboxView: View {
             GM.bg.ignoresSafeArea()
             VStack(spacing: 0) {
                 header
+                offlineBanner
                 staleBanner
                 listArea
                 MailBottomBar(
@@ -206,6 +212,29 @@ struct MailboxView: View {
 
     private var filterActive: Bool {
         vm.state.filter != .unread || vm.state.sort != .newest
+    }
+
+    /// The device's own path to the network, read before asking rather than
+    /// after a failure. The stale-list chip can only say a refresh was refused;
+    /// this says why, and says it while the list is still on screen, so a list
+    /// that has not moved for ten minutes is not mistaken for a quiet inbox.
+    ///
+    /// `nil` — no reading yet — draws nothing. "Offline" before the monitor's
+    /// first callback would be a claim about a network nobody has checked.
+    @ViewBuilder private var offlineBanner: some View {
+        if network.online == false {
+            HStack(spacing: 8) {
+                Text("No network right now — showing the last loaded mail.")
+                    .font(.system(size: 12)).foregroundColor(GM.warnInk)
+                    .lineLimit(2)
+                Spacer(minLength: 4)
+            }
+            .padding(.horizontal, 12).padding(.vertical, 8)
+            .background(RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .fill(GM.warnChipBg))
+            .padding(.horizontal, 16).padding(.vertical, 6)
+            .accessibilityIdentifier("mail-offline")
+        }
     }
 
     /// A refresh that failed over a populated list says so here instead of

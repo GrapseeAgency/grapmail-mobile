@@ -41,12 +41,33 @@ targets:
         INFOPLIST_KEY_UIApplicationSceneManifest_Generation: YES
         INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents: YES
         INFOPLIST_KEY_UIRequiresFullScreen: YES
-        INFOPLIST_KEY_UILaunchScreen_Generation: YES
         INFOPLIST_KEY_UISupportedInterfaceOrientations: "UIInterfaceOrientationPortrait"
         INFOPLIST_KEY_UISupportedInterfaceOrientations~ipad: "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown"
         PRODUCT_BUNDLE_IDENTIFIER: com.grapsee.grapmail
         ENABLE_PREVIEWS: YES
         SWIFT_STRICT_CONCURRENCY: minimal
+    # The launch screen, the background mode and the home-screen shortcut are
+    # dictionaries and arrays, not single build-setting values, so they cannot
+    # ride on INFOPLIST_KEY_* (Xcode exposes only `UILaunchScreen_Generation`,
+    # which synthesizes an EMPTY launch screen -- the plain blue rectangle the
+    # app shipped with). XcodeGen writes the real Info.plist instead, and
+    # GENERATE_INFOPLIST_FILE still fills the bundle keys it owns.
+    info:
+      path: GrapMail/Info.plist
+      properties:
+        UILaunchScreen:
+          UIImageName: LaunchBrand
+          UIColorName: LaunchBackground
+        # Local new-mail polling, not push: there is no push service in the
+        # backend, so the app is allowed to wake, read `GET /stats`, and say
+        # something IT observed. `fetch` is the mode that matches that job.
+        UIBackgroundModes:
+          - fetch
+        UIApplicationShortcutItems:
+          - UIApplicationShortcutItemType: com.grapsee.grapmail.compose
+            UIApplicationShortcutItemTitle: "Compose mail"
+            UIApplicationShortcutItemIconType: UIApplicationShortcutIconTypeCompose
+
   GrapMailUITests:
     type: bundle.ui-testing
     platform: iOS

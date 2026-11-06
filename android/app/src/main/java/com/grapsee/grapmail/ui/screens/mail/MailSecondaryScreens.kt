@@ -647,6 +647,46 @@ fun MailSettingsScreen(
                 "The list beside the mailbox", palette, onClick = onTasks)
 
             SectionLabel("This account", palette)
+            // New-mail alerts are local polling, not push: this backend has no
+            // push service, so the honest description of the feature is what
+            // the app actually does — the system wakes a scheduled read, it
+            // asks `GET /stats`, and it reports what arrived since the last
+            // number this device saw.
+            //
+            // The row reports the device's real answer rather than a remembered
+            // one, and the ask is here on a tap, not at launch. Android 13 made
+            // it a runtime permission: without this row the poll worker could
+            // run its read correctly forever and never be allowed to say so,
+            // which is a feature that exists only in the source file.
+            val notifyContext = androidx.compose.ui.platform.LocalContext.current
+            var notifyAllowed by androidx.compose.runtime.remember {
+                mutableStateOf(com.grapsee.grapmail.logic.Notifications.allowed(notifyContext))
+            }
+            val askNotifications = androidx.activity.compose.rememberLauncherForActivityResult(
+                androidx.activity.contract.ActivityResultContracts.RequestPermission(),
+            ) { granted ->
+                // Re-read the system's state rather than trusting the callback:
+                // the grant can be refused with "don't ask again", and the
+                // channel's own importance is what a later post will meet.
+                notifyAllowed = granted &&
+                    com.grapsee.grapmail.logic.Notifications.allowed(notifyContext)
+            }
+            SettingRow(Icons.Rounded.NotificationsActive, "New mail notifications",
+                if (notifyAllowed) "On — GrapMail checks for new mail in the background"
+                else "Off — tap to allow new-mail alerts",
+                palette,
+                onClick = {
+                    if (notifyAllowed) {
+                        // Already answered: the system will not show a second
+                        // prompt, so open the app's notification page instead of
+                        // pretending a tap here changes anything.
+                        val open = android.content.Intent(android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                            .putExtra(android.provider.Settings.EXTRA_APP_PACKAGE, notifyContext.packageName)
+                        runCatching { notifyContext.startActivity(open) }
+                    } else {
+                        askNotifications.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+                    }
+                })
             SettingRow(Icons.Rounded.Person, "Personal info",
                 "Name, birthday, photo", palette, onClick = onProfile)
             SettingRow(Icons.Rounded.Shield, "Data & privacy",

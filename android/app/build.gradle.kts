@@ -105,5 +105,17 @@ dependencies {
 
     implementation("androidx.datastore:datastore-preferences:1.1.1")
 
+    // The system splash screen. Without it the window the person sees between
+    // tapping the icon and the first composed frame is the system's blank
+    // default — the smallest form of "this is not a native app".
+    implementation("androidx.core:core-splashscreen:1.0.1")
+
+    // The new-mail poll. WorkManager is Android's answer to "do this again
+    // later even if the app is closed", it enforces a real minimum interval,
+    // and it survives a reboot — which is what makes the notification a report
+    // of a read the device actually made rather than a timer that dies with a
+    // process.
+    implementation("androidx.work:work-runtime-ktx:2.9.1")
+
     debugImplementation("androidx.compose.ui:ui-tooling")
 }
