@@ -210,7 +210,13 @@ struct RemoteImageView: View {
         }
         .task(id: url) {
             phase = .loading
-            phase = await fetchRemoteImage(url)
+            // The fetcher's outcome and the view's phase are different types on
+            // purpose: what a request answered is not the same fact as what the
+            // screen shows, and the mapping is where the reason gets its words.
+            switch await fetchRemoteImage(url) {
+            case .ready(let image): phase = .ready(image)
+            case .problem(let reason): phase = .problem(reason)
+            }
         }
     }
 }

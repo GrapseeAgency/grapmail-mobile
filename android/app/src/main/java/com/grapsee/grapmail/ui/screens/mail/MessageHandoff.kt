@@ -308,10 +308,15 @@ fun printMessageText(
     }
     val docName = (message.subject?.takeIf { it.isNotBlank() } ?: "GrapMail message")
         .take(60)
-    val attributes = runCatching { manager.defaultPrintAttributes }.getOrNull()
-        ?: PrintAttributes.Builder().build()
+    // The attributes the system hands `onLayout` are the printer's own, and the
+    // page geometry is read from them. What is NOT asked for is the device's
+    // last-used attributes: `print()` takes the attributes to *request*, and the
+    // panel lets the person change them, so the layout pass is where the real
+    // numbers arrive.
     val adapter = TextPrintAdapter(messageShareText(message), docName)
-    val handed = runCatching { manager.print(docName, adapter, attributes) }.isSuccess
+    val handed = runCatching {
+        manager.print(docName, adapter, PrintAttributes.Builder().build())
+    }.isSuccess
     // `null` means the request reached the print service, which is the most this
     // process can witness: what the person then does with the system's print
     // screen — pick a printer, cancel, save as PDF — belongs to that screen.
@@ -361,7 +366,6 @@ private class TextPrintAdapter(
         val info = PrintDocumentInfo.Builder(jobName)
             .setContentType(PrintDocumentInfo.CONTENT_TYPE_DOCUMENT)
             .setPageCount(pages(attrs, text))
-            .setBitsPerPixel(32)
             .build()
         // "changed" is honest here for the same reason it is always honest for a
         // fresh adapter: there is no previous layout of this job to compare with.
@@ -402,7 +406,7 @@ private class TextPrintAdapter(
             }
             FileOutputStream(descriptor.fileDescriptor).use { document.writeTo(it) }
             document.close()
-            callback?.onWriteReceived(ranges)
+            callback?.onWriteFinished(ranges)
         } catch (e: Exception) {
             runCatching { document.close() }
             callback?.onWriteFailed(e.message ?: "The print document could not be written.")
@@ -412,8 +416,8 @@ private class TextPrintAdapter(
     private fun drawPage(
         canvas: Canvas, lines: List<String>, index: Int, perPage: Int, lastPage: Int,
     ) {
-        val left = contentInset(attrs).left.toFloat()
-        val top = contentInset(attrs).top.toFloat()
+        val left = contentInset(attrs).toFloat()
+        val top = contentInset(attrs).toFloat()
         val start = index * perPage
         for (row in 0 until perPage) {
             val line = lines.getOrNull(start + row) ?: break
@@ -427,8 +431,7 @@ private class TextPrintAdapter(
         // back in order.
         if (lastPage > 1) {
             canvas.drawText("${index + 1} / $lastPage", left,
-                contentInset(attrs).top.toFloat() + perPage * PRINT_LINE_HEIGHT +
-                    PRINT_TEXT_SIZE + 14f, body)
+                top + perPage * PRINT_LINE_HEIGHT + PRINT_TEXT_SIZE + 14f, body)
         }
     }
 
@@ -438,25 +441,40 @@ private class TextPrintAdapter(
 }
 
 // ── the adapter's arithmetic, outside the class so it can be read on its own ─
+//
+// `MediaSize` answers in MILS (thousandths of an inch) and a PDF page is laid
+// out in POINTS (72 to an inch), so every number here crosses that unit once,
+// in one place. The margins are the document's own 48pt (about 17mm) rather
+// than the printer's `minMargins`, for the same reason: `minMargins` is also in
+// mils, the print panel applies its own content area to the finished PDF, and
+// a page that sets its own generous inset cannot run text off the sheet on any
+// printer — while one computed from per-device numbers can be wrong on the only
+// device that matters, the one a person actually owns.
 
-private fun pageWidth(attrs: PrintAttributes): Int = attrs.mediaSize?.width ?: 612
+/** Mils to points: 1000 mils is one inch, one inch is 72 points. */
+private fun milsToPoints(mils: Int): Int = (mils * 72 / 1000.0).toInt()
 
-private fun pageHeight(attrs: PrintAttributes): Int = attrs.mediaSize?.height ?: 792
+private const val PRINT_MARGIN = 48
 
-private fun contentInset(attrs: PrintAttributes): android.graphics.Rect =
-    attrs.minMargins ?: android.graphics.Rect(36, 36, 36, 36)
+private fun pageWidth(attrs: PrintAttributes): Int =
+    milsToPoints(runCatching { attrs.mediaSize?.widthMils ?: 8500 }.getOrNull() ?: 8500)
+        .coerceAtLeast(240)
+
+private fun pageHeight(attrs: PrintAttributes): Int =
+    milsToPoints(runCatching { attrs.mediaSize?.heightMils ?: 11000 }.getOrNull() ?: 11000)
+        .coerceAtLeast(320)
+
+private fun contentInset(attrs: PrintAttributes): Int = PRINT_MARGIN
 
 private fun linesPerPage(attrs: PrintAttributes): Int {
-    val inset = contentInset(attrs)
-    val usable = pageHeight(attrs) - inset.top - inset.bottom - 24
+    val usable = pageHeight(attrs) - contentInset(attrs) * 2 - 24
     return (usable / PRINT_LINE_HEIGHT).toInt().coerceAtLeast(1)
 }
 
 /** The wrapped lines of the document, in print order. */
 private fun layoutLines(attrs: PrintAttributes, text: String): List<String> {
     val measure = Paint().apply { textSize = PRINT_TEXT_SIZE; isAntiAlias = true }
-    val inset = contentInset(attrs)
-    val width = (pageWidth(attrs) - inset.left - inset.right).toFloat().coerceAtLeast(40f)
+    val width = (pageWidth(attrs) - contentInset(attrs) * 2).toFloat().coerceAtLeast(40f)
     val out = ArrayList<String>()
     for (paragraph in text.split("\n")) {
         if (paragraph.isBlank()) {

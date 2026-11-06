@@ -112,7 +112,7 @@ struct MailSnapshotView: View {
         return m
     }
 
-    private static let rows = [
+    fileprivate static let rows = [
         row("m1", "Amira Rahman", "amira@northwind.example", "Q3 facilities invoice",
             "Attached is the invoice for the quarter, payable on receipt.", unread: true),
         row("m2", "Devon Okafor", "devon@brightline.example", "Standoff on the shared calendar",
@@ -523,13 +523,13 @@ struct MailSnapshotView: View {
                 return AnyView(
                 secondary(ThreadView(vm: model, e2e: e2e, id: "t-m1",
                                      isThread: true, onBack: {}, onReply: { _, _ in },
-                                     onStepPrev: {}, onStepNext: {}))
+                                     onStepPrev: { _ in }, onStepNext: { _ in }))
                 )
             case "mail-thread-encrypted":
                 return AnyView(
                 secondary(ThreadView(vm: model, e2e: e2e, id: "t-m9",
                                      isThread: true, onBack: {}, onReply: { _, _ in },
-                                     onStepPrev: {}, onStepNext: {}))
+                                     onStepPrev: { _ in }, onStepNext: { _ in }))
                 )
             // The live reader again, over a message whose only part is HTML: the
             // frame photographs the images gate, the stepper's honest range and
@@ -541,7 +541,7 @@ struct MailSnapshotView: View {
                 return AnyView(
                 secondary(ThreadView(vm: model, e2e: e2e, id: "t-n2",
                                      isThread: true, onBack: {}, onReply: { _, _ in },
-                                     onStepPrev: {}, onStepNext: {}))
+                                     onStepPrev: { _ in }, onStepNext: { _ in }))
                 )
             case "mail-compose":
                 return AnyView(
