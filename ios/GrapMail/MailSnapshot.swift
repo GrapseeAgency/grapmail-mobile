@@ -373,10 +373,7 @@ struct MailSnapshotView: View {
          "to":["you@grapmail.com"],"subject":"This week in letterforms",
          "isRead":true,"isStarred":false,"hasAttachments":false,
          "createdAt":"2026-10-28T08:00:00Z",
-         "bodyHtml":"<html><body><p>The kerning quarrels, mostly, and one \
-         risograph plate that printed better than the mockup.</p>\
-         <img src='https://images.newsletter.example/plate-1.png'>\
-         <img src='https://images.newsletter.example/pixel.gif?m=n2'></body></html>",
+         "bodyHtml":"<html><body><p>The kerning quarrels, mostly, and one risograph plate that printed better than the mockup.</p><img src='https://images.newsletter.example/plate-1.png'><img src='https://images.newsletter.example/pixel.gif?m=n2'></body></html>",
          "attachments":[]}
         """
         return (try? JSONDecoder().decode(MailMessageFull.self, from: Data(json.utf8)))
