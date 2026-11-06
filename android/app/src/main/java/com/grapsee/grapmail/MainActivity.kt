@@ -873,6 +873,22 @@ fun GrapMailNav() {
                 isThread = isThread,
                 onBack = { nav.popBackStack() },
                 onReply = { m, mode -> nav.navigate(Routes.mailCompose(m.id, mode)) },
+                // Stepping replaces the reader rather than pushing another
+                // copy of it: five nexts must not bury the list under five
+                // identical screens the back button has to unwind one at a
+                // time. The target's own flag decides the route, exactly as the
+                // list's tap does — a neighbour that is a single message would
+                // otherwise be opened on the thread route and 404.
+                onStepPrev = { step ->
+                    nav.navigate(Routes.mailThread(step.id, step.isThread)) {
+                        popUpTo(Routes.MAIL_THREAD) { inclusive = true }
+                    }
+                },
+                onStepNext = { step ->
+                    nav.navigate(Routes.mailThread(step.id, step.isThread)) {
+                        popUpTo(Routes.MAIL_THREAD) { inclusive = true }
+                    }
+                },
             )
         }
         composable(Routes.MAIL_COMPOSE) { entry ->

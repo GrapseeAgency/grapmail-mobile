@@ -1,6 +1,20 @@
 import Foundation
 import Combine
 
+/// What the reader's next/prev controls need to open a row: which resource, and
+/// whether it is a conversation.
+///
+/// The flag travels with the target rather than being assumed by the caller,
+/// because the two thread routes are different resources — `/thread/:id` answers
+/// a message id with a 404, and the list already had to learn that (`isThread`
+/// exists on its tap for the same reason). A stepper that hardcoded `true` would
+/// reopen the same dead end one button further in. Android's `MailStep` is the
+/// same pair.
+struct MailStep: Equatable {
+    let id: String
+    let isThread: Bool
+}
+
 /// The mailbox's state and its only writer.
 ///
 /// ── WHAT A FAILED REFRESH IS ALLOWED TO DO ──────────────────────────────────
@@ -1103,6 +1117,75 @@ final class MailboxModel: ObservableObject {
                 self.reproject()
             } catch {
                 self.thread = ThreadState(error: Self.describe(error))
+            }
+        }
+    }
+
+    /// The neighbours of an open message, in the order the list showed them.
+    ///
+    /// A mail reader that cannot step makes the person walk back to the list
+    /// for every message. The range is stated honestly: this walks the rows
+    /// this device actually loaded for the current box, and the reader's own
+    /// label says "of N loaded" rather than claiming the box's total, which
+    /// is a number nothing here has seen.
+    ///
+    /// Nil on either side when there is nothing to step to, so the chevron is
+    /// disabled rather than tapping into nowhere.
+    func neighbours(of id: String) -> (prev: MailStep?, next: MailStep?) {
+        let rows = state.rows
+        guard let idx = rows.firstIndex(where: { $0.id == id || $0.threadId == id })
+        else { return (nil, nil) }
+        return (step(of: idx > 0 ? rows[idx - 1] : nil),
+                step(of: idx + 1 < rows.count ? rows[idx + 1] : nil))
+    }
+
+    /// The row as the reader must open it: a row with a `threadId` is a
+    /// conversation and goes to the thread route, a row without one is a single
+    /// message and the thread route answers its id with a 404. The list's own
+    /// tap makes exactly this pair of decisions, so the stepper derives the
+    /// target from the row instead of assuming every neighbour is a thread.
+    func step(of row: MailMessage?) -> MailStep? {
+        guard let row = row else { return nil }
+        return MailStep(id: row.threadId ?? row.id, isThread: row.threadId != nil)
+    }
+
+    /// The reader's position within the loaded rows, 1-based; 0 when absent.
+    func loadedPosition(of id: String) -> Int {
+        guard let idx = state.rows.firstIndex(where: { $0.id == id || $0.threadId == id })
+        else { return 0 }
+        return idx + 1
+    }
+
+    /// How many loaded rows the reader is stepping between, for its own label.
+    func loadedRowCount() -> Int { state.rows.count }
+
+    /// Mark one message unread from inside the reader, and report the outcome to
+    /// the reader.
+    ///
+    /// `actOn` is the list's path: it files a failure into the list's stale-read
+    /// banner, which is not on screen here, and it leaves the conversation's own
+    /// copy of the message flagged as read. A control in the reader needs both
+    /// halves — the thread's flag patched, so the button that offered this stops
+    /// offering it, and the real result handed back to be said out loud. `nil`
+    /// means the server accepted it. Android's `markUnread` is the same contract.
+    func markUnread(_ id: String, onOutcome: @escaping (String?) -> Void) {
+        guard let token else {
+            onOutcome("You are signed out, so this could not be saved.")
+            return
+        }
+        Task { [weak self] in
+            guard let self else { return }
+            do {
+                _ = try await ApiClient.mailAction(token: token, id: id,
+                                                   action: .unread, until: nil)
+                await self.applyLocally(id: id, action: .unread)
+                if let idx = self.thread.messages.firstIndex(where: { $0.id == id }) {
+                    self.thread.messages[idx].isRead = false
+                }
+                self.reproject()
+                onOutcome(nil)
+            } catch {
+                onOutcome(Self.describe(error))
             }
         }
     }

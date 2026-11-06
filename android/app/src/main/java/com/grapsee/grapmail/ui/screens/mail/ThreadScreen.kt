@@ -22,6 +22,8 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.AttachFile
+import androidx.compose.material.icons.rounded.ChevronLeft
+import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.Download
 import androidx.compose.material.icons.rounded.Forward
 import androidx.compose.material.icons.rounded.Lock
@@ -53,6 +55,7 @@ import com.grapsee.grapmail.ui.components.AppTextField
 import com.grapsee.grapmail.data.MailAttachmentDto
 import com.grapsee.grapmail.data.MailMessageFullDto
 import com.grapsee.grapmail.logic.MailboxViewModel
+import com.grapsee.grapmail.logic.MailStep
 import com.grapsee.grapmail.ui.components.SenderAvatar
 import com.grapsee.grapmail.ui.components.unsubscribeTarget
 import com.grapsee.grapmail.ui.components.absoluteDateTimeOrRaw
@@ -94,6 +97,11 @@ fun ThreadScreen(
      *  screen builds the quote and the addressing from the FULL row, so the
      *  thread hands over the row it actually displayed. */
     onReply: (MailMessageFullDto, String) -> Unit,
+    /** Step to the previous / next loaded row without leaving the reader.
+     *  The ViewModel names the target, including whether it is a conversation:
+     *  the reader does not know the order, and it must not guess the route. */
+    onStepPrev: (MailStep) -> Unit,
+    onStepNext: (MailStep) -> Unit,
 ) {
     val palette = LocalPalette.current
     val thread by vm.thread.collectAsState()
@@ -116,6 +124,33 @@ fun ThreadScreen(
             Text(if (thread.messages.size > 1) "${thread.messages.size} messages" else "Message",
                 fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = palette.textPrimary)
             Spacer(Modifier.weight(1f))
+            // Step through the mail the list already showed, without walking
+            // back to it. The label counts LOADED rows, not the box's total:
+            // the device has seen twelve, so twelve is the honest range, and
+            // a chevron that ran off the end of what is actually here would
+            // be a button that goes nowhere.
+            run {
+                val (prior, next) = vm.neighboursOf(threadId)
+                val at = vm.loadedPositionOf(threadId)
+                val total = vm.loadedRowCount()
+                if (at > 0 && total > 1) {
+                    Text("$at of $total loaded", fontSize = 12.sp,
+                        color = palette.textTertiary)
+                    Spacer(Modifier.width(10.dp))
+                    Icon(Icons.Rounded.ChevronLeft, "Previous message",
+                        tint = if (prior != null) palette.textPrimary else palette.textTertiary,
+                        modifier = Modifier.size(26.dp).clip(CircleShape)
+                            .clickable(enabled = prior != null) { prior?.let(onStepPrev) }
+                            .testTag("mail-thread-prev"))
+                    Spacer(Modifier.width(6.dp))
+                    Icon(Icons.Rounded.ChevronRight, "Next message",
+                        tint = if (next != null) palette.textPrimary else palette.textTertiary,
+                        modifier = Modifier.size(26.dp).clip(CircleShape)
+                            .clickable(enabled = next != null) { next?.let(onStepNext) }
+                            .testTag("mail-thread-next"))
+                    Spacer(Modifier.width(12.dp))
+                }
+            }
             if (thread.messages.firstOrNull()?.isStarred == true) {
                 Icon(Icons.Rounded.Star, "Starred", tint = palette.star, 
                     modifier = Modifier.size(22.dp))
@@ -146,6 +181,7 @@ fun ThreadScreen(
         Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
             thread.messages.forEachIndexed { index, message ->
                 ThreadMessageCard(
+                    vm = vm,
                     message = message,
                     expanded = index == thread.messages.lastIndex,
                     busy = busy == message.id,
@@ -176,6 +212,7 @@ fun ThreadScreen(
 
 @Composable
 private fun ThreadMessageCard(
+    vm: MailboxViewModel,
     message: MailMessageFullDto,
     expanded: Boolean,
     busy: Boolean,
@@ -188,7 +225,26 @@ private fun ThreadMessageCard(
     val palette = LocalPalette.current
     val context = androidx.compose.ui.platform.LocalContext.current
     var showUnsub by androidx.compose.runtime.remember { mutableStateOf(false) }
-    var unsubNote by androidx.compose.runtime.remember { mutableStateOf<String?>(null) }
+    // Keyed on the message, because the reader can now step to a neighbouring
+    // message without leaving this composition: a note that belonged to the
+    // message just read would otherwise be printed under the next one.
+    var unsubNote by androidx.compose.runtime.remember(message.id) { mutableStateOf<String?>(null) }
+    // One note line for the affordances that can fail out of view — sharing
+    // and printing both leave the app to ask the system for something, and
+    // "nothing received it" has to be said here rather than left as a button
+    // that appeared to do nothing.
+    var shareNote by androidx.compose.runtime.remember(message.id) { mutableStateOf<String?>(null) }
+    // The reader's own read/unread control reports into these two lines, not
+    // into the list's stale-read banner: the banner is on a screen the person
+    // has left. Accepted and refused are different sentences, so they are kept
+    // apart — an absent error is not evidence of a write.
+    var unreadDone by androidx.compose.runtime.remember(message.id) { mutableStateOf(false) }
+    var unreadNote by androidx.compose.runtime.remember(message.id) { mutableStateOf<String?>(null) }
+    // The images the sender's HTML part points at, and whether this message has
+    // asked for them. Both belong to the message: stepping from here must not
+    // carry an opt-in that was given for somebody else's mail.
+    val hiddenImages = remoteImageUrls(message.bodyHtml)
+    var shownImages by androidx.compose.runtime.remember(message.id) { mutableStateOf(false) }
     // The sender's own `List-Unsubscribe` offer, narrowed to an http(s) address by
     // the same rule iOS applies. Null means show nothing: a button that opens a
     // broken or dangerous URL is worse than no button, and most mail simply has no
@@ -260,6 +316,42 @@ private fun ThreadMessageCard(
                 Text(text, fontSize = 15.sp, color = palette.textPrimary, lineHeight = 22.sp,
                     modifier = Modifier.testTag("mail-body"))
             }
+            // An HTML part can point at images that live on the SENDER's
+            // server. Fetching one is a request that carries this device's
+            // address to them and tells them the mail was opened, so nothing
+            // here is fetched until the person asks, for this message alone.
+            // The count is what the part references, not what arrives: an image
+            // the sender withdrew is still named here and fails on its own line
+            // below, which is the honest order of the two facts.
+            if (hiddenImages.isNotEmpty()) {
+                Spacer(Modifier.height(12.dp))
+                if (!shownImages) {
+                    Text(
+                        "${hiddenImages.size} image" +
+                            (if (hiddenImages.size == 1) "" else "s") +
+                            " in this message load from the sender's server, not " +
+                            "from GrapMail. " +
+                            "Loading them tells the sender this message was opened.",
+                        fontSize = 12.sp, color = palette.textSecondary,
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    com.grapsee.grapmail.ui.components.OutlineButton(
+                        "Show images",
+                        onClick = { shownImages = true },
+                        modifier = Modifier.testTag("mail-show-images"),
+                    )
+                } else {
+                    // Said once, because the requests have already left by the
+                    // time this line draws — the sentence is about what just
+                    // happened, not about a choice still to be made.
+                    Text("These images load from the sender's server.",
+                        fontSize = 12.sp, color = palette.textTertiary)
+                    hiddenImages.forEachIndexed { i, url ->
+                        Spacer(Modifier.height(10.dp))
+                        RemoteImageView(url, label = "Image ${i + 1} in this message")
+                    }
+                }
+            }
         }
 
         if (message.attachments.isNotEmpty()) {
@@ -310,16 +402,86 @@ private fun ThreadMessageCard(
         }
 
         Spacer(Modifier.height(14.dp))
+        // Three doors, same words as iOS's thread. `fill = false` is the fix,
+        // not a style choice: `OutlineButton` fills its width by default, and a
+        // Row measures each unweighted child against the space LEFT — so the
+        // first button took the whole row and "Reply all" and "Forward" were
+        // photographed at zero width in 74-mail-thread while iOS showed all
+        // three. Content-sized buttons fit the row (330dp of content in 379dp
+        // on the walk's device), and the trailing icons go with the fill: iOS
+        // draws these three as words alone, and two platforms disagreeing about
+        // which actions exist is the drift this sector's gates exist to catch.
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            com.grapsee.grapmail.ui.components.OutlineButton("Reply", { onReply("reply") },
-                trailing = { Icon(Icons.Rounded.Reply, null, tint = palette.primarySolid,
-                    modifier = Modifier.size(16.dp)) })
-            com.grapsee.grapmail.ui.components.OutlineButton("Reply all", { onReply("all") },
-                trailing = { Icon(Icons.Rounded.SupervisedUserCircle, null,
-                    tint = palette.primarySolid, modifier = Modifier.size(16.dp)) })
-            com.grapsee.grapmail.ui.components.OutlineButton("Forward", { onReply("forward") },
-                trailing = { Icon(Icons.Rounded.Forward, null, tint = palette.primarySolid,
-                    modifier = Modifier.size(16.dp)) })
+            com.grapsee.grapmail.ui.components.OutlineButton("Reply",
+                { onReply("reply") }, fill = false)
+            com.grapsee.grapmail.ui.components.OutlineButton("Reply all",
+                { onReply("all") }, fill = false)
+            com.grapsee.grapmail.ui.components.OutlineButton("Forward",
+                { onReply("forward") }, fill = false)
+        }
+        // Opening a message marks it read — the thread route does that on the
+        // server. Without a way back out of that state from here, reading one
+        // thing commits the person to having read it, and the only undo lives
+        // in the list's selection toolbar they have now left. Same route that
+        // toolbar uses, offered where the read actually happened, and only
+        // while the message is actually read: a "mark unread" button on mail
+        // that is already unread is a control wired to nothing.
+        Spacer(Modifier.height(10.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            if (message.isRead) {
+                com.grapsee.grapmail.ui.components.OutlineButton("Mark unread", {
+                    vm.markUnread(message.id) { outcome ->
+                        // Accepted and refused are different sentences, so they
+                        // are different states. Nothing here reads as success
+                        // because no error arrived.
+                        unreadDone = outcome == null
+                        unreadNote = outcome
+                    }
+                }, fill = false, modifier = Modifier.testTag("mail-mark-unread"))
+            }
+            com.grapsee.grapmail.ui.components.OutlineButton("Share", {
+                // The text the server actually holds, handed to the system
+                // chooser. Nothing is invented for the share card: an empty
+                // body shares the header and the subject, because that is
+                // what the message is. The HTML part is never the shared item
+                // — a receiving app would then be doing the rendering this app
+                // refused to do.
+                val intent = android.content.Intent(android.content.Intent.ACTION_SEND)
+                    .setType("text/plain")
+                    .putExtra(android.content.Intent.EXTRA_SUBJECT, message.subject ?: "")
+                    .putExtra(android.content.Intent.EXTRA_TEXT, messageShareText(message))
+                try {
+                    context.startActivity(
+                        android.content.Intent.createChooser(intent, "Share message"))
+                } catch (e: android.content.ActivityNotFoundException) {
+                    // No app to hand it to is a real state and gets said, not
+                    // swallowed: a button that appears to do nothing reads as
+                    // a broken app.
+                    shareNote = "Nothing on this device can receive shared text."
+                }
+            }, fill = false, modifier = Modifier.testTag("mail-share"))
+            com.grapsee.grapmail.ui.components.OutlineButton("Print", {
+                // The system's own print screen is the feedback when this
+                // succeeds, so only a refusal needs a line here — and a
+                // refusal is a real state on a device with no print service,
+                // not an error to swallow.
+                printMessageText(context, message) { outcome -> shareNote = outcome }
+            }, fill = false, modifier = Modifier.testTag("mail-print"))
+        }
+        if (unreadDone) {
+            Spacer(Modifier.height(8.dp))
+            // The button above has already gone: the thread's own copy of the
+            // message is flagged unread, so the control for the state that
+            // ended is not left on screen offering it again.
+            Text("Marked unread.", fontSize = 12.sp, color = palette.textSecondary)
+        }
+        unreadNote?.let {
+            Spacer(Modifier.height(8.dp))
+            Text(it, fontSize = 12.sp, color = palette.error)
+        }
+        shareNote?.let {
+            Spacer(Modifier.height(8.dp))
+            Text(it, fontSize = 12.sp, color = palette.error)
         }
     }
 }

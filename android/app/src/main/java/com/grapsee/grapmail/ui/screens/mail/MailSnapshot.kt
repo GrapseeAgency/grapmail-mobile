@@ -99,8 +99,29 @@ fun MailSnapshotScreen(name: String) {
             // The id goes with the body: the thread screen asks the model for its
             // conversation on appear, and the model has to know this one is already
             // here rather than fetching over it and landing on an error state.
-            "mail-thread" -> seedThread(vm, id = "t-m1", encrypted = false)
-            "mail-thread-encrypted" -> seedThread(vm, id = "t-m9", encrypted = true)
+            "mail-thread" -> {
+                // The rows go in beside the conversation because the reader now
+                // names its own range: "3 of 11 loaded" is computed from the
+                // list the app holds, and a host that seeded only the
+                // conversation would photograph a reader that cannot say how
+                // far its chevrons reach.
+                seedRows(vm)
+                seedThread(vm, id = "t-m1", encrypted = false)
+            }
+            "mail-thread-encrypted" -> {
+                seedRows(vm)
+                seedThread(vm, id = "t-m9", encrypted = true)
+            }
+            // An HTML-only message from a sender who hosts their own images: the
+            // reader must show what it refused to render, name how many images
+            // are waiting on the sender's server, and offer the opt-in — the one
+            // reader state no CI mailbox can produce. The row sits in the middle
+            // of the seeded list so the same frame photographs both chevrons
+            // enabled, which a first or last row never could.
+            "mail-thread-images" -> {
+                seedRows(vm)
+                seedHtmlThread(vm)
+            }
             "mail-files", "mail-attachment-preview" -> seedCache()
             // The subscriptions frames read the same cache Contacts derives
             // from; the populated frame is the sample inbox, and the empty
@@ -260,9 +281,20 @@ fun MailSnapshotScreen(name: String) {
             "mail-labels" -> LabelsScreen(vm, onBack = {}, onCreate = {}, onEdit = { })
             "mail-label-create" -> LabelCreateScreen(vm, onDone = {})
             "mail-thread" -> ThreadScreen(vm, e2eVm, threadId = "t-m1", isThread = true,
-                onBack = {}, onReply = { _, _ -> })
+                onBack = {}, onReply = { _, _ -> },
+                onStepPrev = { }, onStepNext = { })
+            // The live reader again, over a message whose only part is HTML: the
+            // frame photographs the images gate, the stepper's honest range and
+            // the reader's own read-state control, none of which a CI mailbox
+            // can produce. The closures do nothing, as everywhere in this host —
+            // a walk that tapped them would be asking a sender's server for
+            // bytes on a reserved address, which proves nothing about the gate.
+            "mail-thread-images" -> ThreadScreen(vm, e2eVm, threadId = "t-n2", isThread = true,
+                onBack = {}, onReply = { _, _ -> },
+                onStepPrev = { }, onStepNext = { })
             "mail-thread-encrypted" -> ThreadScreen(vm, e2eVm, threadId = "t-m9", isThread = true,
-                onBack = {}, onReply = { _, _ -> })
+                onBack = {}, onReply = { _, _ -> },
+                onStepPrev = {}, onStepNext = {})
             "mail-compose" -> ComposeScreen(vm = vm, profile = profileVm, e2e = e2eVm, onBack = {})
             "mail-send-receipt" -> sheetHost {
                 // The live `SendReceipt` composable, with the strings a server
@@ -597,6 +629,42 @@ private suspend fun seedEmptyInbox() {
     MailStore.putPage(MailBox.Inbox, null,
         MailInboxResponse(success = true, box = "inbox", messages = emptyList()),
         replace = true)
+}
+
+/**
+ * The loaded list, seeded into the state the reader counts rows from.
+ *
+ * The reader's own label is the thing being photographed ("7 of 11 loaded"),
+ * and that number is only true of the rows this device holds — so the host puts
+ * the sample rows where the live list would have put the ones it fetched, and
+ * the reader's arithmetic stays the shipping one.
+ */
+private fun seedRows(vm: MailboxViewModel) {
+    vm.seedForSnapshot { it.copy(rows = rows, loaded = rows.size, total = rows.size) }
+}
+
+/// The HTML-only newsletter, seeded as a conversation of one. The two `img`
+/// addresses are on a reserved TLD like every other host in this file: the frame
+/// photographs the gate, and the gate is the point — nothing in CI asks that
+/// address for anything.
+private fun seedHtmlThread(vm: MailboxViewModel) {
+    vm.seedThreadForSnapshot(forId = "t-n2", messages = listOf(
+        MailMessageFullDto(
+            id = "n2",
+            threadId = "t-n2",
+            direction = "inbound",
+            status = "delivered",
+            from = MailPersonDto(address = "hello@newsletter.example", name = "The Weekly Draft"),
+            to = listOf("you@grapmail.com"),
+            subject = "This week in letterforms",
+            isRead = true,
+            createdAt = "2026-10-28T08:00:00Z",
+            bodyHtml = "<html><body><p>The kerning quarrels, mostly, and one " +
+                "risograph plate that printed better than the mockup.</p>" +
+                "<img src=\"https://images.newsletter.example/plate-1.png\">" +
+                "<img src=\"https://images.newsletter.example/pixel.gif?m=n2\"></body></html>",
+        ),
+    ))
 }
 
 private fun seedThread(vm: MailboxViewModel, id: String, encrypted: Boolean) {

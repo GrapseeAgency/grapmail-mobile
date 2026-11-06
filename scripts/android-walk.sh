@@ -518,6 +518,7 @@ for spec in "two-factor-on:40-sec-two-factor-on" \
             "mail-label-create:73-mail-label-create" \
             "mail-thread:74-mail-thread" \
             "mail-thread-encrypted:75-mail-thread-encrypted" \
+            "mail-thread-images:116-mail-thread-images" \
             "mail-compose:76-mail-compose" \
             "mail-contacts:77-mail-contacts" \
             "mail-files:78-mail-files" \
@@ -590,6 +591,11 @@ for spec in "two-factor-on:40-sec-two-factor-on" \
     # the photograph must wait for the content to land or it catches the empty
     # branch of a screen that has data one frame later.
     mail-thread|mail-thread-encrypted) settled="Q3 facilities invoice" ;;
+    # The reader's images gate. The marker is the control's own tag, not a
+    # sentence: it exists only once an HTML-only body has landed, stripped for
+    # display, and had its `img` addresses read — which is the whole branch this
+    # frame is here to photograph.
+    mail-thread-images) settled="mail-show-images" ;;
     mail-contacts|mail-contact-detail) settled="amira@northwind.example" ;;
     mail-files|mail-attachment-preview) settled="invoice-q3.pdf" ;;
     mail-settings) settled="GrapMail address" ;;
@@ -692,6 +698,20 @@ for spec in "two-factor-on:40-sec-two-factor-on" \
   fi
   if [ -n "$(find_nodes "n.get('text','')=='Unknown snapshot: $nm'")" ]; then
     echo "FAIL: app did not recognise snapshot '$nm'" >&2; FAILURES=$((FAILURES + 1))
+  fi
+  # The reader's three reply doors must ALL be on screen. `OutlineButton` fills
+  # its width by default, and a Row measures each unweighted child against the
+  # space that is LEFT — so the first took the row and "Reply all" and "Forward"
+  # were drawn at zero width. A photograph of the reader missing two of its
+  # actions still filled every count CI checks, which is why this is asserted
+  # and not merely looked at.
+  if [ "$nm" = "mail-thread" ]; then
+    for door in "Reply all" "Forward"; do
+      if [ -z "$(find_nodes "n.get('text','')=='$door'")" ]; then
+        echo "FAIL: the reader drew no '$door' button" >&2
+        FAILURES=$((FAILURES + 1))
+      fi
+    done
   fi
   shot "$pic"
 done
@@ -893,7 +913,7 @@ for want in 01-welcome-light 02-step1-name-light 03-step2-basicinfo-light \
             109-mail-subs-list 110-mail-subs-empty \
             111-account-profile-dark 112-e2e-status-unlocked-dark \
             113-mail-subs-list-dark 114-account-connection-detail \
-            115-account-connection-unknown; do
+            115-account-connection-unknown 116-mail-thread-images; do
   [ -s "$OUT/$want.png" ] || { echo "FAIL: missing $want.png" >&2; FAILURES=$((FAILURES + 1)); }
 done
 if [ "$FAILURES" -gt 0 ]; then

@@ -443,6 +443,11 @@ final class ScreenshotWalkUITests: XCTestCase {
             // Android names the same two frames and waits on the same text.
             ("114-account-connection-detail", "account-connection-detail"),
             ("115-account-connection-unknown", "account-connection-unknown"),
+            // The reader over an HTML-only message: the images gate, the
+            // stepper's honest range and the read-state control all exist only
+            // for mail a CI mailbox does not have. Android's host draws the same
+            // frame from the same seeded sender.
+            ("116-mail-thread-images", "mail-thread-images"),
         ]
         // These two fetch on appear, so the shutter has to wait for the loaded
         // branch — otherwise the photograph catches "Checking your account…"
@@ -457,6 +462,12 @@ final class ScreenshotWalkUITests: XCTestCase {
             // the artifact would document the wrong state.
             "mail-thread": "Q3 facilities invoice",
             "mail-thread-encrypted": "End-to-end encrypted",
+            // The seeded newsletter's subject: it exists only once the HTML-only
+            // body has landed and stripped, which is the branch this frame is
+            // here to photograph. Android waits on the gate control's own tag
+            // for the same screen, because its harness can read identifiers and
+            // this one reads static text only.
+            "mail-thread-images": "This week in letterforms",
             "mail-contacts": "amira@northwind.example",
             "mail-contact-detail": "Messages seen",
             "mail-files": "invoice-q3.pdf",
@@ -561,6 +572,18 @@ final class ScreenshotWalkUITests: XCTestCase {
             if let settled = settledLabels[screen.name] {
                 XCTAssertTrue(app.staticTexts[settled].waitForExistence(timeout: 12),
                               "snapshot '\(screen.name)' never finished loading")
+            }
+            // The reader's three reply doors must ALL be on screen. iOS drew
+            // them correctly — the zero-width pair was Android's, where a
+            // filling button inside a shared Row leaves its siblings nothing.
+            // The check lives here as well because an assertion that exists on
+            // one platform only records that platform's good luck, and 74's
+            // photograph passed every gate while showing two missing actions.
+            if screen.name == "mail-thread" {
+                for door in ["Reply all", "Forward"] {
+                    XCTAssertTrue(app.staticTexts[door].waitForExistence(timeout: 5),
+                                  "the reader drew no '\(door)' button")
+                }
             }
             snap(screen.shot)
         }

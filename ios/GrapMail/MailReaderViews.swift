@@ -30,6 +30,11 @@ struct ThreadView: View {
     /// the quote and the addressing from the FULL row, so the thread hands
     /// over the id it actually displayed -- same contract as Android's.
     let onReply: (String, String) -> Void
+    /// Step to the previous / next loaded row without leaving the reader. The
+    /// model names the target, including whether it is a conversation: the
+    /// reader does not know the order, and it must not guess the route.
+    let onStepPrev: (MailStep) -> Void
+    let onStepNext: (MailStep) -> Void
     /// Per-attachment, not global: a download result belongs to the row that
     /// asked for it, and a shared variable would let a later failure overwrite an
     /// earlier success on screen.
@@ -48,6 +53,7 @@ struct ThreadView: View {
                     VStack(spacing: 0) {
                         ForEach(Array(vm.thread.messages.enumerated()), id: \.element.id) { index, m in
                             ThreadMessageCard(
+                                vm: vm,
                                 message: m,
                                 e2e: e2e,
                                 expanded: index == vm.thread.messages.count - 1,
@@ -93,6 +99,38 @@ struct ThreadView: View {
                 .font(.system(size: 16, weight: .semibold))
                 .foregroundColor(GM.textPrimary)
             Spacer()
+            // Step through the mail the list already showed, without walking
+            // back to it. The label counts LOADED rows, not the box's total:
+            // a chevron that ran off the end of what is actually here would
+            // be a button that goes nowhere.
+            let near = vm.neighbours(of: id)
+            let at = vm.loadedPosition(of: id)
+            let total = vm.loadedRowCount()
+            if at > 0 && total > 1 {
+                Text("\(at) of \(total) loaded")
+                    .font(.system(size: 12))
+                    .foregroundColor(GM.textTertiary)
+                Button {
+                    if let prior = near.prev { onStepPrev(prior) }
+                } label: {
+                    Image(systemName: "chevron.backward")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundColor(near.prev == nil ? GM.textTertiary : GM.textPrimary)
+                }
+                .disabled(near.prev == nil)
+                .accessibilityLabel("Previous message")
+                .accessibilityIdentifier("mail-thread-prev")
+                Button {
+                    if let next = near.next { onStepNext(next) }
+                } label: {
+                    Image(systemName: "chevron.forward")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundColor(near.next == nil ? GM.textTertiary : GM.textPrimary)
+                }
+                .disabled(near.next == nil)
+                .accessibilityLabel("Next message")
+                .accessibilityIdentifier("mail-thread-next")
+            }
             if vm.thread.messages.first?.isStarred == true {
                 Image(systemName: "star.fill")
                     .font(.system(size: 18))
@@ -118,6 +156,7 @@ struct ThreadView: View {
 }
 
 private struct ThreadMessageCard: View {
+    let vm: MailboxModel
     let message: MailMessageFull
     let e2e: E2eModel
     let expanded: Bool
@@ -133,6 +172,23 @@ private struct ThreadMessageCard: View {
     /// "cannot find 'showUnsub' in scope" -- four errors, and the CI run named them.)
     @State private var showUnsub = false
     @State private var unsubNote: String?
+    /// The reader's own outcomes, kept beside the controls that produced them.
+    /// Accepted and refused are different sentences, so they are different
+    /// states -- an absent error is not evidence of a write.
+    @State private var unreadDone = false
+    @State private var unreadNote: String?
+    /// One note line for the affordances that leave the app: sharing and
+    /// printing both ask the system for something, and a refusal has to be said
+    /// here rather than left as a button that appeared to do nothing.
+    @State private var handoffNote: String?
+    /// The share sheet's own presentation state. The sheet is the system's, so
+    /// this app only ever knows that it was asked for.
+    @State private var showShare = false
+    /// The images the sender's HTML part points at, and whether this message has
+    /// asked for them. Both belong to the message, and the card is rebuilt per
+    /// message -- an opt-in given for one mail must not travel to the next.
+    @State private var shownImages = false
+    private var hiddenImages: [String] { remoteImageUrls(message.bodyHtml) }
     // Handing the link over is the browser's job, not this app's, and the note
     // below says only what this process witnessed. It goes through
     // `UIApplication.shared.open` rather than `\.openURL`, because this SDK's
@@ -212,6 +268,56 @@ private struct ThreadMessageCard: View {
                     GradientButton(title: "Reply all", action: { onReply("all") })
                     GradientButton(title: "Forward", action: { onReply("forward") })
                 }
+                // Opening a message marks it read — the thread route does that
+                // on the server. Without a way back out of that state from
+                // here, reading one thing commits the person to having read it,
+                // and the only undo lives in the list's selection toolbar they
+                // have now left. Same route that toolbar uses, offered where the
+                // read actually happened, and only while the message is actually
+                // read: a "mark unread" button on mail that is already unread is
+                // a control wired to nothing.
+                HStack(spacing: 10) {
+                    if message.isRead {
+                        ReaderOutlineButton("Mark unread",
+                                            identifier: "mail-mark-unread") {
+                            vm.markUnread(message.id) { outcome in
+                                // Accepted and refused are different sentences,
+                                // so they are different states. Nothing here
+                                // reads as success because no error arrived.
+                                unreadDone = outcome == nil
+                                unreadNote = outcome
+                            }
+                        }
+                    }
+                    // The text the server actually holds, handed to the system
+                    // chooser. Nothing is invented for the share card, and the
+                    // HTML part is never the shared item — a receiving app would
+                    // then be doing the rendering this app refused to do.
+                    ReaderOutlineButton("Share", identifier: "mail-share") {
+                        showShare = true
+                    }
+                    // The system's own print panel is the feedback when this
+                    // succeeds, so only a refusal needs a line here — and a
+                    // refusal is a real state, not an error to swallow.
+                    ReaderOutlineButton("Print", identifier: "mail-print") {
+                        printMessageText(message) { outcome in handoffNote = outcome }
+                    }
+                }
+                if unreadDone {
+                    // The button above has already gone: the thread's own copy
+                    // of the message is flagged unread, so the control for the
+                    // state that ended is not left offering it again.
+                    Text("Marked unread.")
+                        .font(.system(size: 12)).foregroundColor(GM.textSecondary)
+                }
+                if let unreadNote {
+                    Text(unreadNote)
+                        .font(.system(size: 12)).foregroundColor(GM.error)
+                }
+                if let handoffNote {
+                    Text(handoffNote)
+                        .font(.system(size: 12)).foregroundColor(GM.error)
+                }
             }
         }
         // `.sheet` hangs off the card's outermost view, not off the `if expanded`
@@ -271,6 +377,15 @@ private struct ThreadMessageCard: View {
                 )
             }
         }
+        // The share sheet hangs off the card's outermost view for the same
+        // reason the unsubscribe sheet does: a leading-dot modifier written
+        // after a conditional inside a ViewBuilder binds to that conditional's
+        // last expression, not to the branch. The item is the one text builder
+        // print uses too, so the two handoffs cannot drift into describing
+        // different messages.
+        .sheet(isPresented: $showShare) {
+            MessageActivityView(text: messageShareText(message))
+        }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -281,7 +396,14 @@ private struct ThreadMessageCard: View {
         // can actually be opened here. Mirrors Android's condition exactly.
         if message.isE2eEncrypted || message.e2eEnvelope != nil {
             E2eEncryptedBlock(message: message, e2e: e2e)
-        } else if let text = message.bodyText?.nilIfBlank() {
+        } else {
+            bodyText
+            imagesGate
+        }
+    }
+
+    @ViewBuilder private var bodyText: some View {
+        if let text = message.bodyText?.nilIfBlank() {
             Text(text)
                 .font(.system(size: 15))
                 .foregroundColor(GM.textSecondary)
@@ -298,6 +420,42 @@ private struct ThreadMessageCard: View {
         } else {
             Text("This message has no text body.")
                 .font(.system(size: 14)).foregroundColor(GM.textSecondary)
+        }
+    }
+
+    /// An HTML part can point at images that live on the SENDER's server.
+    /// Fetching one is a request that carries this device's address to them and
+    /// tells them the mail was opened, so nothing here is fetched until the
+    /// person asks, for this message alone. The count is what the part
+    /// references, not what arrives: an image the sender withdrew is still
+    /// named here and fails on its own line below, which is the honest order of
+    /// the two facts.
+    @ViewBuilder private var imagesGate: some View {
+        let hidden = hiddenImages
+        if !hidden.isEmpty {
+            VStack(alignment: .leading, spacing: 8) {
+                if shownImages {
+                    // Said once, because the requests have already left by the
+                    // time this line draws — the sentence is about what just
+                    // happened, not about a choice still to be made.
+                    Text("These images load from the sender's server.")
+                        .font(.system(size: 12)).foregroundColor(GM.textTertiary)
+                    ForEach(Array(hidden.enumerated()), id: \.offset) { index, url in
+                        RemoteImageView(url: url,
+                                        label: "Image \(index + 1) in this message")
+                    }
+                } else {
+                    Text("\(hidden.count) image\(hidden.count == 1 ? "" : "s") in this "
+                         + "message load from the sender's server, not from GrapMail. "
+                         + "Loading them tells the sender this message was opened.")
+                        .font(.system(size: 12)).foregroundColor(GM.textSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    ReaderOutlineButton("Show images", identifier: "mail-show-images") {
+                        shownImages = true
+                    }
+                }
+            }
+            .padding(.top, 4)
         }
     }
 
@@ -970,6 +1128,41 @@ enum MimeType {
             "heic": "image/heic", "webp": "image/webp", "mp4": "video/mp4",
         ]
         return map[ext] ?? "application/octet-stream"
+    }
+}
+
+/// An outlined action inside the reader, in the shape the reader's own controls
+/// use.
+///
+/// There is no `maxWidth: .infinity` here and that is the whole point: the
+/// unsubscribe button owns its row alone, and three of these share one.
+/// Android's `OutlineButton(fill: false)` is the same decision made for the same
+/// reason — a filling button inside a shared row measures against the whole row
+/// and leaves its siblings no width at all, which is how two of the reader's
+/// three reply doors vanished from 74-mail-thread while iOS showed all three.
+struct ReaderOutlineButton: View {
+    let title: String
+    let identifier: String
+    let action: () -> Void
+
+    init(_ title: String, identifier: String, action: @escaping () -> Void) {
+        self.title = title
+        self.identifier = identifier
+        self.action = action
+    }
+
+    var body: some View {
+        Button(action: action) {
+            Text(title)
+                .font(.system(size: 15))
+                .foregroundColor(GM.textPrimary)
+                .padding(.horizontal, 14)
+                .frame(minHeight: 44)
+                .background(RoundedRectangle(cornerRadius: GMShape.button, style: .continuous)
+                    .stroke(GM.border, lineWidth: 1))
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier(identifier)
     }
 }
 

@@ -2600,6 +2600,241 @@ pin("the open control answers to the same identifier on both platforms",
     'testTag("mail-attachment-open")' in code_only(KT_ATTACH_UI)
     and 'accessibilityIdentifier("mail-attachment-open")' in code_only(SW_ATTACH_UI))
 
+# ── 38. the reader does the four things a reader is for (§38) ────────────────
+# Stepping, undoing the read an open caused, deciding who gets to load remote
+# images, and getting the message out. Each of these was a reader that stopped
+# short: the person had to go back to the list for the next message, could not
+# mark the one they had just read as unread, had no word about the images the
+# sender's HTML pointed at, and had no way to hand the text to anything.
+#
+# The four are pinned together because they share one risk: each is a control
+# that can exist on screen and be wired to nothing, or be wired to something
+# that quietly costs the person more than the button said.
+KT_THREAD = android("ui/screens/mail/ThreadScreen.kt")
+SW_READ = ios("MailReaderViews.swift")
+KT_HANDOFF = android("ui/screens/mail/MessageHandoff.kt")
+SW_HANDOFF = ios("MailHandoff.swift")
+KT_SNAP = android("ui/screens/mail/MailSnapshot.kt")
+SW_SNAP = ios("MailSnapshot.swift")
+KT_WALK = (ROOT / "scripts/android-walk.sh").read_text(encoding="utf-8")
+SW_WALK = (ROOT / "ios/GrapMailUITests/ScreenshotWalkUITests.swift") \
+    .read_text(encoding="utf-8")
+
+# ── stepping ────────────────────────────────────────────────────────────────
+pin("the reader can step on both platforms",
+    "onStepPrev: (MailStep) -> Unit" in code_only(KT_THREAD)
+    and "onStepNext: (MailStep) -> Unit" in code_only(KT_THREAD)
+    and "let onStepPrev: (MailStep) -> Void" in code_only(SW_READ)
+    and "let onStepNext: (MailStep) -> Void" in code_only(SW_READ))
+
+# The range the chevrons actually cover. `state.total` is the box's own count,
+# which on a paged mailbox is a number this device has never seen: a reader
+# saying "3 of 400" while its next button runs out at row 12 is a control
+# promising a walk it cannot take. Both sides count LOADED rows and say so.
+pin("the stepper names the loaded range, not the box's total",
+    'val (prior, next) = vm.neighboursOf(threadId)' in code_only(KT_THREAD)
+    and '"$at of $total loaded"' in code_only(KT_THREAD)
+    and "let near = vm.neighbours(of: id)" in code_only(SW_READ)
+    and 'of \(total) loaded' in code_only(SW_READ))
+
+# The target carries the thread flag, because the two routes are different
+# resources: `/thread/:id` answers a message id with a 404. A stepper that
+# hardcoded "it is a thread" would show "could not be opened" for mail that
+# exists — the same dead end the list's own `isThread` flag exists to avoid,
+# reopened one button further in.
+pin("the step target decides the route from the row, never a hardcoded flag",
+    "MailStep(it.threadId ?: it.id, it.threadId != null)" in code_only(KT_VM)
+    and "MailStep(id: row.threadId ?? row.id, isThread: row.threadId != nil)"
+        in code_only(SW_MODEL)
+    and code_only(KT_MAIN).count("Routes.mailThread(step.id, step.isThread)") == 2
+    and code_only(SW_ROOT).count(".mailThread(id: step.id, isThread: step.isThread)") == 2
+    and "Routes.mailThread(id, true)" not in code_only(KT_MAIN)
+    and "isThread: true" not in code_only(SW_ROOT))
+
+# Five nexts must not bury the list under five identical screens the back button
+# then has to unwind one at a time. Android replaces the destination; iOS pops
+# and re-pushes, which also rebuilds the view so the new message is fetched (a
+# reused ThreadView would not fire its appear-time ask again).
+pin("stepping replaces the reader instead of stacking another copy",
+    code_only(KT_MAIN).count("popUpTo(Routes.MAIL_THREAD) { inclusive = true }") == 2
+    and code_only(SW_ROOT).count("path.removeLast()") >= 2)
+
+# ── the read an open caused ─────────────────────────────────────────────────
+# Opening marks read on the server. The only way back out of that state lived in
+# the list's selection toolbar — on a screen the person has left.
+pin("the reader can mark its own message unread",
+    "fun markUnread(id: String, onOutcome: (String?) -> Unit)" in code_only(KT_VM)
+    and "func markUnread(_ id: String, onOutcome: @escaping (String?) -> Void)"
+        in code_only(SW_MODEL)
+    and "vm.markUnread(message.id)" in code_only(KT_THREAD)
+    and "vm.markUnread(message.id)" in code_only(SW_READ))
+
+# The control is gated on the flag it changes: "Mark unread" on mail that is
+# already unread is a button wired to nothing, and after the write succeeds the
+# thread's own copy of the message flips, so the control leaves with the state
+# it described.
+pin("the unread control appears only while the message is read",
+    "if (message.isRead) {" in code_only(KT_THREAD)
+    and "if message.isRead {" in code_only(SW_READ)
+    and "m.copy(isRead = false)" in code_only(KT_VM)
+    and "self.thread.messages[idx].isRead = false" in code_only(SW_MODEL))
+
+# The reader reports its own outcome. `actOn` files a failure into the list's
+# stale-read banner, which is not on screen here — so a refused write would have
+# looked exactly like an accepted one.
+pin("accepted and refused are two different sentences in the reader",
+    'Text("Marked unread."' in code_only(KT_THREAD)
+    and 'Text("Marked unread.")' in code_only(SW_READ)
+    and "You are signed out, so this could not be saved." in code_only(KT_VM)
+    and "You are signed out, so this could not be saved." in code_only(SW_MODEL))
+
+# ── the images the sender hosts ─────────────────────────────────────────────
+# The HTML part is not rendered, and that decision already blocks every remote
+# image. Blocking silently is the other wrong answer: the person reads a message
+# with a picture in it, sees a gap, and is told nothing about why. So the reader
+# names the count, says whose server they live on, says what loading them
+# reveals, and asks.
+pin("remote images are named and gated, per message",
+    "val hiddenImages = remoteImageUrls(message.bodyHtml)" in code_only(KT_THREAD)
+    and "private var hiddenImages: [String] { remoteImageUrls(message.bodyHtml) }"
+        in code_only(SW_READ)
+    and "tells the sender this message was opened" in code_only(KT_THREAD)
+    and "tells the sender this message was opened" in code_only(SW_READ))
+
+# The opt-in starts closed and belongs to one message. A shared flag would carry
+# a consent given for one sender's mail to the next one's, and Android's card is
+# reused across a step — an unkeyed `remember` would have kept it open.
+pin("the opt-in starts closed and is keyed to its own message",
+    "remember(message.id) { mutableStateOf(false) }" in code_only(KT_THREAD)
+    and "@State private var shownImages = false" in code_only(SW_READ))
+
+# Nothing reaches the network until the person asks: the fetcher is constructed
+# inside the branch the opt-in opens, and nowhere else.
+pin("no image is fetched before the person asks",
+    code_only(KT_THREAD).count("RemoteImageView(url") == 1
+    and code_only(KT_THREAD).index("RemoteImageView(url")
+        > code_only(KT_THREAD).index("if (!shownImages)")
+    and code_only(SW_READ).count("RemoteImageView(url:") == 1
+    and code_only(SW_READ).index("RemoteImageView(url:")
+        > code_only(SW_READ).index("if shownImages"))
+
+# The extraction rule, not the markup: only an absolute http(s) `img src` is
+# ever kept. `data:` asks nothing of the network, `cid:` is an attachment the
+# rows already offer, and anything else reaches no request.
+pin("only an absolute http(s) image address is ever considered",
+    'if (scheme != "http" && scheme != "https") return null' in code_only(KT_HANDOFF)
+    and 'guard scheme == "http" || scheme == "https" else { return nil }'
+        in code_only(SW_HANDOFF))
+
+# A sender's server has no business holding a GrapMail session. The loader is
+# its own client on both platforms: no auth header, no cookie jar, and no route
+# through the API client that has either.
+pin("the image loader carries no session and no cookies",
+    "CookieJar.NO_COOKIES" in code_only(KT_HANDOFF)
+    and "config.httpCookieAcceptPolicy = .never" in code_only(SW_HANDOFF)
+    and "token" not in code_only(KT_HANDOFF).lower()
+    and "token" not in code_only(SW_HANDOFF).lower()
+    and "ApiClient" not in code_only(SW_HANDOFF)
+    and "Api." not in code_only(KT_HANDOFF))
+
+# The content type is checked, not trusted: an <img> tag does not license this
+# app to hand a document to a renderer, and a 404 page is the common answer.
+pin("a response is only drawn when the server says it is an image",
+    'if (!type.startsWith("image/"))' in code_only(KT_HANDOFF)
+    and 'if !mime.hasPrefix("image/")' in code_only(SW_HANDOFF)
+    and "That address is not an image" in code_only(KT_HANDOFF)
+    and "That address is not an image" in code_only(SW_HANDOFF))
+
+# Four answers a fetch can have, and each said as itself. "Could not load" for
+# every one of them would let a refused request read as a network problem.
+pin("a failed image says which kind of failure it was",
+    all(s in code_only(KT_HANDOFF) for s in
+        ("refused the image", "could not be reached", "could not be read",
+         "not one this app can request"))
+    and all(s in code_only(SW_HANDOFF) for s in
+        ("refused the image", "could not be reached", "could not be read",
+         "not one this app can request")))
+
+# ── getting the message out ─────────────────────────────────────────────────
+# One document, both handoffs. Two builders drift invisibly — the shared card
+# saying the mail came from somebody while the printed page said nothing, or one
+# of them starting to carry the HTML part. Each platform defines the document
+# once and reaches it from both controls.
+pin("Android shares and prints the same one document",
+    re.search(r"^fun messageShareText", code_only(KT_HANDOFF), re.M) is not None
+    and "TextPrintAdapter(messageShareText(message), docName)" in code_only(KT_HANDOFF)
+    and "EXTRA_TEXT, messageShareText(message)" in code_only(KT_THREAD))
+pin("iOS shares and prints the same one document",
+    re.search(r"^func messageShareText", code_only(SW_HANDOFF), re.M) is not None
+    and "text: messageShareText(message))" in code_only(SW_HANDOFF)
+    and "MessageActivityView(text: messageShareText(message))" in code_only(SW_READ))
+
+# The print path has no renderer in it, on either platform. The usual recipe —
+# an off-screen web view of the HTML part, or `printHTMLURL` — is the exact thing
+# §4 forbids for the screen, moved to a surface this app controls even less.
+pin("neither print path renders HTML anywhere",
+    "printHTMLURL" not in code_only(SW_HANDOFF)
+    and "UIPrintFormatter.from(webView" not in code_only(SW_HANDOFF)
+    and "UISimpleTextPrintFormatter" in code_only(SW_HANDOFF)
+    and "PrintDocumentAdapter" in code_only(KT_HANDOFF)
+    and "WebView" not in code_only(KT_HANDOFF))
+
+# A device that cannot print, or has nothing to hand text to, is a real state
+# and gets said. A button that appeared to do nothing reads as a broken app.
+pin("a handoff the device refuses is reported, not swallowed",
+    "This device has no print service." in code_only(KT_HANDOFF)
+    and "This device could not open its print screen." in code_only(KT_HANDOFF)
+    and "This device could not open its print screen." in code_only(SW_HANDOFF)
+    and "Nothing on this device can receive shared text." in code_only(KT_THREAD))
+
+# The shared item is text, on both platforms: handing a receiver the HTML part
+# would make that app do the rendering this one refused to do.
+pin("what leaves the app is text, never the HTML part",
+    '.setType("text/plain")' in code_only(KT_THREAD)
+    and "UIActivityViewController(activityItems: [text]" in code_only(SW_HANDOFF)
+    and "EXTRA_TEXT, messageShareText(message)" in code_only(KT_THREAD)
+    and "MessageActivityView(text: messageShareText(message))" in code_only(SW_READ))
+
+# One affordance, one name on both platforms — the rule every other interactive
+# screen in this sector follows, so a walk or an assistive reader finds the same
+# control wherever the mail is opened. iOS names them at the call site of its
+# `ReaderOutlineButton`, which is where the identifier is written as a literal.
+for ident in ("mail-thread-prev", "mail-thread-next", "mail-mark-unread",
+              "mail-share", "mail-print", "mail-show-images"):
+    pin(f"the reader control {ident} answers to the same name on both platforms",
+        f'testTag("{ident}")' in code_only(KT_THREAD)
+        and (f'accessibilityIdentifier("{ident}")' in code_only(SW_READ)
+             or f'identifier: "{ident}"' in code_only(SW_READ)))
+
+# The greedy-width defect 74-mail-thread photographed: `OutlineButton` fills its
+# width, a Row measures each unweighted child against the space LEFT, and two of
+# the reader's three reply doors were drawn at zero width while iOS showed all
+# three. The fix is content-sized buttons; a pin keeps it from being "tidied"
+# back, because the regression is invisible to every other gate in CI.
+pin("the reader's action rows size their buttons to their content",
+    code_only(KT_THREAD).count("fill = false") == 6
+    and code_only(KT_THREAD).count("OutlineButton(") == 8
+    and "trailing = { Icon(Icons.Rounded.Reply" not in code_only(KT_THREAD))
+
+# The frame that proves all of this composes: an HTML-only message opened in the
+# middle of a seeded list, named the same on both platforms and launched by both
+# walks. The images-shown state is deliberately NOT photographed — it would mean
+# CI asking a sender's server for bytes, and a frame of a loading spinner proves
+# nothing the gate does not already prove in code.
+pin("116-mail-thread-images is a real frame on both platforms",
+    KT_WALK.count("116-mail-thread-images") == 2
+    and 'mail-thread-images) settled="mail-show-images"' in KT_WALK
+    and '("116-mail-thread-images", "mail-thread-images")' in SW_WALK
+    and '"mail-thread-images": "This week in letterforms"' in SW_WALK
+    and "mail-thread-images" in code_only(KT_SNAP)
+    and "mail-thread-images" in code_only(SW_SNAP))
+
+# The reader's own list positions come from the same seeded rows on both sides,
+# so the range the frame photographs is the range the code computes.
+pin("the thread frames seed the rows the stepper counts",
+    "seedRows(vm)" in code_only(KT_SNAP)
+    and "s.rows = MailSnapshotView.rows" in code_only(SW_SNAP))
+
 print()
 if failures:
     print(f"mail-honesty: {len(failures)} pin(s) broken")

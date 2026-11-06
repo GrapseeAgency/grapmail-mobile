@@ -35,6 +35,18 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 /**
+ * What the reader's next/prev controls need to open a row: which resource, and
+ * whether it is a conversation.
+ *
+ * The flag travels with the target rather than being assumed by the caller,
+ * because the two thread routes are different resources — `GET /thread/:id`
+ * answers a message id with a 404, and the list already had to learn that
+ * (`isThread` exists on its tap for the same reason). A stepper that hardcoded
+ * `true` would reopen the same dead end one button further in.
+ */
+data class MailStep(val id: String, val isThread: Boolean)
+
+/**
  * The mailbox's state and its only writer.
  *
  * ── WHAT A FAILED REFRESH IS ALLOWED TO DO ──────────────────────────────────
@@ -1355,6 +1367,83 @@ class MailboxViewModel @JvmOverloads constructor(
                 .onFailure { e ->
                     _thread.update { it.copy(loading = false,
                         error = e.message ?: "This conversation could not be opened.") }
+                }
+        }
+    }
+
+    /**
+     * The neighbours of an open message, in the order the list showed them.
+     *
+     * Every serious mail reader can step without going back to the list, and
+     * the affordance has to be honest about its range: it walks the rows this
+     * device actually loaded for the current box, not the whole mailbox. The
+     * reader says "3 of 12 loaded" for exactly that reason — claiming the
+     * box's own total would be a number nothing on this device has seen.
+     *
+     * Returns null on either side when there is nothing to step to, so the
+     * chevron is disabled rather than tapping into nowhere.
+     */
+    fun neighboursOf(id: String): Pair<MailStep?, MailStep?> {
+        val rows = _state.value.rows
+        val idx = rows.indexOfFirst { it.id == id || it.threadId == id }
+        if (idx < 0) return null to null
+        return stepOf(rows.getOrNull(idx - 1)) to stepOf(rows.getOrNull(idx + 1))
+    }
+
+    /**
+     * The row as the reader must open it. A row with a `threadId` is a
+     * conversation and goes to the thread route; a row without one is a single
+     * message and the thread route answers its id with a 404. The list's own
+     * tap makes exactly this pair of decisions (`MailboxScreen`'s `tid ?: row.id`
+     * and `tid != null`), so the stepper derives its target from the row instead
+     * of assuming every neighbour is a thread — a reader that opened a message id
+     * on the thread route would show "could not be opened" for mail that exists.
+     */
+    fun stepOf(row: MailMessageDto?): MailStep? =
+        row?.let { MailStep(it.threadId ?: it.id, it.threadId != null) }
+
+    /** The reader's position within the loaded rows, 1-based; 0 when absent. */
+    fun loadedPositionOf(id: String): Int {
+        val rows = _state.value.rows
+        val idx = rows.indexOfFirst { it.id == id || it.threadId == id }
+        return if (idx < 0) 0 else idx + 1
+    }
+
+    /** How many loaded rows the reader is stepping between, for its own label. */
+    fun loadedRowCount(): Int = _state.value.rows.size
+
+    /**
+     * Mark one message unread from inside the reader, and report the outcome to
+     * the reader.
+     *
+     * `actOn` is the list's path: it files a failure into the list's stale-read
+     * banner, which is not on screen here, and it leaves the conversation's own
+     * copy of the message flagged as read. A control in the reader therefore
+     * needs both halves — the thread's flag patched, so the button that offered
+     * this stops offering it, and the real result handed back to say out loud
+     * what happened. `null` means the server accepted it.
+     */
+    fun markUnread(id: String, onOutcome: (String?) -> Unit) {
+        viewModelScope.launch {
+            val t = token()
+            if (t == null) {
+                onOutcome("You are signed out, so this could not be saved.")
+                return@launch
+            }
+            runCatching { Api.mailAction(t, id, MailAction.Unread, null) }
+                .onSuccess {
+                    applyLocally(id, MailAction.Unread)
+                    _thread.update { s ->
+                        s.copy(messages = s.messages.map { m ->
+                            if (m.id == id) m.copy(isRead = false) else m
+                        })
+                    }
+                    reproject()
+                    onOutcome(null)
+                }
+                .onFailure {
+                    onOutcome((it as? ApiException)?.message
+                        ?: "That action didn't go through.")
                 }
         }
     }

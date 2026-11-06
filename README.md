@@ -385,6 +385,74 @@ working mailbox.
   still resolve through `GM`'s trait lookup, so the frame goes through the same
   path a real dark-mode user does.
 
+### The reader batch — stepping, unread, images, and getting mail out
+
+The reader used to be a screen you read and left. Four things were missing, and
+each was the kind that reads as a finished app while the person does the work:
+
+- **Next and prev step through the rows this device loaded.** `neighboursOf`
+  (`MailboxViewModel.kt`) / `neighbours(of:)` (`MailboxModel.swift)`) name the
+  target *and* whether it is a conversation, because the list's own tap already
+  had to learn that `/thread/:id` answers a message id with a 404 — a stepper
+  that hardcoded "it is a thread" reopens that dead end one button further in.
+  The label says "7 of 11 **loaded**", never the box's total: a reader claiming
+  "3 of 400" whose next runs out at row 12 is a control promising a walk it
+  cannot take. Stepping replaces the destination (`popUpTo(..., inclusive)` on
+  Android, remove-then-append on iOS) so five nexts do not bury the list under
+  five identical screens the back gesture has to unwind one at a time.
+- **Marking unread lives where the read happened.** Opening a message marks it
+  read on the server, and the only way out of that state was the list's
+  selection toolbar — on a screen the person has left. The reader's control uses
+  a new `markUnread(id, onOutcome)` rather than the list's `actOn`, because
+  `actOn` files a failure into the list's stale-read banner (not on screen here)
+  and leaves the conversation's own copy of the message flagged as read. The
+  thread's flag is patched too, so the button disappears with the state it
+  described, and "Marked unread." is said only when the server accepted it.
+- **Remote images are gated, per message, and the gate says what it costs.**
+  The HTML part is not rendered (§4), which already blocks every remote image —
+  but blocking silently leaves a gap the person cannot explain. The reader now
+  names the count, says the images come from the sender's server and not
+  GrapMail, says loading them tells the sender the message was opened, and asks.
+  `remoteImageUrls` reads one attribute and keeps only an absolute http(s) URI
+  with a host; `data:` needs no consent, `cid:` belongs to the attachment rows,
+  and nothing else reaches a request. The loader is its **own** HTTP client —
+  no auth header, no cookie jar (`CookieJar.NO_COOKIES` /
+  `httpCookieAcceptPolicy = .never`) — because a sender's server has no business
+  holding a GrapMail session. Content type is checked, not trusted: an `<img>`
+  tag does not license handing a document to a renderer. Four failure kinds are
+  named separately, and the opt-in is keyed to the message (Android's card is
+  reused across a step, so an unkeyed `remember` would have carried one sender's
+  consent to the next).
+- **Share and print hand over one document, and it is text.**
+  `messageShareText` is defined once per platform and reached from both
+  controls — two builders drift invisibly. Neither print path renders HTML
+  anywhere: the usual recipe (an off-screen WebView, or `printHTMLURL`) is §4's
+  forbidden thing moved to a surface the app controls even less, so Android
+  paginates measured text through a `PrintDocumentAdapter` of its own and iOS
+  uses `UISimpleTextPrintFormatter`. A device that cannot print, or has nothing
+  to hand text to, is said out loud.
+- **The reply row was drawn with two of its three buttons invisible.** Found
+  while laying the new row out beside it: `OutlineButton` fills its width by
+  default, a `Row` measures each unweighted child against the space *left*, and
+  so "Reply all" and "Forward" got zero width — `74-mail-thread` photographed a
+  reader with two missing actions and every count in CI stayed green, while iOS
+  showed all three. The fix is `fill = false` (content-sized) on the six reader
+  actions; both walks now *assert* the two doors exist, and §38 pins the counts
+  so the "tidying" cannot come back.
+- **`116-mail-thread-images`** is the frame for all of it: an HTML-only
+  newsletter, opened at the row in the *middle* of the seeded list so both
+  chevrons are enabled and the range claim is on screen. The thread frames now
+  seed the rows the stepper counts (`seedRows`), which is what makes the
+  photographed "7 of 11 loaded" the number the code actually computes. The
+  images-*shown* state is deliberately not photographed: it would mean CI asking
+  a sender's server for bytes, and a frame of a loading spinner proves nothing
+  the gate does not already prove in code.
+- **Pinned as §38** (`scripts/mail-honesty.py`, 522 pins) and proved by
+  mutation: `scripts/mutate-38.py` seeds one regression per rule — a hardcoded
+  thread flag, an ungated unread control, a cookie jar, an unchecked content
+  type, a web view in the print path, a filling button, a renamed frame — and
+  requires the gate to refuse all seventeen.
+
 ### Which backend, and the two halves of it
 
 | Surface | Where it actually lives | State |

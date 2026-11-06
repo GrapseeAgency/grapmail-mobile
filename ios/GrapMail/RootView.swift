@@ -606,7 +606,22 @@ struct RootView: View {
                     ThreadView(
                         vm: mail, e2e: e2e, id: id, isThread: isThread,
                         onBack: { path.removeLast() },
-                        onReply: { id, mode in path.append(.mailCompose(reply: id, mode: mode)) }
+                        onReply: { id, mode in path.append(.mailCompose(reply: id, mode: mode)) },
+                        // Stepping replaces the reader rather than pushing
+                        // another copy of it: five nexts must not bury the
+                        // list under five identical screens the back gesture
+                        // has to unwind one at a time. The target's own flag
+                        // decides the route, exactly as the list's tap does —
+                        // a neighbour that is a single message would otherwise
+                        // be opened on the thread route and answer 404.
+                        onStepPrev: { step in
+                            path.removeLast()
+                            path.append(.mailThread(id: step.id, isThread: step.isThread))
+                        },
+                        onStepNext: { step in
+                            path.removeLast()
+                            path.append(.mailThread(id: step.id, isThread: step.isThread))
+                        }
                     )
                 case let .mailCompose(reply, mode):
                     ComposeView(vm: mail, account: account, e2e: e2e, replyId: reply, mode: mode,

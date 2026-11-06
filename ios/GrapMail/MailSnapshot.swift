@@ -357,6 +357,32 @@ struct MailSnapshotView: View {
         return (try? dec.decode(MailMessageFull.self, from: Data(json.utf8))) ?? MailMessageFull()
     }
 
+    /// The HTML-only newsletter, decoded through the same real decoder as
+    /// [full]. No `bodyText` on purpose: the reader then shows the stripped
+    /// text, admits it is a plain-text rendering, and gates the two images the
+    /// sender's own server hosts.
+    ///
+    /// The attributes are single-quoted where Android's seed uses double quotes.
+    /// That is deliberate rather than sloppy: `remoteImageUrls` accepts both
+    /// shapes and an unquoted one, and a seed set that only ever used one would
+    /// leave the other two branches unphotographed on one of the platforms.
+    fileprivate static func htmlOnly(_ id: String) -> MailMessageFull {
+        let json = """
+        {"id":"\(id)","threadId":"t-\(id)","direction":"in","status":"delivered",
+         "from":{"name":"The Weekly Draft","address":"hello@newsletter.example"},
+         "to":["you@grapmail.com"],"subject":"This week in letterforms",
+         "isRead":true,"isStarred":false,"hasAttachments":false,
+         "createdAt":"2026-10-28T08:00:00Z",
+         "bodyHtml":"<html><body><p>The kerning quarrels, mostly, and one \
+         risograph plate that printed better than the mockup.</p>\
+         <img src='https://images.newsletter.example/plate-1.png'>\
+         <img src='https://images.newsletter.example/pixel.gif?m=n2'></body></html>",
+         "attachments":[]}
+        """
+        return (try? JSONDecoder().decode(MailMessageFull.self, from: Data(json.utf8)))
+            ?? MailMessageFull()
+    }
+
     var body: some View {
         frame
             .task(id: name) {
@@ -496,12 +522,26 @@ struct MailSnapshotView: View {
             case "mail-thread":
                 return AnyView(
                 secondary(ThreadView(vm: model, e2e: e2e, id: "t-m1",
-                                     isThread: true, onBack: {}, onReply: { _, _ in }))
+                                     isThread: true, onBack: {}, onReply: { _, _ in },
+                                     onStepPrev: {}, onStepNext: {}))
                 )
             case "mail-thread-encrypted":
                 return AnyView(
                 secondary(ThreadView(vm: model, e2e: e2e, id: "t-m9",
-                                     isThread: true, onBack: {}, onReply: { _, _ in }))
+                                     isThread: true, onBack: {}, onReply: { _, _ in },
+                                     onStepPrev: {}, onStepNext: {}))
+                )
+            // The live reader again, over a message whose only part is HTML: the
+            // frame photographs the images gate, the stepper's honest range and
+            // the reader's own read-state control, none of which a CI mailbox
+            // can produce. The closures do nothing, as everywhere in this host —
+            // a walk that tapped them would be asking a sender's server for
+            // bytes on a reserved address, which proves nothing about the gate.
+            case "mail-thread-images":
+                return AnyView(
+                secondary(ThreadView(vm: model, e2e: e2e, id: "t-n2",
+                                     isThread: true, onBack: {}, onReply: { _, _ in },
+                                     onStepPrev: {}, onStepNext: {}))
                 )
             case "mail-compose":
                 return AnyView(
@@ -767,6 +807,22 @@ extension MailboxModel {
         // photographed its empty branch with the sample data set.
         seedLabelsForSnapshot(MailSnapshotView.labels())
         switch name {
+        case "mail-thread", "mail-thread-encrypted", "mail-thread-images":
+            // The rows go in beside the conversation because the reader now
+            // names its own range: "7 of 11 loaded" is computed from the list
+            // this device holds, and a host that seeded only the conversation
+            // would photograph a reader that cannot say how far its chevrons
+            // reach. The same sample rows the list frames use — the reader's
+            // arithmetic stays the shipping one.
+            seedForSnapshot { s in
+                s.rows = MailSnapshotView.rows
+                s.loaded = MailSnapshotView.rows.count
+                s.total = MailSnapshotView.rows.count
+            }
+        default:
+            break
+        }
+        switch name {
         case "mail-thread":
             seedThreadForSnapshot([MailSnapshotView.full("m1",
                 body: "Attached is the invoice for the quarter, payable on receipt. "
@@ -776,6 +832,14 @@ extension MailboxModel {
             seedThreadForSnapshot([MailSnapshotView.full("m9", body: nil,
                                                             encrypted: true)],
                                   for: "t-m9")
+        // An HTML-only newsletter, opened at the row that sits in the middle of
+        // the seeded list — a first or last row can never photograph both
+        // chevrons enabled, and the range claim is the thing on screen. The two
+        // `img` addresses are on a reserved TLD like every other host in this
+        // file: the frame shows the gate, and the gate is the point — nothing in
+        // CI asks that address for anything.
+        case "mail-thread-images":
+            seedThreadForSnapshot([MailSnapshotView.htmlOnly("n2")], for: "t-n2")
         case "mail-screener":
             seedScreenerForSnapshot(enabled: true, pending: 3)
         case "mail-adv-search":
