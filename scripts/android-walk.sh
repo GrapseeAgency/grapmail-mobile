@@ -705,9 +705,14 @@ for spec in "two-factor-on:40-sec-two-factor-on" \
   # were drawn at zero width. A photograph of the reader missing two of its
   # actions still filled every count CI checks, which is why this is asserted
   # and not merely looked at.
+  #
+  # Matched on text OR content-description: Compose merges a button's label into
+  # the button's own semantics node, and which attribute uiautomator carries it
+  # in depends on the merge — an assertion that reads only one of the two can
+  # fail on a screen that shows the control, and that is how checks get deleted.
   if [ "$nm" = "mail-thread" ]; then
     for door in "Reply all" "Forward"; do
-      if [ -z "$(find_nodes "n.get('text','')=='$door'")" ]; then
+      if [ -z "$(find_nodes "n.get('text','')=='$door' or n.get('content-desc','')=='$door'")" ]; then
         echo "FAIL: the reader drew no '$door' button" >&2
         FAILURES=$((FAILURES + 1))
       fi

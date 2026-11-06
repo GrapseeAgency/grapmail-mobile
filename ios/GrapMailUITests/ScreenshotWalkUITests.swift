@@ -579,9 +579,18 @@ final class ScreenshotWalkUITests: XCTestCase {
             // The check lives here as well because an assertion that exists on
             // one platform only records that platform's good luck, and 74's
             // photograph passed every gate while showing two missing actions.
+            //
+            // Queried as a BUTTON first, with the static text as the fallback:
+            // SwiftUI folds a plain button's label into the button element, so
+            // `staticTexts["Reply all"]` alone has no such child to find, and
+            // the first run failed on a screen that visibly shows the door. A
+            // check that can only fail is worse than no check — it teaches the
+            // next reader to delete the line.
             if screen.name == "mail-thread" {
                 for door in ["Reply all", "Forward"] {
-                    XCTAssertTrue(app.staticTexts[door].waitForExistence(timeout: 5),
+                    let asButton = app.buttons[door].firstMatch
+                    let asText = app.staticTexts[door].firstMatch
+                    XCTAssertTrue(asButton.waitForExistence(timeout: 5) || asText.exists,
                                   "the reader drew no '\(door)' button")
                 }
             }
