@@ -50,8 +50,17 @@ android {
         // 0.3.2 is the design-and-behavior release: the frame-audit fixes (empty
         // states, centering, destructive colours, toolbar pair), the compose
         // parity, and the non-filling button inset that un-clipped "Check".
-        versionCode = 6
-        versionName = "0.3.2"
+        // 0.4.0 is the advanced-completion release, and it is the one the audit
+        // asked for by name: artwork drawn in code instead of cropped from the
+        // reference, drafts that open in the composer, attachments that actually
+        // open, a reader that steps / marks unread / asks before loading a
+        // sender's images / hands mail to share and print, and the platform
+        // rules that were missing entirely — an iOS icon that had no file, no
+        // splash on either platform, haptics tied to the write rather than the
+        // tap, a background new-mail read that says what it is evidence of, an
+        // offline fact read from the device, and a home-screen Compose shortcut.
+        versionCode = 7
+        versionName = "0.4.0"
         // Real account API — same contract the website uses.
         buildConfigField("String", "API_BASE", "\"https://grapsee.com/api\"")
     }

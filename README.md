@@ -1,4 +1,4 @@
-# GrapMail Mobile — v0.0.0.1
+# GrapMail Mobile — v0.4.0
 
 Native GrapMail apps for Android and iOS. The account & authentication sector
 of the website, ported 1:1 to each platform's native stack — no cross-platform
@@ -7,7 +7,12 @@ framework, no shared UI layer.
 - **Android** — Kotlin + Jetpack Compose (`android/`)
 - **iOS** — Swift + SwiftUI (`ios/`)
 
-## What v0.0.0.1 contains
+## What the first release (v0.0.0.1) contained
+
+The sections below are historical: each describes the batch it shipped in. The
+current version is in the title, asserted against `build.gradle.kts` and
+`project.yml` by the version pin in `scripts/mail-honesty.py` — the tag gate
+refuses a release page that cannot name its own build.
 
 The full signup arc plus sign-in, exactly as the founder's designs specify:
 
