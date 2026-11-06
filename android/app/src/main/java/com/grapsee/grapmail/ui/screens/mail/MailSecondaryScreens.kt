@@ -33,6 +33,7 @@ import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.HelpOutline
 import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.MailOutline
+import androidx.compose.material.icons.rounded.NotificationsActive
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.PersonAddAlt1
 import androidx.compose.material.icons.rounded.Settings
@@ -663,7 +664,7 @@ fun MailSettingsScreen(
                 mutableStateOf(com.grapsee.grapmail.logic.Notifications.allowed(notifyContext))
             }
             val askNotifications = androidx.activity.compose.rememberLauncherForActivityResult(
-                androidx.activity.contract.ActivityResultContracts.RequestPermission(),
+                androidx.activity.result.contract.ActivityResultContracts.RequestPermission(),
             ) { granted ->
                 // Re-read the system's state rather than trusting the callback:
                 // the grant can be refused with "don't ask again", and the

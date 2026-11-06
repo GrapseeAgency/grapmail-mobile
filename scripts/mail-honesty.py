@@ -3075,6 +3075,76 @@ pin("no push is claimed where there is no push service",
     and "firebase" not in KT_GRADLE.lower()
     and "FCM" not in code_only(KT_POLL) and "APNs" not in code_only(SW_INT))
 
+# ── 40. settings the server cannot answer are not built (§40) ───────────────
+# W6 asked for a compose "From" picker wired to `GET /grapmail/aliases`. The
+# read does exist; the SEND does not accept a from-address at all — `/send` and
+# `/draft` both build `fromAddress` from the mailbox's own handle, and
+# `mail_aliases` has no send-side column of any kind (aliases are addresses that
+# DELIVER here). A picker would therefore choose an address, show it in the
+# composer, and send from another one: the recipient sees the address the person
+# just declined to use, and only they can discover the disagreement.
+#
+# So the excluded list is documented instead (`FINDINGS.md`), with the exact
+# endpoint change each item needs, and the absences below are pinned so the
+# half-built version cannot be added later because the code looked nearby.
+KT_SEND_DTO = android("data/Api.kt")
+SW_SEND_DTO = ios("MailAPI.swift")
+KT_COMPOSE = android("ui/screens/mail/ComposeScreen.kt")
+SW_COMPOSE = ios("MailReaderViews.swift")
+FINDINGS = (ROOT / "FINDINGS.md")
+
+
+def declared_fields(src: str, marker: str, limit: int = 900) -> str:
+    """The text of one type's declaration body, or "" when the marker is gone.
+
+    Returning "" rather than indexing a missing split is the point: a pin whose
+    marker was renamed should FAIL with its own reason, not raise and take the
+    whole gate's output with it -- the failure mode §39's splash helper had to
+    be written around for the same reason.
+    """
+    at = src.find(marker)
+    return "" if at == -1 else src[at:at + limit]
+
+
+# The wire format is the strongest form of the rule: a client that invented a
+# `from` field would be sending a parameter the route ignores, which is a bug
+# that looks like a feature in every screenshot.
+kt_send_body = declared_fields(code_only(KT_SEND_DTO), "data class MailSendRequest")
+kt_draft_body = declared_fields(code_only(KT_SEND_DTO), "data class MailDraftRequest")
+sw_send_body = declared_fields(code_only(SW_SEND_DTO), "struct MailSendRequest")
+sw_draft_body = declared_fields(code_only(SW_SEND_DTO), "struct MailDraftRequest")
+pin("neither send request carries a from-address the server would ignore",
+    all(b for b in (kt_send_body, kt_draft_body, sw_send_body, sw_draft_body))
+    and not re.search(r"^\s*(?:val|var)\s+from(?:Address)?\s*[:=]",
+                       "\n".join((kt_send_body, kt_draft_body)), re.M)
+    and not re.search(r"^\s*var\s+from(?:Address)?\s*[:=]",
+                      "\n".join((sw_send_body, sw_draft_body)), re.M))
+
+pin("the composer offers no sender it cannot send from",
+    "From:" not in code_only(KT_COMPOSE)
+    and "pickAlias" not in code_only(KT_COMPOSE)
+    and "onPickFrom" not in code_only(SW_COMPOSE)
+    and "aliasesState" not in code_only(KT_COMPOSE)
+    and "aliasesState" not in code_only(SW_COMPOSE))
+
+pin("the excluded settings are documented with the endpoint each needs",
+    FINDINGS.exists()
+    and all(name in FINDINGS.read_text(encoding="utf-8") for name in (
+        "Undo timeout", "Swipe-action", "Default reply mode",
+        "Remote-image policy", "Link previews",
+        "mail_aliases", "fromAddress")))
+
+# Aliases ARE shipped where the endpoint is real: minting, removing, and the
+# receive-side meaning. The read state is kept distinct from an empty answer, so
+# a refused list never reads as "this mailbox has no aliases".
+pin("aliases ship for what the server actually does with them",
+    "mailCreateAlias" in code_only(android("data/Api.kt"))
+    and "mailDeleteAlias" in code_only(android("data/Api.kt"))
+    and "mailCreateAlias" in code_only(SW_SEND_DTO)
+    and "mailDeleteAlias" in code_only(SW_SEND_DTO)
+    and "read = .reading" in code_only(SW_MODEL)
+    and "AliasesState" in code_only(KT_VM))
+
 print()
 if failures:
     print(f"mail-honesty: {len(failures)} pin(s) broken")
