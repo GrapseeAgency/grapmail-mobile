@@ -626,6 +626,16 @@ else
   fi
 fi
 
+# The composer the shortcut opened is not where §5 begins: the send leg starts
+# from the home chrome and taps the compose FAB. Return to home the same way
+# every other leg does, bounded, and let the next step fail with its own message
+# if the screen never comes back.
+for _ in 1 2 3; do
+  [ -n "$(find_nodes "n.get('resource-id','').rsplit('/',1)[-1]=='mail-menu'" | head -1)" ] && break
+  adb shell input keyevent 4
+  sleep 1
+done
+
 # ── 5. a real write, and the feel that has to agree with it ──
 # The haptic is tied to the server's answer rather than to the tap, which is the
 # design decision §39 pinned. This checks it against the answer instead of the
