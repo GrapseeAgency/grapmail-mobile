@@ -1,6 +1,8 @@
 package com.grapsee.grapmail.data
 
 import android.content.Context
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 /**
  * Rotating the gateway's JWT pair.
@@ -10,24 +12,36 @@ import android.content.Context
  * mail. The web client has done this since it moved to the gateway; the app has
  * to do the same or the migration would trade one broken screen for another.
  *
- * Rotation is single-flight on the OkHttp side (the authenticator runs per
- * call chain), and the gateway invalidates the presented refresh token, so
- * every successful refresh must be written back — reading the old one again
- * would strand the session.
+ * Rotation is single-flight. The gateway invalidates the presented refresh token
+ * on every rotation, so two concurrent renewals mean the second one presents a
+ * token the first just spent: it is refused, its caller sees a 401, and the
+ * person is signed out of a session that is perfectly alive. The mailbox fires
+ * several calls at once (list, stats, me), which is exactly when a stale token
+ * expires — so the race is not a corner case, it is the normal path.
+ *
+ * Under the lock the store is re-checked: the first caller rotates and writes a
+ * fresh token, and every caller waiting behind it returns with that token
+ * instead of rotating again.
  */
 object SessionRefresh {
 
-    /** True when the pair was rotated and the stored session is usable again. */
-    suspend fun refresh(context: Context): Boolean {
-        val refresh = SessionStore.refreshToken(context) ?: return false
-        val pair = runCatching { Api.refreshSession(refresh) }.getOrNull() ?: return false
-        val token = pair.accessToken ?: pair.token ?: return false
+    private val mutex = Mutex()
+
+    /** True when a usable session is stored after this call. */
+    suspend fun refresh(context: Context): Boolean = mutex.withLock {
+        // Somebody else may have rotated while this caller waited. Asking the
+        // store — not the caller's stale request — is the point of the lock.
+        if (SessionStore.hasValidSession(context)) return@withLock true
+
+        val refresh = SessionStore.refreshToken(context) ?: return@withLock false
+        val pair = runCatching { Api.refreshSession(refresh) }.getOrNull() ?: return@withLock false
+        val token = pair.accessToken ?: pair.token ?: return@withLock false
         SessionStore.updateTokens(
             context,
             token,
             pair.refreshToken,
             pair.expiresAtMillis,
         )
-        return true
+        true
     }
 }

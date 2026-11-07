@@ -964,7 +964,18 @@ struct ApiClient {
     /// dedicated POST is the whole operation, and its answer is written back
     /// through `SessionStore.updateTokens` because the gateway invalidates the
     /// presented refresh token on every rotation.
+    ///
+    /// Single-flight: the gateway invalidates the presented refresh token on
+    /// every rotation, so two concurrent renewals would have the second one
+    /// spend a token the first already used — it is refused, its caller sees a
+    /// 401, and a live session is signed out. The mailbox fires several calls at
+    /// once (list, stats, me), which is exactly when a stale token expires, so
+    /// this gate is on the normal path, not a corner case.
     static func renewPair() async -> String? {
+        await RenewalGate.shared.run { await performRenewPair() }
+    }
+
+    private static func performRenewPair() async -> String? {
         guard let refresh = SessionStore.refreshToken,
               let url = URL(string: "\(base)/grapsee/auth/refresh") else { return nil }
         struct RefreshBody: Encodable { let refreshToken: String }
@@ -986,6 +997,21 @@ struct ApiClient {
             expiresAtRaw: pair.expiresAtMillis
         )
         return access
+    }
+
+    /// Shares one renewal between every caller that arrived while it ran.
+    private actor RenewalGate {
+        static let shared = RenewalGate()
+        private var inFlight: Task<String?, Never>?
+
+        func run(_ operation: @escaping () async -> String?) async -> String? {
+            if let inFlight { return await inFlight.value }
+            let task = Task { await operation() }
+            inFlight = task
+            let result = await task.value
+            inFlight = nil
+            return result
+        }
     }
 
     /// One definition of "the server no longer knows us", shared by the JSON
