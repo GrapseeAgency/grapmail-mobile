@@ -18,10 +18,19 @@ struct SignInView: View {
 
     var body: some View {
         ZStack(alignment: .topTrailing) {
-            GM.bg.ignoresSafeArea()
-            DecorativeBlobs()
-                .frame(width: 520, height: 320)
-                .ignoresSafeArea(edges: .top)
+            // The decorative field is an overlay of the BACKGROUND, not a
+            // ZStack sibling. As a fixed 520-point sibling it decided the
+            // ZStack's width, so on a 402-point screen the entire form was laid
+            // out 59 points wider than the screen on each side: the title, the
+            // fields and the Sign In button all ran off both edges (photographed
+            // by the walk as "elcome back" and clipped fields). A view attached
+            // to the background cannot change its parent's layout size.
+            GM.bg
+                .ignoresSafeArea()
+                .overlay(alignment: .topTrailing) {
+                    DecorativeBlobs()
+                        .frame(width: 520, height: 320)
+                }
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
                     AccountHeader(onBack: onBack)
