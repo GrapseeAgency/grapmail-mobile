@@ -160,6 +160,20 @@ struct RootView: View {
             // and a photograph set that contradicts itself screen by screen.
             .toolbar(.hidden, for: .navigationBar)
             .navigationBarBackButtonHidden(true)
+            // The gateway's access token lives one hour; the refresh token is
+            // good for thirty days. A stored pair whose access token aged out
+            // is renewed silently here, so launching the morning after a
+            // sign-in does not present the sign-in screen to someone who is
+            // still signed in. The snapshot host never refreshes: the walk
+            // owns its own session.
+            .task {
+                if SecuritySnapshot.requested() == nil,
+                   SessionStore.token != nil,
+                   !SessionStore.hasValidSession,
+                   await ApiClient.renewPair() != nil {
+                    if path.isEmpty || path.last == .signIn { path = [.home] }
+                }
+            }
             // A dead token is discovered by the server, not by us: the first
             // authenticated call that comes back 401 clears the Keychain and
             // posts this. Without the handler the app stays on a signed-in

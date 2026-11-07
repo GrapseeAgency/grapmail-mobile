@@ -16,18 +16,31 @@ enum DeviceId {
 /// Keychain-backed session storage — the st1 token never touches plaintext disk.
 enum SessionStore {
     private static let tokenKey = "grapmail.session.token"
+    private static let refreshKey = "grapmail.session.refresh"
     private static let addressKey = "grapmail.session.address"
     private static let nameKey = "grapmail.session.name"
     private static let expiresKey = "grapmail.session.expires"
 
-    static func save(token: String, address: String, name: String, expiresAtRaw: Double? = nil) {
+    static func save(token: String, refreshToken: String? = nil, address: String, name: String, expiresAtRaw: Double? = nil) {
         Keychain.set(token, for: tokenKey)
+        if let refreshToken { Keychain.set(refreshToken, for: refreshKey) }
         UserDefaults.standard.set(address, forKey: addressKey)
         UserDefaults.standard.set(name, forKey: nameKey)
         UserDefaults.standard.set(expiresAtRaw, forKey: expiresKey)
     }
 
+    /// The pair after a rotation, keeping address and name.
+    ///
+    /// The gateway invalidates the presented refresh token on every refresh, so
+    /// writing only the access token would strand the session at the next one.
+    static func updateTokens(token: String, refreshToken: String?, expiresAtRaw: Double?) {
+        Keychain.set(token, for: tokenKey)
+        if let refreshToken { Keychain.set(refreshToken, for: refreshKey) }
+        UserDefaults.standard.set(expiresAtRaw, forKey: expiresKey)
+    }
+
     static var token: String? { Keychain.get(tokenKey) }
+    static var refreshToken: String? { Keychain.get(refreshKey) }
     static var address: String? { UserDefaults.standard.string(forKey: addressKey) }
     static var name: String? { UserDefaults.standard.string(forKey: nameKey) }
 
@@ -45,6 +58,7 @@ enum SessionStore {
 
     static func clear() {
         Keychain.delete(tokenKey)
+        Keychain.delete(refreshKey)
         UserDefaults.standard.removeObject(forKey: addressKey)
         UserDefaults.standard.removeObject(forKey: nameKey)
         UserDefaults.standard.removeObject(forKey: expiresKey)

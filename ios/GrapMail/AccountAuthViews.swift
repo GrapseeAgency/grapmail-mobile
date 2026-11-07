@@ -151,6 +151,7 @@ struct SignInView: View {
                 let address = resp.account?.address ?? identifier
                 SessionStore.save(
                     token: token,
+                    refreshToken: resp.refreshToken,
                     address: address,
                     name: resp.account?.name ?? "",
                     expiresAtRaw: resp.expiresAtMillis
@@ -253,6 +254,7 @@ struct TwoFactorView: View {
                 let address = resp.user?.address ?? model.identifier
                 SessionStore.save(
                     token: token,
+                    refreshToken: resp.refreshToken,
                     address: address,
                     name: resp.user?.name ?? "",
                     expiresAtRaw: resp.expiresAtMillis
@@ -405,6 +407,7 @@ struct BackupCodeView: View {
                 let address = resp.user?.address ?? model.identifier
                 SessionStore.save(
                     token: token,
+                    refreshToken: resp.refreshToken,
                     address: address,
                     name: resp.user?.name ?? "",
                     expiresAtRaw: resp.expiresAtMillis

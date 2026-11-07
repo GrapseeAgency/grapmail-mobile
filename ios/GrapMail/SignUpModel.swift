@@ -128,8 +128,11 @@ final class SignUpModel: ObservableObject {
                         acceptedTerms: true
                     )
                 )
-                let address = resp.account?.address ?? "\(s.chosenHandle)@grapsee.com"
-                update { $0.creating = false; $0.createdAddress = address; $0.createdName = resp.account?.name }
+                // The gateway answers `grapmail` (and no account object); the
+                // old local route answered `account.address`.
+                let fullName = "\(s.firstName) \(s.lastName)".trimmingCharacters(in: .whitespaces)
+                let address = resp.grapmail ?? resp.account?.address ?? "\(s.chosenHandle)@grapsee.com"
+                update { $0.creating = false; $0.createdAddress = address; $0.createdName = resp.account?.name ?? fullName }
                 // Auto sign-in — the same call the website makes the moment the
                 // account exists. The freshly-created credential can take a
                 // beat to become usable, so retry a few times before giving up
@@ -143,14 +146,15 @@ final class SignUpModel: ObservableObject {
                     if let session = try? await ApiClient.signIn(identifier: address, password: s.password),
                        let token = session.sessionToken ?? session.accessToken ?? session.token {
                         SessionStore.save(
-                            token: token, address: address,
+                            token: token, refreshToken: session.refreshToken,
+                            address: address,
                             name: resp.account?.name ?? s.firstName,
                             expiresAtRaw: session.expiresAtMillis
                         )
                         break
                     }
                 }
-                onCreated(address, resp.account?.name ?? s.firstName)
+                onCreated(address, resp.account?.name ?? fullName)
             } catch let ApiError.http(_, code, message) {
                 update { $0.creating = false }
                 switch code {

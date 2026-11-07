@@ -785,12 +785,12 @@ pin("Android drops no HTTP status anywhere in the mail API",
 # Sign-in now goes through the gateway that owns the mailbox, so the two tokens
 # are one token: a 401 on any authenticated call means the session is dead, and a
 # carve-out would keep an expired session alive behind a screen that cannot load.
-# Android's carve-out is gone; iOS's stays until its client moves too.
+# Neither client carves mail out any more.
 pin("iOS's mail routes end no account session on a 401",
     "signalUnauthorized" not in code_only(SW_API))
-pin("iOS's JSON carve-out is still scoped to non-mail paths",
-    re.search(r"if http\.statusCode == 401, bearer != nil, !path\.hasPrefix\(mailBase\)",
-              code_only(ios("APIClient.swift"))) is not None)
+pin("iOS signals a dead session on every authenticated 401",
+    "!path.hasPrefix(mailBase)" not in code_only(ios("APIClient.swift"))
+    and "signalUnauthorized()" in code_only(ios("APIClient.swift")))
 pin("Android signals a dead session on every authenticated 401",
     "!isMailCall" not in code_only(KT_API) and "SessionEvents.signalExpired()" in code_only(KT_API))
 

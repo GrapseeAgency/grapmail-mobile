@@ -905,6 +905,7 @@ struct ChangePasswordView: View {
                                 if let fresh = resp.accessToken {
                                     SessionStore.save(
                                         token: fresh,
+                                        refreshToken: SessionStore.refreshToken,
                                         address: SessionStore.address ?? "",
                                         name: SessionStore.name ?? "",
                                         // Without this the expiry key is removed, which
@@ -1029,6 +1030,7 @@ struct SignOutAllDevicesView: View {
                                 if let fresh = resp.accessToken {
                                     SessionStore.save(
                                         token: fresh,
+                                        refreshToken: SessionStore.refreshToken,
                                         address: SessionStore.address ?? "",
                                         name: SessionStore.name ?? "",
                                         // Without this the expiry key is removed, which

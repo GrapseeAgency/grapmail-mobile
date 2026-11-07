@@ -117,25 +117,38 @@ struct CreateRequest: Codable {
     var grapmailHandle: String?
     var password: String
     var acceptedTerms: Bool?
+    /// The gateway splits the agency dashboard's CLIENT accounts from GrapMail's
+    /// USER accounts; only USER accounts get a handle and a mailbox.
+    var accountType: String = "USER"
 }
 
 struct CreateResponse: Codable {
     var success: Bool = false
     var account: AccountDto?
     var mailboxDomain: String?
+    /// The gateway answers with the address it provisioned, under its own name.
+    var grapmail: String?
+    var grapmailStatus: String?
+    /// Present when the account carried an email (the gateway then gates the
+    /// first sign-in on an emailed OTP); a handle-only signup does not set it.
+    var requireOtp: Bool?
     var message: String?
     var phoneVerified: Bool = false
     var error: String?
     var code: String?
 
     private enum CodingKeys: String, CodingKey {
-        case success, account, mailboxDomain, message, phoneVerified, error, code
+        case success, account, mailboxDomain, grapmail, grapmailStatus, requireOtp,
+             message, phoneVerified, error, code
     }
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         success = c.lenient(.success, false)
         account = c.lenientOpt(.account)
         mailboxDomain = c.lenientOpt(.mailboxDomain)
+        grapmail = c.lenientOpt(.grapmail)
+        grapmailStatus = c.lenientOpt(.grapmailStatus)
+        requireOtp = c.lenientOpt(.requireOtp)
         message = c.lenientOpt(.message)
         phoneVerified = c.lenient(.phoneVerified, false)
         error = c.lenientOpt(.error)
@@ -179,6 +192,7 @@ struct SignInResponse: Decodable {
     var sessionToken: String?
     var accessToken: String?
     var token: String?
+    var refreshToken: String?
     var expiresAt: Int?
     /// The live /auth/account/signin envelope answers with a RELATIVE lifetime
     /// (`expiresIn`, seconds) rather than an absolute `expiresAt`. Only the
@@ -203,7 +217,7 @@ struct SignInResponse: Decodable {
     var code: String?
 
     private enum CodingKeys: String, CodingKey {
-        case success, sessionToken, accessToken, token, expiresAt,
+        case success, sessionToken, accessToken, token, refreshToken, expiresAt,
              expiresIn, account, user, requireOtp, challengeId,
              backupCodesRemaining, message, error, code
     }
@@ -213,6 +227,7 @@ struct SignInResponse: Decodable {
         sessionToken = c.lenientOpt(.sessionToken)
         accessToken = c.lenientOpt(.accessToken)
         token = c.lenientOpt(.token)
+        refreshToken = c.lenientOpt(.refreshToken)
         expiresAt = c.lenientOpt(.expiresAt)
         expiresIn = c.lenientOpt(.expiresIn)
         // The account object arrives under `account` on the documented shape
@@ -258,6 +273,7 @@ struct TwoFactorResponse: Decodable {
     var sessionToken: String?
     var accessToken: String?
     var token: String?
+    var refreshToken: String?
     var expiresAt: Int?
     var expiresIn: Int?
     var user: AccountDto?
@@ -265,7 +281,7 @@ struct TwoFactorResponse: Decodable {
     var code: String?
 
     private enum CodingKeys: String, CodingKey {
-        case success, sessionToken, accessToken, token, expiresAt,
+        case success, sessionToken, accessToken, token, refreshToken, expiresAt,
              expiresIn, user, account, error, code
     }
     init(from decoder: Decoder) throws {
@@ -274,6 +290,7 @@ struct TwoFactorResponse: Decodable {
         sessionToken = c.lenientOpt(.sessionToken)
         accessToken = c.lenientOpt(.accessToken)
         token = c.lenientOpt(.token)
+        refreshToken = c.lenientOpt(.refreshToken)
         expiresAt = c.lenientOpt(.expiresAt)
         expiresIn = c.lenientOpt(.expiresIn)
         let userField: AccountDto? = c.lenientOpt(.user)
@@ -940,6 +957,37 @@ struct ApiClient {
         return "GrapMail/1.0 (iPhone; \(name) \(version))"
     }()
 
+    /// Rotate the JWT pair once, from the stored refresh token.
+    ///
+    /// Deliberately not built on `request`: that helper is generic over the
+    /// response type and would recurse through this same 401 branch. A small
+    /// dedicated POST is the whole operation, and its answer is written back
+    /// through `SessionStore.updateTokens` because the gateway invalidates the
+    /// presented refresh token on every rotation.
+    static func renewPair() async -> String? {
+        guard let refresh = SessionStore.refreshToken,
+              let url = URL(string: "\(base)/grapsee/auth/refresh") else { return nil }
+        struct RefreshBody: Encodable { let refreshToken: String }
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        req.timeoutInterval = 20
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.setValue(DeviceId.value, forHTTPHeaderField: "x-device-id")
+        req.setValue(userAgent, forHTTPHeaderField: "User-Agent")
+        req.httpBody = try? encoder.encode(RefreshBody(refreshToken: refresh))
+        guard let (data, response) = try? await URLSession.shared.data(for: req),
+              let http = response as? HTTPURLResponse,
+              (200..<300).contains(http.statusCode),
+              let pair = try? decoder.decode(SignInResponse.self, from: data),
+              let access = pair.accessToken ?? pair.token else { return nil }
+        SessionStore.updateTokens(
+            token: access,
+            refreshToken: pair.refreshToken,
+            expiresAtRaw: pair.expiresAtMillis
+        )
+        return access
+    }
+
     /// One definition of "the server no longer knows us", shared by the JSON
     /// path and the binary attachment path. A second copy of this block is how a
     /// download could silently keep a revoked session alive.
@@ -963,7 +1011,7 @@ struct ApiClient {
         return req
     }
 
-    static func request<T: Decodable>(_ path: String, method: String = "GET", body: Data? = nil, bearer: String? = nil) async throws -> T {
+    static func request<T: Decodable>(_ path: String, method: String = "GET", body: Data? = nil, bearer: String? = nil, retried: Bool = false) async throws -> T {
         guard var components = URLComponents(string: "\(base)\(path)") else {
             throw ApiError.http(status: -1, code: nil, message: "Bad URL")
         }
@@ -1003,7 +1051,20 @@ struct ApiClient {
             // refuses a bearer those endpoints accept; killing the session for
             // that would sign a person out of a working sign-in and take the
             // security screens with it. Every account call keeps the rule whole.
-            if http.statusCode == 401, bearer != nil, !path.hasPrefix(mailBase) {
+            // One gateway, one verifier now: a 401 on any authenticated call
+            // means the session is dead. Before declaring that, try the pair
+            // rotation the gateway's one-hour access token requires — a
+            // refreshed token retries this call once, and a refused refresh
+            // signals the expiry (which lands the person on sign-in).
+            //
+            // The mail carve-out that used to live here is gone for the same
+            // reason Android's is: the mailbox and the account routes now
+            // verify the same token, so exempting mail would keep an expired
+            // session alive behind a screen that cannot load.
+            if http.statusCode == 401, bearer != nil, !path.contains("/auth/refresh") {
+                if !retried, let renewed = await Self.renewPair() {
+                    return try await request(path, method: method, body: body, bearer: renewed, retried: true)
+                }
                 Self.signalUnauthorized()
             }
             let carrier = try? decoder.decode(ErrorCarrier.self, from: data)
@@ -1028,52 +1089,52 @@ struct ApiClient {
 
     static func checkHandle(_ handle: String) async throws -> CheckResponse {
         let encoded = handle.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? handle
-        return try await request("/auth/grapmail/check?handle=\(encoded)")
+        return try await request("/grapsee/auth/grapmail/check?handle=\(encoded)")
     }
 
     static func createAccount(_ payload: CreateRequest) async throws -> CreateResponse {
         let body = try encoder.encode(payload)
-        return try await request("/auth/account/create", method: "POST", body: body)
+        return try await request("/grapsee/auth/register", method: "POST", body: body)
     }
 
     static func signIn(identifier: String, password: String) async throws -> SignInResponse {
         let body = try encoder.encode(SignInRequest(identifier: identifier, password: password))
-        return try await request("/auth/account/signin", method: "POST", body: body)
+        return try await request("/grapsee/auth/login", method: "POST", body: body)
     }
 
     static func twoFactorCode(challengeId: String, code: String) async throws -> TwoFactorResponse {
         let body = try encoder.encode(TwoFactorRequest(challengeId: challengeId, code: code))
-        return try await request("/auth/account/twofactor", method: "POST", body: body)
+        return try await request("/grapsee/auth/account/twofactor", method: "POST", body: body)
     }
 
     static func twoFactorBackup(identifier: String, password: String, backupCode: String) async throws -> TwoFactorResponse {
         let body = try encoder.encode(TwoFactorRequest(identifier: identifier, password: password, backupCode: backupCode))
-        return try await request("/auth/account/twofactor", method: "POST", body: body)
+        return try await request("/grapsee/auth/account/twofactor", method: "POST", body: body)
     }
 
     /// Step 1 of a reset. `challengeId` is present only when a code went out;
     /// absent means the account takes the slower manual route.
     static func forgotPassword(identifier: String) async throws -> ForgotPasswordResponse {
         let body = try encoder.encode(ForgotPasswordRequest(identifier: identifier))
-        return try await request("/auth/account/reset/start", method: "POST", body: body)
+        return try await request("/grapsee/auth/forgot-password", method: "POST", body: body)
     }
 
     /// Step 2: the code and the new password are checked together, by design.
     static func resetPassword(challengeId: String, code: String, password: String) async throws -> ResetPasswordResponse {
         let body = try encoder.encode(ResetPasswordRequest(challengeId: challengeId, code: code, password: password))
-        return try await request("/auth/account/reset/confirm", method: "POST", body: body)
+        return try await request("/grapsee/auth/reset-password", method: "POST", body: body)
     }
 
     /// Phone -> partially hidden address. A full address only ever reaches the
     /// clipboard, never the screen.
     static func findAddress(phone: String) async throws -> FindAddressResponse {
         let body = try encoder.encode(FindAddressRequest(phone: phone))
-        return try await request("/auth/account/find", method: "POST", body: body)
+        return try await request("/grapsee/auth/account/find", method: "POST", body: body)
     }
 
     static func startPhoneVerification(phone: String) async throws -> PhoneStartResponse {
         let body = try encoder.encode(PhoneStartRequest(phone: phone))
-        return try await request("/auth/phone/start", method: "POST", body: body)
+        return try await request("/grapsee/auth/phone/start", method: "POST", body: body)
     }
 
     static func verifyPhone(challengeId: String, code: String, token: String? = nil) async throws -> PhoneVerifyResponse {
@@ -1081,20 +1142,20 @@ struct ApiClient {
         // The bearer is optional: the sign-up wizard verifies with no session yet,
         // while the 2FA flow verifies the account's own number from a signed-in
         // device. Only the latter can mint the phone proof the enable call spends.
-        return try await request("/auth/phone/verify", method: "POST", body: body, bearer: token)
+        return try await request("/grapsee/auth/phone/verify", method: "POST", body: body, bearer: token)
     }
 
     /// Saves the verified number to the signed-in account: the phone token is
     /// the proof of possession, the bearer token is who it belongs to.
     static func linkPhone(sessionToken: String, phoneToken: String) async throws -> LinkPhoneResponse {
         let body = try encoder.encode(LinkPhoneRequest(phoneToken: phoneToken))
-        return try await request("/auth/account/profile", method: "PATCH", body: body, bearer: sessionToken)
+        return try await request("/grapsee/auth/account/profile", method: "PATCH", body: body, bearer: sessionToken)
     }
 
     // ── Security sector ─────────────────────────────────────────────────────
 
     static func profile(token: String) async throws -> ProfileResponse {
-        try await request("/auth/account/profile", bearer: token)
+        try await request("/grapsee/auth/account/profile", bearer: token)
     }
 
     // ── Account-record sector (the eight profile screens) ──────────────────
@@ -1129,7 +1190,7 @@ struct ApiClient {
             }
         }
         let data = try JSONSerialization.data(withJSONObject: body)
-        return try await request("/auth/account/profile", method: "PATCH", body: data, bearer: token)
+        return try await request("/grapsee/auth/account/profile", method: "PATCH", body: data, bearer: token)
     }
 
     /// A profile-settings write is `patchProfile` with the `settings` object
@@ -1171,7 +1232,7 @@ struct ApiClient {
         body.append(bytes)
         text("\r\n--\(boundary)--\r\n")
         let (data, http) = try await accountBinary(
-            path: "/auth/account/avatar", method: "POST", bearer: token,
+            path: "/grapsee/auth/account/avatar", method: "POST", bearer: token,
             body: body, contentType: "multipart/form-data; boundary=\(boundary)")
         guard (200..<300).contains(http.statusCode) else { throw requestFailure(data: data, http: http) }
         return try decoder.decode(AvatarResponse.self, from: data)
@@ -1179,7 +1240,7 @@ struct ApiClient {
 
     static func deleteAvatar(token: String) async throws -> AvatarResponse {
         let (data, http) = try await accountBinary(
-            path: "/auth/account/avatar", method: "DELETE", bearer: token,
+            path: "/grapsee/auth/account/avatar", method: "DELETE", bearer: token,
             body: nil, contentType: nil)
         guard (200..<300).contains(http.statusCode) else { throw requestFailure(data: data, http: http) }
         return try decoder.decode(AvatarResponse.self, from: data)
@@ -1193,7 +1254,7 @@ struct ApiClient {
     /// the caller distinguishes them by the code, which only the route chose.
     static func avatarBytes(token: String) async throws -> Data {
         let (data, http) = try await accountBinary(
-            path: "/auth/account/avatar", method: "GET", bearer: token,
+            path: "/grapsee/auth/account/avatar", method: "GET", bearer: token,
             body: nil, contentType: nil)
         guard (200..<300).contains(http.statusCode) else { throw requestFailure(data: data, http: http) }
         return data
@@ -1239,50 +1300,50 @@ struct ApiClient {
 
     static func enableTwoFactor(token: String, proof: String?, phoneProof: String?) async throws -> ProfileResponse {
         let body = try encoder.encode(TwoFactorEnableRequest(twoFactor: "on", proof: proof ?? "", phoneProof: phoneProof ?? ""))
-        return try await request("/auth/account/profile", method: "PATCH", body: body, bearer: token)
+        return try await request("/grapsee/auth/account/profile", method: "PATCH", body: body, bearer: token)
     }
 
     static func disableTwoFactor(token: String, password: String) async throws -> ProfileResponse {
         let body = try encoder.encode(TwoFactorDisableRequest(twoFactor: "off", currentPassword: password))
-        return try await request("/auth/account/profile", method: "PATCH", body: body, bearer: token)
+        return try await request("/grapsee/auth/account/profile", method: "PATCH", body: body, bearer: token)
     }
 
     static func changePassword(token: String, current: String, next: String) async throws -> ProfileResponse {
         let body = try encoder.encode(PasswordChangeRequest(currentPassword: current, newPassword: next))
-        return try await request("/auth/account/profile", method: "PATCH", body: body, bearer: token)
+        return try await request("/grapsee/auth/account/profile", method: "PATCH", body: body, bearer: token)
     }
 
     static func generateBackupCodes(token: String) async throws -> ProfileResponse {
         let body = try encoder.encode(BackupCodesRequest(generateBackupCodes: true))
-        return try await request("/auth/account/profile", method: "PATCH", body: body, bearer: token)
+        return try await request("/grapsee/auth/account/profile", method: "PATCH", body: body, bearer: token)
     }
 
     static func signOutEverywhere(token: String) async throws -> ProfileResponse {
         let body = try encoder.encode(SignOutEverywhereRequest(signOutEverywhere: true))
-        return try await request("/auth/account/profile", method: "PATCH", body: body, bearer: token)
+        return try await request("/grapsee/auth/account/profile", method: "PATCH", body: body, bearer: token)
     }
 
     static func verifyPassword(token: String, password: String) async throws -> ProfileResponse {
         let body = try encoder.encode(VerifyPasswordRequest(password: password))
-        return try await request("/auth/account/verify-password", method: "POST", body: body, bearer: token)
+        return try await request("/grapsee/auth/account/verify-password", method: "POST", body: body, bearer: token)
     }
 
     static func sessions(token: String) async throws -> SessionsResponse {
-        try await request("/auth/account/sessions", bearer: token)
+        try await request("/grapsee/auth/account/sessions", bearer: token)
     }
 
     static func revokeSession(token: String, id: String) async throws -> ProfileResponse {
         let encoded = id.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? id
-        return try await request("/auth/account/sessions?id=\(encoded)", method: "DELETE", bearer: token)
+        return try await request("/grapsee/auth/account/sessions?id=\(encoded)", method: "DELETE", bearer: token)
     }
 
     static func activity(token: String) async throws -> ActivityResponse {
-        try await request("/auth/account/activity", bearer: token)
+        try await request("/grapsee/auth/account/activity", bearer: token)
     }
 
     /// "This sign-in was me": recorded, not deleted, so the alert can clear
     /// honestly and the original row stays in the history.
     static func acknowledgeActivity(token: String) async throws -> ProfileResponse {
-        try await request("/auth/account/activity", method: "POST", body: Data("{}".utf8), bearer: token)
+        try await request("/grapsee/auth/account/activity", method: "POST", body: Data("{}".utf8), bearer: token)
     }
 }
