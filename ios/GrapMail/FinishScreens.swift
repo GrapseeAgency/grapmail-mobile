@@ -241,9 +241,9 @@ struct AccountCreatedView: View {
                 Text(subtitle).font(.system(size: 12)).foregroundColor(GM.textSecondary)
             }
             Spacer()
-            Image(systemName: "chevron.right")
-                .font(.system(size: 12))
-                .foregroundColor(GM.textTertiary)
+            // No chevron: this tile has no destination. The screen's one action
+            // is "Continue to Onboarding", and a chevron promises a tap that
+            // does nothing. Removing the affordance beats faking one.
         }
         .padding(.vertical, 10)
     }

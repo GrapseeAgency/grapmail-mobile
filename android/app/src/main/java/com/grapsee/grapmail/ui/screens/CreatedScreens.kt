@@ -292,7 +292,11 @@ private fun NextTile(
             Text(title, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = palette.textPrimary)
             Text(subtitle, fontSize = 12.sp, color = palette.textSecondary)
         }
-        Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, contentDescription = null, tint = palette.textTertiary, modifier = Modifier.size(18.dp))
+        // No chevron: this tile has no destination. The screen's one action is
+        // "Continue to Onboarding", and a row that draws a chevron promises a
+        // tap that does nothing — the exact class the audit called out on the
+        // label chips and the box tabs. Removing the affordance is the repo's
+        // rule; it is not made tappable until a destination is decided.
     }
 }
 
