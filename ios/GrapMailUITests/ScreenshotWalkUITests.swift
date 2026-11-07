@@ -246,6 +246,13 @@ final class ScreenshotWalkUITests: XCTestCase {
         XCTAssertTrue(homeOnScreen(), "missing: Mailbox home")
         snap("60-mail-home")
 
+        // The observation that would have caught the auth seam weeks earlier:
+        // the signed-in home either rendered a mailbox or said it could not. Not
+        // an assertion — a server that briefly refuses is a state the walk must
+        // still photograph — but it stops being invisible in the run log.
+        let loadFailure = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "Couldn't load")).firstMatch
+        print("live-mail: home shows load failure = \(loadFailure.exists)")
+
         // Mailbox leg — read-only. The drawer and the search field are reachable
         // without filing, deleting or sending, so they are photographed from the
         // live screen. Send, permanent delete and Report spam are not in this

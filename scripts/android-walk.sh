@@ -297,6 +297,20 @@ echo "· mailbox — the live home, read-only"
 # shows is the state that gets photographed, and the frame is named for the
 # screen, not for an outcome the run cannot control.
 must_shot 60-mail-home "n.get('resource-id','').rsplit('/',1)[-1]=='mail-menu'"
+
+# The one observation that would have caught the auth seam weeks earlier: the
+# signed-in home either rendered a mailbox or said it could not. Both are
+# photographed (that is the frame), but only one of them means the mailbox the
+# person was promised exists — so the run summary names which one it saw, in the
+# app's own words. Not a FAIL: a server that briefly refuses is a state the walk
+# must still photograph. But it stops being invisible.
+sleep 3
+if [ -n "$(find_nodes "n.get('text','').startswith(\"Couldn't load\")" | head -1)" ]; then
+  echo "  [live-mail] the signed-in home shows the load failure"
+  sys_summary "* live mailbox read: **failed** — the signed-in home shows \`Couldn't load Inbox\`; the mail API refused or could not be reached"
+else
+  sys_summary "* live mailbox read: **answered** — the signed-in home rendered the mailbox"
+fi
 # The home's own chrome comes first, while nothing overlays it. The drawer is
 # opened LAST and deliberately left open: the security leg enters through the
 # drawer's own Security row, so no step has to dismiss it.
