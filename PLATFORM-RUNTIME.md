@@ -23,6 +23,7 @@ Android writes a `sys_summary` block onto the run page. The lines that matter:
 - `* background read: **observed**` — the system ran the job and the worker named a branch.
 - `* new-mail notification: **observed**` — the job announced a rise and the shade drew the line.
 - `* new-mail notification: **not observed**` — the read was refused (the string carries the server's status). The poll staying silent is the correct branch; it is reported instead of hidden.
+- `* new-mail notification: **not due**` — either the job's first run only stored the baseline it compares against, or the unread count did not rise. Both mean no notification *could* be announced, which is different from a notification that failed, and the run page says which.
 - `* live mailbox read: **answered / failed**` — whether the signed-in home rendered a mailbox or showed `Couldn't load Inbox`. This is the line that would have named the auth seam.
 
 iOS prints `live-mail: home shows load failure = <bool>` into the test log.

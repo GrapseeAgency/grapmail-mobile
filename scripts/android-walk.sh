@@ -744,11 +744,20 @@ if [ -n "$JOB" ]; then
           echo "FAIL: the poll announced a rise and the notification manager holds no record for $PKG" >&2
           FAILURES=$((FAILURES + 1))
         fi ;;
+      *"first-read"*)
+        # The first run of the worker stores the count it will compare against;
+        # there is no previous count, so nothing can be announced. Naming that
+        # here is the difference between "the notification did not happen" and
+        # "the notification was never due".
+        sys_summary "* new-mail notification: **not due** — the job's first run stores the baseline it compares against, so nothing could be announced this cycle"
+        ;;
+      *"no-rise"*)
+        sys_summary "* new-mail notification: **not due** — the unread count did not rise, so nothing arrived this cycle"
+        ;;
       *"read-refused"*)
-        # The honest branch, and today's production branch: the worker ran, the
-        # read was refused by the server, and nothing was claimed. The walk does
-        # not fail an app for a server's answer — but it will not let the run
-        # imply the notification was proven either.
+        # The worker ran, the read was refused by the server, and nothing was
+        # claimed. The walk does not fail an app for a server's answer — but it
+        # will not let the run imply the notification was proven either.
         echo "  [notification] not provable this run: $(printf '%s' "$BRANCH" | sed 's/.*GrapMailPoll *: //')"
         sys_summary "* new-mail notification: **not observed** — the system ran the job and \`GET /stats\` was refused ($(printf '%s' "$BRANCH" | sed 's/.*status=//')). The poll stayed silent, which is the correct branch; see PLATFORM-RUNTIME.md." ;;
       *)
