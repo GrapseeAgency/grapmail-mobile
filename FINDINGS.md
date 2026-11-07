@@ -206,3 +206,22 @@ Until the migration lands, the app keeps its current, honest behaviour: account
 screens work against a real store, mailbox screens say "Couldn't load Inbox"
 against a real gateway refusal, and no seeded row exists outside the test-only
 snapshot host.
+
+## The gateway's login envelope leaks the credential hash (2026-11-08)
+
+While reading the envelope the client now depends on, the login response was
+found to include the account row's `passwordHash`, `emailVerificationOtp`,
+`emailVerificationExpires` and the stored `refreshToken` inside its `user`
+object. Measured live on a throwaway account:
+
+    POST /api/grapsee/auth/login
+      -> {"success":true,"accessToken":"eyJ…","user":{"passwordHash":"$2a$10$…",
+          "emailVerificationOtp":null,"refreshToken":"…", …}}
+
+The clients ignore unknown keys, so nothing in this repo renders or stores them.
+The leak is on the server: `auth-account-profile.ts` already has a projection
+(`dal-projection.ts`) that exists precisely to keep these fields out of client
+responses, so the login and verify-otp handlers should serialize through it
+rather than returning the row. Recorded here because the mobile client is the
+first party to depend on the envelope, and a response that hands out an offline
+crack target and a live refresh token is a defect that outranks any client.
