@@ -106,19 +106,18 @@ signed in, wrong password 401, ten codes generated, current-session revoke 409).
 **iOS has not been compiled** — there is no Xcode on this host; the Swift needs a
 build on a Mac before it goes to a device.
 
-Everything hits the **real account API** at `https://grapsee.com/api` — the
-same endpoints, token format (`st1`), and rules as the website. No mocks, no
+Everything hits the **real API** at `https://grapsee.com/api` — no mocks, no
 stubs, no fake data anywhere.
 
-> **Qualification, added while investigating the mailbox.** "The same … as the
-> website" is true of the account and security surface and is *not* true of
-> mail. The website's mail traffic goes to the gateway (`api.iqracsc.com`,
-> Postgres + MTA) and its login issues the token that API accepts; this app's
-> account traffic goes to the Next.js handlers backed by a JSONL file store,
-> whose tokens the gateway rejects. The two stores do not share users — see
-> "Mailbox sector" below. So "no fake data" still holds, but it holds because
-> the app talks to a real store, not because that store is the one the mail
-> service reads.
+> **Sign-in moved to the gateway (2026-11-08).** The app used to sign in against
+> the website's JSONL store (`/api/auth/account/*`), whose `st1` session ids the
+> mailbox gateway does not verify — the two stores shared no users, so a token
+> from there could never open a mailbox. Sign-in now goes through
+> `/api/grapsee/auth/*`; the app stores the JWT pair (access and refresh, both
+> encrypted with the platform keystore) and rotates it on a 401. The bearer the
+> account routes accept is the one the mailbox verifies. `FINDINGS.md` records
+> the measured seam, the full endpoint map, and the deployment backlog it
+> exposed.
 
 ## Mailbox sector — built, and what still gates it
 
@@ -130,37 +129,22 @@ thread, compose, labels, contacts, files, settings and the screener.
 What has changed since this section was written is the server, and it changed in
 one place and not another.
 
-**The account backend answers.** `POST /api/auth/account/create` with an empty body
-returns `422 {"code":"INVALID_NAME"}` and `POST /api/auth/account/signin` with a
-nonexistent address returns `401 {"code":"INVALID_CREDENTIALS"}` — validation and
-lookup running against the real `users` table, not a `500`. CI proves the same from
-inside the app: the walk creates an account for real, signs in, and the security
-hub renders server verdicts ("One thing left to do", "Off", "Add").
+**The mailbox serves the signed-in account.** Sign-up provisions the GrapMail
+address at the gateway (`accountType: "USER"`, no email — the wizard never
+collects one, and the gateway gates only email-bearing accounts on an OTP), and
+the signed-in home reads `GET /api/grapsee/grapmail/{inbox,stats,me}` with the
+same bearer the account routes accept. The live walk leg renders the mailbox
+instead of the generic load error, and the run summary states which one it saw —
+`live mailbox read: answered/failed` — so a regression cannot hide behind a
+photographed screen.
 
-An earlier version of this section cited `POST /auth/register` and `/auth/login` on
-`api.iqracsc.com` failing with a missing-columns `500`. Those are not the paths this
-app calls — it uses `/auth/account/create` and `/auth/account/signin` on
-`grapsee.com/api` — so that evidence was measuring a surface the client never
-touches. Recorded here because the correction matters more than the original claim
-looking right.
-
-**The mailbox still does not serve the signed-in account.** Its routes are
-deployed: `GET /api/grapsee/grapmail/inbox` and `/stats` answer `401
-{"error":"Unauthorized"}` with no bearer, which is a live route asking for
-authentication, not a missing one. But the app's authenticated mail request fails,
-and it fails as the *generic* load error — "Couldn't load Inbox / Your mailbox could
-not be reached. Nothing has been deleted." — not as `66-mail-no-mailbox`. So the
-server is refusing or erroring on a request that carries a token the account routes
-accept. Why is visible in the gateway's logs and not from a client, and the client
-will not guess at it.
-
-That distinction is the point of this paragraph. The sector was built against the
-verified contract, so the day the mailbox path is fixed it lights up with no code
-change; until then the live walk leg photographs whatever the app actually says,
-and the two failure states — unreachable, and reachable-but-unprovisioned — stay
-visibly different. Neither is presented as the other, and no seeded row exists
-outside the test-only snapshot host, so a broken network layer cannot read as a
-working mailbox.
+**What is still deployment-gated.** The Sessions, Activity and password-proof
+screens call real gateway routes
+(`/grapsee/auth/account/{sessions,activity,verify-password}`) that the deployed
+auth-service predates, and phone verification hits a `500` there. Those are
+measured route-by-route in `FINDINGS.md`; they return with a backend deploy, not
+with a client change. The website's own copies of those routes are equally older
+than the repo — same cause, same remedy.
 
 ### What shipped, and how CI proves it
 
