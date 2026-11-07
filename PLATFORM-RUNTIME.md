@@ -21,6 +21,7 @@ what the run summary points at when a platform surface is mentioned.
 Android writes a `sys_summary` block onto the run page. The lines that matter:
 
 - `* background read: **observed**` — the system ran the job and the worker named a branch.
+- `* background read: **NOT observed**` — the job was forced and the worker said nothing. That is the failure the leg exists to surface, and the run page states it rather than counting a silent worker as success.
 - `* new-mail notification: **observed**` — the job announced a rise and the shade drew the line.
 - `* new-mail notification: **not observed**` — the read was refused (the string carries the server's status). The poll staying silent is the correct branch; it is reported instead of hidden.
 - `* new-mail notification: **not due**` — either the job's first run only stored the baseline it compares against, or the unread count did not rise. Both mean no notification *could* be announced, which is different from a notification that failed, and the run page says which.
