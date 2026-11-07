@@ -225,3 +225,28 @@ responses, so the login and verify-otp handlers should serialize through it
 rather than returning the row. Recorded here because the mobile client is the
 first party to depend on the envelope, and a response that hands out an offline
 crack target and a live refresh token is a defect that outranks any client.
+
+## Labels were dead in production, and the database said why (2026-11-08)
+
+Live probe of every mail endpoint the app calls, with a throwaway account's
+gateway JWT, found `GET/POST /grapmail/labels` and `GET /labels/assignments`
+answering **500** with the backend's own error envelope. The route was not the
+problem: `grapmail_labels` and `grapmail_message_labels` did not exist in the
+production database. The repository's canonical migration
+(`services/shared/src/db/migrations/0030_grapmail_labels.sql`, idempotent) had
+never been applied there, and production keeps no `__drizzle_migrations` journal
+to notice a gap.
+
+Applied that migration as-is (transactional; `CREATE TABLE IF NOT EXISTS` plus
+`duplicate_object` guards, so re-running is safe), then verified against the
+live gateway: list 200, create 201, assignments 200, assign-to-message 200, and
+the unread count reads back. No client change was needed — the screens were
+calling real routes that were failing on a missing table.
+
+What the same probe confirmed as *not* defects, so they are not chased again:
+`POST /grapmail/send`, `/draft`, `/aliases`, `/labels` reach the backend;
+`POST /e2e/plan` and `POST /screener/decision` exist; `/screener/enabled` is
+PUT-only by design and the app reads its state through `GET /screener`; and the
+message-action `PATCH` requests pass the backend's CSRF guard because both
+clients send a JSON body (the guard refuses unsafe methods with no
+`content-type`, which is what a probe without one sees).
