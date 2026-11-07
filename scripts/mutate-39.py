@@ -50,10 +50,10 @@ MUTATIONS = [
     ("android/app/src/main/java/com/grapsee/grapmail/logic/MailPollWorker.kt",
      "val unread = stats.inbox?.unread ?: return Result.success()",
      "val unread = (stats.inbox?.total ?? 0)"),
-    # announcing a first read as arrivals
+    # announcing a first read as arrivals: the first-read branch falls through
     ("android/app/src/main/java/com/grapsee/grapmail/logic/MailPollWorker.kt",
-     "if (!hadPrevious || unread <= previous) return Result.success()",
-     "if (unread <= previous && hadPrevious) return Result.success()"),
+     '        if (!hadPrevious) {\n            report("silent first-read unread=$unread")\n            return Result.success()\n        }\n',
+     '        if (!hadPrevious) {\n            report("silent first-read unread=$unread")\n        }\n'),
     # claiming delivery in the notification line
     ("android/app/src/main/java/com/grapsee/grapmail/logic/Notifications.kt",
      '.setContentText("$total unread in the inbox")',

@@ -2977,7 +2977,8 @@ pin("the poll asks the server's own unread count, nothing else",
 # when all that happened is that the app looked at it.
 pin("a poll that cannot name a difference says nothing",
     "guard didSee, count > previous else { return false }" in code_only(SW_INT)
-    and "if (!hadPrevious || unread <= previous) return Result.success()" in code_only(KT_POLL))
+    and 'if (!hadPrevious) {\n            report("silent first-read unread=$unread")\n            return Result.success()\n        }' in code_only(KT_POLL)
+    and 'if (unread <= previous) {\n            report("silent no-rise $previous->$unread")\n            return Result.success()\n        }' in code_only(KT_POLL))
 
 # Both say what the notification is evidence of, in the same two numbers, and
 # neither claims delivery — the relay's queue is not the recipient's inbox.

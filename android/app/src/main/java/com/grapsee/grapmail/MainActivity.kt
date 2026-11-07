@@ -419,7 +419,21 @@ fun GrapMailNav(
                         android.view.HapticFeedbackConstants.REJECT
                     else android.view.HapticFeedbackConstants.LONG_PRESS
             }
-            hapticView.performHapticFeedback(constant)
+            // Asked of the view once, and the view's own answer reported.
+            // `performHapticFeedback` returns false when there is no actuator
+            // to play on, so the line ties the model's event to what the view
+            // actually did with it — and calling it twice to print that answer
+            // would be two vibrations for one action, which is the kind of
+            // "observability" that changes the thing it observes.
+            //
+            // CI greps this tag: a haptic that only exists in a source file is
+            // not observable any other way, because no screenshot can show a
+            // vibration and no emulator has a motor.
+            val accepted = hapticView.performHapticFeedback(constant)
+            android.util.Log.i(
+                com.grapsee.grapmail.logic.GMHaptics.LOG_TAG,
+                "played $event constant=$constant accepted=$accepted",
+            )
         }
     }
 

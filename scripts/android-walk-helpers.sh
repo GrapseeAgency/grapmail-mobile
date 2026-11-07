@@ -392,3 +392,78 @@ PY
   echo "TIMEOUT: field '$label' never focused" >&2
   return 1
 }
+
+# ── platform-surface helpers: the things a screenshot cannot show ──────────
+#
+# The mailbox screens are proved by photographs. The platform surfaces —
+# a job the system scheduled, a notification the system holds, a permission
+# the system granted, a haptic the view accepted — are proved by asking the
+# system and the running app what they actually did, which is what these are
+# for. Each one reads a real answer out of a real service; none of them
+# reports success when the answer is missing.
+
+log_reset() { adb logcat -c >/dev/null 2>&1 || true; }
+
+# log_wait <pattern> [tries] — print the first logcat line matching <pattern>.
+#
+# Cleared before the action that should produce the line, so a match cannot be
+# an echo of an earlier leg. Retries rather than one fixed sleep: a background
+# worker's own timing is not the walk's to guess.
+log_wait() {
+  local want="$1" tries="${2:-12}" line="" i
+  for i in $(seq 1 "$tries"); do
+    line="$(adb logcat -d 2>/dev/null | grep -E "$want" | tail -1 | tr -d '\r')"
+    [ -n "$line" ] && { echo "$line"; return 0; }
+    sleep 1
+  done
+  echo "TIMEOUT: no logcat line matching $want" >&2
+  adb logcat -d 2>/dev/null | grep -E "GrapMailPoll|GrapMailHaptics|WM-SystemJobService" \
+    | tail -12 >&2
+  return 1
+}
+
+# sys_summary <line> — put a fact on the run page, not only in the log.
+#
+# The platform leg's whole purpose is to say which surfaces were observed by
+# this run. A person reading the run must not have to open a raw log to find
+# out that the notification was NOT provable today, so the same sentence goes
+# to the step summary when the runner offers one. Outside CI it is a no-op.
+sys_summary() {
+  [ -n "${GITHUB_STEP_SUMMARY:-}" ] && printf '%s\n' "$1" >> "$GITHUB_STEP_SUMMARY"
+  echo "  · $1"
+}
+
+# type_into_tag <resource-id> <value> — the field is named by its testTag, not
+# by the label beside it. The compose fields the platform leg fills carry tags
+# (`mail-to`), and their labels are shared with other rows on other screens.
+type_into_tag() {
+  local tag="$1" value="$2" pos="" i
+  for i in $(seq 1 8); do
+    pos="$(find_nodes "n.get('resource-id','').endsWith('/$tag')" | head -1)"
+    if [ -n "$pos" ]; then
+      adb shell input tap $pos
+      sleep 1
+      if ! keyboard_shown && anr_in_view; then dismiss_anr; ensure_foreground; fi
+      if keyboard_shown || dump_xml && python3 - "$OUT/.ui.xml" "$tag" <<'PY'
+import re, sys
+xml = open(sys.argv[1], encoding="utf-8", errors="ignore").read()
+tag = sys.argv[2]
+for m in re.finditer(r'<node[^>]*>', xml):
+    a = dict(re.findall(r'(\w[\w-]*)="([^"]*)"', m.group(0)))
+    if a.get("resource-id", "").endswith("/" + tag) and a.get("focused") == "true":
+        sys.exit(0)
+sys.exit(1)
+PY
+      then
+        adb shell input text "$value"
+        sleep 0.6
+        dismiss_keyboard
+        sleep 0.4
+        return 0
+      fi
+    fi
+    sleep 1
+  done
+  echo "TIMEOUT: field '$tag' never focused" >&2
+  return 1
+}

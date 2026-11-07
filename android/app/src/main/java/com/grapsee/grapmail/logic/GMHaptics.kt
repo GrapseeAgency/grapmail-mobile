@@ -24,6 +24,15 @@ import kotlinx.coroutines.flow.asSharedFlow
 object GMHaptics {
     enum class Event { Filing, Marking, Success, Failure }
 
+    /**
+     * The logcat tag the player writes to and the CI walk greps.
+     *
+     * Declared here rather than spelled at both ends for the same reason the
+     * worker's name is: a tag that drifts between the emitter and the reader
+     * stops being a gate and becomes a comment.
+     */
+    const val LOG_TAG = "GrapMailHaptics"
+
     private val _events = MutableSharedFlow<Event>(extraBufferCapacity = 8)
     val events: SharedFlow<Event> = _events.asSharedFlow()
 

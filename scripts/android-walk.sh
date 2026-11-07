@@ -485,6 +485,259 @@ must "hub back tap" tap_xy "$(wait_nodes "n.get('content-desc','')=='Back'" | he
 sleep 2
 must "home after security" wait_nodes "n.get('resource-id','').rsplit('/',1)[-1]=='mail-menu'" >/dev/null
 
+echo "· platform surfaces — observed at runtime, not compiled"
+# Everything the §39 batch added is a hook into the system rather than a screen:
+# a job the scheduler holds, a channel the notification manager holds, a
+# permission the permission manager holds, a haptic the view accepted, a
+# shortcut the launcher resolved. A photograph cannot show any of them, so until
+# now none of them was OBSERVED anywhere — the honest limit the release notes
+# carried. This leg asks each owning service what it actually holds, and asks the
+# running app what it actually did, and writes the answer on the run page.
+#
+# What it proves is split deliberately from what it cannot. Where the answer is
+# the app's, a wrong answer fails the walk. Where the answer depends on a server
+# that is not answering (see PLATFORM-RUNTIME.md: the mail API refuses the
+# session the account API accepts, so the poll's read is refused and the
+# notification is never due), the run says which surface it could not observe
+# and why, in the same place it says which ones it did. A gate that goes green by
+# staying quiet about the second kind is the thing this leg exists to replace.
+
+# ── 1. the schedule the system holds, not the constant the source holds ──
+adb shell dumpsys jobscheduler > /tmp/jobs.txt 2>/dev/null || true
+JOB="$(python3 - <<'PY'
+import re
+pkg = "com.grapsee.grapmail"
+text = open("/tmp/jobs.txt", encoding="utf-8", errors="ignore").read()
+# Three shapes, newest AOSP first, because the dump is not a documented format
+# and a run that cannot find the job says so rather than guessing an id.
+for pat in (r"Job\{(\d+) @ [^ ]*" + re.escape(pkg),
+            r"u\d+/(\d+)[^\n]*" + re.escape(pkg),
+            r"^\s*(\d+)\s*:\s*\{[^}]*" + re.escape(pkg)):
+    m = re.search(pat, text, re.M)
+    if m:
+        print(m.group(1)); break
+else:
+    print("")
+PY
+)"
+if [ -n "$JOB" ]; then
+  echo "  [jobscheduler] $PKG holds job id $JOB"
+  grep -A6 -m1 "Job{$JOB @" /tmp/jobs.txt | sed 's/^/      /' || true
+else
+  echo "FAIL: the periodic new-mail job is not in the system's job store" >&2
+  FAILURES=$((FAILURES + 1))
+  grep -n "$PKG" /tmp/jobs.txt | head -8 | sed 's/^/      /' >&2
+fi
+
+# ── 2. the channel, as the notification manager holds it ──
+adb shell dumpsys notification --noredact > /tmp/notif.txt 2>/dev/null \
+  || adb shell dumpsys notification > /tmp/notif.txt 2>/dev/null || true
+if grep -q "grapmail-new-mail" /tmp/notif.txt; then
+  echo "  [notification] channel grapmail-new-mail exists in the system"
+else
+  echo "FAIL: the new-mail channel was never created in the system" >&2
+  FAILURES=$((FAILURES + 1))
+fi
+
+# ── 3. offline, read from the device ──
+# The banner's whole claim is that it comes from a callback the OS fires. With
+# the radio off there is nothing to fake it with: either the node appears or the
+# callback never ran. Restored immediately — every later leg needs the network.
+adb shell cmd connectivity airplane-mode enable >/dev/null 2>&1 || true
+OFF_NODE=""
+for _ in 1 2 3 4 5 6 7 8 9 10; do
+  OFF_NODE="$(find_nodes "n.get('resource-id','').endsWith('/mail-offline')" | head -1)"
+  [ -n "$OFF_NODE" ] && break
+  sleep 1
+done
+if [ -n "$OFF_NODE" ]; then
+  shot 123-platform-offline
+  echo "  [connectivity] airplane mode on -> the offline banner drew"
+else
+  echo "FAIL: radio off, and no offline banner appeared" >&2
+  FAILURES=$((FAILURES + 1))
+  adb shell dumpsys connectivity 2>/dev/null | grep -m4 -iE "airplane|AgentState|tether" | sed 's/^/      /' >&2
+fi
+adb shell cmd connectivity airplane-mode disable >/dev/null 2>&1 || true
+sleep 4
+if [ -n "$(find_nodes "n.get('resource-id','').endsWith('/mail-offline')" | head -1)" ]; then
+  # The other half of the claim: a banner that never leaves is a decoration, not
+  # a reading. This is the check that would catch a callback registered once and
+  # never updated.
+  echo "FAIL: the offline banner is still up with the radio restored" >&2
+  FAILURES=$((FAILURES + 1))
+else
+  echo "  [connectivity] radio restored -> the banner went away"
+fi
+
+# ── 4. the shortcut the launcher resolves, delivered as the launcher delivers it ──
+# The action is read out of the file that declares it, so this leg cannot drift
+# from the manifest: a renamed action in shortcuts.xml changes the intent the
+# walk sends, and the app either still routes it or the leg goes red.
+SHORTCUT_ACTION="$(python3 - <<'PY'
+import re, pathlib
+p = pathlib.Path("android/app/src/main/res/xml/shortcuts.xml")
+m = re.search(r'android:action="([^"]+)"', p.read_text(encoding="utf-8")) if p.exists() else None
+print(m.group(1) if m else "")
+PY
+)"
+if [ -z "$SHORTCUT_ACTION" ]; then
+  echo "FAIL: shortcuts.xml declares no intent action to deliver" >&2
+  FAILURES=$((FAILURES + 1))
+else
+  echo "  [shortcut] declared action: $SHORTCUT_ACTION"
+  # What the system parsed out of the declaration, in the system's own words.
+  adb shell dumpsys shortcut 2>/dev/null | grep -i -m6 "compose\|shortcutinfo\|$PKG" \
+    | sed 's/^/      /' || true
+  log_reset
+  adb shell am start -W -a "$SHORTCUT_ACTION" -n "$PKG/.MainActivity" >/tmp/shortcut.log 2>&1 \
+    || { echo "FAIL: the shortcut intent did not start the activity" >&2; cat /tmp/shortcut.log >&2; FAILURES=$((FAILURES + 1)); }
+  if wait_nodes "n.get('resource-id','').endsWith('/mail-to')" >/dev/null; then
+    shot 122-platform-compose-shortcut
+    echo "  [shortcut] the launcher's intent opened the composer"
+  else
+    echo "FAIL: the shortcut intent arrived and no composer was drawn" >&2
+    FAILURES=$((FAILURES + 1))
+  fi
+fi
+
+# ── 5. a real write, and the feel that has to agree with it ──
+# The haptic is tied to the server's answer rather than to the tap, which is the
+# design decision §39 pinned. This checks it against the answer instead of the
+# source: whatever the receipt says happened, the event that played must be the
+# one that agrees with it. Both branches are acceptable; a mismatch, or a write
+# that played nothing at all, is the failure.
+must "compose tap" tap_xy "$(wait_nodes "n.get('resource-id','').endsWith('/mail-compose')" | head -1)"
+if wait_nodes "n.get('resource-id','').endsWith('/mail-to')" >/dev/null; then
+  must_type_tag "mail-to" "$HANDLE@grapsee.com"
+  must_type_tag "mail-subject" "platform runtime proof"
+  must_type_tag "mail-body-field" "One message, sent by the CI walk, to this account's own address."
+  log_reset
+  must "send tap" tap_text "Send"
+  RECEIPT=""
+  for line in "Sent" "Queued for delivery" "Not delivered"; do
+    if [ -n "$(wait_nodes "n.get('text','')=='$line'" 3 2>/dev/null | head -1)" ]; then RECEIPT="$line"; break; fi
+  done
+  PLAYED="$(log_wait "GrapMailHaptics: played" 10 || true)"
+  shot 125-platform-send-receipt
+  if [ -z "$RECEIPT" ]; then
+    echo "FAIL: the send produced no receipt at all" >&2
+    FAILURES=$((FAILURES + 1))
+  elif [ -z "$PLAYED" ]; then
+    echo "FAIL: '$RECEIPT' and no haptic was played for it" >&2
+    FAILURES=$((FAILURES + 1))
+  else
+    echo "  [haptics] $PLAYED"
+    case "$RECEIPT" in
+      "Not delivered")
+        echo "$PLAYED" | grep -q "played Failure" || {
+          echo "FAIL: the server refused the send and the played event was not Failure" >&2
+          FAILURES=$((FAILURES + 1)); } ;;
+      *)
+        echo "$PLAYED" | grep -q "played Success" || {
+          echo "FAIL: the server accepted the send and the played event was not Success" >&2
+          FAILURES=$((FAILURES + 1)); } ;;
+    esac
+  fi
+  adb shell input keyevent KEYCODE_BACK
+  sleep 1
+  adb shell input keyevent KEYCODE_BACK
+  sleep 1
+else
+  echo "FAIL: the compose FAB did not open the composer" >&2
+  FAILURES=$((FAILURES + 1))
+fi
+
+# ── 6. the permission, asked through the app's own row ──
+# The row is the only route to the prompt: the app never asks at launch. So the
+# prompt appearing IS the proof the row is wired, and the row reading "On"
+# afterwards is the proof it re-reads the system rather than remembering the tap.
+must "home before settings" wait_nodes "n.get('resource-id','').endsWith('/mail-menu')" >/dev/null
+must "drawer for settings" tap_xy "$(wait_nodes "n.get('resource-id','').endsWith('/mail-menu')" | head -1)"
+must "settings row" wait_overlay "n.get('resource-id','').endsWith('/mail-drawer-Settings')" >/dev/null
+must "settings tap" tap_xy "$(wait_overlay "n.get('resource-id','').endsWith('/mail-drawer-Settings')" | head -1)"
+NOTIFY_ROW="n.get('text','')=='New mail notifications'"
+if [ -z "$(wait_overlay "$NOTIFY_ROW" 2>/dev/null | head -1)" ]; then
+  echo "FAIL: the settings screen shows no new-mail row" >&2
+  FAILURES=$((FAILURES + 1))
+else
+  shot 120-platform-notify-ask
+  must "notify row tap" tap_text "New mail notifications"
+  # The system's own dialog, from the app's tap. If the grant was already
+  # answered the system will not show it again, and the row says so — which is
+  # the branch the row's code takes, not a walk fallback.
+  if [ -n "$(wait_overlay "n.get('text','')=='Allow'" 2>/dev/null | head -1)" ]; then
+    must "allow the notification prompt" tap_text "Allow"
+    sleep 2
+  else
+    echo "  [notifications] no prompt offered — the system already holds an answer"
+  fi
+  if [ -n "$(wait_overlay "n.get('text','')=='On — GrapMail checks for new mail in the background'" 2>/dev/null | head -1)" ]; then
+    shot 121-platform-notify-granted
+    echo "  [notifications] the row re-read the system and reports On"
+  else
+    echo "FAIL: after the grant the new-mail row does not report On" >&2
+    FAILURES=$((FAILURES + 1))
+    adb shell dumpsys package "$PKG" 2>/dev/null | grep -m3 "POST_NOTIFICATIONS" | sed 's/^/      /' >&2
+  fi
+fi
+adb shell input keyevent KEYCODE_BACK
+sleep 1
+
+# ── 7. the background wake, forced from outside the app ──
+# Not the app calling its own worker: the system's job scheduler running the job
+# it holds for this package, which is the same entry point the 30-minute schedule
+# uses. What the worker then decides is read out of its own log line.
+if [ -n "$JOB" ]; then
+  log_reset
+  adb shell cmd jobscheduler run -f "$PKG" "$JOB" >/tmp/jobrun.log 2>&1 \
+    || { echo "FAIL: jobscheduler refused to run job $JOB" >&2; cat /tmp/jobrun.log >&2; FAILURES=$((FAILURES + 1)); }
+  BRANCH="$(log_wait "GrapMailPoll" 20 || true)"
+  if [ -z "$BRANCH" ]; then
+    echo "FAIL: the scheduled job ran and the poll worker never reported a branch" >&2
+    FAILURES=$((FAILURES + 1))
+    sys_summary "* background read: NOT observed — job $JOB was forced and \`MailPollWorker\` said nothing"
+  else
+    echo "  [poll] $BRANCH"
+    case "$BRANCH" in
+      *announced*)
+        # The post, asked of the notification manager rather than trusted from
+        # the call that made it.
+        adb shell dumpsys notification --noredact 2>/dev/null > /tmp/notif2.txt || true
+        if grep -q "NotificationRecord.*$PKG" /tmp/notif2.txt; then
+          must "expand the shade" adb shell cmd statusbar expand-notifications
+          sleep 2
+          if [ -n "$(find_nodes "n.get('text','').contains('new message')" | head -1)" ]; then
+            shot 124-platform-notify-shade
+            echo "  [notification] the shade shows the posted new-mail line"
+            sys_summary "* new-mail notification: **observed** — the system ran the job, the read rose, and the shade drew the posted line"
+          else
+            echo "FAIL: the notification was posted but the shade does not show it" >&2
+            FAILURES=$((FAILURES + 1))
+          fi
+          adb shell cmd statusbar collapse-notifications >/dev/null 2>&1 || true
+        else
+          echo "FAIL: the poll announced a rise and the notification manager holds no record for $PKG" >&2
+          FAILURES=$((FAILURES + 1))
+        fi ;;
+      *"read-refused"*)
+        # The honest branch, and today's production branch: the worker ran, the
+        # read was refused by the server, and nothing was claimed. The walk does
+        # not fail an app for a server's answer — but it will not let the run
+        # imply the notification was proven either.
+        echo "  [notification] not provable this run: $(printf '%s' "$BRANCH" | sed 's/.*GrapMailPoll *: //')"
+        sys_summary "* new-mail notification: **not observed** — the system ran the job and \`GET /stats\` was refused ($(printf '%s' "$BRANCH" | sed 's/.*status=//')). The poll stayed silent, which is the correct branch; see PLATFORM-RUNTIME.md." ;;
+      *)
+        sys_summary "* background read: **observed** — the system ran job $JOB and the worker reported \`$(printf '%s' "$BRANCH" | sed 's/.*GrapMailPoll *: //')\`"
+        ;;
+    esac
+  fi
+fi
+
+# One line on the run page for the surfaces this mechanism always settles.
+sys_summary "* platform surfaces observed at runtime: scheduled job ${JOB:-none}, notification channel, offline banner (radio toggled), shortcut intent, haptic tied to the send's answer, notification permission asked through the app's own row"
+
+
 echo "· post-write confirmations — via the app's test-only snapshot hook"
 # These screens exist only AFTER a write the walk must not perform: signing out
 # everywhere ends the session the restore leg proves, and a password change

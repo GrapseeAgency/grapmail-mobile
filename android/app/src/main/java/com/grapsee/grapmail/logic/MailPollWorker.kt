@@ -26,6 +26,15 @@ import com.grapsee.grapmail.data.SessionStore
  * The interval is WorkManager's floor (30 minutes is the shortest period it
  * honours) and the system may run it later than that. No screen promises a
  * minute; the channel description says what actually happens.
+ *
+ * ── WHY THE BRANCH IS WRITTEN TO THE SYSTEM LOG ────────────────────────────
+ * A background read that stays silent is indistinguishable from one that never
+ * ran, and "indistinguishable" is the whole problem: the honest branches above
+ * are the reason the feature exists, and nothing outside the process could see
+ * which one was taken. So each run names its branch in logcat under
+ * `GrapMailPoll`. Nothing is computed for the log — every line reports the
+ * decision the code had already made, with the server's own status when the
+ * refusal is the server's — and no screen reads it.
  */
 class MailPollWorker(
     appContext: Context,
@@ -36,27 +45,62 @@ class MailPollWorker(
         /** One unique schedule, named once: the app enqueues it and the system
          *  keeps exactly one of it across launches and reboots. */
         const val NAME = "grapmail-mail-poll"
+        /** The logcat tag the CI walk greps. Named here so the walk and the
+         *  worker cannot drift apart without the pin noticing. */
+        const val LOG_TAG = "GrapMailPoll"
+    }
+
+    /** One line per run, saying which branch decided and why. */
+    private fun report(branch: String) {
+        android.util.Log.i(LOG_TAG, branch)
     }
 
     override suspend fun doWork(): Result {
-        val token = SessionStore.token(applicationContext) ?: return Result.success()
-        val stats = runCatching { Api.mailStats(token) }.getOrNull()
+        val token = SessionStore.token(applicationContext)
+        if (token == null) {
+            report("silent signed-out")
+            return Result.success()
+        }
+        val stats = runCatching { Api.mailStats(token) }
+            .onFailure { error ->
+                // The status is the server's answer, not something this file
+                // invented: a refused read is the branch a person would call
+                // "the app stopped telling me", and it is also the branch that
+                // lets a CI run name an upstream refusal instead of guessing it.
+                val status = (error as? com.grapsee.grapmail.data.ApiException)?.status
+                report("silent read-refused" + (status?.let { " status=$it" } ?: ""))
+            }
             // A refused read is not a failure worth retrying in a loop the
             // person never asked for: the next scheduled run asks again, and
             // nothing is announced meanwhile.
-            ?: return Result.success()
-        val unread = stats.inbox?.unread ?: return Result.success()
+            .getOrNull() ?: return Result.success()
+        val unread = stats.inbox?.unread
+        if (unread == null) {
+            report("silent no-inbox-count")
+            return Result.success()
+        }
         val prefs = applicationContext
             .getSharedPreferences("grapmail-poll", Context.MODE_PRIVATE)
         val sawKey = "lastUnread"
         val hadPrevious = prefs.contains(sawKey)
         val previous = prefs.getInt(sawKey, 0)
         prefs.edit().putInt(sawKey, unread).apply()
-        if (!hadPrevious || unread <= previous) return Result.success()
+        if (!hadPrevious) {
+            report("silent first-read unread=$unread")
+            return Result.success()
+        }
+        if (unread <= previous) {
+            report("silent no-rise $previous->$unread")
+            return Result.success()
+        }
         // The post itself can be refused by the permission; either way the read
         // happened and the new baseline is stored, so the next run does not
         // re-announce the same arrivals.
-        Notifications.newMail(applicationContext, grew = unread - previous, total = unread)
+        val posted = Notifications.newMail(
+            applicationContext, grew = unread - previous, total = unread,
+        )
+        report(if (posted) "announced +${unread - previous} of $unread"
+        else "silent post-refused-by-permission +${unread - previous} of $unread")
         return Result.success()
     }
 }
