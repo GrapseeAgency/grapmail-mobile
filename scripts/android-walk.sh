@@ -731,7 +731,7 @@ if [ -n "$JOB" ]; then
         if grep -q "NotificationRecord.*$PKG" /tmp/notif2.txt; then
           must "expand the shade" adb shell cmd statusbar expand-notifications
           sleep 2
-          if [ -n "$(find_nodes "n.get('text','').contains('new message')" | head -1)" ]; then
+          if [ -n "$(find_nodes "'new message' in n.get('text','')" | head -1)" ]; then
             shot 124-platform-notify-shade
             echo "  [notification] the shade shows the posted new-mail line"
             sys_summary "* new-mail notification: **observed** — the system ran the job, the read rose, and the shade drew the posted line"
