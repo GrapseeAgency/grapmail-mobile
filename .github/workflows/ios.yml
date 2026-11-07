@@ -6,6 +6,16 @@ on:
     tags: ["v*"]
   workflow_dispatch:
 
+# One run per ref at a time. Without this, every push queues another 30-minute
+# walk behind the last one: a session that pushes five fixes waits 2.5 hours for
+# the fifth to be tested, and every intermediate run reports a state the tree
+# has already left. Cancelling the superseded run is the point — the newest
+# commit is the only one whose verdict still matters. Tags get their own group
+# (github.ref includes the tag), so a release run is never cancelled by a push.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build-test-screenshot:
     name: Build, live-test & screenshot (iPhone simulator)
