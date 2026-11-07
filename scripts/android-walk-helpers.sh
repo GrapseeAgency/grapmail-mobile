@@ -439,6 +439,13 @@ sys_summary() {
 type_into_tag() {
   local tag="$1" value="$2" pos="" i
   for i in $(seq 1 8); do
+    # The composer auto-focuses the body with its keyboard already up, and a
+    # tap delivered while that IME is open is consumed by the dismiss gesture:
+    # the field never takes focus, the focus check fails, nothing is typed —
+    # one run photographed the keyboard up over an empty composer for eight
+    # straight attempts. Close it first, the same rule tap_text already
+    # follows ("close the keyboard FIRST, then locate").
+    dismiss_keyboard
     pos="$(find_nodes "n.get('resource-id','').rsplit('/',1)[-1]=='$tag'" | head -1)"
     if [ -n "$pos" ]; then
       adb shell input tap $pos
