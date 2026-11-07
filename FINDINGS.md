@@ -131,3 +131,40 @@ and no `associated-domains` entitlement while `/.well-known/assetlinks.json` and
 `apple-app-site-association` answer 404, and no push background mode or FCM
 dependency while no push service exists. A mutation that adds any of them is
 refused by `scripts/mutate-39.py`.
+
+## The mail auth seam, measured (2026-11-08)
+
+One consequence, reproduced end to end with a throwaway account the same way the
+walk creates one:
+
+    # sign in through the store the app calls today
+    POST https://grapsee.com/api/auth/account/signin
+    {"identifier":"<handle>@grapsee.com","password":"…"}
+      -> 200, sessionToken "st1.…"
+
+    GET https://grapsee.com/api/auth/account/profile   (the same st1 token)  -> 200
+    GET https://grapsee.com/api/grapsee/grapmail/stats  (the same st1 token)  -> 401
+        {"error":"Invalid token"}
+    GET https://grapsee.com/api/grapsee/grapmail/me     (the same st1 token)  -> 401
+
+So the app's mailbox reads are refused by the service that owns the mailbox, by
+its *token verifier* and not by its route table: `middleware/auth.ts` runs
+`jwt.verify(token, config.jwt.secret)`, and `st1.` is a session id, not a JWT.
+The mail gateway (`/grapmail/*`, same auth-service, same secret) accepts only the
+JWT pair its own `/auth/login` issues — and that login will not issue a pair to
+an account that is not in its `users` table and email-verified. There are two
+account stores: the Next.js JSONL store the app signs into, and the gateway's
+Postgres store the mailbox belongs to. They share no users.
+
+The gateway signup can provision the address (`POST /auth/register` with
+`grapmailHandle` answers `{"grapmail":"<handle>@grapsee.com"}`) but gates the
+first login on an emailed OTP, and no CI-readable inbox or test bypass exists in
+the service. That gate is the whole migration: signup (handle + email OTP),
+sign-in (JWT pair), every `/auth/account/*` call (the local store's contracts
+are not the gateway's), and the walk's account creation, which today works
+precisely because the local store has no OTP. A URL swap is not the fix; swapping
+the sign-in URL alone would leave the app unable to sign in at all.
+
+Until then the app keeps its current, honest behaviour: account screens work
+against a real store, mailbox screens say "Couldn't load Inbox" against a real
+gateway refusal, and no seeded row exists outside the test-only snapshot host.
