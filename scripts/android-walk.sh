@@ -577,7 +577,12 @@ fi
 adb shell cmd connectivity airplane-mode enable >/dev/null 2>&1 || true
 sleep 2
 STILL_ONLINE=""
+# Two signals, because the dump's wording is not a documented contract: the
+# system's own idea of a default network, and whether a packet actually leaves.
+# Either one still answering means the state could not be forced.
 if adb shell dumpsys connectivity 2>/dev/null | grep -q "Active default network"; then
+  STILL_ONLINE=1
+elif adb shell ping -c 1 -W 2 8.8.8.8 >/dev/null 2>&1; then
   STILL_ONLINE=1
 fi
 OFF_NODE=""
