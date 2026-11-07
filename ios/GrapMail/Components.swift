@@ -73,6 +73,11 @@ struct StepProgress: View {
             ForEach(0..<5, id: \.self) { i in
                 let n = i + 1
                 let active = n <= step
+                // Equal columns. Before this the labels competed with the
+                // connectors for width, so "Address" and "Password" were
+                // proposed less than their intrinsic width and wrapped
+                // mid-word ("Addres / s", "Passw / ord") on a 402pt screen —
+                // Android had always drawn them on one line.
                 VStack(spacing: 5) {
                     Circle()
                         .fill(active ? GM.primarySolid : GM.stepInactive)
@@ -85,12 +90,14 @@ struct StepProgress: View {
                     Text(labels[i])
                         .font(.system(size: 12, weight: n == step ? .semibold : .regular))
                         .foregroundColor(n == step ? GM.textPrimary : GM.textTertiary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
                 }
+                .frame(maxWidth: .infinity)
                 if n < 5 {
                     Rectangle()
                         .fill(n < step ? GM.primarySolid : GM.stepInactive)
-                        .frame(height: 2)
-                        .padding(.horizontal, 5)
+                        .frame(width: 14, height: 2)
                         .padding(.top, 14)
                 }
             }
