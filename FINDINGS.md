@@ -250,3 +250,42 @@ PUT-only by design and the app reads its state through `GET /screener`; and the
 message-action `PATCH` requests pass the backend's CSRF guard because both
 clients send a JSON body (the guard refuses unsafe methods with no
 `content-type`, which is what a probe without one sees).
+
+## The deployed gateway is older than the repo (measured 2026-11-08)
+
+The app now signs in at `/api/grapsee/auth/*`, which the Next app proxies to
+`https://api.iqracsc.com`. That host answers `/health` and serves the auth
+routes the app needs for sign-in and mail — but not the whole account surface.
+Measured with a live JWT, path by path:
+
+    GET  /grapsee/auth/account/profile          -> 200
+    PATCH/grapsee/auth/account/profile          -> 200
+    POST /grapsee/auth/account/twofactor        -> 401 TWO_FACTOR_REJECTED  (route exists)
+    GET  /grapsee/auth/account/avatar           -> 404 NO_AVATAR           (route exists, none set)
+    POST /grapsee/auth/login, /register, /refresh -> 200
+    POST /grapsee/auth/forgot-password          -> 200
+    GET  /grapsee/auth/grapmail/check           -> 200
+
+    GET  /grapsee/auth/account/sessions         -> 404 (Hono 404, forwarded as text)
+    GET  /grapsee/auth/account/activity         -> 404
+    POST /grapsee/auth/account/verify-password  -> 404
+    POST /grapsee/auth/account/find             -> 404
+    POST /grapsee/auth/phone/start              -> 500 {"error":"An unexpected error occurred"}
+
+Every one of those five is defined in this repo
+(`services/shared/src/routes/auth-account-profile.ts`, `.../auth.ts`), so the
+deployed auth-service predates them. The client is calling real routes the
+deployment has not caught up with; the security sector's Sessions and Activity
+screens, the danger-action proof, and phone verification cannot succeed until
+the backend is deployed at current `main`. That is a deploy, not a client fix —
+and it is the next blocker after the migration lands.
+
+Two server-side defects measured in the same pass, for the server owner:
+
+- `POST /auth/phone/start` 500s for a valid number. Phone verification (and the
+  2FA-by-SMS setup that depends on it) is down on production.
+- `POST /auth/forgot-password` answers `{"channel":"sms","challengeId":"otp_…",
+  "maskedPhone":null}` for a handle-only account with no phone and no email:
+  it issues a challenge, names SMS as the channel, and has nothing to send the
+  code to. A GrapMail account created without a recovery channel has no path to
+  recover at all, and the route does not say so.
