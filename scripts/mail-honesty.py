@@ -780,19 +780,19 @@ for _fn in VOID_WRITERS:
 pin("Android drops no HTTP status anywhere in the mail API",
     re.search(r"^\s{4,8}execute\(", code_only(KT_API), re.M) is None)
 
-# The other half of the same mistake, on the other side: iOS's attachment byte
-# and upload routes ended the ACCOUNT session on a mail 401, while its JSON path
-# and Android's interceptor both deliberately carve mail out — the mail service is
-# a different backend that refuses a bearer the account endpoints still accept.
-# A download was therefore the one action that could sign a person out of a
-# working sign-in, with the thread they were reading behind it.
+# Both platforms used to carve mail out of the 401-is-expired rule, because the
+# mailbox was a different backend that refused the account API's `st1` bearer.
+# Sign-in now goes through the gateway that owns the mailbox, so the two tokens
+# are one token: a 401 on any authenticated call means the session is dead, and a
+# carve-out would keep an expired session alive behind a screen that cannot load.
+# Android's carve-out is gone; iOS's stays until its client moves too.
 pin("iOS's mail routes end no account session on a 401",
     "signalUnauthorized" not in code_only(SW_API))
 pin("iOS's JSON carve-out is still scoped to non-mail paths",
     re.search(r"if http\.statusCode == 401, bearer != nil, !path\.hasPrefix\(mailBase\)",
               code_only(ios("APIClient.swift"))) is not None)
-pin("Android's interceptor still carves mail out and keeps the rule for accounts",
-    "!isMailCall" in code_only(KT_API) and "SessionEvents.signalExpired()" in code_only(KT_API))
+pin("Android signals a dead session on every authenticated 401",
+    "!isMailCall" not in code_only(KT_API) and "SessionEvents.signalExpired()" in code_only(KT_API))
 
 # -- 16. the confirmation names the destination the tap will actually reach ----
 #
@@ -1915,8 +1915,8 @@ pin("both clients address exactly one host and it is the app's own API",
 WF_TEXT = (ROOT / ".github/workflows/android.yml").read_text(encoding="utf-8")
 DFLOW = (ROOT / "DATA-FLOW.md").read_text(encoding="utf-8")
 pin("the data-flow doc covers the real endpoint groups",
-    all(g in DFLOW for g in ("/auth/account/create", "/auth/account/signin",
-                             "/auth/account/profile", "e2e/keys", "e2e/plan",
+    all(g in DFLOW for g in ("/grapsee/auth/register", "/grapsee/auth/login",
+                             "/grapsee/auth/account/profile", "e2e/keys", "e2e/plan",
                              "/screener/decision", "/send", "/draft")))
 pin("the data-flow doc states the deletion gap in the screens' own words",
     "that path is not built" in DFLOW and "no account-delete endpoint" in DFLOW.lower())

@@ -157,9 +157,12 @@ class SignUpViewModel : ViewModel() {
                         acceptedTerms = true,
                     )
                 )
-                val address = resp.account?.address ?: "${s.chosenHandle}@grapsee.com"
-                update { copy(creating = false, createdAddress = address, createdName = resp.account?.name) }
-                onCreated(address, resp.account?.name ?: s.firstName)
+                // The gateway envelope answers `grapmail` (and no account
+                // object); the old local route answered `account.address`.
+                val fullName = "${s.firstName.trim()} ${s.lastName.trim()}".trim()
+                val address = resp.addressOrNull ?: "${s.chosenHandle}@grapsee.com"
+                update { copy(creating = false, createdAddress = address, createdName = resp.account?.name ?: fullName) }
+                onCreated(address, resp.account?.name ?: fullName)
             } catch (e: ApiException) {
                 update { copy(creating = false) }
                 onError(

@@ -27,12 +27,12 @@ contacts, no notifications).
 
 | Group | Endpoints (from the clients' own code) | Data carried |
 |---|---|---|
-| Sign-up | `POST /auth/account/create`, `GET /auth/grapmail/check` | name (+ first/last), chosen handle/domain, password (to derive the credential), terms acceptance, birthday (age gate), `x-device-id` |
-| Sign-in & 2FA | `POST /auth/account/signin`, `POST /auth/account/twofactor` | address or identifier, password, SMS code / backup code, `x-device-id`, user-agent header |
-| Recovery | `POST /auth/account/reset/start`, `.../reset/confirm`, `POST /auth/account/find`, `POST /auth/phone/start`, `POST /auth/phone/verify` | identifier or recovery address, SMS code, new password, phone number, `x-device-id` |
-| Session | `GET /auth/account/sessions`, `DELETE /auth/account/sessions/:id`, `PATCH` sign-out-everywhere | bearer token only; the answers (device labels, times) come back |
-| Profile | `GET/PATCH /auth/account/profile`, `POST /auth/account/avatar`, `.../avatar/remove` | sparse patches of: name, birthday, gender, signature, density, locale, blocked/safe senders, notes, tasks, phone, recovery email, 2FA toggle; avatar bytes (≤256 KB, the route's ceiling) |
-| Security settings | `POST /auth/account/twofactor` (enable/disable), `POST /auth/account/verify-password`, `GET /auth/account/activity` | current password for the proof calls; activity is a read |
+| Sign-up | `POST /grapsee/auth/register`, `GET /grapsee/auth/grapmail/check` | name (+ first/last), chosen handle/domain, password (to derive the credential), terms acceptance, birthday (age gate), `x-device-id` |
+| Sign-in & 2FA | `POST /grapsee/auth/login`, `POST /grapsee/auth/account/twofactor` | address or identifier, password, SMS code / backup code, `x-device-id`, user-agent header |
+| Recovery | `POST /grapsee/auth/forgot-password`, `POST /grapsee/auth/reset-password`, `POST /grapsee/auth/account/find`, `POST /grapsee/auth/phone/start`, `POST /grapsee/auth/phone/verify` | identifier or recovery address, SMS code, new password, phone number, `x-device-id` |
+| Session | `GET /grapsee/auth/account/sessions`, `DELETE /grapsee/auth/account/sessions/:id`, `PATCH` sign-out-everywhere | bearer token only; the answers (device labels, times) come back |
+| Profile | `GET/PATCH /grapsee/auth/account/profile`, `POST /grapsee/auth/account/avatar`, `.../avatar/remove` | sparse patches of: name, birthday, gender, signature, density, locale, blocked/safe senders, notes, tasks, phone, recovery email, 2FA toggle; avatar bytes (≤256 KB, the route's ceiling) |
+| Security settings | `POST /grapsee/auth/account/twofactor` (enable/disable), `POST /grapsee/auth/account/verify-password`, `GET /grapsee/auth/account/activity` | current password for the proof calls; activity is a read |
 | Mailbox read | `GET …/inbox`, `…/me`, `…/stats`, `GET …/thread/:id`, `GET …/message/:id`, `GET …/attachments`, labels lists | bearer + box/filter/query params; opening a message marks it read server-side (the route's own side effect) |
 | Mailbox write | `POST …/send`, `POST …/draft`, `PATCH …/message/:id/:action`, label assignments, `PUT/DELETE …/labels(/:id)`, `POST …/aliases`, `DELETE …/aliases/:address` | recipients (to/cc/bcc), subject, body text/HTML, attachments (upload), In-Reply-To; `e2eEnvelope` instead of the body when the sender sealed the message — the server stores its notice, never the plaintext |
 | Screener | `GET/PUT …/screener`, `…/screener/enabled`, `PUT …/screener/decision` | sender address + the user's standing decision |

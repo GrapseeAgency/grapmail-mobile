@@ -1,6 +1,8 @@
 package com.grapsee.grapmail.data
 
+import android.content.Context
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -39,17 +41,30 @@ import java.util.concurrent.TimeUnit
     val grapmailHandle: String? = null,
     val password: String,
     val acceptedTerms: Boolean? = null,
+    /** The gateway distinguishes the agency dashboard's CLIENT accounts from
+     *  GrapMail's USER accounts, and only USER accounts get a handle and a
+     *  mailbox. This app only ever creates USER accounts. */
+    val accountType: String = "USER",
 )
 
 @Serializable data class CreateResponse(
     val success: Boolean = false,
     val account: AccountDto? = null,
     val mailboxDomain: String? = null,
+    /** The gateway answers with the address it provisioned, under its own name. */
+    val grapmail: String? = null,
+    val grapmailStatus: String? = null,
+    /** Present when the account carried an email: the gateway then gates the
+     *  first sign-in on an emailed OTP. A handle-only signup does not set it. */
+    val requireOtp: Boolean = false,
     val message: String? = null,
     val phoneVerified: Boolean = false,
     val error: String? = null,
     val code: String? = null,
-)
+) {
+    /** The provisioned address under either envelope. */
+    val addressOrNull: String? get() = account?.address ?: grapmail
+}
 
 @Serializable data class CheckResponse(
     val success: Boolean = false,
@@ -62,11 +77,14 @@ import java.util.concurrent.TimeUnit
 
 @Serializable data class SignInRequest(val identifier: String, val password: String)
 
+@Serializable data class RefreshRequest(val refreshToken: String)
+
 @Serializable data class SignInResponse(
     val success: Boolean = false,
     val sessionToken: String? = null,
     val accessToken: String? = null,
     val token: String? = null,
+    val refreshToken: String? = null,
     val expiresAt: Long? = null,
     /** The live /auth/account/signin envelope answers with a RELATIVE lifetime
      *  (seconds), not an absolute `expiresAt`. Only the absolute one was ever
@@ -118,6 +136,7 @@ import java.util.concurrent.TimeUnit
     val sessionToken: String? = null,
     val accessToken: String? = null,
     val token: String? = null,
+    val refreshToken: String? = null,
     val expiresAt: Long? = null,
     val expiresIn: Long? = null,
     val user: AccountDto? = null,
@@ -532,6 +551,35 @@ class ApiException(val status: Int, val code: String?, message: String) : Except
 object Api {
     val BASE: String = com.grapsee.grapmail.BuildConfig.API_BASE
 
+    /**
+     * The application context, handed over once at process start.
+     *
+     * Only the token refresh needs it: the authenticator below runs on an
+     * OkHttp thread with no screen in scope, and rotating the pair has to read
+     * and rewrite the encrypted session store. Everything else takes its token
+     * explicitly, as before.
+     */
+    private var appContext: Context? = null
+
+    fun init(context: Context) {
+        appContext = context.applicationContext
+    }
+
+    /**
+     * The gateway's auth surface — the same service, and the same JWT, that the
+     * website signs in against.
+     *
+     * This was `$BASE/auth`, the Next.js handlers backed by the JSONL store.
+     * Those handlers issue `st1.` session ids, and the service that owns the
+     * mailbox verifies a JWT signature, so every authenticated mail call was
+     * refused with `{"error":"Invalid token"}` no matter how many screens were
+     * built on top of it. The two stores also shared no users: an account made
+     * there could never open a mailbox here. Signing in through `/grapsee/auth`
+     * ends that split — the token this app holds is the token the mailbox
+     * verifies, and mail lit up on the first request after the swap.
+     */
+    private val AUTH: String get() = "$BASE/grapsee/auth"
+
     private val json = Json { ignoreUnknownKeys = true; coerceInputValues = true }
 
     /**
@@ -561,22 +609,40 @@ object Api {
                     .build(),
             )
             // A 401 on a call that carried our bearer means the server no longer
-            // recognises the session (expired, or revoked from another device).
-            // Say so once, loudly, so the app can land the person on sign-in
-            // instead of leaving them on a signed-in screen that cannot load.
-            // Anonymous 401s — a wrong password at sign-in — must not do this.
-            // Scoped by URL on purpose. The mail service is served by a different
-            // backend than the account endpoints, and today it refuses a bearer
-            // the account API still accepts. Clearing the session for that would
-            // log a person out of a working sign-in because a second service
-            // disagreed — and it would take the security screens down with it.
-            // The rule stays exactly as strong for every account call.
-            val isMailCall = chain.request().url.encodedPath.contains("/grapsee/grapmail")
-            if (response.code == 401 && chain.request().header("Authorization") != null
-                && !isMailCall) {
+            // recognises the session (expired, revoked from another device, or a
+            // token minted before the gateway migration). Say so once, loudly, so
+            // the app can land the person on sign-in instead of leaving them on a
+            // signed-in screen that cannot load. Anonymous 401s — a wrong password
+            // at sign-in — must not do this.
+            //
+            // There used to be a URL carve-out here for `/grapsee/grapmail`: the
+            // mail service was a different backend that refused the account API's
+            // `st1` bearer, and treating that refusal as a dead session would have
+            // logged a person out of a sign-in that still worked. Now there is one
+            // gateway, one verifier and one token — a mail 401 IS a dead session,
+            // so the carve-out would only excuse an expired session forever.
+            if (response.code == 401 && chain.request().header("Authorization") != null) {
                 SessionEvents.signalExpired()
             }
             response
+        }
+        // The access token lives one hour; a session that cannot rotate dies
+        // hourly while the person is reading mail. On a 401 this trades the
+        // stale bearer for a freshly rotated one and retries once. A refused
+        // refresh returns null, the 401 surfaces, and the interceptor above
+        // lands the person on sign-in — the honest failure for a dead session.
+        //
+        // Never on the refresh call itself (it has no bearer, and a refusal
+        // there must not loop), and never twice in one chain (`priorResponse`
+        // is set once the request has been retried).
+        .authenticator { _, response ->
+            if (response.request.header("Authorization") == null) return@authenticator null
+            if (response.priorResponse != null) return@authenticator null
+            if (response.request.url.encodedPath.endsWith("/refresh")) return@authenticator null
+            val ctx = appContext ?: return@authenticator null
+            if (!runBlocking { SessionRefresh.refresh(ctx) }) return@authenticator null
+            val renewed = runBlocking { SessionStore.token(ctx) } ?: return@authenticator null
+            response.request.newBuilder().header("Authorization", "Bearer $renewed").build()
         }
         .connectTimeout(15, TimeUnit.SECONDS)
         .readTimeout(20, TimeUnit.SECONDS)
@@ -618,7 +684,7 @@ object Api {
 
     suspend fun checkHandle(handle: String): CheckResponse {
         val req = Request.Builder()
-            .url("$BASE/auth/grapmail/check?handle=${URLEncoder.encode(handle, "UTF-8")}")
+            .url("$AUTH/grapmail/check?handle=${URLEncoder.encode(handle, "UTF-8")}")
             .header("x-device-id", DeviceId.value)
             .get().build()
         val (status, body) = execute(req)
@@ -628,7 +694,7 @@ object Api {
 
     suspend fun createAccount(req: CreateRequest): CreateResponse {
         val request = Request.Builder()
-            .url("$BASE/auth/account/create")
+            .url("$AUTH/register")
             .header("x-device-id", DeviceId.value)
             .post(postBody(json.encodeToString(CreateRequest.serializer(), req)))
             .build()
@@ -639,9 +705,27 @@ object Api {
 
     suspend fun signIn(identifier: String, password: String): SignInResponse {
         val request = Request.Builder()
-            .url("$BASE/auth/account/signin")
+            .url("$AUTH/login")
             .header("x-device-id", DeviceId.value)
             .post(postBody(json.encodeToString(SignInRequest.serializer(), SignInRequest(identifier, password))))
+            .build()
+        val (status, body) = execute(request)
+        if (status >= 400) fail(status, body)
+        return json.decodeFromString<SignInResponse>(body)
+    }
+
+    /**
+     * Rotate the pair with the stored refresh token.
+     *
+     * The gateway invalidates the presented refresh token on every rotation, so
+     * the caller must store the returned one too — writing only the access token
+     * strands the session at the next refresh.
+     */
+    suspend fun refreshSession(refreshToken: String): SignInResponse {
+        val request = Request.Builder()
+            .url("$AUTH/refresh")
+            .header("x-device-id", DeviceId.value)
+            .post(postBody(json.encodeToString(RefreshRequest.serializer(), RefreshRequest(refreshToken))))
             .build()
         val (status, body) = execute(request)
         if (status >= 400) fail(status, body)
@@ -662,7 +746,7 @@ object Api {
      */
     suspend fun forgotPassword(identifier: String): ForgotPasswordResponse {
         val request = Request.Builder()
-            .url("$BASE/auth/account/reset/start")
+            .url("$AUTH/forgot-password")
             .header("x-device-id", DeviceId.value)
             .post(postBody(json.encodeToString(ForgotPasswordRequest.serializer(), ForgotPasswordRequest(identifier))))
             .build()
@@ -674,7 +758,7 @@ object Api {
     /** Step 2: the code and the new password are checked together, by design. */
     suspend fun resetPassword(challengeId: String, code: String, password: String): ResetPasswordResponse {
         val request = Request.Builder()
-            .url("$BASE/auth/account/reset/confirm")
+            .url("$AUTH/reset-password")
             .header("x-device-id", DeviceId.value)
             .post(
                 postBody(
@@ -693,7 +777,7 @@ object Api {
     /** Phone -> partially hidden GrapMail address. Never returns the full one. */
     suspend fun findAddress(phone: String): FindAddressResponse {
         val request = Request.Builder()
-            .url("$BASE/auth/account/find")
+            .url("$AUTH/account/find")
             .header("x-device-id", DeviceId.value)
             .post(postBody(json.encodeToString(FindAddressRequest.serializer(), FindAddressRequest(phone))))
             .build()
@@ -704,7 +788,7 @@ object Api {
 
     suspend fun startPhoneVerification(phone: String): PhoneStartResponse {
         val request = Request.Builder()
-            .url("$BASE/auth/phone/start")
+            .url("$AUTH/phone/start")
             .header("x-device-id", DeviceId.value)
             .post(postBody(json.encodeToString(PhoneStartRequest.serializer(), PhoneStartRequest(phone))))
             .build()
@@ -718,8 +802,8 @@ object Api {
         // with no session yet, while the 2FA flow verifies the account's own number
         // from a signed-in device. Only the latter can mint the phone proof, and the
         // server mints it only when this header is present and names a live session.
-        val builder = if (token != null) authed("$BASE/auth/phone/verify", token)
-            else Request.Builder().url("$BASE/auth/phone/verify").header("x-device-id", DeviceId.value)
+        val builder = if (token != null) authed("$AUTH/phone/verify", token)
+            else Request.Builder().url("$AUTH/phone/verify").header("x-device-id", DeviceId.value)
         val request = builder
             .post(
                 postBody(
@@ -742,7 +826,7 @@ object Api {
      */
     suspend fun linkPhone(sessionToken: String, phoneToken: String): LinkPhoneResponse {
         val request = Request.Builder()
-            .url("$BASE/auth/account/profile")
+            .url("$AUTH/account/profile")
             .header("x-device-id", DeviceId.value)
             .header("authorization", "Bearer $sessionToken")
             .patch(postBody(json.encodeToString(LinkPhoneRequest.serializer(), LinkPhoneRequest(phoneToken))))
@@ -754,7 +838,7 @@ object Api {
 
     private suspend fun twoFactor(payload: TwoFactorRequest): TwoFactorResponse {
         val request = Request.Builder()
-            .url("$BASE/auth/account/twofactor")
+            .url("$AUTH/account/twofactor")
             .header("x-device-id", DeviceId.value)
             .post(postBody(json.encodeToString(TwoFactorRequest.serializer(), payload)))
             .build()
@@ -776,7 +860,7 @@ object Api {
         return decode(body)
     }
 
-    suspend fun profile(token: String): ProfileResponse = read(authed("$BASE/auth/account/profile", token).get().build()) {
+    suspend fun profile(token: String): ProfileResponse = read(authed("$AUTH/account/profile", token).get().build()) {
         json.decodeFromString<ProfileResponse>(it)
     }
 
@@ -791,7 +875,7 @@ object Api {
      * makes "only the keys that arrive are touched" true rather than intended.
      */
     suspend fun patchProfile(token: String, patch: ProfilePatch): ProfileResponse {
-        val req = authed("$BASE/auth/account/profile", token)
+        val req = authed("$AUTH/account/profile", token)
             .method("PATCH", postBody(jsonSparse.encodeToString(ProfilePatch.serializer(), patch)))
             .build()
         return read(req) { json.decodeFromString<ProfileResponse>(it) }
@@ -807,13 +891,13 @@ object Api {
         val body = MultipartBody.Builder().setType(MultipartBody.FORM)
             .addFormDataPart("file", filename, bytes.toRequestBody(mime.toMediaType()))
             .build()
-        return read(authed("$BASE/auth/account/avatar", token).post(body).build()) {
+        return read(authed("$AUTH/account/avatar", token).post(body).build()) {
             json.decodeFromString<AvatarResponse>(it)
         }
     }
 
     suspend fun deleteAvatar(token: String): AvatarResponse {
-        val req = authed("$BASE/auth/account/avatar", token).delete().build()
+        val req = authed("$AUTH/account/avatar", token).delete().build()
         return read(req) { json.decodeFromString<AvatarResponse>(it) }
     }
 
@@ -823,7 +907,7 @@ object Api {
      * else throws like every other read, because a 500 must not look like no photo.
      */
     suspend fun avatarBytes(token: String): ByteArray? = withContext(Dispatchers.IO) {
-        val request = authed("$BASE/auth/account/avatar", token).get().build()
+        val request = authed("$AUTH/account/avatar", token).get().build()
         client.newCall(request).execute().use { resp ->
             when {
                 resp.code == 404 -> null
@@ -834,7 +918,7 @@ object Api {
     }
 
     suspend fun enableTwoFactor(token: String, proof: String?, phoneProof: String?): ProfileResponse {
-        val req = authed("$BASE/auth/account/profile", token)
+        val req = authed("$AUTH/account/profile", token)
             .patch(postBody(json.encodeToString(
                 TwoFactorEnableRequest.serializer(),
                 TwoFactorEnableRequest("on", proof ?: "", phoneProof ?: ""),
@@ -844,21 +928,21 @@ object Api {
     }
 
     suspend fun disableTwoFactor(token: String, password: String): ProfileResponse {
-        val req = authed("$BASE/auth/account/profile", token)
+        val req = authed("$AUTH/account/profile", token)
             .patch(postBody(json.encodeToString(TwoFactorDisableRequest.serializer(), TwoFactorDisableRequest("off", password))))
             .build()
         return read(req) { json.decodeFromString<ProfileResponse>(it) }
     }
 
     suspend fun changePassword(token: String, currentPassword: String, newPassword: String): ProfileResponse {
-        val req = authed("$BASE/auth/account/profile", token)
+        val req = authed("$AUTH/account/profile", token)
             .patch(postBody(json.encodeToString(PasswordChangeRequest.serializer(), PasswordChangeRequest(currentPassword, newPassword))))
             .build()
         return read(req) { json.decodeFromString<ProfileResponse>(it) }
     }
 
     suspend fun generateBackupCodes(token: String): ProfileResponse {
-        val req = authed("$BASE/auth/account/profile", token)
+        val req = authed("$AUTH/account/profile", token)
             .patch(postBody(json.encodeToString(BackupCodesRequest.serializer(), BackupCodesRequest(true))))
             .build()
         return read(req) { json.decodeFromString<ProfileResponse>(it) }
@@ -866,35 +950,35 @@ object Api {
 
     /** Signs every OTHER device out. The token passed here stays valid. */
     suspend fun signOutEverywhere(token: String): ProfileResponse {
-        val req = authed("$BASE/auth/account/profile", token)
+        val req = authed("$AUTH/account/profile", token)
             .patch(postBody(json.encodeToString(SignOutEverywhereRequest.serializer(), SignOutEverywhereRequest(true))))
             .build()
         return read(req) { json.decodeFromString<ProfileResponse>(it) }
     }
 
     suspend fun verifyPassword(token: String, password: String): ProfileResponse {
-        val req = authed("$BASE/auth/account/verify-password", token)
+        val req = authed("$AUTH/account/verify-password", token)
             .post(postBody(json.encodeToString(VerifyPasswordRequest.serializer(), VerifyPasswordRequest(password))))
             .build()
         return read(req) { json.decodeFromString<ProfileResponse>(it) }
     }
 
-    suspend fun sessions(token: String): SessionsResponse = read(authed("$BASE/auth/account/sessions", token).get().build()) {
+    suspend fun sessions(token: String): SessionsResponse = read(authed("$AUTH/account/sessions", token).get().build()) {
         json.decodeFromString<SessionsResponse>(it)
     }
 
     suspend fun revokeSession(token: String, id: String): ProfileResponse {
-        val url = "$BASE/auth/account/sessions?id=" + URLEncoder.encode(id, "UTF-8")
+        val url = "$AUTH/account/sessions?id=" + URLEncoder.encode(id, "UTF-8")
         return read(authed(url, token).delete().build()) { json.decodeFromString<ProfileResponse>(it) }
     }
 
-    suspend fun activity(token: String): ActivityResponse = read(authed("$BASE/auth/account/activity", token).get().build()) {
+    suspend fun activity(token: String): ActivityResponse = read(authed("$AUTH/account/activity", token).get().build()) {
         json.decodeFromString<ActivityResponse>(it)
     }
 
     /** "This sign-in was me": recorded, not deleted, so the alert can clear honestly. */
     suspend fun acknowledgeSignIn(token: String): ProfileResponse {
-        val req = authed("$BASE/auth/account/activity", token)
+        val req = authed("$AUTH/account/activity", token)
             .post(postBody("{}"))
             .build()
         return read(req) { json.decodeFromString<ProfileResponse>(it) }

@@ -77,6 +77,7 @@ fun SignOutAllDevicesScreen(onBack: () -> Unit, onDone: () -> Unit) {
                                     SessionStore.save(
                                         context,
                                         fresh,
+                                        SessionStore.refreshToken(context),
                                         SessionStore.address(context) ?: "",
                                         SessionStore.name(context) ?: "",
                                         resp.tokenExpiresAtMillis,

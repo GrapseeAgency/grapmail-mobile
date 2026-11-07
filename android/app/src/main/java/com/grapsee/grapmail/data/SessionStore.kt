@@ -19,14 +19,23 @@ import javax.crypto.spec.GCMParameterSpec
 private val Context.sessionStore by preferencesDataStore("grapmail_session")
 
 /**
- * Session persistence: the st1 token is encrypted with an Android Keystore
- * AES-GCM key before it touches disk. The stored form is ciphertext, never
- * plaintext — matching the security posture of the web client's storage.
+ * Session persistence: the access token and its refresh token are encrypted
+ * with an Android Keystore AES-GCM key before they touch disk. The stored form
+ * is ciphertext, never plaintext — matching the security posture of the web
+ * client's storage.
+ *
+ * Both tokens are the gateway's JWT pair now, not the `st1` session id older
+ * builds stored: the mailbox API verifies the JWT's signature and `jti`, and
+ * refuses anything else. The refresh token is kept encrypted for the same
+ * reason the access token is — it is a bearer credential that can mint new
+ * sessions.
  */
 object SessionStore {
 
     private val KEY_TOKEN = stringPreferencesKey("token_enc")
     private val KEY_IV = stringPreferencesKey("token_iv")
+    private val KEY_REFRESH = stringPreferencesKey("refresh_enc")
+    private val KEY_REFRESH_IV = stringPreferencesKey("refresh_iv")
     private val KEY_ADDRESS = stringPreferencesKey("address")
     private val KEY_NAME = stringPreferencesKey("name")
     private val KEY_EXPIRES = stringPreferencesKey("expires_at")
@@ -52,32 +61,85 @@ object SessionStore {
     // cipher.iv. Supplying a caller-generated IV to ENCRYPT_MODE throws
     // InvalidAlgorithmParameterException on every save — the crash that took
     // down sign-in.
-    suspend fun save(context: Context, token: String, address: String, name: String, expiresAt: Long) =
-        withContext(Dispatchers.IO) {
-            val cipher = Cipher.getInstance("AES/GCM/NoPadding")
-            cipher.init(Cipher.ENCRYPT_MODE, key())
-            val encrypted = cipher.doFinal(token.toByteArray())
-            val iv = cipher.iv
-            context.sessionStore.edit { prefs ->
-                prefs[KEY_TOKEN] = android.util.Base64.encodeToString(encrypted, android.util.Base64.NO_WRAP)
-                prefs[KEY_IV] = android.util.Base64.encodeToString(iv, android.util.Base64.NO_WRAP)
-                prefs[KEY_ADDRESS] = address
-                prefs[KEY_NAME] = name
-                prefs[KEY_EXPIRES] = expiresAt.toString()
+    suspend fun save(
+        context: Context,
+        token: String,
+        refreshToken: String?,
+        address: String,
+        name: String,
+        expiresAt: Long,
+    ) = withContext(Dispatchers.IO) {
+        val (encrypted, iv) = seal(token)
+        context.sessionStore.edit { prefs ->
+            prefs[KEY_TOKEN] = encrypted
+            prefs[KEY_IV] = iv
+            if (refreshToken != null) {
+                val (refreshEnc, refreshIv) = seal(refreshToken)
+                prefs[KEY_REFRESH] = refreshEnc
+                prefs[KEY_REFRESH_IV] = refreshIv
             }
+            prefs[KEY_ADDRESS] = address
+            prefs[KEY_NAME] = name
+            prefs[KEY_EXPIRES] = expiresAt.toString()
         }
+    }
 
-    suspend fun token(context: Context): String? = withContext(Dispatchers.IO) {
-        val prefs = context.sessionStore.data.first()
-        val enc = prefs[KEY_TOKEN] ?: return@withContext null
-        val ivB64 = prefs[KEY_IV] ?: return@withContext null
-        try {
-            val encrypted = android.util.Base64.decode(enc, android.util.Base64.NO_WRAP)
+    /**
+     * Replace the pair after a refresh, keeping address and name.
+     *
+     * A refresh rotates both tokens, and the old refresh token is invalidated
+     * server-side, so writing only the access token would strand the session at
+     * the next refresh.
+     */
+    suspend fun updateTokens(
+        context: Context,
+        token: String,
+        refreshToken: String?,
+        expiresAt: Long,
+    ) = withContext(Dispatchers.IO) {
+        val (encrypted, iv) = seal(token)
+        context.sessionStore.edit { prefs ->
+            prefs[KEY_TOKEN] = encrypted
+            prefs[KEY_IV] = iv
+            if (refreshToken != null) {
+                val (refreshEnc, refreshIv) = seal(refreshToken)
+                prefs[KEY_REFRESH] = refreshEnc
+                prefs[KEY_REFRESH_IV] = refreshIv
+            }
+            prefs[KEY_EXPIRES] = expiresAt.toString()
+        }
+    }
+
+    private fun seal(value: String): Pair<String, String> {
+        val cipher = Cipher.getInstance("AES/GCM/NoPadding")
+        cipher.init(Cipher.ENCRYPT_MODE, key())
+        val encrypted = cipher.doFinal(value.toByteArray())
+        return android.util.Base64.encodeToString(encrypted, android.util.Base64.NO_WRAP) to
+            android.util.Base64.encodeToString(cipher.iv, android.util.Base64.NO_WRAP)
+    }
+
+    private fun open(encB64: String?, ivB64: String?): String? {
+        if (encB64 == null || ivB64 == null) return null
+        return try {
+            val encrypted = android.util.Base64.decode(encB64, android.util.Base64.NO_WRAP)
             val iv = android.util.Base64.decode(ivB64, android.util.Base64.NO_WRAP)
             val cipher = Cipher.getInstance("AES/GCM/NoPadding")
             cipher.init(Cipher.DECRYPT_MODE, key(), GCMParameterSpec(128, iv))
             String(cipher.doFinal(encrypted))
-        } catch (_: Exception) { null }
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    suspend fun token(context: Context): String? = withContext(Dispatchers.IO) {
+        val prefs = context.sessionStore.data.first()
+        open(prefs[KEY_TOKEN], prefs[KEY_IV])
+    }
+
+    /** The refresh token, or null for a session stored before the migration. */
+    suspend fun refreshToken(context: Context): String? = withContext(Dispatchers.IO) {
+        val prefs = context.sessionStore.data.first()
+        open(prefs[KEY_REFRESH], prefs[KEY_REFRESH_IV])
     }
 
     suspend fun address(context: Context): String? =

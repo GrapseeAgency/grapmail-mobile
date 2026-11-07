@@ -109,7 +109,7 @@ fun SignInScreen(
                         return@launch
                     }
                     SessionStore.save(
-                        context, token,
+                        context, token, resp.refreshToken,
                         resp.accountOrNull?.address ?: identifier.trim(),
                         resp.accountOrNull?.name ?: "",
                         resp.expiresAtMillis,

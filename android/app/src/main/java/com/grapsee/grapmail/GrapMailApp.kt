@@ -13,6 +13,10 @@ class GrapMailApp : Application() {
     override fun onCreate() {
         super.onCreate()
         DeviceId.init(this)
+        // The API layer needs one thing it cannot take from a screen: an
+        // application context for the token authenticator, which rotates the
+        // gateway pair from an OkHttp thread when a call 401s.
+        com.grapsee.grapmail.data.Api.init(this)
         // The channel exists before anything can post to it. Creating it here
         // rather than at first notify means a notification raised by a process
         // the person never opened — the poll, woken by the system — is not

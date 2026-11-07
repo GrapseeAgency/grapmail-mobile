@@ -122,6 +122,7 @@ fun ChangePasswordScreen(
                                     SessionStore.save(
                                         context,
                                         fresh,
+                                        SessionStore.refreshToken(context),
                                         SessionStore.address(context) ?: "",
                                         SessionStore.name(context) ?: "",
                                         // The server says when this token dies. Storing 0

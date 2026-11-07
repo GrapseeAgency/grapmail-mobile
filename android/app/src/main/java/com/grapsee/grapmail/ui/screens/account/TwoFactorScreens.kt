@@ -79,7 +79,7 @@ fun TwoFactorScreen(
                     return@launch
                 }
                 SessionStore.save(
-                    context, token,
+                    context, token, resp.refreshToken,
                     resp.user?.address ?: state.identifier,
                     resp.user?.name ?: "",
                     resp.expiresAtMillis,
@@ -227,7 +227,7 @@ fun BackupCodeScreen(
                     return@launch
                 }
                 SessionStore.save(
-                    context, token,
+                    context, token, resp.refreshToken,
                     resp.user?.address ?: state.identifier,
                     resp.user?.name ?: "",
                     resp.expiresAtMillis,
