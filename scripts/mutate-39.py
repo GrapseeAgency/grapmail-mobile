@@ -35,8 +35,8 @@ MUTATIONS = [
      "if (sent) Unit else GMHaptics.failure()"),
     # the haptic player removed: the model still emits and nothing ever plays it
     ("android/app/src/main/java/com/grapsee/grapmail/MainActivity.kt",
-     "            hapticView.performHapticFeedback(constant)",
-     "            // played by the system"),
+     "            val accepted = hapticView.performHapticFeedback(constant)",
+     "            val accepted = false // played by the system"),
     ("android/app/src/main/java/com/grapsee/grapmail/ui/screens/mail/MailboxScreen.kt",
      'Text(state.staleError!!, fontSize = 12.sp, color = palette.warnInk,',
      'androidx.compose.ui.platform.LocalHapticFeedback.current.performHapticFeedback('
@@ -52,8 +52,8 @@ MUTATIONS = [
      "        _ = request"),
     # the poll inventing its own count instead of asking the server
     ("android/app/src/main/java/com/grapsee/grapmail/logic/MailPollWorker.kt",
-     "val unread = stats.inbox?.unread ?: return Result.success()",
-     "val unread = (stats.inbox?.total ?? 0)"),
+     "val unread = stats.inbox?.unread",
+     "val unread = stats.inbox?.total"),
     # announcing a first read as arrivals: the first-read branch falls through
     ("android/app/src/main/java/com/grapsee/grapmail/logic/MailPollWorker.kt",
      '        if (!hadPrevious) {\n            report("silent first-read unread=$unread")\n            return Result.success()\n        }\n',
