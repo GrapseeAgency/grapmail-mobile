@@ -13,7 +13,8 @@ enum DeviceId {
     }()
 }
 
-/// Keychain-backed session storage — the st1 token never touches plaintext disk.
+/// Keychain-backed session storage — the gateway's JWT pair never touches
+/// plaintext disk.
 enum SessionStore {
     private static let tokenKey = "grapmail.session.token"
     private static let refreshKey = "grapmail.session.refresh"

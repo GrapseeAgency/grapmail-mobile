@@ -86,7 +86,7 @@ import java.util.concurrent.TimeUnit
     val token: String? = null,
     val refreshToken: String? = null,
     val expiresAt: Long? = null,
-    /** The live /auth/account/signin envelope answers with a RELATIVE lifetime
+    /** The live /grapsee/auth/login envelope answers with a RELATIVE lifetime
      *  (seconds), not an absolute `expiresAt`. Only the absolute one was ever
      *  read, so every stored session had expiry 0 — which SessionStore treats as
      *  "never expires". A token revoked on the server kept the app on a home
@@ -272,7 +272,7 @@ class ApiException(val status: Int, val code: String?, message: String) : Except
     val createdAt: String? = null,
     // ── The mail-preference half of the same record ──────────────────────────
     //
-    // `GET /auth/account/profile` answers one document that carries the person's
+    // `GET /grapsee/auth/account/profile` answers one document that carries the person's
     // name, their display name, their recovery targets, their photo and every
     // mail preference the website's settings page edits
     // (`auth-account-profile.ts:69-80`, `:175-214`). The mobile app used to read
@@ -336,7 +336,7 @@ class ApiException(val status: Int, val code: String?, message: String) : Except
 
 /**
  * One connected app (`:213`, and the JSONL route's cleaned shape at
- * `src/app/api/auth/account/profile/route.ts:330-345`). `product` is the display
+ * `services/shared/src/routes/auth-account-profile.ts`). `product` is the display
  * name and the key the disconnect acts on; `host` only exists for third-party
  * apps — our own products have no domain to draw a logo from, so they render a
  * monogram, the same rule the web applies.
@@ -585,7 +585,7 @@ object Api {
     /**
      * For the partial PATCH bodies only.
      *
-     * `PATCH /auth/account/profile` writes exactly the keys that arrive
+     * `PATCH /grapsee/auth/account/profile` writes exactly the keys that arrive
      * (`auth-account-profile.ts:397-441`, and `:638-641` merges the `settings`
      * object it was given over the stored one). kotlinx.serialization's default
      * encoder emits every default value, including the `null`s that mean "this

@@ -194,7 +194,7 @@ struct SignInResponse: Decodable {
     var token: String?
     var refreshToken: String?
     var expiresAt: Int?
-    /// The live /auth/account/signin envelope answers with a RELATIVE lifetime
+    /// The live /grapsee/auth/login envelope answers with a RELATIVE lifetime
     /// (`expiresIn`, seconds) rather than an absolute `expiresAt`. Only the
     /// absolute one was ever read, so every stored session had no expiry and
     /// `hasValidSession` treated it as valid forever — a token revoked on the
