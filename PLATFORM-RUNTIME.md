@@ -25,6 +25,7 @@ Android writes a `sys_summary` block onto the run page. The lines that matter:
 - `* new-mail notification: **observed**` — the job announced a rise and the shade drew the line.
 - `* new-mail notification: **not observed**` — the read was refused (the string carries the server's status). The poll staying silent is the correct branch; it is reported instead of hidden.
 - `* new-mail notification: **not due**` — either the job's first run only stored the baseline it compares against, or the unread count did not rise. Both mean no notification *could* be announced, which is different from a notification that failed, and the run page says which.
+- `* offline claim: **not observed**` — airplane mode was set but the system still reports a default network (the AVD's route is virtual ethernet, which airplane mode does not remove), so the connectivity callback had nothing to lose. The leg fails only when the network really is gone and the banner still does not draw.
 - `* live mailbox read: **answered / failed**` — whether the signed-in home rendered a mailbox or showed `Couldn't load Inbox`. This is the line that would have named the auth seam.
 
 iOS prints `live-mail: home shows load failure = <bool>` into the test log.
