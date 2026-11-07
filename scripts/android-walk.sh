@@ -525,9 +525,12 @@ adb shell dumpsys jobscheduler > /tmp/jobs.txt 2>/dev/null || true
 # fails the leg for a reason that is not the app.
 poll_job_id() {
   adb shell dumpsys jobscheduler > /tmp/jobs.txt 2>/dev/null || true
-  python3 - <<'PY'
-import re
-pkg = "com.grapsee.grapmail"
+  # The package comes from the walk's own PKG, not a second literal: a rename
+  # that updated one and not the other would make this leg report "no job" for
+  # an app that has one.
+  PKG="$PKG" python3 - <<'PY'
+import os, re
+pkg = os.environ["PKG"]
 text = open("/tmp/jobs.txt", encoding="utf-8", errors="ignore").read()
 # Three shapes, newest AOSP first, because the dump is not a documented format
 # and a run that cannot find the job says so rather than guessing an id.
