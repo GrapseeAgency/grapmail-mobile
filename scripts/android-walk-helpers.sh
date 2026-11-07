@@ -444,7 +444,11 @@ type_into_tag() {
       adb shell input tap $pos
       sleep 1
       if ! keyboard_shown && anr_in_view; then dismiss_anr; ensure_foreground; fi
-      if keyboard_shown || dump_xml && python3 - "$OUT/.ui.xml" "$tag" <<'PY'
+      # The FIELD must hold focus. A keyboard being visible is not proof: it
+      # can outlive the focus it opened for, and one failed run photographed a
+      # keyboard up over an empty composer — the keyboard-shown shortcut typed
+      # into an IME that had not bound to the field, and the text was dropped.
+      if dump_xml && python3 - "$OUT/.ui.xml" "$tag" <<'PY'
 import re, sys
 xml = open(sys.argv[1], encoding="utf-8", errors="ignore").read()
 tag = sys.argv[2]
@@ -457,13 +461,29 @@ PY
       then
         adb shell input text "$value"
         sleep 0.6
-        dismiss_keyboard
-        sleep 0.4
-        return 0
+        # The text must be IN the field. `input text` delivered to an IME that
+        # has not finished binding drops it silently, the send below refuses an
+        # empty recipient, and every later claim sits on an empty composer.
+        # Verified, or the tap is retried.
+        if dump_xml && python3 - "$OUT/.ui.xml" "$tag" "$value" <<'PY'
+import re, sys
+xml = open(sys.argv[1], encoding="utf-8", errors="ignore").read()
+tag, value = sys.argv[2], sys.argv[3]
+for m in re.finditer(r'<node[^>]*>', xml):
+    a = dict(re.findall(r'(\w[\w-]*)="([^"]*)"', m.group(0)))
+    if a.get("resource-id", "").endswith("/" + tag):
+        sys.exit(0 if value in a.get("text", "") else 1)
+sys.exit(1)
+PY
+        then
+          dismiss_keyboard
+          sleep 0.4
+          return 0
+        fi
       fi
     fi
     sleep 1
   done
-  echo "TIMEOUT: field '$tag' never focused" >&2
+  echo "TIMEOUT: field '$tag' never received its text" >&2
   return 1
 }
