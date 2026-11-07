@@ -191,9 +191,18 @@ The mobile-side map, checked against the gateway's route table:
     phone       /auth/phone/{start,verify}    -> /grapsee/auth/phone/…    (same names)
     mail        /grapsee/grapmail/*           -> unchanged; accepts the JWT
 
-The walk's account creation is the CI constraint: the gateway demands the email
-OTP, and the workflow cannot read a mailbox. Options are a pre-verified CI account
-held in secrets, or a one-time provisioning step with database access. Until the
-migration lands, the app keeps its current, honest behaviour: account screens work
-against a real store, mailbox screens say "Couldn't load Inbox" against a real
-gateway refusal, and no seeded row exists outside the test-only snapshot host.
+The walk's account creation is the CI constraint, and it is smaller than it first
+looked: a USER account registered with **no email** skips the OTP gate entirely.
+Measured: `register {accountType:"USER", grapmailHandle, password, acceptedTerms}`
+with no `email` answers `{"email":null,"grapmailStatus":"active","requireOtp":false}`,
+and `login` with the address answers `200` with the JWT pair on the first try
+(`login` only challenges when `user.email` is set — the mobile signup wizard never
+collects one). So a fresh CI account signs in immediately, the walk's handle-and-
+password flow is unchanged, and the migration is the URL/shape swap plus the
+account-route move — no OTP screen, no seeded CI account. The verified-email
+variant remains available for accounts that do carry an address.
+
+Until the migration lands, the app keeps its current, honest behaviour: account
+screens work against a real store, mailbox screens say "Couldn't load Inbox"
+against a real gateway refusal, and no seeded row exists outside the test-only
+snapshot host.
