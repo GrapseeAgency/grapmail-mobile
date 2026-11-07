@@ -568,7 +568,18 @@ fi
 # The banner's whole claim is that it comes from a callback the OS fires. With
 # the radio off there is nothing to fake it with: either the node appears or the
 # callback never ran. Restored immediately — every later leg needs the network.
+#
+# Airplane mode is not guaranteed to remove the network here. The AVD's default
+# route is a virtual ETHERNET interface, which airplane mode does not touch, so
+# "the callback never fired" can be the environment rather than the app. The
+# system is asked whether a default network survived; if it did, the leg reports
+# that it could not force the state instead of failing the app for it.
 adb shell cmd connectivity airplane-mode enable >/dev/null 2>&1 || true
+sleep 2
+STILL_ONLINE=""
+if adb shell dumpsys connectivity 2>/dev/null | grep -q "Active default network"; then
+  STILL_ONLINE=1
+fi
 OFF_NODE=""
 for _ in 1 2 3 4 5 6 7 8 9 10; do
   OFF_NODE="$(find_nodes "n.get('resource-id','').rsplit('/',1)[-1]=='mail-offline'" | head -1)"
@@ -578,6 +589,9 @@ done
 if [ -n "$OFF_NODE" ]; then
   shot 123-platform-offline
   echo "  [connectivity] airplane mode on -> the offline banner drew"
+elif [ -n "$STILL_ONLINE" ]; then
+  echo "  [connectivity] the system kept a default network — the offline banner is not provable on this device"
+  sys_summary "* offline claim: **not observed** — airplane mode was set but the system still reports a default network, so the callback had nothing to lose. Not a failure; see PLATFORM-RUNTIME.md."
 else
   echo "FAIL: radio off, and no offline banner appeared" >&2
   FAILURES=$((FAILURES + 1))
@@ -585,10 +599,10 @@ else
 fi
 adb shell cmd connectivity airplane-mode disable >/dev/null 2>&1 || true
 sleep 4
-if [ -n "$(find_nodes "n.get('resource-id','').rsplit('/',1)[-1]=='mail-offline'" | head -1)" ]; then
+if [ -n "$OFF_NODE" ] && [ -n "$(find_nodes "n.get('resource-id','').rsplit('/',1)[-1]=='mail-offline'" | head -1)" ]; then
   # The other half of the claim: a banner that never leaves is a decoration, not
   # a reading. This is the check that would catch a callback registered once and
-  # never updated.
+  # never updated. Only meaningful when the banner was actually observed.
   echo "FAIL: the offline banner is still up with the radio restored" >&2
   FAILURES=$((FAILURES + 1))
 else
