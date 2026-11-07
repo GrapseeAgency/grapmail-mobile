@@ -629,6 +629,22 @@ fi
 # source: whatever the receipt says happened, the event that played must be the
 # one that agrees with it. Both branches are acceptable; a mismatch, or a write
 # that played nothing at all, is the failure.
+#
+# One forced poll BEFORE the send, for one reason: the worker's first run only
+# stores the count it compares against, so without a baseline the §7 poll can
+# never announce anything and the notification surface stays unobservable on
+# every run. The baseline stores the empty inbox; the send below raises unread;
+# the §7 force then has a genuine rise to announce.
+BASELINE_JOB="$(poll_job_id)"
+if [ -n "$BASELINE_JOB" ]; then
+  log_reset
+  adb shell cmd jobscheduler run -f "$PKG" "$BASELINE_JOB" >/dev/null 2>&1 || true
+  if log_wait "GrapMailPoll" 15 >/dev/null 2>&1; then
+    echo "  [poll] baseline stored before the send"
+  else
+    echo "  [poll] no baseline line — the first-read store did not report (continuing)"
+  fi
+fi
 must "compose tap" tap_xy "$(wait_nodes "n.get('resource-id','').rsplit('/',1)[-1]=='mail-compose'" | head -1)"
 if wait_nodes "n.get('resource-id','').rsplit('/',1)[-1]=='mail-to'" >/dev/null; then
   must_type_tag "mail-to" "$HANDLE@grapsee.com"
