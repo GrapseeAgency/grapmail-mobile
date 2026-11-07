@@ -437,42 +437,26 @@ sys_summary() {
 # by the label beside it. The compose fields the platform leg fills carry tags
 # (`mail-to`), and their labels are shared with other rows on other screens.
 type_into_tag() {
-  local tag="$1" value="$2" pos="" i
+  local tag="$1" value="$2" pos="" i landed=""
+  # The device shell splits `input text` on spaces, so a sentence body would
+  # arrive as its first word only. `%s` is the documented space escape for the
+  # input command; the field receives the real spaces back.
+  local typed="${value// /%s}"
   for i in $(seq 1 8); do
-    # The composer auto-focuses the body with its keyboard already up, and a
-    # tap delivered while that IME is open is consumed by the dismiss gesture:
-    # the field never takes focus, the focus check fails, nothing is typed —
-    # one run photographed the keyboard up over an empty composer for eight
-    # straight attempts. Close it first, the same rule tap_text already
-    # follows ("close the keyboard FIRST, then locate").
+    # The composer auto-focuses the body with its keyboard up; a tap delivered
+    # while an IME is open may be consumed by the dismiss gesture. Close any
+    # keyboard first, the same rule tap_text follows.
     dismiss_keyboard
     pos="$(find_nodes "n.get('resource-id','').rsplit('/',1)[-1]=='$tag'" | head -1)"
-    if [ -n "$pos" ]; then
-      adb shell input tap $pos
-      sleep 1
-      if ! keyboard_shown && anr_in_view; then dismiss_anr; ensure_foreground; fi
-      # The FIELD must hold focus. A keyboard being visible is not proof: it
-      # can outlive the focus it opened for, and one failed run photographed a
-      # keyboard up over an empty composer — the keyboard-shown shortcut typed
-      # into an IME that had not bound to the field, and the text was dropped.
-      if dump_xml && python3 - "$OUT/.ui.xml" "$tag" <<'PY'
-import re, sys
-xml = open(sys.argv[1], encoding="utf-8", errors="ignore").read()
-tag = sys.argv[2]
-for m in re.finditer(r'<node[^>]*>', xml):
-    a = dict(re.findall(r'(\w[\w-]*)="([^"]*)"', m.group(0)))
-    if a.get("resource-id", "").endswith("/" + tag) and a.get("focused") == "true":
-        sys.exit(0)
-sys.exit(1)
-PY
-      then
-        adb shell input text "$value"
-        sleep 0.6
-        # The text must be IN the field. `input text` delivered to an IME that
-        # has not finished binding drops it silently, the send below refuses an
-        # empty recipient, and every later claim sits on an empty composer.
-        # Verified, or the tap is retried.
-        if dump_xml && python3 - "$OUT/.ui.xml" "$tag" "$value" <<'PY'
+    [ -n "$pos" ] || { sleep 1; continue; }
+    adb shell input tap $pos
+    sleep 1.2
+    # Typed unconditionally after the tap: if the tap moved focus, the text
+    # lands here; if something kept focus, the check below names WHERE it
+    # landed instead of guessing.
+    adb shell input text "$typed"
+    sleep 1.2
+    if dump_xml && python3 - "$OUT/.ui.xml" "$tag" "$value" <<'PY'
 import re, sys
 xml = open(sys.argv[1], encoding="utf-8", errors="ignore").read()
 tag, value = sys.argv[2], sys.argv[3]
@@ -482,13 +466,35 @@ for m in re.finditer(r'<node[^>]*>', xml):
         sys.exit(0 if value in a.get("text", "") else 1)
 sys.exit(1)
 PY
-        then
-          dismiss_keyboard
-          sleep 0.4
-          return 0
-        fi
-      fi
+    then
+      dismiss_keyboard
+      sleep 0.4
+      return 0
     fi
+    # Where did the text go? Named on every failed attempt: the tag field's
+    # own state, and any other field that received it. The composer's body
+    # auto-focuses, so a first input landing in the body is the expected
+    # miss — the next attempt re-taps the tag field and re-types.
+    dump_xml || true
+    python3 - "$OUT/.ui.xml" "$tag" "$value" <<'PY' >&2
+import re, sys, html
+xml = open(sys.argv[1], encoding="utf-8", errors="ignore").read()
+tag, value = sys.argv[2], sys.argv[3]
+tagstate = landed = None
+for m in re.finditer(r'<node[^>]*>', xml):
+    a = dict(re.findall(r'(\w[\w-]*)="([^"]*)"', m.group(0)))
+    rid = a.get("resource-id", "")
+    if rid.endswith("/" + tag):
+        tagstate = f"text={a.get('text','')!r} focused={a.get('focused')}"
+    elif "EditText" in a.get("class", "") and value in a.get("text", ""):
+        landed = rid.split("/")[-1] if "/" in rid else rid
+if tagstate is None:
+    print(f"  [type] attempt: field {tag} absent from the dump")
+else:
+    print(f"  [type] attempt: field {tag} holds {tagstate}")
+    if landed:
+        print(f"  [type] attempt: the text landed in {landed!r} — focus went there instead")
+PY
     sleep 1
   done
   echo "TIMEOUT: field '$tag' never received its text" >&2
