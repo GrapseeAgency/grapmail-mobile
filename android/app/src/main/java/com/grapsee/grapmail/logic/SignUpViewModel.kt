@@ -155,6 +155,7 @@ class SignUpViewModel : ViewModel() {
                         grapmailHandle = s.chosenHandle.ifBlank { null },
                         password = s.password,
                         acceptedTerms = true,
+                        accountType = "USER",
                     )
                 )
                 // The gateway envelope answers `grapmail` (and no account

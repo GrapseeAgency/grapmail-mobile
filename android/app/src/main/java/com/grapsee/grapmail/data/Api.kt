@@ -43,8 +43,17 @@ import java.util.concurrent.TimeUnit
     val acceptedTerms: Boolean? = null,
     /** The gateway distinguishes the agency dashboard's CLIENT accounts from
      *  GrapMail's USER accounts, and only USER accounts get a handle and a
-     *  mailbox. This app only ever creates USER accounts. */
-    val accountType: String = "USER",
+     *  mailbox. This app only ever creates USER accounts.
+     *
+     *  No default, deliberately. The encoder in this file is
+     *  `Json { ignoreUnknownKeys = true; coerceInputValues = true }`, whose
+     *  `encodeDefaults` is false — a defaulted field is omitted from the wire
+     *  entirely. With a default here the gateway read `accountType` as absent,
+     *  defaulted to CLIENT, and refused the signup with "Name, email, and
+     *  password are required": the walk's terms step created nothing, so the
+     *  human-verification screen never appeared and every later frame cascaded
+     *  red. An explicit constructor argument cannot be omitted. */
+    val accountType: String,
 )
 
 @Serializable data class CreateResponse(
