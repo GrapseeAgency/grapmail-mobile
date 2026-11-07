@@ -89,6 +89,10 @@ must() { # must <description> <cmd...> — a failed interaction fails the walk
 }
 must_tap()  { must "tap '$1'"  tap_text "$1"; }
 must_type() { must "type into '$1'" type_into "$1" "$2"; }
+# The composer's fields are named by testTag, not by a visible label, so the
+# type_into path cannot find them. Same must-wrapper contract as must_type: a
+# failure here is named, counted, and cannot silently empty the send.
+must_type_tag() { must "type into field $1" type_into_tag "$1" "$2"; }
 must_tap_low() { # tap the first node with this exact text below MINY px —
                  # dodges same-text chrome above (the CREATE ACCOUNT eyebrow)
   local pos
@@ -671,7 +675,7 @@ BASELINE_JOB="$(poll_job_id)"
 if [ -n "$BASELINE_JOB" ]; then
   log_reset
   adb shell cmd jobscheduler run -f "$PKG" "$BASELINE_JOB" >/dev/null 2>&1 || true
-  if log_wait "GrapMailPoll" 15 >/dev/null 2>&1; then
+  if log_wait "GrapMailPoll" 30 >/dev/null 2>&1; then
     echo "  [poll] baseline stored before the send"
   else
     echo "  [poll] no baseline line — the first-read store did not report (continuing)"
@@ -762,9 +766,27 @@ if [ -n "$JOB" ]; then
   FRESH="$(poll_job_id)"
   [ -n "$FRESH" ] && JOB="$FRESH"
   log_reset
-  adb shell cmd jobscheduler run -f "$PKG" "$JOB" >/tmp/jobrun.log 2>&1 \
-    || { echo "FAIL: jobscheduler refused to run job $JOB" >&2; cat /tmp/jobrun.log >&2; FAILURES=$((FAILURES + 1)); }
-  BRANCH="$(log_wait "GrapMailPoll" 20 || true)"
+  FORCE_OK=1
+  if ! adb shell cmd jobscheduler run -f "$PKG" "$JOB" >/tmp/jobrun.log 2>&1; then
+    # The id the scheduler reported minutes ago can be stale by the time this
+    # leg forces it — the dump spells pending and running jobs differently, so
+    # a re-ask can come back empty too. Re-ask once and retry before failing
+    # the leg for an id that was never the app's fault.
+    sleep 2
+    JOB="$(poll_job_id)"
+    if [ -n "$JOB" ] && adb shell cmd jobscheduler run -f "$PKG" "$JOB" >/tmp/jobrun.log 2>&1; then
+      echo "  [poll] job re-discovered as $JOB after the first force was refused"
+    else
+      echo "FAIL: jobscheduler refused to run job $JOB" >&2
+      cat /tmp/jobrun.log >&2
+      FAILURES=$((FAILURES + 1))
+      FORCE_OK=0
+    fi
+  fi
+  BRANCH=""
+  if [ "$FORCE_OK" = 1 ]; then
+    BRANCH="$(log_wait "GrapMailPoll" 20 || true)"
+  fi
   if [ -z "$BRANCH" ]; then
     echo "FAIL: the scheduled job ran and the poll worker never reported a branch" >&2
     FAILURES=$((FAILURES + 1))
