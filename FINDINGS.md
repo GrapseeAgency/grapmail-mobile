@@ -309,3 +309,34 @@ its accounts skip the gate entirely), but real for anyone who created a GrapMail
 account elsewhere and signs in here. The fix is a code-entry screen bound to
 `verify-otp`, or having `signIn` surface the 403 body so the existing challenge
 screen can carry it — a product decision, recorded rather than half-built.
+
+## CORRECTION: the 404s predate the migration — both deployments are stale
+
+The Sessions frame in the v0.4.0 walk set (`25-sec-sessions-light.png`, photographed
+before any auth change) already renders **"Request failed (404)"**. Measured
+against the deployed Next app with a live `st1` session:
+
+    GET  /api/auth/account/profile      -> 200        GET  /api/auth/me          -> 200
+    GET  /api/auth/account/avatar       -> 404 NO_AVATAR
+    POST /api/auth/phone/start          -> 200 (challenge issued)
+    GET  /api/auth/account/sessions     -> 404 (Next HTML not-found)
+    GET  /api/auth/account/activity     -> 404 (Next HTML not-found)
+    POST /api/auth/account/verify-password -> 404 (Next HTML not-found)
+    POST /api/auth/account/find         -> 404 (Next HTML not-found)
+
+Those route FILES exist in this repo (`src/app/api/auth/account/...`). So the
+deployed site is older than the repo, exactly as the deployed gateway is older
+than the backend repo. The migration did not break Sessions/Activity/proof — they
+were already returning 404 to the app, which is why the frame says so.
+
+What the migration DOES change is phone verification: the deployed Next route
+answers, the deployed gateway route 500s. The gateway is the correct target
+(a phone proof has to belong to the account the mailbox belongs to), so the
+app keeps `/grapsee/auth/phone/*`; until the backend deploy, adding a phone or
+turning on SMS 2FA fails where it used to work. That is a regression by
+deployment, not by code, and it is named here rather than left for the walk to
+photograph.
+
+**Root cause of both stales: no deploy ran after the routes were added.** The
+remedy is a Next deploy and a backend deploy at current `main`; every client-side
+route is correct and verified against the source that defines it.
