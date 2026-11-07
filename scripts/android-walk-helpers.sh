@@ -439,7 +439,7 @@ sys_summary() {
 type_into_tag() {
   local tag="$1" value="$2" pos="" i
   for i in $(seq 1 8); do
-    pos="$(find_nodes "n.get('resource-id','').endsWith('/$tag')" | head -1)"
+    pos="$(find_nodes "n.get('resource-id','').rsplit('/',1)[-1]=='$tag'" | head -1)"
     if [ -n "$pos" ]; then
       adb shell input tap $pos
       sleep 1

@@ -518,7 +518,14 @@ echo "· platform surfaces — observed at runtime, not compiled"
 
 # ── 1. the schedule the system holds, not the constant the source holds ──
 adb shell dumpsys jobscheduler > /tmp/jobs.txt 2>/dev/null || true
-JOB="$(python3 - <<'PY'
+# The job id WorkManager holds for this package, read from the system's own
+# dump. A function because it is asked twice: once to report what the system
+# holds, and again immediately before forcing the job — the id is stable in
+# practice but not guaranteed across an app restart, and forcing a stale id
+# fails the leg for a reason that is not the app.
+poll_job_id() {
+  adb shell dumpsys jobscheduler > /tmp/jobs.txt 2>/dev/null || true
+  python3 - <<'PY'
 import re
 pkg = "com.grapsee.grapmail"
 text = open("/tmp/jobs.txt", encoding="utf-8", errors="ignore").read()
@@ -533,7 +540,8 @@ for pat in (r"Job\{(\d+) @ [^ ]*" + re.escape(pkg),
 else:
     print("")
 PY
-)"
+}
+JOB="$(poll_job_id)"
 if [ -n "$JOB" ]; then
   echo "  [jobscheduler] $PKG holds job id $JOB"
   grep -A6 -m1 "Job{$JOB @" /tmp/jobs.txt | sed 's/^/      /' || true
@@ -560,7 +568,7 @@ fi
 adb shell cmd connectivity airplane-mode enable >/dev/null 2>&1 || true
 OFF_NODE=""
 for _ in 1 2 3 4 5 6 7 8 9 10; do
-  OFF_NODE="$(find_nodes "n.get('resource-id','').endsWith('/mail-offline')" | head -1)"
+  OFF_NODE="$(find_nodes "n.get('resource-id','').rsplit('/',1)[-1]=='mail-offline'" | head -1)"
   [ -n "$OFF_NODE" ] && break
   sleep 1
 done
@@ -574,7 +582,7 @@ else
 fi
 adb shell cmd connectivity airplane-mode disable >/dev/null 2>&1 || true
 sleep 4
-if [ -n "$(find_nodes "n.get('resource-id','').endsWith('/mail-offline')" | head -1)" ]; then
+if [ -n "$(find_nodes "n.get('resource-id','').rsplit('/',1)[-1]=='mail-offline'" | head -1)" ]; then
   # The other half of the claim: a banner that never leaves is a decoration, not
   # a reading. This is the check that would catch a callback registered once and
   # never updated.
@@ -606,7 +614,7 @@ else
   log_reset
   adb shell am start -W -a "$SHORTCUT_ACTION" -n "$PKG/.MainActivity" >/tmp/shortcut.log 2>&1 \
     || { echo "FAIL: the shortcut intent did not start the activity" >&2; cat /tmp/shortcut.log >&2; FAILURES=$((FAILURES + 1)); }
-  if wait_nodes "n.get('resource-id','').endsWith('/mail-to')" >/dev/null; then
+  if wait_nodes "n.get('resource-id','').rsplit('/',1)[-1]=='mail-to'" >/dev/null; then
     shot 122-platform-compose-shortcut
     echo "  [shortcut] the launcher's intent opened the composer"
   else
@@ -621,8 +629,8 @@ fi
 # source: whatever the receipt says happened, the event that played must be the
 # one that agrees with it. Both branches are acceptable; a mismatch, or a write
 # that played nothing at all, is the failure.
-must "compose tap" tap_xy "$(wait_nodes "n.get('resource-id','').endsWith('/mail-compose')" | head -1)"
-if wait_nodes "n.get('resource-id','').endsWith('/mail-to')" >/dev/null; then
+must "compose tap" tap_xy "$(wait_nodes "n.get('resource-id','').rsplit('/',1)[-1]=='mail-compose'" | head -1)"
+if wait_nodes "n.get('resource-id','').rsplit('/',1)[-1]=='mail-to'" >/dev/null; then
   must_type_tag "mail-to" "$HANDLE@grapsee.com"
   must_type_tag "mail-subject" "platform runtime proof"
   must_type_tag "mail-body-field" "One message, sent by the CI walk, to this account's own address."
@@ -666,10 +674,10 @@ fi
 # The row is the only route to the prompt: the app never asks at launch. So the
 # prompt appearing IS the proof the row is wired, and the row reading "On"
 # afterwards is the proof it re-reads the system rather than remembering the tap.
-must "home before settings" wait_nodes "n.get('resource-id','').endsWith('/mail-menu')" >/dev/null
-must "drawer for settings" tap_xy "$(wait_nodes "n.get('resource-id','').endsWith('/mail-menu')" | head -1)"
-must "settings row" wait_overlay "n.get('resource-id','').endsWith('/mail-drawer-Settings')" >/dev/null
-must "settings tap" tap_xy "$(wait_overlay "n.get('resource-id','').endsWith('/mail-drawer-Settings')" | head -1)"
+must "home before settings" wait_nodes "n.get('resource-id','').rsplit('/',1)[-1]=='mail-menu'" >/dev/null
+must "drawer for settings" tap_xy "$(wait_nodes "n.get('resource-id','').rsplit('/',1)[-1]=='mail-menu'" | head -1)"
+must "settings row" wait_overlay "n.get('resource-id','').rsplit('/',1)[-1]=='mail-drawer-Settings'" >/dev/null
+must "settings tap" tap_xy "$(wait_overlay "n.get('resource-id','').rsplit('/',1)[-1]=='mail-drawer-Settings'" | head -1)"
 NOTIFY_ROW="n.get('text','')=='New mail notifications'"
 if [ -z "$(wait_overlay "$NOTIFY_ROW" 2>/dev/null | head -1)" ]; then
   echo "FAIL: the settings screen shows no new-mail row" >&2
@@ -703,6 +711,8 @@ sleep 1
 # it holds for this package, which is the same entry point the 30-minute schedule
 # uses. What the worker then decides is read out of its own log line.
 if [ -n "$JOB" ]; then
+  FRESH="$(poll_job_id)"
+  [ -n "$FRESH" ] && JOB="$FRESH"
   log_reset
   adb shell cmd jobscheduler run -f "$PKG" "$JOB" >/tmp/jobrun.log 2>&1 \
     || { echo "FAIL: jobscheduler refused to run job $JOB" >&2; cat /tmp/jobrun.log >&2; FAILURES=$((FAILURES + 1)); }
