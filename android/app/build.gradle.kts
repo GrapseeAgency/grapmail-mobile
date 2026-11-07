@@ -59,8 +59,14 @@ android {
         // splash on either platform, haptics tied to the write rather than the
         // tap, a background new-mail read that says what it is evidence of, an
         // offline fact read from the device, and a home-screen Compose shortcut.
-        versionCode = 7
-        versionName = "0.4.0"
+        // 0.5.0 is the gateway-auth release: sign-in, sign-up and every account
+        // call moved to the service that owns the mailbox, so the signed-in home
+        // reads real mail instead of "Couldn't load Inbox" (the seam and its
+        // proof are in FINDINGS.md). It also carries the §39 runtime leg with
+        // its walk-side fixes, and two iOS layout defects the frame audit found
+        // (a 520pt sign-in form on a 402pt screen; a stepper wrapping mid-word).
+        versionCode = 8
+        versionName = "0.5.0"
         // Real account API — same contract the website uses.
         buildConfigField("String", "API_BASE", "\"https://grapsee.com/api\"")
     }

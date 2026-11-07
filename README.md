@@ -1,4 +1,4 @@
-# GrapMail Mobile — v0.4.0
+# GrapMail Mobile — v0.5.0
 
 Native GrapMail apps for Android and iOS. The account & authentication sector
 of the website, ported 1:1 to each platform's native stack — no cross-platform
