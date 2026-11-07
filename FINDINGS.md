@@ -289,3 +289,23 @@ Two server-side defects measured in the same pass, for the server owner:
   it issues a challenge, names SMS as the channel, and has nothing to send the
   code to. A GrapMail account created without a recovery channel has no path to
   recover at all, and the route does not say so.
+
+## Sign-in edge: an email-bearing account is told "code sent" with nowhere to type it
+
+The gateway's sign-in has two different challenge shapes, and the app handles one:
+
+- **SMS second factor** (account has a phone and `twoFactor` on): login answers
+  **200** `{requireOtp:true, challengeId, expiresAt, channel}`. The app's sign-in
+  screen reads `challengeId` and routes to its code screen — correct.
+- **Unverified email** (an account created on the website with an address):
+  login answers **403** `{error:'Email verification required. A new OTP has been
+  dispatched.', requireOtp:true, email}`. `Api.signIn` treats any >=400 as a
+  thrown `ApiException`, so the person sees the message but no screen ever asks
+  for the code; the email-OTP route (`POST /grapsee/auth/verify-otp
+  {email, otp}`) is not called by either client.
+
+Not reachable from this app's own signup (the wizard never collects an email, so
+its accounts skip the gate entirely), but real for anyone who created a GrapMail
+account elsewhere and signs in here. The fix is a code-entry screen bound to
+`verify-otp`, or having `signIn` surface the 403 body so the existing challenge
+screen can carry it — a product decision, recorded rather than half-built.
