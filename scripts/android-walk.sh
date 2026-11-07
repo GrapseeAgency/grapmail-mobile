@@ -527,7 +527,14 @@ adb shell dumpsys jobscheduler > /tmp/jobs.txt 2>/dev/null || true
 # holds, and again immediately before forcing the job — the id is stable in
 # practice but not guaranteed across an app restart, and forcing a stale id
 # fails the leg for a reason that is not the app.
-poll_job_id() {
+# Every scheduler job id the package holds, one per line. A LIST, not one id:
+# WorkManager re-enqueues its periodic work under a NEW scheduler id when the
+# process restarts (a run watched id 10192 vanish between two forces for this
+# reason), the dump spells jobs differently across API levels (Job{...} on old
+# releases, JOB #u0aNN/<id>: on 34+), and forcing a stale or misread id must
+# never be able to fail a leg the app did not cause. The force loop simply
+# tries every id the system currently holds; a wrong id is refused harmlessly.
+poll_job_ids() {
   adb shell dumpsys jobscheduler > /tmp/jobs.txt 2>/dev/null || true
   # The package comes from the walk's own PKG, not a second literal: a rename
   # that updated one and not the other would make this leg report "no job" for
@@ -536,22 +543,23 @@ poll_job_id() {
 import os, re
 pkg = os.environ["PKG"]
 text = open("/tmp/jobs.txt", encoding="utf-8", errors="ignore").read()
-# Three shapes, newest AOSP first, because the dump is not a documented format
-# and a run that cannot find the job says so rather than guessing an id.
-for pat in (r"Job\{(\d+) @ [^ ]*" + re.escape(pkg),
-            r"u\d+/(\d+)[^\n]*" + re.escape(pkg),
-            r"^\s*(\d+)\s*:\s*\{[^}]*" + re.escape(pkg)):
-    m = re.search(pat, text, re.M)
-    if m:
-        print(m.group(1)); break
-else:
-    print("")
+pats = (r"[Jj][Oo][Bb]\{(\d+) @ [^\n]{0,200}" + re.escape(pkg),
+        r"[Jj][Oo][Bb]\s*#u\d+a\d+/(\d+):[^\n]{0,200}" + re.escape(pkg),
+        r"u\d+a\d+\s+(\d+)[^\n]{0,200}" + re.escape(pkg),
+        r"^\s*(\d+)\s*:\s*\{[^}]{0,200}" + re.escape(pkg))
+ids = []
+for pat in pats:
+    for m in re.finditer(pat, text, re.M):
+        if m.group(1) not in ids:
+            ids.append(m.group(1))
+print("\n".join(ids))
 PY
 }
-JOB="$(poll_job_id)"
-if [ -n "$JOB" ]; then
-  echo "  [jobscheduler] $PKG holds job id $JOB"
-  grep -A6 -m1 "Job{$JOB @" /tmp/jobs.txt | sed 's/^/      /' || true
+JOBS="$(poll_job_ids)"
+JOB="$(echo "$JOBS" | head -1)"
+if [ -n "$JOBS" ]; then
+  echo "  [jobscheduler] $PKG holds job id(s): $(echo $JOBS | tr '\n' ' ')"
+  grep -m1 "$PKG" /tmp/jobs.txt | sed 's/^/      /' || true
 else
   echo "FAIL: the periodic new-mail job is not in the system's job store" >&2
   FAILURES=$((FAILURES + 1))
@@ -671,10 +679,12 @@ done
 # never announce anything and the notification surface stays unobservable on
 # every run. The baseline stores the empty inbox; the send below raises unread;
 # the §7 force then has a genuine rise to announce.
-BASELINE_JOB="$(poll_job_id)"
-if [ -n "$BASELINE_JOB" ]; then
+BASELINE_JOBS="$(poll_job_ids)"
+if [ -n "$BASELINE_JOBS" ]; then
   log_reset
-  adb shell cmd jobscheduler run -f "$PKG" "$BASELINE_JOB" >/dev/null 2>&1 || true
+  for _bj in $BASELINE_JOBS; do
+    adb shell cmd jobscheduler run -f "$PKG" "$_bj" >/dev/null 2>&1 || true
+  done
   if log_wait "GrapMailPoll" 30 >/dev/null 2>&1; then
     echo "  [poll] baseline stored before the send"
   else
@@ -762,31 +772,17 @@ sleep 1
 # Not the app calling its own worker: the system's job scheduler running the job
 # it holds for this package, which is the same entry point the 30-minute schedule
 # uses. What the worker then decides is read out of its own log line.
-if [ -n "$JOB" ]; then
-  FRESH="$(poll_job_id)"
-  [ -n "$FRESH" ] && JOB="$FRESH"
+JOBS="$(poll_job_ids)"
+JOB="$(echo "$JOBS" | head -1)"
+if [ -n "$JOBS" ]; then
+  # Re-ask HERE, not minutes earlier: the id set can change when the process
+  # restarts. Force EVERY id the system now holds — a stale id is refused
+  # harmlessly, and the worker speaks if any of them is the poll.
   log_reset
-  FORCE_OK=1
-  if ! adb shell cmd jobscheduler run -f "$PKG" "$JOB" >/tmp/jobrun.log 2>&1; then
-    # The id the scheduler reported minutes ago can be stale by the time this
-    # leg forces it — the dump spells pending and running jobs differently, so
-    # a re-ask can come back empty too. Re-ask once and retry before failing
-    # the leg for an id that was never the app's fault.
-    sleep 2
-    JOB="$(poll_job_id)"
-    if [ -n "$JOB" ] && adb shell cmd jobscheduler run -f "$PKG" "$JOB" >/tmp/jobrun.log 2>&1; then
-      echo "  [poll] job re-discovered as $JOB after the first force was refused"
-    else
-      echo "FAIL: jobscheduler refused to run job $JOB" >&2
-      cat /tmp/jobrun.log >&2
-      FAILURES=$((FAILURES + 1))
-      FORCE_OK=0
-    fi
-  fi
-  BRANCH=""
-  if [ "$FORCE_OK" = 1 ]; then
-    BRANCH="$(log_wait "GrapMailPoll" 20 || true)"
-  fi
+  for _fj in $JOBS; do
+    adb shell cmd jobscheduler run -f "$PKG" "$_fj" >/tmp/jobrun.log 2>&1 || true
+  done
+  BRANCH="$(log_wait "GrapMailPoll" 20 || true)"
   if [ -z "$BRANCH" ]; then
     echo "FAIL: the scheduled job ran and the poll worker never reported a branch" >&2
     FAILURES=$((FAILURES + 1))
