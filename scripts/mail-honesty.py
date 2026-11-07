@@ -2991,6 +2991,20 @@ for side, src in (("Android", KT_NOTIF), ("iOS", SW_INT)):
 # The permission is the person's, asked for on a tap in Settings and checked
 # again before posting. An app that posts into a denied channel has a feature
 # that exists only in its source file.
+# The runtime leg's evidence frames. A surface reported as observed but never
+# photographed is a claim without a picture, and a renamed frame would silently
+# stop being collected while every summary line still said "observed". The pin
+# names the frames the walk shoots, so a rename and a deletion fail alike.
+pin("the runtime leg photographs the surfaces it observes",
+    all(re.search(rf"shot {re.escape(f)}(?:\s|$)", KT_WALK) for f in (
+        "120-platform-notify-ask",
+        "121-platform-notify-granted",
+        "122-platform-compose-shortcut",
+        "123-platform-offline",
+        "124-platform-notify-shade",
+        "125-platform-send-receipt",
+    )))
+
 pin("the notification permission is asked, checked, and never assumed",
     "requestAuthorization" in code_only(SW_SEC)
     and "UNAuthorizationStatus" in code_only(SW_SEC)

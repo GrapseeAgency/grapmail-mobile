@@ -42,6 +42,10 @@ MUTATIONS = [
      'androidx.compose.ui.platform.LocalHapticFeedback.current.performHapticFeedback('
      'androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)\n'
      '                        Text(state.staleError!!, fontSize = 12.sp, color = palette.warnInk,'),
+    # a runtime evidence frame renamed: its surface would still read as observed
+    ("scripts/android-walk.sh",
+     "shot 120-platform-notify-ask",
+     "shot 120-platform-notification-prompt"),
     # the background read: never rescheduled
     ("ios/GrapMail/AppIntegration.swift",
      "        try? BGTaskScheduler.shared.submit(request)",
