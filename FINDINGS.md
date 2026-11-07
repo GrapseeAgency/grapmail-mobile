@@ -156,15 +156,44 @@ an account that is not in its `users` table and email-verified. There are two
 account stores: the Next.js JSONL store the app signs into, and the gateway's
 Postgres store the mailbox belongs to. They share no users.
 
-The gateway signup can provision the address (`POST /auth/register` with
-`grapmailHandle` answers `{"grapmail":"<handle>@grapsee.com"}`) but gates the
-first login on an emailed OTP, and no CI-readable inbox or test bypass exists in
-the service. That gate is the whole migration: signup (handle + email OTP),
-sign-in (JWT pair), every `/auth/account/*` call (the local store's contracts
-are not the gateway's), and the walk's account creation, which today works
-precisely because the local store has no OTP. A URL swap is not the fix; swapping
-the sign-in URL alone would leave the app unable to sign in at all.
+The gate is the whole migration: signup (handle + email OTP), sign-in (JWT pair),
+every `/auth/account/*` call (the local store's contracts are not the gateway's),
+and the walk's account creation, which today works precisely because the local
+store has no OTP. A URL swap is not the fix; swapping the sign-in URL alone would
+leave the app unable to sign in at all.
 
-Until then the app keeps its current, honest behaviour: account screens work
+### The target chain is proven, not hypothetical (measured 2026-11-08)
+
+The same throwaway flow, done the gateway's way, lights the mailbox up:
+
+    POST /api/grapsee/auth/register
+      {"accountType":"USER","grapmailHandle":"<handle>", …}
+      -> 200  {"grapmail":"<handle>@grapsee.com","grapmailStatus":"active"}
+    POST /api/grapsee/auth/login
+      -> 403  {"requireOtp":true}          # an OTP is dispatched
+    POST /api/grapsee/auth/verify-otp      # the OTP is read server-side for this probe
+      {"email":"…","otp":"…"}
+      -> 200  {"accessToken":"eyJ…"}       # 405-char HS256 JWT, jti = session
+    GET  /api/grapsee/grapmail/me    (Bearer JWT) -> 200 {"status":"active", …}
+    GET  /api/grapsee/grapmail/stats (Bearer JWT) -> 200 {"inbox":{"total":0,"unread":0}, …}
+    GET  /api/grapsee/grapmail/inbox (Bearer JWT) -> 200 {"messages":[], …}
+
+So the mailbox sector's code paths are right; the credential is the whole fix.
+The mobile-side map, checked against the gateway's route table:
+
+    signup      /auth/account/create          -> /grapsee/auth/register   (accountType USER, handle)
+    sign-in     /auth/account/signin          -> /grapsee/auth/login      (JWT pair; 403 = OTP step)
+    new         —                             -> /grapsee/auth/verify-otp, /resend-otp, /refresh
+    password    /auth/account/reset/{start,confirm} -> /grapsee/auth/{forgot-password,reset-password}
+    account     /auth/account/{profile,twofactor,verify-password,sessions,activity,avatar}
+                                              -> /grapsee/auth/account/…  (same names, JWT auth)
+    handle      /auth/grapmail/check          -> /grapsee/auth/grapmail/check
+    phone       /auth/phone/{start,verify}    -> /grapsee/auth/phone/…    (same names)
+    mail        /grapsee/grapmail/*           -> unchanged; accepts the JWT
+
+The walk's account creation is the CI constraint: the gateway demands the email
+OTP, and the workflow cannot read a mailbox. Options are a pre-verified CI account
+held in secrets, or a one-time provisioning step with database access. Until the
+migration lands, the app keeps its current, honest behaviour: account screens work
 against a real store, mailbox screens say "Couldn't load Inbox" against a real
 gateway refusal, and no seeded row exists outside the test-only snapshot host.
