@@ -1233,7 +1233,12 @@ class MailboxViewModel @JvmOverloads constructor(
                 // accepted the message, so a failed send leaves the draft
                 // exactly where it was. Deleting first would trade a
                 // half-written mail for an error message.
-                val sent = r.status == "sent" || r.status == "queued"
+                // The live server answers a delivered self-send with status
+                // "delivered" — a third success word, measured by the walk in
+                // 2026-11-08's run (the receipt said "Server reported:
+                // delivered" in warn ink beneath a failure tap). Without it
+                // here, every delivered message buzzed as a failure.
+                val sent = r.status == "sent" || r.status == "queued" || r.status == "delivered"
                 if (s.draftId.isNotEmpty() && sent) {
                     runCatching { Api.mailDeleteMessage(t, s.draftId) }
                         .onSuccess { MailStore.invalidate(MailBox.Drafts) }

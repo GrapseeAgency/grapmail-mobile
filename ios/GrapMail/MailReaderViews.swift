@@ -1094,6 +1094,10 @@ struct SendReceipt: View {
     private var headline: String {
         switch status {
         case "sent": return "Sent"
+        // The live send route answers a delivered self-send with this status
+        // word — measured, not assumed (the walk's own send came back
+        // "delivered"). Without the arm it fell to the verbatim fallback.
+        case "delivered": return "Delivered"
         case "queued": return "Queued for delivery"
         case "failed": return "Not delivered"
         case "draft": return "Saved to Drafts"
@@ -1103,7 +1107,7 @@ struct SendReceipt: View {
 
     private var tone: Color {
         switch status {
-        case "sent", "draft": return GM.successInk
+        case "sent", "draft", "delivered": return GM.successInk
         case "failed": return GM.error
         default: return GM.warnInk
         }

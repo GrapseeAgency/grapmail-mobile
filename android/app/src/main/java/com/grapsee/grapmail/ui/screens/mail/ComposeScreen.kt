@@ -453,6 +453,10 @@ internal fun SendReceipt(status: String, detail: String?, error: String?) {
     val palette = LocalPalette.current
     val (headline, tone) = when (status) {
         "sent" -> "Sent" to palette.successInk
+        // The status the live send route answers for a delivered message —
+        // measured, not assumed: the walk's own self-send came back
+        // "delivered". Without this arm it fell to the warn-ink fallback.
+        "delivered" -> "Delivered" to palette.successInk
         "queued" -> "Queued for delivery" to palette.warnInk
         "failed" -> "Not delivered" to palette.error
         // The draft path answers with this status word, and without an arm for it a
