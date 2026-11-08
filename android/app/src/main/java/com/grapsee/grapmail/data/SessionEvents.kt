@@ -28,7 +28,7 @@ object SessionEvents {
     // One subscriber, one pending signal: the collector resets the replay
     // cache the moment it has acted, so a new subscription never re-fires an
     // answered expiry.
-    private val _expired = MutableSharedFlow<Unit>(
+    private val _expired = MutableSharedFlow<String>(
         replay = 1,
         extraBufferCapacity = 1,
         onBufferOverflow = BufferOverflow.DROP_OLDEST,
@@ -36,8 +36,8 @@ object SessionEvents {
     val expired = _expired.asSharedFlow()
 
     /** Non-suspending so the interceptor can fire it from any thread. */
-    fun signalExpired() {
-        _expired.tryEmit(Unit)
+    fun signalExpired(rejectedToken: String) {
+        _expired.tryEmit(rejectedToken)
     }
 
     /** Called by the collector after it has taken the session down, so the

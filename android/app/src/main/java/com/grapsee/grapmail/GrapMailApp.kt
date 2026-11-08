@@ -22,6 +22,12 @@ class GrapMailApp : Application() {
         // the person never opened — the poll, woken by the system — is not
         // dropped for a channel that was never declared.
         Notifications.ensureChannel(this)
+        // A restored session re-announces the device to the push service: a
+        // token minted while signed out is parked until this moment, and a
+        // registration the backend pruned is renewed. A no-op without the
+        // Firebase client config or without a session; the poll is the
+        // delivery either way.
+        com.grapsee.grapmail.logic.PushSync.registerAsync(this)
         // The new-mail read. KEEP, not REPLACE: every launch replacing the
         // schedule would reset the system's own window and could starve the
         // poll the person expects to keep running while the app is closed.

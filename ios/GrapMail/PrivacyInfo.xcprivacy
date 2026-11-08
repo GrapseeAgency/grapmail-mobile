@@ -167,6 +167,25 @@
 				<string>NSPrivacyCollectedDataTypePurposeOther</string>
 			</array>
 		</dict>
+		<!-- Push device token: the opaque token Apple issues per install
+		     (AppIntegration.swift), sent once to the app's own backend at
+		     POST /grapsee/grapmail/push/register so the server can wake this
+		     device for new mail, and removed at sign-out. Declared as
+		     'Other Data' because Apple defines no narrower type for a push
+		     token, and it is a different identifier from the DeviceID above.
+		     The server uses it to reach the device and for nothing else. -->
+		<dict>
+			<key>NSPrivacyCollectedDataType</key>
+			<string>NSPrivacyCollectedDataTypeOtherData</string>
+			<key>NSPrivacyCollectedDataTypeLinked</key>
+			<true/>
+			<key>NSPrivacyCollectedDataTypeTracking</key>
+			<false/>
+			<key>NSPrivacyCollectedDataTypePurposes</key>
+			<array>
+				<string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+			</array>
+		</dict>
 		<!-- Coarse location: the birthday/age gate is date math on a typed
 		     field, NOT location — no location is collected, and this entry
 		     says so by being absent. E2E passphrases, message keys and the

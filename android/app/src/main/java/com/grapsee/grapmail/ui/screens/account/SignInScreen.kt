@@ -74,7 +74,8 @@ fun SignInScreen(
     val flowState by flow.state.collectAsState()
 
     var identifier by rememberSaveable { mutableStateOf(flowState.prefillIdentifier ?: "") }
-    var password by rememberSaveable { mutableStateOf("") }
+    var password by remember { mutableStateOf("") }
+    LaunchedEffect(Unit) { flow.clearSignIn() }
     var error by rememberSaveable { mutableStateOf<String?>(null) }
     var busy by remember { mutableStateOf(false) }
 
@@ -85,37 +86,45 @@ fun SignInScreen(
     }
 
     fun submit() {
-        if (identifier.isBlank() || password.isBlank()) return
+        if (busy || identifier.isBlank() || password.isBlank()) return
+        val submittedIdentifier = identifier.trim()
+        val submittedPassword = password
         busy = true; error = null
         scope.launch {
             try {
-                val resp = Api.signIn(identifier.trim(), password)
-                busy = false
-                if (resp.secondFactorRequired && resp.challengeId != null) {
+                val resp = Api.signIn(submittedIdentifier, submittedPassword)
+                if (resp.secondFactorRequired) {
+                    if (!resp.emailOtpRequired && resp.challengeId.isNullOrBlank()) {
+                        error = "The verification challenge is incomplete. Sign in again."
+                        return@launch
+                    }
                     flow.update {
                         copy(
-                            identifier = identifier.trim(),
-                            password = password,
+                            identifier = submittedIdentifier,
+                            password = if (resp.emailOtpRequired) "" else submittedPassword,
+                            emailOtpAddress = if (resp.emailOtpRequired) resp.email else null,
                             challengeId = resp.challengeId,
                             expiresAt = resp.expiresAt ?: 0L,
                             prefillIdentifier = null,
                         )
                     }
+                    password = ""
                     onNeedSecondFactor()
                 } else {
                     val token = resp.sessionToken ?: resp.accessToken ?: resp.token
-                    if (token == null) {
+                    if (token.isNullOrBlank()) {
                         error = "Sign-in succeeded but no session was returned. Please try again."
                         return@launch
                     }
-                    SessionStore.save(
-                        context, token, resp.refreshToken,
-                        resp.accountOrNull?.address ?: identifier.trim(),
-                        resp.accountOrNull?.name ?: "",
-                        resp.expiresAtMillis,
-                    )
-                    onSignedIn(resp.accountOrNull?.address ?: identifier.trim())
+                    val address = resp.signedInAddress(submittedIdentifier)
+                    SessionStore.save(context, token, resp.refreshToken, address,
+                        resp.accountOrNull?.name ?: "", resp.expiresAtMillis)
+                    password = ""
+                    flow.clearSignIn()
+                    onSignedIn(address)
                 }
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
             } catch (e: ApiException) {
                 busy = false
                 error = when (e.code) {
@@ -125,6 +134,8 @@ fun SignInScreen(
             } catch (_: Exception) {
                 busy = false
                 error = "Network error. Please try again."
+            } finally {
+                busy = false
             }
         }
     }

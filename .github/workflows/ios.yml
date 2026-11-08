@@ -10,11 +10,13 @@ on:
 # walk behind the last one: a session that pushes five fixes waits 2.5 hours for
 # the fifth to be tested, and every intermediate run reports a state the tree
 # has already left. Cancelling the superseded run is the point — the newest
-# commit is the only one whose verdict still matters. Tags get their own group
-# (github.ref includes the tag), so a release run is never cancelled by a push.
+# commit is the only one whose verdict still matters — but only for PUSHES. A
+# release run (dispatch or tag) is producing something, not reporting on the
+# tree, so cancelling it mid-archive throws away the build it was making;
+# tags additionally carry their own group and were never exposed to this.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'push' && !startsWith(github.ref, 'refs/tags/v') }}
 
 jobs:
   build-test-screenshot:
@@ -214,3 +216,183 @@ jobs:
             echo "::error::the two walks photograph different mailbox screens"
             exit 1
           fi
+
+  release:
+    name: Archive & upload to App Store Connect
+    runs-on: macos-15
+    timeout-minutes: 40
+    # Pushes to main keep building and walking; only a tag or an explicit run
+    # ships. The workflow-level concurrency above still applies, so a release
+    # dispatched on main can be cancelled by a push to main — a tag carries its
+    # own group and never is.
+    if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/v')
+    env:
+      SCHEME: GrapMail
+      # Job scope, not step scope: the gate reads them, and the install steps
+      # CONSUME them — a secret declared only in the gate's env would make every
+      # later step see an empty variable and fail somewhere confusing instead of
+      # here, loudly, by name.
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+      APPLE_API_ISSUER_ID: ${{ secrets.APPLE_API_ISSUER_ID }}
+      APPLE_API_KEY_P8: ${{ secrets.APPLE_API_KEY_P8 }}
+      BUILD_CERTIFICATE_P12: ${{ secrets.BUILD_CERTIFICATE_P12 }}
+      BUILD_CERTIFICATE_PASSWORD: ${{ secrets.BUILD_CERTIFICATE_PASSWORD }}
+      APPSTORE_PROVISIONING_PROFILE: ${{ secrets.APPSTORE_PROVISIONING_PROFILE }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Refuse to run without the signing secrets
+        # A missing secret must end the run RED naming what is absent. A quiet
+        # skip would print a green row over a release that never happened — the
+        # same lie as a count gate satisfied by the wrong screenshots. A
+        # dispatch run before the secrets exist is how this is met in practice:
+        # the failure is the checklist.
+        run: |
+          MISSING=""
+          for VAR in APPLE_TEAM_ID APPLE_API_KEY_ID APPLE_API_ISSUER_ID APPLE_API_KEY_P8 BUILD_CERTIFICATE_P12 BUILD_CERTIFICATE_PASSWORD APPSTORE_PROVISIONING_PROFILE; do
+            [ -n "${!VAR}" ] || MISSING="$MISSING $VAR"
+          done
+          if [ -n "$MISSING" ]; then
+            echo "::error::release secrets absent:$MISSING — nothing was archived or uploaded."
+            echo "Create them under the repository's Settings › Secrets › Actions and re-run the job."
+            exit 1
+          fi
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        working-directory: ios
+        run: xcodegen generate
+
+      - name: Install the distribution certificate
+        # A throwaway keychain, not the runner's login one: the P12 holds the
+        # private key that signs the build, and it must outlive xcodebuild's
+        # codesign invocation without ever touching a keychain a later step
+        # could confuse for it. `-A` on import and the partition list below
+        # are what let codesign reach the key headlessly, without a prompt.
+        env:
+          KEYCHAIN_PASSWORD: ${{ secrets.BUILD_CERTIFICATE_PASSWORD }}
+        run: |
+          CERT_PATH="$RUNNER_TEMP/dist.p12"
+          KEYCHAIN_PATH="$RUNNER_TEMP/grapmail-release.keychain-db"
+          echo "$BUILD_CERTIFICATE_P12" | base64 --decode > "$CERT_PATH"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security import "$CERT_PATH" -P "$BUILD_CERTIFICATE_PASSWORD" -A -t cert -f pkcs12 -k "$KEYCHAIN_PATH"
+          security set-key-partition-list -S apple-tool:,apple: -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security list-keychain -d user -s "$KEYCHAIN_PATH" login.keychain-db
+
+      - name: Install the App Store provisioning profile
+        # The profile is read back, not trusted: if it is not the store profile
+        # the export needs, the run must say so here instead of three steps
+        # later inside codesign's own wall of output.
+        run: |
+          PP_PATH="$RUNNER_TEMP/appstore.mobileprovision"
+          echo "$APPSTORE_PROVISIONING_PROFILE" | base64 --decode > "$PP_PATH"
+          security cms -D -i "$PP_PATH" > "$RUNNER_TEMP/profile.plist"
+          UUID=$(/usr/libexec/PlistBuddy -c 'Print :UUID' "$RUNNER_TEMP/profile.plist")
+          NAME=$(/usr/libexec/PlistBuddy -c 'Print :Name' "$RUNNER_TEMP/profile.plist")
+          APS=$(/usr/libexec/PlistBuddy -c 'Print :Entitlements:aps-environment' "$RUNNER_TEMP/profile.plist" 2>/dev/null || echo missing)
+          echo "profile $NAME ($UUID), aps-environment=$APS"
+          if [ "$APS" != "production" ]; then
+            echo "::error::APPSTORE_PROVISIONING_PROFILE is not a production (App Store) profile — aps-environment is $APS"
+            exit 1
+          fi
+          mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
+          cp "$PP_PATH" "$HOME/Library/MobileDevice/Provisioning Profiles/$UUID.mobileprovision"
+          echo "PROFILE_NAME=$NAME" >> "$GITHUB_ENV"
+
+      - name: Install the App Store Connect API key
+        # One key file serves every step: archive and export both authenticate
+        # through it by explicit path (-authenticationKeyPath), and the export's
+        # destination=Upload reuses it for the App Store Connect transfer.
+        run: |
+          mkdir -p "$HOME/private_keys"
+          echo "$APPLE_API_KEY_P8" | base64 --decode > "$HOME/private_keys/AuthKey_${APPLE_API_KEY_ID}.p8"
+
+      - name: Archive
+        working-directory: ios
+        # DEVELOPMENT_TEAM on the command line outranks the project's committed
+        # empty value — the injection point that keeps the team id out of the
+        # repository. -allowProvisioningUpdates lets archive resolve signing
+        # through the API key rather than interactive prompts.
+        run: |
+          xcodebuild archive \
+            -project GrapMail.xcodeproj \
+            -scheme "$SCHEME" \
+            -configuration Release \
+            -destination "generic/platform=iOS" \
+            -archivePath "$RUNNER_TEMP/GrapMail.xcarchive" \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$HOME/private_keys/AuthKey_${APPLE_API_KEY_ID}.p8" \
+            -authenticationKeyID "$APPLE_API_KEY_ID" \
+            -authenticationKeyIssuerID "$APPLE_API_ISSUER_ID" \
+            DEVELOPMENT_TEAM="$APPLE_TEAM_ID" \
+            CODE_SIGN_STYLE=Automatic
+
+      - name: The build must name the tag's own version
+        # Android's release gate refuses a package whose versionName disagrees
+        # with the tag; an iOS build self-reporting a different marketing
+        # version is the same disagreement kept quiet. Tag runs only — a
+        # dispatch run has no version to agree with.
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          WANT="${GITHUB_REF_NAME#v}"
+          GOT=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' \
+            "$RUNNER_TEMP/GrapMail.xcarchive/Products/Applications/GrapMail.app/Info.plist")
+          echo "tag wants $WANT, archive reports $GOT"
+          [ "$GOT" = "$WANT" ] || {
+            echo "::error::archive's CFBundleShortVersionString is $GOT, but the tag says $WANT — the tag and the build disagree"
+            exit 1
+          }
+
+      - name: Export & upload the IPA to App Store Connect
+        # destination=Upload makes -exportArchive itself validate and upload
+        # through the same API key — one tool, no deprecated altool hop, and a
+        # failed upload fails THIS step instead of a later one. The .ipa is
+        # still written to the export path first, so the artifact step below
+        # has something to keep even when the upload is refused.
+        run: |
+          cat > "$RUNNER_TEMP/ExportOptions.plist" <<EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key>
+            <string>app-store-connect</string>
+            <key>teamID</key>
+            <string>${APPLE_TEAM_ID}</string>
+            <key>signingStyle</key>
+            <string>automatic</string>
+            <key>provisioningProfiles</key>
+            <dict>
+              <key>com.grapsee.grapmail</key>
+              <string>${PROFILE_NAME}</string>
+            </dict>
+            <key>destination</key>
+            <string>Upload</string>
+            <key>uploadSymbols</key>
+            <true/>
+          </dict>
+          </plist>
+          EOF
+          xcodebuild -exportArchive \
+            -archivePath "$RUNNER_TEMP/GrapMail.xcarchive" \
+            -exportPath "$RUNNER_TEMP/export" \
+            -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist" \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$HOME/private_keys/AuthKey_${APPLE_API_KEY_ID}.p8" \
+            -authenticationKeyID "$APPLE_API_KEY_ID" \
+            -authenticationKeyIssuerID "$APPLE_API_ISSUER_ID"
+
+      - name: Upload the IPA for the record
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-release-ipa
+          path: |
+            ${{ runner.temp }}/export/*.ipa
+          if-no-files-found: error

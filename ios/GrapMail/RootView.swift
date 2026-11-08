@@ -18,7 +18,7 @@ struct RootView: View {
 
     enum Route: Hashable {
         case welcome, signIn
-        case twoFactor, backupCode
+        case twoFactor, backupCode, emailVerification
         case forgotPassword, recoveryCode, newPassword, resetDone, recoveryPending
         case findAddress, addressFound
         case phoneVerify, phoneVerified
@@ -111,6 +111,7 @@ struct RootView: View {
     /// signs in next.
 
     private func backToSignIn() {
+        recovery.clearSignInChallenge()
         if path.contains(.signIn) {
             while let last = path.last, last != .signIn { path.removeLast() }
         } else {
@@ -257,7 +258,7 @@ struct RootView: View {
     @ViewBuilder private func destination(_ route: Route) -> some View {
         Group {
             switch route {
-            case .welcome, .signIn, .twoFactor, .backupCode, .forgotPassword,
+            case .welcome, .signIn, .twoFactor, .backupCode, .emailVerification, .forgotPassword,
                  .recoveryCode, .newPassword, .resetDone, .recoveryPending,
                  .findAddress, .addressFound, .phoneVerify, .phoneVerified:
                 authDestination(route)
@@ -301,8 +302,13 @@ struct RootView: View {
                         onBack: { path.removeLast() },
                         onSignUp: { path.append(.stepName) },
                         onForgotPassword: { path.append(.forgotPassword) },
-                        onNeedSecondFactor: { path.append(.twoFactor) }
+                        onNeedSecondFactor: { path.append(.twoFactor) },
+                        onNeedEmailVerification: { path.append(.emailVerification) }
                     )
+                case .emailVerification:
+                    EmailVerificationView(model: recovery,
+                                          onSignedIn: { _ in path = [.home] },
+                                          onBack: { backToSignIn() })
                 case .twoFactor:
                     TwoFactorView(
                         model: recovery,
@@ -745,6 +751,11 @@ struct RootView: View {
                         onAddresses: { path.append(.mailAddresses) },
                         onPrefs: { path.append(.mailPrefs) },
                         onSupport: { path.append(.mailSupport) },
+                        onDeleted: {
+                            e2e.clearForSignOut()
+                            recovery.clearSignInChallenge()
+                            NotificationCenter.default.post(name: .gmAccountDeleted, object: nil)
+                        }
                     )
                 case .mailSupport:
                     SupportView(

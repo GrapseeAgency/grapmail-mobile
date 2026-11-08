@@ -22,6 +22,11 @@ class AccountFlowViewModel : ViewModel() {
         /** Held only while a 2FA challenge is open — it re-sends the code. */
         val password: String = "",
         val challengeId: String? = null,
+        /** Set instead of [challengeId] when the challenge is the email-OTP gate
+         *  the gateway answers a web-created account's login with: the value is
+         *  the ADDRESS the code was dispatched to, not the code itself —
+         *  verify-otp and resend-otp both take the address. */
+        val emailOtpAddress: String? = null,
         val expiresAt: Long = 0L,
         val maskedPhone: String? = null,
         /** The 6-digit code, proven when the password screen submits. */
@@ -41,6 +46,10 @@ class AccountFlowViewModel : ViewModel() {
 
     private val _state = MutableStateFlow(State())
     val state: StateFlow<State> = _state.asStateFlow()
+
+    fun clearSignIn() {
+        update { copy(password = "", code = "", challengeId = null, emailOtpAddress = null, expiresAt = 0L) }
+    }
 
     fun update(block: State.() -> State) {
         _state.value = _state.value.block()

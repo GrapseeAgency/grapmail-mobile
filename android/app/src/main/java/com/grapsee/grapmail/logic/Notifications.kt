@@ -15,14 +15,11 @@ import com.grapsee.grapmail.MainActivity
 import com.grapsee.grapmail.R
 
 /**
- * The "New mail" channel and the one notification this app is allowed to raise.
+ * The mail channel and the two producers it carries.
  *
  * ── WHAT THE COUNT IS EVIDENCE OF ──────────────────────────────────────────
- * There is no push service in this backend: no provider credentials, no device
- * token registration, nothing that could wake the app from a server. So the
- * only honest notification is a report of a read the device itself made —
- * `GET /stats` answered an inbox badge, and it is higher than the badge this
- * app last saw.
+ * [newMail] is a report of a read the device itself made — `GET /stats`
+ * answered an inbox badge, and it is higher than the badge this app last saw.
  *
  * Every wording choice follows from that. The line gives both numbers: how many
  * arrived since the last read, and how many the server counts unread now. It
@@ -30,6 +27,15 @@ import com.grapsee.grapmail.R
  * never says "you have new mail" after a failed read (nothing was seen), and
  * never fires on a first-ever read, where there is no previous number to
  * compare against and a difference cannot be named.
+ *
+ * ── WHAT THE SIGNAL IS EVIDENCE OF ─────────────────────────────────────────
+ * [pushSignal] is the other producer: the backend woke the device through the
+ * platform's push service. The payload carries no message content — mail may be
+ * sealed end-to-end, and the server stores a notice, never a plaintext body —
+ * so this notification can say only that the server sent a signal, and it says
+ * exactly that. The counted summary comes from the refresh that follows, which
+ * posts [newMail]'s comparison under the same id and replaces this one when the
+ * read answers.
  */
 object Notifications {
     const val CHANNEL_NEW_MAIL = "grapmail-new-mail"
@@ -77,21 +83,13 @@ object Notifications {
     fun newMail(context: Context, grew: Int, total: Int): Boolean {
         if (!allowed(context)) return false
         ensureChannel(context)
-        val open = Intent(context, MainActivity::class.java).apply {
-            action = Intent.ACTION_MAIN
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
-        }
-        val pending = PendingIntent.getActivity(
-            context, 0, open,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
-        )
         val content = NotificationCompat.Builder(context, CHANNEL_NEW_MAIL)
             .setSmallIcon(R.drawable.splash_logo)
             .setContentTitle("$grew new message" + (if (grew == 1) "" else "s"))
             .setContentText("$total unread in the inbox")
             .setStyle(androidx.core.app.NotificationCompat.InboxStyle()
                 .setSummaryText("$total unread in the inbox"))
-            .setContentIntent(pending)
+            .setContentIntent(pendingOpen(context))
             .setAutoCancel(true)
             .build()
         return try {
@@ -104,4 +102,38 @@ object Notifications {
             false
         }
     }
+
+    /**
+     * The push path's placeholder. The payload carries no content, so the only
+     * true sentence available is that the server sent a signal; the counted
+     * summary that follows replaces this under the same id. Returns false when
+     * the permission or the channel refused, exactly like [newMail].
+     */
+    fun pushSignal(context: Context, address: String?): Boolean {
+        if (!allowed(context)) return false
+        ensureChannel(context)
+        val content = NotificationCompat.Builder(context, CHANNEL_NEW_MAIL)
+            .setSmallIcon(R.drawable.splash_logo)
+            .setContentTitle("New mail")
+            .setContentText(if (address.isNullOrBlank()) "A new-mail signal arrived for this account."
+            else "A new-mail signal arrived for $address.")
+            .setContentIntent(pendingOpen(context))
+            .setAutoCancel(true)
+            .build()
+        return try {
+            NotificationManagerCompat.from(context).notify(NOTIFICATION_ID, content)
+            true
+        } catch (e: SecurityException) {
+            false
+        }
+    }
+
+    private fun pendingOpen(context: Context) = PendingIntent.getActivity(
+        context, 0,
+        Intent(context, MainActivity::class.java).apply {
+            action = Intent.ACTION_MAIN
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+        },
+        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+    )
 }

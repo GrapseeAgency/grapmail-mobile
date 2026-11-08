@@ -21,6 +21,15 @@ final class RecoveryModel: ObservableObject {
     @Published var phoneExpiresAt: Date?
     @Published var verifiedPhone: String?
     @Published var prefillIdentifier: String?
+    @Published var verificationEmail: String?
+
+    func clearSignInChallenge() {
+        password = ""
+        challengeId = nil
+        expiresAt = nil
+        code = ""
+        verificationEmail = nil
+    }
 }
 
 /// The recovery/security screen shell — founder design verbatim.

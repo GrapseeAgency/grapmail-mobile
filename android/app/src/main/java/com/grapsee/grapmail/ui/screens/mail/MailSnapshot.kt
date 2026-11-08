@@ -333,7 +333,8 @@ fun MailSnapshotScreen(name: String) {
                     onBack = {}, onSupport = {})
             "account-profile" -> ProfileEditScreen(profileVm, onBack = {})
             "account-privacy" -> PrivacyScreen(profileVm, onBack = {}, onProfile = {},
-                onPhone = {}, onAddresses = {}, onPrefs = {}, onSupport = {})
+                onPhone = {}, onAddresses = {}, onPrefs = {}, onDeleteAccount = {},
+                onSupport = {})
             "mail-support" -> SupportScreen(profileVm, onBack = {}, onForgot = {},
                 onPhone = {}, onAddresses = {})
             // The encryption band. Every frame renders the live screen over the
@@ -664,6 +665,22 @@ private fun seedHtmlThread(vm: MailboxViewModel) {
                 "<img src=\"https://images.newsletter.example/plate-1.png\">" +
                 "<img src=\"https://images.newsletter.example/pixel.gif?m=n2\"></body></html>",
         ),
+    ))
+    // The formatted body is planted beside the row: the images-off variant the
+    // body endpoint would return — sanitized markup with the remote sources
+    // already moved to `data-grapmail-blocked-src` (one real image, one
+    // tracking pixel, both blocked, both rendered as alt-text chips by the
+    // island). No sanitizer runs here: the string is a developer-authored
+    // sample of the endpoint's output, not a processing of the seed's raw
+    // HTML, which stays in the row for the images-gate count.
+    vm.seedBodyForSnapshot("n2", MailboxViewModel.BodyRender(
+        html = "<p>The kerning quarrels, mostly, and one risograph plate that " +
+            "printed better than the mockup.</p>" +
+            "<img alt=\"Risograph plate 1\" " +
+            "data-grapmail-blocked-src=\"https://images.newsletter.example/plate-1.png\">" +
+            "<img alt=\"Open-rate pixel\" " +
+            "data-grapmail-blocked-src=\"https://images.newsletter.example/pixel.gif?m=n2\">",
+        blockedImages = 2,
     ))
 }
 

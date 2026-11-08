@@ -1128,11 +1128,8 @@ struct ProfileEditView: View {
 
 // ── 91 · data & privacy ──────────────────────────────────────────────────────
 
-/// What this account keeps and the controls that change it — the web's
-/// `/mail/account/privacy`. The deletion section copies the web's honesty
-/// rather than inventing a button: no self-serve delete exists, because
-/// deleting a mailbox needs a verified request and that path is not built;
-/// the page says so and points at the people who can do it.
+/// Account controls, including password-confirmed deletion. The client clears
+/// local state only after the authenticated endpoint explicitly confirms success.
 struct PrivacyView: View {
     @ObservedObject var vm: ProfileModel
     let onBack: () -> Void
@@ -1141,6 +1138,9 @@ struct PrivacyView: View {
     let onAddresses: () -> Void
     let onPrefs: () -> Void
     let onSupport: () -> Void
+
+    var onDeleted: () -> Void = {}
+    @State private var showDeletion = false
 
     private var p: ProfileDto? { vm.state.profile }
 
@@ -1185,12 +1185,12 @@ struct PrivacyView: View {
                         }
                     }())
                     AccountSectionLabel(text: "Deleting the account")
-                    Text("There is no self-serve delete button on this page, and it is not " +
-                         "shown as one because it does not exist yet: deleting a mailbox " +
-                         "needs a verified request, and that path is not built. Ask from " +
-                         "the help page and it will be handled by hand.")
+                    Text("Deletion removes the mailbox, every message in it, all aliases, and the GrapMail address itself. It is irreversible, so it asks for the account password and a final confirmation.")
                         .font(.system(size: 13)).foregroundColor(GM.textSecondary)
                         .padding(.vertical, 6)
+                    Button("Delete account", role: .destructive) { showDeletion = true }
+                        .padding(.vertical, 8)
+                        .accessibilityIdentifier("gm-privacy-delete")
                     Button {
                         onSupport()
                     } label: {
@@ -1216,6 +1216,74 @@ struct PrivacyView: View {
             }
         }
         .task { vm.load() }
+        .sheet(isPresented: $showDeletion) {
+            DeleteAccountView {
+                showDeletion = false
+                onDeleted()
+            }
+        }
+    }
+}
+
+private struct DeleteAccountView: View {
+    @Environment(\.dismiss) private var dismiss
+    let onDeleted: () -> Void
+    @State private var password = ""
+    @State private var confirm = false
+    @State private var busy = false
+    @State private var error: String?
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    Text("Deleting the account removes the mailbox, every message in it, all aliases, and the GrapMail address. This cannot be undone — save anything needed before continuing.")
+                    SecureField("Account password", text: $password)
+                        .textContentType(.password)
+                        .accessibilityIdentifier("gm-delete-password")
+                }
+                if let error { Text(error).foregroundColor(GM.error) }
+                Button("Delete account permanently", role: .destructive) { confirm = true }
+                    .disabled(password.isEmpty || password.count > 1024 || busy)
+                    .accessibilityIdentifier("gm-delete-confirm")
+                if busy { ProgressView("Requesting deletion…") }
+            }
+            .navigationTitle("Delete account")
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { password = ""; dismiss() }.disabled(busy)
+                }
+            }
+            .disabled(busy)
+            .confirmationDialog("Permanently delete this account?", isPresented: $confirm,
+                                titleVisibility: .visible) {
+                Button("Delete permanently", role: .destructive) { delete() }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("This action cannot be undone.")
+            }
+        }
+        .interactiveDismissDisabled(busy)
+        .onDisappear { password = "" }
+    }
+
+    private func delete() {
+        guard !busy, !password.isEmpty, let token = SessionStore.token else {
+            error = "Sign in again before requesting deletion."
+            return
+        }
+        busy = true; error = nil
+        Task { @MainActor in
+            defer { busy = false; password = "" }
+            do {
+                _ = try await ApiClient.deleteAccount(token: token, password: password)
+                SessionStore.clear()
+                URLCache.shared.removeAllCachedResponses()
+                onDeleted()
+            } catch {
+                self.error = "Deletion was not confirmed. Check account status before retrying. " + error.localizedDescription
+            }
+        }
     }
 }
 

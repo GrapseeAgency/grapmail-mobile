@@ -6,6 +6,8 @@ import UIKit
 /// be signed in instead of showing a home screen whose every request fails.
 extension Notification.Name {
     static let gmSessionExpired = Notification.Name("grapmail.session.expired")
+    static let gmSessionChanged = Notification.Name("grapmail.session.changed")
+    static let gmAccountDeleted = Notification.Name("grapmail.account.deleted")
 }
 
 /// Lenient decoding helpers.
@@ -55,6 +57,8 @@ extension KeyedDecodingContainer {
 enum ApiError: Error, LocalizedError {
     case http(status: Int, code: String?, message: String)
     case network(Error)
+    // Only the login endpoint's exact 403 envelope can open this flow.
+    case emailVerificationRequired(email: String)
 
     /// The sentence a screen shows. Named rather than reaching for
     /// `localizedDescription` at each call site so the mailbox sector's loaders
@@ -69,6 +73,8 @@ enum ApiError: Error, LocalizedError {
             return message.isEmpty ? "Request failed (\(status))." : message
         case .network:
             return "Network error. Please try again."
+        case .emailVerificationRequired:
+            return "Email verification is required to finish signing in."
         }
     }
 
@@ -80,6 +86,16 @@ struct ErrorCarrier: Codable {
     var code: String?
     var message: String?
     var error: String?
+}
+
+private struct EmailVerificationChallenge: Decodable {
+    let requireOtp: Bool
+    let email: String
+}
+
+struct AccountActionResponse: Decodable {
+    let success: Bool
+    let message: String?
 }
 
 struct AccountDto: Codable {
@@ -1064,6 +1080,11 @@ struct ApiClient {
         guard let http = response as? HTTPURLResponse else {
             throw ApiError.http(status: -1, code: nil, message: "No response")
         }
+        if http.statusCode == 403, path == "/grapsee/auth/login", bearer == nil,
+           let challenge = try? decoder.decode(EmailVerificationChallenge.self, from: data),
+           challenge.requireOtp, !challenge.email.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            throw ApiError.emailVerificationRequired(email: challenge.email)
+        }
         if http.statusCode >= 400 {
             // A 401 on a call that carried our bearer means the server no
             // longer recognises the session — the token may have expired or
@@ -1126,6 +1147,68 @@ struct ApiClient {
     static func signIn(identifier: String, password: String) async throws -> SignInResponse {
         let body = try encoder.encode(SignInRequest(identifier: identifier, password: password))
         return try await request("/grapsee/auth/login", method: "POST", body: body)
+    }
+
+    static func verifyEmailOTP(email: String, otp: String) async throws -> SignInResponse {
+        struct Body: Encodable { let email: String; let otp: String }
+        return try await request("/grapsee/auth/verify-otp", method: "POST",
+                                 body: encoder.encode(Body(email: email, otp: otp)))
+    }
+
+    static func resendEmailOTP(email: String) async throws -> AccountActionResponse {
+        struct Body: Encodable { let email: String }
+        return try await request("/grapsee/auth/resend-otp", method: "POST",
+                                 body: encoder.encode(Body(email: email)))
+    }
+
+    static func deleteAccount(token: String, password: String) async throws -> AccountActionResponse {
+        // The web proxy forwards this exact body and bearer to /auth/account/delete.
+        // No local success or fallback: an unavailable upstream must remain a failure.
+        let response: AccountActionResponse = try await request(
+            "/grapsee/auth/account/delete", method: "POST",
+            body: encoder.encode(VerifyPasswordRequest(password: password)), bearer: token)
+        guard response.success else {
+            throw ApiError.http(status: 200, code: nil,
+                                message: response.message ?? "Account deletion was not confirmed.")
+        }
+        return response
+    }
+
+    /// The backend keeps this device's push token so it can wake the app when
+    /// mail reaches the mailbox. `deviceId` is the same `x-device-id` the other
+    /// routes carry, so the server can tell one install from another.
+    static func registerPush(token: String, pushToken: String) async throws {
+        struct Body: Encodable { let token: String; let platform: String; let deviceId: String }
+        let response: AccountActionResponse = try await request(
+            "/grapsee/grapmail/push/register", method: "POST",
+            body: encoder.encode(Body(token: pushToken, platform: "ios", deviceId: DeviceId.value)),
+            bearer: token)
+        guard response.success else {
+            throw ApiError.http(status: 200, code: nil,
+                                message: response.message ?? "Push registration was not confirmed.")
+        }
+    }
+
+    /// Sign-out removes the token so the server stops waking this device. The
+    /// token — not the bearer — is the payload, matching the route's contract.
+    /// The route's 204 carries no body: `request` only reaches decoding on a
+    /// 2xx, so a decode failure here IS the status-is-the-confirmation case
+    /// (the same contract Android's `LaunchApi` encodes), while a JSON body
+    /// that names the write refused is still a refusal.
+    static func unregisterPush(token: String, pushToken: String) async throws {
+        struct Body: Encodable { let token: String }
+        let response: AccountActionResponse
+        do {
+            response = try await request(
+                "/grapsee/grapmail/push/register", method: "DELETE",
+                body: encoder.encode(Body(token: pushToken)), bearer: token)
+        } catch is DecodingError {
+            return
+        }
+        guard response.success else {
+            throw ApiError.http(status: 200, code: nil,
+                                message: response.message ?? "Push deregistration was not confirmed.")
+        }
     }
 
     static func twoFactorCode(challengeId: String, code: String) async throws -> TwoFactorResponse {

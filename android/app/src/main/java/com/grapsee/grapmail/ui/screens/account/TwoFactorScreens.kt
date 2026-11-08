@@ -42,6 +42,14 @@ import kotlinx.coroutines.launch
  * TWO-STEP VERIFICATION eyebrow, six code cells, the expiry countdown, the
  * arrowed CTA, Resend code, OR, Back to sign in.
  *
+ * The same screen carries the second challenge the gateway answers a login
+ * with: an account created elsewhere with an unverified email gets a 403
+ * naming that address, and finish-sign-in then goes through /verify-otp
+ * instead of the factor challenge. Same cells, same buttons; the copy names
+ * the address the code was emailed to, and the backup-code door is absent —
+ * backup codes belong to the second factor, and this path's password is never
+ * held in the flow for them to spend.
+ *
  * "Use a backup code" is the one addition. The artwork puts a backup-code
  * screen in the same arc but draws no way into it, and a factor screen with no
  * alternative is a locked door when the phone is gone; the link sits under
@@ -59,32 +67,47 @@ fun TwoFactorScreen(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val state by flow.state.collectAsState()
+    val emailChallenge = state.emailOtpAddress
 
-    var code by rememberSaveable { mutableStateOf("") }
+    var code by remember { mutableStateOf("") }
     var error by rememberSaveable { mutableStateOf<String?>(null) }
     var notice by rememberSaveable { mutableStateOf<String?>(null) }
     var busy by remember { mutableStateOf(false) }
     var resending by remember { mutableStateOf(false) }
 
     fun verify() {
-        val challenge = state.challengeId ?: return
+        if (busy || resending || code.length != 6) return
+        val submitted = state
+        val submittedCode = code
+        if (submitted.emailOtpAddress == null && submitted.challengeId == null) {
+            error = "Sign in again to request a code."
+            return
+        }
         busy = true; error = null; notice = null
         scope.launch {
             try {
-                val resp = Api.twoFactorCode(challenge, code)
-                busy = false
+                val resp = if (submitted.emailOtpAddress != null) {
+                    Api.verifyEmailOtp(submitted.emailOtpAddress, submittedCode)
+                } else {
+                    val factor = Api.twoFactorCode(submitted.challengeId!!, submittedCode)
+                    com.grapsee.grapmail.data.SignInResponse(
+                        sessionToken = factor.sessionToken, accessToken = factor.accessToken,
+                        token = factor.token, refreshToken = factor.refreshToken,
+                        expiresAt = factor.expiresAt, expiresIn = factor.expiresIn, user = factor.user)
+                }
                 val token = resp.sessionToken ?: resp.accessToken ?: resp.token
-                if (token == null) {
-                    error = "That code is not correct."
+                if (resp.secondFactorRequired || token.isNullOrBlank()) {
+                    error = "Verification did not return a session. Sign in again."
                     return@launch
                 }
-                SessionStore.save(
-                    context, token, resp.refreshToken,
-                    resp.user?.address ?: state.identifier,
-                    resp.user?.name ?: "",
-                    resp.expiresAtMillis,
-                )
-                onSignedIn(resp.user?.address ?: state.identifier)
+                val address = resp.signedInAddress(submitted.identifier)
+                SessionStore.save(context, token, resp.refreshToken, address,
+                    resp.accountOrNull?.name ?: "", resp.expiresAtMillis)
+                code = ""
+                flow.clearSignIn()
+                onSignedIn(address)
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
             } catch (e: ApiException) {
                 busy = false
                 error = when (e.code) {
@@ -99,10 +122,35 @@ fun TwoFactorScreen(
         }
     }
 
-    // Resending means signing in again: the server issues a fresh challenge and
-    // texts a new code, and the old one stops working. The credentials are
-    // still in the flow, in memory only.
+    // Resending: on the email gate the address alone is the contract
+    // (/resend-otp takes {email}); on the factor challenge it means signing in
+    // again — the server issues a fresh challenge and texts a new code, and the
+    // old one stops working. The credentials are still in the flow, in memory
+    // only.
     fun resend() {
+        if (emailChallenge != null) {
+            if (emailChallenge.isBlank()) return
+            resending = true; error = null; notice = null
+            scope.launch {
+                try {
+                    val sent = Api.resendEmailOtp(emailChallenge)
+                    resending = false
+                    if (!sent.success) {
+                        error = sent.error ?: "Could not resend the code. Try again."
+                        return@launch
+                    }
+                    code = ""
+                    notice = "A new code is on its way."
+                } catch (e: ApiException) {
+                    resending = false
+                    error = e.message ?: "Could not resend the code. Try again."
+                } catch (_: Exception) {
+                    resending = false
+                    error = "Network error. Please try again."
+                }
+            }
+            return
+        }
         if (state.identifier.isBlank() || state.password.isBlank()) return
         resending = true; error = null; notice = null
         scope.launch {
@@ -129,9 +177,12 @@ fun TwoFactorScreen(
     AccountScreen(
         onBack = onBack,
         illustration = "account-2fa",
-        eyebrow = "Two-step verification",
-        title = "Enter your 6-digit code",
-        body = "We've sent a verification code to your GrapMail account. Please enter the 6-digit code to continue.",
+        eyebrow = if (emailChallenge != null) "Email verification" else "Two-step verification",
+        title = if (emailChallenge != null) "Enter the code sent to $emailChallenge" else "Enter your 6-digit code",
+        body = if (emailChallenge != null)
+            "Finish signing in by entering the 6-digit code that was sent to this address."
+        else
+            "We've sent a verification code to your GrapMail account. Please enter the 6-digit code to continue.",
         footer = {
             GradientButton(
                 "Verify & Continue",
@@ -147,9 +198,11 @@ fun TwoFactorScreen(
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
                 AccountLink(if (resending) "Sending…" else "Resend code", onClick = { resend() })
             }
-            Spacer(Modifier.height(2.dp))
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
-                AccountLink("Use a backup code", onClick = onUseBackupCode)
+            if (emailChallenge == null) {
+                Spacer(Modifier.height(2.dp))
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
+                    AccountLink("Use a backup code", onClick = onUseBackupCode)
+                }
             }
             Spacer(Modifier.height(12.dp))
             OrDivider()
@@ -203,7 +256,7 @@ fun BackupCodeScreen(
     val scope = rememberCoroutineScope()
     val state by flow.state.collectAsState()
 
-    var code by rememberSaveable { mutableStateOf("") }
+    var code by remember { mutableStateOf("") }
     var error by rememberSaveable { mutableStateOf<String?>(null) }
     var busy by remember { mutableStateOf(false) }
 

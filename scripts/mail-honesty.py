@@ -177,6 +177,69 @@ pin("the comment reader drops a whole block and keeps what follows",
     "middle" not in code_only("/**\n * middle\n */\nafter = 1\n")
     and "after = 1" in code_only("/**\n * middle\n */\nafter = 1\n"))
 
+def strings_of(src):
+    """The file's string literals only: comments and code dropped.
+
+    `code_only` answers "what does the CODE say"; this answers "what does the
+    app SAY". A wording pin ("the notification never claims delivery") is about
+    text a person can read, and scanning it over code made one fail on a
+    cleanup method whose API name carries the forbidden word
+    (`removeAllDeliveredNotifications`) -- an identifier nobody reads as a
+    sentence. Scanning literals keeps the rule on the wording and leaves the
+    plumbing alone.
+
+    A Swift `\\(...)` interpolation may contain further quotes, so the scanner
+    can split one source literal into pieces. That can only ever make a pin
+    MISS wording, never invent it: a split happens at a quote, and a word a
+    pin forbids is contiguous, so no split can hide a fragment mid-word.
+    """
+    out, i, n = [], 0, len(src)
+    while i < n:
+        c = src[i]
+        if c == "/" and i + 1 < n and src[i + 1] == "/":
+            while i < n and src[i] != "\n":
+                i += 1
+            continue
+        if c == "/" and i + 1 < n and src[i + 1] == "*":
+            i += 2
+            while i + 1 < n and not (src[i] == "*" and src[i + 1] == "/"):
+                i += 1
+            i += 2
+            continue
+        if c == '"':
+            # A triple-quoted block is one literal; none of these sources use
+            # one, but a plain-quote read would close at the second mark and
+            # leak the rest of the block into nothing.
+            if src[i:i + 3] == '"""':
+                end = src.find('"""', i + 3)
+                if end < 0:
+                    break
+                out.append(src[i:end + 3])
+                i = end + 3
+                continue
+            run, i = ['"'], i + 1
+            while i < n:
+                if src[i] == "\\":
+                    run.append(src[i:i + 2])
+                    i += 2
+                    continue
+                run.append(src[i])
+                if src[i] == '"':
+                    i += 1
+                    break
+                i += 1
+            out.append("".join(run))
+            continue
+        i += 1
+    return "".join(out)
+
+# Held to the same standard as the comment reader above: tested on its own text
+# before any pin leans on it.
+pin("the literal reader drops a comment and keeps the literal",
+    strings_of("// \"no\"\nlet s = \"yes\"") == '"yes"')
+pin("the literal reader keeps wording after an escaped quote",
+    strings_of('print("a \\"b c")').find("b c") > 0)
+
 KT_COMPOSE = android("ui/screens/mail/ComposeScreen.kt")
 SW_READER = ios("MailReaderViews.swift")
 
@@ -254,6 +317,28 @@ pin("iOS puts the action in the message URL's path",
 # The only thing allowed into that PATCH body is the snooze deadline.
 pin("Android sends a body only for snooze's `until`",
     KT_API.count("MailSnoozeRequest") >= 1 and '"{}"' in KT_API)
+
+# ── autosave ────────────────────────────────────────────────────────────────
+# The compose saves itself on a debounce, updating the draft row it created
+# rather than inserting a twin per save. Three invariants matter: the request
+# carries the draft's own id (the route's owner-scoped select is what keeps a
+# stale id from becoming anything other than a new row), an empty compose
+# schedules nothing — closing a composer nobody typed into must not leave a
+# draft row — and the send cancels the autosave before it deletes the row the
+# stale save would resurrect.
+pin("Android's autosave carries the draft's own id",
+    "id = cur.draftId.takeIf { it.isNotEmpty() }" in code_only(android("logic/MailboxViewModel.kt")))
+pin("iOS's autosave carries the draft's own id",
+    "id: self.compose.draftId.nilIfBlank()" in code_only(ios("MailboxModel.swift")))
+pin("Android's autosave refuses an empty compose",
+    "s.to.isBlank() && s.cc.isBlank() && s.subject.isBlank() && s.body.isBlank()"
+    in code_only(android("logic/MailboxViewModel.kt")))
+pin("iOS's autosave refuses an empty compose",
+    "s.to.trimmingCharacters(in: .whitespaces).isEmpty"
+    in code_only(ios("MailboxModel.swift")))
+pin("the send cancels the autosave before deleting the draft",
+    "autosaveJob?.cancel()" in code_only(android("logic/MailboxViewModel.kt"))
+    and "autosaveTask?.cancel()" in code_only(ios("MailboxModel.swift")))
 
 # ── 3. nothing destroys mail without the confirmation sheet ──────────────────
 KT_BOX = android("ui/screens/mail/MailboxScreen.kt")
@@ -351,22 +436,44 @@ pin("iOS gates each swipe direction on the box",
     ios("MailboxView.swift").count("vm.state.box != .trash") >= 1
     and ios("MailboxView.swift").count("vm.state.box != .archive") >= 1)
 
-# ── 4. no remote HTML gets a renderer ───────────────────────────────────────
+# ── 4. only server-sanitized HTML reaches a renderer ────────────────────────
+# The reader renders the HTML part through one island per platform
+# (`MailHtmlBody.kt` / `MailHtmlBody.swift`). The ONLY string that may reach a
+# WebView is the body endpoint's response — the same DOMPurify email profile
+# the web's SafeEmailBody renders with, applied server-side before the HTML
+# leaves the app's origin. The raw `bodyHtml` the message row carries is never
+# a render input, page script is off at the engine level on both platforms,
+# and a failed fetch falls back to the stripped-text branch the reader always
+# had — never to raw HTML. A WebView anywhere else in mail code is still the
+# original defect: the print path must stay WebView-free.
 MAIL_SOURCES = ([ANDROID / "ui/screens/mail" / p for p in
                  sorted((ANDROID / "ui/screens/mail").iterdir())]
                 + [ANDROID / "ui/components/Mail.kt"]
                 + [IOS / p for p in sorted(IOS.iterdir()) if p.name.startswith("Mail")])
 
-for f in MAIL_SOURCES:
-    src = f.read_text(encoding="utf-8", errors="ignore")
-    lines = [ln for ln in src.splitlines()
-             if not ln.lstrip().startswith(("//", "*", "///", "// "))]
-    code = "\n".join(lines)
-    pin(f"{f.name}: no WebView renders a message body",
-        "WebView" not in code and "loadHTMLString" not in code)
+webview_files = sorted(f.name for f in MAIL_SOURCES
+                       if "WebView" in code_only(f.read_text(encoding="utf-8", errors="ignore"))
+                       or "loadHTMLString" in code_only(f.read_text(encoding="utf-8", errors="ignore")))
+pin("only the two reader islands carry a WebView",
+    webview_files == ["MailHtmlBody.kt", "MailHtmlBody.swift"])
+
+kt_island = code_only(android("ui/screens/mail/MailHtmlBody.kt"))
+sw_island = code_only(ios("MailHtmlBody.swift"))
+pin("Android's island runs no page script", "javaScriptEnabled = false" in kt_island)
+pin("iOS's island runs no page script", "allowsContentJavaScript = false" in sw_island)
+pin("Android's island is fed only from the fetched body",
+    "message.bodyHtml" not in kt_island)
+pin("iOS's island is fed only from the fetched body",
+    "message.bodyHtml" not in sw_island)
+pin("Android's model loads the body endpoint", "Api.mailBody(" in KT_VM)
+pin("iOS's model loads the body endpoint", "ApiClient.mailBody(" in ios("MailboxModel.swift"))
+pin("the islands take the images opt-in from the gate",
+    "allowImages = shownImages" in android("ui/screens/mail/ThreadScreen.kt")
+    and "allowImages: shownImages" in ios("MailReaderViews.swift"))
 
 # The thread view shows stripped text and says so, rather than silently
-# presenting a downgrade as the original.
+# presenting a downgrade as the original — now the FALLBACK for a failed
+# formatted fetch, still stated rather than hidden.
 pin("Android explains an HTML-only body instead of hiding the fact",
     re.search(r"(plain text|stripped|formatting)", KT_BOX if "stripHtml" in KT_BOX else
               android("ui/screens/mail/ThreadScreen.kt"), re.I) is not None)
@@ -785,14 +892,21 @@ pin("Android drops no HTTP status anywhere in the mail API",
 # Sign-in now goes through the gateway that owns the mailbox, so the two tokens
 # are one token: a 401 on any authenticated call means the session is dead, and a
 # carve-out would keep an expired session alive behind a screen that cannot load.
-# Neither client carves mail out any more.
+# Neither client carves mail out any more. Android's signal carries the token
+# the server rejected, and the collector clears only the session that token
+# belongs to — a 401 from a request still in flight when a fresh sign-in
+# completed must not kill the new session.
 pin("iOS's mail routes end no account session on a 401",
     "signalUnauthorized" not in code_only(SW_API))
 pin("iOS signals a dead session on every authenticated 401",
     "!path.hasPrefix(mailBase)" not in code_only(ios("APIClient.swift"))
     and "signalUnauthorized()" in code_only(ios("APIClient.swift")))
 pin("Android signals a dead session on every authenticated 401",
-    "!isMailCall" not in code_only(KT_API) and "SessionEvents.signalExpired()" in code_only(KT_API))
+    "!isMailCall" not in code_only(KT_API)
+    and 'removePrefix("Bearer ")' in code_only(KT_API)
+    and "fun signalExpired(rejectedToken: String)"
+        in code_only(android("data/SessionEvents.kt"))
+    and "clearIfToken" in code_only(android("MainActivity.kt")))
 
 # -- 16. the confirmation names the destination the tap will actually reach ----
 #
@@ -1353,13 +1467,27 @@ pin("iOS's addresses screen says unreadable and empty differently",
 pin("the privacy screen refuses to invent an unread created date",
     "Could not be read" in KT_ACCT and "Could not be read" in SW_ACCT)
 
-# DELETE-ACCOUNT: no endpoint exists on either store, so the page must say the
-# truth in the web's own words and route to a person -- and no client may call
-# a delete-account route that does not exist.
-pin("both privacy pages state that self-serve deletion is not built",
-    "that path is not built" in KT_ACCT and "that path is not built" in SW_ACCT)
-pin("no client calls a delete-account route that does not exist",
-    not re.search(r"account/delete|deleteAccount", KT_API + SW_APIC))
+# DELETE-ACCOUNT: the backend contract is `POST /auth/account/delete` (bearer +
+# `{password}`, 403 on a wrong password) — the destructive call itself carries
+# the credential, so a replayed verify-password proof cannot delete an account,
+# and neither client may report a success the server did not confirm. Both
+# screens say what deletion removes before any password is asked for.
+KT_LAUNCH = android("data/LaunchApi.kt")
+KT_DEL = android("ui/screens/security/DeleteAccountScreen.kt")
+pin("both deletion screens say what is removed and demand the password",
+    "What is deleted" in KT_DEL and "Every message" in KT_DEL
+    and "Your aliases" in KT_DEL and "Only the password" in KT_DEL
+    and "Delete account" in SW_ACCT and "the mailbox, every message" in SW_ACCT
+    and "all aliases" in SW_ACCT and "Account password" in SW_ACCT)
+pin("both clients call the real delete route with the password as the proof",
+    "/grapsee/auth/account/delete" in code_only(KT_LAUNCH)
+    and "/grapsee/auth/account/delete"
+        in body_of(code_only(SW_APIC), "static func deleteAccount")
+    and re.search(r"suspend fun deleteAccount\(", KT_API) is not None
+    and re.search(r"static func deleteAccount\(", SW_APIC) is not None
+    and "The server did not confirm the request." in code_only(KT_LAUNCH)
+    and "guard response.success else {"
+        in body_of(code_only(SW_APIC), "static func deleteAccount"))
 
 # The PATCH is the whole write path, and "only the keys that arrive are
 # touched" is only true if the ENCODER omits what the caller did not set:
@@ -2635,7 +2763,9 @@ pin("the stepper names the loaded range, not the box's total",
     'val (prior, next) = vm.neighboursOf(threadId)' in code_only(KT_THREAD)
     and '"$at of $total loaded"' in code_only(KT_THREAD)
     and "let near = vm.neighbours(of: id)" in code_only(SW_READ)
-    and 'of \(total) loaded' in code_only(SW_READ))
+    # Raw string: `\(…)` is not a Python escape, and a future interpreter
+    # turns the deprecation warning on this line into a hard error.
+    and r'of \(total) loaded' in code_only(SW_READ))
 
 # The target carries the thread flag, because the two routes are different
 # resources: `/thread/:id` answers a message id with a 404. A stepper that
@@ -2708,15 +2838,17 @@ pin("the opt-in starts closed and is keyed to its own message",
     "remember(message.id) { mutableStateOf(false) }" in code_only(KT_THREAD)
     and "@State private var shownImages = false" in code_only(SW_READ))
 
-# Nothing reaches the network until the person asks: the fetcher is constructed
-# inside the branch the opt-in opens, and nowhere else.
+# Nothing reaches the sender's server until the person asks — and the engine
+# agrees with the reader now: the sanctioned HTML carries no remote `src` until
+# the opt-in re-fetches the body with `?images=1`, and the island's own
+# settings refuse remote image loads while the gate is closed. The images-gate
+# fetch is keyed on the opt-in itself, so a closed gate cannot produce a body
+# variant with live images in it. The standalone loader the print/share handoff
+# uses keeps its own no-cookie client (pinned below).
 pin("no image is fetched before the person asks",
-    code_only(KT_THREAD).count("RemoteImageView(url") == 1
-    and code_only(KT_THREAD).index("RemoteImageView(url")
-        > code_only(KT_THREAD).index("if (!shownImages)")
-    and code_only(SW_READ).count("RemoteImageView(url:") == 1
-    and code_only(SW_READ).index("RemoteImageView(url:")
-        > code_only(SW_READ).index("if shownImages"))
+    "blockNetworkImage = !allowImages" in code_only(android("ui/screens/mail/MailHtmlBody.kt"))
+    and "vm.loadBody(message.id, shownImages)" in code_only(KT_THREAD)
+    and "vm.loadBody(message.id, allowImages: newValue)" in code_only(SW_READ))
 
 # The extraction rule, not the markup: only an absolute http(s) `img src` is
 # ever kept. `data:` asks nothing of the network, `cid:` is an attachment the
@@ -2981,12 +3113,15 @@ pin("a poll that cannot name a difference says nothing",
     and 'if (unread <= previous) {\n            report("silent no-rise $previous->$unread")\n            return Result.success()\n        }' in code_only(KT_POLL))
 
 # Both say what the notification is evidence of, in the same two numbers, and
-# neither claims delivery — the relay's queue is not the recipient's inbox.
+# neither claims delivery — the relay's queue is not the recipient's inbox. The
+# forbidden word is scanned over LITERALS (strings_of), not code: the sign-out
+# cleanup's removeAllDeliveredNotifications() carries it inside an API name, and
+# an identifier is not a sentence any person reads.
 for side, src in (("Android", KT_NOTIF), ("iOS", SW_INT)):
     pin(f"{side} announces arrivals as a comparison, never as delivery",
         "unread in the inbox" in code_only(src)
         and "new message" in code_only(src)
-        and "delivered" not in code_only(src).lower())
+        and "delivered" not in strings_of(src).lower())
 
 # The permission is the person's, asked for on a tap in Settings and checked
 # again before posting. An app that posts into a denied channel has a feature
@@ -3077,18 +3212,33 @@ pin("Android is opted into predictive back",
 # opening the app from web links, and the app looks broken in the one place a
 # person cannot debug it. The rule is endpoint-or-it-doesn't-exist, applied to
 # the platform's own verification: no autoVerify filter, no associated-domains
-# entitlement, until those two URLs serve real files. The same reasoning keeps
-# push out: there is no push service in this backend, so `remote-notification`
-# and any FCM/APNs dependency would be a promise nothing can answer.
+# entitlement, until those two URLs serve real files.
 pin("no half-verified deep-link surface is shipped while the backend 404s",
     "autoVerify" not in KT_MANIFEST
     and "associated-domains" not in YML
     and "applinks:" not in YML)
 
-pin("no push is claimed where there is no push service",
-    "remote-notification" not in YML
-    and "firebase" not in KT_GRADLE.lower()
-    and "FCM" not in code_only(KT_POLL) and "APNs" not in code_only(SW_INT))
+# ── push: the contract both phones are now wired to ─────────────────────────
+# The backend registers device tokens and wakes the apps, so the old absence
+# pin is gone. What replaces it pins the SHAPE of the thing, so the same
+# half-verified surface cannot return from the other direction: the wake mode
+# is declared, each phone registers through its own native path (no FCM on
+# iOS, no cross-platform push SDK), both write to the app's own
+# /grapsee/grapmail/push/register, and BOTH wakes land in the same
+# authenticated read — a notification is still a report of a read the device
+# made, never a claim of delivery.
+KT_PUSH = android("logic/PushService.kt")
+pin("push is the backend's own contract, and the wake still reads the stats itself",
+    "remote-notification" in YML
+    and "BGTaskSchedulerPermittedIdentifiers" in YML
+    and "firebase" not in YML.lower()
+    and "FCM" not in code_only(SW_INT) and "APNs" not in code_only(SW_INT)
+    and "/grapsee/grapmail/push/register" in code_only(KT_LAUNCH)
+    and "/grapsee/grapmail/push/register" in code_only(SW_APIC)
+    and "didReceiveRemoteNotification" in code_only(SW_INT)
+    and "MailPoll.runOnce()" in code_only(SW_INT)
+    and "onMessageReceived" in code_only(KT_PUSH)
+    and "OneTimeWorkRequestBuilder<MailPollWorker>()" in code_only(KT_PUSH))
 
 # ── 40. settings the server cannot answer are not built (§40) ───────────────
 # W6 asked for a compose "From" picker wired to `GET /grapmail/aliases`. The

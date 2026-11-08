@@ -271,6 +271,31 @@ data class MailThreadResponse(
 )
 
 /**
+ * `GET /grapmail/message/:id/body` — the reader's render body, served by the
+ * web app's same-origin route (`src/app/api/grapsee/grapmail/message/[id]/body/
+ * route.ts`), not by the backend: the raw HTML part the message row carries is
+ * sanitized server-side — with `sanitizeEmailHtml`, the same strict
+ * untrusted-email profile the web's SafeEmailBody renders through — before it
+ * is allowed near a renderer.
+ *
+ * `bodyHtml` is therefore the ONLY string this app may put in a WebView. The
+ * raw `message.bodyHtml` from the row is never a render input: no sanitiser
+ * ships in this app, and the correct one is not a regex. Remote images are
+ * already neutralised in the response (`src` moved to
+ * `data-grapmail-blocked-src`) unless `?images=1` accompanied the request —
+ * `blockedImages` is the honest count of what was blocked, and `bodyText` is
+ * the row's plain part echoed back for the no-HTML case, so a null `bodyHtml`
+ * means "there is no formatted view", not "the field went missing".
+ */
+@Serializable
+data class MailBodyResponse(
+    val success: Boolean = false,
+    val bodyHtml: String? = null,
+    val bodyText: String? = null,
+    val blockedImages: Int = 0,
+)
+
+/**
  * `GET /grapmail/me` — `grapmail.ts:632-638`. `status` is the mailbox's own
  * state, which is not the account's state; keep them apart in the UI.
  */

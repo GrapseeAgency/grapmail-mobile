@@ -9,6 +9,12 @@ import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.distinctUntilChanged
+import androidx.datastore.preferences.core.Preferences
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import java.util.UUID
 import kotlinx.coroutines.withContext
 import java.security.KeyStore
 import javax.crypto.Cipher
@@ -30,7 +36,27 @@ private val Context.sessionStore by preferencesDataStore("grapmail_session")
  * reason the access token is — it is a bearer credential that can mint new
  * sessions.
  */
+// Not a data class: diagnostics must never print credentials.
+class SessionSnapshot(val id: String, val token: String, val address: String)
+
 object SessionStore {
+    private val writes = Mutex()
+    private val KEY_SESSION = stringPreferencesKey("session_id")
+
+    private fun sessionId(prefs: Preferences): String? =
+        if (prefs[KEY_TOKEN] == null) null else prefs[KEY_SESSION] ?: prefs[KEY_IV]
+
+    fun sessionIds(context: Context) = context.sessionStore.data.map(::sessionId).distinctUntilChanged()
+
+    suspend fun snapshot(context: Context): SessionSnapshot? = withContext(Dispatchers.IO) {
+        val prefs = context.sessionStore.data.first()
+        val id = sessionId(prefs) ?: return@withContext null
+        val token = open(prefs[KEY_TOKEN], prefs[KEY_IV]) ?: return@withContext null
+        SessionSnapshot(id, token, prefs[KEY_ADDRESS] ?: "")
+    }
+
+    suspend fun isCurrent(context: Context, id: String): Boolean =
+        sessionId(context.sessionStore.data.first()) == id
 
     private val KEY_TOKEN = stringPreferencesKey("token_enc")
     private val KEY_IV = stringPreferencesKey("token_iv")
@@ -69,18 +95,24 @@ object SessionStore {
         name: String,
         expiresAt: Long,
     ) = withContext(Dispatchers.IO) {
-        val (encrypted, iv) = seal(token)
-        context.sessionStore.edit { prefs ->
-            prefs[KEY_TOKEN] = encrypted
-            prefs[KEY_IV] = iv
-            if (refreshToken != null) {
-                val (refreshEnc, refreshIv) = seal(refreshToken)
-                prefs[KEY_REFRESH] = refreshEnc
-                prefs[KEY_REFRESH_IV] = refreshIv
+        writes.withLock {
+            val (encrypted, iv) = seal(token)
+            context.sessionStore.edit { prefs ->
+                prefs[KEY_TOKEN] = encrypted
+                prefs[KEY_IV] = iv
+                // Never inherit a different sign-in's refresh token.
+                prefs.remove(KEY_REFRESH)
+                prefs.remove(KEY_REFRESH_IV)
+                if (refreshToken != null) {
+                    val (refreshEnc, refreshIv) = seal(refreshToken)
+                    prefs[KEY_REFRESH] = refreshEnc
+                    prefs[KEY_REFRESH_IV] = refreshIv
+                }
+                prefs[KEY_SESSION] = UUID.randomUUID().toString()
+                prefs[KEY_ADDRESS] = address
+                prefs[KEY_NAME] = name
+                prefs[KEY_EXPIRES] = expiresAt.toString()
             }
-            prefs[KEY_ADDRESS] = address
-            prefs[KEY_NAME] = name
-            prefs[KEY_EXPIRES] = expiresAt.toString()
         }
     }
 
@@ -96,17 +128,26 @@ object SessionStore {
         token: String,
         refreshToken: String?,
         expiresAt: Long,
-    ) = withContext(Dispatchers.IO) {
-        val (encrypted, iv) = seal(token)
-        context.sessionStore.edit { prefs ->
-            prefs[KEY_TOKEN] = encrypted
-            prefs[KEY_IV] = iv
-            if (refreshToken != null) {
-                val (refreshEnc, refreshIv) = seal(refreshToken)
-                prefs[KEY_REFRESH] = refreshEnc
-                prefs[KEY_REFRESH_IV] = refreshIv
+        expectedToken: String,
+    ): Boolean = withContext(Dispatchers.IO) {
+        writes.withLock {
+            var updated = false
+            context.sessionStore.edit { prefs ->
+                if (open(prefs[KEY_TOKEN], prefs[KEY_IV]) != expectedToken) return@edit
+                val id = sessionId(prefs) ?: return@edit
+                val (encrypted, iv) = seal(token)
+                prefs[KEY_SESSION] = id
+                prefs[KEY_TOKEN] = encrypted
+                prefs[KEY_IV] = iv
+                if (refreshToken != null) {
+                    val (refreshEnc, refreshIv) = seal(refreshToken)
+                    prefs[KEY_REFRESH] = refreshEnc
+                    prefs[KEY_REFRESH_IV] = refreshIv
+                }
+                prefs[KEY_EXPIRES] = expiresAt.toString()
+                updated = true
             }
-            prefs[KEY_EXPIRES] = expiresAt.toString()
+            updated
         }
     }
 
@@ -162,17 +203,25 @@ object SessionStore {
         millis > System.currentTimeMillis()
     }
 
-    suspend fun clear(context: Context) = withContext(Dispatchers.IO) {
-        context.sessionStore.edit { it.clear() }
-        // The cached security verdict belongs to the account being signed out
-        // of. Left in memory it would be the first thing the next account's
-        // hub renders.
-        SecurityProfileCache.clear()
-        // Same reason, larger blast radius: a cached mailbox would hand the next
-        // account on this device another person's subjects, senders and bodies.
-        // NonCancellable: this is the one call that must not be skipped, because a
-        // cancelled clear leaves the next account's first screen showing this one's
-        // mail.
-        withContext(NonCancellable) { MailStore.clear() }
-    }
+    suspend fun clear(context: Context) { clearMatching(context) { true } }
+
+    suspend fun clearIfCurrent(context: Context, id: String): Boolean =
+        clearMatching(context) { sessionId(it) == id }
+
+    suspend fun clearIfToken(context: Context, token: String): Boolean =
+        clearMatching(context) { open(it[KEY_TOKEN], it[KEY_IV]) == token }
+
+    private suspend fun clearMatching(context: Context, matches: (Preferences) -> Boolean): Boolean =
+        withContext(Dispatchers.IO + NonCancellable) {
+            writes.withLock {
+                var cleared = false
+                context.sessionStore.edit { if (matches(it)) { it.clear(); cleared = true } }
+                if (cleared) {
+                    SecurityProfileCache.clear()
+                    MailStore.clear()
+                    context.getSystemService(android.app.NotificationManager::class.java)?.cancelAll()
+                }
+                cleared
+            }
+        }
 }

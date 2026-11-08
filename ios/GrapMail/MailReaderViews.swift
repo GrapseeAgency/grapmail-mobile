@@ -189,6 +189,10 @@ private struct ThreadMessageCard: View {
     /// message -- an opt-in given for one mail must not travel to the next.
     @State private var shownImages = false
     private var hiddenImages: [String] { remoteImageUrls(message.bodyHtml) }
+    /// The formatted body's measured height. The web view sizes itself to its
+    /// document and the reader owns scrolling, so this is the frame the island
+    /// renders inside; it resets with each message.
+    @State private var htmlBodyHeight: CGFloat = 180
     // Handing the link over is the browser's job, not this app's, and the note
     // below says only what this process witnessed. It goes through
     // `UIApplication.shared.open` rather than `\.openURL`, because this SDK's
@@ -403,23 +407,57 @@ private struct ThreadMessageCard: View {
     }
 
     @ViewBuilder private var bodyText: some View {
-        if let text = message.bodyText?.nilIfBlank() {
+        if let html = message.bodyHtml?.nilIfBlank() {
+            htmlBody(html)
+        } else if let text = message.bodyText?.nilIfBlank() {
             Text(text)
                 .font(.system(size: 15))
                 .foregroundColor(GM.textSecondary)
                 .fixedSize(horizontal: false, vertical: true)
                 .frame(maxWidth: .infinity, alignment: .leading)
-        } else if let html = message.bodyHtml?.nilIfBlank() {
-            VStack(alignment: .leading, spacing: 6) {
-                Text(HtmlStripper.strip(html))
-                    .font(.system(size: 15))
-                    .foregroundColor(GM.textSecondary)
-                    .fixedSize(horizontal: false, vertical: true)
-                HtmlStrippedNotice()
-            }
         } else {
             Text("This message has no text body.")
                 .font(.system(size: 14)).foregroundColor(GM.textSecondary)
+        }
+    }
+
+    /// HTML-first, matching the web's SafeEmailBody: when the message carries
+    /// an HTML part, the reader renders the SERVER-sanitized body the endpoint
+    /// answered with, never this row's raw markup — there is no sanitiser in
+    /// this app's dependencies, and the raw string is never a render input.
+    /// While the fetch is in flight, and if it fails, the stripped-text branch
+    /// the card always had is the visible fallback, said per message rather
+    /// than hidden.
+    @ViewBuilder private func htmlBody(_ html: String) -> some View {
+        let render = vm.bodies[message.id]
+        if let clean = render?.html?.nilIfBlank() {
+            MailHtmlBodyView(
+                html: clean,
+                allowImages: shownImages,
+                onOpenLink: { urlString in
+                    if let url = URL(string: urlString) {
+                        UIApplication.shared.open(url)
+                    }
+                },
+                contentHeight: $htmlBodyHeight
+            )
+            .frame(height: htmlBodyHeight)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        } else if let failure = render?.error {
+            // The formatted view is unavailable: say what failed and fall back
+            // to the plain rendering — the honest downgrade, still stated.
+            VStack(alignment: .leading, spacing: 6) {
+                HtmlStrippedNotice()
+                Text(failure)
+                    .font(.system(size: 12)).foregroundColor(GM.textTertiary)
+                    .fixedSize(horizontal: false, vertical: true)
+                Text(HtmlStripper.strip(html))
+                    .font(.system(size: 15)).foregroundColor(GM.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        } else {
+            Text("Loading formatted message…")
+                .font(.system(size: 13)).foregroundColor(GM.textTertiary)
         }
     }
 
@@ -436,14 +474,11 @@ private struct ThreadMessageCard: View {
             VStack(alignment: .leading, spacing: 8) {
                 if shownImages {
                     // Said once, because the requests have already left by the
-                    // time this line draws — the sentence is about what just
-                    // happened, not about a choice still to be made.
+                    // time this line draws — the images now load inside the
+                    // formatted body itself, so there is no per-image row to
+                    // draw below it.
                     Text("These images load from the sender's server.")
                         .font(.system(size: 12)).foregroundColor(GM.textTertiary)
-                    ForEach(Array(hidden.enumerated()), id: \.offset) { index, url in
-                        RemoteImageView(url: url,
-                                        label: "Image \(index + 1) in this message")
-                    }
                 } else {
                     Text("\(hidden.count) image\(hidden.count == 1 ? "" : "s") in this "
                          + "message load from the sender's server, not from GrapMail. "
@@ -485,6 +520,18 @@ private struct ThreadMessageCard: View {
                     Text(notice).font(.system(size: 12)).foregroundColor(GM.textSecondary)
                 }
             }
+        }
+        // The formatted body is fetched when the card composes and again when
+        // the images gate is answered — the two variants are different renders,
+        // and the model memoises both per message. The height resets with the
+        // id: a taller message must not hand its frame to the next one.
+        .task(id: message.id) {
+            htmlBodyHeight = 180
+            shownImages = false
+            vm.loadBody(message.id, allowImages: false)
+        }
+        .onChange(of: shownImages) { newValue in
+            vm.loadBody(message.id, allowImages: newValue)
         }
     }
 }
@@ -689,6 +736,20 @@ struct ComposeView: View {
             } else if let error = vm.compose.error {
                 Text(error).font(.system(size: 13)).foregroundColor(GM.error)
                     .padding(.top, 12)
+                    .padding(.horizontal, 16)
+            } else if vm.compose.autosaving {
+                // The autosave's own quiet line, deliberately NOT the receipt:
+                // a background save is not an event the person acted on, so it
+                // draws smaller and duller than anything the buttons produce,
+                // and it yields to the receipt entirely when one exists.
+                Text("Saving draft…")
+                    .font(.system(size: 11)).foregroundColor(GM.textTertiary)
+                    .padding(.top, 10)
+                    .padding(.horizontal, 16)
+            } else if let note = vm.compose.autosaveNote {
+                Text(note)
+                    .font(.system(size: 11)).foregroundColor(GM.textTertiary)
+                    .padding(.top, 10)
                     .padding(.horizontal, 16)
             }
             actions

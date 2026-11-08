@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -155,7 +156,7 @@ fun ComposeScreen(
         if (uri != null) uploadOne(vm, context, uri, attached) { notice = it }
     }
 
-    Column(Modifier.fillMaxSize().background(palette.bg).statusBarsPadding()) {
+    Column(Modifier.fillMaxSize().background(palette.bg).statusBarsPadding().imePadding()) {
         Row(
             Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -349,6 +350,25 @@ fun ComposeScreen(
             state.resultStatus?.let { status ->
                 Spacer(Modifier.height(14.dp))
                 SendReceipt(status = status, detail = state.result, error = state.error)
+            }
+
+            // The autosave's own quiet line, deliberately NOT the receipt: a
+            // background save is not an event the person acted on, so it draws
+            // smaller and duller than anything the buttons produce. It yields
+            // to the receipt entirely when one exists — the send verdict is
+            // the sentence this area exists for.
+            if (state.resultStatus == null) {
+                val autosaveNote = state.autosaveNote
+                when {
+                    state.autosaving -> {
+                        Spacer(Modifier.height(8.dp))
+                        Text("Saving draft…", fontSize = 11.sp, color = palette.textTertiary)
+                    }
+                    autosaveNote != null -> {
+                        Spacer(Modifier.height(8.dp))
+                        Text(autosaveNote, fontSize = 11.sp, color = palette.textTertiary)
+                    }
+                }
             }
 
             Spacer(Modifier.height(18.dp))

@@ -12,6 +12,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowForward
 import androidx.compose.material.icons.rounded.AlternateEmail
 import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.material.icons.rounded.DeleteForever
 import androidx.compose.material.icons.rounded.Devices
 import androidx.compose.material.icons.rounded.HeadsetMic
 import androidx.compose.material.icons.rounded.Lock
@@ -72,6 +73,7 @@ fun AccountSecurityScreen(
     onBackupCodes: () -> Unit,
     onPassword: () -> Unit,
     onSignOutAll: () -> Unit,
+    onDeleteAccount: () -> Unit,
     onSupport: () -> Unit,
 ) {
     val context = LocalContext.current
@@ -220,6 +222,17 @@ fun AccountSecurityScreen(
             title = "Sign Out All Devices",
             subtitle = "Log out from all devices except this one.",
             onClick = onSignOutAll,
+        )
+        RowDivider()
+        // The store-required self-serve deletion. Styled as the danger row it
+        // is: the destructive ink of the sign-out rows, but it removes the
+        // account itself rather than a session.
+        SecurityRow(
+            icon = Icons.Rounded.DeleteForever,
+            title = "Delete Account",
+            subtitle = "Permanently delete this account and its mailbox.",
+            tint = LocalPalette.current.error,
+            onClick = onDeleteAccount,
         )
         RowDivider()
         // Two rows the reference hub does not draw but the sector needs a

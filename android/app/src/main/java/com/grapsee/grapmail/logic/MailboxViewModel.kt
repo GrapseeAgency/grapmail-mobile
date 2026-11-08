@@ -1044,19 +1044,84 @@ class MailboxViewModel @JvmOverloads constructor(
         val inReplyTo: String? = null,
         /** The draft row this compose was opened FROM. Non-empty means the
          *  person is continuing a saved message, and a successful send
-         *  deletes it — see [send]. */
+         *  deletes it — see [send]. The autosave loop keeps it current: the
+         *  first autosave records the id its insert produced, and every later
+         *  one updates that row. */
         val draftId: String = "",
         val sending: Boolean = false,
         /** The server's own verdict, shown verbatim. Never a local "Sent". */
         val result: String? = null,
         val resultStatus: String? = null,
         val error: String? = null,
+        /** The autosave's own quiet state, deliberately separate from
+         *  [result]: a background save must never read like a send receipt,
+         *  and the composer draws it as one small tertiary line. */
+        val autosaving: Boolean = false,
+        val autosaveNote: String? = null,
     )
 
     private val _compose = MutableStateFlow(ComposeState())
     val compose: StateFlow<ComposeState> = _compose.asStateFlow()
 
-    fun composeUpdate(transform: (ComposeState) -> ComposeState) = _compose.update(transform)
+    fun composeUpdate(transform: (ComposeState) -> ComposeState) {
+        _compose.update(transform)
+        scheduleAutosave()
+    }
+
+    // ── autosave ─────────────────────────────────────────────────────────────
+    //
+    // The compose box saves itself. Every edit schedules a debounced draft
+    // write; the first save inserts and records the row's id, and every save
+    // after it updates that row in place, so a compose that stays open for an
+    // afternoon is ONE draft, not one draft per keystroke batch.
+
+    private var autosaveJob: kotlinx.coroutines.Job? = null
+    private var autosaveInFlight = false
+
+    /**
+     * The rules the debounce obeys, each one a refusal rather than a feature:
+     * an EMPTY compose saves nothing (a person opening the composer and
+     * leaving must not find an empty draft row named after nothing); a send or
+     * a manual save in flight is not interrupted; and the autosave never
+     * writes the receipt — its outcome is the composer's own quiet line, not
+     * the "Saved to Drafts" banner the manual save earns.
+     */
+    private fun scheduleAutosave() {
+        val s = _compose.value
+        if (s.sending) return
+        if (s.to.isBlank() && s.cc.isBlank() && s.subject.isBlank() && s.body.isBlank()) return
+        autosaveJob?.cancel()
+        autosaveJob = viewModelScope.launch {
+            kotlinx.coroutines.delay(2_000)
+            val t = token() ?: return@launch
+            val cur = _compose.value
+            if (cur.sending || autosaveInFlight) return@launch
+            autosaveInFlight = true
+            _compose.update { it.copy(autosaving = true) }
+            try {
+                val r = Api.mailDraft(t, MailDraftRequest(
+                    to = splitAddresses(cur.to), cc = splitAddresses(cur.cc),
+                    subject = cur.subject, bodyText = cur.body, inReplyTo = cur.inReplyTo,
+                    id = cur.draftId.takeIf { it.isNotEmpty() },
+                ))
+                _compose.update {
+                    it.copy(
+                        autosaving = false,
+                        autosaveNote = "Draft saved",
+                        draftId = r.id ?: it.draftId,
+                    )
+                }
+                MailStore.invalidate(MailBox.Drafts)
+            } catch (e: Exception) {
+                _compose.update {
+                    it.copy(autosaving = false, autosaveNote = "Draft not saved — it will be saved on the next change.")
+                }
+            } finally {
+                autosaveInFlight = false
+            }
+        }
+    }
+
 
     /** Reply: prefill the thread's addressing and carry In-Reply-To. */
     fun startReply(m: MailMessageDto) = _compose.update {
@@ -1185,6 +1250,12 @@ class MailboxViewModel @JvmOverloads constructor(
     fun send(e2eEnvelope: String? = null) {
         val s = _compose.value
         if (s.sending) return
+        // The send deletes this compose's draft row; an autosave in flight
+        // would land after that delete, resolve nothing, and INSERT a copy of
+        // the message that was just sent. Cancelling here closes the client
+        // side of that race; the route's own owner-scoped select closes the
+        // server side.
+        autosaveJob?.cancel()
         // An empty To is refused here, not by the server: a message with no
         // recipient is not a send, and a receipt naming the server's 422 after
         // the person pressed Send twice is worse than a button that says why
@@ -1273,9 +1344,18 @@ class MailboxViewModel @JvmOverloads constructor(
                 Api.mailDraft(t, MailDraftRequest(
                     to = splitAddresses(s.to), cc = splitAddresses(s.cc),
                     subject = s.subject, bodyText = s.body, inReplyTo = s.inReplyTo,
+                    id = s.draftId.takeIf { it.isNotEmpty() },
                 ))
-            }.onSuccess {
-                _compose.update { it.copy(sending = false, result = "Saved to Drafts", resultStatus = "draft") }
+            }.onSuccess { r ->
+                // The manual save keeps the draft's id current too: continuing
+                // a saved message and pressing Save updates that row now
+                // instead of inserting a second one.
+                _compose.update {
+                    it.copy(
+                        sending = false, result = "Saved to Drafts", resultStatus = "draft",
+                        draftId = r.id ?: it.draftId,
+                    )
+                }
                 MailStore.invalidate(MailBox.Drafts)
             }.onFailure { e ->
                 _compose.update { it.copy(sending = false, error = e.message ?: "The draft was not saved.") }
@@ -1451,6 +1531,95 @@ class MailboxViewModel @JvmOverloads constructor(
 
     private val _thread = MutableStateFlow(ThreadState())
     val thread: StateFlow<ThreadState> = _thread.asStateFlow()
+
+    // ── the reader's formatted body ─────────────────────────────────────────
+    //
+    // One render per message, keyed by id. The html IS the server's answer: the
+    // body endpoint sanitized it with the web's untrusted-email profile before
+    // it left the app's origin, so this map is the only source a WebView is
+    // ever fed from. `allowImages` is stored with the render because the two
+    // variants are different answers, not a reload of one: without it, an
+    // images-off render would be mistaken for the opt-in one and the gate's
+    // second fetch would be skipped.
+
+    data class BodyRender(
+        val html: String? = null,
+        val bodyText: String? = null,
+        val blockedImages: Int = 0,
+        val allowImages: Boolean = false,
+        val loading: Boolean = false,
+        val error: String? = null,
+    )
+
+    private val _bodies = MutableStateFlow<Map<String, BodyRender>>(emptyMap())
+    val bodies: StateFlow<Map<String, BodyRender>> = _bodies.asStateFlow()
+
+    /** Requests already in flight, as `id:images` — a re-compose must not queue a twin. */
+    private val bodyRequestsInFlight = mutableSetOf<String>()
+
+    /**
+     * The snapshot host's pre-seeded renders, keyed by message id. The host
+     * seeds the render beside the row it belongs to, so the walk photographs
+     * the formatted branch without a session or a backend.
+     */
+    private val snapshotBodies = mutableMapOf<String, BodyRender>()
+
+    /** Test-only seam, in the shape of [seedThreadForSnapshot]: the host plants
+     *  the images-off render the body endpoint would have answered. */
+    fun seedBodyForSnapshot(messageId: String, render: BodyRender) {
+        snapshotBodies[messageId] = render
+    }
+
+    /**
+     * Fetch the sanitized render body for one message. Called from the reader
+     * on open and again when the images gate is answered; the per-message
+     * memo means stepping through a conversation costs one read per row, and
+     * a failure is stored as the render's own error so the reader can fall
+     * back to the stripped-text branch it always had — visibly, per message,
+     * instead of a shared error a later row would inherit.
+     */
+    fun loadBody(messageId: String, allowImages: Boolean) {
+        // The CI snapshot host has no session and no backend, and the walk must
+        // still photograph the formatted branch — so its own seed answers here.
+        // The opt-in is deliberately unphotographed: rendering it would mean CI
+        // asking a sender's server for bytes.
+        if (snapshotMode) {
+            _bodies.update { it + (messageId to (snapshotBodies[messageId] ?: BodyRender())) }
+            return
+        }
+        viewModelScope.launch {
+            val t = token() ?: return@launch
+            val key = "$messageId:$allowImages"
+            val current = _bodies.value[messageId]
+            // The memo guard: same variant already answered, nothing to do.
+            if (current != null && !current.loading && current.error == null &&
+                current.html != null && current.allowImages == allowImages
+            ) return@launch
+            if (key in bodyRequestsInFlight) return@launch
+            bodyRequestsInFlight.add(key)
+            _bodies.update { it + (messageId to BodyRender(loading = true, allowImages = allowImages)) }
+            try {
+                val r = Api.mailBody(t, messageId, allowImages)
+                _bodies.update {
+                    it + (messageId to BodyRender(
+                        html = r.bodyHtml,
+                        bodyText = r.bodyText,
+                        blockedImages = r.blockedImages,
+                        allowImages = allowImages,
+                    ))
+                }
+            } catch (e: Exception) {
+                _bodies.update {
+                    it + (messageId to BodyRender(
+                        allowImages = allowImages,
+                        error = e.message ?: "The formatted view could not be loaded.",
+                    ))
+                }
+            } finally {
+                bodyRequestsInFlight.remove(key)
+            }
+        }
+    }
 
     /**
      * Open a thread. The list payload has no bodies by design, so the bodies are

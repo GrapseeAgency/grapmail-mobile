@@ -358,9 +358,10 @@ struct MailSnapshotView: View {
     }
 
     /// The HTML-only newsletter, decoded through the same real decoder as
-    /// [full]. No `bodyText` on purpose: the reader then shows the stripped
-    /// text, admits it is a plain-text rendering, and gates the two images the
-    /// sender's own server hosts.
+    /// [full]. No `bodyText` on purpose: the reader renders the formatted
+    /// branch for it — the seeded render beside the row (see
+    /// `mailSnapshotBodyRender`) — and gates the two images the sender's own
+    /// server hosts.
     ///
     /// The attributes are single-quoted where Android's seed uses double quotes.
     /// That is deliberate rather than sloppy: `remoteImageUrls` accepts both
@@ -856,4 +857,30 @@ extension MailboxModel {
             break
         }
     }
+}
+
+/// The formatted body the snapshot host answers with: the images-off variant of
+/// the seeded newsletter's HTML part exactly as the body endpoint would return
+/// it — sanitized markup with the remote sources already moved to
+/// `data-grapmail-blocked-src` (one real image, one tracking pixel, both
+/// blocked, both rendered as alt-text chips by the island). No sanitizer runs
+/// here: the string is a developer-authored sample of the endpoint's output,
+/// not a processing of the seed's raw HTML, which stays in the row for the
+/// images-gate count.
+func mailSnapshotBodyRender(id: String) -> MailboxModel.BodyRender {
+    let html: String? = id == "n2"
+        ? "<p>The kerning quarrels, mostly, and one risograph plate that printed "
+            + "better than the mockup.</p>"
+            + "<img alt=\"Risograph plate 1\" "
+            + "data-grapmail-blocked-src=\"https://images.newsletter.example/plate-1.png\">"
+            + "<img alt=\"Open-rate pixel\" "
+            + "data-grapmail-blocked-src=\"https://images.newsletter.example/pixel.gif?m=n2\">"
+        : nil
+    return MailboxModel.BodyRender(
+        html: html,
+        bodyText: nil,
+        blockedImages: html == nil ? 0 : 2,
+        allowImages: false,
+        error: nil
+    )
 }

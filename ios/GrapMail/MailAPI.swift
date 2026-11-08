@@ -315,6 +315,37 @@ struct MailThreadResponse: Decodable {
     }
 }
 
+/// `GET /message/:id/body` — the reader's render body, served by the web app's
+/// same-origin route (`src/app/api/grapsee/grapmail/message/[id]/body/route.ts`),
+/// not by the backend: the raw HTML part the message row carries is sanitized
+/// server-side — with `sanitizeEmailHtml`, the same strict untrusted-email
+/// profile the web's SafeEmailBody renders through — before it is allowed near
+/// a renderer.
+///
+/// `bodyHtml` is therefore the ONLY string this app may put in a WebView. The
+/// raw `message.bodyHtml` from the row is never a render input: no sanitiser
+/// ships in this app, and the correct one is not a regex. Remote images are
+/// already neutralised in the response (`src` moved to
+/// `data-grapmail-blocked-src`) unless `?images=1` accompanied the request —
+/// `blockedImages` is the honest count of what was blocked, and `bodyText` is
+/// the row's plain part echoed back for the no-HTML case, so a null `bodyHtml`
+/// means "there is no formatted view", not "the field went missing".
+struct MailBodyResponse: Decodable {
+    var success = false
+    var bodyHtml: String?
+    var bodyText: String?
+    var blockedImages = 0
+
+    private enum CodingKeys: String, CodingKey { case success, bodyHtml, bodyText, blockedImages }
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        success = c.lenient(.success, false)
+        bodyHtml = c.lenientOpt(.bodyHtml)
+        bodyText = c.lenientOpt(.bodyText)
+        blockedImages = c.lenient(.blockedImages, 0)
+    }
+}
+
 /// `GET /me` — `grapmail.ts:632-638`. `status` is the **mailbox's** state, not
 /// the account's; the two must not be shown as one fact.
 /// A `404` with `code == "NO_MAILBOX"` is its own screen (`66-mail-no-mailbox`),
@@ -1194,6 +1225,12 @@ struct MailDraftRequest: Encodable {
     var subject: String = ""
     var bodyText: String = ""
     var inReplyTo: String? = nil
+    /// The draft row this save updates, when there is one. Absent on a first
+    /// save (the route inserts), present on every autosave after it (the route
+    /// updates that owned draft in place instead of inserting a twin). An id
+    /// that no longer resolves falls back to an insert and the response's `id`
+    /// replaces the stale one — the autosave loop's own recovery.
+    var id: String? = nil
 }
 
 struct MailSnoozeRequest: Encodable { var until: String }
@@ -1351,6 +1388,18 @@ extension ApiClient {
 
     static func mailThread(token: String, threadId: String) async throws -> MailThreadResponse {
         try await mailGet("/thread/\(threadId.percentEncodedPath())", bearer: token)
+    }
+
+    /// `GET /message/:id/body` — the reader's render body. The web app
+    /// sanitizes the message's HTML part with its own `sanitizeEmailHtml`
+    /// profile before answering, so this response is the only HTML a renderer
+    /// here may load; `allowImages` is the reader's images-gate opt-in, sent
+    /// as `?images=1` only when the person asked for this message's remote
+    /// images. Throws like every other call — the model decides what the
+    /// reader falls back to (the stripped-text branch it always had).
+    static func mailBody(token: String, id: String, allowImages: Bool) async throws -> MailBodyResponse {
+        let query = allowImages ? "?images=1" : ""
+        try await mailGet("/message/\(id.percentEncodedPath())/body\(query)", bearer: token)
     }
 
     /// `PATCH /message/:id/:action` — path-carried action. Only `snooze` reads a

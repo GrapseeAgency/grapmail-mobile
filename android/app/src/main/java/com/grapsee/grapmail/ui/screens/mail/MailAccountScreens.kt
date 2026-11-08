@@ -960,10 +960,10 @@ fun ProfileEditScreen(vm: ProfileViewModel, onBack: () -> Unit) {
 
 /**
  * What this account keeps and the controls that change it — the web's
- * `/mail/account/privacy`. The deletion section copies the web's honesty rather
- * than inventing a button: no self-serve delete exists, because deleting a
- * mailbox needs a verified request and that path is not built; the page says so
- * and points at the people who can do it.
+ * `/mail/account/privacy`. The deletion section routes to the real flow:
+ * self-serve deletion is a password-proved call the backend owns
+ * (`POST /auth/account/delete`), reached from the security hub, and the page
+ * names where rather than drawing a second copy of the confirmation here.
  */
 @Composable
 fun PrivacyScreen(
@@ -973,6 +973,7 @@ fun PrivacyScreen(
     onPhone: () -> Unit,
     onAddresses: () -> Unit,
     onPrefs: () -> Unit,
+    onDeleteAccount: () -> Unit,
     onSupport: () -> Unit,
 ) {
     val palette = LocalPalette.current
@@ -1016,14 +1017,15 @@ fun PrivacyScreen(
                 null -> if (p == null) "Could not be read" else "Not reported"
             }, palette)
             SectionLabel("Deleting the account", palette)
-            Text("There is no self-serve delete button on this page, and it is not shown as one " +
-                "because it does not exist yet: deleting a mailbox needs a verified request, " +
-                "and that path is not built. Ask from the help page and it will be handled " +
-                "by hand.",
+            Text("Deleting is self-serve and permanent: it removes the mailbox, every " +
+                "message, the aliases and the address itself, and it cannot be undone. " +
+                "The flow asks for the account password and the server confirms it; " +
+                "this page does not carry the confirmation itself, so the destructive " +
+                "step exists in exactly one place.",
                 fontSize = 13.sp, color = palette.textSecondary,
                 modifier = Modifier.padding(vertical = 6.dp))
-            Text("Go to help & support", fontSize = 14.sp, fontWeight = FontWeight.SemiBold,
-                color = palette.primarySolid, modifier = Modifier.clickable(onClick = onSupport)
+            Text("Delete this account…", fontSize = 14.sp, fontWeight = FontWeight.SemiBold,
+                color = palette.primarySolid, modifier = Modifier.clickable(onClick = onDeleteAccount)
                     .padding(vertical = 6.dp))
             SectionLabel("The documents", palette)
             Text("Privacy Policy · Terms of Service", fontSize = 14.sp,

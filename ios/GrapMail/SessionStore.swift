@@ -21,10 +21,17 @@ enum SessionStore {
     private static let addressKey = "grapmail.session.address"
     private static let nameKey = "grapmail.session.name"
     private static let expiresKey = "grapmail.session.expires"
+    private(set) static var generation = UUID()
 
     static func save(token: String, refreshToken: String? = nil, address: String, name: String, expiresAtRaw: Double? = nil) {
+        generation = UUID()
+        MailPoll.clear()
+        Keychain.delete(refreshKey)
         Keychain.set(token, for: tokenKey)
         if let refreshToken { Keychain.set(refreshToken, for: refreshKey) }
+        DispatchQueue.main.async {
+            NotificationCenter.default.post(name: .gmSessionChanged, object: nil)
+        }
         UserDefaults.standard.set(address, forKey: addressKey)
         UserDefaults.standard.set(name, forKey: nameKey)
         UserDefaults.standard.set(expiresAtRaw, forKey: expiresKey)
@@ -58,6 +65,13 @@ enum SessionStore {
     }
 
     static func clear() {
+        generation = UUID()
+        MailPoll.clear()
+        // The push deregistration is authenticated with THIS session's bearer,
+        // so it must run before the Keychain deletes below remove it. Its own
+        // teardown stays deferred inside there: it must not unregister a
+        // registration that belongs to a sign-in completed in the meantime.
+        NotificationRegistration.shared.sessionEnding()
         Keychain.delete(tokenKey)
         Keychain.delete(refreshKey)
         UserDefaults.standard.removeObject(forKey: addressKey)

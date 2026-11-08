@@ -63,5 +63,22 @@
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/file_paths" />
         </provider>
+        <!--
+            The push receiver. The backend wakes the device through the
+            platform's push service; this service registers the device token
+            (onNewToken) and, on a signal, shows the placeholder notification
+            and runs the same read the poll runs — the payload carries no
+            message content, so nothing here displays anything the server
+            could not know. Without google-services.json the Firebase app is
+            never initialized and this service simply never fires; the poll
+            remains the delivery the person actually gets.
+        -->
+        <service
+            android:name=".logic.PushService"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.google.firebase.MESSAGING_EVENT" />
+            </intent-filter>
+        </service>
     </application>
 </manifest>

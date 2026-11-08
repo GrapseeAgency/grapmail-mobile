@@ -105,6 +105,9 @@ fun ThreadScreen(
 ) {
     val palette = LocalPalette.current
     val thread by vm.thread.collectAsState()
+    // The reader's formatted bodies, keyed by message id: the model fetches the
+    // server-sanitized render per row, and the island below renders from it.
+    val bodies by vm.bodies.collectAsState()
     var busy by remember { mutableStateOf<String?>(null) }
     // Per-message, not global: a download result belongs to the row that asked
     // for it, and a shared variable would let a later failure overwrite an
@@ -224,6 +227,9 @@ private fun ThreadMessageCard(
 ) {
     val palette = LocalPalette.current
     val context = androidx.compose.ui.platform.LocalContext.current
+    // The reader's formatted bodies, keyed by message id: the model fetches the
+    // server-sanitized render per row, and the island below renders from it.
+    val bodies by vm.bodies.collectAsState()
     var showUnsub by androidx.compose.runtime.remember { mutableStateOf(false) }
     // Keyed on the message, because the reader can now step to a neighbouring
     // message without leaving this composition: a note that belonged to the
@@ -245,6 +251,10 @@ private fun ThreadMessageCard(
     // carry an opt-in that was given for somebody else's mail.
     val hiddenImages = remoteImageUrls(message.bodyHtml)
     var shownImages by androidx.compose.runtime.remember(message.id) { mutableStateOf(false) }
+    // The formatted body is fetched when the card composes and again when the
+    // images gate is answered — the two variants are different renders, and
+    // the model memoises both per message.
+    LaunchedEffect(message.id, shownImages) { vm.loadBody(message.id, shownImages) }
     // The sender's own `List-Unsubscribe` offer, narrowed to an http(s) address by
     // the same rule iOS applies. Null means show nothing: a button that opens a
     // broken or dangerous URL is worse than no button, and most mail simply has no
@@ -301,20 +311,49 @@ private fun ThreadMessageCard(
         if (message.isE2eEncrypted || message.e2eEnvelope != null) {
             EncryptedBlock(message, e2e)
         } else {
-            val text = message.bodyText
-            if (text.isNullOrBlank()) {
-                if (!message.bodyHtml.isNullOrBlank()) {
-                    // Stripped for display, and the screen says so.
-                    HtmlStrippedNotice()
-                    Spacer(Modifier.height(8.dp))
-                    Text(stripHtml(message.bodyHtml!!), fontSize = 15.sp,
-                        color = palette.textPrimary, lineHeight = 22.sp)
-                } else if (expanded) {
-                    Text("This message has no text body.", fontSize = 14.sp, color = palette.textSecondary)
+            // HTML-first, matching the web's SafeEmailBody: when the message
+            // carries an HTML part, the reader renders the SERVER-sanitized
+            // body the endpoint answered with, never this row's raw markup —
+            // there is no sanitiser in this app's dependencies, and the raw
+            // string is never a render input. While the fetch is in flight,
+            // and if it fails, the stripped-text branch the screen always had
+            // is the visible fallback, said per message rather than hidden.
+            val htmlPart = message.bodyHtml?.takeIf { it.isNotBlank() }
+            val render = bodies[message.id]
+            if (htmlPart != null) {
+                when {
+                    render?.html != null -> {
+                        HtmlMailBody(
+                            html = render.html,
+                            allowImages = shownImages,
+                            onOpenLink = { url -> openExternally(context, url) },
+                            modifier = Modifier.testTag("mail-body"),
+                        )
+                    }
+                    render?.error != null -> {
+                        HtmlStrippedNotice()
+                        Spacer(Modifier.height(6.dp))
+                        Text(render.error, fontSize = 12.sp, color = palette.textTertiary)
+                        Spacer(Modifier.height(8.dp))
+                        Text(stripHtml(htmlPart), fontSize = 15.sp,
+                            color = palette.textPrimary, lineHeight = 22.sp)
+                    }
+                    else -> {
+                        Text("Loading formatted message…", fontSize = 13.sp,
+                            color = palette.textTertiary,
+                            modifier = Modifier.testTag("mail-body-loading"))
+                    }
                 }
             } else {
-                Text(text, fontSize = 15.sp, color = palette.textPrimary, lineHeight = 22.sp,
-                    modifier = Modifier.testTag("mail-body"))
+                val text = message.bodyText
+                if (text.isNullOrBlank()) {
+                    if (expanded) {
+                        Text("This message has no text body.", fontSize = 14.sp, color = palette.textSecondary)
+                    }
+                } else {
+                    Text(text, fontSize = 15.sp, color = palette.textPrimary, lineHeight = 22.sp,
+                        modifier = Modifier.testTag("mail-body"))
+                }
             }
             // An HTML part can point at images that live on the SENDER's
             // server. Fetching one is a request that carries this device's
@@ -342,14 +381,11 @@ private fun ThreadMessageCard(
                     )
                 } else {
                     // Said once, because the requests have already left by the
-                    // time this line draws — the sentence is about what just
-                    // happened, not about a choice still to be made.
+                    // time this line draws — the images now load inside the
+                    // formatted body itself, so there is no per-image row to
+                    // draw below it.
                     Text("These images load from the sender's server.",
                         fontSize = 12.sp, color = palette.textTertiary)
-                    hiddenImages.forEachIndexed { i, url ->
-                        Spacer(Modifier.height(10.dp))
-                        RemoteImageView(url, label = "Image ${i + 1} in this message")
-                    }
                 }
             }
         }

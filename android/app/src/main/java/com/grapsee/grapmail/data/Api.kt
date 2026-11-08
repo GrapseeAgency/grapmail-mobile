@@ -28,6 +28,8 @@ import java.util.concurrent.TimeUnit
     val lastName: String? = null,
     val address: String = "",
     val handle: String = "",
+    val email: String? = null,
+    val grapmailAddress: String? = null,
     val phone: String? = null,
     val accountType: String = "USER",
 )
@@ -105,12 +107,21 @@ import java.util.concurrent.TimeUnit
     /** The same object under the name the live envelope actually uses. */
     val user: AccountDto? = null,
     val requireOtp: Boolean = false,
+    val email: String? = null,
     val challengeId: String? = null,
     val backupCodesRemaining: Int? = null,
     val message: String? = null,
     val error: String? = null,
     val code: String? = null,
 ) {
+    val emailOtpRequired: Boolean
+        get() = requireOtp && !email.isNullOrBlank() && challengeId == null
+
+    fun signedInAddress(fallback: String): String = accountOrNull?.let {
+        it.address.takeIf(String::isNotBlank) ?: it.grapmailAddress?.takeIf(String::isNotBlank)
+            ?: it.email?.takeIf(String::isNotBlank)
+    } ?: fallback
+
     /** Absolute epoch-milliseconds, from whichever shape the server sent. */
     val expiresAtMillis: Long
         get() {
@@ -631,7 +642,9 @@ object Api {
             // gateway, one verifier and one token — a mail 401 IS a dead session,
             // so the carve-out would only excuse an expired session forever.
             if (response.code == 401 && chain.request().header("Authorization") != null) {
-                SessionEvents.signalExpired()
+                response.request.header("Authorization")?.removePrefix("Bearer ")?.let {
+                    SessionEvents.signalExpired(it)
+                }
             }
             response
         }
@@ -649,9 +662,13 @@ object Api {
             if (response.priorResponse != null) return@authenticator null
             if (response.request.url.encodedPath.endsWith("/refresh")) return@authenticator null
             val ctx = appContext ?: return@authenticator null
-            if (!runBlocking { SessionRefresh.refresh(ctx) }) return@authenticator null
-            val renewed = runBlocking { SessionStore.token(ctx) } ?: return@authenticator null
-            response.request.newBuilder().header("Authorization", "Bearer $renewed").build()
+            val original = runBlocking { SessionStore.snapshot(ctx) } ?: return@authenticator null
+            val rejected = response.request.header("Authorization")?.removePrefix("Bearer ")
+            if (original.token != rejected) return@authenticator null
+            if (!runBlocking { SessionRefresh.refresh(ctx, rejected) }) return@authenticator null
+            val renewed = runBlocking { SessionStore.snapshot(ctx) } ?: return@authenticator null
+            if (renewed.id != original.id) return@authenticator null
+            response.request.newBuilder().header("Authorization", "Bearer ${renewed.token}").build()
         }
         .connectTimeout(15, TimeUnit.SECONDS)
         .readTimeout(20, TimeUnit.SECONDS)
@@ -719,9 +736,40 @@ object Api {
             .post(postBody(json.encodeToString(SignInRequest.serializer(), SignInRequest(identifier, password))))
             .build()
         val (status, body) = execute(request)
+        // Only this precise 403 shape is a challenge. Throttles and other 403s still fail.
+        if (status == 403) {
+            val challenge = runCatching { json.decodeFromString<SignInResponse>(body) }.getOrNull()
+            if (challenge?.emailOtpRequired == true) return challenge
+        }
         if (status >= 400) fail(status, body)
         return json.decodeFromString<SignInResponse>(body)
     }
+
+    suspend fun verifyEmailOtp(email: String, otp: String): SignInResponse {
+        val payload = kotlinx.serialization.json.buildJsonObject {
+            put("email", kotlinx.serialization.json.JsonPrimitive(email))
+            put("otp", kotlinx.serialization.json.JsonPrimitive(otp))
+        }
+        return read(Request.Builder().url("$AUTH/verify-otp")
+            .header("x-device-id", DeviceId.value).post(postBody(payload.toString())).build()) {
+            json.decodeFromString<SignInResponse>(it)
+        }
+    }
+
+    suspend fun resendEmailOtp(email: String): ActionResponse {
+        val payload = kotlinx.serialization.json.buildJsonObject {
+            put("email", kotlinx.serialization.json.JsonPrimitive(email))
+        }
+        return read(Request.Builder().url("$AUTH/resend-otp")
+            .header("x-device-id", DeviceId.value).post(postBody(payload.toString())).build()) {
+            json.decodeFromString<ActionResponse>(it)
+        }
+    }
+
+    private val launchApi by lazy { LaunchApi(BASE, DeviceId.value, userAgent) }
+    suspend fun deleteAccount(token: String, password: String) = launchApi.deleteAccount(token, password)
+    suspend fun registerPush(token: String, pushToken: String) = launchApi.registerPush(token, pushToken)
+    suspend fun unregisterPush(token: String, pushToken: String) = launchApi.unregisterPush(token, pushToken)
 
     /**
      * Rotate the pair with the stored refresh token.
@@ -1061,6 +1109,20 @@ object Api {
 
     suspend fun mailThread(token: String, threadId: String): MailThreadResponse =
         read(authed("$MAIL/thread/${enc(threadId)}", token).get().build()) { json.decodeFromString(it) }
+
+    /**
+     * `GET /message/:id/body` — the reader's render body. The web app
+     * sanitizes the message's HTML part with its own `sanitizeEmailHtml`
+     * profile before answering, so this response is the only HTML a renderer
+     * here may load; `allowImages` is the reader's images-gate opt-in, sent as
+     * `?images=1` only when the person asked for this message's remote images.
+     * An error is thrown like every other call — the model decides what the
+     * reader falls back to (the stripped-text branch it always had).
+     */
+    suspend fun mailBody(token: String, id: String, allowImages: Boolean): MailBodyResponse =
+        read(
+            authed("$MAIL/message/${enc(id)}/body" + if (allowImages) "?images=1" else "", token).get().build(),
+        ) { json.decodeFromString(it) }
 
     /**
      * `PATCH /message/:id/:action` — the action is in the **path**, never the
@@ -1434,6 +1496,14 @@ data class MailDraftRequest(
     val subject: String = "",
     val bodyText: String = "",
     val inReplyTo: String? = null,
+    /**
+     * The draft row this save updates, when there is one. Absent on a first
+     * save (the route inserts), present on every autosave after it (the route
+     * updates that owned draft in place instead of inserting a twin). An id
+     * that no longer resolves falls back to an insert and the response's `id`
+     * replaces the stale one — the autosave loop's own recovery.
+     */
+    val id: String? = null,
 )
 
 @Serializable

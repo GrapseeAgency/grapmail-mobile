@@ -28,20 +28,18 @@ object SessionRefresh {
     private val mutex = Mutex()
 
     /** True when a usable session is stored after this call. */
-    suspend fun refresh(context: Context): Boolean = mutex.withLock {
+    suspend fun refresh(context: Context, rejectedToken: String? = null): Boolean = mutex.withLock {
         // Somebody else may have rotated while this caller waited. Asking the
         // store — not the caller's stale request — is the point of the lock.
-        if (SessionStore.hasValidSession(context)) return@withLock true
+        val original = SessionStore.snapshot(context) ?: return@withLock false
+        if (rejectedToken != null && rejectedToken != original.token) return@withLock false
+        if (rejectedToken == null && SessionStore.hasValidSession(context)) return@withLock true
 
         val refresh = SessionStore.refreshToken(context) ?: return@withLock false
-        val pair = runCatching { Api.refreshSession(refresh) }.getOrNull() ?: return@withLock false
+        val pair = try { Api.refreshSession(refresh) }
+            catch (e: kotlinx.coroutines.CancellationException) { throw e }
+            catch (_: Exception) { return@withLock false }
         val token = pair.accessToken ?: pair.token ?: return@withLock false
-        SessionStore.updateTokens(
-            context,
-            token,
-            pair.refreshToken,
-            pair.expiresAtMillis,
-        )
-        true
+        SessionStore.updateTokens(context, token, pair.refreshToken, pair.expiresAtMillis, original.token)
     }
 }

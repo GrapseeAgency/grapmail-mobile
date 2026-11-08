@@ -10,6 +10,7 @@ struct SignInView: View {
     let onSignUp: () -> Void
     let onForgotPassword: () -> Void
     let onNeedSecondFactor: () -> Void
+    var onNeedEmailVerification: () -> Void = {}
 
     @State private var identifier = ""
     @State private var password = ""
@@ -120,7 +121,11 @@ struct SignInView: View {
             .scrollDismissesKeyboard(.interactively)
         }
         .centeredForm()
-        .onAppear { identifier = model.prefillIdentifier ?? identifier }
+        .onAppear {
+            identifier = model.prefillIdentifier ?? identifier
+            model.clearSignInChallenge()
+        }
+        .disabled(busy)
         .onChange(of: model.prefillIdentifier) { newValue in
             if let newValue { identifier = newValue }
         }
@@ -143,6 +148,7 @@ struct SignInView: View {
                 if resp.secondFactorRequired, let cid = resp.challengeId {
                     model.identifier = identifier.trimmingCharacters(in: .whitespaces)
                     model.password = password
+                    password = ""
                     model.challengeId = cid
                     // The CHALLENGE's expiry, for the code countdown — deliberately
                     // `expiresAt` and not `expiresAtDate`: the latter falls back to
@@ -153,8 +159,9 @@ struct SignInView: View {
                     onNeedSecondFactor()
                     return
                 }
-                guard let token = resp.sessionToken ?? resp.accessToken ?? resp.token else {
-                    error = "Sign-in succeeded but no session was returned. Please try again."
+                guard !resp.secondFactorRequired, resp.success,
+                      let token = resp.sessionToken ?? resp.accessToken ?? resp.token, !token.isEmpty else {
+                    error = "Sign-in did not return a complete session. Please try again."
                     return
                 }
                 let address = resp.account?.address ?? identifier
@@ -165,10 +172,85 @@ struct SignInView: View {
                     name: resp.account?.name ?? "",
                     expiresAtRaw: resp.expiresAtMillis
                 )
+                password = ""
+                model.clearSignInChallenge()
                 onSignedIn(address)
+            } catch ApiError.emailVerificationRequired(let email) {
+                password = ""
+                model.clearSignInChallenge()
+                model.verificationEmail = email
+                onNeedEmailVerification()
             } catch {
                 self.error = error.localizedDescription
             }
+        }
+    }
+}
+
+/// Email verification is not phone two-factor: no challengeId or backup codes.
+struct EmailVerificationView: View {
+    @ObservedObject var model: RecoveryModel
+    let onSignedIn: (String) -> Void
+    let onBack: () -> Void
+    @State private var otp = ""
+    @State private var busy = false
+    @State private var error: String?
+    @State private var notice: String?
+
+    var body: some View {
+        AccountScreen(onBack: { model.clearSignInChallenge(); onBack() },
+                      eyebrow: "Email verification", title: "Enter the email code",
+                      subtitle: model.verificationEmail,
+                      content: {
+            CodeCells(length: 6, value: $otp)
+            if let error { Text(error).font(GMFont.caption).foregroundColor(GM.error) }
+            if let notice { Text(notice).font(GMFont.caption).foregroundColor(GM.textSecondary) }
+        }, footer: {
+            GradientButton(title: "Verify & Continue", enabled: otp.count == 6, busy: busy) {
+                verify()
+            }
+            AccountLink(title: "Resend code") { resend() }
+            Text("A pending code stays valid. A resend request does not confirm a new delivery.")
+                .font(GMFont.caption).foregroundColor(GM.textSecondary)
+        })
+        .disabled(busy)
+        .onDisappear { otp = "" }
+    }
+
+    private func verify() {
+        guard !busy, let email = model.verificationEmail else { return }
+        busy = true; error = nil; notice = nil
+        Task { @MainActor in
+            defer { busy = false }
+            do {
+                let resp = try await ApiClient.verifyEmailOTP(email: email, otp: otp)
+                guard resp.success, !resp.secondFactorRequired,
+                      let token = resp.accessToken ?? resp.sessionToken ?? resp.token, !token.isEmpty else {
+                    error = "Verification did not return a complete session. Sign in again."
+                    return
+                }
+                let address = resp.account?.address.isEmpty == false ? resp.account!.address : email
+                SessionStore.save(token: token, refreshToken: resp.refreshToken, address: address,
+                                  name: resp.account?.name ?? "", expiresAtRaw: resp.expiresAtMillis)
+                otp = ""
+                model.clearSignInChallenge()
+                onSignedIn(address)
+            } catch { self.error = error.localizedDescription }
+        }
+    }
+
+    private func resend() {
+        guard !busy, let email = model.verificationEmail else { return }
+        busy = true; error = nil; notice = nil
+        Task { @MainActor in
+            defer { busy = false }
+            do {
+                let resp = try await ApiClient.resendEmailOTP(email: email)
+                guard resp.success else { error = "The request was not accepted."; return }
+                // The endpoint deliberately returns the same answer on cooldown,
+                // existing codes, unknown accounts and provider failure. No countdown.
+                notice = "Request accepted. Check for an existing code; a new delivery is not confirmed."
+            } catch { self.error = error.localizedDescription }
         }
     }
 }

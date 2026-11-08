@@ -68,6 +68,8 @@ fun SecurityRow(
     chipTone: ChipTone = ChipTone.Success,
     onClick: (() -> Unit)? = null,
     trailing: (@Composable () -> Unit)? = null,
+    /** Danger rows recolour the icon; the default keeps the brand blue. */
+    tint: Color? = null,
 ) {
     val palette = LocalPalette.current
     Row(
@@ -86,7 +88,7 @@ fun SecurityRow(
                 .background(palette.softFill),
             contentAlignment = Alignment.Center,
         ) {
-            Icon(icon, contentDescription = null, tint = palette.primarySolid, modifier = Modifier.size(20.dp))
+            Icon(icon, contentDescription = null, tint = tint ?: palette.primarySolid, modifier = Modifier.size(20.dp))
         }
         Column(Modifier.weight(1f)) {
             Text(title, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = palette.textPrimary)

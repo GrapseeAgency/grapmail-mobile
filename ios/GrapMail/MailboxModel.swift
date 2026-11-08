@@ -155,13 +155,20 @@ final class MailboxModel: ObservableObject {
         var inReplyTo: String?
         /// The draft row this compose was opened FROM. Non-empty means the
         /// person is continuing a saved message, and a successful send
-        /// deletes it — see [send].
+        /// deletes it — see [send]. The autosave loop keeps it current: the
+        /// first autosave records the id its insert produced, and every later
+        /// one updates that row.
         var draftId = ""
         var sending = false
         /// The server's own verdict, shown verbatim. Never a local "Sent".
         var result: String?
         var resultStatus: String?
         var error: String?
+        /// The autosave's own quiet state, deliberately separate from
+        /// [result]: a background save must never read like a send receipt,
+        /// and the composer draws it as one small tertiary line.
+        var autosaving = false
+        var autosaveNote: String?
     }
 
     struct LabelState {
@@ -1245,9 +1252,136 @@ final class MailboxModel: ObservableObject {
         }
     }
 
+    // ── the reader's formatted body ──────────────────────────────────────────
+
+    /// One render per message. The html IS the server's answer: the body
+    /// endpoint sanitized it with the web's untrusted-email profile before it
+    /// left the app's origin, so this map is the only source a WebView is ever
+    /// fed from. `allowImages` is stored with the render because the two
+    /// variants are different answers, not a reload of one: without it, an
+    /// images-off render would be mistaken for the opt-in one and the gate's
+    /// second fetch would be skipped.
+    struct BodyRender {
+        let html: String?
+        let bodyText: String?
+        let blockedImages: Int
+        let allowImages: Bool
+        let error: String?
+    }
+
+    @Published private(set) var bodies: [String: BodyRender] = [:]
+
+    /// Requests already in flight, as `id:images` — a re-render must not queue
+    /// a twin of a request this model has not answered yet.
+    private var bodyRequestsInFlight: Set<String> = []
+
+    /// Fetch the sanitized render body for one message. Called from the reader
+    /// card on open and again when the images gate is answered; a failure is
+    /// stored as the render's own error so the card can fall back to the
+    /// stripped-text branch it always had — visibly, per message, instead of a
+    /// shared error a later row would inherit.
+    func loadBody(_ messageId: String, allowImages: Bool) {
+        // The CI snapshot host has no backend, and the walk must still
+        // photograph the formatted branch — so the host's own seed answers
+        // here with the images-off variant the endpoint would produce. The
+        // opt-in is deliberately unphotographed: rendering it would mean CI
+        // asking a sender's server for bytes.
+        if snapshotSeeded {
+            bodies[messageId] = mailSnapshotBodyRender(id: messageId)
+            return
+        }
+        guard let token else { return }
+        let key = "\(messageId):\(allowImages)"
+        if let current = bodies[messageId], current.error == nil,
+           current.html?.nilIfBlank() != nil, current.allowImages == allowImages {
+            return
+        }
+        if bodyRequestsInFlight.contains(key) { return }
+        bodyRequestsInFlight.insert(key)
+        Task { [weak self] in
+            guard let self else { return }
+            defer { self.bodyRequestsInFlight.remove(key) }
+            do {
+                let resp = try await ApiClient.mailBody(token: token, id: messageId, allowImages: allowImages)
+                self.bodies[messageId] = BodyRender(
+                    html: resp.bodyHtml,
+                    bodyText: resp.bodyText,
+                    blockedImages: resp.blockedImages,
+                    allowImages: allowImages,
+                    error: nil
+                )
+            } catch {
+                self.bodies[messageId] = BodyRender(
+                    html: nil, bodyText: nil, blockedImages: 0,
+                    allowImages: allowImages,
+                    error: Self.describe(error)
+                )
+            }
+        }
+    }
+
     // ── compose ──────────────────────────────────────────────────────────────
 
-    func composeUpdate(_ transform: (inout ComposeState) -> Void) { transform(&compose) }
+    func composeUpdate(_ transform: (inout ComposeState) -> Void) {
+        transform(&compose)
+        scheduleAutosave()
+    }
+
+    // ── autosave ─────────────────────────────────────────────────────────────
+
+    /// The compose box saves itself. Every edit schedules a debounced draft
+    /// write; the first save inserts and records the row's id, and every save
+    /// after it updates that row in place, so a compose that stays open for an
+    /// afternoon is ONE draft, not one draft per keystroke batch.
+    private var autosaveTask: Task<Void, Never>?
+    private var autosaveInFlight = false
+
+    /// The rules the debounce obeys, each one a refusal rather than a feature:
+    /// an EMPTY compose saves nothing (a person opening the composer and
+    /// leaving must not find an empty draft row named after nothing); a send
+    /// or a manual save in flight is not interrupted; and the autosave never
+    /// writes the receipt — its outcome is the composer's own quiet line, not
+    /// the "Saved to Drafts" banner the manual save earns.
+    private func scheduleAutosave() {
+        let s = compose
+        if s.sending { return }
+        if s.to.trimmingCharacters(in: .whitespaces).isEmpty
+            && s.cc.trimmingCharacters(in: .whitespaces).isEmpty
+            && s.subject.trimmingCharacters(in: .whitespaces).isEmpty
+            && s.body.trimmingCharacters(in: .whitespaces).isEmpty {
+            return
+        }
+        autosaveTask?.cancel()
+        autosaveTask = Task { [weak self] in
+            guard let self else { return }
+            do {
+                try await Task.sleep(nanoseconds: 2_000_000_000)
+            } catch {
+                return // cancelled by a newer edit; that edit schedules its own save
+            }
+            guard let token = self.token, !self.compose.sending, !self.autosaveInFlight else { return }
+            self.autosaveInFlight = true
+            self.compose.autosaving = true
+            do {
+                let resp = try await ApiClient.mailDraft(
+                    token: token,
+                    MailDraftRequest(
+                        to: Self.splitAddresses(self.compose.to), cc: Self.splitAddresses(self.compose.cc),
+                        subject: self.compose.subject, bodyText: self.compose.body,
+                        inReplyTo: self.compose.inReplyTo,
+                        id: self.compose.draftId.nilIfBlank(),
+                    ))
+                self.compose.autosaving = false
+                self.compose.autosaveNote = "Draft saved"
+                if let newId = resp.id { self.compose.draftId = newId }
+                await MailStore.shared.invalidate(.drafts)
+            } catch {
+                self.compose.autosaving = false
+                self.compose.autosaveNote = "Draft not saved — it will be saved on the next change."
+            }
+            self.autosaveInFlight = false
+        }
+    }
 
     func startReply(_ m: MailMessage) {
         compose.to = m.from?.address ?? ""
@@ -1382,6 +1516,13 @@ final class MailboxModel: ObservableObject {
     /// travels — that is the whole claim the encrypt row makes.
     func send(e2eEnvelope: String? = nil) {
         guard let token, !compose.sending else { return }
+        // The send deletes this compose's draft row; an autosave in flight
+        // would land after that delete, resolve nothing, and INSERT a copy of
+        // the message that was just sent. Cancelling here closes the client
+        // side of that race; the route's own owner-scoped select closes the
+        // server side.
+        autosaveTask?.cancel()
+        autosaveInFlight = false
         // An empty To is refused here, not by the server: a message with no
         // recipient is not a send, and a receipt naming the server's 422 after
         // the person pressed Send twice is worse than a button that says why
@@ -1460,15 +1601,20 @@ final class MailboxModel: ObservableObject {
         guard let token else { return }
         let req = MailDraftRequest(
             to: Self.splitAddresses(compose.to), cc: Self.splitAddresses(compose.cc),
-            subject: compose.subject, bodyText: compose.body, inReplyTo: compose.inReplyTo)
+            subject: compose.subject, bodyText: compose.body, inReplyTo: compose.inReplyTo,
+            id: compose.draftId.nilIfBlank())
         compose.sending = true
         Task { [weak self] in
             guard let self else { return }
             do {
-                _ = try await ApiClient.mailDraft(token: token, req)
+                let resp = try await ApiClient.mailDraft(token: token, req)
+                // The manual save keeps the draft's id current too: continuing
+                // a saved message and pressing Save updates that row now
+                // instead of inserting a second one.
                 self.compose.sending = false
                 self.compose.result = "Saved to Drafts"
                 self.compose.resultStatus = "draft"
+                if let newId = resp.id { self.compose.draftId = newId }
                 await MailStore.shared.invalidate(.drafts)
             } catch {
                 self.compose.sending = false

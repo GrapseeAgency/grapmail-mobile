@@ -6,6 +6,7 @@ struct GrapMailApp: App {
     /// background-refresh registration, home-screen shortcut delivery, and the
     /// reschedule when the app goes away. See `AppDelegate`.
     @UIApplicationDelegateAdaptor(AppDelegate.self) private var delegate
+    @State private var accountGeneration = UUID()
 
     init() {
         // Started before the first view so the very first mailbox read knows
@@ -18,6 +19,11 @@ struct GrapMailApp: App {
     var body: some Scene {
         WindowGroup {
             RootView()
+                .id(accountGeneration)
+                // Discard all account-owned view models after confirmed deletion.
+                .onReceive(NotificationCenter.default.publisher(for: .gmAccountDeleted)) { _ in
+                    accountGeneration = UUID()
+                }
         }
     }
 }

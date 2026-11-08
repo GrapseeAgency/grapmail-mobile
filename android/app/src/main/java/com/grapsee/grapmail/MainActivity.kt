@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.layout.systemBars
+import androidx.compose.foundation.layout.waterfall
 import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.widthIn
@@ -170,9 +171,10 @@ class MainActivity : ComponentActivity() {
                 ) {
                     Box(
                         Modifier
-                            .fillMaxSize()
-                            .windowInsetsPadding(WindowInsets.systemBars.union(WindowInsets.displayCutout))
+                            .windowInsetsPadding(WindowInsets.systemBars
+                                .union(WindowInsets.displayCutout).union(WindowInsets.waterfall))
                             .widthIn(max = 520.dp)
+                            .fillMaxSize()
                     ) {
                         GrapMailNav(
                             composeRequest = composeRequest.value,
@@ -236,6 +238,7 @@ object Routes {
     const val SEC_PASSWORD_UPDATED = "security/password/updated"
     const val SEC_SIGNOUT_ALL = "security/signout-all"
     const val SEC_SIGNOUT_ALL_DONE = "security/signout-all/done"
+    const val SEC_DELETE_ACCOUNT = "security/delete-account"
     const val SEC_SESSIONS = "security/sessions"
     const val SEC_REVOKE = "security/sessions/revoke/{id}/{device}"
     const val SEC_REVOKED = "security/sessions/revoked/{device}"
@@ -372,6 +375,33 @@ fun GrapMailNav(
         }
     }
 
+    // One place for a completed sign-in, whichever door finished it (password,
+    // factor code, email code, backup code, the wizard's auto sign-in): the
+    // session is stored by the door itself; this announces the device to the
+    // push service with the bearer that was just stored. Without the Firebase
+    // client config this is a quiet no-op and the poll remains the delivery.
+    fun signedIn(address: String) {
+        com.grapsee.grapmail.logic.PushSync.registerAsync(nav.context.applicationContext)
+        nav.navigate(Routes.HOME) { popUpTo(Routes.WELCOME) }
+    }
+
+    // Sign-out and deletion share the same teardown: the push registration is
+    // retired while the bearer it needs is still stored, the security sector's
+    // in-memory material dies with the person it belonged to, and the mailbox
+    // cache goes so the next account on this device never reads this one's
+    // mail. The unregister is capped, so a slow server never delays the
+    // sign-out itself — the navigation below runs regardless.
+    fun leaveSignedInState() {
+        com.grapsee.grapmail.ui.screens.security.SecurityFlow.reset()
+        e2e.clearForSignOut()
+        scope.launch {
+            kotlinx.coroutines.withTimeoutOrNull(4_000) {
+                com.grapsee.grapmail.logic.PushSync.unregister(nav.context.applicationContext)
+            }
+            SessionStore.clear(nav.context.applicationContext)
+        }
+    }
+
     // A stored, unexpired session opens the app signed-in — the encrypted
     // token has to be read at launch, not just written.
     var startDest by remember { mutableStateOf<String?>(null) }
@@ -451,13 +481,19 @@ fun GrapMailNav(
     // dropping the session and landing on sign-in here is the only way back in
     // that does not require reinstalling the app.
     LaunchedEffect(Unit) {
-        SessionEvents.expired.collect {
+        SessionEvents.expired.collect { rejectedToken ->
             // The activity-scoped E2E view model outlives the nav graph: a
             // dead token must drop the unlocked private halves exactly like
             // a deliberate sign-out, or the next account inherits them.
-            e2e.clearForSignOut()
-            SessionStore.clear(nav.context.applicationContext)
-            backToSignIn()
+            if (SessionStore.clearIfToken(nav.context.applicationContext, rejectedToken)) {
+                e2e.clearForSignOut()
+                SecurityFlow.reset()
+                // The bearer is dead, so the backend unregister has nothing to
+                // authenticate with; the local push record goes, and the next
+                // sign-in re-registers the same device token.
+                com.grapsee.grapmail.logic.PushSync.forget(nav.context.applicationContext)
+                nav.navigate(Routes.SIGN_IN) { popUpTo(0) { inclusive = true } }
+            }
             // The flow replays its one pending signal to a fresh subscriber;
             // we have just acted on it, so take it out of the cache — the
             // next subscribe (a recomposition, a config change) must not
@@ -489,6 +525,7 @@ fun GrapMailNav(
                             nav.context.applicationContext,
                             token, resp.refreshToken, address, name, resp.expiresAtMillis,
                         )
+                        com.grapsee.grapmail.logic.PushSync.registerAsync(nav.context.applicationContext)
                         signedIn = true
                         break
                     }
@@ -565,7 +602,7 @@ fun GrapMailNav(
         composable(Routes.SIGN_IN) {
             SignInScreen(
                 flow = flow,
-                onSignedIn = { nav.navigate(Routes.HOME) { popUpTo(Routes.WELCOME) } },
+                onSignedIn = { signedIn(it) },
                 onBack = { nav.popBackStack() },
                 onSignUp = { nav.navigate(Routes.STEP_NAME) },
                 onForgotPassword = { nav.navigate(Routes.FORGOT_PASSWORD) },
@@ -575,7 +612,7 @@ fun GrapMailNav(
         composable(Routes.TWO_FACTOR) {
             TwoFactorScreen(
                 flow = flow,
-                onSignedIn = { nav.navigate(Routes.HOME) { popUpTo(Routes.WELCOME) } },
+                onSignedIn = { signedIn(it) },
                 onBack = { nav.popBackStack() },
                 onBackToSignIn = { backToSignIn() },
                 onUseBackupCode = { nav.navigate(Routes.BACKUP_CODE) },
@@ -584,7 +621,7 @@ fun GrapMailNav(
         composable(Routes.BACKUP_CODE) {
             BackupCodeScreen(
                 flow = flow,
-                onSignedIn = { nav.navigate(Routes.HOME) { popUpTo(Routes.WELCOME) } },
+                onSignedIn = { signedIn(it) },
                 onBack = { nav.popBackStack() },
                 onTryAnotherMethod = { nav.popBackStack() },
                 onBackToSignIn = { backToSignIn() },
@@ -680,6 +717,7 @@ fun GrapMailNav(
                 onBackupCodes = { nav.navigate(Routes.SEC_BACKUP) },
                 onPassword = { nav.navigate(Routes.SEC_PASSWORD) },
                 onSignOutAll = { nav.navigate(Routes.SEC_SIGNOUT_ALL) },
+                onDeleteAccount = { nav.navigate(Routes.SEC_DELETE_ACCOUNT) },
                 onSupport = { openSupport() },
             )
         }
@@ -770,6 +808,19 @@ fun GrapMailNav(
             SignOutAllDevicesScreen(
                 onBack = { nav.popBackStack() },
                 onDone = { nav.navigate(Routes.SEC_SIGNOUT_ALL_DONE) },
+            )
+        }
+        composable(Routes.SEC_DELETE_ACCOUNT) {
+            com.grapsee.grapmail.ui.screens.security.DeleteAccountScreen(
+                onBack = { nav.popBackStack() },
+                onDeleted = {
+                    // The server confirmed the deletion; the same teardown a
+                    // sign-out runs, because everything the device still holds
+                    // for this account is now material about an account that
+                    // no longer exists.
+                    leaveSignedInState()
+                    nav.navigate(Routes.WELCOME) { popUpTo(0) { inclusive = true } }
+                },
             )
         }
         composable(Routes.SEC_SIGNOUT_ALL_DONE) {
@@ -959,15 +1010,12 @@ fun GrapMailNav(
                 onScreener = { nav.navigate(Routes.MAIL_SCREENER) },
                 onSubscriptions = { nav.navigate(Routes.MAIL_SUBSCRIPTIONS) },
                 onSignOut = {
-                    // The token leaves, and so does everything the security sector
-                    // was holding in memory: ten plaintext recovery codes and a live
-                    // action proof must not outlive the person they belong to.
-                    // Signing out clears the mailbox cache the same way, so the next
-                    // account on this device never opens a list of somebody else's
-                    // messages.
-                    com.grapsee.grapmail.ui.screens.security.SecurityFlow.reset()
+                    // The unlocked E2E halves drop HERE, visibly at the door,
+                    // not only inside the shared teardown: a sign-out that
+                    // leaves the key material reachable in memory is the
+                    // lifetime defect the §-pin counts at every door.
                     e2e.clearForSignOut()
-                    scope.launch { SessionStore.clear(nav.context.applicationContext) }
+                    leaveSignedInState()
                     nav.navigate(Routes.WELCOME) { popUpTo(0) { inclusive = true } }
                 },
             )
@@ -1071,9 +1119,9 @@ fun GrapMailNav(
                 onEncryption = { nav.navigate(Routes.E2E_STATUS) },
                 onHelp = { nav.navigate(Routes.MAIL_SUPPORT) },
                 onSignOut = {
-                    com.grapsee.grapmail.ui.screens.security.SecurityFlow.reset()
+                    // Same visible-at-the-door drop as the drawer's sign-out.
                     e2e.clearForSignOut()
-                    scope.launch { SessionStore.clear(nav.context.applicationContext) }
+                    leaveSignedInState()
                     nav.navigate(Routes.WELCOME) { popUpTo(0) { inclusive = true } }
                 },
             )
@@ -1119,6 +1167,7 @@ fun GrapMailNav(
                 onPhone = { nav.navigate(Routes.PHONE_VERIFY) },
                 onAddresses = { nav.navigate(Routes.MAIL_ADDRESSES) },
                 onPrefs = { nav.navigate(Routes.MAIL_PREFS) },
+                onDeleteAccount = { nav.navigate(Routes.SEC_DELETE_ACCOUNT) },
                 onSupport = { nav.navigate(Routes.MAIL_SUPPORT) },
             )
         }
