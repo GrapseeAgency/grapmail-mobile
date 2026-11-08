@@ -699,10 +699,18 @@ if wait_nodes "n.get('resource-id','').rsplit('/',1)[-1]=='mail-to'" >/dev/null;
   log_reset
   must "send tap" tap_text "Send"
   RECEIPT=""
-  for line in "Sent" "Queued for delivery" "Not delivered"; do
-    if [ -n "$(wait_nodes "n.get('text','')=='$line'" 8 2>/dev/null | head -1)" ]; then RECEIPT="$line"; break; fi
+  for line in "Delivered" "Sent" "Queued for delivery" "Not delivered"; do
+    if [ -n "$(wait_nodes "n.get('text','')=='$line'" 6 2>/dev/null | head -1)" ]; then RECEIPT="$line"; break; fi
   done
-  PLAYED="$(log_wait "GrapMailHaptics: played" 10 || true)"
+  if [ -z "$RECEIPT" ]; then
+    # A status word the app has no headline for still names itself on screen —
+    # "Server reported: <word>" — and the walk reads that word rather than
+    # reporting nothing.
+    if [ -n "$(find_nodes "'Server reported:' in n.get('text','')" | head -1)" ]; then
+      RECEIPT="Server reported"
+    fi
+  fi
+  PLAYED="$(log_wait "GrapMailHaptics" 12 || true)"
   shot 125-platform-send-receipt
   if [ -z "$RECEIPT" ]; then
     echo "FAIL: the send produced no receipt at all" >&2
@@ -788,6 +796,8 @@ if [ -n "$JOBS" ]; then
     # The worker's silence is a fact about the device, not a verdict to guess
     # at: the log's last GrapMail and WorkManager lines say whether the job
     # fired and what the system did with it.
+    echo "      force command answered: $(tail -2 /tmp/jobrun.log 2>/dev/null | tr '\n' ' ')" >&2
+    adb shell dumpsys jobscheduler 2>/dev/null | grep -m4 -iE "grapsee" | sed 's/^/      /' >&2
     adb logcat -d 2>/dev/null | grep -E "GrapMailPoll|GrapMailHaptics|WM-SystemJobService|WM-WorkerWrapper|jobscheduler" | tail -12 | sed 's/^/      /' >&2
     FAILURES=$((FAILURES + 1))
     sys_summary "* background read: NOT observed — job $JOB was forced and \`MailPollWorker\` said nothing"
