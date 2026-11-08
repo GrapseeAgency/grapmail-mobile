@@ -695,7 +695,7 @@ must "compose tap" tap_xy "$(wait_nodes "n.get('resource-id','').rsplit('/',1)[-
 if wait_nodes "n.get('resource-id','').rsplit('/',1)[-1]=='mail-to'" >/dev/null; then
   must_type_tag "mail-to" "$HANDLE@grapsee.com"
   must_type_tag "mail-subject" "platform runtime proof"
-  must_type_tag "mail-body-field" "One message, sent by the CI walk, to this account's own address."
+  must_type_tag "mail-body-field" "One message sent by the CI walk to this account own address, to raise the unread count."
   log_reset
   must "send tap" tap_text "Send"
   RECEIPT=""
@@ -785,6 +785,10 @@ if [ -n "$JOBS" ]; then
   BRANCH="$(log_wait "GrapMailPoll" 45 || true)"
   if [ -z "$BRANCH" ]; then
     echo "FAIL: the scheduled job ran and the poll worker never reported a branch" >&2
+    # The worker's silence is a fact about the device, not a verdict to guess
+    # at: the log's last GrapMail and WorkManager lines say whether the job
+    # fired and what the system did with it.
+    adb logcat -d 2>/dev/null | grep -E "GrapMailPoll|GrapMailHaptics|WM-SystemJobService|WM-WorkerWrapper|jobscheduler" | tail -12 | sed 's/^/      /' >&2
     FAILURES=$((FAILURES + 1))
     sys_summary "* background read: NOT observed — job $JOB was forced and \`MailPollWorker\` said nothing"
   else

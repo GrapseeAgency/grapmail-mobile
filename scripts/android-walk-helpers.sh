@@ -463,7 +463,14 @@ type_into_tag() {
   # The device shell splits `input text` on spaces (a sentence body would
   # arrive as its first word only); %s is the documented space escape and the
   # field receives the real spaces back.
-  adb shell input text "${value// /%s}"
+  # The remote command is quoted on the DEVICE shell: the body sentence once
+  # contained an apostrophe, and the unquoted form made /system/bin/sh answer
+  # "no closing quote" — the whole input command failed, the composer stayed
+  # empty, and the send refused a body-less message. Inside the device's own
+  # double quotes the apostrophe is inert, %s keeps meaning space for `input`,
+  # and no value this walk types carries a double quote, a dollar or a
+  # backtick.
+  adb shell "input text \"${value// /%s}\""
   sleep 1
   dismiss_keyboard
   sleep 0.6
