@@ -643,7 +643,7 @@ struct MailSettingsView: View {
                 // A just-granted permission is the last thing push registration
                 // was waiting for; reconcile re-checks the real state and only
                 // then asks the system for a token.
-                Task { @MainActor in NotificationRegistration.shared.reconcile() }
+                Task { @MainActor in await NotificationRegistration.shared.reconcile() }
                 readNotificationStatus()
             }
         case .denied, .authorized, .provisional, .none:
