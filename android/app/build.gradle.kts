@@ -5,9 +5,19 @@ plugins {
     id("org.jetbrains.kotlin.plugin.serialization")
 }
 
+// Local builds remain usable without Firebase; the UI reports push unavailable.
+// Provision this ignored client configuration separately, never a service-account key.
+// The founder's required setup, once the Firebase project exists: create it with the
+// package `com.grapsee.grapmail`, add an Android app, and drop the downloaded
+// `google-services.json` HERE — this file only then applies the plugin, and the
+// pushed new-mail path goes live beside the poll.
+if (file("google-services.json").isFile) {
+    apply(plugin = "com.google.gms.google-services")
+}
+
 android {
     namespace = "com.grapsee.grapmail"
-    compileSdk = 34
+    compileSdk = 36
 
     // The signing identity is a decision the founder owns, not a build detail:
     // a key that ships once cannot be swapped later without every install
@@ -33,7 +43,7 @@ android {
     defaultConfig {
         applicationId = "com.grapsee.grapmail"
         minSdk = 26
-        targetSdk = 34
+        targetSdk = 36
         // Bumped for the mailbox sector. `versionName` is what the release page
         // and `aapt dump badging` are checked against, so the tag and the APK
         // cannot quietly disagree about which build this is. 0.2.1 is the first
@@ -65,8 +75,11 @@ android {
         // proof are in FINDINGS.md). It also carries the §39 runtime leg with
         // its walk-side fixes, and two iOS layout defects the frame audit found
         // (a 520pt sign-in form on a 402pt screen; a stepper wrapping mid-word).
-        versionCode = 8
-        versionName = "0.5.0"
+        // v0.6.0 / versionCode 9: the first release that can be signed with the
+        // founder's distribution key (android.yml resolves CI_KEYSTORE_* secrets
+        // and refuses to label a test-signed file as founder-signed).
+        versionCode = 9
+        versionName = "0.6.0"
         // Real account API — same contract the website uses.
         buildConfigField("String", "API_BASE", "\"https://grapsee.com/api\"")
     }
@@ -119,6 +132,13 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
 
     implementation("androidx.datastore:datastore-preferences:1.1.1")
+    implementation(platform("com.google.firebase:firebase-bom:33.7.0"))
+    implementation("com.google.firebase:firebase-messaging")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.9.0")
+
+    testImplementation("junit:junit:4.13.2")
+    testImplementation("com.squareup.okhttp3:mockwebserver:4.12.0")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.9.0")
 
     // The system splash screen. Without it the window the person sees between
     // tapping the icon and the first composed frame is the system's blank

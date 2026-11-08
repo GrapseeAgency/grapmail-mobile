@@ -1,4 +1,4 @@
-# GrapMail Mobile — v0.5.0
+# GrapMail Mobile — v0.6.0
 
 Native GrapMail apps for Android and iOS. The account & authentication sector
 of the website, ported 1:1 to each platform's native stack — no cross-platform
@@ -471,15 +471,16 @@ can never be posted runs its code perfectly.
   plays it, because a `performHapticFeedback` in a button's `onClick` feels
   identical whether the write worked — the same lie as a banner that says
   "Archived" over mail still in the inbox.
-- **New-mail notifications are polling, and say so.** There is no push service
-  in this backend, so the honest equivalent is `BGAppRefreshTask` / a
-  `WorkManager` periodic read of `GET /stats` — the same call the badge already
-  uses. The line gives both numbers ("3 new messages", "12 unread in the
-  inbox") and never claims delivery: the relay's queue is not the recipient's
-  inbox. It stays silent when nothing can be said — signed out, the read
-  refused, a first read with no previous number to compare against, a count that
-  did not rise. iOS resubmits its next window before doing the work, or the poll
-  stops forever.
+- **New-mail notifications are polling, and say so.** The server can also wake
+  the device now (push registration contract in `DATA-FLOW.md`), but the
+  honest equivalent — `BGAppRefreshTask` / a `WorkManager` periodic read of
+  `GET /stats` — stays as the fallback, and even a push wake lands in the same
+  read-and-compare the poll makes. The line gives both numbers ("3 new
+  messages", "12 unread in the inbox") and never claims delivery: the relay's
+  queue is not the recipient's inbox. It stays silent when nothing can be
+  said — signed out, the read refused, a first read with no previous number to
+  compare against, a count that did not rise. iOS resubmits its next window
+  before doing the work, or the poll stops forever.
 - **The permission is asked for, checked, and never assumed.** Both platforms
   put the ask on a Settings row that reports the system's real answer rather
   than a remembered one, and the poster re-checks the grant before posting.
@@ -499,9 +500,11 @@ can never be posted runs its code perfectly.
   `apple-app-site-association` both answer **404** today, so there is no
   `autoVerify` intent filter and no `associated-domains` entitlement — a deep
   link whose verification file is missing does not degrade, it silently stops
-  opening the app, and the app looks broken where nobody can debug it. And no
-  push: no `remote-notification` background mode, no FCM dependency. Both
-  absences are pinned, so a half-verified surface cannot be added by accident.
+  opening the app, and the app looks broken where nobody can debug it. (Push
+  used to sit in this list too; it shipped against the backend's registration
+  contract — see `DATA-FLOW.md` — and stays silent until the founder
+  provisions the Firebase project and drops `android/app/google-services.json`,
+  after which the poll remains the fallback either way.)
 
 ### Which backend, and the two halves of it
 

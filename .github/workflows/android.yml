@@ -221,17 +221,91 @@ jobs:
       # one on the Releases page made the page say something false about the file
       # next to it. This job builds the release variant: R8, resource shrinking,
       # no debug flag.
+
+      # ── the signing identity, resolved before anything is built ──────────────
+      #
+      # Two possible signers, and the release page must name the one that was
+      # actually used:
+      #
+      #   1. The founder's distribution key, as repository secrets:
+      #      CI_KEYSTORE_FILE (the .jks, base64-encoded), CI_KEYSTORE_PASSWORD,
+      #      CI_KEYSTORE_ALIAS. When all three exist the key is decoded, VERIFIED
+      #      (a bad paste must refuse the build, not silently fall back to the
+      #      ephemeral key — a release page that says founder-signed over a
+      #      test-signed file is the lie this whole section exists to prevent),
+      #      and exported for the build step below. Nothing in
+      #      build.gradle.kts changes: it reads CI_KEYSTORE_* from the
+      #      environment and has since the signing block was written.
+      #   2. The ephemeral CI key, generated inside the build step exactly as
+      #      before — used once, never stored, honestly labelled test-signed.
+      #
+      # The password is never echoed: it travels through `env:` (GitHub masks
+      # registered secrets) with an explicit ::add-mask belt-and-braces, and
+      # every keytool call reads it with `-storepass:env`, so it never appears
+      # in a process list or a log line.
+      - name: Resolve the distribution key
+        id: signing
+        env:
+          FOUNDER_KEY_B64: ${{ secrets.CI_KEYSTORE_FILE }}
+          FOUNDER_KEY_PASSWORD: ${{ secrets.CI_KEYSTORE_PASSWORD }}
+          FOUNDER_KEY_ALIAS: ${{ secrets.CI_KEYSTORE_ALIAS }}
+        run: |
+          set -eu
+          if [ -n "$FOUNDER_KEY_B64" ]; then
+            echo "::add-mask::$FOUNDER_KEY_PASSWORD"
+            echo "::add-mask::$FOUNDER_KEY_B64"
+            base64 -d > /tmp/founder-release.keystore <<< "$FOUNDER_KEY_B64"
+            # The verification is the point: the decoded file must open with
+            # the password AND contain the alias, or the job stops here.
+            if ! keytool -list -keystore /tmp/founder-release.keystore \
+                 -storepass:env FOUNDER_KEY_PASSWORD -alias "$FOUNDER_KEY_ALIAS" > /tmp/ks-verify.txt 2>&1; then
+              echo "::error::CI_KEYSTORE_* secrets were set but do not open as a keystore/alias pair."
+              echo "::error::Refusing to build with the ephemeral key instead: a release page"
+              echo "::error::that says founder-signed must be founder-signed."
+              sed -n '1,8p' /tmp/ks-verify.txt >&2
+              exit 1
+            fi
+            echo "CI_KEYSTORE_FILE=/tmp/founder-release.keystore" >> "$GITHUB_ENV"
+            echo "CI_KEYSTORE_PASSWORD=$FOUNDER_KEY_PASSWORD" >> "$GITHUB_ENV"
+            echo "CI_KEYSTORE_ALIAS=$FOUNDER_KEY_ALIAS" >> "$GITHUB_ENV"
+            {
+              echo 'label<<EOF_SIGNING'
+              echo 'Signed with **the founder'"'"'s distribution key** (repository secrets'
+              echo '`CI_KEYSTORE_FILE` / `CI_KEYSTORE_PASSWORD` / `CI_KEYSTORE_ALIAS`), verified as'
+              echo 'an openable keystore/alias pair before the build ran. Updates signed the same'
+              echo 'way install over this build.'
+              echo 'EOF_SIGNING'
+            } >> "$GITHUB_OUTPUT"
+          else
+            {
+              echo 'label<<EOF_SIGNING'
+              echo 'Signed with an **ephemeral CI key generated for this job and discarded after'
+              echo 'it** (test-signed). That makes the APK installable and verifiable, but it is'
+              echo 'not the product'"'"'s signing identity: an update signed with a different key'
+              echo 'cannot be installed over this one. To make this the real distribution'
+              echo 'artifact, add the founder'"'"'s keystore as repository secrets'
+              echo '(`CI_KEYSTORE_FILE` base64-encoded, plus `CI_KEYSTORE_PASSWORD` and'
+              echo '`CI_KEYSTORE_ALIAS`); the Gradle block already reads exactly those three.'
+              echo 'EOF_SIGNING'
+            } >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Build the release APK
         working-directory: android
         run: |
           chmod +x gradlew
+          if [ -n "${CI_KEYSTORE_FILE:-}" ]; then
+            # The founder's key arrived through the job environment from the
+            # resolve step. Nothing is generated here: the identity that signs
+            # this build must be the one the release page names.
+            echo "Signing with the resolved distribution key (alias: $CI_KEYSTORE_ALIAS)"
+          else
           # Ephemeral signing identity: generated here, used once, never stored —
           # the private half is left on a runner that is about to be destroyed.
-          # The founder's distribution key goes into CI_KEYSTORE_FILE/PASSWORD/ALIAS
-          # as repository secrets and nothing in build.gradle.kts changes; until it
-          # exists, the release page says the APK is test-signed, because a build
-          # that cannot be updated over a different key is a decision, and it should
-          # not be made silently by a CI file.
+          # Reached only when the founder's secrets are absent, so the release
+          # page says the APK is test-signed, because a build that cannot be
+          # updated over a different key is a decision, and it should not be
+          # made silently by a CI file.
           KS=/tmp/ci-release.keystore
           PW=$(openssl rand -hex 24)
           export CI_KEYSTORE_PASSWORD="$PW"
@@ -256,6 +330,7 @@ jobs:
           export CI_KEYSTORE_FILE="$KS"
           export CI_KEYSTORE_PASSWORD="$PW"
           export CI_KEYSTORE_ALIAS=grapmail-ci
+          fi
           ./gradlew assembleRelease bundleRelease --no-daemon
           ls -la app/build/outputs/apk/release/
           ls -la app/build/outputs/bundle/release/
@@ -406,13 +481,7 @@ jobs:
 
             ## Signing — read this before distributing
 
-            Signed with an **ephemeral CI key generated for this job and discarded after
-            it**. That makes the APK installable and verifiable, but it is not the
-            product's signing identity: an update signed with a different key cannot be
-            installed over this one. To make this the real distribution artifact, add the
-            founder's keystore as repository secrets (`CI_KEYSTORE_FILE` pointing at the
-            decoded file, plus `CI_KEYSTORE_PASSWORD` and `CI_KEYSTORE_ALIAS`); the Gradle
-            block already reads exactly those three and nothing else needs to change.
+            ${{ steps.signing.outputs.label }}
 
             ## Sector in this build
 
