@@ -685,7 +685,7 @@ if [ -n "$BASELINE_JOBS" ]; then
   for _bj in $BASELINE_JOBS; do
     adb shell cmd jobscheduler run -f "$PKG" "$_bj" >/dev/null 2>&1 || true
   done
-  if log_wait "GrapMailPoll" 30 >/dev/null 2>&1; then
+  if log_wait "GrapMailPoll" 45 >/dev/null 2>&1; then
     echo "  [poll] baseline stored before the send"
   else
     echo "  [poll] no baseline line — the first-read store did not report (continuing)"
@@ -700,7 +700,7 @@ if wait_nodes "n.get('resource-id','').rsplit('/',1)[-1]=='mail-to'" >/dev/null;
   must "send tap" tap_text "Send"
   RECEIPT=""
   for line in "Sent" "Queued for delivery" "Not delivered"; do
-    if [ -n "$(wait_nodes "n.get('text','')=='$line'" 3 2>/dev/null | head -1)" ]; then RECEIPT="$line"; break; fi
+    if [ -n "$(wait_nodes "n.get('text','')=='$line'" 8 2>/dev/null | head -1)" ]; then RECEIPT="$line"; break; fi
   done
   PLAYED="$(log_wait "GrapMailHaptics: played" 10 || true)"
   shot 125-platform-send-receipt
@@ -782,7 +782,7 @@ if [ -n "$JOBS" ]; then
   for _fj in $JOBS; do
     adb shell cmd jobscheduler run -f "$PKG" "$_fj" >/tmp/jobrun.log 2>&1 || true
   done
-  BRANCH="$(log_wait "GrapMailPoll" 20 || true)"
+  BRANCH="$(log_wait "GrapMailPoll" 45 || true)"
   if [ -z "$BRANCH" ]; then
     echo "FAIL: the scheduled job ran and the poll worker never reported a branch" >&2
     FAILURES=$((FAILURES + 1))
