@@ -290,6 +290,26 @@ jobs:
             } >> "$GITHUB_OUTPUT"
           fi
 
+      # Optional Firebase client config. When the founder adds
+      # CI_GOOGLE_SERVICES_JSON (the google-services.json, base64), it lands in
+      # android/app/ and the google-services plugin applies itself — the Gradle
+      # file checks for the file's existence, so a build without it stays a
+      # build without Firebase and the app falls back to polling, honestly.
+      # The file is gitignored; this is the only way it travels.
+      - name: Resolve the Firebase client config (optional)
+        env:
+          GOOGLE_SERVICES_B64: ${{ secrets.CI_GOOGLE_SERVICES_JSON }}
+        run: |
+          if [ -n "$GOOGLE_SERVICES_B64" ]; then
+            echo "::add-mask::$GOOGLE_SERVICES_B64"
+            base64 -d > android/app/google-services.json <<< "$GOOGLE_SERVICES_B64"
+            python3 -c "import json,sys; json.load(open('android/app/google-services.json'))" \
+              || { echo "::error::CI_GOOGLE_SERVICES_JSON is not valid JSON"; exit 1; }
+            echo "google-services.json resolved — this build carries Firebase push"
+          else
+            echo "no CI_GOOGLE_SERVICES_JSON — this build polls only (push disabled, honestly)"
+          fi
+
       - name: Build the release APK
         working-directory: android
         run: |
