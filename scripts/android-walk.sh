@@ -542,17 +542,23 @@ poll_job_ids() {
   PKG="$PKG" python3 - <<'PY'
 import os, re
 pkg = os.environ["PKG"]
-text = open("/tmp/jobs.txt", encoding="utf-8", errors="ignore").read()
-pats = (r"tag=\*job\*/[^\s]*" + re.escape(pkg) + r"[^\s]*#(\d+)",
-        r"[Jj][Oo][Bb]\{(\d+) @ [^\n]{0,200}" + re.escape(pkg),
-        r"[Jj][Oo][Bb]\s*#u\d+a\d+/(\d+):[^\n]{0,200}" + re.escape(pkg),
-        r"u\d+a\d+\s+(\d+)[^\n]{0,200}" + re.escape(pkg),
-        r"^\s*(\d+)\s*:\s*\{[^}]{0,200}" + re.escape(pkg))
 ids = []
-for pat in pats:
-    for m in re.finditer(pat, text, re.M):
-        if m.group(1) not in ids:
-            ids.append(m.group(1))
+def keep(n):
+    if n and n not in ids:
+        ids.append(n)
+# Line-based, not one mega-regex: dumpsys jobscheduler shifts its record shape
+# across API levels, but a line that names the package always carries the id in
+# one of three stable places — the #u<user>a<app>/<id> JobInfo reference, the
+# WorkManager tag .../<service>#<id>, or a {id @ ...} record header.
+for line in open("/tmp/jobs.txt", encoding="utf-8", errors="ignore"):
+    if pkg not in line:
+        continue
+    for m in re.finditer(r'#u\d+a\d+/(\d+)', line):
+        keep(m.group(1))
+    for m in re.finditer(r'tag=\*job\*/\S*' + re.escape(pkg) + r'\S*?#(\d+)', line):
+        keep(m.group(1))
+    for m in re.finditer(r'\{(\d+) @ ', line):
+        keep(m.group(1))
 print("\n".join(ids))
 PY
 }
@@ -757,6 +763,18 @@ if [ -n "$(wait_overlay "n.get('text','')=='Mail settings'" 2>/dev/null | head -
   must "mail settings tap" tap_text "Mail settings"
 fi
 NOTIFY_ROW="n.get('text','')=='New mail notifications'"
+# The prefs screen is a scrolling list and the row sits below the fold: a
+# uiautomator dump only holds composed nodes, so the walk scrolls the way a
+# person does until the row composes, bounded so a missing row still fails
+# with its own message.
+SCR_W="$(adb shell wm size 2>/dev/null | grep -oE '[0-9]+x[0-9]+' | cut -dx -f1)"
+SCR_H="$(adb shell wm size 2>/dev/null | grep -oE '[0-9]+x[0-9]+' | cut -dx -f2)"
+SCR_W="${SCR_W:-1080}"; SCR_H="${SCR_H:-2000}"
+for _ in 1 2 3 4 5; do
+  [ -n "$(wait_overlay "$NOTIFY_ROW" 2>/dev/null | head -1)" ] && break
+  adb shell input swipe "$((SCR_W / 2))" "$((SCR_H * 72 / 100))" "$((SCR_W / 2))" "$((SCR_H * 30 / 100))" 300
+  sleep 1
+done
 if [ -z "$(wait_overlay "$NOTIFY_ROW" 2>/dev/null | head -1)" ]; then
   echo "FAIL: the settings screen shows no new-mail row" >&2
   FAILURES=$((FAILURES + 1))
