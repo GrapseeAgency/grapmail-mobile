@@ -249,6 +249,12 @@ wait_nodes() { # wait_nodes <filter> [count] → prints first match.
       echo "  [anr] system dialog persisting through 6 recoveries — searching on" >&2
     fi
     n=$((n + 1))
+    # A shade that drifted down over the app makes every predicate false at once
+    # and never leaves on its own — relaunching the activity under it changes
+    # nothing. Collapse it on a cadence, unconditionally: collapsing a closed
+    # shade is a no-op, and the spellings that would let this ask first move
+    # between Android versions.
+    if [ $((n % 5)) -eq 0 ]; then collapse_shade; ensure_foreground; fi
     # scroll down while searching; once pinned at the bottom, rewind to the
     # top so the next sweep re-scans from the start
     if [ $((n % 8)) -eq 0 ]; then scroll_to_top; elif [ $((n % 3)) -eq 0 ]; then scroll_up; fi
@@ -273,11 +279,15 @@ wait_nodes() { # wait_nodes <filter> [count] → prints first match.
 # Use this for sheets, dialogs and the drawer. It still retries, so a slow
 # transition is not a failure.
 wait_overlay() {
-  local want="${2:-1}" pos=""
+  local want="${2:-1}" pos="" n=0
   for _ in $(seq 1 20); do
     pos="$(find_nodes "$1" | head -"$want" | tail -1)"
     [ -n "$pos" ] && { echo "$pos"; return 0; }
     anr_in_view && { dismiss_anr; ensure_foreground; }
+    n=$((n + 1))
+    # Same shade poison as wait_nodes: an overlay wait must also collapse the
+    # shade on a cadence or a drifted-down shade fails every remaining leg.
+    if [ $((n % 5)) -eq 0 ]; then collapse_shade; ensure_foreground; fi
     sleep 1
   done
   echo "TIMEOUT (overlay): $1" >&2
