@@ -543,7 +543,8 @@ poll_job_ids() {
 import os, re
 pkg = os.environ["PKG"]
 text = open("/tmp/jobs.txt", encoding="utf-8", errors="ignore").read()
-pats = (r"[Jj][Oo][Bb]\{(\d+) @ [^\n]{0,200}" + re.escape(pkg),
+pats = (r"tag=\*job\*/[^\s]*" + re.escape(pkg) + r"[^\s]*#(\d+)",
+        r"[Jj][Oo][Bb]\{(\d+) @ [^\n]{0,200}" + re.escape(pkg),
         r"[Jj][Oo][Bb]\s*#u\d+a\d+/(\d+):[^\n]{0,200}" + re.escape(pkg),
         r"u\d+a\d+\s+(\d+)[^\n]{0,200}" + re.escape(pkg),
         r"^\s*(\d+)\s*:\s*\{[^}]{0,200}" + re.escape(pkg))
@@ -748,6 +749,13 @@ must "home before settings" wait_nodes "n.get('resource-id','').rsplit('/',1)[-1
 must "drawer for settings" tap_xy "$(wait_nodes "n.get('resource-id','').rsplit('/',1)[-1]=='mail-menu'" | head -1)"
 must "settings row" wait_overlay "n.get('resource-id','').rsplit('/',1)[-1]=='mail-drawer-Settings'" >/dev/null
 must "settings tap" tap_xy "$(wait_overlay "n.get('resource-id','').rsplit('/',1)[-1]=='mail-drawer-Settings'" | head -1)"
+# Since the mailbox sector the settings screen is a hub: the notification row
+# lives on the "Mail settings" page, one tap deeper than the pre-hub layout.
+# The walk follows the taps a person makes, with the old direct layout kept as
+# the fallback so either shape proves the row.
+if [ -n "$(wait_overlay "n.get('text','')=='Mail settings'" 2>/dev/null | head -1)" ]; then
+  must "mail settings tap" tap_text "Mail settings"
+fi
 NOTIFY_ROW="n.get('text','')=='New mail notifications'"
 if [ -z "$(wait_overlay "$NOTIFY_ROW" 2>/dev/null | head -1)" ]; then
   echo "FAIL: the settings screen shows no new-mail row" >&2
