@@ -755,22 +755,17 @@ must "home before settings" wait_nodes "n.get('resource-id','').rsplit('/',1)[-1
 must "drawer for settings" tap_xy "$(wait_nodes "n.get('resource-id','').rsplit('/',1)[-1]=='mail-menu'" | head -1)"
 must "settings row" wait_overlay "n.get('resource-id','').rsplit('/',1)[-1]=='mail-drawer-Settings'" >/dev/null
 must "settings tap" tap_xy "$(wait_overlay "n.get('resource-id','').rsplit('/',1)[-1]=='mail-drawer-Settings'" | head -1)"
-# Since the mailbox sector the settings screen is a hub: the notification row
-# lives on the "Mail settings" page, one tap deeper than the pre-hub layout.
-# The walk follows the taps a person makes, with the old direct layout kept as
-# the fallback so either shape proves the row.
-if [ -n "$(wait_overlay "n.get('text','')=='Mail settings'" 2>/dev/null | head -1)" ]; then
-  must "mail settings tap" tap_text "Mail settings"
-fi
+# The drawer's Settings opens the settings hub (MailSettingsScreen), and the
+# notification row sits at the BOTTOM of its long scrolling column — below
+# Account security, Screener, Labels, Mail settings, Addresses, Connected
+# accounts. A uiautomator dump only holds composed nodes, so the walk scrolls
+# the way a person does until the row composes, bounded so a missing row still
+# fails with its own message.
 NOTIFY_ROW="n.get('text','')=='New mail notifications'"
-# The prefs screen is a scrolling list and the row sits below the fold: a
-# uiautomator dump only holds composed nodes, so the walk scrolls the way a
-# person does until the row composes, bounded so a missing row still fails
-# with its own message.
 SCR_W="$(adb shell wm size 2>/dev/null | grep -oE '[0-9]+x[0-9]+' | cut -dx -f1)"
 SCR_H="$(adb shell wm size 2>/dev/null | grep -oE '[0-9]+x[0-9]+' | cut -dx -f2)"
 SCR_W="${SCR_W:-1080}"; SCR_H="${SCR_H:-2000}"
-for _ in 1 2 3 4 5; do
+for _ in 1 2 3 4 5 6 7 8; do
   [ -n "$(wait_overlay "$NOTIFY_ROW" 2>/dev/null | head -1)" ] && break
   adb shell input swipe "$((SCR_W / 2))" "$((SCR_H * 72 / 100))" "$((SCR_W / 2))" "$((SCR_H * 30 / 100))" 300
   sleep 1
@@ -825,6 +820,9 @@ if [ -n "$JOBS" ]; then
     echo "      force command answered: $(tail -2 /tmp/jobrun.log 2>/dev/null | tr '\n' ' ')" >&2
     adb shell dumpsys jobscheduler 2>/dev/null | grep -m4 -iE "grapsee" | sed 's/^/      /' >&2
     adb logcat -d 2>/dev/null | grep -E "GrapMailPoll|GrapMailHaptics|WM-SystemJobService|WM-WorkerWrapper|jobscheduler" | tail -12 | sed 's/^/      /' >&2
+    # The raw job store travels with the artifacts: a parse that captured the
+    # wrong id is settled by reading the dump, not by guessing formats.
+    cp /tmp/jobs.txt "$SCREEN_DIR/jobsdump.txt" 2>/dev/null || true
     FAILURES=$((FAILURES + 1))
     sys_summary "* background read: NOT observed — job $JOB was forced and \`MailPollWorker\` said nothing"
   else
