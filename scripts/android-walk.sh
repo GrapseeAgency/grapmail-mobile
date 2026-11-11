@@ -1074,7 +1074,14 @@ for spec in "two-factor-on:40-sec-two-factor-on" \
   # to break. Accepting both keeps one mechanism instead of two divergent ones.
   marker() { find_nodes "n.get('text','')=='$1' or n.get('resource-id','').rsplit('/',1)[-1]=='$1'" | head -1; }
   if [ -n "$settled" ] && [ -z "$(marker "$settled")" ]; then
-    sleep 4   # one retry: the fetch may still be in flight
+    # Bounded retries, not one: the snapshot activity cold-starts into a host
+    # that has been alive for half an hour, and a compose + fetch pass can
+    # legitimately miss a 4s window. Five retries ≈ 25s of patience; past that
+    # the screen genuinely did not settle and the failure is real.
+    for _ in 1 2 3 4 5; do
+      sleep 4
+      [ -n "$(marker "$settled")" ] && break
+    done
     if [ -z "$(marker "$settled")" ]; then
       echo "FAIL: snapshot '$nm' never finished loading" >&2; FAILURES=$((FAILURES + 1))
     fi
