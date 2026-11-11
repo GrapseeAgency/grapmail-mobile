@@ -84,7 +84,9 @@ object Notifications {
         if (!allowed(context)) return false
         ensureChannel(context)
         val content = NotificationCompat.Builder(context, CHANNEL_NEW_MAIL)
-            .setSmallIcon(R.drawable.splash_logo)
+            // The small icon is a monochrome alpha silhouette — the platform tints it;
+            // the full-color mark only ever appears on the launcher and the splash.
+            .setSmallIcon(R.mipmap.ic_launcher_monochrome)
             .setContentTitle("$grew new message" + (if (grew == 1) "" else "s"))
             .setContentText("$total unread in the inbox")
             .setStyle(androidx.core.app.NotificationCompat.InboxStyle()
@@ -113,7 +115,9 @@ object Notifications {
         if (!allowed(context)) return false
         ensureChannel(context)
         val content = NotificationCompat.Builder(context, CHANNEL_NEW_MAIL)
-            .setSmallIcon(R.drawable.splash_logo)
+            // The small icon is a monochrome alpha silhouette — the platform tints it;
+            // the full-color mark only ever appears on the launcher and the splash.
+            .setSmallIcon(R.mipmap.ic_launcher_monochrome)
             .setContentTitle("New mail")
             .setContentText(if (address.isNullOrBlank()) "A new-mail signal arrived for this account."
             else "A new-mail signal arrived for $address.")

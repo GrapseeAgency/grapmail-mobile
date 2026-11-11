@@ -58,19 +58,23 @@ fun LaunchSplash(onFinished: () -> Unit) {
             .fillMaxSize()
             .background(Color(0xFF1A6DF0)),
     ) {
+        // The real mark, at the scale Gmail shows its M: ~15% of the width,
+        // dead center — the system splash (Android 12+) has already shown the
+        // launcher icon; this continues the same picture in-app.
         Image(
-            painter = painterResource(R.drawable.splash_logo),
+            painter = painterResource(R.drawable.grapmail_launch_logo),
             contentDescription = null,
             modifier = Modifier
                 .align(Alignment.Center)
-                .size(148.dp),
+                .size(112.dp),
         )
+        // The branded element lives in the official bottom zone (200x80dp):
+        // small, quiet, at the bottom edge — never a centerpiece.
         GrapseeShimmer(
             Modifier
                 .align(Alignment.BottomCenter)
-                .padding(bottom = 72.dp)
-                .fillMaxWidth()
-                .height(56.dp),
+                .padding(bottom = 48.dp)
+                .size(width = 190.dp, height = 30.dp),
         )
     }
 }

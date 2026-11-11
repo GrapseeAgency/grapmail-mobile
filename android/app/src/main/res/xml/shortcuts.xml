@@ -18,7 +18,7 @@
     <shortcut
         android:shortcutId="compose"
         android:enabled="true"
-        android:icon="@drawable/splash_logo"
+        android:icon="@mipmap/ic_launcher"
         android:shortcutShortLabel="@string/shortcut_compose_short"
         android:shortcutLongLabel="@string/shortcut_compose_long">
         <intent

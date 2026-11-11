@@ -2573,9 +2573,13 @@ pin("no UI screen reads an illustration raster anymore",
     and "Artwork(" in code_only(KT_UI_ALL)
     and ("Art.view(" in code_only(SW_UI_ALL) or "Art.fill(" in code_only(SW_UI_ALL)))
 
-pin("the illustration mapper and its raster assets are gone, not shadowed",
+# drawable-nodpi holds exactly one file now: the brand's launch logo (the real
+# mark, bundled as a bitmap because the 3D artwork cannot be a hand vector).
+# Anything else appearing there is the old illustration pipeline coming back.
+pin("the illustration mapper is gone; drawable-nodpi carries only the launch logo",
     not (ROOT / "android/app/src/main/java/com/grapsee/grapmail/ui/components/IllRes.kt").exists()
-    and not (ROOT / "android/app/src/main/res/drawable-nodpi").exists()
+    and sorted(f.name for f in (ROOT / "android/app/src/main/res/drawable-nodpi").glob("*"))
+        == ["grapmail_launch_logo.png"]
     and not list((ROOT / "ios/GrapMail/Assets.xcassets").glob("ill_*.imageset"))
     and not list((ROOT / "ios/GrapMail/Assets.xcassets").glob("puzzle_photo.imageset")))
 
@@ -3032,7 +3036,7 @@ pin("Android's splash theme is installed before the window content exists",
     'androidx.core:core-splashscreen' in KT_GRADLE
     and "Theme.GrapMail.Splash" in (ROOT / "android/app/src/main/res/values/themes.xml")
         .read_text(encoding="utf-8")
-    and "@drawable/splash_logo" in (ROOT / "android/app/src/main/res/values/themes.xml")
+    and 'windowSplashScreenAnimatedIcon">@mipmap/ic_launcher' in (ROOT / "android/app/src/main/res/values/themes.xml")
         .read_text(encoding="utf-8")
     and "androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen" in code_only(KT_MAIN)
     # The order is the whole rule: installed after `super.onCreate`, the system
@@ -3069,9 +3073,10 @@ pin("the new logo is the launcher on every density, themed, round, iOS and splas
     and 'android:roundIcon="@mipmap/ic_launcher"' in KT_MANIFEST
     and (ICON_SET / "AppIcon-1024.png").exists()
     and (ICON_SET / "AppIcon-1024.png").stat().st_size > 40000
-    and (ROOT / "android/app/src/main/res/drawable/splash_logo.xml").exists()
-    and "<vector" in (ROOT / "android/app/src/main/res/drawable/splash_logo.xml")
+    and "@mipmap/ic_launcher" in (ROOT / "android/app/src/main/res/values/themes.xml")
         .read_text(encoding="utf-8")
+    and not (ROOT / "android/app/src/main/res/drawable/splash_logo.xml").exists()
+    and (ROOT / "android/app/src/main/res/drawable-nodpi/grapmail_launch_logo.png").exists()
     and _debug_src.exists()
     and (_debug_src / "java/com/grapsee/grapmail/DebugPollReceiver.kt").exists()
     and (_debug_src / "AndroidManifest.xml").exists()

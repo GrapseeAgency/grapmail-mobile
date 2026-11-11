@@ -14,10 +14,10 @@ struct LaunchSplashView: View {
             Image("LaunchBrand")
                 .resizable()
                 .scaledToFit()
-                .frame(width: 132, height: 130)
+                .frame(width: 112, height: 112)
             GrapseeShimmer()
-                .frame(maxWidth: 260, maxHeight: 52)
-                .padding(.bottom, 64)
+                .frame(width: 190, height: 30)
+                .padding(.bottom, 48)
                 .frame(maxHeight: .infinity, alignment: .bottom)
         }
         .ignoresSafeArea()
