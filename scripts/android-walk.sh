@@ -801,74 +801,84 @@ sleep 1
 # Not the app calling its own worker: the system's job scheduler running the job
 # it holds for this package, which is the same entry point the 30-minute schedule
 # uses. What the worker then decides is read out of its own log line.
-JOBS="$(poll_job_ids)"
-JOB="$(echo "$JOBS" | head -1)"
-if [ -n "$JOBS" ]; then
-  # Re-ask HERE, not minutes earlier: the id set can change when the process
-  # restarts. Force EVERY id the system now holds — a stale id is refused
-  # harmlessly, and the worker speaks if any of them is the poll.
-  log_reset
-  for _fj in $JOBS; do
-    adb shell cmd jobscheduler run -f "$PKG" "$_fj" >/tmp/jobrun.log 2>&1 || true
-  done
-  BRANCH="$(log_wait "GrapMailPoll" 45 || true)"
-  if [ -z "$BRANCH" ]; then
-    echo "FAIL: the scheduled job ran and the poll worker never reported a branch" >&2
-    # The worker's silence is a fact about the device, not a verdict to guess
-    # at: the log's last GrapMail and WorkManager lines say whether the job
-    # fired and what the system did with it.
-    echo "      force command answered: $(tail -2 /tmp/jobrun.log 2>/dev/null | tr '\n' ' ')" >&2
-    adb shell dumpsys jobscheduler 2>/dev/null | grep -m4 -iE "grapsee" | sed 's/^/      /' >&2
-    adb logcat -d 2>/dev/null | grep -E "GrapMailPoll|GrapMailHaptics|WM-SystemJobService|WM-WorkerWrapper|jobscheduler" | tail -12 | sed 's/^/      /' >&2
-    # The raw job store travels with the artifacts: a parse that captured the
-    # wrong id is settled by reading the dump, not by guessing formats.
-    cp /tmp/jobs.txt "$SCREEN_DIR/jobsdump.txt" 2>/dev/null || true
-    FAILURES=$((FAILURES + 1))
-    sys_summary "* background read: NOT observed — job $JOB was forced and \`MailPollWorker\` said nothing"
-  else
-    echo "  [poll] $BRANCH"
-    case "$BRANCH" in
-      *announced*)
-        # The post, asked of the notification manager rather than trusted from
-        # the call that made it.
-        adb shell dumpsys notification --noredact 2>/dev/null > /tmp/notif2.txt || true
-        if grep -q "NotificationRecord.*$PKG" /tmp/notif2.txt; then
-          must "expand the shade" adb shell cmd statusbar expand-notifications
-          sleep 2
-          if [ -n "$(find_nodes "'new message' in n.get('text','')" | head -1)" ]; then
-            shot 124-platform-notify-shade
-            echo "  [notification] the shade shows the posted new-mail line"
-            sys_summary "* new-mail notification: **observed** — the system ran the job, the read rose, and the shade drew the posted line"
-          else
-            echo "FAIL: the notification was posted but the shade does not show it" >&2
-            FAILURES=$((FAILURES + 1))
-          fi
-          adb shell cmd statusbar collapse-notifications >/dev/null 2>&1 || true
-        else
-          echo "FAIL: the poll announced a rise and the notification manager holds no record for $PKG" >&2
-          FAILURES=$((FAILURES + 1))
-        fi ;;
-      *"first-read"*)
-        # The first run of the worker stores the count it will compare against;
-        # there is no previous count, so nothing can be announced. Naming that
-        # here is the difference between "the notification did not happen" and
-        # "the notification was never due".
-        sys_summary "* new-mail notification: **not due** — the job's first run stores the baseline it compares against, so nothing could be announced this cycle"
-        ;;
-      *"no-rise"*)
-        sys_summary "* new-mail notification: **not due** — the unread count did not rise, so nothing arrived this cycle"
-        ;;
-      *"read-refused"*)
-        # The worker ran, the read was refused by the server, and nothing was
-        # claimed. The walk does not fail an app for a server's answer — but it
-        # will not let the run imply the notification was proven either.
-        echo "  [notification] not provable this run: $(printf '%s' "$BRANCH" | sed 's/.*GrapMailPoll *: //')"
-        sys_summary "* new-mail notification: **not observed** — the system ran the job and \`GET /stats\` was refused ($(printf '%s' "$BRANCH" | sed 's/.*status=//')). The poll stayed silent, which is the correct branch; see PLATFORM-RUNTIME.md." ;;
-      *)
-        sys_summary "* background read: **observed** — the system ran job $JOB and the worker reported \`$(printf '%s' "$BRANCH" | sed 's/.*GrapMailPoll *: //')\`"
-        ;;
-    esac
+#
+# The JobInfo id is not stable across a run: WorkManager re-registers the
+# periodic work when the app's process is recreated, and the id observed at §1
+# can be gone by §7 while a new one sits in the store. So the capture → force →
+# wait cycle runs three rounds, re-asking the system for the CURRENT id set each
+# time, and the worker's own log line decides. Stale ids are refused harmlessly.
+BRANCH=""
+JOB="none"
+for _round in 1 2 3; do
+  JOBS="$(poll_job_ids)"
+  [ -z "$JOB" ] || [ "$JOB" = "none" ] && JOB="$(echo "$JOBS" | head -1)"
+  if [ -n "$JOBS" ]; then
+    log_reset
+    for _fj in $JOBS; do
+      adb shell cmd jobscheduler run -f "$PKG" "$_fj" >>/tmp/jobrun.log 2>&1 || true
+    done
+    BRANCH="$(log_wait "GrapMailPoll" 20 || true)"
+    [ -n "$BRANCH" ] && break
   fi
+  echo "  [poll] round $_round: ids were '$(echo $JOBS | tr '\n' ' ')' — no branch yet; re-asking the system"
+  sleep 5
+done
+if [ -n "$BRANCH" ]; then
+  echo "  [poll] $BRANCH"
+  case "$BRANCH" in
+    *announced*)
+      # The post, asked of the notification manager rather than trusted from
+      # the call that made it.
+      adb shell dumpsys notification --noredact 2>/dev/null > /tmp/notif2.txt || true
+      if grep -q "NotificationRecord.*$PKG" /tmp/notif2.txt; then
+        must "expand the shade" adb shell cmd statusbar expand-notifications
+        sleep 2
+        if [ -n "$(find_nodes "'new message' in n.get('text','')" | head -1)" ]; then
+          shot 124-platform-notify-shade
+          echo "  [notification] the shade shows the posted new-mail line"
+          sys_summary "* new-mail notification: **observed** — the system ran the job, the read rose, and the shade drew the posted line"
+        else
+          echo "FAIL: the notification was posted but the shade does not show it" >&2
+          FAILURES=$((FAILURES + 1))
+        fi
+        adb shell cmd statusbar collapse-notifications >/dev/null 2>&1 || true
+      else
+        echo "FAIL: the poll announced a rise and the notification manager holds no record for $PKG" >&2
+        FAILURES=$((FAILURES + 1))
+      fi ;;
+    *"first-read"*)
+      # The first run of the worker stores the count it will compare against;
+      # there is no previous count, so nothing can be announced. Naming that
+      # here is the difference between "the notification did not happen" and
+      # "the notification was never due".
+      sys_summary "* new-mail notification: **not due** — the job's first run stores the baseline it compares against, so nothing could be announced this cycle"
+      ;;
+    *"no-rise"*)
+      sys_summary "* new-mail notification: **not due** — the unread count did not rise, so nothing arrived this cycle"
+      ;;
+    *"read-refused"*)
+      # The worker ran, the read was refused by the server, and nothing was
+      # claimed. The walk does not fail an app for a server's answer — but it
+      # will not let the run imply the notification was proven either.
+      echo "  [notification] not provable this run: $(printf '%s' "$BRANCH" | sed 's/.*GrapMailPoll *: //')"
+      sys_summary "* new-mail notification: **not observed** — the system ran the job and \`GET /stats\` was refused ($(printf '%s' "$BRANCH" | sed 's/.*status=//')). The poll stayed silent, which is the correct branch; see PLATFORM-RUNTIME.md." ;;
+    *)
+      sys_summary "* background read: **observed** — the system ran job $JOB and the worker reported \`$(printf '%s' "$BRANCH" | sed 's/.*GrapMailPoll *: //')\`"
+      ;;
+  esac
+else
+  echo "FAIL: the scheduled job ran and the poll worker never reported a branch" >&2
+  # The worker's silence is a fact about the device, not a verdict to guess
+  # at: the log's last GrapMail and WorkManager lines say whether the job
+  # fired and what the system did with it.
+  echo "      force commands answered: $(tail -3 /tmp/jobrun.log 2>/dev/null | tr '\n' ' ')" >&2
+  adb shell dumpsys jobscheduler 2>/dev/null | grep -m4 -iE "grapsee" | sed 's/^/      /' >&2
+  adb logcat -d 2>/dev/null | grep -E "GrapMailPoll|GrapMailHaptics|WM-SystemJobService|WM-WorkerWrapper|jobscheduler" | tail -12 | sed 's/^/      /' >&2
+  # The raw job store travels with the artifacts: a parse that captured the
+  # wrong id is settled by reading the dump, not by guessing formats.
+  cp /tmp/jobs.txt "$OUT/jobsdump.txt" 2>/dev/null || true
+  FAILURES=$((FAILURES + 1))
+  sys_summary "* background read: NOT observed — job id(s) '$(echo $JOBS | tr '\n' ' ')' were forced and \`MailPollWorker\` said nothing"
 fi
 
 # One line on the run page for the surfaces this mechanism always settles.
