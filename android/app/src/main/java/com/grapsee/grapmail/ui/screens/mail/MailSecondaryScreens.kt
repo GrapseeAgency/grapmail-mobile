@@ -648,11 +648,13 @@ fun MailSettingsScreen(
                 "The list beside the mailbox", palette, onClick = onTasks)
 
             SectionLabel("This account", palette)
-            // New-mail alerts are local polling, not push: this backend has no
-            // push service, so the honest description of the feature is what
-            // the app actually does — the system wakes a scheduled read, it
-            // asks `GET /stats`, and it reports what arrived since the last
-            // number this device saw.
+            // New-mail alerts have two wake paths: FCM for the immediate signal and
+            // WorkManager polling as the reliability fallback. Both converge on the
+            // same authenticated `GET /stats` read before the app claims a count;
+            // the push payload itself carries no message content. The description
+            // therefore says only the durable product fact — GrapMail checks for
+            // mail in the background — rather than promising one transport always
+            // arrives first.
             //
             // The row reports the device's real answer rather than a remembered
             // one, and the ask is here on a tap, not at launch. Android 13 made

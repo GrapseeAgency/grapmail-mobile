@@ -3048,13 +3048,35 @@ pin("Android's splash theme is installed before the window content exists",
 
 # One mark, three surfaces: the launcher, the splash and the iOS launch screen
 # are the same two paths, so the brand does not change shape between them.
-pin("the launcher, splash and launch screen draw one mark, in vector",
-    (ROOT / "android/app/src/main/res/drawable/splash_logo.xml").exists()
+# The 3D mark cannot be a hand-written vector, so the launcher ships as raster
+# adaptive layers: one foreground + one themed monochrome per density, both XMLs
+# (adaptive + round), roundIcon in the manifest, the iOS 1024, and the splash
+# vector. A missing density or a leaked debug receiver fails here, not in CI.
+_DENS = ("mdpi", "hdpi", "xhdpi", "xxhdpi", "xxxhdpi")
+_LAUNCHER_FILES = tuple(
+    ROOT / "android/app/src/main/res" / f"mipmap-{d}" / n
+    for d in _DENS
+    for n in ("ic_launcher_foreground.png", "ic_launcher_monochrome.png"))
+_ADAPTIVE = ROOT / "android/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml"
+_round_xml = ROOT / "android/app/src/main/res/mipmap-anydpi-v26/ic_launcher_round.xml"
+_debug_src = ROOT / "android/app/src/debug"
+pin("the new logo is the launcher on every density, themed, round, iOS and splash",
+    all(f.exists() and f.stat().st_size > 1000 for f in _LAUNCHER_FILES)
+    and _ADAPTIVE.exists()
+    and "ic_launcher_foreground" in _ADAPTIVE.read_text(encoding="utf-8")
+    and "ic_launcher_monochrome" in _ADAPTIVE.read_text(encoding="utf-8")
+    and _round_xml.exists()
+    and 'android:roundIcon="@mipmap/ic_launcher"' in KT_MANIFEST
+    and (ICON_SET / "AppIcon-1024.png").exists()
+    and (ICON_SET / "AppIcon-1024.png").stat().st_size > 40000
+    and (ROOT / "android/app/src/main/res/drawable/splash_logo.xml").exists()
     and "<vector" in (ROOT / "android/app/src/main/res/drawable/splash_logo.xml")
         .read_text(encoding="utf-8")
-    and "M30.8,42.4 L54,58 L77.2,42.4" in
-        (ROOT / "android/app/src/main/res/drawable/ic_launcher_foreground.xml")
-            .read_text(encoding="utf-8"))
+    and _debug_src.exists()
+    and (_debug_src / "java/com/grapsee/grapmail/DebugPollReceiver.kt").exists()
+    and (_debug_src / "AndroidManifest.xml").exists()
+    and "DEBUG_RUN_POLL" in (_debug_src / "AndroidManifest.xml").read_text(encoding="utf-8")
+    and "DEBUG_RUN_POLL" not in KT_MANIFEST)
 
 # ── haptics that belong to the result ───────────────────────────────────────
 pin("filing, starring and sending all have a feel, on both platforms",

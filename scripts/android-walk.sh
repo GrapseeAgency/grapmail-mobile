@@ -681,22 +681,21 @@ done
 # one that agrees with it. Both branches are acceptable; a mismatch, or a write
 # that played nothing at all, is the failure.
 #
-# One forced poll BEFORE the send, for one reason: the worker's first run only
-# stores the count it compares against, so without a baseline the §7 poll can
-# never announce anything and the notification surface stays unobservable on
-# every run. The baseline stores the empty inbox; the send below raises unread;
-# the §7 force then has a genuine rise to announce.
-BASELINE_JOBS="$(poll_job_ids)"
-if [ -n "$BASELINE_JOBS" ]; then
-  log_reset
-  for _bj in $BASELINE_JOBS; do
-    adb shell cmd jobscheduler run -f "$PKG" "$_bj" >/dev/null 2>&1 || true
-  done
-  if log_wait "GrapMailPoll" 45 >/dev/null 2>&1; then
-    echo "  [poll] baseline stored before the send"
-  else
-    echo "  [poll] no baseline line — the first-read store did not report (continuing)"
-  fi
+# One deterministic DEBUG-build request before the send, for one reason: the
+# worker's first run only stores the count it compares against, so without a
+# baseline the §7 read can never announce anything. Android's `jobscheduler
+# run -f` starts WorkManager's wrapper but WorkManager can still decline a
+# not-yet-due periodic worker; the debug-only receiver enqueues this SAME
+# MailPollWorker as one-time work. It does not exist in the release manifest.
+log_reset
+adb shell am broadcast \
+  -a com.grapsee.grapmail.DEBUG_RUN_POLL \
+  -n "$PKG/.DebugPollReceiver" >/tmp/polltrigger.log 2>&1 || true
+if log_wait "GrapMailPoll" 45 >/dev/null 2>&1; then
+  echo "  [poll] baseline stored before the send"
+else
+  echo "  [poll] no baseline line — the first-read store did not report (continuing)"
+  echo "      debug trigger answered: $(tail -2 /tmp/polltrigger.log 2>/dev/null | tr '\n' ' ')" >&2
 fi
 must "compose tap" tap_xy "$(wait_nodes "n.get('resource-id','').rsplit('/',1)[-1]=='mail-compose'" | head -1)"
 if wait_nodes "n.get('resource-id','').rsplit('/',1)[-1]=='mail-to'" >/dev/null; then
@@ -785,7 +784,8 @@ else
   else
     echo "  [notifications] no prompt offered — the system already holds an answer"
   fi
-  if [ -n "$(wait_overlay "n.get('text','')=='On — GrapMail checks for new mail in the background'" 2>/dev/null | head -1)" ]; then
+  NOTIFY_ON="n.get('text','')=='On — GrapMail checks for new mail in the background'"
+  if [ -n "$(wait_nodes "$NOTIFY_ON" 2>/dev/null | head -1)" ]; then
     shot 121-platform-notify-granted
     echo "  [notifications] the row re-read the system and reports On"
   else
@@ -797,32 +797,30 @@ fi
 adb shell input keyevent KEYCODE_BACK
 sleep 1
 
-# ── 7. the background wake, forced from outside the app ──
-# Not the app calling its own worker: the system's job scheduler running the job
-# it holds for this package, which is the same entry point the 30-minute schedule
-# uses. What the worker then decides is read out of its own log line.
+# ── 7. the background read, through the exact worker the scheduler owns ──
+# The real periodic schedule was already proven above by the JobScheduler store:
+# Android holds SystemJobService for this package with connectivity + timing
+# constraints. `jobscheduler run -f` only starts WorkManager's wrapper;
+# WorkManager still enforces its own due-time and may finish that wrapper without
+# invoking a periodic worker that is not due. Treating wrapper completion as
+# proof of MailPollWorker was the defect.
 #
-# The JobInfo id is not stable across a run: WorkManager re-registers the
-# periodic work when the app's process is recreated, and the id observed at §1
-# can be gone by §7 while a new one sits in the store. So the capture → force →
-# wait cycle runs three rounds, re-asking the system for the CURRENT id set each
-# time, and the worker's own log line decides. Stale ids are refused harmlessly.
-BRANCH=""
-JOB="none"
-for _round in 1 2 3; do
-  JOBS="$(poll_job_ids)"
-  [ -z "$JOB" ] || [ "$JOB" = "none" ] && JOB="$(echo "$JOBS" | head -1)"
-  if [ -n "$JOBS" ]; then
-    log_reset
-    for _fj in $JOBS; do
-      adb shell cmd jobscheduler run -f "$PKG" "$_fj" >>/tmp/jobrun.log 2>&1 || true
-    done
-    BRANCH="$(log_wait "GrapMailPoll" 20 || true)"
-    [ -n "$BRANCH" ] && break
-  fi
-  echo "  [poll] round $_round: ids were '$(echo $JOBS | tr '\n' ' ')' — no branch yet; re-asking the system"
-  sleep 5
-done
+# The debug APK carries a debug-source-set-only receiver that enqueues THIS SAME
+# MailPollWorker as one-time work, exactly like the production FCM callback does.
+# The receiver and manifest entry do not exist in the release variant; the
+# release keeps only the real periodic request + push callback. CI asks the debug
+# receiver and the worker's own GrapMailPoll line is the evidence.
+JOBS="$(poll_job_ids)"
+JOB="$(echo "$JOBS" | head -1)"
+if [ -z "$JOBS" ]; then
+  echo "FAIL: the periodic new-mail job disappeared from JobScheduler" >&2
+  FAILURES=$((FAILURES + 1))
+fi
+log_reset
+adb shell am broadcast \
+  -a com.grapsee.grapmail.DEBUG_RUN_POLL \
+  -n "$PKG/.DebugPollReceiver" >/tmp/polltrigger2.log 2>&1 || true
+BRANCH="$(log_wait "GrapMailPoll" 45 || true)"
 if [ -n "$BRANCH" ]; then
   echo "  [poll] $BRANCH"
   case "$BRANCH" in
@@ -836,7 +834,7 @@ if [ -n "$BRANCH" ]; then
         if [ -n "$(find_nodes "'new message' in n.get('text','')" | head -1)" ]; then
           shot 124-platform-notify-shade
           echo "  [notification] the shade shows the posted new-mail line"
-          sys_summary "* new-mail notification: **observed** — the system ran the job, the read rose, and the shade drew the posted line"
+          sys_summary "* new-mail notification: **observed** — the worker read rose, and the shade drew the posted line"
         else
           echo "FAIL: the notification was posted but the shade does not show it" >&2
           FAILURES=$((FAILURES + 1))
@@ -847,42 +845,29 @@ if [ -n "$BRANCH" ]; then
         FAILURES=$((FAILURES + 1))
       fi ;;
     *"first-read"*)
-      # The first run of the worker stores the count it will compare against;
-      # there is no previous count, so nothing can be announced. Naming that
-      # here is the difference between "the notification did not happen" and
-      # "the notification was never due".
-      sys_summary "* new-mail notification: **not due** — the job's first run stores the baseline it compares against, so nothing could be announced this cycle"
+      sys_summary "* new-mail notification: **not due** — the worker's first run stores its comparison baseline"
       ;;
     *"no-rise"*)
-      sys_summary "* new-mail notification: **not due** — the unread count did not rise, so nothing arrived this cycle"
+      sys_summary "* new-mail notification: **not due** — the unread count did not rise"
       ;;
     *"read-refused"*)
-      # The worker ran, the read was refused by the server, and nothing was
-      # claimed. The walk does not fail an app for a server's answer — but it
-      # will not let the run imply the notification was proven either.
       echo "  [notification] not provable this run: $(printf '%s' "$BRANCH" | sed 's/.*GrapMailPoll *: //')"
-      sys_summary "* new-mail notification: **not observed** — the system ran the job and \`GET /stats\` was refused ($(printf '%s' "$BRANCH" | sed 's/.*status=//')). The poll stayed silent, which is the correct branch; see PLATFORM-RUNTIME.md." ;;
+      sys_summary "* new-mail notification: **not observed** — the worker ran and \`GET /stats\` was refused ($(printf '%s' "$BRANCH" | sed 's/.*status=//'))." ;;
     *)
-      sys_summary "* background read: **observed** — the system ran job $JOB and the worker reported \`$(printf '%s' "$BRANCH" | sed 's/.*GrapMailPoll *: //')\`"
+      sys_summary "* background read: **observed** — the worker reported \`$(printf '%s' "$BRANCH" | sed 's/.*GrapMailPoll *: //')\`"
       ;;
   esac
 else
-  echo "FAIL: the scheduled job ran and the poll worker never reported a branch" >&2
-  # The worker's silence is a fact about the device, not a verdict to guess
-  # at: the log's last GrapMail and WorkManager lines say whether the job
-  # fired and what the system did with it.
-  echo "      force commands answered: $(tail -3 /tmp/jobrun.log 2>/dev/null | tr '\n' ' ')" >&2
-  adb shell dumpsys jobscheduler 2>/dev/null | grep -m4 -iE "grapsee" | sed 's/^/      /' >&2
-  adb logcat -d 2>/dev/null | grep -E "GrapMailPoll|GrapMailHaptics|WM-SystemJobService|WM-WorkerWrapper|jobscheduler" | tail -12 | sed 's/^/      /' >&2
-  # The raw job store travels with the artifacts: a parse that captured the
-  # wrong id is settled by reading the dump, not by guessing formats.
-  cp /tmp/jobs.txt "$OUT/jobsdump.txt" 2>/dev/null || true
+  echo "FAIL: the debug runtime trigger enqueued MailPollWorker and it never reported a branch" >&2
+  echo "      trigger answered: $(tail -3 /tmp/polltrigger2.log 2>/dev/null | tr '\n' ' ')" >&2
+  adb logcat -d 2>/dev/null | grep -E "GrapMailPoll|GrapMailPollTrigger|WM-SystemJobService|WM-WorkerWrapper" | tail -16 | sed 's/^/      /' >&2
+  adb shell dumpsys jobscheduler > "$OUT/jobsdump.txt" 2>/dev/null || true
   FAILURES=$((FAILURES + 1))
-  sys_summary "* background read: NOT observed — job id(s) '$(echo $JOBS | tr '\n' ' ')' were forced and \`MailPollWorker\` said nothing"
+  sys_summary "* background read: NOT observed — debug trigger enqueued \`MailPollWorker\` and it said nothing"
 fi
 
 # One line on the run page for the surfaces this mechanism always settles.
-sys_summary "* platform surfaces observed at runtime: scheduled job ${JOB:-none}, notification channel, offline banner (radio toggled), shortcut intent, haptic tied to the send's answer, notification permission asked through the app's own row"
+sys_summary "* platform surfaces observed at runtime: periodic job ${JOB:-none} in Android's store, worker branch, notification channel, offline banner (radio toggled), shortcut intent, haptic tied to the send's answer, notification permission asked through the app's own row"
 
 
 echo "· post-write confirmations — via the app's test-only snapshot hook"

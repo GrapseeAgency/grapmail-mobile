@@ -1,25 +1,12 @@
-<?xml version="1.0" encoding="utf-8"?>
-<!--
-    The brand mark, drawn — not a PNG. Same two paths as the adaptive launcher
-    icon's foreground, on a transparent field, so the splash, the launcher and
-    the iOS launch screen are one mark rather than three drawings of it.
-
-    The splash icon is masked by the system into a circle on most devices, so
-    the glyph keeps to the middle band and the stroke that reads as the flap is
-    part of the same geometry the launcher uses.
--->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
-    android:width="108dp"
-    android:height="108dp"
-    android:viewportWidth="108"
-    android:viewportHeight="108">
-    <path
-        android:fillColor="#FFFFFF"
-        android:pathData="M30,38 L78,38 A3,3 0 0 1 81,41 L81,67 A3,3 0 0 1 78,70 L30,70 A3,3 0 0 1 27,67 L27,41 A3,3 0 0 1 30,38 Z M30.8,42.4 L54,58 L77.2,42.4 A1.4,1.4 0 0 0 75.6,40.2 L54,55 L32.4,40.2 A1.4,1.4 0 0 0 30.8,42.4 Z" />
-    <path
-        android:strokeColor="#1A6DF0"
-        android:strokeWidth="1.6"
-        android:strokeLineCap="round"
-        android:fillColor="#00000000"
-        android:pathData="M30.5,41.5 L54,58.5 L77.5,41.5" />
+    android:width="108dp" android:height="108dp"
+    android:viewportWidth="108" android:viewportHeight="108">
+    <!-- The new mark, drawn for the splash: tilted sheet, open envelope body,
+         flap cut in the splash background color so the V reads on the blue. -->
+    <path android:fillColor="#FFFFFF"
+        android:pathData="M33,34 L64,30 a3,3 0 0 1 3.4,2.6 L70.5,53 L36.5,57.4 L33.4,37.4 a3,3 0 0 1 2.6,-3.4 Z"/>
+    <path android:fillColor="#FFFFFF"
+        android:pathData="M24,54 h60 a4,4 0 0 1 4,4 v24 a4,4 0 0 1 -4,4 h-60 a4,4 0 0 1 -4,-4 v-24 a4,4 0 0 1 4,-4 z"/>
+    <path android:fillColor="#1A6DF0"
+        android:pathData="M20,52 L54,74 L88,52 L88,58 L54,80 L20,58 Z"/>
 </vector>
