@@ -691,7 +691,7 @@ log_reset
 adb shell am broadcast \
   -a com.grapsee.grapmail.DEBUG_RUN_POLL \
   -n "$PKG/.DebugPollReceiver" >/tmp/polltrigger.log 2>&1 || true
-if log_wait "GrapMailPoll" 45 >/dev/null 2>&1; then
+if log_wait "GrapMailPoll:" 45 >/dev/null 2>&1; then
   echo "  [poll] baseline stored before the send"
 else
   echo "  [poll] no baseline line — the first-read store did not report (continuing)"
@@ -765,7 +765,10 @@ SCR_W="$(adb shell wm size 2>/dev/null | grep -oE '[0-9]+x[0-9]+' | cut -dx -f1)
 SCR_H="$(adb shell wm size 2>/dev/null | grep -oE '[0-9]+x[0-9]+' | cut -dx -f2)"
 SCR_W="${SCR_W:-1080}"; SCR_H="${SCR_H:-2000}"
 for _ in 1 2 3 4 5 6 7 8; do
-  [ -n "$(wait_overlay "$NOTIFY_ROW" 2>/dev/null | head -1)" ] && break
+  # find_nodes, not wait_overlay: an expired wait_overlay writes a timeout dump,
+  # and a poll that succeeds on swipe 4 would still have left four dumps behind
+  # for the final evidence check to count as failures.
+  [ -n "$(find_nodes "$NOTIFY_ROW" | head -1)" ] && break
   adb shell input swipe "$((SCR_W / 2))" "$((SCR_H * 72 / 100))" "$((SCR_W / 2))" "$((SCR_H * 30 / 100))" 300
   sleep 1
 done
@@ -820,7 +823,7 @@ log_reset
 adb shell am broadcast \
   -a com.grapsee.grapmail.DEBUG_RUN_POLL \
   -n "$PKG/.DebugPollReceiver" >/tmp/polltrigger2.log 2>&1 || true
-BRANCH="$(log_wait "GrapMailPoll" 45 || true)"
+BRANCH="$(log_wait "GrapMailPoll:" 45 || true)"
 if [ -n "$BRANCH" ]; then
   echo "  [poll] $BRANCH"
   case "$BRANCH" in
