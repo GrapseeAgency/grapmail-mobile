@@ -750,6 +750,16 @@ fi
 # The row is the only route to the prompt: the app never asks at launch. So the
 # prompt appearing IS the proof the row is wired, and the row reading "On"
 # afterwards is the proof it re-reads the system rather than remembering the tap.
+#
+# Small screens first: the send receipt is a dialog there, so the send leg's
+# two BACKs can exit the app to the launcher — one BACK past home. The walk
+# recovers the way a person does (bring the app back) before requiring the
+# chrome; on wider screens the app is already home and this is a no-op.
+for _ in 1 2 3 4 5 6; do
+  [ -n "$(find_nodes "n.get('resource-id','').rsplit('/',1)[-1]=='mail-menu'" | head -1)" ] && break
+  ensure_foreground || true
+  sleep 2
+done
 must "home before settings" wait_nodes "n.get('resource-id','').rsplit('/',1)[-1]=='mail-menu'" >/dev/null
 must "drawer for settings" tap_xy "$(wait_nodes "n.get('resource-id','').rsplit('/',1)[-1]=='mail-menu'" | head -1)"
 must "settings row" wait_overlay "n.get('resource-id','').rsplit('/',1)[-1]=='mail-drawer-Settings'" >/dev/null
