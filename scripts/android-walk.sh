@@ -757,7 +757,11 @@ fi
 # chrome; on wider screens the app is already home and this is a no-op.
 for _ in 1 2 3 4 5 6; do
   [ -n "$(find_nodes "n.get('resource-id','').rsplit('/',1)[-1]=='mail-menu'" | head -1)" ] && break
-  ensure_foreground || true
+  # Unconditional am start, not ensure_foreground: after a BACK-exit the app
+  # still appears in the recents list, so a foreground check that greps for the
+  # package reads a stale answer and never relaunches. am start is idempotent —
+  # it brings a live activity to the front and starts an exited one.
+  adb shell am start -n "$PKG/.MainActivity" >/dev/null 2>&1 || true
   sleep 2
 done
 must "home before settings" wait_nodes "n.get('resource-id','').rsplit('/',1)[-1]=='mail-menu'" >/dev/null
