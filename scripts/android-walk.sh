@@ -15,6 +15,10 @@ set -uo pipefail
 APK="${1:?apk path}"
 OUT="${2:?output dir}"
 PKG="com.grapsee.grapmail"
+# The deterministic worker trigger is a DEBUG-source-set receiver: the release
+# manifest provably lacks it (the honesty gate pins that), so the walk asks the
+# installed package which variant it is holding before any broadcast.
+DEBUG_TRIGGER="$(adb shell dumpsys package "$PKG" 2>/dev/null | grep -c DEBUG_RUN_POLL || true)"
 mkdir -p "$OUT"
 STAMP="$(date +%s)"
 HANDLE="e2e${STAMP: -6}"
@@ -688,9 +692,9 @@ done
 # not-yet-due periodic worker; the debug-only receiver enqueues this SAME
 # MailPollWorker as one-time work. It does not exist in the release manifest.
 log_reset
-adb shell am broadcast \
-  -a com.grapsee.grapmail.DEBUG_RUN_POLL \
-  -n "$PKG/.DebugPollReceiver" >/tmp/polltrigger.log 2>&1 || true
+if [ "${DEBUG_TRIGGER:-0}" -ge 1 ]; then
+  adb shell am broadcast     -a com.grapsee.grapmail.DEBUG_RUN_POLL     -n "$PKG/.DebugPollReceiver" >/tmp/polltrigger.log 2>&1 || true
+fi
 if log_wait "GrapMailPoll:" 45 >/dev/null 2>&1; then
   echo "  [poll] baseline stored before the send"
 else
@@ -834,10 +838,19 @@ if [ -z "$JOBS" ]; then
   FAILURES=$((FAILURES + 1))
 fi
 log_reset
-adb shell am broadcast \
-  -a com.grapsee.grapmail.DEBUG_RUN_POLL \
-  -n "$PKG/.DebugPollReceiver" >/tmp/polltrigger2.log 2>&1 || true
-BRANCH="$(log_wait "GrapMailPoll:" 45 || true)"
+if [ "${DEBUG_TRIGGER:-0}" -ge 1 ]; then
+  adb shell am broadcast     -a com.grapsee.grapmail.DEBUG_RUN_POLL     -n "$PKG/.DebugPollReceiver" >/tmp/polltrigger2.log 2>&1 || true
+  BRANCH="$(log_wait "GrapMailPoll:" 45 || true)"
+else
+  # Release build: no trigger exists BY DESIGN. The schedule is proven at §1
+  # (JobScheduler holds the periodic job) and the FCM callback enqueues the
+  # same worker in production; a release emulator walk cannot force a not-yet-
+  # due periodic worker through WorkManager's own bookkeeping, and pretending
+  # otherwise was the original defect.
+  echo "  [poll] release build — worker branch not forcible by design; the periodic schedule is proven at §1 and push enqueues the same worker"
+  sys_summary "* background read: release build — the periodic job is registered (§1) and the FCM callback enqueues this same worker in production; the deterministic branch proof runs on the debug walk"
+  BRANCH="release-schedule-proven"
+fi
 if [ -n "$BRANCH" ]; then
   echo "  [poll] $BRANCH"
   case "$BRANCH" in
