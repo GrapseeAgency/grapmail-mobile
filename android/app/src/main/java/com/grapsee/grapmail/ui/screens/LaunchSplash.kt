@@ -6,7 +6,6 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -37,7 +36,6 @@ import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.grapsee.grapmail.R
 import kotlinx.coroutines.delay
 
 /**
@@ -53,28 +51,27 @@ import kotlinx.coroutines.delay
 @Composable
 fun LaunchSplash(onFinished: () -> Unit) {
     LaunchedEffectShimmerDelay(onFinished)
+    // The system splash (Android 12+) has already shown the app icon on this
+    // blue — re-showing a logo page would be a second, redundant picture. The
+    // background is the mark's own diagonal gradient so this screen reads as
+    // one continuous blue with the word, and nothing else.
     Box(
         Modifier
             .fillMaxSize()
-            .background(Color(0xFF1A6DF0)),
+            .background(
+                Brush.linearGradient(
+                    0.0f to Color(0xFF3E89F8),
+                    1.0f to Color(0xFFC6D9FD),
+                ),
+            ),
     ) {
-        // The real mark, at the scale Gmail shows its M: ~15% of the width,
-        // dead center — the system splash (Android 12+) has already shown the
-        // launcher icon; this continues the same picture in-app.
-        Image(
-            painter = painterResource(R.drawable.grapmail_launch_logo),
-            contentDescription = null,
-            modifier = Modifier
-                .align(Alignment.Center)
-                .size(112.dp),
-        )
         // The branded element lives in the official bottom zone (200x80dp):
         // small, quiet, at the bottom edge — never a centerpiece.
         GrapseeShimmer(
             Modifier
                 .align(Alignment.BottomCenter)
                 .padding(bottom = 48.dp)
-                .size(width = 190.dp, height = 30.dp),
+                .size(width = 210.dp, height = 38.dp),
         )
     }
 }
@@ -125,7 +122,7 @@ fun GrapseeShimmer(modifier: Modifier = Modifier) {
         if (canvasSize == IntSize.Zero) return@Box
         val w = canvasSize.width.toFloat()
         val h = canvasSize.height.toFloat()
-        val base = h * 0.52f
+        val base = h * 0.9f
         val layouts = remember(measurer, canvasSize) {
             sizes.map { s ->
                 measurer.measure(
@@ -137,20 +134,21 @@ fun GrapseeShimmer(modifier: Modifier = Modifier) {
         }
         Canvas(Modifier.fillMaxSize()) {
             val sliceW = w / layouts.size
-            val shift = sweep * 2f - 1f
+            // The CSS truth: each span translates from -100% (fully left, off
+            // screen) to 100% (fully right, off screen). Every band shows its
+            // own scaled copy of the SAME sliding word, anchored at the same
+            // left edge — centering was the mangling.
             layouts.forEachIndexed { i, lm ->
+                val slideX = sweep * (w + lm.size.width) - lm.size.width
                 clipRect(i * sliceW, 0f, (i + 1) * sliceW, h) {
-                    translate(
-                        left = (w - lm.size.width) / 2f + shift * sliceW * 1.6f,
-                        top = (h - lm.size.height) / 2f,
-                    ) {
+                    translate(left = slideX, top = (h - lm.size.height) / 2f) {
                         val pair = stops[i]
                         // The TextLayoutResult overloads take brush/color as
                         // separate parameters, not a wrapped TextStyle.
                         if (pair == null) {
                             drawText(lm, color = white, alpha = alphas[i])
                         } else {
-                            val ride = (shift + 1f) * 0.22f
+                            val ride = (sweep * 2f - 1f + 1f) * 0.22f
                             val a = pair.first + ride
                             val b = pair.second + ride
                             drawText(

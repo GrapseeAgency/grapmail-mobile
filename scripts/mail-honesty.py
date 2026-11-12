@@ -2573,13 +2573,9 @@ pin("no UI screen reads an illustration raster anymore",
     and "Artwork(" in code_only(KT_UI_ALL)
     and ("Art.view(" in code_only(SW_UI_ALL) or "Art.fill(" in code_only(SW_UI_ALL)))
 
-# drawable-nodpi holds exactly one file now: the brand's launch logo (the real
-# mark, bundled as a bitmap because the 3D artwork cannot be a hand vector).
-# Anything else appearing there is the old illustration pipeline coming back.
-pin("the illustration mapper is gone; drawable-nodpi carries only the launch logo",
+pin("the illustration mapper and its raster pipeline are gone, not shadowed",
     not (ROOT / "android/app/src/main/java/com/grapsee/grapmail/ui/components/IllRes.kt").exists()
-    and sorted(f.name for f in (ROOT / "android/app/src/main/res/drawable-nodpi").glob("*"))
-        == ["grapmail_launch_logo.png"]
+    and not (ROOT / "android/app/src/main/res/drawable-nodpi").exists()
     and not list((ROOT / "ios/GrapMail/Assets.xcassets").glob("ill_*.imageset"))
     and not list((ROOT / "ios/GrapMail/Assets.xcassets").glob("puzzle_photo.imageset")))
 
@@ -3076,7 +3072,7 @@ pin("the new logo is the launcher on every density, themed, round, iOS and splas
     and "@mipmap/ic_launcher" in (ROOT / "android/app/src/main/res/values/themes.xml")
         .read_text(encoding="utf-8")
     and not (ROOT / "android/app/src/main/res/drawable/splash_logo.xml").exists()
-    and (ROOT / "android/app/src/main/res/drawable-nodpi/grapmail_launch_logo.png").exists()
+    and not (ROOT / "android/app/src/main/res/drawable-nodpi").exists()
     and _debug_src.exists()
     and (_debug_src / "java/com/grapsee/grapmail/DebugPollReceiver.kt").exists()
     and (_debug_src / "AndroidManifest.xml").exists()
