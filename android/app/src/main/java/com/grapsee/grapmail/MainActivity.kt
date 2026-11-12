@@ -56,6 +56,7 @@ import com.grapsee.grapmail.ui.screens.mail.MailSettingsScreen
 import com.grapsee.grapmail.ui.screens.mail.MailboxScreen
 import com.grapsee.grapmail.ui.screens.mail.MailSnapshotScreen
 import com.grapsee.grapmail.ui.screens.mail.ScreenerScreen
+import com.grapsee.grapmail.ui.screens.mail.ScheduledScreen
 import com.grapsee.grapmail.ui.screens.mail.SubscriptionsScreen
 import com.grapsee.grapmail.ui.screens.mail.ThreadScreen
 import com.grapsee.grapmail.ui.screens.AccountCreatedAltScreen
@@ -284,6 +285,7 @@ object Routes {
     const val MAIL_SETTINGS = "mail/settings"
     const val MAIL_SCREENER = "mail/screener"
     const val MAIL_SUBSCRIPTIONS = "mail/subscriptions"
+    const val MAIL_SCHEDULED = "mail/scheduled"
 
     // ── account-record band ─────────────────────────────────────────────────
     // The web client's `/mail/notes`, `/mail/tasks`, `/mail/settings`,
@@ -1004,6 +1006,7 @@ fun GrapMailNav(
                 onFiles = { nav.navigate(Routes.MAIL_FILES) },
                 onScreener = { nav.navigate(Routes.MAIL_SCREENER) },
                 onSubscriptions = { nav.navigate(Routes.MAIL_SUBSCRIPTIONS) },
+                onScheduled = { nav.navigate(Routes.MAIL_SCHEDULED) },
                 onSignOut = {
                     // The unlocked E2E halves drop HERE, visibly at the door,
                     // not only inside the shared teardown: a sign-out that
@@ -1257,6 +1260,10 @@ fun GrapMailNav(
         composable(Routes.MAIL_SUBSCRIPTIONS) { entry ->
             val mail: MailboxViewModel = signedInViewModel(nav, entry)
             SubscriptionsScreen(vm = mail, onBack = { nav.popBackStack() })
+        }
+        composable(Routes.MAIL_SCHEDULED) { entry ->
+            val mail: MailboxViewModel = signedInViewModel(nav, entry)
+            ScheduledScreen(vm = mail, onBack = { nav.popBackStack() })
         }
     }
 }

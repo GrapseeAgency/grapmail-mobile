@@ -144,6 +144,7 @@ fun MailboxScreen(
     onFiles: () -> Unit,
     onScreener: () -> Unit,
     onSubscriptions: () -> Unit,
+    onScheduled: () -> Unit,
     onSignOut: () -> Unit,
 ) {
     val palette = LocalPalette.current
@@ -219,6 +220,7 @@ fun MailboxScreen(
                 onLabels = { scope.launch { drawer.close() }; onLabels() },
                 onScreener = { scope.launch { drawer.close() }; onScreener() },
                 onSubscriptions = { scope.launch { drawer.close() }; onSubscriptions() },
+                onScheduled = { scope.launch { drawer.close() }; onScheduled() },
                 onSortFilter = { scope.launch { drawer.close() }; showSortSheet = true },
                 onAdvanced = { scope.launch { drawer.close() }; showAdvSheet = true },
                 onSettings = { scope.launch { drawer.close() }; onSettings() },
@@ -888,6 +890,7 @@ internal fun MailDrawer(
     onLabels: () -> Unit,
     onScreener: () -> Unit,
     onSubscriptions: () -> Unit,
+    onScheduled: () -> Unit,
     onSortFilter: () -> Unit,
     onAdvanced: () -> Unit,
     onSettings: () -> Unit,
@@ -925,6 +928,9 @@ internal fun MailDrawer(
         DrawerSection("Mail")
         DrawerRow("Subscriptions", Icons.Rounded.MailOutline, null, selected = false) {
             onSubscriptions()
+        }
+        DrawerRow("Scheduled", Icons.Rounded.Schedule, null, selected = false) {
+            onScheduled()
         }
 
         // The search pill carries only the field now — the two glyphs that

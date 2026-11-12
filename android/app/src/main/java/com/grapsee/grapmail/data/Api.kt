@@ -1194,6 +1194,23 @@ object Api {
         if (status >= 400) fail(status, body)
     }
 
+    /**
+     * `GET /scheduled` — the account's future sends, soonest first. Each row
+     * is mail the server holds with status 'scheduled'; the worker promotes
+     * it to 'queued' at its `scheduledFor` instant.
+     */
+    suspend fun mailScheduledList(token: String): MailScheduledResponse =
+        read(authed("$MAIL/scheduled", token).get().build()) { json.decodeFromString(it) }
+
+    /**
+     * `DELETE /scheduled/:id` — take one future send back. The server clears
+     * `scheduled_at` and the row stops being mail the worker will deliver.
+     */
+    suspend fun mailScheduledCancel(token: String, id: String) {
+        val (status, body) = execute(authed("$MAIL/scheduled/${enc(id)}", token).delete().build())
+        if (status >= 400) fail(status, body)
+    }
+
     suspend fun mailSend(token: String, req: MailSendRequest): MailSendResponse {
         val r = authed("$MAIL/send", token).post(postBody(
             json.encodeToString(MailSendRequest.serializer(), req))).build()
@@ -1512,6 +1529,30 @@ data class MailSendRequest(
      */
     val e2eEnvelope: JsonObject? = null,
     val attachmentIds: List<String> = emptyList(),
+    /**
+     * Schedule the send for a future instant (ISO-8601). `grapmail.ts:888`
+     * `parseScheduledFor(body.sendAt)` validates it and the row is stored
+     * with status 'scheduled' — the worker promotes it to 'queued' when the
+     * time comes. Absent means send-now. The undo-send window does not
+     * apply to a scheduled send: scheduling IS the reconsider window.
+     */
+    val sendAt: String? = null,
+)
+
+/** One future send, as `GET /grapmail/scheduled` answers it. */
+@Serializable
+data class MailScheduledDto(
+    val id: String,
+    val subject: String? = null,
+    val to: List<String> = emptyList(),
+    val scheduledFor: String? = null,
+    val createdAt: String? = null,
+)
+
+@Serializable
+data class MailScheduledResponse(
+    val success: Boolean = false,
+    val messages: List<MailScheduledDto> = emptyList(),
 )
 
 @Serializable
