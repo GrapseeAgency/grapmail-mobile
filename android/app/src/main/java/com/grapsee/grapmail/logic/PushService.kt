@@ -9,6 +9,7 @@ import com.google.firebase.messaging.FirebaseMessaging
 import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
 import com.grapsee.grapmail.data.Api
+import com.grapsee.grapmail.data.SessionSnapshot
 import com.grapsee.grapmail.data.SessionStore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -106,12 +107,18 @@ object PushSync {
      * record is dropped regardless — a device that believes it is registered
      * when the server does not is the same lie as a registration nobody sends.
      */
-    suspend fun unregister(context: Context) {
+    suspend fun unregister(context: Context, session: SessionSnapshot) {
+        if (!SessionStore.isCurrent(context, session.id)) return
         val deviceToken = prefs(context).getString(KEY_TOKEN, null) ?: return
         prefs(context).edit().remove(KEY_TOKEN).apply()
         if (!configured(context)) return
-        val bearer = SessionStore.token(context) ?: return
-        runCatching { Api.unregisterPush(bearer, deviceToken) }
+        try {
+            Api.unregisterPush(session.token, deviceToken)
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            // Registration teardown is best-effort. Local sign-out still proceeds.
+        }
     }
 
     /** Drop the local registration record without a network call — the path

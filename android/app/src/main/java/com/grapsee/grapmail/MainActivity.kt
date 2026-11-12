@@ -395,10 +395,12 @@ fun GrapMailNav(
         com.grapsee.grapmail.ui.screens.security.SecurityFlow.reset()
         e2e.clearForSignOut()
         scope.launch {
+            val context = nav.context.applicationContext
+            val session = SessionStore.snapshot(context) ?: return@launch
             kotlinx.coroutines.withTimeoutOrNull(4_000) {
-                com.grapsee.grapmail.logic.PushSync.unregister(nav.context.applicationContext)
+                com.grapsee.grapmail.logic.PushSync.unregister(context, session)
             }
-            SessionStore.clear(nav.context.applicationContext)
+            SessionStore.clearIfCurrent(context, session.id)
         }
     }
 
