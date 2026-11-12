@@ -593,7 +593,7 @@ private struct E2eEncryptedBlock: View {
                         .padding(.vertical, 6)
                         .contentShape(Rectangle())
                         .onTapGesture {
-                            e2e.load()
+                            e2e.load(includeDirectory: false)
                             showPhrase = true
                         }
                         .accessibilityIdentifier("gm-e2e-decrypt-open")
@@ -763,7 +763,7 @@ struct ComposeView: View {
         }
         .task(id: signature) {
             account.load()
-            e2e.load()
+            e2e.load(includeDirectory: false)
             // A prepared compose (reply / reply-all / forward from the thread)
             // builds its fields from the full server row; a blank one gets the
             // signature appended as editable text, the way the web client

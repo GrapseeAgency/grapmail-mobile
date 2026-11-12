@@ -550,7 +550,7 @@ private fun EncryptedBlock(message: MailMessageFullDto, e2e: com.grapsee.grapmai
             Text("Decrypt with your passphrase", fontSize = 14.sp,
                 fontWeight = FontWeight.SemiBold, color = palette.primarySolid,
                 modifier = Modifier.clickable {
-                    scope.launch { e2e.load() }
+                    e2e.load(includeDirectory = false)
                     showPhrase = true
                 }.testTag("gm-e2e-decrypt-open").padding(vertical = 6.dp))
         } else {

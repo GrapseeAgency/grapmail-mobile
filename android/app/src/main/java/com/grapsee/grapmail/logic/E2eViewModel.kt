@@ -127,16 +127,19 @@ class E2eViewModel @JvmOverloads constructor(
         }
     }
 
-    fun load() {
+    private var localLoad: kotlinx.coroutines.Job? = null
+
+    fun load(includeDirectory: Boolean = true) {
         if (snapshotMode) return
-        viewModelScope.launch {
+        localLoad?.cancel()
+        localLoad = viewModelScope.launch {
             val ok = withContext(Dispatchers.Default) { MailE2e.available() }
             _state.update {
                 it.copy(available = ok, unavailableReason = MailE2e.unavailableReason)
             }
             if (!ok) return@launch
             refreshLocal()
-            loadPublished()
+            if (includeDirectory) loadPublished()
         }
     }
 
@@ -211,8 +214,12 @@ class E2eViewModel @JvmOverloads constructor(
                 return@launch
             }
             val identity = made.getOrNull()!!
-            session = runCatching { MailE2e.unlock(identity, passphrase) }.getOrNull()
-            val fp = runCatching { MailE2e.fingerprint(identity.encryption.publicKey) }.getOrNull()
+            val (unlocked, fp) = withContext(Dispatchers.Default) {
+                runCatching { MailE2e.unlock(identity, passphrase) }.getOrNull() to
+                    runCatching { MailE2e.fingerprint(identity.encryption.publicKey) }.getOrNull()
+            }
+            if (identityKey() != t) return@launch
+            session = unlocked
             _state.update { it.copy(record = identity, fingerprint = fp, unlocked = session != null) }
             if (publishOnSetup) {
                 publishNow()
@@ -316,6 +323,7 @@ class E2eViewModel @JvmOverloads constructor(
      *  halves still here — unlocked and ready to seal mail with a stranger's
      *  key. This is that promised leg, finally true. */
     fun clearForSignOut() {
+        localLoad?.cancel()
         session = null
         _state.value = State()
     }
@@ -442,6 +450,7 @@ class E2eViewModel @JvmOverloads constructor(
      *  Suspend because the unlock is 600,000 PBKDF2 rounds: on the main
      *  thread that is an app freeze, and a frozen app looks like a crashed one. */
     suspend fun decrypt(envelopeJson: String, passphrase: String): String? {
+        localLoad?.join()
         val record = _state.value.record ?: run {
             note("This device has no key to open messages with.", true)
             return null

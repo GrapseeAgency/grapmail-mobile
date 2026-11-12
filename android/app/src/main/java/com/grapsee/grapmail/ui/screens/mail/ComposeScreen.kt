@@ -116,7 +116,7 @@ fun ComposeScreen(
     } ?: "").trim()
 
     LaunchedEffect(Unit) { profile.load() }
-    LaunchedEffect(Unit) { e2e.load() }
+    LaunchedEffect(Unit) { e2e.load(includeDirectory = false) }
     LaunchedEffect(vm) { vm.loadAccount() }
 
     // A prepared compose (reply / reply-all / forward from the thread) builds

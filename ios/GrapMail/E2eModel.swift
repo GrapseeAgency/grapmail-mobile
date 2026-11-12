@@ -34,6 +34,7 @@ final class E2eModel: ObservableObject {
 
     private var snapshotSeeded = false
     private var session: MailE2e.Unlocked?
+    private var localRead: Task<Void, Never>?
 
     func seedForSnapshot(record: MailE2e.Identity?, published: MailE2eKeys?,
                          fingerprint: String?, unlocked: Bool = false,
@@ -64,32 +65,51 @@ final class E2eModel: ObservableObject {
     /// v0.3.0 builds wrote under the token digest. Found under the old name
     /// only? Copy it to the stable name and drop the old file, so "Remove the
     /// key" can never leave a resurrectable copy behind.
-    private func loadIdentityFile() -> MailE2e.Identity? {
-        guard let k = identityKey else { return nil }
-        if let fresh = MailE2e.loadIdentity(accountKey: k) { return fresh }
-        guard let legacy = token, legacy != k,
-              let old = MailE2e.loadIdentity(accountKey: legacy) else { return nil }
-        if MailE2e.saveIdentity(accountKey: k, identity: old) {
-            MailE2e.clearIdentity(accountKey: legacy)
+    private nonisolated static func readIdentityFile(
+        key: String, legacy: String?
+    ) async -> (record: MailE2e.Identity?, legacyKey: String?) {
+        await withCheckedContinuation { continuation in
+            DispatchQueue.global(qos: .userInitiated).async {
+                if let record = MailE2e.loadIdentity(accountKey: key) {
+                    continuation.resume(returning: (record, nil))
+                } else if let legacy, legacy != key,
+                          let record = MailE2e.loadIdentity(accountKey: legacy) {
+                    continuation.resume(returning: (record, legacy))
+                } else {
+                    continuation.resume(returning: (nil, nil))
+                }
+            }
         }
-        return old
     }
 
-    func load() {
+    func load(includeDirectory: Bool = true) {
         guard !snapshotSeeded else { return }
         state.available = MailE2e.available()
         state.unavailableReason = MailE2e.unavailableReason
         guard state.available == true else { return }
         refreshLocal()
-        loadPublished()
+        if includeDirectory { loadPublished() }
     }
 
     func refreshLocal() {
-        guard !snapshotSeeded else { return }
-        let record = loadIdentityFile()
-        state.record = record
-        state.fingerprint = record.flatMap {
-            MailE2e.fingerprint(publicKeyB64: $0.encryption.publicKey)
+        guard !snapshotSeeded, let key = identityKey else { return }
+        localRead?.cancel()
+        let legacy = token
+        let generation = SessionStore.generation
+        localRead = Task { [weak self] in
+            let result = await Self.readIdentityFile(key: key, legacy: legacy)
+            guard let self, !Task.isCancelled, !self.state.busy,
+                  generation == SessionStore.generation else { return }
+            if let old = result.legacyKey, let record = result.record,
+               MailE2e.saveIdentity(accountKey: key, identity: record) {
+                MailE2e.clearIdentity(accountKey: old)
+            }
+            var updated = self.state
+            updated.record = result.record
+            updated.fingerprint = result.record.flatMap {
+                MailE2e.fingerprint(publicKeyB64: $0.encryption.publicKey)
+            }
+            self.state = updated
         }
     }
 
@@ -252,6 +272,7 @@ final class E2eModel: ObservableObject {
     /// with a stranger's key. A clear the UI forgets to call is a leak; this
     /// is called from every sign-out door and from the expiry handler.
     func clearForSignOut() {
+        localRead?.cancel()
         session = nil
         state = State()
     }
@@ -296,6 +317,7 @@ final class E2eModel: ObservableObject {
 
     func removeKey() {
         guard !snapshotSeeded else { return }
+        localRead?.cancel()
         state.busy = true
         // Both names: the stable one, and the token-keyed one a v0.3.0 build
         // may still have on disk. "Remove the key from this device" that left
@@ -360,6 +382,9 @@ final class E2eModel: ObservableObject {
     /// phrase gets the module's own line, and a message not sealed to this key
     /// says so — ciphertext is never shown as if it were plaintext.
     func decrypt(envelopeJson: String, passphrase: String) async -> String? {
+        let generation = SessionStore.generation
+        await localRead?.value
+        guard !Task.isCancelled, generation == SessionStore.generation else { return nil }
         guard let record = state.record else {
             note("This device has no key to open messages with.", bad: true)
             return nil
@@ -370,6 +395,7 @@ final class E2eModel: ObservableObject {
                 return try MailE2e.open(envelopeJson, recipientPrivateKeyB64: priv)
             }
         }.value
+        guard !Task.isCancelled, generation == SessionStore.generation else { return nil }
         switch result {
         case .success(let plain): return plain
         case .failure(let error):
