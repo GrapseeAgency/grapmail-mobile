@@ -1530,18 +1530,21 @@ class MailboxViewModel @JvmOverloads constructor(
      */
     data class Person(val address: String, val name: String?, val seen: Int)
 
-    suspend fun people(): List<Person> {
+    suspend fun people(): List<Person> = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
         val counts = LinkedHashMap<String, Pair<String?, Int>>()
+        val seenMessages = HashSet<String>()
         MailBox.tabOrder.forEach { box ->
             MailStore.page(box, null)?.messages?.forEach { m ->
-                m.from?.address?.takeIf { it.isNotBlank() }?.let { a ->
-                    val prior = counts[a]
-                    counts[a] = (m.from?.name ?: prior?.first) to ((prior?.second ?: 0) + 1)
+                if (seenMessages.add(m.id)) {
+                    m.from?.address?.takeIf { it.isNotBlank() }?.let { a ->
+                        val prior = counts[a]
+                        counts[a] = (m.from?.name ?: prior?.first) to ((prior?.second ?: 0) + 1)
+                    }
+                    m.to.forEach { a -> if (a.isNotBlank()) counts.putIfAbsent(a, null to 0) }
                 }
-                m.to.forEach { a -> if (a.isNotBlank()) counts.putIfAbsent(a, null to 0) }
             }
         }
-        return counts.map { (addr, v) -> Person(addr, v.first, v.second) }
+        counts.map { (addr, v) -> Person(addr, v.first, v.second) }
             .sortedWith(compareByDescending<Person> { it.seen }.thenBy { it.address.lowercase() })
     }
 
@@ -2104,10 +2107,11 @@ class MailboxViewModel @JvmOverloads constructor(
      * Attachments the app has actually seen. Partial by construction — see
      * [MailStore.allBodies] for why the screen has to say so.
      */
-    suspend fun files(): List<FileEntry> =
+    suspend fun files(): List<FileEntry> = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
         MailStore.allBodies().flatMap { m ->
             m.attachments.map { FileEntry(it, m.subject?.takeIf { s -> s.isNotBlank() }) }
         }
+    }
 
     /**
      * Take one attachment out of the message for good.

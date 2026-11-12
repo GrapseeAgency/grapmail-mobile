@@ -139,21 +139,24 @@ fun ComposeScreen(
     // People the To field can offer. Derived, not an address book — see
     // MailboxViewModel.people for why that distinction is stated rather than
     // papered over.
-    var people by remember { mutableStateOf<List<MailboxViewModel.Person>>(emptyList()) }
-    LaunchedEffect(state.to) {
+    var contactCandidates by remember(vm) { mutableStateOf<List<MailboxViewModel.Person>>(emptyList()) }
+    LaunchedEffect(vm) { contactCandidates = vm.people() }
+    val people = remember(contactCandidates, state.to) {
+        val needle = state.to.trim()
+        if (needle.isEmpty()) return@remember emptyList()
         val already = splitTo(state.to)
-        people = vm.people().filter { p ->
-            (p.address.contains(state.to.trim(), ignoreCase = true) ||
-                p.name?.contains(state.to.trim(), ignoreCase = true) == true) &&
+        contactCandidates.asSequence().filter { p ->
+            (p.address.contains(needle, ignoreCase = true) ||
+                p.name?.contains(needle, ignoreCase = true) == true) &&
                 already.none { it.equals(p.address, ignoreCase = true) }
-        }.take(5)
+        }.take(5).toList()
     }
 
     val pickFile = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
-        if (uri != null) uploadOne(vm, context, uri, attached) { notice = it }
+        if (uri != null) scope.launch { uploadOne(vm, context, uri, attached) { notice = it } }
     }
     val pickImage = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
-        if (uri != null) uploadOne(vm, context, uri, attached) { notice = it }
+        if (uri != null) scope.launch { uploadOne(vm, context, uri, attached) { notice = it } }
     }
 
     Column(Modifier.fillMaxSize().background(palette.bg).statusBarsPadding().imePadding()) {
@@ -514,17 +517,20 @@ internal fun SendReceipt(status: String, detail: String?, error: String?) {
  * here and handed on — a URI passed to a later screen would fail once the
  * permission died, which is the kind of bug that only appears a day later.
  */
-private fun uploadOne(
+private suspend fun uploadOne(
     vm: MailboxViewModel,
     context: android.content.Context,
     uri: Uri,
     into: androidx.compose.runtime.snapshots.SnapshotStateList<MailAttachmentDto>,
     report: (String) -> Unit,
 ) {
-    val mime = context.contentResolver.getType(uri) ?: "application/octet-stream"
-    val name = queryName(context, uri) ?: uri.lastPathSegment ?: "attachment"
-    val bytes = runCatching { context.contentResolver.openInputStream(uri)?.use { it.readBytes() } }
-        .getOrNull()
+    val (name, mime, bytes) = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+        val resolver = context.contentResolver
+        val name = queryName(context, uri) ?: uri.lastPathSegment ?: "attachment"
+        val mime = runCatching { resolver.getType(uri) }.getOrNull() ?: "application/octet-stream"
+        val bytes = runCatching { resolver.openInputStream(uri)?.use { it.readBytes() } }.getOrNull()
+        Triple(name, mime, bytes)
+    }
     if (bytes == null) { report("That file could not be read."); return }
     if (bytes.isEmpty()) { report("That file is empty."); return }
     report("Uploading ${name}…")

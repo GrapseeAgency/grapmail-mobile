@@ -684,7 +684,7 @@ struct ComposeView: View {
     @State private var notice: String?
     @State private var showCc = false
     @State private var picking = false
-    @State private var people: [MailboxModel.Person] = []
+    @State private var contactCandidates: [MailboxModel.Person] = []
     @State private var prepared = false
     @State private var encryptOn = false
 
@@ -781,9 +781,8 @@ struct ComposeView: View {
                     prepared = true
                 }
             }
-            await refreshSuggestions()
+            contactCandidates = await vm.people()
         }
-        .onChange(of: vm.compose.to) { _ in Task { await refreshSuggestions() } }
         .accessibilityIdentifier("mail-compose-screen")
     }
 
@@ -898,9 +897,10 @@ struct ComposeView: View {
     }
 
     @ViewBuilder private var suggestions: some View {
-        if !people.isEmpty && !vm.compose.to.isEmpty {
+        let matches = people
+        if !matches.isEmpty {
             VStack(alignment: .leading, spacing: 0) {
-                ForEach(people, id: \.address) { p in
+                ForEach(matches, id: \.address) { p in
                     Button {
                         vm.composeUpdate { s in s.to = ComposeView.append(s.to, p.address) }
                     } label: {
@@ -1021,16 +1021,15 @@ struct ComposeView: View {
     /// The people the To field can name — derived from mail the app has loaded,
     /// not an address book. There is no contacts endpoint; the web client
     /// derives them the same way and the app says so rather than implying more.
-    private func refreshSuggestions() async {
+    private var people: [MailboxModel.Person] {
         let needle = vm.compose.to.trimmingCharacters(in: .whitespaces)
+        guard !needle.isEmpty else { return [] }
         let already = MailboxModel.splitAddresses(vm.compose.to)
-        let all = await vm.people()
-        guard !needle.isEmpty else { people = []; return }
-        people = all.filter { p in
+        return Array(contactCandidates.lazy.filter { p in
             (p.address.localizedCaseInsensitiveContains(needle)
              || p.name?.localizedCaseInsensitiveContains(needle) == true)
             && !already.contains { $0.caseInsensitiveCompare(p.address) == .orderedSame }
-        }.prefix(5).map { $0 }
+        }.prefix(5))
     }
 
     private func pick(_ result: Result<[URL], Error>) {
@@ -1038,23 +1037,35 @@ struct ComposeView: View {
             if case let .failure(e) = result { notice = e.localizedDescription }
             return
         }
-        let name = url.lastPathComponent
-        // `OpenDocument`-style access grants read permission to this process
-        // only, so the bytes are taken now rather than a URI being carried to a
-        // later screen that would fail once the permission died.
-        guard url.startAccessingSecurityScopedResource() else {
-            notice = "The app could not be given permission to read that file."
-            return
+        Task { @MainActor in
+            let name = url.lastPathComponent
+            notice = "Reading \(name)…"
+            let result = await Self.readPickedFile(url)
+            guard let bytes = result.bytes else {
+                notice = result.error
+                return
+            }
+            guard !bytes.isEmpty else { notice = "That file is empty."; return }
+            notice = "Uploading \(name)…"
+            vm.uploadAttachment(bytes: bytes, filename: name,
+                                mimeType: MimeType.of(filename: name)) { a, message in
+                notice = message
+                if let a { attached.append(a) }
+            }
         }
-        defer { url.stopAccessingSecurityScopedResource() }
-        guard let bytes = try? Data(contentsOf: url) else {
-            notice = "That file could not be read."
-            return
-        }
-        vm.uploadAttachment(bytes: bytes, filename: name,
-                            mimeType: MimeType.of(filename: name)) { a, message in
-            notice = message
-            if let a { attached.append(a) }
+    }
+
+    private nonisolated static func readPickedFile(_ url: URL) async -> (bytes: Data?, error: String?) {
+        await withCheckedContinuation { continuation in
+            DispatchQueue.global(qos: .userInitiated).async {
+                guard url.startAccessingSecurityScopedResource() else {
+                    continuation.resume(returning: (nil, "The app could not be given permission to read that file."))
+                    return
+                }
+                let bytes = try? Data(contentsOf: url)
+                url.stopAccessingSecurityScopedResource()
+                continuation.resume(returning: (bytes, bytes == nil ? "That file could not be read." : nil))
+            }
         }
     }
 

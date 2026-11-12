@@ -1040,11 +1040,13 @@ final class MailboxModel: ObservableObject {
     /// (`src/app/(mail)/mail/contacts/page.tsx:26-28`). Saying "contacts" while
     /// reading the mailbox is honest; showing a list that looks like an address
     /// book the user never filled in would not be.
-    func people() async -> [Person] {
+    nonisolated func people() async -> [Person] {
         var counts: [String: (name: String?, seen: Int)] = [:]
+        var seenMessages: Set<String> = []
         for box in MailBox.tabOrder {
             guard let page = await MailStore.shared.page(box, nil) else { continue }
             for m in page.messages {
+                guard seenMessages.insert(m.id).inserted else { continue }
                 if let a = m.from?.address?.nilIfBlank() {
                     let prior = counts[a]
                     counts[a] = (m.from?.name ?? prior?.name, (prior?.seen ?? 0) + 1)
@@ -1064,7 +1066,7 @@ final class MailboxModel: ObservableObject {
 
     /// Attachments the app has actually seen. Partial by construction — the Files
     /// screen says so, because there is no list-all attachments route.
-    func files() async -> [FileEntry] {
+    nonisolated func files() async -> [FileEntry] {
         (await MailStore.shared.allBodies()).flatMap { m in
             m.attachments.map { FileEntry(attachment: $0, fromMessage: m.subject?.nilIfBlank()) }
         }

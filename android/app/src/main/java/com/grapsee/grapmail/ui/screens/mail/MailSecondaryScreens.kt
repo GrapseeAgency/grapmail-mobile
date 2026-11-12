@@ -47,6 +47,8 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -590,17 +592,23 @@ fun MailSettingsScreen(
     // A locally cached list rendered as though it were the server's answer would
     // show a create or a delete that had not happened.
     val aliases by vm.aliasesState.collectAsState()
+    val accountFields = remember(vm) {
+        vm.state.map { Triple(it.accountAddress, it.accountStatus, it.memberSince) }
+            .distinctUntilChanged()
+    }
+    val account by accountFields.collectAsState(
+        initial = vm.state.value.let { Triple(it.accountAddress, it.accountStatus, it.memberSince) },
+    )
     LaunchedEffect(Unit) { vm.loadAliases() }
 
     MailScaffold("Settings", onBack) {
         Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
-            val me = vm.state.value.accountAddress
             SectionLabel("Account", palette)
-            SettingRow(Icons.Rounded.MailOutline, "GrapMail address", me ?: "Not loaded", palette)
+            SettingRow(Icons.Rounded.MailOutline, "GrapMail address", account.first ?: "Not loaded", palette)
             SettingRow(Icons.Rounded.Star, "Mailbox status",
-                vm.state.value.accountStatus ?: "Not reported", palette)
+                account.second ?: "Not reported", palette)
             SettingRow(Icons.Rounded.Lock, "Member since",
-                vm.state.value.memberSince ?: "Not reported", palette)
+                account.third ?: "Not reported", palette)
 
             SectionLabel("Sending as", palette)
             // Three answers, not two: while the read is outstanding the screen
@@ -611,6 +619,10 @@ fun MailSettingsScreen(
                 aliases.read == com.grapsee.grapmail.data.AssignmentsRead.Reading ||
                     aliases.read == com.grapsee.grapmail.data.AssignmentsRead.NotRead ->
                     Text("Checking…", fontSize = 13.sp, color = palette.textTertiary,
+                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp))
+                aliases.read == com.grapsee.grapmail.data.AssignmentsRead.Failed && aliases.list.isEmpty() ->
+                    Text(aliases.error ?: "The alias list did not load.",
+                        fontSize = 13.sp, color = palette.textSecondary,
                         modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp))
                 aliases.list.isEmpty() ->
                     Text("No aliases on this mailbox. An alias is a second address " +
