@@ -532,48 +532,53 @@ class MailboxViewModel @JvmOverloads constructor(
      * Re-derive the visible rows from what is loaded. Never a network call — this
      * runs on filter and sort changes, which are local operations.
      */
+    private var projectionGeneration = 0L
+
     private suspend fun reproject() {
+        val generation = ++projectionGeneration
         val s = _state.value
         val cache = MailStore.page(s.box, s.query.trim().takeIf { it.length >= 3 })
-        var rows = cache?.messages ?: s.rows
         val total = cache?.total ?: s.total
+        val rows = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+            var rows = cache?.messages ?: s.rows
 
-        if (s.filter == MailFilter.Unread) rows = rows.filterNot { it.isRead }
+            if (s.filter == MailFilter.Unread) rows = rows.filterNot { it.isRead }
 
-        // The advanced filters run here, on the loaded pages, before the sort.
-        // Blank fields are absent filters, not empty-string matches: a screen
-        // that sent "" at the server would match nothing, and one that matched
-        // "" here would hide mail the person never meant to exclude.
-        val advOn = s.advFrom.isNotBlank() || s.advTo.isNotBlank() ||
-            s.advSubject.isNotBlank() || s.advFiles ||
-            s.advAfter.isNotBlank() || s.advBefore.isNotBlank()
-        if (advOn) {
-            rows = rows.filter { m ->
-                (s.advFrom.isBlank() ||
-                    (m.from?.display ?: "").contains(s.advFrom.trim(), ignoreCase = true)) &&
-                (s.advTo.isBlank() || m.to.any { it.contains(s.advTo.trim(), ignoreCase = true) } ||
-                    m.cc.any { it.contains(s.advTo.trim(), ignoreCase = true) }) &&
-                (s.advSubject.isBlank() ||
-                    (m.subject ?: "").contains(s.advSubject.trim(), ignoreCase = true)) &&
-                (!s.advFiles || m.hasAttachments) &&
-                (s.advAfter.isBlank() || (m.createdAt ?: "").take(10) >= s.advAfter.trim()) &&
-                (s.advBefore.isBlank() || (m.createdAt ?: "").take(10) <= s.advBefore.trim())
+            // The advanced filters run here, on the loaded pages, before the sort.
+            // Blank fields are absent filters, not empty-string matches: a screen
+            // that sent "" at the server would match nothing, and one that matched
+            // "" here would hide mail the person never meant to exclude.
+            val advOn = s.advFrom.isNotBlank() || s.advTo.isNotBlank() ||
+                s.advSubject.isNotBlank() || s.advFiles ||
+                s.advAfter.isNotBlank() || s.advBefore.isNotBlank()
+            if (advOn) {
+                rows = rows.filter { m ->
+                    (s.advFrom.isBlank() ||
+                        (m.from?.display ?: "").contains(s.advFrom.trim(), ignoreCase = true)) &&
+                    (s.advTo.isBlank() || m.to.any { it.contains(s.advTo.trim(), ignoreCase = true) } ||
+                        m.cc.any { it.contains(s.advTo.trim(), ignoreCase = true) }) &&
+                    (s.advSubject.isBlank() ||
+                        (m.subject ?: "").contains(s.advSubject.trim(), ignoreCase = true)) &&
+                    (!s.advFiles || m.hasAttachments) &&
+                    (s.advAfter.isBlank() || (m.createdAt ?: "").take(10) >= s.advAfter.trim()) &&
+                    (s.advBefore.isBlank() || (m.createdAt ?: "").take(10) <= s.advBefore.trim())
+                }
             }
-        }
 
-        rows = when (s.sort) {
-            // The server's own order: covers the whole box, not just the pages.
-            MailSort.Newest -> rows
-            MailSort.Oldest -> rows.reversed()
-            MailSort.SenderAsc -> rows.sortedBy { it.from?.display.orEmpty().lowercase() }
-            MailSort.SenderDesc -> rows.sortedByDescending { it.from?.display.orEmpty().lowercase() }
-            MailSort.SubjectAsc -> rows.sortedBy { (it.subject ?: "").lowercase() }
-            MailSort.SubjectDesc -> rows.sortedByDescending { (it.subject ?: "").lowercase() }
+            when (s.sort) {
+                // The server's own order: covers the whole box, not just the pages.
+                MailSort.Newest -> rows
+                MailSort.Oldest -> rows.reversed()
+                MailSort.SenderAsc -> rows.sortedBy { it.from?.display.orEmpty().lowercase() }
+                MailSort.SenderDesc -> rows.sortedByDescending { it.from?.display.orEmpty().lowercase() }
+                MailSort.SubjectAsc -> rows.sortedBy { (it.subject ?: "").lowercase() }
+                MailSort.SubjectDesc -> rows.sortedByDescending { (it.subject ?: "").lowercase() }
+            }
         }
 
         val stats = runCatching { MailStore.stats() }.getOrNull()
         _state.update {
-            if (it.box != s.box || it.query.trim().takeIf { term -> term.length >= 3 } !=
+            if (generation != projectionGeneration || it.box != s.box || it.query.trim().takeIf { term -> term.length >= 3 } !=
                 s.query.trim().takeIf { term -> term.length >= 3 } ||
                 it.filter != s.filter || it.sort != s.sort) return@update it
             it.copy(

@@ -460,60 +460,23 @@ final class MailboxModel: ObservableObject {
 
     /// Re-derive the visible rows from what is loaded. Never a network call — this
     /// runs on filter and sort changes, which are local operations.
+    private var projectionGeneration = 0
+
     func reproject() {
+        projectionGeneration &+= 1
+        let generation = projectionGeneration
+        let settings = state
         let box = state.box
         let term = state.query.trimmingCharacters(in: .whitespaces)
             .nilIfBlank().flatMap { $0.count >= 3 ? $0 : nil }
         Task { [weak self] in
             guard let self else { return }
             let cache = await MailStore.shared.page(box, term)
-            var rows = cache?.messages ?? self.state.rows
+            let rows = await Self.projectRows(cache?.messages ?? settings.rows, settings: settings)
             let total = cache?.total ?? self.state.total
 
-            if self.state.filter == .unread { rows = rows.filter { !$0.isRead } }
-
-            // The advanced filters run here, on the loaded pages, before the
-            // sort. Blank fields are absent filters, not empty-string matches.
-            let advOn = !self.state.advFrom.trimmed.isEmpty || !self.state.advTo.trimmed.isEmpty
-                || !self.state.advSubject.trimmed.isEmpty || self.state.advFiles
-                || !self.state.advAfter.trimmed.isEmpty || !self.state.advBefore.trimmed.isEmpty
-            if advOn {
-                let f = self.state.advFrom.trimmed.lowercased()
-                let tt = self.state.advTo.trimmed.lowercased()
-                let sj = self.state.advSubject.trimmed.lowercased()
-                let after = self.state.advAfter.trimmed
-                let before = self.state.advBefore.trimmed
-                rows = rows.filter { m in
-                    (f.isEmpty || (m.from?.display ?? "").lowercased().contains(f))
-                    && (tt.isEmpty || m.to.contains { $0.lowercased().contains(tt) }
-                        || m.cc.contains { $0.lowercased().contains(tt) })
-                    && (sj.isEmpty || (m.subject ?? "").lowercased().contains(sj))
-                    && (!self.state.advFiles || m.hasAttachments)
-                    && (after.isEmpty || String((m.createdAt ?? "").prefix(10)) >= after)
-                    && (before.isEmpty || String((m.createdAt ?? "").prefix(10)) <= before)
-                }
-            }
-
-            // The keys are computed through locals on purpose. Written inline as
-            // `$0.from?.display.lowercased() < $1.from?.display.lowercased()`,
-            // the optional chain makes both sides `String?`, `<` has no such
-            // overload, and the compiler then resolves `sort` to the
-            // `Comparator` API and reports an error that names nothing useful.
-            switch self.state.sort {
-            case .newest: break                                  // the server's own order
-            case .oldest: rows = rows.reversed()
-            case .senderAsc:
-                rows.sort { a, b in Self.senderKey(a) < Self.senderKey(b) }
-            case .senderDesc:
-                rows.sort { a, b in Self.senderKey(a) > Self.senderKey(b) }
-            case .subjectAsc:
-                rows.sort { a, b in Self.subjectKey(a) < Self.subjectKey(b) }
-            case .subjectDesc:
-                rows.sort { a, b in Self.subjectKey(a) > Self.subjectKey(b) }
-            }
-
             let stats = await MailStore.shared.stats()
-            guard self.state.box == box,
+            guard self.projectionGeneration == generation, self.state.box == box,
                   self.state.query.trimmingCharacters(in: .whitespaces)
                     .nilIfBlank().flatMap({ $0.count >= 3 ? $0 : nil }) == term else { return }
             var updated = self.state
@@ -528,6 +491,52 @@ final class MailboxModel: ObservableObject {
             self.applyFolderCounts(stats, to: &updated)
             self.state = updated
         }
+    }
+
+    private nonisolated static func projectRows(_ messages: [MailMessage], settings: State) async -> [MailMessage] {
+        var rows = messages
+        if settings.filter == .unread { rows = rows.filter { !$0.isRead } }
+
+        // The advanced filters run here, on the loaded pages, before the
+        // sort. Blank fields are absent filters, not empty-string matches.
+        let advOn = !settings.advFrom.trimmed.isEmpty || !settings.advTo.trimmed.isEmpty
+            || !settings.advSubject.trimmed.isEmpty || settings.advFiles
+            || !settings.advAfter.trimmed.isEmpty || !settings.advBefore.trimmed.isEmpty
+        if advOn {
+            let f = settings.advFrom.trimmed.lowercased()
+            let tt = settings.advTo.trimmed.lowercased()
+            let sj = settings.advSubject.trimmed.lowercased()
+            let after = settings.advAfter.trimmed
+            let before = settings.advBefore.trimmed
+            rows = rows.filter { m in
+                (f.isEmpty || (m.from?.display ?? "").lowercased().contains(f))
+                && (tt.isEmpty || m.to.contains { $0.lowercased().contains(tt) }
+                    || m.cc.contains { $0.lowercased().contains(tt) })
+                && (sj.isEmpty || (m.subject ?? "").lowercased().contains(sj))
+                && (!settings.advFiles || m.hasAttachments)
+                && (after.isEmpty || String((m.createdAt ?? "").prefix(10)) >= after)
+                && (before.isEmpty || String((m.createdAt ?? "").prefix(10)) <= before)
+            }
+        }
+
+        // The keys are computed through locals on purpose. Written inline as
+        // `$0.from?.display.lowercased() < $1.from?.display.lowercased()`,
+        // the optional chain makes both sides `String?`, `<` has no such
+        // overload, and the compiler then resolves `sort` to the
+        // `Comparator` API and reports an error that names nothing useful.
+        switch settings.sort {
+        case .newest: break                                  // the server's own order
+        case .oldest: rows = rows.reversed()
+        case .senderAsc:
+            rows.sort { a, b in Self.senderKey(a) < Self.senderKey(b) }
+        case .senderDesc:
+            rows.sort { a, b in Self.senderKey(a) > Self.senderKey(b) }
+        case .subjectAsc:
+            rows.sort { a, b in Self.subjectKey(a) < Self.subjectKey(b) }
+        case .subjectDesc:
+            rows.sort { a, b in Self.subjectKey(a) > Self.subjectKey(b) }
+        }
+        return rows
     }
 
     private func applyFolderCounts(_ stats: MailStatsResponse?, to state: inout State) {
@@ -2004,8 +2013,8 @@ final class MailboxModel: ObservableObject {
     /// Sort keys. Blank stays blank and case folds away: a message whose sender
     /// the server never named belongs at one end of the list, not scattered
     /// through it, and it must not sort differently on two runs.
-    static func senderKey(_ m: MailMessage) -> String { (m.from?.display ?? "").lowercased() }
-    static func subjectKey(_ m: MailMessage) -> String { (m.subject ?? "").lowercased() }
+    nonisolated static func senderKey(_ m: MailMessage) -> String { (m.from?.display ?? "").lowercased() }
+    nonisolated static func subjectKey(_ m: MailMessage) -> String { (m.subject ?? "").lowercased() }
 
     private static func isNoMailbox(_ e: ApiError) -> Bool {
         if case .http(_, let code, _) = e, code == "NO_MAILBOX" { return true }
