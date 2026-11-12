@@ -93,7 +93,7 @@ struct BasicInfoView: View {
     // The real photo picker (the design ships the control; the old build
     // had a dead label). Held locally — the account API takes no photo.
     @State private var photoItem: PhotosPickerItem?
-    @State private var photoData: Data?
+    @State private var photoPreview: UIImage?
 
     private let months = ["January", "February", "March", "April", "May", "June",
                           "July", "August", "September", "October", "November", "December"]
@@ -152,7 +152,7 @@ struct BasicInfoView: View {
                 .frame(width: 72, height: 72)
                 .overlay(
                     Group {
-                        if let photoData, let ui = UIImage(data: photoData) {
+                        if let ui = photoPreview {
                             Image(uiImage: ui)
                                 .resizable()
                                 .aspectRatio(contentMode: .fill)
@@ -189,7 +189,7 @@ struct BasicInfoView: View {
                 .font(GMFont.caption)
                 .foregroundColor(GM.textSecondary)
             PhotosPicker(selection: $photoItem, matching: .images) {
-                Text(photoData == nil ? "Choose Photo" : "Change Photo")
+                Text(photoPreview == nil ? "Choose Photo" : "Change Photo")
                     .font(GMFont.captionMedium)
                     .foregroundColor(GM.primarySolid)
                     .padding(.horizontal, 14)
@@ -197,10 +197,12 @@ struct BasicInfoView: View {
                     .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(GM.border))
             }
             .buttonStyle(.plain)
-            .onChange(of: photoItem) { item in
-                Task {
-                    if let item { photoData = try? await item.loadTransferable(type: Data.self) }
-                }
+            .task(id: photoItem) {
+                guard let item = photoItem else { return }
+                guard let data = try? await item.loadTransferable(type: Data.self) else { return }
+                let thumbnail = await AvatarThumbnail.decode(data)
+                guard !Task.isCancelled else { return }
+                photoPreview = thumbnail.map { UIImage(cgImage: $0) }
             }
             .padding(.top, 8)
         }

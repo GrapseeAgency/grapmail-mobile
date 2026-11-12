@@ -1,5 +1,26 @@
 import SwiftUI
 import PhotosUI
+import ImageIO
+
+enum AvatarThumbnail {
+    static func decode(_ data: Data) async -> CGImage? {
+        await withCheckedContinuation { continuation in
+            DispatchQueue.global(qos: .userInitiated).async {
+                let source = CGImageSourceCreateWithData(data as CFData, nil)
+                let options: [CFString: Any] = [
+                    kCGImageSourceCreateThumbnailFromImageAlways: true,
+                    kCGImageSourceCreateThumbnailWithTransform: true,
+                    kCGImageSourceThumbnailMaxPixelSize: 256,
+                    kCGImageSourceShouldCacheImmediately: true,
+                ]
+                let thumbnail = source.flatMap {
+                    CGImageSourceCreateThumbnailAtIndex($0, 0, options as CFDictionary)
+                }
+                continuation.resume(returning: thumbnail)
+            }
+        }
+    }
+}
 
 /// The account-record screens — the mobile form of the web client's
 /// `/mail/notes`, `/mail/tasks`, `/mail/settings`, `/mail/account/addresses`,
@@ -994,6 +1015,7 @@ struct ProfileEditView: View {
     @State private var gender = ""
     @State private var photoError: String?
     @State private var photoItem: PhotosPickerItem?
+    @State private var avatarPreview: UIImage?
 
     private var p: ProfileDto? { vm.state.profile }
 
@@ -1027,6 +1049,12 @@ struct ProfileEditView: View {
             birthday = p?.birthday ?? ""
             gender = p?.gender ?? ""
         }
+        .task(id: vm.state.avatar) {
+            guard let data = vm.state.avatar else { avatarPreview = nil; return }
+            let thumbnail = await AvatarThumbnail.decode(data)
+            guard !Task.isCancelled else { return }
+            avatarPreview = thumbnail.map { UIImage(cgImage: $0) }
+        }
         .onChange(of: photoItem) { item in
             Task {
                 guard let item, let bytes = try? await item.loadTransferable(type: Data.self)
@@ -1048,7 +1076,7 @@ struct ProfileEditView: View {
         HStack(spacing: 14) {
             ZStack {
                 Circle().fill(GM.softFill).frame(width: 64, height: 64)
-                if let data = vm.state.avatar, let img = UIImage(data: data) {
+                if let img = avatarPreview {
                     Image(uiImage: img).resizable()
                         .scaledToFill().frame(width: 64, height: 64).clipped()
                         .clipShape(Circle())

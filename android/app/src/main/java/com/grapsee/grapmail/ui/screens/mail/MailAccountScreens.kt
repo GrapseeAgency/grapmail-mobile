@@ -41,6 +41,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -832,34 +836,48 @@ fun ProfileEditScreen(vm: ProfileViewModel, onBack: () -> Unit) {
     var birthday by remember(p?.birthday) { mutableStateOf(p?.birthday ?: "") }
     var gender by remember(p?.gender) { mutableStateOf(p?.gender ?: "") }
     var photoError by remember { mutableStateOf<String?>(null) }
+    val photoScope = rememberCoroutineScope()
 
     val picker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent(),
     ) { uri: Uri? ->
-        if (uri != null) {
+        if (uri != null) photoScope.launch {
             // Read the bytes, honour the server's own ceiling, and hand them to
             // the upload route. A refusal says why in the same words the API
             // uses — the screen never uploads something it already knows will
             // be rejected.
             val ctx = vm.getApplication<android.app.Application>()
-            runCatching {
-                ctx.contentResolver.openInputStream(uri)?.use { it.readBytes() }
-            }.onSuccess { bytes ->
-                when {
-                    bytes == null -> photoError = "That file could not be read."
-                    bytes.size > 256 * 1024 ->
-                        photoError = "That photo is too large. A profile photo can be up to 256 KB."
-                    else -> {
-                        val mime = ctx.contentResolver.getType(uri) ?: "image/jpeg"
-                        val ext = when (mime) {
-                            "image/png" -> "png"; "image/webp" -> "webp"
-                            "image/gif" -> "gif"; else -> "jpg"
+            val (bytes, mime) = withContext(Dispatchers.IO) {
+                val resolver = ctx.contentResolver
+                val bytes = runCatching {
+                    resolver.openInputStream(uri)?.use { stream ->
+                        val buffer = ByteArray(256 * 1024 + 1)
+                        var count = 0
+                        while (count < buffer.size) {
+                            val read = stream.read(buffer, count, buffer.size - count)
+                            if (read <= 0) break
+                            count += read
                         }
-                        vm.uploadAvatar(bytes, "profile.$ext", mime)
-                        photoError = null
+                        buffer.copyOf(count)
                     }
+                }.getOrNull()
+                bytes to (runCatching { resolver.getType(uri) }.getOrNull() ?: "image/jpeg")
+            }
+            when {
+                bytes == null || bytes.isEmpty() -> photoError = "That file could not be read."
+                bytes.size > 256 * 1024 ->
+                    photoError = "That photo is too large. A profile photo can be up to 256 KB."
+                else -> {
+                    val ext = when (mime) {
+                        "image/png" -> "png"
+                        "image/webp" -> "webp"
+                        "image/gif" -> "gif"
+                        else -> "jpg"
+                    }
+                    vm.uploadAvatar(bytes, "profile.$ext", mime)
+                    photoError = null
                 }
-            }.onFailure { photoError = "That file could not be read." }
+            }
         }
     }
 

@@ -88,10 +88,18 @@ fun BasicInfoStepScreen(vm: SignUpViewModel, onBack: () -> Unit, onSignIn: () ->
         bitmap = photoUri?.let {
             kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
                 runCatching {
-                    // openInputStream + decodeStream works from API 21 up;
-                    // loadThumbnail/getBitmap would need an API-29 gate.
-                    context.contentResolver.openInputStream(android.net.Uri.parse(it))?.use { stream ->
-                        android.graphics.BitmapFactory.decodeStream(stream)?.asImageBitmap()
+                    val uri = android.net.Uri.parse(it)
+                    val resolver = context.contentResolver
+                    val options = android.graphics.BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                    resolver.openInputStream(uri)?.use { stream ->
+                        android.graphics.BitmapFactory.decodeStream(stream, null, options)
+                    }
+                    var sample = 1
+                    while (maxOf(options.outWidth, options.outHeight) / sample > 512) sample *= 2
+                    options.inSampleSize = sample
+                    options.inJustDecodeBounds = false
+                    resolver.openInputStream(uri)?.use { stream ->
+                        android.graphics.BitmapFactory.decodeStream(stream, null, options)?.asImageBitmap()
                     }
                 }.getOrNull()
             }
