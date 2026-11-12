@@ -66,6 +66,8 @@ struct MailboxView: View {
                     onLabels: { drawerOpen = false; onLabels() },
                     onScreener: { drawerOpen = false; onScreener() },
                     onSubscriptions: { drawerOpen = false; onSubscriptions() },
+                    onSortFilter: { drawerOpen = false; sheet = .sortFilter },
+                    onAdvanced: { drawerOpen = false; sheet = .advanced },
                     onSettings: { drawerOpen = false; onSettings() },
                     onSecurity: { drawerOpen = false; onSecurity() },
                     onHelp: { drawerOpen = false; onHelp() },
@@ -217,19 +219,10 @@ struct MailboxView: View {
                 .foregroundColor(GM.textPrimary)
                 .accessibilityLabel("Search subject, body or sender")
                 .accessibilityIdentifier("mail-search")
-            Button { sheet = .advanced } label: {
-                Image(systemName: "slider.horizontal.3")
-                    .font(.system(size: 15))
-                    .foregroundColor(advActive ? GM.primarySolid : GM.textSecondary)
-            }
-            .accessibilityLabel("Search filters")
-            .accessibilityIdentifier("mail-adv-filter")
-            Button { sheet = .sortFilter } label: {
-                Image(systemName: "tag")
-                    .font(.system(size: 15))
-                    .foregroundColor(filterActive ? GM.primarySolid : GM.textSecondary)
-            }
-            .accessibilityLabel("Sort and filter")
+            // No glyphs in the pill. Sort & filter and advanced search live in
+            // the drawer's Search section — the pill is the reference's own
+            // clean "Search in mail", and every tool stays one tap away where
+            // the other tools live.
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 11)

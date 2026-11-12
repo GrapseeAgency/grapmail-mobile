@@ -21,6 +21,10 @@ struct MailDrawer: View {
     let onLabels: () -> Void
     let onScreener: () -> Void
     let onSubscriptions: () -> Void
+    /// The two tools the search pill used to carry. The pill is the
+    /// reference's own clean "Search in mail": one field, nothing else.
+    let onSortFilter: () -> Void
+    let onAdvanced: () -> Void
     let onSettings: () -> Void
     let onSecurity: () -> Void
     let onHelp: () -> Void
@@ -58,6 +62,15 @@ struct MailDrawer: View {
                         section("Mail")
                         DrawerRow(label: "Subscriptions", icon: "envelope",
                                   count: nil, selected: false, onClick: onSubscriptions)
+
+                        // The two tools the search pill used to carry, where
+                        // every other tool lives. The pill stays the reference's
+                        // clean "Search in mail": one field, nothing else.
+                        section("Search")
+                        DrawerRow(label: "Sort & filter", icon: "tag",
+                                  count: nil, selected: false, onClick: onSortFilter)
+                        DrawerRow(label: "Advanced search", icon: "slider.horizontal.3",
+                                  count: nil, selected: false, onClick: onAdvanced)
 
                         // Queue and Labels follow the Mail section on both
                         // platforms; both keep a second door (Settings rows,

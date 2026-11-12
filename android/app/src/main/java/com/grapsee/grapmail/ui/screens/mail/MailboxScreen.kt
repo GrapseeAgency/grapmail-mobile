@@ -219,6 +219,8 @@ fun MailboxScreen(
                 onLabels = { scope.launch { drawer.close() }; onLabels() },
                 onScreener = { scope.launch { drawer.close() }; onScreener() },
                 onSubscriptions = { scope.launch { drawer.close() }; onSubscriptions() },
+                onSortFilter = { scope.launch { drawer.close() }; showSortSheet = true },
+                onAdvanced = { scope.launch { drawer.close() }; showAdvSheet = true },
                 onSettings = { scope.launch { drawer.close() }; onSettings() },
                 onSecurity = { scope.launch { drawer.close() }; onSecurity() },
                 onHelp = { scope.launch { drawer.close() }; onHelp() },
@@ -675,19 +677,10 @@ private fun SearchField(query: String, onQuery: (String) -> Unit, onFilter: () -
                 }
             },
         )
-        Spacer(Modifier.width(8.dp))
-        Icon(
-            Icons.Rounded.Tune, "Search filters",
-            tint = if (advActive) palette.primarySolid else palette.textSecondary,
-            modifier = Modifier.size(18.dp).clip(CircleShape).clickable(onClick = onAdvanced)
-                .testTag("mail-adv-filter"),
-        )
-        Spacer(Modifier.width(10.dp))
-        Icon(
-            Icons.Rounded.Label, "Sort and filter",
-            tint = if (filterActive) palette.primarySolid else palette.textSecondary,
-            modifier = Modifier.size(18.dp).clip(CircleShape).clickable(onClick = onFilter),
-        )
+        // No glyphs in the pill. Sort & filter and advanced search live in the
+        // drawer's Search section — the pill is the reference's own clean
+        // "Search in mail", and every tool stays one tap away where the other
+        // tools live.
     }
 }
 
@@ -895,6 +888,8 @@ internal fun MailDrawer(
     onLabels: () -> Unit,
     onScreener: () -> Unit,
     onSubscriptions: () -> Unit,
+    onSortFilter: () -> Unit,
+    onAdvanced: () -> Unit,
     onSettings: () -> Unit,
     onSecurity: () -> Unit,
     onHelp: () -> Unit,
@@ -931,6 +926,13 @@ internal fun MailDrawer(
         DrawerRow("Subscriptions", Icons.Rounded.MailOutline, null, selected = false) {
             onSubscriptions()
         }
+
+        // The search pill carries only the field now — the two glyphs that
+        // cluttered it moved here, where every other tool lives. The pill is
+        // the reference's own "Search in mail": one field, nothing else.
+        DrawerSection("Search")
+        DrawerRow("Sort & filter", Icons.Rounded.Label, null, selected = false) { onSortFilter() }
+        DrawerRow("Advanced search", Icons.Rounded.Tune, null, selected = false) { onAdvanced() }
 
         Spacer(Modifier.height(14.dp))
         // Queue and Labels follow the Mail section deliberately: frame 62
