@@ -60,11 +60,14 @@ targets:
       path: GrapMail/GrapMail.entitlements
       properties:
         aps-environment: $(APS_ENVIRONMENT)
-    # XcodeGen writes the launch storyboard and structured Info.plist entries.
+    # XcodeGen writes the native launch configuration and other Info.plist entries.
     info:
       path: GrapMail/Info.plist
       properties:
-        UILaunchStoryboardName: LaunchScreen
+        UILaunchScreen:
+          UIColorName: LaunchBackground
+          UIImageName: LaunchBrand
+          UIImageRespectsSafeAreaInsets: true
         # Must exactly match MailPoll.refreshIdentifier's registration/submission.
         BGTaskSchedulerPermittedIdentifiers:
           - com.grapsee.grapmail.inbox-refresh

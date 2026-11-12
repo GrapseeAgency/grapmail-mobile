@@ -3030,15 +3030,13 @@ pin("the iOS app icon points at a file that exists",
     and (ICON_SET / "AppIcon-1024.png").exists()
     and (ICON_SET / "AppIcon-1024.png").stat().st_size > 4096)
 
-IOS_LAUNCH = (ROOT / "ios/GrapMail/LaunchScreen.storyboard").read_text(encoding="utf-8")
-pin("the iOS launch storyboard shows the icon and Grapsee",
-    "UILaunchStoryboardName: LaunchScreen" in YML
-    and 'launchScreen="YES"' in IOS_LAUNCH
-    and 'image="GrapMailLogo"' in IOS_LAUNCH
-    and 'text="Grapsee"' in IOS_LAUNCH
-    and 'key="backgroundColor" name="LaunchBackground"' in IOS_LAUNCH
+pin("the iOS native launch screen uses the branded image and background",
+    "UILaunchScreen:" in YML
+    and "UIImageName: LaunchBrand" in YML
+    and "UIColorName: LaunchBackground" in YML
+    and not (ROOT / "ios/GrapMail/LaunchScreen.storyboard").exists()
     and not (ROOT / "ios/GrapMail/LaunchSplashView.swift").exists()
-    and (ROOT / "ios/GrapMail/Assets.xcassets/GrapMailLogo.imageset/grapmail_logo.png").exists()
+    and (ROOT / "ios/GrapMail/Assets.xcassets/LaunchBrand.imageset/LaunchBrand.png").exists()
     and (ROOT / "ios/GrapMail/Assets.xcassets/LaunchBackground.colorset/Contents.json").exists()
     and "INFOPLIST_KEY_UILaunchScreen_Generation" not in YML)
 
