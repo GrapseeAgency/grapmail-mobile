@@ -15,10 +15,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.AttachFile
@@ -181,8 +181,8 @@ fun ThreadScreen(
             return@Column
         }
 
-        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
-            thread.messages.forEachIndexed { index, message ->
+        LazyColumn(Modifier.fillMaxSize()) {
+            itemsIndexed(thread.messages, key = { _, message -> message.id }) { index, message ->
                 ThreadMessageCard(
                     vm = vm,
                     message = message,
@@ -208,7 +208,7 @@ fun ThreadScreen(
                     Box(Modifier.fillMaxWidth().height(1.dp).background(palette.border))
                 }
             }
-            Spacer(Modifier.height(80.dp))
+            item { Spacer(Modifier.height(80.dp)) }
         }
     }
 }
@@ -249,12 +249,16 @@ private fun ThreadMessageCard(
     // The images the sender's HTML part points at, and whether this message has
     // asked for them. Both belong to the message: stepping from here must not
     // carry an opt-in that was given for somebody else's mail.
-    val hiddenImages = remoteImageUrls(message.bodyHtml)
+    val hiddenImages = remember(message.bodyHtml) { remoteImageUrls(message.bodyHtml) }
     var shownImages by androidx.compose.runtime.remember(message.id) { mutableStateOf(false) }
     // The formatted body is fetched when the card composes and again when the
     // images gate is answered — the two variants are different renders, and
     // the model memoises both per message.
-    LaunchedEffect(message.id, shownImages) { vm.loadBody(message.id, shownImages) }
+    val needsFormattedBody = !message.isE2eEncrypted && message.e2eEnvelope == null &&
+        !message.bodyHtml.isNullOrBlank()
+    LaunchedEffect(message.id, shownImages, needsFormattedBody) {
+        if (needsFormattedBody) vm.loadBody(message.id, shownImages)
+    }
     // The sender's own `List-Unsubscribe` offer, narrowed to an http(s) address by
     // the same rule iOS applies. Null means show nothing: a button that opens a
     // broken or dangerous URL is worse than no button, and most mail simply has no

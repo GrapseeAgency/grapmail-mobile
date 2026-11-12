@@ -50,7 +50,7 @@ struct ThreadView: View {
                 failedBody(error)
             } else {
                 ScrollView {
-                    VStack(spacing: 0) {
+                    LazyVStack(spacing: 0) {
                         ForEach(Array(vm.thread.messages.enumerated()), id: \.element.id) { index, m in
                             ThreadMessageCard(
                                 vm: vm,
@@ -188,6 +188,12 @@ private struct ThreadMessageCard: View {
     /// asked for them. Both belong to the message, and the card is rebuilt per
     /// message -- an opt-in given for one mail must not travel to the next.
     @State private var shownImages = false
+    @State private var openEarlierMessage = false
+    private var showsBody: Bool { expanded || openEarlierMessage }
+    private var needsFormattedBody: Bool {
+        showsBody && !message.isE2eEncrypted && message.e2eEnvelope == nil
+            && message.bodyHtml?.nilIfBlank() != nil
+    }
     private var hiddenImages: [String] { remoteImageUrls(message.bodyHtml) }
     /// The formatted body's measured height. The web view sizes itself to its
     /// document and the reader owns scrolling, so this is the frame the island
@@ -229,7 +235,12 @@ private struct ThreadMessageCard: View {
                 .font(.system(size: 17, weight: .semibold))
                 .foregroundColor(GM.textPrimary)
 
-            if expanded { bodyView }
+            if showsBody {
+                bodyView
+            } else {
+                Button("Show message") { openEarlierMessage = true }
+                    .font(.system(size: 13, weight: .medium))
+            }
 
             if !message.cc.isEmpty {
                 Text("Cc \(message.cc.joined(separator: ", "))")
@@ -525,13 +536,14 @@ private struct ThreadMessageCard: View {
         // the images gate is answered — the two variants are different renders,
         // and the model memoises both per message. The height resets with the
         // id: a taller message must not hand its frame to the next one.
-        .task(id: message.id) {
+        .task(id: needsFormattedBody) {
+            guard needsFormattedBody else { return }
             htmlBodyHeight = 180
             shownImages = false
             vm.loadBody(message.id, allowImages: false)
         }
         .onChange(of: shownImages) { newValue in
-            vm.loadBody(message.id, allowImages: newValue)
+            if needsFormattedBody { vm.loadBody(message.id, allowImages: newValue) }
         }
     }
 }

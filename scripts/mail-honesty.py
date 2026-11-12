@@ -2834,7 +2834,7 @@ pin("accepted and refused are two different sentences in the reader",
 # names the count, says whose server they live on, says what loading them
 # reveals, and asks.
 pin("remote images are named and gated, per message",
-    "val hiddenImages = remoteImageUrls(message.bodyHtml)" in code_only(KT_THREAD)
+    "remember(message.bodyHtml) { remoteImageUrls(message.bodyHtml) }" in code_only(KT_THREAD)
     and "private var hiddenImages: [String] { remoteImageUrls(message.bodyHtml) }"
         in code_only(SW_READ)
     and "tells the sender this message was opened" in code_only(KT_THREAD)
