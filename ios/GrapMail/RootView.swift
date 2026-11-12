@@ -7,7 +7,9 @@ import Combine
 
 @MainActor
 private final class MailboxOwner: ObservableObject {
-    let model = MailboxModel()
+    @Published private(set) var model = MailboxModel()
+
+    func reset() { model = MailboxModel() }
 }
 
 /// The root navigation for the account sector: welcome → wizard (5 steps) →
@@ -196,6 +198,7 @@ struct RootView: View {
             // sign-in) never reach here — only a rejected bearer does.
             .onReceive(NotificationCenter.default.publisher(for: .gmSessionExpired)) { _ in
                 restoredSession = true
+                mailboxOwner.reset()
                 guard path.last != .signIn else { return }
                 // A dead token strands the unlocked private halves in this
                 // stack otherwise: the model outlives path rewrites, so the
@@ -665,6 +668,7 @@ struct RootView: View {
                         onSignOut: {
                             e2e.clearForSignOut()
                             SessionStore.clear()
+                            mailboxOwner.reset()
                             path.removeAll()
                         }
                     )
@@ -740,6 +744,7 @@ struct RootView: View {
                         onSignOut: {
                             e2e.clearForSignOut()
                             SessionStore.clear()
+                            mailboxOwner.reset()
                             path.removeAll()
                         }
                     )

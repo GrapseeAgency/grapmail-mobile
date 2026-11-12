@@ -474,8 +474,9 @@ class MailboxViewModel @JvmOverloads constructor(
             if (replace && !_state.value.hasRows) _state.update { it.copy(loading = true, staleError = null) }
             if (!replace) _state.update { it.copy(loadingMore = true) }
 
-            val t = token()
-            if (t == null) {
+            val context = getApplication<Application>()
+            val session = com.grapsee.grapmail.data.SessionStore.snapshot(context)
+            if (session == null) {
                 // The generation moves here too. This is an exit from a load, and the
                 // refresh gesture waits on precisely that signal; leaving it out
                 // parks an indeterminate spinner over the list for the rest of the
@@ -502,7 +503,8 @@ class MailboxViewModel @JvmOverloads constructor(
                         _state.update { it.copy(loading = false) }
                     }
                 }
-                val resp = Api.mailInbox(t, box, page = page, q = term)
+                val resp = Api.mailInbox(session.token, box, page = page, q = term)
+                if (!com.grapsee.grapmail.data.SessionStore.isCurrent(context, session.id)) return@launch
                 MailStore.putPage(box, term, resp, replace)
                 reproject()
                 _state.update { it.copy(loading = false, loadingMore = false, fatal = null,
@@ -512,7 +514,8 @@ class MailboxViewModel @JvmOverloads constructor(
                     // knows, so nothing here raises an error; a cancelled one is
                     // rethrown like the outer call's.
                     try {
-                        val stats = Api.mailStats(t)
+                        val stats = Api.mailStats(session.token)
+                        if (!com.grapsee.grapmail.data.SessionStore.isCurrent(context, session.id)) return@launch
                         MailStore.putStats(stats)
                         _state.update { it.withFolderCounts(stats) }
                     } catch (e: kotlinx.coroutines.CancellationException) {

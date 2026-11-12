@@ -264,7 +264,15 @@ final class MailboxModel: ObservableObject {
         screener.error = nil
     }
 
-    private var token: String? { SessionStore.token }
+    private var sessionGeneration: UUID?
+
+    private var token: String? {
+        let generation = SessionStore.generation
+        guard sessionGeneration == nil || sessionGeneration == generation,
+              let token = SessionStore.token else { return nil }
+        sessionGeneration = generation
+        return token
+    }
 
     /// Whether a bearer is still held. Every cache write checks this AFTER its
     /// await, because sign-out clears the store and the cache together, and a
@@ -272,7 +280,7 @@ final class MailboxModel: ObservableObject {
     /// account's pages a moment later -- the exact cross-account leak the cache
     /// exists to prevent. iOS cannot await the clear itself: `SessionStore.clear()`
     /// is synchronous, so the guard belongs on the writer.
-    private var sessionIsLive: Bool { SessionStore.token != nil }
+    private var sessionIsLive: Bool { sessionGeneration == SessionStore.generation }
 
     /// Set by the CI snapshot host's seams, and checked by every loader that would
     /// otherwise overwrite a seeded field. Nothing in the live flow sets it.
