@@ -37,7 +37,7 @@ private val Context.sessionStore by preferencesDataStore("grapmail_session")
  * sessions.
  */
 // Not a data class: diagnostics must never print credentials.
-class SessionSnapshot(val id: String, val token: String, val address: String)
+class SessionSnapshot(val id: String, val token: String, val address: String, val unexpired: Boolean)
 
 object SessionStore {
     private val writes = Mutex()
@@ -52,7 +52,7 @@ object SessionStore {
         val prefs = context.sessionStore.data.first()
         val id = sessionId(prefs) ?: return@withContext null
         val token = open(prefs[KEY_TOKEN], prefs[KEY_IV]) ?: return@withContext null
-        SessionSnapshot(id, token, prefs[KEY_ADDRESS] ?: "")
+        SessionSnapshot(id, token, prefs[KEY_ADDRESS] ?: "", isUnexpired(prefs))
     }
 
     suspend fun isCurrent(context: Context, id: String): Boolean =
@@ -196,11 +196,14 @@ object SessionStore {
      *  epoch-milliseconds threshold are seconds, not milliseconds. */
     suspend fun hasValidSession(context: Context): Boolean = withContext(Dispatchers.IO) {
         val prefs = context.sessionStore.data.first()
-        if (prefs[KEY_TOKEN] == null) return@withContext false
+        prefs[KEY_TOKEN] != null && isUnexpired(prefs)
+    }
+
+    private fun isUnexpired(prefs: Preferences): Boolean {
         val raw = prefs[KEY_EXPIRES]?.toLongOrNull() ?: 0L
-        if (raw <= 0L) return@withContext true
+        if (raw <= 0L) return true
         val millis = if (raw < 100_000_000_000L) raw * 1000L else raw
-        millis > System.currentTimeMillis()
+        return millis > System.currentTimeMillis()
     }
 
     suspend fun clear(context: Context) { clearMatching(context) { true } }

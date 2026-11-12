@@ -407,13 +407,13 @@ fun GrapMailNav(
     var startDest by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(Unit) {
         val ctx = nav.context.applicationContext
-        val stored = SessionStore.token(ctx) != null
-        val unexpired = stored && SessionStore.hasValidSession(ctx)
+        val stored = SessionStore.snapshot(ctx)
+        val unexpired = stored?.unexpired == true
         // The gateway's access token is an hour old at most; the refresh token
         // is good for thirty days. A stored pair whose access token has aged out
         // is a session to renew silently, not a person to send back to sign-in —
         // otherwise every launch the morning after a sign-in looks signed out.
-        val renewed = if (!unexpired && stored) {
+        val renewed = if (!unexpired && stored != null) {
             com.grapsee.grapmail.data.SessionRefresh.refresh(ctx)
         } else false
         startDest = if (unexpired || renewed) Routes.HOME else Routes.WELCOME
@@ -427,7 +427,7 @@ fun GrapMailNav(
     LaunchedEffect(composeRequest, dest) {
         if (!composeRequest) return@LaunchedEffect
         onComposeRequestConsumed()
-        if (dest == Routes.HOME) {
+        if (SessionStore.snapshot(nav.context.applicationContext)?.unexpired == true) {
             nav.navigate(Routes.mailCompose("", "reply"))
         } else {
             nav.navigate(Routes.SIGN_IN) { popUpTo(Routes.WELCOME) }

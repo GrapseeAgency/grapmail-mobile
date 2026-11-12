@@ -58,10 +58,23 @@ enum SessionStore {
     /// (same normalization as Android's SessionStore).
     static var hasValidSession: Bool {
         guard token != nil else { return false }
+        return isUnexpired
+    }
+
+    private static var isUnexpired: Bool {
         let raw = UserDefaults.standard.double(forKey: expiresKey)
         if raw <= 0 { return true }
         let millis = raw < 1e11 ? raw * 1000 : raw
         return Date().timeIntervalSince1970 * 1000 < millis
+    }
+
+    static func launchSession() async -> (stored: Bool, unexpired: Bool) {
+        await withCheckedContinuation { continuation in
+            DispatchQueue.global(qos: .userInitiated).async {
+                let stored = token != nil
+                continuation.resume(returning: (stored, stored && isUnexpired))
+            }
+        }
     }
 
     @MainActor

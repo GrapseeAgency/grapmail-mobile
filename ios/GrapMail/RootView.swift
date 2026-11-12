@@ -111,8 +111,8 @@ struct RootView: View {
     /// relaunches per screen a live session exists, and pushing `.home` on top
     /// of the stub left every post-write screenshot a photograph of the home
     /// screen. The hook outranks the restore because no real launch carries it.
-    @State private var path: [Route] =
-        (SecuritySnapshot.requested() == nil && SessionStore.hasValidSession) ? [.home] : []
+    @State private var path: [Route] = []
+    @State private var restoredSession = false
     /// The ten codes live in SecurityFlow.backupCodes, not a view @State, so
     /// SessionStore.clear() → SecurityFlow.reset() wipes them on sign-out. A
     /// plaintext recovery code left in the root view's memory after the account
@@ -177,12 +177,16 @@ struct RootView: View {
             // still signed in. The snapshot host never refreshes: the walk
             // owns its own session.
             .task {
-                if SecuritySnapshot.requested() == nil,
-                   SessionStore.token != nil,
-                   !SessionStore.hasValidSession,
-                   await ApiClient.renewPair() != nil {
-                    if path.isEmpty || path.last == .signIn { path = [.home] }
-                }
+                guard !restoredSession, SecuritySnapshot.requested() == nil else { return }
+                let generation = SessionStore.generation
+                let session = await SessionStore.launchSession()
+                guard !Task.isCancelled, generation == SessionStore.generation else { return }
+                var signedIn = session.unexpired
+                if session.stored && !signedIn { signedIn = await ApiClient.renewPair() != nil }
+                guard !Task.isCancelled, generation == SessionStore.generation else { return }
+                restoredSession = true
+                if signedIn, path.isEmpty { path = [.home] }
+                if shortcuts.pendingCompose { openComposeShortcut() }
             }
             // A dead token is discovered by the server, not by us: the first
             // authenticated call that comes back 401 clears the Keychain and
@@ -191,6 +195,7 @@ struct RootView: View {
             // in short of reinstalling. Anonymous 401s (wrong password at
             // sign-in) never reach here — only a rejected bearer does.
             .onReceive(NotificationCenter.default.publisher(for: .gmSessionExpired)) { _ in
+                restoredSession = true
                 guard path.last != .signIn else { return }
                 // A dead token strands the unlocked private halves in this
                 // stack otherwise: the model outlives path rewrites, so the
@@ -205,14 +210,8 @@ struct RootView: View {
             // asked for. Signed out, the honest route to writing a mail is
             // sign-in, not a composer whose every send would fail.
             .onChange(of: shortcuts.pendingCompose) { pending in
-                guard pending else { return }
-                shortcuts.consume()
-                guard SessionStore.hasValidSession else {
-                    path = [.signIn]
-                    return
-                }
-                if path.last != .home { path = [.home] }
-                path.append(.mailCompose(reply: "", mode: "reply"))
+                guard pending, restoredSession else { return }
+                openComposeShortcut()
             }
             // The background poll is scheduled whenever this app goes away:
             // that is the moment the next read has to be asked for, and the
@@ -221,6 +220,16 @@ struct RootView: View {
                 MailPoll.scheduleNext()
             }
         }
+    }
+
+    private func openComposeShortcut() {
+        shortcuts.consume()
+        guard SessionStore.hasValidSession else {
+            path = [.signIn]
+            return
+        }
+        if path.last != .home { path = [.home] }
+        path.append(.mailCompose(reply: "", mode: "reply"))
     }
 
     /// The launch screen: the test-only snapshot host when the walk named
@@ -249,6 +258,8 @@ struct RootView: View {
                 // lookup; this only changes which trait the system reports.
                 .preferredColorScheme(
                     ProcessInfo.processInfo.arguments.contains("-gmDark") ? .dark : nil)
+            } else if !restoredSession {
+                GM.bg.ignoresSafeArea()
             } else {
                 WelcomeView(
                     onCreateAccount: { path.append(.stepName) },

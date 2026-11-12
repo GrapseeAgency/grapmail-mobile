@@ -3231,7 +3231,7 @@ kt_shortcut_block = re.search(
 pin("the shortcut never lands on a composer that cannot send",
     kt_shortcut_block is not None
     and "Routes.SIGN_IN" in kt_shortcut_block.group(1)
-    and "dest == Routes.HOME" in kt_shortcut_block.group(1)
+    and "SessionStore.snapshot(nav.context.applicationContext)?.unexpired == true" in kt_shortcut_block.group(1)
     and "guard SessionStore.hasValidSession else {" in code_only(SW_ROOT)
     and ".signIn]" in code_only(SW_ROOT))
 
