@@ -67,11 +67,13 @@ fun LaunchSplash(onFinished: () -> Unit) {
     ) {
         // The branded element lives in the official bottom zone (200x80dp):
         // small, quiet, at the bottom edge — never a centerpiece.
+        // The official branded zone: 200x80dp at the bottom of the splash
+        // screen (developer.android.com/develop/ui/views/launch/splash-screen).
         GrapseeShimmer(
             Modifier
                 .align(Alignment.BottomCenter)
-                .padding(bottom = 48.dp)
-                .size(width = 210.dp, height = 38.dp),
+                .padding(bottom = 20.dp)
+                .size(width = 200.dp, height = 40.dp),
         )
     }
 }
