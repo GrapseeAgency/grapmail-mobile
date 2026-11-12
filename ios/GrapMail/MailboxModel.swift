@@ -273,8 +273,20 @@ final class MailboxModel: ObservableObject {
         searchTask?.cancel()
         searchTask = nil
         loadedBoxes.insert(box)
-        state.box = box
-        state.selection = []
+        var updated = state
+        updated.box = box
+        updated.selection = []
+        updated.rows = []
+        updated.pages = 0
+        updated.loaded = 0
+        updated.total = 0
+        updated.advScope = 0
+        updated.loading = true
+        updated.loadingMore = false
+        updated.noMailbox = false
+        updated.fatal = nil
+        updated.staleError = nil
+        state = updated
         load(replace: true)
     }
 
@@ -340,6 +352,13 @@ final class MailboxModel: ObservableObject {
             }
 
             do {
+                if replace, self.state.rows.isEmpty,
+                   await MailStore.shared.page(box, term) != nil,
+                   !Task.isCancelled, sessionIsLive {
+                    self.reproject()
+                    self.state.loading = false
+                }
+                guard !Task.isCancelled else { return }
                 let resp = try await ApiClient.mailInbox(
                     token: token, box: box, page: page, query: term)
                 guard !Task.isCancelled else { return }

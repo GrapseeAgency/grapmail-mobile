@@ -392,7 +392,9 @@ class MailboxViewModel @JvmOverloads constructor(
         if (_state.value.box == box) return
         searchJob?.cancel()
         loadedBoxes.add(box)
-        _state.update { it.copy(box = box, selection = emptySet()) }
+        _state.update { it.copy(box = box, selection = emptySet(), rows = emptyList(),
+            pages = 0, loaded = 0, total = 0, advScope = 0, loading = true,
+            loadingMore = false, noMailbox = false, fatal = null, staleError = null) }
         load(replace = true)
     }
 
@@ -469,6 +471,10 @@ class MailboxViewModel @JvmOverloads constructor(
             // Throwable. A box switch or a new search cancels the previous read,
             // which should leave error reporting to the request that replaced it.
             try {
+                if (replace && !_state.value.hasRows && MailStore.page(box, term) != null) {
+                    reproject()
+                    _state.update { it.copy(loading = false) }
+                }
                 val resp = Api.mailInbox(t, box, page = page, q = term)
                 MailStore.putPage(box, term, resp, replace)
                 reproject()
