@@ -12,7 +12,7 @@ import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -66,7 +66,7 @@ fun TwoFactorScreen(
     val palette = LocalPalette.current
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val state by flow.state.collectAsState()
+    val state by flow.state.collectAsStateWithLifecycle()
     val emailChallenge = state.emailOtpAddress
 
     var code by remember { mutableStateOf("") }
@@ -254,7 +254,7 @@ fun BackupCodeScreen(
     val palette = LocalPalette.current
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val state by flow.state.collectAsState()
+    val state by flow.state.collectAsStateWithLifecycle()
 
     var code by remember { mutableStateOf("") }
     var error by rememberSaveable { mutableStateOf<String?>(null) }

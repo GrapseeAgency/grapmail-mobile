@@ -63,50 +63,87 @@ final class ProfileModel: ObservableObject {
 
     private var token: String? { SessionStore.token }
 
-    func load() {
-        guard !snapshotSeeded, let token else { return }
+    private var profileLoad: Task<Void, Never>?
+    private var avatarLoad: Task<Void, Never>?
+    private var profileLoadedAt: TimeInterval?
+
+    func load(force: Bool = false) {
+        guard !snapshotSeeded, profileLoad == nil, !state.busy, let token else { return }
+        if !force, state.staleError == nil, let profileLoadedAt, ProcessInfo.processInfo.systemUptime - profileLoadedAt < 30 { return }
         if state.profile == nil { state.loading = true }
-        Task {
+        let generation = SessionStore.generation
+        profileLoad = Task { [weak self] in
+            guard let self, !Task.isCancelled else { return }
+            defer { if !Task.isCancelled { self.profileLoad = nil } }
             do {
                 let resp = try await ApiClient.profile(token: token)
-                state.profile = resp.profile ?? state.profile
-                state.loading = false
-                state.fatal = nil
-                state.staleError = nil
-                loadAvatar()
-            } catch {
-                let msg = reason(error)
-                // With a record on screen this is a stale read, not a dead
-                // screen; without one it is the error state.
-                if state.profile != nil {
-                    state.staleError = msg
-                } else {
-                    state.fatal = msg
+                guard !Task.isCancelled, generation == SessionStore.generation else { return }
+                var updated = self.state
+                if let fresh = resp.profile {
+                    if fresh.avatarUrl != updated.profile?.avatarUrl {
+                        updated.avatar = nil
+                        updated.avatarTried = false
+                    }
+                    updated.profile = fresh
+                    self.profileLoadedAt = ProcessInfo.processInfo.systemUptime
                 }
-                state.loading = false
+                updated.loading = false
+                updated.fatal = updated.profile == nil ? "The account record is unavailable." : nil
+                updated.staleError = nil
+                self.state = updated
+            } catch {
+                guard !Task.isCancelled, generation == SessionStore.generation else { return }
+                let message = self.reason(error)
+                var updated = self.state
+                updated.loading = false
+                updated.fatal = updated.profile == nil ? message : nil
+                updated.staleError = updated.profile != nil ? message : nil
+                self.state = updated
             }
         }
     }
 
-    /// The photo bytes, once. `GET /avatar` answers 404 with code `NO_AVATAR`
-    /// when the account has none — the route's own way of saying "no photo",
-    /// so that one refusal is the empty state. Every other failure is unknown
-    /// and must not be drawn as absent.
     func loadAvatar() {
-        guard !snapshotSeeded, let token, !state.avatarTried else { return }
-        Task {
+        guard !snapshotSeeded, !state.avatarTried, !state.busy, let token,
+              let url = state.profile?.avatarUrl?.nilIfBlank() else { return }
+        avatarLoad?.cancel()
+        let generation = SessionStore.generation
+        avatarLoad = Task { [weak self] in
+            guard let self else { return }
+            defer { if !Task.isCancelled { self.avatarLoad = nil } }
             do {
-                state.avatar = try await ApiClient.avatarBytes(token: token)
-                state.avatarTried = true
+                let bytes = try await ApiClient.avatarBytes(token: token)
+                guard !Task.isCancelled, generation == SessionStore.generation,
+                      self.state.profile?.avatarUrl == url else { return }
+                var updated = self.state
+                updated.avatar = bytes
+                updated.avatarTried = true
+                self.state = updated
             } catch let error as ApiError {
-                if case let .http(_, code, _) = error, code == "NO_AVATAR" {
-                    state.avatar = nil
-                    state.avatarTried = true
+                guard !Task.isCancelled, generation == SessionStore.generation,
+                      self.state.profile?.avatarUrl == url else { return }
+                if case let .http(status, _, _) = error, status == 404 {
+                    var updated = self.state
+                    updated.avatar = nil
+                    updated.avatarTried = true
+                    self.state = updated
                 }
-                // Any other refusal keeps the old bytes and does not claim
-                // the photo question was answered.
-            } catch { /* network — unknown, keep the old bytes */ }
+            } catch {}
         }
+    }
+
+    private func beginWrite() -> String? {
+        guard !state.busy, let token else { return nil }
+        profileLoad?.cancel()
+        profileLoad = nil
+        avatarLoad?.cancel()
+        avatarLoad = nil
+        var updated = state
+        updated.busy = true
+        updated.loading = false
+        updated.note = nil
+        state = updated
+        return token
     }
 
     /// Apply one partial write and settle the note from the server's answer.
@@ -117,20 +154,22 @@ final class ProfileModel: ObservableObject {
     func save(label: String, personal: [String: String?] = [:],
               settings: [String: Any?]? = nil,
               connections: [[String: Any?]]? = nil) {
-        guard let token else { return }
-        state.busy = true
-        state.note = nil
+        guard let token = beginWrite() else { return }
+        let generation = SessionStore.generation
         Task {
             do {
                 let resp = try await ApiClient.patchProfile(
                     token: token, personal: personal, settings: settings,
                     connections: connections)
+                guard generation == SessionStore.generation else { return }
                 state.busy = false
                 state.profile = resp.profile ?? state.profile
+                if resp.profile != nil { profileLoadedAt = ProcessInfo.processInfo.systemUptime }
                 let text = resp.message?.trimmingCharacters(in: .whitespacesAndNewlines)
                 state.note = (text?.isEmpty == false) ? text! : label
                 state.noteIsBad = false
             } catch {
+                guard generation == SessionStore.generation else { return }
                 state.busy = false
                 state.note = reason(error)
                 state.noteIsBad = true
@@ -184,14 +223,14 @@ final class ProfileModel: ObservableObject {
     /// is the same table the settings rows quote — both must move together or
     /// one is lying.
     func aliasWrite(value: String, remove: Bool) {
-        guard let token else { return }
-        state.busy = true
-        state.note = nil
+        guard let token = beginWrite() else { return }
+        let generation = SessionStore.generation
         Task {
             do {
                 var msg = ""
                 if remove {
                     let r = try await ApiClient.mailDeleteAlias(token, address: value)
+                    guard generation == SessionStore.generation else { return }
                     guard r.success else {
                         state.busy = false
                         state.note = r.error ?? "That alias could not be removed."
@@ -201,6 +240,7 @@ final class ProfileModel: ObservableObject {
                     msg = r.message ?? "Alias removed."
                 } else {
                     let r = try await ApiClient.mailCreateAlias(token, label: value)
+                    guard generation == SessionStore.generation else { return }
                     guard r.success else {
                         state.busy = false
                         state.note = r.error ?? r.message ?? "The alias could not be created."
@@ -213,8 +253,9 @@ final class ProfileModel: ObservableObject {
                 state.noteIsBad = false
                 state.note = msg
                 snapshotSeeded = false  // a live write re-owns the record
-                load()
+                load(force: true)
             } catch {
+                guard generation == SessionStore.generation else { return }
                 state.busy = false
                 state.note = reason(error)
                 state.noteIsBad = true
@@ -226,13 +267,13 @@ final class ProfileModel: ObservableObject {
     /// replaces the stale one immediately; on failure the old bytes stay — a
     /// refused upload must not blank the photo that is still on the record.
     func uploadAvatar(bytes: Data, filename: String, mime: String) {
-        guard let token else { return }
-        state.busy = true
-        state.note = nil
+        guard let token = beginWrite() else { return }
+        let generation = SessionStore.generation
         Task {
             do {
                 let resp = try await ApiClient.uploadAvatar(
                     token: token, bytes: bytes, filename: filename, mime: mime)
+                guard generation == SessionStore.generation else { return }
                 state.busy = false
                 state.avatar = bytes
                 state.avatarTried = true
@@ -241,6 +282,7 @@ final class ProfileModel: ObservableObject {
                 state.note = (text?.isEmpty == false) ? text! : "Profile photo updated."
                 state.noteIsBad = false
             } catch {
+                guard generation == SessionStore.generation else { return }
                 state.busy = false
                 state.note = reason(error)
                 state.noteIsBad = true
@@ -249,12 +291,12 @@ final class ProfileModel: ObservableObject {
     }
 
     func removeAvatar() {
-        guard let token else { return }
-        state.busy = true
-        state.note = nil
+        guard let token = beginWrite() else { return }
+        let generation = SessionStore.generation
         Task {
             do {
                 let resp = try await ApiClient.deleteAvatar(token: token)
+                guard generation == SessionStore.generation else { return }
                 state.busy = false
                 state.avatar = nil
                 state.avatarTried = true
@@ -263,6 +305,7 @@ final class ProfileModel: ObservableObject {
                 state.note = (text?.isEmpty == false) ? text! : "Profile photo removed."
                 state.noteIsBad = false
             } catch {
+                guard generation == SessionStore.generation else { return }
                 state.busy = false
                 state.note = reason(error)
                 state.noteIsBad = true

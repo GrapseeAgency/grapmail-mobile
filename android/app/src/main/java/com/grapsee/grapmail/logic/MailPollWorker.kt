@@ -5,6 +5,10 @@ import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import com.grapsee.grapmail.data.Api
 import com.grapsee.grapmail.data.SessionStore
+import com.grapsee.grapmail.data.MailStatsResponse
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.sync.Mutex
 
 /**
  * The periodic new-mail read.
@@ -46,10 +50,15 @@ class MailPollWorker(
          *  keeps exactly one of it across launches and reboots. */
         const val NAME = "grapmail-mail-poll"
         const val PUSH_NAME = "grapmail-push-refresh"
+        private val activePoll = Mutex()
+        private val completedPolls = MutableSharedFlow<PollResult>(extraBufferCapacity = 1)
+        val results = completedPolls.asSharedFlow()
         /** The logcat tag the CI walk greps. Named here so the walk and the
          *  worker cannot drift apart without the pin noticing. */
         const val LOG_TAG = "GrapMailPoll"
     }
+
+    data class PollResult(val sessionId: String, val stats: MailStatsResponse)
 
     /** One line per run, saying which branch decided and why. */
     private fun report(branch: String) {
@@ -57,6 +66,15 @@ class MailPollWorker(
     }
 
     override suspend fun doWork(): Result {
+        if (!activePoll.tryLock()) return Result.success()
+        return try {
+            pollMailbox()
+        } finally {
+            activePoll.unlock()
+        }
+    }
+
+    private suspend fun pollMailbox(): Result {
         val session = SessionStore.snapshot(applicationContext)
         if (session == null) {
             report("silent signed-out")
@@ -77,10 +95,11 @@ class MailPollWorker(
             // person never asked for: the next scheduled run asks again, and
             // nothing is announced meanwhile.
             .getOrNull() ?: return Result.success()
-        if (SessionStore.snapshot(applicationContext)?.id != session.id) {
+        if (!SessionStore.isCurrent(applicationContext, session.id)) {
             report("silent session changed")
             return Result.success()
         }
+        completedPolls.tryEmit(PollResult(session.id, stats))
         val unread = stats.inbox?.unread
         if (unread == null) {
             report("silent no-inbox-count")
@@ -89,9 +108,9 @@ class MailPollWorker(
         val prefs = applicationContext
             .getSharedPreferences("grapmail-poll", Context.MODE_PRIVATE)
         val sawKey = "lastUnread"
-        val hadPrevious = prefs.contains(sawKey)
+        val hadPrevious = prefs.getString("sessionId", null) == session.id && prefs.contains(sawKey)
         val previous = prefs.getInt(sawKey, 0)
-        prefs.edit().putInt(sawKey, unread).apply()
+        prefs.edit().putString("sessionId", session.id).putInt(sawKey, unread).apply()
         if (!hadPrevious) {
             report("silent first-read unread=$unread")
             return Result.success()

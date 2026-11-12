@@ -38,7 +38,24 @@ actor MailStore {
     private var labelsValue: [MailLabel]?
     private var aliasesValue: [MailAlias]?
     private var meValue: MailMeResponse?
-    private var bodies: [String: MailMessageFull] = [:]
+    private final class CachedMessage {
+        let message: MailMessageFull
+        init(_ message: MailMessageFull) { self.message = message }
+    }
+
+    private let bodies: NSCache<NSString, CachedMessage> = {
+        let cache = NSCache<NSString, CachedMessage>()
+        cache.totalCostLimit = 8 * 1024 * 1024
+        cache.countLimit = 96
+        return cache
+    }()
+
+    struct IndexedAttachment {
+        let attachment: MailAttachment
+        let subject: String?
+    }
+
+    private var attachmentsByMessage: [String: [IndexedAttachment]] = [:]
 
     /// messageId → the label ids that message carries. nil means the account has
     /// never been asked; an EMPTY dictionary means it was asked and nothing is
@@ -147,42 +164,66 @@ actor MailStore {
     /// delete cannot leave a ghost label keyed on an id nothing has any more.
     func forgetAssignments(_ messageId: String) { assignments?[messageId] = nil }
 
-    /// Opened bodies, memoised by id. A body is fetched once: the list payload
-    /// has none, and re-reading a payload to redraw a row is the over-fetch the
-    /// shape was designed to avoid.
-    func body(_ id: String) -> MailMessageFull? { bodies[id] }
-    func putBody(_ v: MailMessageFull) { bodies[v.id] = v }
-    func putBodies(_ messages: [MailMessageFull]) {
-        for message in messages { bodies[message.id] = message }
+    func body(_ id: String) -> MailMessageFull? {
+        bodies.object(forKey: id as NSString)?.message
     }
 
-    /// Take one attachment out of every cached body.
-    ///
-    /// `DELETE /attachments/:id` destroys the file, not the message
-    /// (`grapmail-attachments.ts:412`), so the body stays cached and only that
-    /// one row of its `attachments` list goes. Leaving it would keep the Files
-    /// screen offering a download of bytes the server has thrown away. Android
-    /// carries the same rule in its store.
-    func forgetAttachment(_ attachmentId: String) {
-        for (id, b) in bodies {
-            if b.attachments.contains(where: { $0.id == attachmentId }) {
-                var copy = b
-                copy.attachments.removeAll { $0.id == attachmentId }
-                bodies[id] = copy
+    func putBody(_ message: MailMessageFull) {
+        let bodySize = ((message.bodyText?.utf16.count ?? 0) + (message.bodyHtml?.utf16.count ?? 0)) * 2
+        let cost = max(1_024, max(message.sizeBytes ?? 0, bodySize))
+        if cost <= 8 * 1024 * 1024 {
+            bodies.setObject(CachedMessage(message), forKey: message.id as NSString, cost: cost)
+        } else {
+            bodies.removeObject(forKey: message.id as NSString)
+        }
+        let subject = message.subject?.nilIfBlank()
+        attachmentsByMessage[message.id] = message.attachments.isEmpty ? nil :
+            message.attachments.map { IndexedAttachment(attachment: $0, subject: subject) }
+    }
+
+    func putBodies(_ messages: [MailMessageFull]) -> [MailMessageFull] {
+        messages.map { message in
+            var merged = message
+            if message.hasAttachments, message.attachments.isEmpty, let known = attachmentsByMessage[message.id] {
+                merged.attachments = known.map(\.attachment)
             }
+            putBody(merged)
+            return merged
         }
     }
 
-    /// Every body the app has opened. This is what the Files screen is built
-    /// from, and it is honest only because the screen says so: there is no
-    /// list-all attachments route, so a file inside mail the user has not opened
-    /// is genuinely not here.
-    func allBodies() -> [MailMessageFull] { Array(bodies.values) }
+    func forgetBody(_ id: String) {
+        bodies.removeObject(forKey: id as NSString)
+        attachmentsByMessage[id] = nil
+    }
+
+    func forgetAttachment(_ attachmentId: String) {
+        for (id, entries) in attachmentsByMessage {
+            let remaining = entries.filter { $0.attachment.id != attachmentId }
+            guard remaining.count != entries.count else { continue }
+            bodies.removeObject(forKey: id as NSString)
+            attachmentsByMessage[id] = remaining.isEmpty ? nil : remaining
+        }
+    }
+
+    func indexedAttachments() -> [IndexedAttachment] { attachmentsByMessage.values.flatMap { $0 } }
+
+    func indexedAttachment(_ id: String) -> IndexedAttachment? {
+        attachmentsByMessage.values.lazy.compactMap { entries in
+            entries.first { $0.attachment.id == id }
+        }.first
+    }
 
     /// Apply a local flag change to every cached page, so starring or reading a
     /// message shows immediately and survives a scroll back — without waiting for
     /// a refetch that may not happen and may not succeed.
     func patchFlags(id: String, read: Bool? = nil, starred: Bool? = nil) {
+        if var message = body(id),
+           read.map({ $0 != message.isRead }) == true || starred.map({ $0 != message.isStarred }) == true {
+            message.isRead = read ?? message.isRead
+            message.isStarred = starred ?? message.isStarred
+            putBody(message)
+        }
         for (k, cache) in pages {
             guard let index = cache.messages.firstIndex(where: { $0.id == id }) else { continue }
             let message = cache.messages[index]
@@ -208,8 +249,6 @@ actor MailStore {
 
     func invalidateAllBoxes() {
         pages = [:]
-        statsValue = nil
-        bodies = [:]
     }
 
     /// Non-async on purpose: this is called from the sign-out path, where a
@@ -224,7 +263,8 @@ actor MailStore {
         labelsValue = nil
         aliasesValue = nil
         meValue = nil
-        bodies = [:]
+        bodies.removeAllObjects()
+        attachmentsByMessage.removeAll()
         // Back to nil, not to an empty map: the next account has not been asked
         // anything, and an empty map would claim its mail carries no labels.
         assignments = nil

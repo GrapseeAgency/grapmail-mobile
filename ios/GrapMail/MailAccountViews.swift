@@ -1,6 +1,7 @@
 import SwiftUI
 import PhotosUI
 import ImageIO
+import UniformTypeIdentifiers
 
 enum AvatarThumbnail {
     static func decode(_ data: Data) async -> CGImage? {
@@ -317,6 +318,7 @@ struct TasksView: View {
 struct MailPrefsView: View {
     @ObservedObject var vm: ProfileModel
     let onBack: () -> Void
+    @State private var fieldsReady = false
     @State private var signature = ""
     @State private var language = ""
     @State private var timezone = ""
@@ -356,7 +358,7 @@ struct MailPrefsView: View {
                     if s == nil {
                         AccountReadState(profile: vm.state.profile, loading: vm.state.loading,
                                          fatal: vm.state.fatal, what: "These settings")
-                    } else {
+                    } else if fieldsReady {
                         prefsBody
                     }
                     Spacer().frame(height: 24)
@@ -364,12 +366,14 @@ struct MailPrefsView: View {
                 .padding(.horizontal, 20)
             }
         }
-        .task {
-            vm.load()
-            signature = s?.signature ?? ""
-            language = s?.locale.language ?? ""
-            timezone = s?.locale.timezone ?? ""
-            overrides = s?.signatures ?? [:]
+        .task { vm.load() }
+        .task(id: s != nil) {
+            guard !fieldsReady, let settings = s else { return }
+            signature = settings.signature
+            language = settings.locale.language
+            timezone = settings.locale.timezone
+            overrides = settings.signatures
+            fieldsReady = true
         }
     }
 
@@ -1006,6 +1010,7 @@ struct ConnectionDetailView: View {
 struct ProfileEditView: View {
     @ObservedObject var vm: ProfileModel
     let onBack: () -> Void
+    @State private var fieldsReady = false
     @State private var first = ""
     @State private var last = ""
     @State private var display = ""
@@ -1030,7 +1035,7 @@ struct ProfileEditView: View {
                     if p == nil {
                         AccountReadState(profile: vm.state.profile, loading: vm.state.loading,
                                          fatal: vm.state.fatal, what: "Your account record")
-                    } else {
+                    } else if fieldsReady {
                         avatarRow
                         fields
                     }
@@ -1039,15 +1044,20 @@ struct ProfileEditView: View {
                 .padding(.horizontal, 20)
             }
         }
-        .task {
-            vm.load()
-            first = p?.firstName ?? ""
-            last = p?.lastName ?? ""
-            display = p?.displayName ?? ""
-            recoveryEmail = p?.recoveryEmail ?? ""
-            recoveryPhone = p?.recoveryPhone ?? ""
-            birthday = p?.birthday ?? ""
-            gender = p?.gender ?? ""
+        .task { vm.load() }
+        .task(id: p != nil) {
+            guard !fieldsReady, let profile = p else { return }
+            first = profile.firstName ?? ""
+            last = profile.lastName ?? ""
+            display = profile.displayName ?? ""
+            recoveryEmail = profile.recoveryEmail ?? ""
+            recoveryPhone = profile.recoveryPhone ?? ""
+            birthday = profile.birthday ?? ""
+            gender = profile.gender ?? ""
+            fieldsReady = true
+        }
+        .task(id: vm.state.busy ? nil : p?.avatarUrl) {
+            if !vm.state.busy { vm.loadAvatar() }
         }
         .task(id: vm.state.avatar) {
             guard let data = vm.state.avatar else { avatarPreview = nil; return }
@@ -1055,20 +1065,38 @@ struct ProfileEditView: View {
             guard !Task.isCancelled else { return }
             avatarPreview = thumbnail.map { UIImage(cgImage: $0) }
         }
-        .onChange(of: photoItem) { item in
-            Task {
-                guard let item, let bytes = try? await item.loadTransferable(type: Data.self)
-                else { return }
-                // Honour the server's own ceiling in the person's words BEFORE
-                // the upload — the screen never sends what it knows will be
-                // rejected (`auth-account-profile.ts:256`).
-                if bytes.count > 256 * 1024 {
-                    photoError = "That photo is too large. A profile photo can be up to 256 KB."
-                } else {
-                    photoError = nil
-                    vm.uploadAvatar(bytes: bytes, filename: "profile.jpg", mime: "image/jpeg")
-                }
+        .task(id: photoItem) {
+            guard let item = photoItem else { return }
+            defer { if photoItem == item { photoItem = nil } }
+            guard let bytes = try? await item.loadTransferable(type: Data.self), !bytes.isEmpty else {
+                if !Task.isCancelled { photoError = "That image could not be read." }
+                return
             }
+            guard !Task.isCancelled else { return }
+            if bytes.count > 256 * 1024 {
+                photoError = "That photo is too large. A profile photo can be up to 256 KB."
+                return
+            }
+            guard let image = await Self.avatarType(bytes) else {
+                if !Task.isCancelled { photoError = "Choose a PNG, JPEG, WebP or GIF image." }
+                return
+            }
+            guard !Task.isCancelled else { return }
+            photoError = nil
+            vm.uploadAvatar(bytes: bytes, filename: "profile.\(image.ext)", mime: image.mime)
+        }
+    }
+
+    private nonisolated static func avatarType(_ bytes: Data) async -> (ext: String, mime: String)? {
+        guard let source = CGImageSourceCreateWithData(bytes as CFData, nil),
+              let identifier = CGImageSourceGetType(source),
+              let type = UTType(identifier as String), let mime = type.preferredMIMEType else { return nil }
+        switch mime {
+        case "image/jpeg": return ("jpg", mime)
+        case "image/png": return ("png", mime)
+        case "image/webp": return ("webp", mime)
+        case "image/gif": return ("gif", mime)
+        default: return nil
         }
     }
 

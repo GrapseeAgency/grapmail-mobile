@@ -190,11 +190,23 @@ private struct ThreadMessageCard: View {
     @State private var shownImages = false
     @State private var openEarlierMessage = false
     private var showsBody: Bool { expanded || openEarlierMessage }
+    @State private var detailsError: String?
+    @State private var detailsAttempt = 0
     private var needsFormattedBody: Bool {
         showsBody && !message.isE2eEncrypted && message.e2eEnvelope == nil
             && message.bodyHtml?.nilIfBlank() != nil
     }
-    private var hiddenImages: [String] { remoteImageUrls(message.bodyHtml) }
+    @State private var hiddenImages: [String] = []
+    @State private var formattedBody: MailboxModel.BodyRender?
+    @State private var fallbackText = ""
+
+    private nonisolated static func findRemoteImages(in html: String?) async -> [String] {
+        remoteImageUrls(html)
+    }
+
+    private nonisolated static func plainText(from html: String) async -> String {
+        HtmlStripper.strip(html)
+    }
     /// The formatted body's measured height. The web view sizes itself to its
     /// document and the reader owns scrolling, so this is the frame the island
     /// renders inside; it resets with each message.
@@ -237,6 +249,11 @@ private struct ThreadMessageCard: View {
 
             if showsBody {
                 bodyView
+                attachmentRows
+                if let detailsError {
+                    Text(detailsError).font(.system(size: 12)).foregroundColor(GM.textSecondary)
+                    Button("Retry") { detailsAttempt += 1 }
+                }
             } else {
                 Button("Show message") { openEarlierMessage = true }
                     .font(.system(size: 13, weight: .medium))
@@ -254,7 +271,6 @@ private struct ThreadMessageCard: View {
                     Text(when)
                         .font(.system(size: 12)).foregroundColor(GM.textTertiary)
                 }
-                attachmentRows
                 if let unsub = unsubscribeTarget(message.unsubscribe) {
                     Spacer(minLength: 10)
                     Button {
@@ -403,6 +419,25 @@ private struct ThreadMessageCard: View {
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
+        .task(id: showsBody ? detailsAttempt : nil) {
+            guard showsBody else { return }
+            let error = await vm.viewMessage(message.id)
+            if !Task.isCancelled { detailsError = error }
+        }
+        .task(id: needsFormattedBody ? shownImages : nil) {
+            formattedBody = nil
+            guard needsFormattedBody else { return }
+            let allowImages = shownImages
+            guard let render = try? await vm.loadBody(message.id, allowImages: allowImages),
+                  !Task.isCancelled else { return }
+            formattedBody = render
+        }
+        .task(id: needsFormattedBody ? message.bodyHtml : nil) {
+            guard needsFormattedBody else { return }
+            let images = await Self.findRemoteImages(in: message.bodyHtml)
+            guard !Task.isCancelled else { return }
+            hiddenImages = images
+        }
     }
 
     @ViewBuilder private var bodyView: some View {
@@ -440,7 +475,7 @@ private struct ThreadMessageCard: View {
     /// the card always had is the visible fallback, said per message rather
     /// than hidden.
     @ViewBuilder private func htmlBody(_ html: String) -> some View {
-        let render = vm.bodies[message.id]
+        let render = formattedBody.flatMap { $0.allowImages == shownImages ? $0 : nil }
         if let clean = render?.html?.nilIfBlank() {
             MailHtmlBodyView(
                 html: clean,
@@ -462,9 +497,14 @@ private struct ThreadMessageCard: View {
                 Text(failure)
                     .font(.system(size: 12)).foregroundColor(GM.textTertiary)
                     .fixedSize(horizontal: false, vertical: true)
-                Text(HtmlStripper.strip(html))
+                Text(fallbackText)
                     .font(.system(size: 15)).foregroundColor(GM.textSecondary)
                     .fixedSize(horizontal: false, vertical: true)
+            }
+            .task(id: html) {
+                let text = await Self.plainText(from: html)
+                guard !Task.isCancelled else { return }
+                fallbackText = text
             }
         } else {
             Text("Loading formatted message…")
@@ -532,19 +572,7 @@ private struct ThreadMessageCard: View {
                 }
             }
         }
-        // The formatted body is fetched when the card composes and again when
-        // the images gate is answered — the two variants are different renders,
-        // and the model memoises both per message. The height resets with the
-        // id: a taller message must not hand its frame to the next one.
-        .task(id: needsFormattedBody) {
-            guard needsFormattedBody else { return }
-            htmlBodyHeight = 180
-            shownImages = false
-            vm.loadBody(message.id, allowImages: false)
-        }
-        .onChange(of: shownImages) { newValue in
-            if needsFormattedBody { vm.loadBody(message.id, allowImages: newValue) }
-        }
+
     }
 }
 
@@ -692,13 +720,17 @@ struct ComposeView: View {
     let replyId: String
     let mode: String
     let onBack: () -> Void
+    var initialRecipient = ""
     @State private var attached: [MailAttachment] = []
     @State private var notice: String?
     @State private var showCc = false
     @State private var picking = false
     @State private var contactCandidates: [MailboxModel.Person] = []
+    @State private var started = false
     @State private var prepared = false
     @State private var encryptOn = false
+    @State private var preparingSend = false
+    @State private var uploading = false
 
     private var signature: String {
         guard let s = account.state.profile?.settings else { return "" }
@@ -774,6 +806,10 @@ struct ComposeView: View {
             pick(result)
         }
         .task(id: signature) {
+            if !started {
+                vm.resetCompose(initialRecipient: initialRecipient)
+                started = true
+            }
             account.load()
             e2e.load(includeDirectory: false)
             // A prepared compose (reply / reply-all / forward from the thread)
@@ -801,14 +837,13 @@ struct ComposeView: View {
     private var header: some View {
         HStack(spacing: 12) {
             Button {
-                // Discarding is a choice, not an accident: the draft is saved
-                // first, because losing half-written text is the other way a
-                // mail app loses something.
-                if !vm.compose.body.trimmingCharacters(in: .whitespaces).isEmpty
-                    || !vm.compose.subject.trimmingCharacters(in: .whitespaces).isEmpty {
-                    vm.saveDraft()
+                guard !vm.compose.sending, !preparingSend, !uploading else { return }
+                let draft = vm.compose
+                if !draft.accepted && (!attached.isEmpty || [draft.to, draft.cc, draft.subject, draft.body].contains(where: { $0.nilIfBlank() != nil })) {
+                    saveDraft(onSaved: onBack)
+                } else {
+                    onBack()
                 }
-                onBack()
             } label: {
                 Image(systemName: "xmark").font(.system(size: 17))
                     .foregroundColor(GM.textPrimary)
@@ -823,7 +858,7 @@ struct ComposeView: View {
                     .font(.system(size: 18))
                     .foregroundColor(vm.compose.sending ? GM.textTertiary : GM.primarySolid)
             }
-            .disabled(vm.compose.sending)
+            .disabled(!sendEnabled)
             .accessibilityLabel("Send")
             .accessibilityIdentifier("mail-send")
         }
@@ -959,6 +994,11 @@ struct ComposeView: View {
                             HStack(spacing: 6) {
                                 Image(systemName: "paperclip").font(.system(size: 11))
                                 Text(a.name ?? "file").font(.system(size: 12)).lineLimit(1)
+                                Button { attached.removeAll { $0.id == a.id } } label: {
+                                    Image(systemName: "xmark.circle")
+                                }
+                                .accessibilityLabel("Remove " + (a.name ?? "attachment"))
+                                .disabled(vm.compose.sending || vm.compose.accepted || preparingSend)
                             }
                             .foregroundColor(GM.textSecondary)
                             .padding(.horizontal, 10).padding(.vertical, 6)
@@ -979,9 +1019,9 @@ struct ComposeView: View {
                     .background(Circle().stroke(GM.border, lineWidth: 1))
             }
             .accessibilityLabel("Attach a file")
+            .disabled(!sendEnabled)
             Button {
-                vm.saveDraft()
-                notice = "Saving…"
+                saveDraft()
             } label: {
                 Text("Save draft")
                     .font(.system(size: 15, weight: .medium))
@@ -991,7 +1031,7 @@ struct ComposeView: View {
             }
             Spacer()
             GradientButton(title: vm.compose.sending ? "Sending…" : "Send",
-                           enabled: !vm.compose.sending,
+                           enabled: sendEnabled,
                            action: { sendTapped() })
         }
         .padding(.top, 14)
@@ -1004,29 +1044,54 @@ struct ComposeView: View {
     /// key, or no answer at all stops the send with a sentence — an encrypted
     /// message half built is the failure mode this gate exists to stop.
     /// Mirror of Android's compose send-icon logic.
+    private var sendEnabled: Bool {
+        !vm.compose.sending && !vm.compose.accepted && !preparingSend && !uploading
+    }
+
+    private func saveDraft(onSaved: @escaping () -> Void = {}) {
+        guard sendEnabled else { return }
+        guard attached.isEmpty else {
+            notice = "Remove the attachments before saving this draft."
+            return
+        }
+        vm.saveDraft(onSaved: onSaved)
+    }
+
     private func sendTapped() {
-        if !encryptOn { vm.send(); return }
+        guard sendEnabled else { return }
+        if !encryptOn {
+            vm.send(attachmentIds: attached.map(\.id))
+            return
+        }
+        guard attached.isEmpty else {
+            notice = "Encrypted messages cannot include attachments."
+            return
+        }
+        let draft = vm.compose
+        preparingSend = true
         Task {
-            let recipients = (MailboxModel.splitAddresses(vm.compose.to)
-                + MailboxModel.splitAddresses(vm.compose.cc)
-                + MailboxModel.splitAddresses(vm.compose.bcc)).reduce(into: [String]()) {
+            defer { preparingSend = false }
+            let recipients = (MailboxModel.splitAddresses(draft.to)
+                + MailboxModel.splitAddresses(draft.cc)
+                + MailboxModel.splitAddresses(draft.bcc)).reduce(into: [String]()) {
                     list, a in if !list.contains(a) { list.append(a) }
                 }
-            let plan = await vm.encryptionPlan(addresses: recipients)
-            if plan == nil {
-                notice = "The directory did not answer, so nothing was encrypted "
-                       + "and nothing was sent. Try again."
-            } else if plan!.mode != "seal" {
-                notice = "Not every recipient has a published key, so this message "
-                       + "cannot be encrypted. Turn encryption off to send it "
-                       + "unencrypted, or stop and wait for the recipients."
-            } else if let envelope = await e2e.seal(plaintext: vm.compose.body,
-                                                    recipientKeys: plan!.keys) {
-                vm.send(e2eEnvelope: envelope)
+            guard let plan = await vm.encryptionPlan(addresses: recipients) else {
+                notice = "The encryption directory is unavailable. Try again."
+                return
             }
-            // A nil seal leaves the reason in the E2E model's note — the
-            // locked-key line, or the crypto module's own sentence. It shows
-            // on the E2E screens; compose's notice stays the send's story.
+            guard plan.mode == "seal" else {
+                notice = "A recipient has no published encryption key."
+                return
+            }
+            guard let envelope = await e2e.seal(plaintext: draft.body, recipientKeys: plan.keys) else { return }
+            let current = vm.compose
+            guard current.to == draft.to, current.cc == draft.cc, current.bcc == draft.bcc,
+                  current.body == draft.body, attached.isEmpty else {
+                notice = "The message changed while encryption was being prepared. Tap Send again."
+                return
+            }
+            vm.send(e2eEnvelope: envelope)
         }
     }
 
@@ -1049,18 +1114,30 @@ struct ComposeView: View {
             if case let .failure(e) = result { notice = e.localizedDescription }
             return
         }
+        guard sendEnabled else { return }
+        guard attached.count < 20 else {
+            notice = "A message can have up to 20 attachments."
+            return
+        }
+        uploading = true
         Task { @MainActor in
             let name = url.lastPathComponent
             notice = "Reading \(name)…"
             let result = await Self.readPickedFile(url)
             guard let bytes = result.bytes else {
+                uploading = false
                 notice = result.error
                 return
             }
-            guard !bytes.isEmpty else { notice = "That file is empty."; return }
+            guard !bytes.isEmpty else {
+                uploading = false
+                notice = "That file is empty."
+                return
+            }
             notice = "Uploading \(name)…"
             vm.uploadAttachment(bytes: bytes, filename: name,
                                 mimeType: MimeType.of(filename: name)) { a, message in
+                uploading = false
                 notice = message
                 if let a { attached.append(a) }
             }
@@ -1074,9 +1151,25 @@ struct ComposeView: View {
                     continuation.resume(returning: (nil, "The app could not be given permission to read that file."))
                     return
                 }
-                let bytes = try? Data(contentsOf: url)
-                url.stopAccessingSecurityScopedResource()
-                continuation.resume(returning: (bytes, bytes == nil ? "That file could not be read." : nil))
+                defer { url.stopAccessingSecurityScopedResource() }
+                do {
+                    let maxBytes = 25 * 1024 * 1024
+                    let file = try FileHandle(forReadingFrom: url)
+                    defer { try? file.close() }
+                    var bytes = Data()
+                    while bytes.count <= maxBytes {
+                        let count = min(64 * 1024, maxBytes + 1 - bytes.count)
+                        guard let chunk = try file.read(upToCount: count), !chunk.isEmpty else { break }
+                        bytes.append(chunk)
+                    }
+                    if bytes.count > maxBytes {
+                        continuation.resume(returning: (nil, "That file exceeds the 25 MB attachment limit."))
+                    } else {
+                        continuation.resume(returning: (bytes, nil))
+                    }
+                } catch {
+                    continuation.resume(returning: (nil, "That file could not be read."))
+                }
             }
         }
     }

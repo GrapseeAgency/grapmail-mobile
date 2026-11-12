@@ -237,7 +237,7 @@ struct MailAttachment: Decodable, Identifiable {
     var createdAt: String?
 
     private enum CodingKeys: String, CodingKey {
-        case id, messageId, name, mimeType, sizeBytes, createdAt
+        case id, messageId, name, mimeType, sizeBytes, size, createdAt
     }
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -245,7 +245,7 @@ struct MailAttachment: Decodable, Identifiable {
         messageId = c.lenientOpt(.messageId)
         name = c.lenientOpt(.name)
         mimeType = c.lenientOpt(.mimeType)
-        sizeBytes = c.lenientOpt(.sizeBytes)
+        sizeBytes = c.lenientOpt(.sizeBytes) ?? c.lenientOpt(.size)
         createdAt = c.lenientOpt(.createdAt)
     }
 }
@@ -1217,6 +1217,7 @@ struct MailSendRequest: Encodable {
     /// route's `!bodyText && !bodyHtml && !e2eEnvelope` refusal — the web's
     /// `e2eEnvelope: seal.envelope` is the contract this mirrors.
     var e2eEnvelope: RawJSON? = nil
+    var attachmentIds: [String] = []
 }
 
 struct MailDraftRequest: Encodable {
@@ -1660,32 +1661,9 @@ extension ApiClient {
         var req = mailRequest(url: url, method: method, bearer: bearer)
         if let contentType { req.setValue(contentType, forHTTPHeaderField: "Content-Type") }
         req.httpBody = body
-        let data: Data
-        let response: URLResponse
-        do {
-            (data, response) = try await URLSession.shared.data(for: req)
-        } catch { throw ApiError.network(error) }
-        guard let http = response as? HTTPURLResponse else {
-            throw ApiError.http(status: -1, code: nil, message: "No response")
-        }
-        return (data, http)
+        return try await authenticatedResponse(for: req, bearer: bearer)
     }
 
-    /// The same error envelope `request` builds, so a failed download reports the
-    /// server's reason rather than a status number — and, like every other mail
-    /// path on both platforms, WITHOUT ending the account session.
-    ///
-    /// An earlier version of this function called `signalUnauthorized()` on a 401.
-    /// That was the one mail route in the app that did: `request` carves mail out
-    /// (`!path.hasPrefix(mailBase)`) because the mail service is a different backend
-    /// that refuses a bearer the account endpoints still accept, and Android's
-    /// interceptor carves every `/grapmail` path out for the same reason — including
-    /// these attachment paths, since they share the prefix. Signing out over a
-    /// mail-scoped rejection would have torn the app down to the sign-in screen in
-    /// the middle of a download, with the thread or draft the person was on behind
-    /// it, and it did so only for files: every JSON mail call already behaves
-    /// correctly. A 401 here is still surfaced to the caller as itself, which is
-    /// what the screen can act on.
     private static func mailFailure(
         data: Data, http: HTTPURLResponse,
     ) -> ApiError {

@@ -671,13 +671,10 @@ object Api {
             if (response.priorResponse != null) return@authenticator null
             if (response.request.url.encodedPath.endsWith("/refresh")) return@authenticator null
             val ctx = appContext ?: return@authenticator null
-            val original = runBlocking { SessionStore.snapshot(ctx) } ?: return@authenticator null
             val rejected = response.request.header("Authorization")?.removePrefix("Bearer ")
-            if (original.token != rejected) return@authenticator null
-            val refreshed = runBlocking { SessionRefresh.refresh(ctx, rejected) }
-            val renewed = runBlocking { SessionStore.snapshot(ctx) } ?: return@authenticator null
-            if (renewed.id != original.id || (!refreshed && renewed.token == rejected)) return@authenticator null
-            response.request.newBuilder().header("Authorization", "Bearer ${renewed.token}").build()
+                ?: return@authenticator null
+            val renewed = runBlocking { SessionRefresh.retryToken(ctx, rejected) } ?: return@authenticator null
+            response.request.newBuilder().header("Authorization", "Bearer $renewed").build()
         }
         .connectTimeout(15, TimeUnit.SECONDS)
         .readTimeout(20, TimeUnit.SECONDS)
@@ -691,25 +688,31 @@ object Api {
     }
 
     private suspend fun execute(request: Request, httpClient: OkHttpClient = client): Pair<Int, String> =
-        suspendCancellableCoroutine { continuation ->
-            val call = httpClient.newCall(request)
-            continuation.invokeOnCancellation { call.cancel() }
-            call.enqueue(object : Callback {
-                override fun onFailure(call: Call, e: IOException) {
-                    continuation.resumeWithException(e)
-                }
+        executeResponse(request, httpClient) { it.code to (it.body?.string() ?: "") }
 
-                override fun onResponse(call: Call, response: Response) {
-                    val result = try {
-                        response.use { it.code to (it.body?.string() ?: "") }
-                    } catch (e: Exception) {
-                        continuation.resumeWithException(e)
-                        return
-                    }
-                    continuation.resume(result)
+    private suspend fun <T> executeResponse(
+        request: Request,
+        httpClient: OkHttpClient = client,
+        readBody: (Response) -> T,
+    ): T = suspendCancellableCoroutine { continuation ->
+        val call = httpClient.newCall(request)
+        continuation.invokeOnCancellation { call.cancel() }
+        call.enqueue(object : Callback {
+            override fun onFailure(call: Call, e: IOException) {
+                continuation.resumeWithException(e)
+            }
+
+            override fun onResponse(call: Call, response: Response) {
+                val result = try {
+                    response.use(readBody)
+                } catch (e: Exception) {
+                    continuation.resumeWithException(e)
+                    return
                 }
-            })
-        }
+                continuation.resume(result)
+            }
+        })
+    }
 
     private fun postBody(payload: String) = payload.toRequestBody(JSON_MEDIA)
 
@@ -993,16 +996,14 @@ object Api {
      * the profile screen draws as the empty state, not as a failure; anything
      * else throws like every other read, because a 500 must not look like no photo.
      */
-    suspend fun avatarBytes(token: String): ByteArray? = withContext(Dispatchers.IO) {
-        val request = authed("$AUTH/account/avatar", token).get().build()
-        client.newCall(request).execute().use { resp ->
+    suspend fun avatarBytes(token: String): ByteArray? =
+        executeResponse(authed("$AUTH/account/avatar", token).get().build()) { resp ->
             when {
                 resp.code == 404 -> null
                 resp.code >= 400 -> fail(resp.code, resp.body?.string() ?: "")
                 else -> resp.body?.bytes()
             }
         }
-    }
 
     suspend fun enableTwoFactor(token: String, proof: String?, phoneProof: String?): ProfileResponse {
         val req = authed("$AUTH/account/profile", token)
@@ -1390,18 +1391,11 @@ object Api {
      * nothing; a 404 or a 401 still throws through the same path so the caller
      * sees the real reason and the 401 interceptor still fires.
      */
-    suspend fun mailAttachmentBytes(token: String, id: String): ByteArray {
-        val request = authed("$MAIL/attachments/${enc(id)}", token).get().build()
-        val bytes = withContext(Dispatchers.IO) {
-            client.newCall(request).execute().use { resp ->
-                if (resp.code >= 400) {
-                    fail(resp.code, resp.body?.string() ?: "")
-                }
-                resp.body?.bytes() ?: ByteArray(0)
-            }
+    suspend fun mailAttachmentBytes(token: String, id: String): ByteArray =
+        executeResponse(authed("$MAIL/attachments/${enc(id)}", token).get().build()) { resp ->
+            if (resp.code >= 400) fail(resp.code, resp.body?.string() ?: "")
+            resp.body?.bytes() ?: ByteArray(0)
         }
-        return bytes
-    }
 
     /**
      * `POST /attachments` — multipart, with the field names the route reads:
@@ -1517,6 +1511,7 @@ data class MailSendRequest(
      * 1846 `e2eEnvelope: seal.envelope`); this is the same shape.
      */
     val e2eEnvelope: JsonObject? = null,
+    val attachmentIds: List<String> = emptyList(),
 )
 
 @Serializable

@@ -48,7 +48,13 @@ object MailStore {
     private var labels: List<MailLabelDto>? = null
     private var aliases: List<MailAliasDto>? = null
     private var me: MailMeResponse? = null
-    private var bodies: Map<String, MailMessageFullDto> = emptyMap()
+    private val bodies = object : android.util.LruCache<String, MailMessageFullDto>(8 * 1024 * 1024) {
+        override fun sizeOf(key: String, value: MailMessageFullDto): Int =
+            maxOf(1_024, value.sizeBytes ?: 0, (value.bodyText.orEmpty().length + value.bodyHtml.orEmpty().length) * 2)
+    }
+
+    data class IndexedAttachment(val attachment: MailAttachmentDto, val subject: String?)
+    private val attachmentsByMessage = mutableMapOf<String, List<IndexedAttachment>>()
 
     /**
      * messageId → the label ids that message carries. Null means the account has
@@ -160,40 +166,55 @@ object MailStore {
     /** Opened bodies, memoised by id. A body is fetched once: the list payload
      *  has none, and re-reading a payload to redraw a row is the over-fetch the
      *  shape was designed to avoid. */
-    suspend fun body(id: String): MailMessageFullDto? = mutex.withLock { bodies[id] }
+    suspend fun body(id: String): MailMessageFullDto? = mutex.withLock { bodies.get(id) }
 
-    /**
-     * Every body the app has opened, newest unknown order.
-     *
-     * This is what the Files screen is built from, and it is honest only because
-     * the screen says so: `GET /attachments/:id` exists but there is no list-all
-     * route, so a file the user has never opened is not in this list. The screen
-     * states that limit rather than presenting a partial index as the mailbox's
-     * full set of files.
-     */
-    suspend fun allBodies(): List<MailMessageFullDto> = mutex.withLock { bodies.values.toList() }
-
-    suspend fun putBody(v: MailMessageFullDto) = mutex.withLock {
-        bodies = bodies + (v.id to v)
+    suspend fun indexedAttachments(): List<IndexedAttachment> = mutex.withLock {
+        attachmentsByMessage.values.flatten()
     }
 
-    suspend fun putBodies(messages: List<MailMessageFullDto>) = mutex.withLock {
-        bodies = bodies + messages.associateBy { it.id }
+    suspend fun indexedAttachment(id: String): IndexedAttachment? = mutex.withLock {
+        attachmentsByMessage.values.firstNotNullOfOrNull { entries ->
+            entries.firstOrNull { it.attachment.id == id }
+        }
     }
 
-    /**
-     * Take one attachment out of every cached body.
-     *
-     * `DELETE /attachments/:id` destroys the file, not the message
-     * (`grapmail-attachments.ts:412`), so the body stays cached and only that one
-     * row of its `attachments` list goes. Leaving it would keep the Files screen
-     * offering a download of bytes the server has thrown away — the request would
-     * 404 and the person would reasonably blame the network.
-     */
+    private fun cacheBody(message: MailMessageFullDto) {
+        bodies.put(message.id, message)
+        if (message.attachments.isEmpty()) {
+            attachmentsByMessage.remove(message.id)
+        } else {
+            val subject = message.subject?.takeIf { it.isNotBlank() }
+            attachmentsByMessage[message.id] = message.attachments.map { IndexedAttachment(it, subject) }
+        }
+    }
+
+    suspend fun putBody(message: MailMessageFullDto) = mutex.withLock { cacheBody(message) }
+
+    suspend fun putBodies(messages: List<MailMessageFullDto>): List<MailMessageFullDto> = mutex.withLock {
+        messages.map { message ->
+            val known = attachmentsByMessage[message.id]
+            val merged = if (message.hasAttachments && message.attachments.isEmpty() && known != null) {
+                message.copy(attachments = known.map { it.attachment })
+            } else message
+            cacheBody(merged)
+            merged
+        }
+    }
+
+    suspend fun forgetBody(id: String) = mutex.withLock {
+        bodies.remove(id)
+        attachmentsByMessage.remove(id)
+        Unit
+    }
+
     suspend fun forgetAttachment(attachmentId: String) = mutex.withLock {
-        bodies = bodies.mapValues { (_, b) ->
-            if (b.attachments.none { it.id == attachmentId }) b
-            else b.copy(attachments = b.attachments.filterNot { it.id == attachmentId })
+        val messages = attachmentsByMessage.iterator()
+        while (messages.hasNext()) {
+            val entry = messages.next()
+            val remaining = entry.value.filterNot { it.attachment.id == attachmentId }
+            if (remaining.size == entry.value.size) continue
+            bodies.remove(entry.key)
+            if (remaining.isEmpty()) messages.remove() else entry.setValue(remaining)
         }
     }
 
@@ -217,6 +238,10 @@ object MailStore {
         read: Boolean? = null,
         starred: Boolean? = null,
     ) = mutex.withLock {
+        bodies.get(id)?.let { message ->
+            val updated = message.copy(isRead = read ?: message.isRead, isStarred = starred ?: message.isStarred)
+            if (updated != message) bodies.put(id, updated)
+        }
         pages = pages.mapValues { (_, cache) ->
             val index = cache.messages.indexOfFirst { it.id == id }
             if (index < 0) return@mapValues cache
@@ -251,8 +276,6 @@ object MailStore {
 
     suspend fun invalidateAllBoxes() = mutex.withLock {
         pages = emptyMap()
-        stats = null
-        bodies = emptyMap()
     }
 
     suspend fun clear() = mutex.withLock {
@@ -268,7 +291,8 @@ object MailStore {
         labels = null
         aliases = null
         me = null
-        bodies = emptyMap()
+        bodies.evictAll()
+        attachmentsByMessage.clear()
         // Back to null, not to an empty map: the next account has not been asked
         // anything, and an empty map would claim its mail carries no labels.
         assignments = null

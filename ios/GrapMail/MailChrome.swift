@@ -281,7 +281,7 @@ struct MailBottomBar: View {
                     .font(.system(size: 19))
                     .foregroundColor(active ? GM.primarySolid : GM.textTertiary)
                 if let badge, badge > 0 {
-                    Circle().fill(GM.error).frame(width: 8, height: 8)
+                    Circle().fill(GM.primarySolid).frame(width: 8, height: 8)
                         .offset(x: 4, y: -2)
                 }
             }

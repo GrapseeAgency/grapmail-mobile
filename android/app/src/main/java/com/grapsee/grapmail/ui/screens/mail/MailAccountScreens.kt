@@ -36,7 +36,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -168,7 +168,7 @@ private fun AddRow(
 @Composable
 fun NotesScreen(vm: ProfileViewModel, onBack: () -> Unit) {
     val palette = LocalPalette.current
-    val state by vm.state.collectAsState()
+    val state by vm.state.collectAsStateWithLifecycle()
     var draft by remember { mutableStateOf("") }
     LaunchedEffect(Unit) { vm.load() }
     MailScaffold("Notes", onBack) {
@@ -216,7 +216,7 @@ fun NotesScreen(vm: ProfileViewModel, onBack: () -> Unit) {
 @Composable
 fun TasksScreen(vm: ProfileViewModel, onBack: () -> Unit) {
     val palette = LocalPalette.current
-    val state by vm.state.collectAsState()
+    val state by vm.state.collectAsStateWithLifecycle()
     var draft by remember { mutableStateOf("") }
     LaunchedEffect(Unit) { vm.load() }
     MailScaffold("Tasks", onBack) {
@@ -278,7 +278,7 @@ fun TasksScreen(vm: ProfileViewModel, onBack: () -> Unit) {
 @Composable
 fun MailPrefsScreen(vm: ProfileViewModel, onBack: () -> Unit) {
     val palette = LocalPalette.current
-    val state by vm.state.collectAsState()
+    val state by vm.state.collectAsStateWithLifecycle()
     val s = state.profile?.settings
     var signature by remember(s?.signature) { mutableStateOf(s?.signature ?: "") }
     var language by remember(s?.locale) { mutableStateOf(s?.locale?.language ?: "") }
@@ -450,7 +450,7 @@ fun MailPrefsScreen(vm: ProfileViewModel, onBack: () -> Unit) {
 @Composable
 fun AddressesScreen(vm: ProfileViewModel, onBack: () -> Unit) {
     val palette = LocalPalette.current
-    val state by vm.state.collectAsState()
+    val state by vm.state.collectAsStateWithLifecycle()
     var label by remember { mutableStateOf("") }
     var pendingDelete by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(Unit) { vm.load() }
@@ -543,7 +543,7 @@ private fun vmAliasDelete(vm: ProfileViewModel, address: String) {
 @Composable
 fun ConnectionsScreen(vm: ProfileViewModel, onBack: () -> Unit, onOpen: (String) -> Unit) {
     val palette = LocalPalette.current
-    val state by vm.state.collectAsState()
+    val state by vm.state.collectAsStateWithLifecycle()
     var query by remember { mutableStateOf("") }
     var view by remember { mutableStateOf("all") }
     var pendingRemove by remember { mutableStateOf<ProfileConnectionDto?>(null) }
@@ -683,7 +683,7 @@ fun sharedWord(scope: String): String = when (scope) {
 fun ConnectionDetailScreen(vm: ProfileViewModel, product: String, onBack: () -> Unit,
                            onSupport: () -> Unit) {
     val palette = LocalPalette.current
-    val state by vm.state.collectAsState()
+    val state by vm.state.collectAsStateWithLifecycle()
     var confirmRemove by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { vm.load() }
     val connected = state.profile?.connections ?: emptyList()
@@ -826,7 +826,7 @@ fun ConnectionDetailScreen(vm: ProfileViewModel, product: String, onBack: () -> 
 @Composable
 fun ProfileEditScreen(vm: ProfileViewModel, onBack: () -> Unit) {
     val palette = LocalPalette.current
-    val state by vm.state.collectAsState()
+    val state by vm.state.collectAsStateWithLifecycle()
     val p = state.profile
     var first by remember(p?.firstName) { mutableStateOf(p?.firstName ?: "") }
     var last by remember(p?.lastName) { mutableStateOf(p?.lastName ?: "") }
@@ -861,12 +861,19 @@ fun ProfileEditScreen(vm: ProfileViewModel, onBack: () -> Unit) {
                         buffer.copyOf(count)
                     }
                 }.getOrNull()
-                bytes to (runCatching { resolver.getType(uri) }.getOrNull() ?: "image/jpeg")
+                val mime = bytes?.takeIf { it.isNotEmpty() && it.size <= 256 * 1024 }?.let {
+                    val options = android.graphics.BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                    android.graphics.BitmapFactory.decodeByteArray(it, 0, it.size, options)
+                    options.outMimeType
+                }
+                bytes to mime
             }
             when {
                 bytes == null || bytes.isEmpty() -> photoError = "That file could not be read."
                 bytes.size > 256 * 1024 ->
                     photoError = "That photo is too large. A profile photo can be up to 256 KB."
+                mime == null || mime !in setOf("image/png", "image/jpeg", "image/webp", "image/gif") ->
+                    photoError = "Choose a PNG, JPEG, WebP or GIF image."
                 else -> {
                     val ext = when (mime) {
                         "image/png" -> "png"
@@ -882,6 +889,9 @@ fun ProfileEditScreen(vm: ProfileViewModel, onBack: () -> Unit) {
     }
 
     LaunchedEffect(Unit) { vm.load() }
+    LaunchedEffect(p?.avatarUrl, state.busy) {
+        if (!state.busy) vm.loadAvatar()
+    }
     MailScaffold("Personal info", onBack) {
         Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())
             .padding(horizontal = 20.dp)) {
@@ -995,7 +1005,7 @@ fun PrivacyScreen(
     onSupport: () -> Unit,
 ) {
     val palette = LocalPalette.current
-    val state by vm.state.collectAsState()
+    val state by vm.state.collectAsStateWithLifecycle()
     val p = state.profile
     LaunchedEffect(Unit) { vm.load() }
     MailScaffold("Data & privacy", onBack) {

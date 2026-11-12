@@ -218,6 +218,8 @@ data class MailAttachmentDto(
     val messageId: String? = null,
     val name: String? = null,
     val mimeType: String? = null,
+    @OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
+    @kotlinx.serialization.json.JsonNames("size")
     val sizeBytes: Int? = null,
     val createdAt: String? = null,
 )

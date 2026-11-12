@@ -85,7 +85,7 @@ enum GM {
         color(light: 0x1A73E8, dark: 0x8AB4F8),
         color(light: 0x0B8043, dark: 0x0B8043),
         color(light: 0xA142F4, dark: 0xA142F4),
-        color(light: 0xC5221F, dark: 0xF2B8B5),
+        color(light: 0x455A64, dark: 0x546E7A),
         color(light: 0xE37400, dark: 0xFBBC04),
         color(light: 0x00796B, dark: 0x00796B),
         color(light: 0x8E24AA, dark: 0x8E24AA),

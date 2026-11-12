@@ -159,14 +159,27 @@ enum MailTime {
         "h:mm a", "MMM d", "MMM d, yyyy", "EEEE, MMMM d, yyyy 'at' h:mm a",
     ].map { ($0, makeFormatter($0)) })
 
+    private static let parsedDates: NSCache<NSString, NSDate> = {
+        let cache = NSCache<NSString, NSDate>()
+        cache.countLimit = 1_024
+        return cache
+    }()
+
     private static func parse(_ iso: String?) -> Date? {
         guard let iso, !iso.isEmpty else { return nil }
+        let key = iso as NSString
+        if let cached = parsedDates.object(forKey: key) { return cached as Date }
         for parser in parsers {
-            if let d = parser.date(from: iso) { return d }
+            if let date = parser.date(from: iso) {
+                parsedDates.setObject(date as NSDate, forKey: key)
+                return date
+            }
         }
         let iso8601 = ISO8601DateFormatter()
         iso8601.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        return iso8601.date(from: iso) ?? ISO8601DateFormatter().date(from: iso)
+        let date = iso8601.date(from: iso) ?? ISO8601DateFormatter().date(from: iso)
+        if let date { parsedDates.setObject(date as NSDate, forKey: key) }
+        return date
     }
 
     private static func makeFormatter(_ pattern: String, lenient: Bool = false) -> DateFormatter {
@@ -272,39 +285,12 @@ struct MessageRow: View {
 
 // ── header pieces ────────────────────────────────────────────────────────────
 
-/// The greeting. Time of day only, and the name comes from `/me`: with no name
-/// from the server the greeting has no name, rather than a plausible one.
-struct MailGreeting: View {
-    let name: String?
-    let address: String?
-
-    private var part: String {
-        switch Calendar.current.component(.hour, from: Date()) {
-        case 0..<12: return "Good morning"
-        case 12..<18: return "Good afternoon"
-        default: return "Good evening"
-        }
-    }
-
-    private var who: String? {
-        if let n = name?.trimmingCharacters(in: .whitespacesAndNewlines), !n.isEmpty { return n }
-        let handle = address?.split(separator: "@").first.map(String.init) ?? ""
-        return handle.isEmpty ? nil : handle
-    }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            HStack(spacing: 6) {
-                Text(who.map { "\(part), \($0)" } ?? part)
-                    .font(.system(size: 22, weight: .bold)).foregroundColor(GM.textPrimary)
-                Text(Calendar.current.component(.hour, from: Date()) < 18 ? "☀️" : "🌙")
-                    .font(.system(size: 18))
-            }
-            Text("Here's what's happening in your inbox today.")
-                .font(.system(size: 13)).foregroundColor(GM.textSecondary)
-        }
-    }
-}
+// The time-of-day greeting view lived here and was removed: nothing composed
+// it — the home header is the drawer menu, the search field and the account
+// avatar, which is the whole Gmail pattern and all the chrome a mail list
+// needs. Decorative filler above the list pushes every row down on a screen
+// the user opens to read mail. If a greeting is ever wanted again it must earn
+// its place with content, not take it by default.
 
 /// A pill in the label strip. Selected pills take the label's own colour, which
 /// is why the server stores it rather than the client picking one.

@@ -987,14 +987,34 @@ struct ApiClient {
     /// 401, and a live session is signed out. The mailbox fires several calls at
     /// once (list, stats, me), which is exactly when a stale token expires, so
     /// this gate is on the normal path, not a corner case.
-    static func renewPair() async -> String? {
-        await RenewalGate.shared.run { await performRenewPair() }
+    private enum RenewalResult {
+        case renewed(String), rejected, unavailable
     }
 
-    private static func performRenewPair() async -> String? {
-        let generation = await MainActor.run { SessionStore.generation }
-        guard let refresh = SessionStore.refreshToken,
-              let url = URL(string: "\(base)/grapsee/auth/refresh") else { return nil }
+    static func renewPair() async -> String? {
+        if case let .renewed(token) = await renewal(for: nil, generation: SessionStore.generation) {
+            return token
+        }
+        return nil
+    }
+
+    private static func renewal(for rejectedBearer: String?, generation: UUID) async -> RenewalResult {
+        if let rejectedBearer, let replacement = SessionStore.replacementToken(for: rejectedBearer, generation: generation) {
+            return .renewed(replacement)
+        }
+        return await RenewalGate.shared.run(generation: generation) {
+            await performRenewPair(rejectedBearer: rejectedBearer, generation: generation)
+        }
+    }
+
+    private static func performRenewPair(rejectedBearer: String?, generation: UUID) async -> RenewalResult {
+        guard SessionStore.generation == generation else { return .rejected }
+        if let rejectedBearer, SessionStore.token != rejectedBearer {
+            return SessionStore.replacementToken(for: rejectedBearer, generation: generation)
+                .map { .renewed($0) } ?? .rejected
+        }
+        guard let refresh = SessionStore.refreshToken else { return .rejected }
+        guard let url = URL(string: "\(base)/grapsee/auth/refresh") else { return .unavailable }
         struct RefreshBody: Encodable { let refreshToken: String }
         var req = URLRequest(url: url)
         req.httpMethod = "POST"
@@ -1004,32 +1024,40 @@ struct ApiClient {
         req.setValue(userAgent, forHTTPHeaderField: "User-Agent")
         req.httpBody = try? encoder.encode(RefreshBody(refreshToken: refresh))
         guard let (data, response) = try? await URLSession.shared.data(for: req),
-              let http = response as? HTTPURLResponse,
-              (200..<300).contains(http.statusCode),
+              let http = response as? HTTPURLResponse else { return .unavailable }
+        if http.statusCode == 401 || http.statusCode == 403 { return .rejected }
+        guard (200..<300).contains(http.statusCode),
               let pair = try? decoder.decode(SignInResponse.self, from: data),
-              let access = pair.accessToken ?? pair.token else { return nil }
+              let access = pair.accessToken ?? pair.token else { return .unavailable }
         return await MainActor.run {
-            guard SessionStore.generation == generation else { return nil }
+            guard SessionStore.generation == generation else { return .rejected }
             SessionStore.updateTokens(
                 token: access,
                 refreshToken: pair.refreshToken,
                 expiresAtRaw: pair.expiresAtMillis
             )
-            return access
+            return SessionStore.token == access ? .renewed(access) : .unavailable
         }
     }
 
-    /// Shares one renewal between every caller that arrived while it ran.
     private actor RenewalGate {
         static let shared = RenewalGate()
-        private var inFlight: Task<String?, Never>?
+        private var inFlight: [UUID: Task<RenewalResult, Never>] = [:]
+        private var lastUnavailable: (generation: UUID, time: TimeInterval)?
 
-        func run(_ operation: @escaping () async -> String?) async -> String? {
-            if let inFlight { return await inFlight.value }
+        func run(generation: UUID, _ operation: @escaping () async -> RenewalResult) async -> RenewalResult {
+            if let task = inFlight[generation] { return await task.value }
+            if let lastUnavailable, lastUnavailable.generation == generation,
+               ProcessInfo.processInfo.systemUptime - lastUnavailable.time < 2 {
+                return .unavailable
+            }
             let task = Task { await operation() }
-            inFlight = task
+            inFlight[generation] = task
             let result = await task.value
-            inFlight = nil
+            inFlight[generation] = nil
+            if case .unavailable = result, SessionStore.generation == generation {
+                lastUnavailable = (generation, ProcessInfo.processInfo.systemUptime)
+            }
             return result
         }
     }
@@ -1037,9 +1065,9 @@ struct ApiClient {
     /// One definition of "the server no longer knows us", shared by the JSON
     /// path and the binary attachment path. A second copy of this block is how a
     /// download could silently keep a revoked session alive.
-    static func signalUnauthorized(rejectedBearer: String) {
+    static func signalUnauthorized(rejectedBearer: String, generation: UUID) {
         DispatchQueue.main.async {
-            guard SessionStore.token == rejectedBearer else { return }
+            guard SessionStore.generation == generation, SessionStore.token == rejectedBearer else { return }
             SessionStore.clear()
             NotificationCenter.default.post(name: .gmSessionExpired, object: nil)
         }
@@ -1058,12 +1086,53 @@ struct ApiClient {
         return req
     }
 
-    static func request<T: Decodable>(_ path: String, method: String = "GET", body: Data? = nil, bearer: String? = nil, retried: Bool = false) async throws -> T {
-        let generation: UUID? = bearer == nil ? nil : await MainActor.run { SessionStore.generation }
-        guard var components = URLComponents(string: "\(base)\(path)") else {
+    static func authenticatedResponse(for request: URLRequest, bearer: String?) async throws -> (Data, HTTPURLResponse) {
+        let generation = SessionStore.generation
+        var request = request
+        var sentBearer = bearer
+        for attempt in 0...1 {
+            try Task.checkCancellation()
+            let data: Data
+            let response: URLResponse
+            do {
+                (data, response) = try await URLSession.shared.data(for: request)
+            } catch {
+                try Task.checkCancellation()
+                throw ApiError.network(error)
+            }
+            guard let http = response as? HTTPURLResponse else {
+                throw ApiError.http(status: -1, code: nil, message: "No response")
+            }
+            guard http.statusCode == 401, let rejected = sentBearer, generation == SessionStore.generation else {
+                return (data, http)
+            }
+
+            if attempt == 0 {
+                let result = await renewal(for: rejected, generation: generation)
+                try Task.checkCancellation()
+                switch result {
+                case let .renewed(token):
+                    if SessionStore.replacementToken(for: rejected, generation: generation) == token {
+                        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+                        sentBearer = token
+                        continue
+                    }
+                case .unavailable:
+                    throw ApiError.http(status: 503, code: nil, message: "The session could not be refreshed. Try again.")
+                case .rejected:
+                    break
+                }
+            }
+            signalUnauthorized(rejectedBearer: rejected, generation: generation)
+            return (data, http)
+        }
+        throw ApiError.http(status: 401, code: nil, message: "Sign in again.")
+    }
+
+    static func request<T: Decodable>(_ path: String, method: String = "GET", body: Data? = nil, bearer: String? = nil) async throws -> T {
+        guard let components = URLComponents(string: "\(base)\(path)") else {
             throw ApiError.http(status: -1, code: nil, message: "Bad URL")
         }
-        if path.contains("check?") == false { components.query = components.query } // path carries its own query when needed
         guard let url = components.url else {
             throw ApiError.http(status: -1, code: nil, message: "Bad URL")
         }
@@ -1076,52 +1145,13 @@ struct ApiClient {
         if let bearer { req.setValue("Bearer \(bearer)", forHTTPHeaderField: "Authorization") }
         req.httpBody = body
 
-        let data: Data
-        let response: URLResponse
-        do {
-            (data, response) = try await URLSession.shared.data(for: req)
-        } catch {
-            throw ApiError.network(error)
-        }
-        guard let http = response as? HTTPURLResponse else {
-            throw ApiError.http(status: -1, code: nil, message: "No response")
-        }
+        let (data, http) = try await authenticatedResponse(for: req, bearer: bearer)
         if http.statusCode == 403, path == "/grapsee/auth/login", bearer == nil,
            let challenge = try? decoder.decode(EmailVerificationChallenge.self, from: data),
            challenge.requireOtp, !challenge.email.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             throw ApiError.emailVerificationRequired(email: challenge.email)
         }
         if http.statusCode >= 400 {
-            // A 401 on a call that carried our bearer means the server no
-            // longer recognises the session — the token may have expired or
-            // been revoked from another device. Clearing it here (rather than
-            // only on an explicit sign-out) is the difference between landing
-            // on sign-in and sitting on a home screen whose every request 401s.
-            // Anonymous calls (sign-in, create, reset) 401 for wrong
-            // credentials, so only an authenticated rejection kills the session.
-            // Scoped by path on purpose, and identically to Android. The mail
-            // service is a different backend from the account endpoints and it
-            // refuses a bearer those endpoints accept; killing the session for
-            // that would sign a person out of a working sign-in and take the
-            // security screens with it. Every account call keeps the rule whole.
-            // One gateway, one verifier now: a 401 on any authenticated call
-            // means the session is dead. Before declaring that, try the pair
-            // rotation the gateway's one-hour access token requires — a
-            // refreshed token retries this call once, and a refused refresh
-            // signals the expiry (which lands the person on sign-in).
-            //
-            // The mail carve-out that used to live here is gone for the same
-            // reason Android's is: the mailbox and the account routes now
-            // verify the same token, so exempting mail would keep an expired
-            // session alive behind a screen that cannot load.
-            if http.statusCode == 401, let bearer, !path.contains("/auth/refresh"),
-               await MainActor.run(body: { SessionStore.generation == generation }) {
-                if !retried, let renewed = await Self.renewPair(),
-                   await MainActor.run(body: { SessionStore.generation == generation }) {
-                    return try await request(path, method: method, body: body, bearer: renewed, retried: true)
-                }
-                Self.signalUnauthorized(rejectedBearer: bearer)
-            }
             let carrier = try? decoder.decode(ErrorCarrier.self, from: data)
             throw ApiError.http(
                 status: http.statusCode,
@@ -1398,17 +1428,10 @@ struct ApiClient {
         guard let url = URL(string: base + path) else {
             throw ApiError.http(status: -1, code: nil, message: "Bad URL")
         }
-        var req = URLRequest(url: url)
-        req.httpMethod = method
-        req.setValue("Bearer \(bearer)", forHTTPHeaderField: "Authorization")
+        var req = mailRequest(url: url, method: method, bearer: bearer)
         if let contentType { req.setValue(contentType, forHTTPHeaderField: "Content-Type") }
         req.httpBody = body
-        let (data, response) = try await URLSession.shared.data(for: req)
-        guard let http = response as? HTTPURLResponse else {
-            throw ApiError.http(status: -1, code: nil, message: "No response")
-        }
-        if http.statusCode == 401 { signalUnauthorized(rejectedBearer: bearer) }
-        return (data, http)
+        return try await authenticatedResponse(for: req, bearer: bearer)
     }
 
     // `POST/DELETE /grapmail/aliases` live on the mail surface in `MailAPI.swift`

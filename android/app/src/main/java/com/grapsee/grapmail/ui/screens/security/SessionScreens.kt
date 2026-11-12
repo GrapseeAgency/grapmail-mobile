@@ -67,20 +67,16 @@ fun SignOutAllDevicesScreen(onBack: () -> Unit, onDone: () -> Unit) {
                         busy = true; error = null
                         scope.launch {
                             try {
-                                val token = SessionStore.token(context) ?: throw IllegalStateException("Sign in again.")
-                                val resp = Api.signOutEverywhere(token)
-                                // The epoch moved, so the token this request was
-                                // made with is dead. Keep the replacement or the
-                                // very next screen asks the person to sign in
-                                // again right after being told they would not.
+                                val session = SessionStore.snapshot(context)
+                                    ?: throw IllegalStateException("Sign in again.")
+                                val resp = Api.signOutEverywhere(session.token)
+                                val active = SessionStore.snapshot(context)
+                                if (active == null || active.id != session.id) return@launch
                                 resp.accessToken?.let { fresh ->
-                                    SessionStore.save(
-                                        context,
-                                        fresh,
-                                        SessionStore.refreshToken(context),
-                                        SessionStore.address(context) ?: "",
-                                        SessionStore.name(context) ?: "",
-                                        resp.tokenExpiresAtMillis,
+                                    SessionStore.updateTokens(
+                                        context, fresh, refreshToken = null,
+                                        expiresAt = resp.tokenExpiresAtMillis,
+                                        expectedToken = active.token,
                                     )
                                 }
                                 onDone()

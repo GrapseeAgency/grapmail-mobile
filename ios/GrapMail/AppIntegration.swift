@@ -138,6 +138,13 @@ enum MailPoll {
     static let channelName = "New mail"
     @MainActor private static var activeGeneration: UUID?
 
+    static let didReadStats = Notification.Name("grapmail.mailPoll.didReadStats")
+
+    struct PollResult {
+        let generation: UUID
+        let stats: MailStatsResponse
+    }
+
     @MainActor
     static func runOnce() async -> Bool {
         guard let token = SessionStore.token else { return false }
@@ -147,9 +154,9 @@ enum MailPoll {
         defer {
             if activeGeneration == generation { activeGeneration = nil }
         }
-        let unread: Int?
+        let stats: MailStatsResponse
         do {
-            unread = try await ApiClient.mailStats(token).inbox?.unread
+            stats = try await ApiClient.mailStats(token)
         } catch {
             // A refused read is not a quiet success: the task ends, nothing is
             // announced, and the next scheduled run asks again. No notification
@@ -159,7 +166,8 @@ enum MailPoll {
         }
         // A suspended read must not publish one account's result after sign-out.
         guard !Task.isCancelled, generation == SessionStore.generation else { return false }
-        guard let count = unread else { return false }
+        NotificationCenter.default.post(name: didReadStats, object: PollResult(generation: generation, stats: stats))
+        guard let count = stats.inbox?.unread else { return false }
         let defaults = UserDefaults.standard
         let didSee = defaults.object(forKey: lastSeenKey) != nil
         let previous = defaults.integer(forKey: lastSeenKey)

@@ -38,10 +38,10 @@ import androidx.compose.material.icons.rounded.Label
 import androidx.compose.material.icons.rounded.MailOutline
 import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.Menu
+import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.MoreHoriz
 import androidx.compose.material.icons.rounded.Report
 import androidx.compose.material.icons.rounded.Schedule
-import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Send
 import androidx.compose.material.icons.rounded.Shield
@@ -65,9 +65,15 @@ import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.repeatOnLifecycle
+import com.grapsee.grapmail.logic.MailPollWorker
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -129,6 +135,7 @@ fun MailboxScreen(
     onCompose: () -> Unit,
     /** A draft row opens the composer on its own text, not the reader. */
     onOpenDraft: (id: String) -> Unit,
+    onProfile: () -> Unit,
     onSettings: () -> Unit,
     onSecurity: () -> Unit,
     onHelp: () -> Unit,
@@ -140,10 +147,10 @@ fun MailboxScreen(
     onSignOut: () -> Unit,
 ) {
     val palette = LocalPalette.current
-    val state by vm.state.collectAsState()
+    val state by vm.state.collectAsStateWithLifecycle()
     val drawer = rememberDrawerState(DrawerValue.Closed)
     val scope = rememberCoroutineScope()
-    val listState = rememberLazyListState()
+    val listState = key(state.box) { rememberLazyListState() }
 
     var showSortSheet by remember { mutableStateOf(false) }
     var showAdvSheet by remember { mutableStateOf(false) }
@@ -157,18 +164,17 @@ fun MailboxScreen(
     // only thing that can dismiss it. The view model's own `error` stays on the
     // screener screen, where it belongs.
     var decisionResult by remember { mutableStateOf<String?>(null) }
-    val screener by vm.screener.collectAsState()
 
     // Ask for more once the list is nearly at the end. Not "on the last item",
     // which fires one screen late and makes the wait visible.
-    val nearEnd by remember {
+    val nearEnd by remember(listState) {
         derivedStateOf {
             val info = listState.layoutInfo
             val lastVisible = info.visibleItemsInfo.lastOrNull()?.index ?: -1
             info.totalItemsCount > 0 && lastVisible >= info.totalItemsCount - 4
         }
     }
-    LaunchedEffect(nearEnd, state.pages) {
+    LaunchedEffect(listState, nearEnd, state.pages) {
         if (nearEnd && state.hasRows && state.canLoadMore && state.appendError == null) vm.loadMore()
     }
 
@@ -178,6 +184,18 @@ fun MailboxScreen(
     LaunchedEffect(vm) {
         vm.ensureLoaded()
         vm.loadAccount()
+    }
+
+    val owner = LocalLifecycleOwner.current
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
+        vm.refreshOnResume(atTop = listState.firstVisibleItemIndex == 0)
+    }
+    LaunchedEffect(vm, owner, listState) {
+        owner.lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
+            MailPollWorker.results.collect {
+                vm.acceptPoll(it, atTop = listState.firstVisibleItemIndex == 0)
+            }
+        }
     }
 
     var refreshing by remember { mutableStateOf(false) }
@@ -219,7 +237,10 @@ fun MailboxScreen(
                         // "Delete" trashes. Permanent destruction is the second,
                         // explicit step behind the confirmation sheet, because a
                         // bulk toolbar must never be able to destroy mail.
-                        onDelete = { showPermanentConfirm = true },
+                        onDelete = {
+                            if (state.box == MailBox.Trash) showPermanentConfirm = true
+                            else vm.act(com.grapsee.grapmail.data.MailAction.Trash)
+                        },
                         onMove = { showMoveSheet = true },
                         // The read is asked for when the sheet is opened, not when
                         // the screen loads: a mailbox where nobody labels in bulk
@@ -243,6 +264,7 @@ fun MailboxScreen(
                         onMenu = { scope.launch { drawer.open() } },
                         accountName = state.accountName.orEmpty(),
                         accountAddress = state.accountAddress,
+                        onProfile = onProfile,
                         onSettings = onSettings,
                         onSignOut = onSignOut,
                     ) {
@@ -290,18 +312,24 @@ fun MailboxScreen(
 
                 // A refresh that failed over a populated list says so here rather
                 // than replacing the list with an error screen.
-                if (state.staleError != null && state.hasRows) {
+                val errorMessage = state.actionError ?: state.staleError?.takeIf { state.hasRows }
+                if (errorMessage != null) {
                     Row(
                         Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp)
                             .clip(RoundedCornerShape(10.dp)).background(palette.warnChipBg)
                             .padding(horizontal = 12.dp, vertical = 8.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Text(state.staleError!!, fontSize = 12.sp, color = palette.warnInk,
+                        Text(errorMessage, fontSize = 12.sp, color = palette.warnInk,
                             maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
                         Spacer(Modifier.width(8.dp))
-                        Text("Retry", fontSize = 12.sp, fontWeight = FontWeight.SemiBold,
-                            color = palette.primarySolid, modifier = Modifier.clickable { vm.load() })
+                        Text(
+                            if (state.actionError == null) "Retry" else "Dismiss",
+                            fontSize = 12.sp, fontWeight = FontWeight.SemiBold,
+                            color = palette.primarySolid, modifier = Modifier.clickable {
+                                if (state.actionError == null) vm.load() else vm.dismissActionError()
+                            },
+                        )
                     }
                 }
 
@@ -455,7 +483,7 @@ fun MailboxScreen(
     if (showSortSheet) {
         MailSheet(onDismiss = { showSortSheet = false }) {
             SortFilterContent(state.sort, state.filter, state.sortScope, state.total) { sort, filter ->
-                vm.setSort(sort); vm.setFilter(filter); showSortSheet = false
+                vm.setSortAndFilter(sort, filter); showSortSheet = false
             }
         }
     }
@@ -490,6 +518,7 @@ fun MailboxScreen(
         }
     }
     if (showSenderSheet) {
+        val screener by vm.screener.collectAsStateWithLifecycle()
         // Deliberately not dismissed on pick, unlike every other sheet here. A
         // filing action either worked or it did not and the list changes under
         // you, so the sheet closing is the feedback. A decision is a standing
@@ -567,6 +596,7 @@ internal fun drawerBoxes(s: MailboxViewModel.MailboxUiState): List<MailBox> =
 @Composable
 private fun MailTopBar(
     onMenu: () -> Unit,
+    onProfile: () -> Unit,
     accountName: String,
     accountAddress: String?,
     onSettings: () -> Unit,
@@ -587,11 +617,21 @@ private fun MailTopBar(
             androidx.compose.material3.IconButton(
                 onClick = { accountOpen = true },
                 modifier = Modifier.semantics { contentDescription = "Account" },
-            ) { SenderAvatar(accountName, accountAddress, size = 32.dp) }
+            ) {
+                if (accountName.isBlank() && accountAddress.isNullOrBlank()) {
+                    Icon(Icons.Rounded.Person, null, tint = palette.textSecondary)
+                } else {
+                    SenderAvatar(accountName, accountAddress, size = 32.dp)
+                }
+            }
             DropdownMenu(expanded = accountOpen, onDismissRequest = { accountOpen = false }) {
                 if (!accountAddress.isNullOrBlank()) {
                     Text(accountAddress, modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
                 }
+                DropdownMenuItem(text = { Text("Profile") }, onClick = {
+                    accountOpen = false
+                    onProfile()
+                })
                 DropdownMenuItem(text = { Text("Settings") }, onClick = {
                     accountOpen = false
                     onSettings()
@@ -614,8 +654,6 @@ private fun SearchField(query: String, onQuery: (String) -> Unit, onFilter: () -
             .border(1.dp, palette.border, RoundedCornerShape(14.dp)).padding(horizontal = 14.dp, vertical = 11.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(Icons.Rounded.Search, null, tint = palette.textTertiary, modifier = Modifier.size(18.dp))
-        Spacer(Modifier.width(10.dp))
         // A real value field: the reference's placeholder is not a hint that the
         // box is empty, it is what an unfocused search looks like. The wording
         // names what the server's term actually covers -- subject, body, sender
@@ -819,7 +857,7 @@ private fun TabItem(icon: ImageVector, label: String, active: Boolean, badge: In
             Icon(icon, null, tint = if (active) palette.primarySolid else palette.textTertiary,
                 modifier = Modifier.size(22.dp))
             if (badge != null && badge > 0) {
-                Box(Modifier.size(8.dp).clip(CircleShape).background(palette.error))
+                Box(Modifier.size(8.dp).clip(CircleShape).background(palette.primarySolid))
             }
         }
         Spacer(Modifier.height(3.dp))

@@ -28,7 +28,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -116,7 +116,7 @@ fun PhoneVerificationScreen(
     val palette = LocalPalette.current
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val state by flow.state.collectAsState()
+    val state by flow.state.collectAsStateWithLifecycle()
 
     var step by rememberSaveable { mutableIntStateOf(1) }
     var countryIndex by rememberSaveable { mutableIntStateOf(0) }
@@ -369,7 +369,7 @@ fun PhoneVerifiedScreen(
     onBackHome: () -> Unit,
 ) {
     val palette = LocalPalette.current
-    val state by flow.state.collectAsState()
+    val state by flow.state.collectAsStateWithLifecycle()
     val phone = state.verifiedPhone ?: state.phone
 
     AccountScreen(

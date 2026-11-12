@@ -1,6 +1,7 @@
 package com.grapsee.grapmail.ui.screens.mail
 
 import android.net.Uri
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -37,11 +38,12 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -59,6 +61,7 @@ import com.grapsee.grapmail.logic.MailboxViewModel
 import com.grapsee.grapmail.ui.components.GradientButton
 import com.grapsee.grapmail.ui.components.OutlineButton
 import com.grapsee.grapmail.ui.theme.LocalPalette
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 
 /**
@@ -89,15 +92,36 @@ fun ComposeScreen(
     replyId: String = "",
     mode: String = "reply",
     onBack: () -> Unit,
+    initialRecipient: String = "",
 ) {
     val palette = LocalPalette.current
     val context = LocalContext.current
     val scope = androidx.compose.runtime.rememberCoroutineScope()
-    val state by vm.compose.collectAsState()
-    val profileState by profile.state.collectAsState()
-    val e2eState by e2e.state.collectAsState()
+    val state by vm.compose.collectAsStateWithLifecycle()
+    val profileState by profile.state.collectAsStateWithLifecycle()
+    val e2eState by e2e.state.collectAsStateWithLifecycle()
     val attached = remember { mutableStateListOf<MailAttachmentDto>() }
     var notice by remember { mutableStateOf<String?>(null) }
+    var uploading by remember { mutableStateOf(false) }
+    var preparingSend by remember { mutableStateOf(false) }
+    val saveDraft: (() -> Unit) -> Unit = { onSaved ->
+        if (!uploading && !preparingSend && !state.sending && !state.accepted) {
+            if (attached.isEmpty()) vm.saveDraft(onSaved)
+            else notice = "Remove the attachments before saving this draft."
+        }
+    }
+    val close = {
+        if (!state.sending && !uploading && !preparingSend) {
+            if (!state.accepted && (attached.isNotEmpty() ||
+                    listOf(state.to, state.cc, state.subject, state.body).any { it.isNotBlank() })
+            ) {
+                saveDraft(onBack)
+            } else {
+                onBack()
+            }
+        }
+    }
+    BackHandler(onBack = close)
     var showCc by remember { mutableStateOf(false) }
     var showEmoji by remember { mutableStateOf(false) }
     // The encryption choice. It can only be ON when this device holds an
@@ -123,8 +147,13 @@ fun ComposeScreen(
     // its fields from the full server row; a blank one gets the signature
     // appended as editable text. Both run once per opened target, so a
     // rotation does not double-append what the person already edited.
-    var prepared by remember { mutableStateOf(false) }
+    var started by rememberSaveable { mutableStateOf(false) }
+    var prepared by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(replyId, signature) {
+        if (!started) {
+            vm.resetCompose(initialRecipient)
+            started = true
+        }
         if (prepared) return@LaunchedEffect
         if (replyId.isNotBlank()) {
             prepared = true
@@ -153,12 +182,65 @@ fun ComposeScreen(
         }.take(5).toList()
     }
 
+    val attachFile: (Uri?) -> Unit = { uri ->
+        if (uri != null && !uploading && attached.size < 20 && !state.sending && !state.accepted) {
+            uploading = true
+            scope.launch {
+                try {
+                    uploadOne(vm, context, uri, attached) { notice = it }
+                } finally {
+                    uploading = false
+                }
+            }
+        } else if (attached.size >= 20) {
+            notice = "A message can have up to 20 attachments."
+        }
+    }
     val pickFile = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
-        if (uri != null) scope.launch { uploadOne(vm, context, uri, attached) { notice = it } }
+        attachFile(uri)
     }
     val pickImage = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
-        if (uri != null) scope.launch { uploadOne(vm, context, uri, attached) { notice = it } }
+        attachFile(uri)
     }
+
+    val sendMessage: () -> Unit = sendMessage@{
+        if (uploading || preparingSend || state.sending || state.accepted) return@sendMessage
+        val attachmentIds = attached.map { it.id }
+        if (!encryptOn) {
+            vm.send(attachmentIds = attachmentIds)
+            return@sendMessage
+        }
+        if (attachmentIds.isNotEmpty()) {
+            notice = "Encrypted messages cannot include attachments."
+            return@sendMessage
+        }
+        val draft = vm.compose.value
+        preparingSend = true
+        scope.launch {
+            try {
+                val recipients = (splitTo(draft.to) + splitTo(draft.cc) + splitTo(draft.bcc)).distinct()
+                val plan = vm.encryptionPlan(recipients)
+                when {
+                    plan == null -> notice = "The encryption directory is unavailable. Try again."
+                    plan.first != "seal" -> notice = "A recipient has no published encryption key."
+                    else -> {
+                        val envelope = e2e.seal(draft.body, plan.second)
+                        val current = vm.compose.value
+                        if (current.to != draft.to || current.cc != draft.cc || current.bcc != draft.bcc ||
+                            current.body != draft.body || attached.isNotEmpty()
+                        ) {
+                            notice = "The message changed while encryption was being prepared. Tap Send again."
+                        } else if (envelope != null) {
+                            vm.send(envelope)
+                        }
+                    }
+                }
+            } finally {
+                preparingSend = false
+            }
+        }
+    }
+    val sendEnabled = !state.sending && !state.accepted && !preparingSend && !uploading
 
     Column(Modifier.fillMaxSize().background(palette.bg).statusBarsPadding().imePadding()) {
         Row(
@@ -170,41 +252,14 @@ fun ComposeScreen(
                     // Discarding is a choice, not an accident: the draft is saved
                     // first, because losing half-written text is the other way a
                     // mail app loses something.
-                    if (state.body.isNotBlank() || state.subject.isNotBlank()) vm.saveDraft()
-                    onBack()
+                    close()
                 })
             Spacer(Modifier.width(12.dp))
             Text("Compose", fontSize = 17.sp, fontWeight = FontWeight.SemiBold, color = palette.textPrimary)
             Spacer(Modifier.weight(1f))
             Icon(Icons.Rounded.Send, "Send", tint = palette.primarySolid,
                 modifier = Modifier.size(22.dp).clip(CircleShape)
-                    .clickable(enabled = !state.sending) {
-                        if (!encryptOn) { vm.send(); return@clickable }
-                        // The seal path: ask the directory for the plan, and
-                        // only send encrypted when EVERY recipient has a key
-                        // and this device can open its own. A plan that says
-                        // "plain", a locked key, or no answer at all stops the
-                        // send with a sentence -- an encrypted message half
-                        // built is the failure mode this gate exists to stop.
-                        scope.launch {
-                            val recipients = (splitTo(state.to) + splitTo(state.cc) +
-                                splitTo(state.bcc)).distinct()
-                            val plan = vm.encryptionPlan(recipients)
-                            when {
-                                plan == null -> notice =
-                                    "The directory did not answer, so nothing was encrypted " +
-                                        "and nothing was sent. Try again."
-                                plan.first != "seal" -> notice =
-                                    "Not every recipient has a published key, so this message " +
-                                        "cannot be encrypted. Turn encryption off to send it " +
-                                        "unencrypted, or stop and wait for the recipients."
-                                else -> {
-                                    val envelope = e2e.seal(state.body, plan.second)
-                                    if (envelope != null) vm.send(envelope)
-                                }
-                            }
-                        }
-                    }
+                    .clickable(enabled = sendEnabled, onClick = sendMessage)
                     .padding(2.dp).testTag("mail-send"))
         }
 
@@ -340,6 +395,12 @@ fun ComposeScreen(
                         Text(a.name ?: "Attachment", fontSize = 13.sp, color = palette.textPrimary,
                             maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
                         a.sizeBytes?.let { Text(humanBytes(it), fontSize = 12.sp, color = palette.textTertiary) }
+                        androidx.compose.material3.IconButton(
+                            onClick = { attached.remove(a) },
+                            enabled = !state.sending && !state.accepted && !preparingSend,
+                        ) {
+                            Icon(Icons.Rounded.Close, "Remove ${a.name ?: "attachment"}")
+                        }
                     }
                 }
             }
@@ -406,12 +467,9 @@ fun ComposeScreen(
             }
 
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                OutlineButton("Save draft", onClick = {
-                    vm.saveDraft()
-                    notice = "Saving…"
-                })
-                GradientButton(if (state.sending) "Sending…" else "Send", onClick = { vm.send() },
-                    enabled = !state.sending, modifier = Modifier.weight(1f))
+                OutlineButton("Save draft", onClick = { saveDraft {} }, fill = false)
+                GradientButton(if (state.sending) "Sending…" else "Send", onClick = sendMessage,
+                    enabled = sendEnabled, modifier = Modifier.weight(1f))
             }
             Spacer(Modifier.height(28.dp))
         }
@@ -525,19 +583,43 @@ private suspend fun uploadOne(
     into: androidx.compose.runtime.snapshots.SnapshotStateList<MailAttachmentDto>,
     report: (String) -> Unit,
 ) {
+    val maxBytes = 25 * 1024 * 1024
     val (name, mime, bytes) = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
         val resolver = context.contentResolver
         val name = queryName(context, uri) ?: uri.lastPathSegment ?: "attachment"
         val mime = runCatching { resolver.getType(uri) }.getOrNull() ?: "application/octet-stream"
-        val bytes = runCatching { resolver.openInputStream(uri)?.use { it.readBytes() } }.getOrNull()
+        val bytes = runCatching {
+            resolver.openInputStream(uri)?.use { stream ->
+                val output = java.io.ByteArrayOutputStream()
+                val buffer = ByteArray(32 * 1024)
+                var remaining = maxBytes + 1
+                while (remaining > 0) {
+                    kotlinx.coroutines.currentCoroutineContext().ensureActive()
+                    val count = stream.read(buffer, 0, minOf(buffer.size, remaining))
+                    if (count < 0) break
+                    output.write(buffer, 0, count)
+                    remaining -= count
+                }
+                output.toByteArray()
+            }
+        }.getOrElse { error ->
+            if (error is kotlinx.coroutines.CancellationException) throw error
+            null
+        }
         Triple(name, mime, bytes)
     }
     if (bytes == null) { report("That file could not be read."); return }
+    if (bytes.size > maxBytes) { report("That file exceeds the 25 MB attachment limit."); return }
     if (bytes.isEmpty()) { report("That file is empty."); return }
     report("Uploading ${name}…")
-    vm.uploadAttachment(bytes, name, mime) { attachment, message ->
-        if (attachment != null) into.add(attachment)
-        report(message)
+    try {
+        val attachment = vm.uploadAttachment(bytes, name, mime)
+        into.add(attachment)
+        report("Attached ${attachment.name ?: name}.")
+    } catch (error: kotlinx.coroutines.CancellationException) {
+        throw error
+    } catch (error: Exception) {
+        report(error.message ?: "This file could not be attached.")
     }
 }
 

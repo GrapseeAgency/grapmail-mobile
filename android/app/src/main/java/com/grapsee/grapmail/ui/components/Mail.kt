@@ -474,34 +474,12 @@ fun MessageRow(
 
 // ── header, tabs, chips ──────────────────────────────────────────────────────
 
-/** The greeting. Time of day only — nothing here claims to know the person's name
- *  unless the server said it, so the fallback is the address the mailbox answered
- *  with, not a made-up first name. */
-@Composable
-fun MailGreeting(name: String?, address: String?, modifier: Modifier = Modifier) {
-    val palette = LocalPalette.current
-    val hour = remember { Calendar.getInstance().get(Calendar.HOUR_OF_DAY) }
-    val part = when {
-        hour < 12 -> "Good morning"
-        hour < 18 -> "Good afternoon"
-        else -> "Good evening"
-    }
-    val who = name?.trim()?.takeIf { it.isNotEmpty() }
-        ?: address?.substringBefore('@')?.takeIf { it.isNotEmpty() }
-    // Built as a plain string, not inside the template: "$part${who?.let(", $it")}"
-    // reads `let(", $it")` as a String argument where a lambda belongs.
-    val greeting = if (who != null) "$part, $who" else part
-    Column(modifier) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(greeting, fontSize = 22.sp, fontWeight = FontWeight.Bold,
-                color = palette.textPrimary)
-            Spacer(Modifier.width(6.dp))
-            Text(if (hour < 18) "☀️" else "🌙", fontSize = 18.sp)
-        }
-        Text("Here's what's happening in your inbox today.",
-            fontSize = 13.sp, color = palette.textSecondary, modifier = Modifier.padding(top = 2.dp))
-    }
-}
+// The time-of-day greeting composable lived here and was removed: nothing
+// composed it — the home top bar is the drawer menu, the search field and the
+// account avatar, which is the whole Gmail pattern and all the chrome a mail
+// list needs. Decorative filler above the list pushes every row down on a
+// screen the user opens to read mail. If a greeting is ever wanted again it
+// must earn its place with content, not take it by default.
 
 /**
  * A pill in the label strip.

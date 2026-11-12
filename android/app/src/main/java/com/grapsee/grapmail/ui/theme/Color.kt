@@ -104,11 +104,11 @@ val LocalGrapMailColors = staticCompositionLocalOf { GrapMailColors() }
  * reference is the palette and the determinism, not the hash.
  */
 val GrapMailAvatarRampLight: List<Color> = listOf(
-    Color(0xFF1A73E8), Color(0xFF0B8043), Color(0xFFA142F4), Color(0xFFC5221F),
+    Color(0xFF1A73E8), Color(0xFF0B8043), Color(0xFFA142F4), Color(0xFF455A64),
     Color(0xFFE37400), Color(0xFF00796B), Color(0xFF8E24AA), Color(0xFF3949AB),
 )
 
 val GrapMailAvatarRampDark: List<Color> = listOf(
-    Color(0xFF8AB4F8), Color(0xFF0B8043), Color(0xFFA142F4), Color(0xFFF2B8B5),
+    Color(0xFF8AB4F8), Color(0xFF0B8043), Color(0xFFA142F4), Color(0xFF546E7A),
     Color(0xFFFBBC04), Color(0xFF00796B), Color(0xFF8E24AA), Color(0xFF3949AB),
 )

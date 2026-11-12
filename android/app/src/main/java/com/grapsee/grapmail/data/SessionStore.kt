@@ -68,9 +68,16 @@ object SessionStore {
     private const val ANDROID_KEYSTORE = "AndroidKeyStore"
     private const val ALIAS = "grapmail_session_key"
 
+    private var cachedKey: SecretKey? = null
+
+    @Synchronized
     private fun key(): SecretKey {
+        cachedKey?.let { return it }
         val ks = KeyStore.getInstance(ANDROID_KEYSTORE).apply { load(null) }
-        (ks.getKey(ALIAS, null) as? SecretKey)?.let { return it }
+        (ks.getKey(ALIAS, null) as? SecretKey)?.let {
+            cachedKey = it
+            return it
+        }
         val generator = KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, ANDROID_KEYSTORE)
         generator.init(
             KeyGenParameterSpec.Builder(ALIAS, KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT)
@@ -79,7 +86,7 @@ object SessionStore {
                 .setKeySize(256)
                 .build()
         )
-        return generator.generateKey()
+        return generator.generateKey().also { cachedKey = it }
     }
 
     // AndroidKeyStore AES-GCM keys are random-IV by default: the cipher must
@@ -97,6 +104,11 @@ object SessionStore {
     ) = withContext(Dispatchers.IO) {
         writes.withLock {
             val (encrypted, iv) = seal(token)
+            val previousAddress = context.sessionStore.data.first()[KEY_ADDRESS]
+            if (previousAddress != null && !previousAddress.equals(address, ignoreCase = true)) {
+                MailStore.clear()
+                SecurityProfileCache.clear()
+            }
             context.sessionStore.edit { prefs ->
                 prefs[KEY_TOKEN] = encrypted
                 prefs[KEY_IV] = iv

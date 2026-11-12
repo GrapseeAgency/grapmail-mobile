@@ -113,22 +113,16 @@ fun ChangePasswordScreen(
                         busy = true; error = null
                         scope.launch {
                             try {
-                                val token = SessionStore.token(context) ?: throw IllegalStateException("Sign in again.")
-                                val resp = Api.changePassword(token, current, next)
-                                // Every other device is signed out by this change,
-                                // this one included: keep the replacement token or
-                                // the next screen answers "session expired".
+                                val session = SessionStore.snapshot(context)
+                                    ?: throw IllegalStateException("Sign in again.")
+                                val resp = Api.changePassword(session.token, current, next)
+                                val active = SessionStore.snapshot(context)
+                                if (active == null || active.id != session.id) return@launch
                                 resp.accessToken?.let { fresh ->
-                                    SessionStore.save(
-                                        context,
-                                        fresh,
-                                        SessionStore.refreshToken(context),
-                                        SessionStore.address(context) ?: "",
-                                        SessionStore.name(context) ?: "",
-                                        // The server says when this token dies. Storing 0
-                                        // means "never expires", so the app kept booting
-                                        // straight into a home screen whose every call 401s.
-                                        resp.tokenExpiresAtMillis,
+                                    SessionStore.updateTokens(
+                                        context, fresh, refreshToken = null,
+                                        expiresAt = resp.tokenExpiresAtMillis,
+                                        expectedToken = active.token,
                                     )
                                 }
                                 onChanged()

@@ -89,20 +89,36 @@ class ProfileViewModel @JvmOverloads constructor(
         _state.update { it.copy(profile = profile, loading = false, avatar = avatarBytes, avatarTried = true) }
     }
 
-    fun load() {
-        if (snapshotMode) return
-        viewModelScope.launch {
+    private var profileLoad: kotlinx.coroutines.Job? = null
+    private var avatarLoad: kotlinx.coroutines.Job? = null
+
+    private var profileLoadedAt: Long? = null
+
+    fun load(force: Boolean = false) {
+        if (snapshotMode || profileLoad?.isActive == true || state.value.busy) return
+        if (!force && state.value.staleError == null &&
+            profileLoadedAt?.let { android.os.SystemClock.elapsedRealtime() - it < 30_000 } == true
+        ) return
+        profileLoad = viewModelScope.launch {
             val t = token() ?: return@launch
             _state.update { it.copy(loading = it.profile == null) }
             runCatching { Api.profile(t) }
                 .onSuccess { resp ->
+                    val fresh = resp.profile
+                    if (fresh != null) profileLoadedAt = android.os.SystemClock.elapsedRealtime()
                     _state.update {
-                        it.copy(profile = resp.profile ?: it.profile, loading = false,
-                            fatal = null, staleError = null)
+                        val avatarChanged = fresh != null && fresh.avatarUrl != it.profile?.avatarUrl
+                        it.copy(
+                            profile = fresh ?: it.profile, loading = false,
+                            avatar = if (avatarChanged) null else it.avatar,
+                            avatarTried = !avatarChanged && it.avatarTried,
+                            fatal = if (fresh == null && it.profile == null) "The account record is unavailable." else null,
+                            staleError = null,
+                        )
                     }
-                    loadAvatar()
                 }
                 .onFailure { e ->
+                    if (e is kotlinx.coroutines.CancellationException) throw e
                     val msg = reason(e)
                     _state.update {
                         it.copy(loading = false,
@@ -122,13 +138,19 @@ class ProfileViewModel @JvmOverloads constructor(
      * must not be drawn as absent: "there is no photo" and "nobody answered"
      * are different sentences, and only the first one is the server's.
      */
-    private fun loadAvatar() {
-        if (snapshotMode) return
-        viewModelScope.launch {
+    fun loadAvatar() {
+        val url = state.value.profile?.avatarUrl ?: return
+        if (snapshotMode || state.value.avatarTried || state.value.busy) return
+        avatarLoad?.cancel()
+        avatarLoad = viewModelScope.launch {
             val t = token() ?: return@launch
             runCatching { Api.avatarBytes(t) }
-                .onSuccess { bytes -> _state.update { it.copy(avatar = bytes, avatarTried = true) } }
+                .onSuccess { bytes ->
+                    if (state.value.profile?.avatarUrl == url) _state.update { it.copy(avatar = bytes, avatarTried = true) }
+                }
                 .onFailure { e ->
+                    if (e is kotlinx.coroutines.CancellationException) throw e
+                    if (state.value.profile?.avatarUrl != url) return@onFailure
                     val none = (e as? ApiException)?.code == "NO_AVATAR"
                     _state.update {
                         it.copy(
@@ -140,6 +162,20 @@ class ProfileViewModel @JvmOverloads constructor(
         }
     }
 
+    private fun beginWrite(): Boolean {
+        if (state.value.busy) return false
+        profileLoad?.cancel()
+        profileLoad = null
+        avatarLoad?.cancel()
+        avatarLoad = null
+        _state.update { it.copy(busy = true, loading = false, note = null) }
+        return true
+    }
+
+    private fun writeTokenMissing() {
+        _state.update { it.copy(busy = false, note = "Sign in again.", noteIsBad = true) }
+    }
+
     /**
      * Apply one partial write and settle the note from the server's answer.
      *
@@ -148,11 +184,12 @@ class ProfileViewModel @JvmOverloads constructor(
      * the same document.
      */
     fun save(label: String, patch: ProfilePatch) {
+        if (!beginWrite()) return
         viewModelScope.launch {
-            val t = token() ?: return@launch
-            _state.update { it.copy(busy = true, note = null) }
+            val t = token() ?: run { writeTokenMissing(); return@launch }
             runCatching { Api.patchProfile(t, patch) }
                 .onSuccess { resp ->
+                    if (resp.profile != null) profileLoadedAt = android.os.SystemClock.elapsedRealtime()
                     _state.update {
                         it.copy(
                             busy = false,
@@ -163,6 +200,7 @@ class ProfileViewModel @JvmOverloads constructor(
                     }
                 }
                 .onFailure { e ->
+                    if (e is kotlinx.coroutines.CancellationException) throw e
                     _state.update {
                         it.copy(busy = false, note = reason(e), noteIsBad = true)
                     }
@@ -187,9 +225,9 @@ class ProfileViewModel @JvmOverloads constructor(
      * lying.
      */
     fun aliasWrite(value: String, remove: Boolean, done: () -> Unit) {
+        if (!beginWrite()) return
         viewModelScope.launch {
-            val t = token() ?: return@launch
-            _state.update { it.copy(busy = true, note = null) }
+            val t = token() ?: run { writeTokenMissing(); return@launch }
             runCatching {
                 if (remove) {
                     val r = Api.mailDeleteAlias(t, value)
@@ -203,10 +241,11 @@ class ProfileViewModel @JvmOverloads constructor(
             }
                 .onSuccess { msg ->
                     _state.update { it.copy(busy = false, noteIsBad = false, note = msg) }
-                    load()
+                    load(force = true)
                     done()
                 }
                 .onFailure { e ->
+                    if (e is kotlinx.coroutines.CancellationException) throw e
                     _state.update { it.copy(busy = false, note = reason(e), noteIsBad = true) }
                 }
         }
@@ -218,9 +257,9 @@ class ProfileViewModel @JvmOverloads constructor(
      * refused upload must not blank the photo that is still on the record.
      */
     fun uploadAvatar(bytes: ByteArray, filename: String, mime: String) {
+        if (!beginWrite()) return
         viewModelScope.launch {
-            val t = token() ?: return@launch
-            _state.update { it.copy(busy = true, note = null) }
+            val t = token() ?: run { writeTokenMissing(); return@launch }
             runCatching { Api.uploadAvatar(t, bytes, filename, mime) }
                 .onSuccess { resp ->
                     _state.update {
@@ -231,15 +270,16 @@ class ProfileViewModel @JvmOverloads constructor(
                     }
                 }
                 .onFailure { e ->
+                    if (e is kotlinx.coroutines.CancellationException) throw e
                     _state.update { it.copy(busy = false, note = reason(e), noteIsBad = true) }
                 }
         }
     }
 
     fun removeAvatar() {
+        if (!beginWrite()) return
         viewModelScope.launch {
-            val t = token() ?: return@launch
-            _state.update { it.copy(busy = true, note = null) }
+            val t = token() ?: run { writeTokenMissing(); return@launch }
             runCatching { Api.deleteAvatar(t) }
                 .onSuccess { resp ->
                     _state.update {
@@ -250,6 +290,7 @@ class ProfileViewModel @JvmOverloads constructor(
                     }
                 }
                 .onFailure { e ->
+                    if (e is kotlinx.coroutines.CancellationException) throw e
                     _state.update { it.copy(busy = false, note = reason(e), noteIsBad = true) }
                 }
         }

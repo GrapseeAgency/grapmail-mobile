@@ -46,7 +46,7 @@ import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import androidx.compose.runtime.getValue
@@ -131,7 +131,7 @@ private fun NoteBar(text: String) {
 fun LabelsScreen(vm: MailboxViewModel, onBack: () -> Unit, onCreate: () -> Unit,
                  onEdit: (MailLabelDto) -> Unit) {
     val palette = LocalPalette.current
-    val state by vm.labelState.collectAsState()
+    val state by vm.labelState.collectAsStateWithLifecycle()
     var notice by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(Unit) { vm.refreshLabels() }
@@ -220,6 +220,8 @@ fun LabelCreateScreen(vm: MailboxViewModel, onDone: () -> Unit,
     }
     var result by remember { mutableStateOf<String?>(null) }
 
+    var saving by remember { mutableStateOf(false) }
+
     MailScaffold(if (editing == null) "New label" else "Edit label", onDone) {
         Column(Modifier.fillMaxSize().padding(horizontal = 20.dp).verticalScroll(rememberScrollState())) {
             Text("Name", fontSize = 13.sp, color = palette.textSecondary)
@@ -274,12 +276,10 @@ fun LabelCreateScreen(vm: MailboxViewModel, onDone: () -> Unit,
             Spacer(Modifier.height(24.dp))
             GradientButton(if (editing == null) "Create label" else "Save changes", onClick = {
                 if (name.isBlank()) { result = "A label needs a name."; return@GradientButton }
-                val done: (String) -> Unit = { outcome ->
-                    result = null
-                    // The route caps labels and rejects duplicates; either way it
-                    // says why, and that text is what the user sees.
-                    if (outcome.startsWith("Created") || outcome == "Saved.") onDone()
-                    else result = outcome
+                saving = true
+                val done: (Boolean, String) -> Unit = { saved, outcome ->
+                    saving = false
+                    if (saved) onDone() else result = outcome
                 }
                 // The key is sent as it stands. It used to be a hex string built
                 // from a local ramp, and the route's `normaliseColour` rejects
@@ -288,7 +288,7 @@ fun LabelCreateScreen(vm: MailboxViewModel, onDone: () -> Unit,
                 // colour the user picked was never the colour the label got.
                 if (editing == null) vm.createLabel(name.trim(), chosen, done)
                 else vm.renameLabel(editing.id, name.trim(), chosen, done)
-            }, enabled = name.isNotBlank())
+            }, enabled = name.isNotBlank() && !saving)
         }
     }
 }
@@ -301,14 +301,23 @@ fun ContactsScreen(vm: MailboxViewModel, onBack: () -> Unit, onOpen: (String) ->
     var people by remember { mutableStateOf<List<MailboxViewModel.Person>>(emptyList()) }
     var query by remember { mutableStateOf("") }
 
-    LaunchedEffect(Unit) { people = vm.people() }
-    val shown = remember(query, people) {
-        if (query.isBlank()) people
-        else people.filter {
-            it.address.contains(query.trim(), ignoreCase = true) ||
-                it.name?.contains(query.trim(), ignoreCase = true) == true
+    var matches by remember { mutableStateOf<List<MailboxViewModel.Person>?>(null) }
+    val needle = query.trim()
+    LaunchedEffect(vm) { people = vm.people() }
+    LaunchedEffect(needle, people) {
+        if (needle.isEmpty()) {
+            matches = null
+        } else {
+            kotlinx.coroutines.delay(120)
+            matches = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+                people.filter {
+                    it.address.contains(needle, ignoreCase = true) ||
+                        it.name?.contains(needle, ignoreCase = true) == true
+                }
+            }
         }
     }
+    val shown = if (needle.isEmpty()) people else matches.orEmpty()
 
     MailScaffold("Contacts", onBack) {
         Column(Modifier.fillMaxSize()) {
@@ -337,9 +346,12 @@ fun ContactsScreen(vm: MailboxViewModel, onBack: () -> Unit, onOpen: (String) ->
                     },
                 )
             }
-            if (shown.isEmpty()) {
-                EmptyNote("No people yet",
-                    "Contacts appear here as mail arrives from or to them.")
+            if (people.isEmpty()) {
+                EmptyNote("No people yet", "Contacts appear here as mail arrives from or to them.")
+            } else if (needle.isNotEmpty() && matches == null) {
+                EmptyNote("Searching…", "")
+            } else if (shown.isEmpty()) {
+                EmptyNote("No matching contacts", "Try another name or email address.")
             } else {
                 LazyColumn(Modifier.fillMaxSize()) {
                     items(shown, key = { it.address }) { p ->
@@ -384,7 +396,7 @@ fun ContactDetailScreen(vm: MailboxViewModel, address: String, onBack: () -> Uni
                 color = palette.textPrimary)
             Text(address, fontSize = 14.sp, color = palette.textSecondary)
             Spacer(Modifier.height(18.dp))
-            DetailLine("Messages seen", (person?.seen ?: 0).toString(), palette)
+            DetailLine("Messages seen", person?.seen?.toString() ?: "Not loaded", palette)
             DetailLine("In this build", "Derived from loaded mail", palette)
             Spacer(Modifier.height(22.dp))
             GradientButton("Write", onClick = onWrite)
@@ -406,7 +418,8 @@ private fun DetailLine(label: String, value: String, palette: com.grapsee.grapma
 fun FilesScreen(vm: MailboxViewModel, onBack: () -> Unit, onOpen: (String) -> Unit) {
     val palette = LocalPalette.current
     var files by remember { mutableStateOf<List<MailboxViewModel.FileEntry>>(emptyList()) }
-    LaunchedEffect(Unit) { files = vm.files() }
+    val filesRevision by vm.filesRevision.collectAsStateWithLifecycle()
+    LaunchedEffect(vm, filesRevision) { files = vm.files() }
 
     MailScaffold("Files", onBack) {
         Column(Modifier.fillMaxSize()) {
@@ -462,7 +475,8 @@ fun FilesScreen(vm: MailboxViewModel, onBack: () -> Unit, onOpen: (String) -> Un
 @Composable
 fun AttachmentPreviewScreen(vm: MailboxViewModel, attachmentId: String, onBack: () -> Unit) {
     val palette = LocalPalette.current
-    var entry by remember { mutableStateOf<MailboxViewModel.FileEntry?>(null) }
+    var entry by remember(attachmentId) { mutableStateOf<MailboxViewModel.FileEntry?>(null) }
+    var loaded by remember(attachmentId) { mutableStateOf(false) }
     var outcome by remember { mutableStateOf<String?>(null) }
     var saving by remember { mutableStateOf(false) }
     var opening by remember { mutableStateOf(false) }
@@ -475,8 +489,9 @@ fun AttachmentPreviewScreen(vm: MailboxViewModel, attachmentId: String, onBack: 
     var deleting by remember { mutableStateOf(false) }
     var deleted by remember { mutableStateOf(false) }
 
-    LaunchedEffect(attachmentId) {
-        entry = vm.files().firstOrNull { it.attachment.id == attachmentId }
+    LaunchedEffect(vm, attachmentId) {
+        entry = vm.file(attachmentId)
+        loaded = true
     }
 
     MailScaffold("Attachment", onBack) {
@@ -484,9 +499,11 @@ fun AttachmentPreviewScreen(vm: MailboxViewModel, attachmentId: String, onBack: 
             val a = entry?.attachment
             if (a == null || deleted) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text(if (deleted) "This attachment has been removed from the message. " +
-                        "The message itself is unchanged."
-                        else "This attachment is no longer listed. Open its message again.",
+                    Text(when {
+                        !loaded -> "Loading attachment…"
+                        deleted -> "This attachment has been removed from the message."
+                        else -> "This attachment is no longer listed. Open its message again."
+                    },
                         fontSize = 14.sp, color = palette.textSecondary)
                 }
                 return@Column
@@ -514,7 +531,7 @@ fun AttachmentPreviewScreen(vm: MailboxViewModel, attachmentId: String, onBack: 
             GradientButton(if (saving) "Saving…" else "Save to this device", onClick = {
                 saving = true
                 vm.downloadAttachment(a) { r -> saving = false; outcome = r }
-            }, enabled = !saving)
+            }, enabled = !saving && !opening && !deleting)
             // The other half of the affordance: saving to a path nobody can
             // reach from inside the app is only useful if the person can then
             // open the file. Handing it to a viewer is the point of an
@@ -522,8 +539,10 @@ fun AttachmentPreviewScreen(vm: MailboxViewModel, attachmentId: String, onBack: 
             Spacer(Modifier.height(12.dp))
             OutlineButton(if (opening) "Opening…" else "Open in another app",
                 onClick = {
-                    opening = true
-                    vm.openAttachment(a) { r -> opening = false; outcome = r }
+                    if (!opening && !saving && !deleting) {
+                        opening = true
+                        vm.openAttachment(a) { r -> opening = false; outcome = r }
+                    }
                 },
                 modifier = Modifier.testTag("mail-attachment-open"),
             )
@@ -551,10 +570,10 @@ fun AttachmentPreviewScreen(vm: MailboxViewModel, attachmentId: String, onBack: 
                             fontWeight = FontWeight.SemiBold, color = palette.error,
                             modifier = Modifier.clickable(enabled = !deleting) {
                                 deleting = true
-                                vm.deleteAttachment(a.id ?: "") { r ->
+                                vm.deleteAttachment(a.id) { removed, message ->
                                     deleting = false; confirmDelete = false
-                                    deleted = true
-                                    outcome = r
+                                    deleted = removed
+                                    outcome = message
                                 }
                             })
                     }
@@ -591,13 +610,13 @@ fun MailSettingsScreen(
     // "Checking…" while it is outstanding and names the failure when it is not.
     // A locally cached list rendered as though it were the server's answer would
     // show a create or a delete that had not happened.
-    val aliases by vm.aliasesState.collectAsState()
+    val aliases by vm.aliasesState.collectAsStateWithLifecycle()
     val accountFields = remember(vm) {
         vm.state.map { Triple(it.accountAddress, it.accountStatus, it.memberSince) }
             .distinctUntilChanged()
     }
-    val account by accountFields.collectAsState(
-        initial = vm.state.value.let { Triple(it.accountAddress, it.accountStatus, it.memberSince) },
+    val account by accountFields.collectAsStateWithLifecycle(
+        initialValue = vm.state.value.let { Triple(it.accountAddress, it.accountStatus, it.memberSince) },
     )
     LaunchedEffect(Unit) { vm.loadAliases() }
 
@@ -769,7 +788,7 @@ internal fun SettingRow(
 @Composable
 fun ScreenerScreen(vm: MailboxViewModel, onBack: () -> Unit, onOpenQueue: () -> Unit) {
     val palette = LocalPalette.current
-    val state by vm.screener.collectAsState()
+    val state by vm.screener.collectAsStateWithLifecycle()
 
     LaunchedEffect(Unit) { vm.loadScreener() }
 
@@ -821,6 +840,9 @@ fun ScreenerScreen(vm: MailboxViewModel, onBack: () -> Unit, onOpenQueue: () -> 
             state.error?.let {
                 Spacer(Modifier.height(10.dp))
                 Text(it, fontSize = 12.sp, color = palette.error)
+                if (!state.busy) androidx.compose.material3.TextButton(onClick = vm::loadScreener) {
+                    Text("Retry")
+                }
             }
 
             Spacer(Modifier.height(18.dp))

@@ -266,10 +266,10 @@ object Routes {
     // blank, "mail/compose?reply=<id>&mode=reply|all|forward" opens prepared.
     // The quote and the addressing are built from the FULL row at the
     // destination, not from what the list snippet happens to show.
-    const val MAIL_COMPOSE = "mail/compose?reply={reply}&mode={mode}"
+    const val MAIL_COMPOSE = "mail/compose?reply={reply}&mode={mode}&to={to}"
 
-    fun mailCompose(reply: String, mode: String) =
-        "mail/compose?reply=${encode(reply)}&mode=$mode"
+    fun mailCompose(reply: String, mode: String, to: String = "") =
+        "mail/compose?reply=${encode(reply)}&mode=$mode&to=${encode(to)}"
     const val MAIL_LABELS = "mail/labels"
     const val MAIL_LABEL_CREATE = "mail/labels/create/{id}"
 
@@ -344,14 +344,6 @@ fun GrapMailNav(
     val nav = rememberNavController()
     val vm: SignUpViewModel = viewModel()
     val flow: AccountFlowViewModel = viewModel()
-    /// One mailbox for the whole signed-in stack, held at the activity scope so
-    /// the list, the thread and the secondary screens read and write the same
-    /// pages rather than each fetching its own copy of the same mailbox.
-    val mail: MailboxViewModel = viewModel()
-    // The account record every Phase-1 screen reads and writes. One instance for
-    // the activity: the screens are eight views of one document, and eight
-    // separate copies of it is eight chances to disagree about the same account.
-    val profile: com.grapsee.grapmail.logic.ProfileViewModel = viewModel()
     // The encryption sector's state: the device's identity, the in-memory
     // unlock session, and the directory's published answer. One instance for
     // the stack -- the status card and the compose lookup must never disagree
@@ -992,17 +984,18 @@ fun GrapMailNav(
                 onContinueOnboarding = { nav.navigate(Routes.HOME) { popUpTo(Routes.WELCOME) } },
             )
         }
-        composable(Routes.HOME) {
+        composable(Routes.HOME) { entry ->
             MailboxScreen(
-                vm = mail,
+                vm = viewModel<MailboxViewModel>(entry),
                 onOpenThread = { id, isThread ->
                     nav.navigate(Routes.mailThread(id, isThread))
                 },
-                onCompose = { nav.navigate(Routes.MAIL_COMPOSE) },
+                onCompose = { nav.navigate(Routes.mailCompose("", "reply")) },
                 // A draft opens in the composer, not the reader: the row is
                 // the person's own unfinished mail, and the only useful tap
                 // is the one that lets them finish it.
                 onOpenDraft = { id -> nav.navigate(Routes.mailCompose(id, "draft")) },
+                onProfile = { nav.navigate(Routes.ACCOUNT_PROFILE) },
                 onSettings = { nav.navigate(Routes.MAIL_SETTINGS) },
                 onSecurity = { nav.navigate(Routes.SECURITY) },
                 onHelp = { openSupport() },
@@ -1023,6 +1016,7 @@ fun GrapMailNav(
             )
         }
         composable(Routes.MAIL_THREAD) { entry ->
+            val mail: MailboxViewModel = signedInViewModel(nav, entry)
             val id = entry.arguments?.getString("id")?.let(android.net.Uri::decode) ?: ""
             // A row that has no thread id is opened through the message route;
             // the thread route answers a message id with a 404, and a tap that
@@ -1054,12 +1048,16 @@ fun GrapMailNav(
             )
         }
         composable(Routes.MAIL_COMPOSE) { entry ->
+            val profile: com.grapsee.grapmail.logic.ProfileViewModel = signedInViewModel(nav, entry)
+            val mail: MailboxViewModel = signedInViewModel(nav, entry)
             val reply = entry.arguments?.getString("reply")?.let(android.net.Uri::decode) ?: ""
             val mode = entry.arguments?.getString("mode") ?: "reply"
+            val to = entry.arguments?.getString("to").orEmpty()
             ComposeScreen(vm = mail, profile = profile, e2e = e2e, replyId = reply, mode = mode,
-                onBack = { nav.popBackStack() })
+                initialRecipient = to, onBack = { nav.popBackStack() })
         }
-        composable(Routes.MAIL_LABELS) {
+        composable(Routes.MAIL_LABELS) { entry ->
+            val mail: MailboxViewModel = signedInViewModel(nav, entry)
             LabelsScreen(
                 vm = mail,
                 onBack = { nav.popBackStack() },
@@ -1068,6 +1066,7 @@ fun GrapMailNav(
             )
         }
         composable(Routes.MAIL_LABEL_CREATE) { entry ->
+            val mail: MailboxViewModel = signedInViewModel(nav, entry)
             val id = entry.arguments?.getString("id")?.let(android.net.Uri::decode) ?: ""
             // The row that opened this screen owns the label. If the list has not
             // loaded it, the screen opens as a new one rather than inventing a
@@ -1076,7 +1075,8 @@ fun GrapMailNav(
                 else mail.state.value.labels.firstOrNull { it.id == id }
             LabelCreateScreen(vm = mail, onDone = { nav.popBackStack() }, editing = editing)
         }
-        composable(Routes.MAIL_CONTACTS) {
+        composable(Routes.MAIL_CONTACTS) { entry ->
+            val mail: MailboxViewModel = signedInViewModel(nav, entry)
             ContactsScreen(
                 vm = mail,
                 onBack = { nav.popBackStack() },
@@ -1084,15 +1084,17 @@ fun GrapMailNav(
             )
         }
         composable(Routes.MAIL_CONTACT) { entry ->
+            val mail: MailboxViewModel = signedInViewModel(nav, entry)
             val address = entry.arguments?.getString("address")?.let(android.net.Uri::decode) ?: ""
             ContactDetailScreen(
                 vm = mail,
                 address = address,
                 onBack = { nav.popBackStack() },
-                onWrite = { nav.navigate(Routes.MAIL_COMPOSE) },
+                onWrite = { nav.navigate(Routes.mailCompose("", "reply", to = address)) },
             )
         }
-        composable(Routes.MAIL_FILES) {
+        composable(Routes.MAIL_FILES) { entry ->
+            val mail: MailboxViewModel = signedInViewModel(nav, entry)
             FilesScreen(
                 vm = mail,
                 onBack = { nav.popBackStack() },
@@ -1100,10 +1102,12 @@ fun GrapMailNav(
             )
         }
         composable(Routes.MAIL_ATTACHMENT) { entry ->
+            val mail: MailboxViewModel = signedInViewModel(nav, entry)
             val id = entry.arguments?.getString("id")?.let(android.net.Uri::decode) ?: ""
             AttachmentPreviewScreen(vm = mail, attachmentId = id, onBack = { nav.popBackStack() })
         }
-        composable(Routes.MAIL_SETTINGS) {
+        composable(Routes.MAIL_SETTINGS) { entry ->
+            val mail: MailboxViewModel = signedInViewModel(nav, entry)
             MailSettingsScreen(
                 vm = mail,
                 onBack = { nav.popBackStack() },
@@ -1128,19 +1132,24 @@ fun GrapMailNav(
                 },
             )
         }
-        composable(Routes.MAIL_NOTES) {
+        composable(Routes.MAIL_NOTES) { entry ->
+            val profile: com.grapsee.grapmail.logic.ProfileViewModel = signedInViewModel(nav, entry)
             com.grapsee.grapmail.ui.screens.mail.NotesScreen(vm = profile, onBack = { nav.popBackStack() })
         }
-        composable(Routes.MAIL_TASKS) {
+        composable(Routes.MAIL_TASKS) { entry ->
+            val profile: com.grapsee.grapmail.logic.ProfileViewModel = signedInViewModel(nav, entry)
             com.grapsee.grapmail.ui.screens.mail.TasksScreen(vm = profile, onBack = { nav.popBackStack() })
         }
-        composable(Routes.MAIL_PREFS) {
+        composable(Routes.MAIL_PREFS) { entry ->
+            val profile: com.grapsee.grapmail.logic.ProfileViewModel = signedInViewModel(nav, entry)
             com.grapsee.grapmail.ui.screens.mail.MailPrefsScreen(vm = profile, onBack = { nav.popBackStack() })
         }
-        composable(Routes.MAIL_ADDRESSES) {
+        composable(Routes.MAIL_ADDRESSES) { entry ->
+            val profile: com.grapsee.grapmail.logic.ProfileViewModel = signedInViewModel(nav, entry)
             com.grapsee.grapmail.ui.screens.mail.AddressesScreen(vm = profile, onBack = { nav.popBackStack() })
         }
-        composable(Routes.MAIL_CONNECTIONS) {
+        composable(Routes.MAIL_CONNECTIONS) { entry ->
+            val profile: com.grapsee.grapmail.logic.ProfileViewModel = signedInViewModel(nav, entry)
             com.grapsee.grapmail.ui.screens.mail.ConnectionsScreen(
                 vm = profile, onBack = { nav.popBackStack() },
                 onOpen = { nav.navigate("mail/settings/connections/${android.net.Uri.encode(it)}") },
@@ -1151,6 +1160,7 @@ fun GrapMailNav(
         // back stack, and an unknown name opens the honest "not connected"
         // answer rather than a redirect.
         composable(Routes.MAIL_CONNECTION_DETAIL) { entry ->
+            val profile: com.grapsee.grapmail.logic.ProfileViewModel = signedInViewModel(nav, entry)
             val product = entry.arguments?.getString("product")?.let(android.net.Uri::decode) ?: ""
             com.grapsee.grapmail.ui.screens.mail.ConnectionDetailScreen(
                 vm = profile, product = product,
@@ -1158,10 +1168,12 @@ fun GrapMailNav(
                 onSupport = { nav.navigate(Routes.MAIL_SUPPORT) },
             )
         }
-        composable(Routes.ACCOUNT_PROFILE) {
+        composable(Routes.ACCOUNT_PROFILE) { entry ->
+            val profile: com.grapsee.grapmail.logic.ProfileViewModel = signedInViewModel(nav, entry)
             com.grapsee.grapmail.ui.screens.mail.ProfileEditScreen(vm = profile, onBack = { nav.popBackStack() })
         }
-        composable(Routes.ACCOUNT_PRIVACY) {
+        composable(Routes.ACCOUNT_PRIVACY) { entry ->
+            val profile: com.grapsee.grapmail.logic.ProfileViewModel = signedInViewModel(nav, entry)
             com.grapsee.grapmail.ui.screens.mail.PrivacyScreen(
                 vm = profile,
                 onBack = { nav.popBackStack() },
@@ -1173,7 +1185,8 @@ fun GrapMailNav(
                 onSupport = { nav.navigate(Routes.MAIL_SUPPORT) },
             )
         }
-        composable(Routes.MAIL_SUPPORT) {
+        composable(Routes.MAIL_SUPPORT) { entry ->
+            val profile: com.grapsee.grapmail.logic.ProfileViewModel = signedInViewModel(nav, entry)
             com.grapsee.grapmail.ui.screens.mail.SupportScreen(
                 vm = profile,
                 onBack = { nav.popBackStack() },
@@ -1222,23 +1235,39 @@ fun GrapMailNav(
         composable(Routes.E2E_RECIPIENTS) {
             com.grapsee.grapmail.ui.screens.mail.E2eRecipientsScreen(vm = e2e,
                 onBack = { nav.popBackStack() },
-                onCompose = { nav.navigate(Routes.MAIL_COMPOSE) })
+                onCompose = { nav.navigate(Routes.mailCompose("", "reply")) })
         }
-        composable(Routes.MAIL_SCREENER) {
+        composable(Routes.MAIL_SCREENER) { entry ->
+            val mail: MailboxViewModel = signedInViewModel(nav, entry)
             ScreenerScreen(
                 vm = mail,
                 onBack = { nav.popBackStack() },
                 onOpenQueue = {
                     mail.open(MailBox.Screener)
-                    nav.navigate(Routes.HOME) { popUpTo(Routes.HOME) }
+                    nav.navigate(Routes.HOME) {
+                        popUpTo(Routes.HOME)
+                        launchSingleTop = true
+                    }
                 },
             )
         }
         // The subscriptions band sits with the other doors off Settings and
         // the drawer: one screen over the mail this device has loaded, no
         // state of its own the mailbox does not already hold.
-        composable(Routes.MAIL_SUBSCRIPTIONS) {
+        composable(Routes.MAIL_SUBSCRIPTIONS) { entry ->
+            val mail: MailboxViewModel = signedInViewModel(nav, entry)
             SubscriptionsScreen(vm = mail, onBack = { nav.popBackStack() })
         }
     }
+}
+
+
+// Popping the signed-in home clears its models and cancels their requests.
+@Composable
+private inline fun <reified VM : androidx.lifecycle.ViewModel> signedInViewModel(
+    nav: androidx.navigation.NavHostController,
+    destination: androidx.navigation.NavBackStackEntry,
+): VM {
+    val home = remember(nav, destination) { nav.getBackStackEntry(Routes.HOME) }
+    return viewModel(home)
 }

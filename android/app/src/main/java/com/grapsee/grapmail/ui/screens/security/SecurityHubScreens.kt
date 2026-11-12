@@ -53,6 +53,7 @@ import com.grapsee.grapmail.ui.components.GradientButton
 import com.grapsee.grapmail.ui.components.InfoCard
 import com.grapsee.grapmail.ui.components.StatusChip
 import com.grapsee.grapmail.ui.theme.LocalPalette
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
 /**
@@ -78,51 +79,45 @@ fun AccountSecurityScreen(
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    // Seeded from the cache rather than null: this screen is a fresh
-    // composition every time it is opened, so with nothing to hold it the hub
-    // re-fetched from zero on every return and showed a spinner — or, if that
-    // one request failed, an error — over data the app already had.
-    var profile by remember { mutableStateOf(SecurityProfileCache.last) }
-    // Without these three the hub printed a confident "Off" and "No number on
-    // this account yet" for the half second before the profile arrived — and
-    // again for ever if the request failed. A security screen may never show a
-    // guess as a fact.
+    var profile by remember { mutableStateOf<com.grapsee.grapmail.data.ProfileDto?>(null) }
     var loading by remember { mutableStateOf(true) }
     var failed by remember { mutableStateOf(false) }
     var reload by remember { mutableStateOf(0) }
 
     LaunchedEffect(reload) {
-        // A refresh is a refresh: whatever is already on screen stays on screen
-        // and the controls stay live. Only a hub with nothing to show may go to
-        // the error state — the old unconditional `failed = true` disabled the
-        // two-step switch on the first rate-limited request, which is what
-        // stalled the CI walk's second pass through the hub.
-        val held = profile
+        val session = SessionStore.snapshot(context)
+        if (session == null) {
+            profile = null
+            failed = true
+            loading = false
+            return@LaunchedEffect
+        }
+        val held = SecurityProfileCache.read(session.id)
+        profile = held
         failed = false
         loading = held == null
         try {
-            val token = SessionStore.token(context) ?: throw IllegalStateException("Sign in again.")
-            val loaded = Api.profile(token).profile
-            // A profile that never answered the security verdict is no answer:
-            // it may not replace a verdict already on screen, because
-            // twoFactorEnabled would then read as false and the hub would claim
-            // "2FA off" for an account that may have it on — and enable a
-            // toggle that routes into the ENABLE flow.
-            if (loaded?.twoFactorState == null) {
+            val fresh = Api.profile(session.token).profile
+            if (!SessionStore.isCurrent(context, session.id)) return@LaunchedEffect
+            if (fresh?.twoFactorState == null) {
                 failed = held == null
             } else {
-                profile = loaded
-                SecurityProfileCache.publish(loaded)
+                SecurityProfileCache.publish(session.id, fresh)
+                profile = fresh
             }
+        } catch (error: kotlinx.coroutines.CancellationException) {
+            throw error
         } catch (_: Exception) {
-            failed = held == null
+            if (SessionStore.isCurrent(context, session.id)) failed = held == null
         } finally {
-            loading = false
+            if (kotlinx.coroutines.currentCoroutineContext().isActive) loading = false
         }
     }
 
     val twoFactorOn = profile?.twoFactorState == true
-    val secure = twoFactorOn && !profile?.phone.isNullOrBlank()
+    val hasPhone = !profile?.phone.isNullOrBlank()
+    val phoneVerified = hasPhone && profile?.phoneVerified == true
+    val secure = twoFactorOn && phoneVerified
 
     AccountScreen(
         onBack = onBack,
@@ -198,8 +193,14 @@ fun AccountSecurityScreen(
             icon = Icons.Rounded.PhoneAndroid,
             title = "Phone Number",
             subtitle = profile?.phone ?: if (loading) null else "Used for account recovery and two-step verification.",
-            chip = if (loading || failed) null else if (profile?.phone.isNullOrBlank()) "Add" else "Verified",
-            chipTone = if (profile?.phone.isNullOrBlank()) ChipTone.Warning else ChipTone.Success,
+            chip = when {
+                loading || failed -> null
+                !hasPhone -> "Add"
+                phoneVerified -> "Verified"
+                profile?.phoneVerified == false -> "Unverified"
+                else -> null
+            },
+            chipTone = if (phoneVerified) ChipTone.Success else ChipTone.Warning,
             onClick = onPhone,
         )
         SectionLabel("Account Management")

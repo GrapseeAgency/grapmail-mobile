@@ -27,7 +27,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -165,7 +165,7 @@ fun E2eStatusScreen(vm: E2eViewModel, onBack: () -> Unit, onSetup: () -> Unit,
                     onChangePassphrase: () -> Unit, onRemove: () -> Unit,
                     onRecipients: () -> Unit) {
     val palette = LocalPalette.current
-    val state by vm.state.collectAsState()
+    val state by vm.state.collectAsStateWithLifecycle()
     LaunchedEffect(Unit) { vm.load() }
     MailScaffold("Encryption", onBack) {
         Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp),
@@ -257,7 +257,7 @@ fun E2eStatusScreen(vm: E2eViewModel, onBack: () -> Unit, onSetup: () -> Unit,
  *  somewhere else, which is the one thing this feature exists to prevent. */
 @Composable
 fun E2eSetupScreen(vm: E2eViewModel, onBack: () -> Unit) {
-    val state by vm.state.collectAsState()
+    val state by vm.state.collectAsStateWithLifecycle()
     var passphrase by remember { mutableStateOf("") }
     var confirm by remember { mutableStateOf("") }
     var publishOnSetup by remember { mutableStateOf(true) }
@@ -308,7 +308,7 @@ fun E2eSetupScreen(vm: E2eViewModel, onBack: () -> Unit) {
 
 @Composable
 fun E2eUnlockScreen(vm: E2eViewModel, onBack: () -> Unit) {
-    val state by vm.state.collectAsState()
+    val state by vm.state.collectAsStateWithLifecycle()
     var phrase by remember { mutableStateOf("") }
     MailScaffold("Unlock your key", onBack) {
         Column(Modifier.fillMaxSize().padding(horizontal = 20.dp)) {
@@ -329,7 +329,7 @@ fun E2eUnlockScreen(vm: E2eViewModel, onBack: () -> Unit) {
 @Composable
 fun E2eDetailsScreen(vm: E2eViewModel, onBack: () -> Unit) {
     val palette = LocalPalette.current
-    val state by vm.state.collectAsState()
+    val state by vm.state.collectAsStateWithLifecycle()
     MailScaffold("This device's key", onBack) {
         // Top-anchored like every other detail screen (subscriptions, the
         // connection page): Arrangement.Center stranded the whole record in
@@ -357,7 +357,7 @@ fun E2eDetailsScreen(vm: E2eViewModel, onBack: () -> Unit) {
 @Composable
 fun E2ePublishScreen(vm: E2eViewModel, onBack: () -> Unit) {
     val palette = LocalPalette.current
-    val state by vm.state.collectAsState()
+    val state by vm.state.collectAsStateWithLifecycle()
     LaunchedEffect(Unit) { vm.loadPublished() }
     MailScaffold("Who can find your key", onBack) {
         Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp),
@@ -415,7 +415,7 @@ fun E2ePublishScreen(vm: E2eViewModel, onBack: () -> Unit) {
 
 @Composable
 fun E2ePassphraseScreen(vm: E2eViewModel, onBack: () -> Unit) {
-    val state by vm.state.collectAsState()
+    val state by vm.state.collectAsStateWithLifecycle()
     var oldPhrase by remember { mutableStateOf("") }
     var newPhrase by remember { mutableStateOf("") }
     MailScaffold("Change your passphrase", onBack) {
@@ -445,7 +445,7 @@ fun E2ePassphraseScreen(vm: E2eViewModel, onBack: () -> Unit) {
 @Composable
 fun E2eRemoveScreen(vm: E2eViewModel, onBack: () -> Unit) {
     val palette = LocalPalette.current
-    val state by vm.state.collectAsState()
+    val state by vm.state.collectAsStateWithLifecycle()
     var confirmRemove by remember { mutableStateOf(false) }
     MailScaffold("Remove the key from this device", onBack) {
         Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())
@@ -485,7 +485,7 @@ fun E2eRemoveScreen(vm: E2eViewModel, onBack: () -> Unit) {
 @Composable
 fun E2eRecipientsScreen(vm: E2eViewModel, onBack: () -> Unit, onCompose: () -> Unit) {
     val palette = LocalPalette.current
-    val state by vm.state.collectAsState()
+    val state by vm.state.collectAsStateWithLifecycle()
     var draft by remember { mutableStateOf("") }
     MailScaffold("Recipient keys", onBack) {
         Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp)) {

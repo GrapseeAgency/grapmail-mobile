@@ -17,16 +17,18 @@ package com.grapsee.grapmail.data
  */
 object SecurityProfileCache {
 
-    @Volatile
-    var last: ProfileDto? = null
-        private set
+    private data class Entry(val sessionId: String, val profile: ProfileDto)
 
-    /** Record a profile the server actually answered with. */
-    fun publish(profile: ProfileDto) {
-        last = profile
+    @Volatile
+    private var entry: Entry? = null
+
+    fun read(sessionId: String): ProfileDto? = entry?.takeIf { it.sessionId == sessionId }?.profile
+
+    fun publish(sessionId: String, profile: ProfileDto) {
+        entry = Entry(sessionId, profile)
     }
 
     fun clear() {
-        last = null
+        entry = null
     }
 }

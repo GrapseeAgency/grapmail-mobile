@@ -24,7 +24,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -51,7 +51,7 @@ import com.grapsee.grapmail.ui.theme.LocalPalette
 @Composable
 fun AddressStepScreen(vm: SignUpViewModel, onBack: () -> Unit, onSignIn: () -> Unit, onNext: () -> Unit) {
     val palette = LocalPalette.current
-    val state by vm.state.collectAsState()
+    val state by vm.state.collectAsStateWithLifecycle()
     val loadedForKey = remember { mutableStateOf<String?>(null) }
     var domainMenuOpen by rememberSaveable { mutableStateOf(false) }
 

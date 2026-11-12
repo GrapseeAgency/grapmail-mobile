@@ -39,6 +39,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -48,7 +49,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.mutableStateMapOf
 import com.grapsee.grapmail.data.MailAction
 import com.grapsee.grapmail.ui.components.AppTextField
@@ -62,6 +63,8 @@ import com.grapsee.grapmail.ui.components.absoluteDateTimeOrRaw
 import com.grapsee.grapmail.ui.components.mailTime
 import com.grapsee.grapmail.ui.theme.LocalPalette
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 /**
  * Reference 74 — a conversation. 75 is the same screen with an encrypted message
@@ -104,17 +107,14 @@ fun ThreadScreen(
     onStepNext: (MailStep) -> Unit,
 ) {
     val palette = LocalPalette.current
-    val thread by vm.thread.collectAsState()
-    // The reader's formatted bodies, keyed by message id: the model fetches the
-    // server-sanitized render per row, and the island below renders from it.
-    val bodies by vm.bodies.collectAsState()
+    val thread by vm.thread.collectAsStateWithLifecycle()
     var busy by remember { mutableStateOf<String?>(null) }
     // Per-message, not global: a download result belongs to the row that asked
     // for it, and a shared variable would let a later failure overwrite an
     // earlier success on screen.
     val notices = remember { mutableStateMapOf<String, String>() }
 
-    LaunchedEffect(threadId) { if (isThread) vm.openThread(threadId) else vm.openMessage(threadId) }
+    LaunchedEffect(threadId, isThread) { if (isThread) vm.openThread(threadId) else vm.openMessage(threadId) }
 
     Column(Modifier.fillMaxSize().background(palette.bg).statusBarsPadding()) {
         Row(
@@ -227,9 +227,6 @@ private fun ThreadMessageCard(
 ) {
     val palette = LocalPalette.current
     val context = androidx.compose.ui.platform.LocalContext.current
-    // The reader's formatted bodies, keyed by message id: the model fetches the
-    // server-sanitized render per row, and the island below renders from it.
-    val bodies by vm.bodies.collectAsState()
     var showUnsub by androidx.compose.runtime.remember { mutableStateOf(false) }
     // Keyed on the message, because the reader can now step to a neighbouring
     // message without leaving this composition: a note that belonged to the
@@ -249,15 +246,27 @@ private fun ThreadMessageCard(
     // The images the sender's HTML part points at, and whether this message has
     // asked for them. Both belong to the message: stepping from here must not
     // carry an opt-in that was given for somebody else's mail.
-    val hiddenImages = remember(message.bodyHtml) { remoteImageUrls(message.bodyHtml) }
     var shownImages by androidx.compose.runtime.remember(message.id) { mutableStateOf(false) }
     // The formatted body is fetched when the card composes and again when the
     // images gate is answered — the two variants are different renders, and
     // the model memoises both per message.
-    val needsFormattedBody = !message.isE2eEncrypted && message.e2eEnvelope == null &&
+    var openEarlierMessage by remember(message.id) { mutableStateOf(false) }
+    val showsBody = expanded || openEarlierMessage
+    var detailsError by remember(message.id) { mutableStateOf<String?>(null) }
+    var detailsAttempt by remember(message.id) { mutableStateOf(0) }
+    LaunchedEffect(message.id, showsBody, detailsAttempt) {
+        if (showsBody) detailsError = vm.viewMessage(message.id)
+    }
+    val needsFormattedBody = showsBody && !message.isE2eEncrypted && message.e2eEnvelope == null &&
         !message.bodyHtml.isNullOrBlank()
-    LaunchedEffect(message.id, shownImages, needsFormattedBody) {
-        if (needsFormattedBody) vm.loadBody(message.id, shownImages)
+    val render by produceState<MailboxViewModel.BodyRender?>(null, message.id, shownImages, needsFormattedBody) {
+        value = null
+        if (needsFormattedBody) value = vm.loadBody(message.id, shownImages)
+    }
+    val hiddenImages by produceState(emptyList<String>(), message.bodyHtml, needsFormattedBody) {
+        value = if (needsFormattedBody) {
+            withContext(Dispatchers.Default) { remoteImageUrls(message.bodyHtml) }
+        } else emptyList()
     }
     // The sender's own `List-Unsubscribe` offer, narrowed to an http(s) address by
     // the same rule iOS applies. Null means show nothing: a button that opens a
@@ -312,7 +321,11 @@ private fun ThreadMessageCard(
         // its notice in place of the body, and the envelope is the ciphertext.
         // The notice is never shown as if it were the message, and the
         // ciphertext is never shown at all: only an opened body is.
-        if (message.isE2eEncrypted || message.e2eEnvelope != null) {
+        if (!showsBody) {
+            com.grapsee.grapmail.ui.components.OutlineButton(
+                "Show message", onClick = { openEarlierMessage = true }, fill = false,
+            )
+        } else if (message.isE2eEncrypted || message.e2eEnvelope != null) {
             EncryptedBlock(message, e2e)
         } else {
             // HTML-first, matching the web's SafeEmailBody: when the message
@@ -323,23 +336,26 @@ private fun ThreadMessageCard(
             // and if it fails, the stripped-text branch the screen always had
             // is the visible fallback, said per message rather than hidden.
             val htmlPart = message.bodyHtml?.takeIf { it.isNotBlank() }
-            val render = bodies[message.id]
+            val formatted = render?.takeIf { it.allowImages == shownImages }
             if (htmlPart != null) {
                 when {
-                    render?.html != null -> {
+                    formatted?.html != null -> {
                         HtmlMailBody(
-                            html = render.html,
+                            html = formatted.html,
                             allowImages = shownImages,
                             onOpenLink = { url -> openExternally(context, url) },
                             modifier = Modifier.testTag("mail-body"),
                         )
                     }
-                    render?.error != null -> {
+                    formatted?.error != null -> {
                         HtmlStrippedNotice()
                         Spacer(Modifier.height(6.dp))
-                        Text(render.error, fontSize = 12.sp, color = palette.textTertiary)
+                        Text(formatted.error, fontSize = 12.sp, color = palette.textTertiary)
                         Spacer(Modifier.height(8.dp))
-                        Text(stripHtml(htmlPart), fontSize = 15.sp,
+                        val fallback by produceState("", htmlPart) {
+                            value = withContext(Dispatchers.Default) { stripHtml(htmlPart) }
+                        }
+                        Text(fallback, fontSize = 15.sp,
                             color = palette.textPrimary, lineHeight = 22.sp)
                     }
                     else -> {
@@ -351,9 +367,7 @@ private fun ThreadMessageCard(
             } else {
                 val text = message.bodyText
                 if (text.isNullOrBlank()) {
-                    if (expanded) {
-                        Text("This message has no text body.", fontSize = 14.sp, color = palette.textSecondary)
-                    }
+                    Text("This message has no text body.", fontSize = 14.sp, color = palette.textSecondary)
                 } else {
                     Text(text, fontSize = 15.sp, color = palette.textPrimary, lineHeight = 22.sp,
                         modifier = Modifier.testTag("mail-body"))
@@ -391,6 +405,13 @@ private fun ThreadMessageCard(
                     Text("These images load from the sender's server.",
                         fontSize = 12.sp, color = palette.textTertiary)
                 }
+            }
+        }
+
+        detailsError?.let { error ->
+            Text(error, fontSize = 12.sp, color = palette.textSecondary)
+            androidx.compose.material3.TextButton(onClick = { detailsAttempt++ }) {
+                Text("Retry")
             }
         }
 

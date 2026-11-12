@@ -13,7 +13,7 @@ import androidx.compose.material.icons.rounded.Phone
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -61,7 +61,7 @@ fun FindAddressScreen(
 ) {
     val palette = LocalPalette.current
     val scope = rememberCoroutineScope()
-    val state by flow.state.collectAsState()
+    val state by flow.state.collectAsStateWithLifecycle()
 
     var phone by rememberSaveable { mutableStateOf("") }
     var error by rememberSaveable { mutableStateOf<String?>(null) }
@@ -158,7 +158,7 @@ fun AddressFoundScreen(
 ) {
     val palette = LocalPalette.current
     val clipboard = LocalClipboardManager.current
-    val state by flow.state.collectAsState()
+    val state by flow.state.collectAsStateWithLifecycle()
     val shown = state.foundAddress ?: ""
     // What Copy puts on the clipboard: the note promises it can be used to sign
     // in, and the mask on screen cannot. Nothing else reads the full value.

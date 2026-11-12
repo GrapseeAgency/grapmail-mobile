@@ -5,6 +5,7 @@ import UIKit
 ///
 /// One view for both references: 02 is the same page with everything switched
 /// on, so the copy follows the state instead of the layout being forked.
+@MainActor
 struct AccountSecurityView: View {
     let onBack: () -> Void
     let onTwoFactor: () -> Void
@@ -16,6 +17,10 @@ struct AccountSecurityView: View {
     let onPassword: () -> Void
     let onSignOutAll: () -> Void
     let onSupport: () -> Void
+
+    private static var cachedVerdict: (generation: UUID, profile: ProfileDto)?
+
+    static func clearCachedVerdict() { cachedVerdict = nil }
 
     @State private var profile: ProfileDto?
     // Without these the hub printed a confident "Off" and "No number on this
@@ -42,7 +47,16 @@ struct AccountSecurityView: View {
     }
 
     private var twoFactorOn: Bool { profile?.twoFactorState ?? false }
-    private var secure: Bool { twoFactorOn && !(profile?.phone ?? "").isEmpty }
+    private var hasPhone: Bool { profile?.phone?.nilIfBlank() != nil }
+    private var phoneVerified: Bool { hasPhone && profile?.phoneVerified == true }
+    private var secure: Bool { twoFactorOn && phoneVerified }
+
+    private var phoneChip: String? {
+        guard !loading, !failed else { return nil }
+        if !hasPhone { return "Add" }
+        if phoneVerified { return "Verified" }
+        return profile?.phoneVerified == false ? "Unverified" : nil
+    }
 
     var body: some View {
         AccountScreen(
@@ -114,8 +128,8 @@ struct AccountSecurityView: View {
                 subtitle: (profile?.phone ?? "").isEmpty
                     ? (loading ? nil : "Used for account recovery and two-step verification.")
                     : profile?.phone,
-                chip: (loading || failed) ? nil : ((profile?.phone ?? "").isEmpty ? "Add" : "Verified"),
-                chipTone: (profile?.phone ?? "").isEmpty ? .warning : .success,
+                chip: phoneChip,
+                chipTone: phoneVerified ? .success : .warning,
                 action: onPhone
             )
 
@@ -169,36 +183,29 @@ struct AccountSecurityView: View {
             FooterNote(text: "Your security matters. We're here to help.")
         }
         .task(id: reload) {
-            // The hub re-fetches on every reappear, so one visit to each row
-            // means eight round-trips — and a rate limit or a dropped request
-            // on any of them used to blank a screen that was already showing
-            // good data: `failed = true` disabled the 2FA switch and the walk
-            // could never reopen the enable flow it had just used. A refresh is
-            // a refresh: keep the profile already on screen and only let the
-            // screen go to the error state when there is nothing to show.
-            let loaded = profile
+            let generation = SessionStore.generation
+            let cached = Self.cachedVerdict
+            let held = cached?.generation == generation ? cached?.profile : nil
+            profile = held
             failed = false
-            loading = loaded == nil
+            loading = held == nil
             guard let token = SessionStore.token else {
                 loading = false
-                failed = loaded == nil
+                failed = true
                 return
             }
             do {
                 let fresh = try await ApiClient.profile(token: token).profile
-                // A profile that never answered the security verdict — neither
-                // the flag nor the legacy string — is no answer at all, so it
-                // must not replace a verdict already on screen: a defaulted
-                // "off" invites re-enabling a factor that is already on and
-                // hides a real lock-out. Keep the older answer; fall back to
-                // the error state only when there was none.
-                if fresh?.twoFactorState == nil {
-                    failed = loaded == nil
-                } else {
+                guard !Task.isCancelled, SessionStore.generation == generation else { return }
+                if let fresh, fresh.twoFactorState != nil {
+                    Self.cachedVerdict = (generation, fresh)
                     profile = fresh
+                } else {
+                    failed = held == nil
                 }
             } catch {
-                failed = loaded == nil
+                guard !Task.isCancelled, SessionStore.generation == generation else { return }
+                failed = held == nil
             }
             loading = false
         }
@@ -899,18 +906,16 @@ struct ChangePasswordView: View {
                         busy = true; error = nil
                         Task {
                             do {
+                                let generation = SessionStore.generation
                                 let resp = try await ApiClient.changePassword(token: token, current: current, next: next)
-                                // Every other device is cut off by this change,
-                                // this one included: keep the replacement token.
+                                guard generation == SessionStore.generation else {
+                                    busy = false
+                                    return
+                                }
                                 if let fresh = resp.accessToken {
-                                    SessionStore.save(
+                                    SessionStore.updateTokens(
                                         token: fresh,
-                                        refreshToken: SessionStore.refreshToken,
-                                        address: SessionStore.address ?? "",
-                                        name: SessionStore.name ?? "",
-                                        // Without this the expiry key is removed, which
-                                        // the store reads as "never expires" — the app then
-                                        // cold-boots into a home screen whose every call 401s.
+                                        refreshToken: nil,
                                         expiresAtRaw: resp.tokenExpiresAtMillis
                                     )
                                 }
@@ -1022,20 +1027,16 @@ struct SignOutAllDevicesView: View {
                         busy = true; error = nil
                         Task {
                             do {
+                                let generation = SessionStore.generation
                                 let resp = try await ApiClient.signOutEverywhere(token: token)
-                                // The epoch moved, so the token this request used is
-                                // dead. Keep the replacement, or the next screen
-                                // asks for a sign-in right after promising this
-                                // device would stay signed in.
+                                guard generation == SessionStore.generation else {
+                                    busy = false
+                                    return
+                                }
                                 if let fresh = resp.accessToken {
-                                    SessionStore.save(
+                                    SessionStore.updateTokens(
                                         token: fresh,
-                                        refreshToken: SessionStore.refreshToken,
-                                        address: SessionStore.address ?? "",
-                                        name: SessionStore.name ?? "",
-                                        // Without this the expiry key is removed, which
-                                        // the store reads as "never expires" — the app then
-                                        // cold-boots into a home screen whose every call 401s.
+                                        refreshToken: nil,
                                         expiresAtRaw: resp.tokenExpiresAtMillis
                                     )
                                 }

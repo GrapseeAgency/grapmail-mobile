@@ -6,10 +6,14 @@ import UIKit
 import Combine
 
 @MainActor
-private final class MailboxOwner: ObservableObject {
-    @Published private(set) var model = MailboxModel()
+private final class SignedInModels: ObservableObject {
+    private(set) var mail = MailboxModel()
+    @Published private(set) var account = ProfileModel()
 
-    func reset() { model = MailboxModel() }
+    func reset() {
+        mail = MailboxModel()
+        account = ProfileModel()
+    }
 }
 
 /// The root navigation for the account sector: welcome → wizard (5 steps) →
@@ -53,7 +57,7 @@ struct RootView: View {
         case mailThread(id: String, isThread: Bool)
         // Compose carries an optional reply target and mode: empty reply opens
         // blank, "reply|all|forward" opens prepared from the full server row.
-        case mailCompose(reply: String, mode: String)
+        case mailCompose(reply: String, mode: String, recipient: String = "")
         case mailLabels, mailLabelCreate(id: String)
         case mailContacts, mailContactDetail(address: String)
         case mailFiles, mailAttachment(id: String)
@@ -90,15 +94,9 @@ struct RootView: View {
     /// the thread is not fetched again by the Files screen.
     // Destinations observe the mailbox directly. Owning it here without
     // forwarding its publications keeps draft edits out of navigation updates.
-    @StateObject private var mailboxOwner = MailboxOwner()
-    private var mail: MailboxModel { mailboxOwner.model }
-
-    /// The account record every account-band screen reads and writes. One
-    /// instance for the stack: the screens are eight views of one document,
-    /// and eight separate copies of it is eight chances to disagree about the
-    /// same account. Mirror of Android's `profile: ProfileViewModel` in
-    /// `GrapMailNav`.
-    @StateObject private var account = ProfileModel()
+    @StateObject private var signedInModels = SignedInModels()
+    private var mail: MailboxModel { signedInModels.mail }
+    private var account: ProfileModel { signedInModels.account }
 
     /// The encryption sector's state: the device identity, the in-memory
     /// unlock session, the directory's published answer. Mirror of Android's
@@ -198,7 +196,7 @@ struct RootView: View {
             // sign-in) never reach here — only a rejected bearer does.
             .onReceive(NotificationCenter.default.publisher(for: .gmSessionExpired)) { _ in
                 restoredSession = true
-                mailboxOwner.reset()
+                signedInModels.reset()
                 guard path.last != .signIn else { return }
                 // A dead token strands the unlocked private halves in this
                 // stack otherwise: the model outlives path rewrites, so the
@@ -660,6 +658,7 @@ struct RootView: View {
                         onLabels: { path.append(.mailLabels) },
                         onScreener: { path.append(.mailScreener) },
                         onSubscriptions: { path.append(.mailSubscriptions) },
+                        onProfile: { path.append(.accountProfile) },
                         onSettings: { path.append(.mailSettings) },
                         onSecurity: { path.append(.security) },
                         onHelp: openSupport,
@@ -668,7 +667,7 @@ struct RootView: View {
                         onSignOut: {
                             e2e.clearForSignOut()
                             SessionStore.clear()
-                            mailboxOwner.reset()
+                            signedInModels.reset()
                             path.removeAll()
                         }
                     )
@@ -693,9 +692,9 @@ struct RootView: View {
                             path.append(.mailThread(id: step.id, isThread: step.isThread))
                         }
                     )
-                case let .mailCompose(reply, mode):
+                case let .mailCompose(reply, mode, recipient):
                     ComposeView(vm: mail, account: account, e2e: e2e, replyId: reply, mode: mode,
-                                onBack: { path.removeLast() })
+                                onBack: { path.removeLast() }, initialRecipient: recipient)
                 case .mailLabels:
                     LabelsView(vm: mail,
                                onBack: { path.removeLast() },
@@ -716,7 +715,7 @@ struct RootView: View {
                 case let .mailContactDetail(address):
                     ContactDetailView(vm: mail, address: address,
                                       onBack: { path.removeLast() },
-                                      onWrite: { path.append(.mailCompose(reply: "", mode: "reply")) })
+                                      onWrite: { path.append(.mailCompose(reply: "", mode: "reply", recipient: address)) })
                 case .mailFiles:
                     FilesView(vm: mail,
                               onBack: { path.removeLast() },
@@ -744,7 +743,7 @@ struct RootView: View {
                         onSignOut: {
                             e2e.clearForSignOut()
                             SessionStore.clear()
-                            mailboxOwner.reset()
+                            signedInModels.reset()
                             path.removeAll()
                         }
                     )

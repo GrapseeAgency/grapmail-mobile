@@ -19,7 +19,7 @@ import androidx.compose.material.icons.rounded.Schedule
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -71,7 +71,7 @@ fun ForgotPasswordScreen(
 ) {
     val palette = LocalPalette.current
     val scope = rememberCoroutineScope()
-    val state by flow.state.collectAsState()
+    val state by flow.state.collectAsStateWithLifecycle()
 
     var identifier by rememberSaveable { mutableStateOf(state.identifier) }
     var error by rememberSaveable { mutableStateOf<String?>(null) }
@@ -170,7 +170,7 @@ fun RecoveryCodeScreen(
 ) {
     val palette = LocalPalette.current
     val scope = rememberCoroutineScope()
-    val state by flow.state.collectAsState()
+    val state by flow.state.collectAsStateWithLifecycle()
 
     var code by rememberSaveable { mutableStateOf(state.code) }
     var error by rememberSaveable { mutableStateOf<String?>(null) }
@@ -281,7 +281,7 @@ fun NewPasswordScreen(
 ) {
     val palette = LocalPalette.current
     val scope = rememberCoroutineScope()
-    val state by flow.state.collectAsState()
+    val state by flow.state.collectAsStateWithLifecycle()
 
     var password by rememberSaveable { mutableStateOf("") }
     var confirm by rememberSaveable { mutableStateOf("") }
@@ -473,7 +473,7 @@ fun RecoveryPendingScreen(
 ) {
     val palette = LocalPalette.current
     val scope = rememberCoroutineScope()
-    val state by flow.state.collectAsState()
+    val state by flow.state.collectAsStateWithLifecycle()
 
     var notice by rememberSaveable { mutableStateOf<String?>(null) }
     var busy by remember { mutableStateOf(false) }

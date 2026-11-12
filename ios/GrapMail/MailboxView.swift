@@ -1,7 +1,7 @@
 import SwiftUI
+import Combine
 
-/// The mailbox home: greeting, search, label strip, box tabs, list, selection,
-/// drawer, FAB and the four sheets.
+/// The mailbox home presents messages, search, and account and folder controls.
 ///
 /// The reference draws Gmail's category tabs (`Primary / Social / Promotions /
 /// Updates`) and filter chips (`All / Personal / Work / +2`). No `category`
@@ -32,12 +32,17 @@ struct MailboxView: View {
     let onLabels: () -> Void
     let onScreener: () -> Void
     let onSubscriptions: () -> Void
+    let onProfile: () -> Void
     let onSettings: () -> Void
     let onSecurity: () -> Void
     let onHelp: () -> Void
     let onContacts: () -> Void
     let onFiles: () -> Void
     let onSignOut: () -> Void
+
+    @Environment(\.scenePhase) private var scenePhase
+    @State private var isAtTop = true
+    @State private var isVisible = false
 
     @State private var drawerOpen = false
     @State private var sheet: MailSheet?
@@ -81,6 +86,16 @@ struct MailboxView: View {
             // `/me` once. Returning from a thread re-enters this task.
             vm.ensureLoaded()
             vm.loadAccount()
+            if scenePhase == .active { vm.refreshOnResume(atTop: isAtTop || vm.state.rows.isEmpty) }
+        }
+        .onAppear { isVisible = true }
+        .onDisappear { isVisible = false }
+        .onChange(of: scenePhase) { phase in
+            if phase == .active, isVisible { vm.refreshOnResume(atTop: isAtTop || vm.state.rows.isEmpty) }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: MailPoll.didReadStats)) { notification in
+            guard scenePhase == .active, isVisible, let result = notification.object as? MailPoll.PollResult else { return }
+            vm.acceptPoll(result, atTop: isAtTop || vm.state.rows.isEmpty)
         }
         // No `.accessibilityElement(children: .contain)` here. It makes the
         // identifier resolvable, and it broke every tap on the screen: with the
@@ -126,7 +141,10 @@ struct MailboxView: View {
                 // "Delete" trashes. Permanent destruction is the second,
                 // explicit step behind the confirmation sheet, because a bulk
                 // toolbar must never be able to destroy mail.
-                onDelete: { sheet = .permanent },
+                onDelete: {
+                    if vm.state.box == .trash { sheet = .permanent }
+                    else { vm.act(.trash) }
+                },
                 onMove: { sheet = .move },
                 onLabel: { vm.ensureAssignments(); sheet = .label },
                 onMarkRead: { vm.act(.read) },
@@ -154,12 +172,21 @@ struct MailboxView: View {
                         if let address = vm.state.accountAddress, !address.isEmpty {
                             Text(address)
                         }
+                        Button("Profile", action: onProfile)
                         Button("Settings", action: onSettings)
                         Button("Sign out", action: onSignOut)
                     } label: {
-                        SenderAvatar(display: vm.state.accountName ?? "",
-                                     address: vm.state.accountAddress ?? "", size: 32)
-                            .frame(width: 44, height: 44)
+                        Group {
+                            if vm.state.accountName?.nilIfBlank() != nil || vm.state.accountAddress?.nilIfBlank() != nil {
+                                SenderAvatar(display: vm.state.accountName ?? "",
+                                             address: vm.state.accountAddress ?? "", size: 32)
+                            } else {
+                                Image(systemName: "person.crop.circle")
+                                    .font(.system(size: 27))
+                                    .foregroundColor(GM.textSecondary)
+                            }
+                        }
+                        .frame(width: 44, height: 44)
                     }
                     .accessibilityLabel("Account")
                 }
@@ -178,8 +205,6 @@ struct MailboxView: View {
 
     private var searchField: some View {
         HStack(spacing: 10) {
-            Image(systemName: "magnifyingglass")
-                .font(.system(size: 15)).foregroundColor(GM.textTertiary)
             // The wording names what the server's term actually covers --
             // subject, body, sender (`grapmail-search.ts:110-118`) -- because
             // a placeholder promising "people or files" would advertise a
@@ -220,7 +245,7 @@ struct MailboxView: View {
     }
 
     private var filterActive: Bool {
-        vm.state.filter != .unread || vm.state.sort != .newest
+        vm.state.filter != .all || vm.state.sort != .newest
     }
 
     /// The device's own path to the network, read before asking rather than
@@ -249,13 +274,16 @@ struct MailboxView: View {
     /// A refresh that failed over a populated list says so here instead of
     /// replacing the list with an error screen — the hub's defect, designed out.
     @ViewBuilder private var staleBanner: some View {
-        if let msg = vm.state.staleError, !vm.state.rows.isEmpty {
+        if let msg = vm.state.actionError ?? (vm.state.rows.isEmpty ? nil : vm.state.staleError) {
             HStack(spacing: 8) {
                 Text(msg)
                     .font(.system(size: 12)).foregroundColor(GM.warnInk)
                     .lineLimit(2)
                 Spacer(minLength: 4)
-                Button("Retry") { vm.load() }
+                Button(vm.state.actionError == nil ? "Retry" : "Dismiss") {
+                    if vm.state.actionError == nil { vm.load() }
+                    else { vm.dismissActionError() }
+                }
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundColor(GM.primarySolid)
             }
@@ -301,9 +329,10 @@ struct MailboxView: View {
     }
 
     /// `List` is lazy, which a mailbox needs and the wizard screens did not.
-    /// Prefetch at the last visible row, with a footer for manual loading and retry.
+    /// Prefetch near the end, with a footer for manual loading and retry.
     private var messageList: some View {
-        List {
+        let prefetchIDs = Set(vm.state.rows.suffix(4).map(\.id))
+        return List {
             ForEach(vm.state.rows) { row in
                 MessageRow(
                     message: row,
@@ -354,7 +383,11 @@ struct MailboxView: View {
                     }
                 }
                 .onAppear {
-                    if vm.state.appendError == nil, row.id == vm.state.rows.last?.id { vm.loadMore() }
+                    if vm.state.rows.first?.id == row.id { isAtTop = true }
+                    if vm.state.appendError == nil, prefetchIDs.contains(row.id) { vm.loadMore() }
+                }
+                .onDisappear {
+                    if vm.state.rows.first?.id == row.id { isAtTop = false }
                 }
             }
             if vm.state.loadingMore {
@@ -375,6 +408,7 @@ struct MailboxView: View {
             }
         }
         .listStyle(.plain)
+        .id(vm.state.box)
         .scrollContentBackground(.hidden)
         .refreshable { await vm.loadAndSettle() }
         .accessibilityIdentifier("mail-list")
@@ -385,7 +419,7 @@ struct MailboxView: View {
         case .sortFilter:
             SortFilterSheet(sort: vm.state.sort, filter: vm.state.filter,
                             sortedCount: vm.sortScope, total: vm.state.total) { s, f in
-                vm.setSort(s); vm.setFilter(f); sheet = nil
+                vm.setSortAndFilter(s, f); sheet = nil
             }
         case .advanced:
             AdvancedSearchSheet(state: vm.state) {

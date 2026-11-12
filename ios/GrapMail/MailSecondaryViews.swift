@@ -205,6 +205,8 @@ struct LabelCreateView: View {
         return rows
     }
 
+    @State private var saving = false
+
     var body: some View {
         MailScaffold(title: editing == nil ? "New label" : "Edit label", onBack: onDone) {
             VStack(alignment: .leading, spacing: 16) {
@@ -242,7 +244,7 @@ struct LabelCreateView: View {
                     Text(notice).font(.system(size: 13)).foregroundColor(GM.error)
                 }
                 GradientButton(title: editing == nil ? "Create label" : "Save changes",
-                               enabled: !name.trimmingCharacters(in: .whitespaces).isEmpty) {
+                               enabled: !saving && !name.trimmingCharacters(in: .whitespaces).isEmpty) {
                     let trimmed = name.trimmingCharacters(in: .whitespaces)
                     guard !trimmed.isEmpty else { notice = "A label needs a name."; return }
                     // The key is sent as it stands.
@@ -254,18 +256,15 @@ struct LabelCreateView: View {
                     // after setting `notice`, so a rejected label (duplicate name, or
                     // the 200 cap) navigated away with the reason never readable and
                     // the user left believing the label existed.
+                    saving = true
+                    let complete: (Bool, String) -> Void = { saved, result in
+                        saving = false
+                        if saved { onDone() } else { notice = result }
+                    }
                     if let label = editing {
-                        vm.renameLabel(id: label.id, name: trimmed, colour: colour) { result in
-                            notice = result
-                            vm.refreshLabels()
-                            if result == "Saved." { onDone() }
-                        }
+                        vm.renameLabel(id: label.id, name: trimmed, colour: colour, then: complete)
                     } else {
-                        vm.createLabel(name: trimmed, colour: colour) { result in
-                            notice = result
-                            vm.refreshLabels()
-                            if result.hasPrefix("Created") { onDone() }
-                        }
+                        vm.createLabel(name: trimmed, colour: colour, then: complete)
                     }
                 }
                 Spacer()
@@ -278,11 +277,20 @@ struct LabelCreateView: View {
 // ── 77 contacts / 85 contact detail ──────────────────────────────────────────
 
 struct ContactsView: View {
-    @ObservedObject var vm: MailboxModel
+    let vm: MailboxModel
     let onBack: () -> Void
     let onOpen: (String) -> Void
     @State private var people: [MailboxModel.Person] = []
     @State private var query = ""
+    @State private var matches: [MailboxModel.Person]?
+    @State private var sourceVersion = 0
+
+    private var needle: String { query.trimmingCharacters(in: .whitespacesAndNewlines) }
+
+    private struct SearchKey: Equatable {
+        let term: String
+        let sourceVersion: Int
+    }
 
     var body: some View {
         MailScaffold(title: "Contacts", onBack: onBack) {
@@ -298,10 +306,14 @@ struct ContactsView: View {
                     .padding(.horizontal, 16)
                     .accessibilityIdentifier("contacts-search")
 
-                let shown = filtered
+                let shown = needle.isEmpty ? people : (matches ?? [])
                 if people.isEmpty {
                     CenteredState(title: "No people yet",
                                   detail: "Contacts appear here as mail arrives from or to them.")
+                } else if !needle.isEmpty && matches == nil {
+                    CenteredState(title: "Searching…")
+                } else if shown.isEmpty {
+                    CenteredState(title: "No matching contacts", detail: "Try another name or email address.")
                 } else {
                     List {
                         ForEach(shown, id: \.address) { p in
@@ -335,21 +347,33 @@ struct ContactsView: View {
                 }
             }
         }
-        .task { people = await vm.people() }
+        .task {
+            let loaded = await vm.people()
+            guard !Task.isCancelled else { return }
+            people = loaded
+            sourceVersion += 1
+        }
+        .task(id: SearchKey(term: needle, sourceVersion: sourceVersion)) {
+            guard !needle.isEmpty else { matches = nil; return }
+            let term = needle
+            do { try await Task.sleep(nanoseconds: 120_000_000) }
+            catch { return }
+            let filtered = await Self.matching(people, term: term)
+            guard !Task.isCancelled else { return }
+            matches = filtered
+        }
     }
 
-    private var filtered: [MailboxModel.Person] {
-        let needle = query.trimmingCharacters(in: .whitespaces)
-        guard !needle.isEmpty else { return people }
-        return people.filter {
-            $0.address.localizedCaseInsensitiveContains(needle)
-            || $0.name?.localizedCaseInsensitiveContains(needle) == true
+    private nonisolated static func matching(_ people: [MailboxModel.Person], term: String) async -> [MailboxModel.Person] {
+        people.filter {
+            $0.address.localizedCaseInsensitiveContains(term)
+                || $0.name?.localizedCaseInsensitiveContains(term) == true
         }
     }
 }
 
 struct ContactDetailView: View {
-    @ObservedObject var vm: MailboxModel
+    let vm: MailboxModel
     let address: String
     let onBack: () -> Void
     let onWrite: () -> Void
@@ -435,15 +459,19 @@ struct FilesView: View {
                 }
             }
         }
-        .task { entries = await vm.files() }
+        .task(id: vm.filesRevision) {
+            let loaded = await vm.files()
+            if !Task.isCancelled { entries = loaded }
+        }
     }
 }
 
 struct AttachmentPreviewView: View {
-    @ObservedObject var vm: MailboxModel
+    let vm: MailboxModel
     let attachmentId: String
     let onBack: () -> Void
     @State private var entry: MailboxModel.FileEntry?
+    @State private var loaded = false
     @State private var outcome: String?
     @State private var saving = false
     @State private var opening = false
@@ -489,7 +517,7 @@ struct AttachmentPreviewView: View {
                                 .foregroundColor(GM.textSecondary).lineLimit(3)
                         }
                         GradientButton(title: saving ? "Saving…" : "Save to this device",
-                                       enabled: !saving) {
+                                       enabled: !saving && !opening && !deleting) {
                             saving = true
                             vm.downloadAttachment(a) { r in
                                 saving = false
@@ -519,7 +547,7 @@ struct AttachmentPreviewView: View {
                                 .frame(maxWidth: .infinity)
                                 .background(Capsule().stroke(GM.border, lineWidth: 1.5))
                         }
-                        .disabled(opening || saving)
+                        .disabled(opening || saving || deleting)
                         .accessibilityIdentifier("mail-attachment-open")
                         .padding(.top, 10)
                         if !confirmDelete {
@@ -546,9 +574,9 @@ struct AttachmentPreviewView: View {
                                         .foregroundColor(GM.textSecondary)
                                     Button(deleting ? "Removing…" : "Remove") {
                                         deleting = true
-                                        vm.deleteAttachment(a.id) { r in
+                                        vm.deleteAttachment(a.id) { removed, message in
                                             deleting = false; confirmDelete = false
-                                            deleted = true; outcome = r
+                                            deleted = removed; outcome = message
                                         }
                                     }
                                     .foregroundColor(GM.error)
@@ -563,6 +591,8 @@ struct AttachmentPreviewView: View {
                         }
                     }
                     .padding(.horizontal, 20)
+                } else if !loaded {
+                    CenteredState(title: "Loading attachment…")
                 } else {
                     CenteredState(
                         title: deleted
@@ -574,8 +604,11 @@ struct AttachmentPreviewView: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
-        .task {
-            entry = await vm.files().first { $0.attachment.id == attachmentId }
+        .task(id: attachmentId) {
+            let result = await vm.file(attachmentId)
+            guard !Task.isCancelled else { return }
+            entry = result
+            loaded = true
         }
         // Presented on the URL itself, not a Bool: QuickLook is only ever
         // opened with a file that actually arrived, and dismissing clears it
@@ -856,6 +889,7 @@ struct ScreenerView: View {
 
                 if let error = vm.screener.error {
                     Text(error).font(.system(size: 13)).foregroundColor(GM.error)
+                    if !vm.screener.busy { Button("Retry") { vm.loadScreener() } }
                 }
 
                 GradientButton(title: "Open the queue", action: onOpenQueue)

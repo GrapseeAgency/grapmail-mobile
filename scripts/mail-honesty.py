@@ -324,8 +324,7 @@ pin("Android sends a body only for snooze's `until`",
 # carries the draft's own id (the route's owner-scoped select is what keeps a
 # stale id from becoming anything other than a new row), an empty compose
 # schedules nothing — closing a composer nobody typed into must not leave a
-# draft row — and the send cancels the autosave before it deletes the row the
-# stale save would resurrect.
+# draft row — and send waits for an in-flight autosave before reading its id.
 pin("Android's autosave carries the draft's own id",
     "id = cur.draftId.takeIf { it.isNotEmpty() }" in code_only(android("logic/MailboxViewModel.kt")))
 pin("iOS's autosave carries the draft's own id",
@@ -336,18 +335,18 @@ pin("Android's autosave refuses an empty compose",
 pin("iOS's autosave refuses an empty compose",
     "s.to.trimmingCharacters(in: .whitespaces).isEmpty"
     in code_only(ios("MailboxModel.swift")))
-pin("the send cancels the autosave before deleting the draft",
-    "autosaveJob?.cancel()" in code_only(android("logic/MailboxViewModel.kt"))
-    and "autosaveTask?.cancel()" in code_only(ios("MailboxModel.swift")))
+
 
 # ── 3. nothing destroys mail without the confirmation sheet ──────────────────
 KT_BOX = android("ui/screens/mail/MailboxScreen.kt")
 SW_BOX = ios("MailboxView.swift")
 
-pin("Android's toolbar Delete opens the confirmation sheet",
-    re.search(r"onDelete\s*=\s*\{\s*showPermanentConfirm\s*=\s*true\s*\}", KT_BOX) is not None)
-pin("iOS's toolbar Delete opens the confirmation sheet",
-    re.search(r"onDelete:\s*\{\s*sheet\s*=\s*\.permanent\s*\}", SW_BOX) is not None)
+pin("Android's toolbar Delete moves mail to Trash and confirms erasure only inside Trash",
+    "if (state.box == MailBox.Trash) showPermanentConfirm = true" in KT_BOX
+    and "else vm.act(com.grapsee.grapmail.data.MailAction.Trash)" in KT_BOX)
+pin("iOS's toolbar Delete moves mail to Trash and confirms erasure only inside Trash",
+    "if vm.state.box == .trash { sheet = .permanent }" in SW_BOX
+    and "else { vm.act(.trash) }" in SW_BOX)
 
 # The permanent call must be a DELETE, and must not be reachable from `act`,
 # which is the bulk path — otherwise a "Delete" that means "erase" could ride
@@ -568,13 +567,16 @@ pin("Android's decision call sends the api value",
 pin("iOS's decision call sends the api value",
     re.search(r"scope: scope\.apiValue, decision: decision\.apiValue", SW_API) is not None)
 
-# A decision is a rule for the NEXT delivery, not an action on the message in
-# hand, so the queue must be re-read rather than edited locally.
+# A standing rule affects future delivery. Saving it must leave the current
+# queue alone and must not spend two reads refreshing unchanged data.
 KT_VM = android("logic/MailboxViewModel.kt")
-pin("Android re-reads the queue after a decision instead of splicing it",
-    "MailStore.invalidate(MailBox.Screener)" in KT_VM)
-pin("iOS re-reads the queue after a decision instead of splicing it",
-    "invalidate(.screener)" in ios("MailboxModel.swift"))
+KT_DECISIONS = KT_VM[KT_VM.index("    fun decideSenders("):KT_VM.index("    // ── files")]
+SW_SCREENER_VM = ios("MailboxModel.swift")
+SW_DECISIONS = SW_SCREENER_VM[SW_SCREENER_VM.index("    func decideSenders("):
+                             SW_SCREENER_VM.index("    /// The distinct senders")]
+pin("a sender decision does not reload the unchanged queue",
+    all("loadScreener()" not in block and "invalidate(" not in block
+        for block in (KT_DECISIONS, SW_DECISIONS)))
 
 # The surface writes decisions and cannot read them back, so no option may be
 # drawn as the one already in force — that would be an invented fact.
@@ -898,9 +900,24 @@ pin("Android drops no HTTP status anywhere in the mail API",
 # completed must not kill the new session.
 pin("iOS's mail routes end no account session on a 401",
     "signalUnauthorized" not in code_only(SW_API))
-pin("iOS signals a dead session on every authenticated 401",
-    "!path.hasPrefix(mailBase)" not in code_only(ios("APIClient.swift"))
-    and "signalUnauthorized(rejectedBearer: bearer)" in code_only(ios("APIClient.swift")))
+SW_TRANSPORT = body_of(ios("APIClient.swift"), "static func authenticatedResponse")
+pin("iOS retries an authenticated 401 before deciding whether to end the session",
+    "http.statusCode == 401" in SW_TRANSPORT
+    and "SessionStore.replacementToken(for: rejected, generation: generation)" in SW_TRANSPORT
+    and SW_TRANSPORT.index("await renewal(") < SW_TRANSPORT.index("signalUnauthorized(")
+    and "case .unavailable:" in SW_TRANSPORT
+    and 'ApiError.http(status: 503' in SW_TRANSPORT)
+pin("iOS attachment requests use the same authenticated transport as JSON",
+    "authenticatedResponse(for: req, bearer: bearer)" in body_of(SW_API, "private static func mailBinary")
+    and "authenticatedResponse(for: req, bearer: bearer)" in body_of(ios("APIClient.swift"), "static func request<T:"))
+KT_RENEWAL = code_only(android("data/SessionRefresh.kt"))
+pin("Android reuses a rotated bearer only for the matching session",
+    "rotation.sessionId == current.id" in KT_RENEWAL
+    and "rotation.rejected == rejected" in KT_RENEWAL
+    and "SessionRefresh.retryToken(ctx, rejected)" in code_only(android("data/Api.kt")))
+pin("Android attachment downloads can cancel the underlying HTTP request",
+    "executeResponse(" in body_of(android("data/Api.kt"), "suspend fun mailAttachmentBytes")
+    and "continuation.invokeOnCancellation { call.cancel() }" in code_only(android("data/Api.kt")))
 pin("Android signals a dead session on every authenticated 401",
     "!isMailCall" not in code_only(KT_API)
     and 'removePrefix("Bearer ")' in code_only(KT_API)
@@ -948,44 +965,32 @@ pin("Android's opener still reports a device with no browser",
 
 # -- 17. a wait the user started must be a wait that can end --------------------
 #
-# `loadAndSettle` spins on `settleGeneration` because the no-blank rule forbids a
-# refresh from raising `loading` over a populated list. That makes every early
-# return which does not bump the generation a main-actor spin for the life of the
-# process, and `try?` on the sleep swallows the cancellation SwiftUI raises when
-# the gesture dies. Both halves are pinned: the exits bump, and the loop is
-# bounded and cancellation-aware.
 SW_LOAD = body_of(SW_MODEL, "func load(replace")
 KT_LOAD = body_of(KT_VM, "fun load(replace")
-pin("iOS's `load` slice was located", bool(SW_LOAD.strip()))
-pin("Android's `load` slice was located", bool(KT_LOAD.strip()))
-pin("iOS bumps the settle signal on every exit from a load",
-    SW_LOAD.count("settleGeneration += 1") >= 4)
-pin("Android bumps the settle signal on every exit from a load",
+SW_REFRESH = body_of(SW_MODEL, "func loadAndSettle")
+pin("iOS's refresh awaits the inbox task without polling",
+    "await loadTask?.value" in SW_REFRESH and "Task.sleep" not in SW_REFRESH)
+pin("Android reports inbox settlement to release the refresh gesture",
     KT_LOAD.count("settleGeneration + 1") >= 3)
-pin("iOS's refresh wait cannot spin forever",
-    re.search(r"while state\.settleGeneration == before, ticks < \d+", code_only(SW_MODEL)) is not None
-    and "if Task.isCancelled { return }" in code_only(SW_MODEL))
-# A cancelled read is not a failed read: `load()` cancels the previous call on
-# every entry, so the superseded one reaching the failure arm prints "couldn't
-# reach the server" over the list the newer read has already filled.
 pin("Android rethrows a cancelled read instead of reporting it",
-    KT_LOAD.count("catch (e: kotlinx.coroutines.CancellationException)") >= 2
-    and "runCatching { Api.mailInbox" not in KT_LOAD)
-# Two, not one: the slice holds two rethrows — the message read and the stats
-# side read — and the first version of this pin matched the string alone, so
-# deleting the OUTER one (the one that matters) left it green on the inner.
-# Found by mutating exactly that line and watching the gate not move.
+    "catch (e: kotlinx.coroutines.CancellationException)" in KT_LOAD
+    and "throw e" in KT_LOAD and "runCatching { Api.mailInbox" not in KT_LOAD)
 pin("iOS ignores a cancelled read instead of reporting it",
-    "if error is CancellationError || Task.isCancelled { return }" in SW_LOAD)
+    "if error is CancellationError || Task.isCancelled" in SW_LOAD)
+pin("Pagination cannot supersede an in-progress inbox read",
+    "loadJob?.isActive == true" in body_of(KT_VM, "fun loadMore")
+    and "loadTask == nil" in body_of(SW_MODEL, "func loadMore"))
 
 # A flag raised before an `await` must be lowered on the abandoned path too.
 pin("iOS's abandoned assignment read resolves its own flag",
     re.search(r"guard sessionIsLive else \{\s*\n?[ \t]*(?://[^\n]*\n)*[ \t]*let stillThere",
               code_only(SW_MODEL)) is not None
     or "assignmentsRead = stillThere" in code_only(SW_MODEL))
-pin("iOS's abandoned label-list read clears its spinner",
-    re.search(r"guard sessionIsLive else \{[\s\S]{0,400}?labelState.loading = false",
-              code_only(SW_MODEL)) is not None)
+SW_LABEL_REFRESH = body_of(SW_MODEL, "func refreshLabels")
+pin("iOS clears the label spinner only when the current read settles",
+    "defer {" in SW_LABEL_REFRESH
+    and "if !Task.isCancelled {" in SW_LABEL_REFRESH
+    and "if self.labelState.loading { self.labelState.loading = false }" in SW_LABEL_REFRESH)
 pin("iOS's undo drops the ids that came back",
     "snoozeUndoIds.filter { $0 != id }" in code_only(SW_MODEL))
 pin("Android's home entry records the box it fetched",
@@ -1002,10 +1007,10 @@ pin("iOS records a memoised body on the cache hit as well as the fetch",
 # value" was printed while the most-visited pixel of every row was exempt. The
 # web reference's ramp (`src/app/(mail)/mail/page.tsx:305`) is EIGHT entries and
 # three of them are theme variables, so the correct table has a value per theme.
-# These are the reference's resolved values, spelled out here rather than read
-# from the outer repo, which this repo's CI cannot check out.
-AVATAR_LIGHT = ["1A73E8", "0B8043", "A142F4", "C5221F", "E37400", "00796B", "8E24AA", "3949AB"]
-AVATAR_DARK = ["8AB4F8", "0B8043", "A142F4", "F2B8B5", "FBBC04", "00796B", "8E24AA", "3949AB"]
+# The native ramps keep sender slots consistent across platforms and use
+# slate for the former red slot.
+AVATAR_LIGHT = ["1A73E8", "0B8043", "A142F4", "455A64", "E37400", "00796B", "8E24AA", "3949AB"]
+AVATAR_DARK = ["8AB4F8", "0B8043", "A142F4", "546E7A", "FBBC04", "00796B", "8E24AA", "3949AB"]
 KT_COLORS = android("ui/theme/Color.kt")
 SW_THEME = ios("Theme.swift")
 
@@ -1022,9 +1027,9 @@ def hex_run(src: str, decl: str) -> list[str]:
                                           src[i:end if end > i else i + 700])]
 
 
-pin("Android's light avatar ramp is the reference's eight",
+pin("Android's light avatar ramp has eight themed colors",
     hex_run(KT_COLORS, "val GrapMailAvatarRampLight") == AVATAR_LIGHT)
-pin("Android's dark avatar ramp is the reference's eight lifted",
+pin("Android's dark avatar ramp has eight themed colors",
     hex_run(KT_COLORS, "val GrapMailAvatarRampDark") == AVATAR_DARK)
 def list_body(src: str, decl: str) -> str:
     """A literal array/dictionary declaration's own text, from its name to the
@@ -1420,10 +1425,13 @@ for kt_name, sw_name in (("NotesScreen", "NotesView"), ("TasksScreen", "TasksVie
 
 # One model per platform holds the document; the nav hosts one instance for all
 # eight screens (eight copies of one record is eight chances to disagree).
-pin("Android's nav holds exactly one ProfileViewModel",
-    "ProfileViewModel = viewModel()" in KT_MAIN)
-pin("iOS's nav holds exactly one ProfileModel",
-    "@StateObject private var account = ProfileModel()" in SW_ROOT)
+pin("Android shares the profile through the signed-in home entry",
+    "ProfileViewModel = signedInViewModel(nav, entry)" in KT_MAIN
+    and "nav.getBackStackEntry(Routes.HOME)" in KT_MAIN
+    and "return viewModel(home)" in KT_MAIN)
+pin("iOS replaces the profile when the signed-in stack resets",
+    "private var account: ProfileModel { signedInModels.account }" in SW_ROOT
+    and "account = ProfileModel()" in body_of(SW_ROOT, "func reset()"))
 for side, src, guard_word in (("Android", KT_PVM, "snapshotMode"), ("iOS", SW_PVM, "snapshotSeeded")):
     pin(f"{side}'s profile model keeps the snapshot seed out of the boot-read race",
         guard_word in src)
@@ -1510,6 +1518,14 @@ pin("iOS adopts the upload's nonce-bearing avatar URL",
 # screen quotes it before uploading, so a refusal is the person's words first.
 pin("both photo pickers honour the server's ceiling before uploading",
     "256 * 1024" in code_only(KT_ACCT) and "256 * 1024" in code_only(SW_ACCT))
+
+pin("opening a profile-backed screen does not fetch the avatar",
+    "loadAvatar()" not in body_of(KT_PVM, "fun load(force")
+    and "loadAvatar()" not in body_of(SW_PVM, "func load(force")
+    and "vm.loadAvatar()" in KT_ACCT and "vm.loadAvatar()" in SW_ACCT)
+pin("iOS waits for loaded account data before showing editable fields",
+    ".task(id: s != nil)" in SW_ACCT and ".task(id: p != nil)" in SW_ACCT
+    and SW_ACCT.count("else if fieldsReady {") >= 2)
 
 # The eight frames must photograph CONTENT, not chrome: every seeded value the
 # walks wait on lives in both hosts' `sampleProfile` -- the two platforms
@@ -1628,6 +1644,17 @@ pin("attachment delete asks first and drops the cached row, both platforms",
     and "mail-attachment-confirm" in code_only(SW_SECOND)
     and "MailStore.forgetAttachment(id)" in code_only(KT_VM)
     and "MailStore.shared.forgetAttachment(id)" in code_only(SW_VM))
+
+pin("attachment removal only leaves the preview after confirmed deletion",
+    "deleted = removed" in body_of(android("ui/screens/mail/MailSecondaryScreens.kt"), "fun AttachmentPreviewScreen")
+    and "deleted = removed" in body_of(SW_SECOND, "struct AttachmentPreviewView")
+    and 'then(true, "Removed.")' in body_of(KT_VM, "fun deleteAttachment")
+    and 'then(true, "Removed.")' in body_of(SW_VM, "func deleteAttachment"))
+pin("contact Write sends the selected address to the composer",
+    'mailCompose("", "reply", to = address)' in code_only(KT_MAIN)
+    and 'recipient: address' in code_only(SW_ROOT)
+    and 'ComposeState(to = initialRecipient)' in body_of(KT_VM, "fun resetCompose")
+    and 'ComposeState(to: initialRecipient)' in body_of(SW_VM, "func resetCompose"))
 
 # Explicitly excluded features stay excluded: no send-later field may appear
 # on either client, because no `/send` parameter accepts one.
@@ -1754,10 +1781,24 @@ pin("compose's encrypt row is gated on a record and an unlock, both platforms",
     and "e2e.state.record != nil" in code_only(SW_RDR)
     and "unlocked" in code_only(KT_COMPOSE) and "unlocked" in code_only(SW_RDR))
 pin("a plain plan or a silent directory stops an encrypted send, both platforms",
-    "The directory did not answer, so nothing was encrypted" in code_only(KT_COMPOSE)
-    and "The directory did not answer, so nothing was encrypted" in code_only(SW_RDR)
-    and "cannot be encrypted. Turn encryption off" in code_only(KT_COMPOSE)
-    and "cannot be encrypted. Turn encryption off" in code_only(SW_RDR))
+    'plan == null -> notice' in code_only(KT_COMPOSE)
+    and 'plan.first != "seal" -> notice' in code_only(KT_COMPOSE)
+    and 'guard let plan = await vm.encryptionPlan' in code_only(SW_RDR)
+    and 'guard plan.mode == "seal" else' in code_only(SW_RDR))
+pin("Android sends from both buttons through the same encryption decision",
+    "clickable(enabled = sendEnabled, onClick = sendMessage)" in code_only(KT_COMPOSE)
+    and 'else "Send", onClick = sendMessage' in code_only(KT_COMPOSE))
+for side, model, send, wait, draft_id in (
+    ("Android", android("logic/MailboxViewModel.kt"), "fun send(e2eEnvelope", "pending?.join()", "val draftId ="),
+    ("iOS", ios("MailboxModel.swift"), "func send(e2eEnvelope", "await pending?.value", "let draft ="),
+):
+    send_body = body_of(model, send)
+    pin(f"{side} waits for in-flight autosave before capturing the sent draft id",
+        "stopAutosaveDebounce()" in send_body
+        and 0 <= send_body.find(wait) < send_body.find(draft_id))
+pin("both native send requests include successfully uploaded attachment IDs",
+    "attachmentIds = attachmentIds" in body_of(KT_VM, "fun send(e2eEnvelope")
+    and "attachmentIds: attachmentIds" in body_of(SW_VM, "func send(e2eEnvelope"))
 pin("a sealed send carries the envelope and an empty bodyText, both platforms",
     'bodyText = if (envelope != null) "" else s.body' in code_only(KT_VM)
     and 'bodyText: envelopeJson == nil ? compose.body : ""' in code_only(SW_VM))
@@ -2687,7 +2728,7 @@ pin("the draft loads as the person's own text, not as a reply",
 # of the person's unfinished message.
 pin("the sent draft is deleted only after the server accepted the send",
     'val sent = r.status == "sent" || r.status == "queued"' in code_only(KT_VM)
-    and 'if (s.draftId.isNotEmpty() && sent)' in code_only(KT_VM)
+    and 'if (draftId.isNotEmpty() && sent)' in code_only(KT_VM)
     and "let sent = r.status == \"sent\" || r.status == \"queued\"" in code_only(SW_VM)
     and "if !draft.isEmpty && sent" in code_only(SW_VM))
 
@@ -2799,6 +2840,19 @@ pin("stepping replaces the reader instead of stacking another copy",
     and code_only(SW_ROOT).count("path.removeLast()") >= 2)
 
 # ── the read an open caused ─────────────────────────────────────────────────
+KT_VIEW_MESSAGE = body_of(KT_VM, "suspend fun viewMessage")
+SW_VIEW_MESSAGE = body_of(SW_VM, "func viewMessage")
+pin("conversation cards request attachments and confirm read changes for the visible message",
+    'vm.viewMessage(message.id)' in code_only(KT_THREAD)
+    and 'await vm.viewMessage(message.id)' in code_only(SW_READ)
+    and "Api.mailMessage(session.token, id)" in KT_VIEW_MESSAGE
+    and "ApiClient.mailMessage(token: token, id: id)" in SW_VIEW_MESSAGE
+    and "Api.mailAction(session.token, id, MailAction.Read)" in KT_VIEW_MESSAGE
+    and "ApiClient.mailAction(token: token, id: id, action: .read)" in SW_VIEW_MESSAGE)
+pin("a thread listing does not mark its first message read locally",
+    "patchFlags(" not in body_of(KT_VM, "fun openThread")
+    and "patchFlags(" not in body_of(SW_VM, "func openThread"))
+
 # Opening marks read on the server. The only way back out of that state lived in
 # the list's selection toolbar — on a screen the person has left.
 pin("the reader can mark its own message unread",
@@ -2815,8 +2869,10 @@ pin("the reader can mark its own message unread",
 pin("the unread control appears only while the message is read",
     "if (message.isRead) {" in code_only(KT_THREAD)
     and "if message.isRead {" in code_only(SW_READ)
-    and "m.copy(isRead = false)" in code_only(KT_VM)
-    and "self.thread.messages[idx].isRead = false" in code_only(SW_MODEL))
+    and "applyLocally(id, MailAction.Unread)" in body_of(KT_VM, "fun markUnread")
+    and "applyLocally(id: id, action: .unread)" in body_of(SW_MODEL, "func markUnread")
+    and "isRead = read ?: message.isRead" in body_of(KT_VM, "private suspend fun applyLocally")
+    and "message.isRead = flags.read ?? message.isRead" in body_of(SW_MODEL, "private func applyLocally"))
 
 # The reader reports its own outcome. `actOn` files a failure into the list's
 # stale-read banner, which is not on screen here — so a refused write would have
@@ -2834,11 +2890,15 @@ pin("accepted and refused are two different sentences in the reader",
 # names the count, says whose server they live on, says what loading them
 # reveals, and asks.
 pin("remote images are named and gated, per message",
-    "remember(message.bodyHtml) { remoteImageUrls(message.bodyHtml) }" in code_only(KT_THREAD)
-    and "private var hiddenImages: [String] { remoteImageUrls(message.bodyHtml) }"
-        in code_only(SW_READ)
+    "withContext(Dispatchers.Default) { remoteImageUrls(message.bodyHtml) }" in code_only(KT_THREAD)
+    and "await Self.findRemoteImages(in: message.bodyHtml)" in code_only(SW_READ)
     and "tells the sender this message was opened" in code_only(KT_THREAD)
     and "tells the sender this message was opened" in code_only(SW_READ))
+
+pin("Both readers load bodies only for open conversation cards",
+    "val needsFormattedBody = showsBody &&" in code_only(KT_THREAD)
+    and "showsBody && !message.isE2eEncrypted" in code_only(SW_READ)
+    and ".task(id: needsFormattedBody ? message.bodyHtml : nil)" in code_only(SW_READ))
 
 # The opt-in starts closed and belongs to one message. A shared flag would carry
 # a consent given for one sender's mail to the next one's, and Android's card is
@@ -2857,7 +2917,8 @@ pin("the opt-in starts closed and is keyed to its own message",
 pin("no image is fetched before the person asks",
     "blockNetworkImage = !allowImages" in code_only(android("ui/screens/mail/MailHtmlBody.kt"))
     and "vm.loadBody(message.id, shownImages)" in code_only(KT_THREAD)
-    and "vm.loadBody(message.id, allowImages: newValue)" in code_only(SW_READ))
+    and ".task(id: needsFormattedBody ? shownImages : nil)" in code_only(SW_READ)
+    and "vm.loadBody(message.id, allowImages: allowImages)" in code_only(SW_READ))
 
 # The extraction rule, not the markup: only an absolute http(s) `img src` is
 # ever kept. `data:` asks nothing of the network, `cid:` is an attachment the
@@ -2953,8 +3014,8 @@ for ident in ("mail-thread-prev", "mail-thread-next", "mail-mark-unread",
 # three. The fix is content-sized buttons; a pin keeps it from being "tidied"
 # back, because the regression is invisible to every other gate in CI.
 pin("the reader's action rows size their buttons to their content",
-    code_only(KT_THREAD).count("fill = false") == 6
-    and code_only(KT_THREAD).count("OutlineButton(") == 8
+    code_only(KT_THREAD).count("fill = false") == 7
+    and code_only(KT_THREAD).count("OutlineButton(") == 9
     and "trailing = { Icon(Icons.Rounded.Reply" not in code_only(KT_THREAD))
 
 # The frame that proves all of this composes: an HTML-only message opened in the
