@@ -3031,11 +3031,11 @@ IOS_LAUNCH = (ROOT / "ios/GrapMail/LaunchScreen.storyboard").read_text(encoding=
 pin("the iOS launch storyboard shows the icon and Grapsee",
     "UILaunchStoryboardName: LaunchScreen" in YML
     and 'launchScreen="YES"' in IOS_LAUNCH
-    and 'image="LaunchBrand"' in IOS_LAUNCH
+    and 'image="GrapMailLogo"' in IOS_LAUNCH
     and 'text="Grapsee"' in IOS_LAUNCH
     and 'key="backgroundColor" name="LaunchBackground"' in IOS_LAUNCH
     and not (ROOT / "ios/GrapMail/LaunchSplashView.swift").exists()
-    and (ROOT / "ios/GrapMail/Assets.xcassets/LaunchBrand.imageset/LaunchBrand.png").exists()
+    and (ROOT / "ios/GrapMail/Assets.xcassets/GrapMailLogo.imageset/grapmail_logo.png").exists()
     and (ROOT / "ios/GrapMail/Assets.xcassets/LaunchBackground.colorset/Contents.json").exists()
     and "INFOPLIST_KEY_UILaunchScreen_Generation" not in YML)
 
@@ -3043,7 +3043,7 @@ pin("Android's splash theme is installed before the window content exists",
     'androidx.core:core-splashscreen' in KT_GRADLE
     and "Theme.GrapMail.Splash" in (ROOT / "android/app/src/main/res/values/themes.xml")
         .read_text(encoding="utf-8")
-    and 'windowSplashScreenAnimatedIcon">@mipmap/ic_launcher' in (ROOT / "android/app/src/main/res/values/themes.xml")
+    and 'windowSplashScreenAnimatedIcon">@drawable/grapmail_splash_icon' in (ROOT / "android/app/src/main/res/values/themes.xml")
         .read_text(encoding="utf-8")
     and "androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen" in code_only(KT_MAIN)
     # The order is the whole rule: installed after `super.onCreate`, the system
@@ -3084,7 +3084,7 @@ pin("the new logo is the launcher on every density, themed, round, iOS and splas
     and 'android:roundIcon="@mipmap/ic_launcher"' in KT_MANIFEST
     and (ICON_SET / "AppIcon-1024.png").exists()
     and (ICON_SET / "AppIcon-1024.png").stat().st_size > 40000
-    and "@mipmap/ic_launcher" in (ROOT / "android/app/src/main/res/values/themes.xml")
+    and "@drawable/grapmail_splash_icon" in (ROOT / "android/app/src/main/res/values/themes.xml")
         .read_text(encoding="utf-8")
     and not (ROOT / "android/app/src/main/res/drawable/splash_logo.xml").exists()
     and sorted(f.name for f in (ROOT / "android/app/src/main/res/drawable-nodpi").glob("*"))

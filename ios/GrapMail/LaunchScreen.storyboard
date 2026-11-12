@@ -12,14 +12,14 @@
                     <view key="view" contentMode="scaleToFill" id="launch-view">
                         <rect key="frame" x="0.0" y="0.0" width="390" height="844"/>
                         <subviews>
-                            <imageView userInteractionEnabled="NO" contentMode="scaleAspectFit" image="LaunchBrand" translatesAutoresizingMaskIntoConstraints="NO" id="launch-icon">
+                            <imageView userInteractionEnabled="NO" contentMode="scaleAspectFit" image="GrapMailLogo" translatesAutoresizingMaskIntoConstraints="NO" id="launch-icon">
                                 <constraints>
-                                    <constraint firstAttribute="width" constant="128" id="icon-width"/>
-                                    <constraint firstAttribute="height" constant="128" id="icon-height"/>
+                                    <constraint firstAttribute="width" constant="56" id="icon-width"/>
+                                    <constraint firstAttribute="height" constant="56" id="icon-height"/>
                                 </constraints>
                             </imageView>
                             <label opaque="NO" userInteractionEnabled="NO" text="Grapsee" textAlignment="center" translatesAutoresizingMaskIntoConstraints="NO" id="launch-wordmark">
-                                <fontDescription key="fontDescription" type="boldSystem" pointSize="26"/>
+                                <fontDescription key="fontDescription" type="boldSystem" pointSize="12"/>
                                 <color key="textColor" white="1" alpha="1" colorSpace="custom" customColorSpace="genericGamma22GrayColorSpace"/>
                             </label>
                         </subviews>
@@ -38,7 +38,7 @@
         </scene>
     </scenes>
     <resources>
-        <image name="LaunchBrand" width="460" height="460"/>
+        <image name="GrapMailLogo" width="379" height="379"/>
         <namedColor name="LaunchBackground">
             <color red="0.10196" green="0.42745" blue="0.94118" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
         </namedColor>
