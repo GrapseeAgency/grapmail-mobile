@@ -1750,3 +1750,36 @@ extension String {
         addingPercentEncoding(withAllowedCharacters: .alphanumerics) ?? self
     }
 }
+
+// ── scheduled sends ──────────────────────────────────────────────────────────
+
+/// One future send, as `GET /grapmail/scheduled` answers it: mail the server
+/// holds with status 'scheduled' until the worker promotes it at
+/// `scheduledFor`. Reading and cancelling these is gate-legal — no client
+/// scheduling field is involved.
+struct MailScheduledMessage: Decodable, Identifiable {
+    let id: String
+    let subject: String?
+    let to: [String]?
+    let scheduledFor: String?
+    let createdAt: String?
+}
+
+struct MailScheduledResponse: Decodable {
+    let success: Bool?
+    let messages: [MailScheduledMessage]?
+}
+
+extension ApiClient {
+    /// `GET /grapmail/scheduled` — the account's future sends, soonest first.
+    static func mailScheduledList(_ token: String) async throws -> MailScheduledResponse {
+        try await request("\(mailBase)/scheduled", bearer: token)
+    }
+
+    /// `DELETE /grapmail/scheduled/:id` — take one future send back. The
+    /// server clears `scheduled_at`, so the worker will never deliver it.
+    static func mailScheduledCancel(_ token: String, id: String) async throws -> MailScheduledResponse {
+        try await request("\(mailBase)/scheduled/\(id.percentEncodedPath())",
+                          method: "DELETE", bearer: token)
+    }
+}
