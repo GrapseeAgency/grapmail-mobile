@@ -22,8 +22,8 @@ settings:
     # tag (v0.3.0's first run refused a disagreeing build), and an iOS build of
     # the same commit self-reporting 0.0.0.1 is the same disagreement kept
     # quiet only because no iOS badging check exists yet.
-    MARKETING_VERSION: "0.6.0"
-    CURRENT_PROJECT_VERSION: "9"
+    MARKETING_VERSION: "0.6.1"
+    CURRENT_PROJECT_VERSION: "10"
     # Empty on purpose for local development: a simulator build needs no team.
     # CI's release job injects the team per invocation with
     # DEVELOPMENT_TEAM="$APPLE_TEAM_ID" on the xcodebuild command line —
@@ -60,18 +60,11 @@ targets:
       path: GrapMail/GrapMail.entitlements
       properties:
         aps-environment: $(APS_ENVIRONMENT)
-    # The launch screen, the background mode and the home-screen shortcut are
-    # dictionaries and arrays, not single build-setting values, so they cannot
-    # ride on INFOPLIST_KEY_* (Xcode exposes only `UILaunchScreen_Generation`,
-    # which synthesizes an EMPTY launch screen -- the plain blue rectangle the
-    # app shipped with). XcodeGen writes the real Info.plist instead, and
-    # GENERATE_INFOPLIST_FILE still fills the bundle keys it owns.
+    # XcodeGen writes the launch storyboard and structured Info.plist entries.
     info:
       path: GrapMail/Info.plist
       properties:
-        UILaunchScreen:
-          UIImageName: LaunchBrand
-          UIColorName: LaunchBackground
+        UILaunchStoryboardName: LaunchScreen
         # Must exactly match MailPoll.refreshIdentifier's registration/submission.
         BGTaskSchedulerPermittedIdentifiers:
           - com.grapsee.grapmail.inbox-refresh

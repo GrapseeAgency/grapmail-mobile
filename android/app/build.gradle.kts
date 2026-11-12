@@ -78,8 +78,8 @@ android {
         // v0.6.0 / versionCode 9: the first release that can be signed with the
         // founder's distribution key (android.yml resolves CI_KEYSTORE_* secrets
         // and refuses to label a test-signed file as founder-signed).
-        versionCode = 9
-        versionName = "0.6.0"
+        versionCode = 10
+        versionName = "0.6.1"
         // Real account API — same contract the website uses.
         buildConfigField("String", "API_BASE", "\"https://grapsee.com/api\"")
     }

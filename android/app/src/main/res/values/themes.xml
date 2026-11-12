@@ -9,26 +9,10 @@
              put dark icons on the dark background in night mode. -->
     </style>
 
-    <!--
-        The system splash screen (androidx.core:core-splashscreen), which is the
-        only window Android shows while the app's own first frame is still being
-        composed. Before this there was no splash at all: the person tapped the
-        icon and saw a blank window of the system's choosing, which is the
-        "native app has certain rules" complaint in its smallest form.
-
-        The icon is the launcher adaptive icon itself (`@mipmap/ic_launcher`) — the mark foreground
-        draws, so the mark does not change shape between the launcher, the
-        splash and iOS's launch screen. The background is the brand blue in both
-        palettes: the splash is drawn by the system before this app has resolved
-        a theme, so it cannot use LocalPalette and must not pretend otherwise.
-        `postSplashScreenTheme` hands the window straight back to
-        Theme.GrapMail, and `windowSplashScreenAnimatedIcon` lets the system
-        animate the icon out rather than cutting it.
-    -->
-    <style name="Theme.GrapMail.Splash" parent="Theme.SplashScreen">
+    <style name="Theme.GrapMail.Splash.Base" parent="Theme.SplashScreen">
         <item name="windowSplashScreenBackground">@color/ic_launcher_background</item>
-        <item name="windowSplashScreenAnimatedIcon">@mipmap/ic_launcher</item>
-        <item name="windowSplashScreenAnimationDuration">300</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/grapmail_splash_icon</item>
         <item name="postSplashScreenTheme">@style/Theme.GrapMail</item>
     </style>
+    <style name="Theme.GrapMail.Splash" parent="Theme.GrapMail.Splash.Base" />
 </resources>

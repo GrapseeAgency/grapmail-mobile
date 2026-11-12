@@ -64,6 +64,7 @@ enum SessionStore {
         return Date().timeIntervalSince1970 * 1000 < millis
     }
 
+    @MainActor
     static func clear() {
         generation = UUID()
         MailPoll.clear()
