@@ -252,10 +252,13 @@ fun MailboxScreen(
                                 state.advAfter.isNotBlank() || state.advBefore.isNotBlank(),
                         )
                     }
-                    Column(Modifier.padding(horizontal = 16.dp)) {
-                        LabelStrip(state)
-                    }
-                    BoxTabRow(state, onSelect = { vm.open(it) })
+                    Text(
+                        state.box.title,
+                        modifier = Modifier.padding(start = 16.dp, bottom = 6.dp),
+                        color = palette.textSecondary,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Medium,
+                    )
                 }
 
                 // The device's own path to the network, read before asking

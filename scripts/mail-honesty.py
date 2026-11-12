@@ -1171,9 +1171,12 @@ pin("iOS's detach mutates the set instead of subtracting from it",
 SW_CHROME = ios("MailChrome.swift")
 pin("iOS's Inbox pill mirrors the list's query and filter",
     re.search(r'selected:\s*query\.isEmpty && filter == \.all', code_only(SW_CHROME)) is not None)
-pin("iOS's label strip is given the two fields it mirrors",
-    re.search(r'LabelStrip\(labels:[\s\S]{0,160}?query: vm\.state\.query, filter: vm\.state\.filter',
-              code_only(SW_BOX)) is not None)
+pin("the inbox header shows the current folder without repeating drawer navigation",
+    "Text(vm.state.box.title)" in code_only(SW_BOX)
+    and "LabelStrip(labels:" not in code_only(SW_BOX)
+    and "BoxTabRow(state:" not in code_only(SW_BOX)
+    and "state.box.title" in code_only(KT_BOX)
+    and "BoxTabRow(state," not in code_only(KT_BOX))
 pin("Android's Inbox pill mirrors the same two fields",
     re.search(r'LabelChip\("Inbox"[^\n]*s\.query\.isEmpty\(\) && s\.filter == MailFilter\.All',
               code_only(KT_BOX)) is not None)

@@ -166,11 +166,12 @@ struct MailboxView: View {
                 .padding(.horizontal, 12)
                 .padding(.vertical, 8)
 
-                LabelStrip(labels: vm.state.labels, unread: vm.state.unreadCount,
-                           query: vm.state.query, filter: vm.state.filter)
+                Text(vm.state.box.title)
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundColor(GM.textSecondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.horizontal, 16)
-
-                BoxTabRow(state: vm.state, onSelect: { open($0) })
+                    .padding(.bottom, 6)
             }
         }
     }

@@ -786,53 +786,61 @@ class MailboxViewModel @JvmOverloads constructor(
 
     fun clearAdvanced() = setAdvanced("", "", "", false, "", "")
 
+    private val pendingRowActions = mutableSetOf<String>()
+
     fun actOn(id: String, action: MailAction) {
         viewModelScope.launch {
             val t = token() ?: return@launch
-            runCatching { Api.mailAction(t, id, action, null) }
-                .onSuccess {
-                    applyLocally(id, action); invalidateFor(action); reproject()
-                    // A single-message action supersedes the undo offer for THAT
-                    // message. Without this, snooze three, swipe one of them to
-                    // Trash, press Undo, and the trashed message is unsnoozed too --
-                    // `act()` clears the offer for bulk actions but this path had no
-                    // equivalent, so the banner outlived the mail it described.
-                    _state.update { s ->
-                        if (!s.snoozeUndoIds.contains(id)) s
-                        else {
-                            val left = s.snoozeUndoIds - id
-                            s.copy(snoozeUndoIds = left,
-                                snoozeUndoNote = if (left.isEmpty()) null else s.snoozeUndoNote)
+            if (!pendingRowActions.add(id)) return@launch
+            try {
+                runCatching { Api.mailAction(t, id, action, null) }
+                    .onSuccess {
+                        applyLocally(id, action); invalidateFor(action); reproject()
+                        // A single-message action supersedes the undo offer for THAT
+                        // message. Without this, snooze three, swipe one of them to
+                        // Trash, press Undo, and the trashed message is unsnoozed too --
+                        // `act()` clears the offer for bulk actions but this path had no
+                        // equivalent, so the banner outlived the mail it described.
+                        _state.update { s ->
+                            if (!s.snoozeUndoIds.contains(id)) s
+                            else {
+                                val left = s.snoozeUndoIds - id
+                                s.copy(snoozeUndoIds = left,
+                                    snoozeUndoNote = if (left.isEmpty()) null else s.snoozeUndoNote)
+                            }
+                        }
+                        // A swipe is the most common filing there is, and the mail
+                        // leaves the screen the instant it succeeds -- so the banner
+                        // must offer the reverse here too, or the undo would exist
+                        // only for selections and the single most undoable action
+                        // would have no path back.
+                        val inv = action.inverse()
+                        _state.update { s ->
+                            if (inv == null) s else s.copy(
+                                undoIds = listOf(id), undoInverse = inv,
+                                undoNote = action.pastLine(1),
+                            )
+                        }
+                        // The swipe is the most common filing there is, and it is
+                        // the one the person cannot see land (the row leaves the
+                        // screen), so the tap is the only feedback there is.
+                        when (action) {
+                            MailAction.Star, MailAction.Unstar,
+                            MailAction.Read, MailAction.Unread -> GMHaptics.marking()
+                            else -> GMHaptics.filing()
                         }
                     }
-                    // A swipe is the most common filing there is, and the mail
-                    // leaves the screen the instant it succeeds -- so the banner
-                    // must offer the reverse here too, or the undo would exist
-                    // only for selections and the single most undoable action
-                    // would have no path back.
-                    val inv = action.inverse()
-                    _state.update { s ->
-                        if (inv == null) s else s.copy(
-                            undoIds = listOf(id), undoInverse = inv,
-                            undoNote = action.pastLine(1),
-                        )
+                    .onFailure {
+                        if (it is kotlinx.coroutines.CancellationException) throw it
+                        GMHaptics.failure()
+                        _state.update { s ->
+                            s.copy(staleError = (it as? ApiException)?.message
+                                ?: "That action didn't go through.")
+                        }
                     }
-                    // The swipe is the most common filing there is, and it is
-                    // the one the person cannot see land (the row leaves the
-                    // screen), so the tap is the only feedback there is.
-                    when (action) {
-                        MailAction.Star, MailAction.Unstar,
-                        MailAction.Read, MailAction.Unread -> GMHaptics.marking()
-                        else -> GMHaptics.filing()
-                    }
-                }
-                .onFailure {
-                    GMHaptics.failure()
-                    _state.update { s ->
-                        s.copy(staleError = (it as? ApiException)?.message
-                            ?: "That action didn't go through.")
-                    }
-                }
+            } finally {
+                pendingRowActions.remove(id)
+            }
         }
     }
 

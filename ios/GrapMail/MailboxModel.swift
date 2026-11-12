@@ -757,12 +757,16 @@ final class MailboxModel: ObservableObject {
 
     func clearAdvanced() { setAdvanced(from: "", to: "", subject: "", files: false, after: "", before: "") }
 
+    private var pendingRowActions: Set<String> = []
+
     func actOn(_ id: String, _ action: MailAction) {
-        guard let token else { return }
+        guard let token, pendingRowActions.insert(id).inserted else { return }
         Task { [weak self] in
             guard let self else { return }
+            defer { self.pendingRowActions.remove(id) }
             do {
                 _ = try await ApiClient.mailAction(token: token, id: id, action: action, until: nil)
+                guard self.sessionIsLive else { return }
                 await self.applyLocally(id: id, action: action)
                 await self.invalidateFor(action)
                 // The undo offer must not outlive the mail it describes: snooze three,
