@@ -31,6 +31,7 @@ actor MailStore {
     }
 
     static let shared = MailStore()
+    private static let maxCachedSearches = 8
 
     private var pages: [String: PageCache] = [:]
     private var statsValue: MailStatsResponse?
@@ -77,6 +78,13 @@ actor MailStore {
             query: query?.trimmingCharacters(in: .whitespaces).nilIfBlank(),
             loadedAt: Date()
         )
+        if !normalised(query).isEmpty {
+            let oldSearches = pages
+                .filter { $0.key != k && $0.value.query != nil }
+                .sorted { $0.value.loadedAt > $1.value.loadedAt }
+                .dropFirst(Self.maxCachedSearches - 1)
+            for entry in oldSearches { pages.removeValue(forKey: entry.key) }
+        }
     }
 
     func stats() -> MailStatsResponse? { statsValue }
@@ -173,13 +181,11 @@ actor MailStore {
     /// a refetch that may not happen and may not succeed.
     func patchFlags(id: String, read: Bool? = nil, starred: Bool? = nil) {
         for (k, cache) in pages {
-            pages[k] = PageCache(
-                messages: cache.messages.map { m in
-                    m.id == id
-                        ? MailMessage(patching: m, read: read, starred: starred)
-                        : m
-                },
-                total: cache.total, pages: cache.pages, query: cache.query, loadedAt: cache.loadedAt)
+            guard let index = cache.messages.firstIndex(where: { $0.id == id }) else { continue }
+            let message = cache.messages[index]
+            guard read.map({ $0 != message.isRead }) == true
+                    || starred.map({ $0 != message.isStarred }) == true else { continue }
+            pages[k]?.messages[index] = MailMessage(patching: message, read: read, starred: starred)
         }
     }
 
@@ -188,9 +194,8 @@ actor MailStore {
     /// the app cannot know that box's ordering without asking the server.
     func removeEverywhere(id: String) {
         for (k, cache) in pages {
-            pages[k] = PageCache(
-                messages: cache.messages.filter { $0.id != id },
-                total: cache.total, pages: cache.pages, query: cache.query, loadedAt: cache.loadedAt)
+            guard let index = cache.messages.firstIndex(where: { $0.id == id }) else { continue }
+            pages[k]?.messages.remove(at: index)
         }
     }
 

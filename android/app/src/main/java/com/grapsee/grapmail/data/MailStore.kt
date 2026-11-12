@@ -41,6 +41,7 @@ object MailStore {
     }
 
     private val mutex = Mutex()
+    private const val MAX_CACHED_SEARCHES = 8
 
     private var pages: Map<String, PageCache> = emptyMap()
     private var stats: MailStatsResponse? = null
@@ -88,6 +89,13 @@ object MailStore {
                 query = query?.trim()?.takeIf { it.isNotEmpty() },
                 loadedAtMillis = System.currentTimeMillis(),
             ))
+            if (!query.isNullOrBlank()) {
+                val oldSearches = pages.entries
+                    .filter { it.key != k && it.value.query != null }
+                    .sortedByDescending { it.value.loadedAtMillis }
+                    .drop(MAX_CACHED_SEARCHES - 1)
+                if (oldSearches.isNotEmpty()) pages = pages - oldSearches.map { it.key }.toSet()
+            }
         }
 
     suspend fun stats(): MailStatsResponse? = mutex.withLock { stats }
@@ -209,12 +217,16 @@ object MailStore {
         starred: Boolean? = null,
     ) = mutex.withLock {
         pages = pages.mapValues { (_, cache) ->
-            cache.copy(messages = cache.messages.map { m ->
-                if (m.id != id) m else m.copy(
-                    isRead = read ?: m.isRead,
-                    isStarred = starred ?: m.isStarred,
-                )
-            })
+            val index = cache.messages.indexOfFirst { it.id == id }
+            if (index < 0) return@mapValues cache
+            val message = cache.messages[index]
+            val updated = message.copy(
+                isRead = read ?: message.isRead,
+                isStarred = starred ?: message.isStarred,
+            )
+            if (updated == message) cache else cache.copy(
+                messages = cache.messages.toMutableList().apply { this[index] = updated },
+            )
         }
     }
 
@@ -223,7 +235,10 @@ object MailStore {
      *  the app cannot know that box's ordering without asking the server. */
     suspend fun removeEverywhere(id: String) = mutex.withLock {
         pages = pages.mapValues { (_, cache) ->
-            cache.copy(messages = cache.messages.filterNot { it.id == id })
+            val index = cache.messages.indexOfFirst { it.id == id }
+            if (index < 0) cache else cache.copy(
+                messages = cache.messages.toMutableList().apply { removeAt(index) },
+            )
         }
     }
 
