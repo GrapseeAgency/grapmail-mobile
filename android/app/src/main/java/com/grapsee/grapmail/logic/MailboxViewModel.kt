@@ -243,10 +243,12 @@ class MailboxViewModel @JvmOverloads constructor(
          * rest of the session.
          */
         val settleGeneration: Int = 0,
+        val appendError: String? = null,
+        val endOfPages: Boolean = false,
     ) {
         val selecting: Boolean get() = selection.isNotEmpty()
         val hasRows: Boolean get() = rows.isNotEmpty()
-        val canLoadMore: Boolean get() = !loadingMore && loaded < total
+        val canLoadMore: Boolean get() = !loading && !loadingMore && !endOfPages && loaded < total
         /** How many rows the chosen sort actually re-ordered. */
         val sortScope: Int get() = loaded
     }
@@ -412,7 +414,8 @@ class MailboxViewModel @JvmOverloads constructor(
         loadedBoxes.add(box)
         _state.update { it.copy(box = box, selection = emptySet(), rows = emptyList(),
             pages = 0, loaded = 0, total = 0, advScope = 0, loading = true,
-            loadingMore = false, noMailbox = false, fatal = null, staleError = null) }
+            loadingMore = false, noMailbox = false, fatal = null, staleError = null,
+            appendError = null, endOfPages = false) }
         load(replace = true, reuseRecentFolder = true)
     }
 
@@ -472,7 +475,7 @@ class MailboxViewModel @JvmOverloads constructor(
             // an existing list must not blank it — the hub's defect, designed out
             // here rather than rediscovered.
             if (replace && !_state.value.hasRows) _state.update { it.copy(loading = true, staleError = null) }
-            if (!replace) _state.update { it.copy(loadingMore = true) }
+            if (!replace) _state.update { it.copy(loadingMore = true, appendError = null) }
 
             val context = getApplication<Application>()
             val session = com.grapsee.grapmail.data.SessionStore.snapshot(context)
@@ -505,10 +508,11 @@ class MailboxViewModel @JvmOverloads constructor(
                 }
                 val resp = Api.mailInbox(session.token, box, page = page, q = term)
                 if (!com.grapsee.grapmail.data.SessionStore.isCurrent(context, session.id)) return@launch
-                MailStore.putPage(box, term, resp, replace)
+                val addedRows = MailStore.putPage(box, term, resp, replace)
                 reproject()
                 _state.update { it.copy(loading = false, loadingMore = false, fatal = null,
-                    staleError = null, settleGeneration = it.settleGeneration + 1) }
+                    staleError = null, appendError = null, endOfPages = !addedRows,
+                    settleGeneration = it.settleGeneration + 1) }
                 if (replace && term == null) {
                     // A side read. If it fails the list above still says what it
                     // knows, so nothing here raises an error; a cancelled one is
@@ -529,6 +533,11 @@ class MailboxViewModel @JvmOverloads constructor(
             } catch (e: Exception) {
                 val noBox = (e as? ApiException)?.code == "NO_MAILBOX"
                 val msg = mailReason(e)
+                if (!replace && !noBox) {
+                    _state.update { it.copy(loadingMore = false, appendError = msg,
+                        settleGeneration = it.settleGeneration + 1) }
+                    return@launch
+                }
                 _state.update { cur ->
                     cur.copy(
                         loading = false, loadingMore = false,

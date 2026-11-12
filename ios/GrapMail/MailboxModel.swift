@@ -48,6 +48,9 @@ final class MailboxModel: ObservableObject {
         var pages: Int = 0
         var loading = false
         var loadingMore = false
+        var appendError: String?
+        var endOfPages = false
+        var canLoadMore: Bool { !loading && !loadingMore && !endOfPages && loaded < total }
         /// A refresh that failed while rows were on screen. Non-nil with rows
         /// present means "this list may be stale", not "there is no mail".
         var staleError: String?
@@ -303,6 +306,8 @@ final class MailboxModel: ObservableObject {
         updated.advScope = 0
         updated.loading = true
         updated.loadingMore = false
+        updated.appendError = nil
+        updated.endOfPages = false
         updated.noMailbox = false
         updated.fatal = nil
         updated.staleError = nil
@@ -358,7 +363,10 @@ final class MailboxModel: ObservableObject {
                 self.state.loading = true
                 self.state.staleError = nil
             }
-            if !replace { self.state.loadingMore = true }
+            if !replace {
+                self.state.loadingMore = true
+                self.state.appendError = nil
+            }
 
             guard let token = self.token else {
                 // The generation moves on this exit too, and `loadAndSettle` below is
@@ -394,11 +402,13 @@ final class MailboxModel: ObservableObject {
                     self.state.settleGeneration += 1
                     return
                 }
-                await MailStore.shared.putPage(box, term, resp, replace: replace)
+                let addedRows = await MailStore.shared.putPage(box, term, resp, replace: replace)
                 guard !Task.isCancelled, sessionIsLive else { return }
                 self.loadedBoxes.insert(box)
                 self.state.loading = false
                 self.state.loadingMore = false
+                self.state.appendError = nil
+                self.state.endOfPages = !addedRows
                 self.state.fatal = nil
                 self.state.staleError = nil
                 self.state.settleGeneration += 1
@@ -422,6 +432,12 @@ final class MailboxModel: ObservableObject {
                 if error is CancellationError || Task.isCancelled { return }
                 let noBox = (error as? ApiError).map { Self.isNoMailbox($0) } ?? false
                 let message = Self.describe(error)
+                if !replace, !noBox {
+                    self.state.loadingMore = false
+                    self.state.appendError = message
+                    self.state.settleGeneration += 1
+                    return
+                }
                 self.state.loading = false
                 self.state.loadingMore = false
                 self.state.noMailbox = noBox
@@ -462,7 +478,7 @@ final class MailboxModel: ObservableObject {
     }
 
     func loadMore() {
-        guard searchTask == nil, !state.loading, !state.loadingMore, state.loaded < state.total else { return }
+        guard searchTask == nil, state.canLoadMore else { return }
         load(replace: false)
     }
 

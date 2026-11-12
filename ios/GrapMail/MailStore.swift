@@ -66,13 +66,15 @@ actor MailStore {
 
     /// Merge a fetched page. `replace` is true for page 1 (a refresh or a new
     /// search), false for a later page appended to what is already shown.
-    func putPage(_ box: MailBox, _ query: String?, _ resp: MailInboxResponse, replace: Bool) {
+    @discardableResult
+    func putPage(_ box: MailBox, _ query: String?, _ resp: MailInboxResponse, replace: Bool) -> Bool {
         let k = key(box, query)
         let prior = replace ? nil : pages[k]
         let merged = (prior?.messages ?? []) + resp.messages
         var seen = Set<String>()
+        let messages = merged.filter { seen.insert($0.id).inserted }
         pages[k] = PageCache(
-            messages: merged.filter { seen.insert($0.id).inserted },
+            messages: messages,
             total: resp.total > 0 ? resp.total : (prior?.total ?? 0),
             pages: (prior?.pages ?? 0) + 1,
             query: query?.trimmingCharacters(in: .whitespaces).nilIfBlank(),
@@ -85,6 +87,7 @@ actor MailStore {
                 .dropFirst(Self.maxCachedSearches - 1)
             for entry in oldSearches { pages.removeValue(forKey: entry.key) }
         }
+        return messages.count > (prior?.messages.count ?? 0)
     }
 
     func stats() -> MailStatsResponse? { statsValue }

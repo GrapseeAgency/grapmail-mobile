@@ -81,9 +81,9 @@ object MailStore {
         mutex.withLock {
             val k = key(box, query)
             val prior = if (replace) null else pages[k]
-            val merged = (prior?.messages ?: listOf()) + resp.messages
+            val merged = ((prior?.messages ?: emptyList()) + resp.messages).distinctBy { it.id }
             pages = pages + (k to PageCache(
-                messages = merged.distinctBy { it.id },
+                messages = merged,
                 total = if (resp.total > 0) resp.total else prior?.total ?: 0,
                 pages = (prior?.pages ?: 0) + 1,
                 query = query?.trim()?.takeIf { it.isNotEmpty() },
@@ -96,6 +96,7 @@ object MailStore {
                     .drop(MAX_CACHED_SEARCHES - 1)
                 if (oldSearches.isNotEmpty()) pages = pages - oldSearches.map { it.key }.toSet()
             }
+            merged.size > (prior?.messages?.size ?: 0)
         }
 
     suspend fun stats(): MailStatsResponse? = mutex.withLock { stats }

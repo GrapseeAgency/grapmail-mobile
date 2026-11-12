@@ -168,7 +168,9 @@ fun MailboxScreen(
             info.totalItemsCount > 0 && lastVisible >= info.totalItemsCount - 4
         }
     }
-    LaunchedEffect(nearEnd) { if (nearEnd && state.canLoadMore) vm.loadMore() }
+    LaunchedEffect(nearEnd, state.pages) {
+        if (nearEnd && state.hasRows && state.canLoadMore && state.appendError == null) vm.loadMore()
+    }
 
     // The screen's first ask: the box that has never been fetched. Nothing here
     // fetched the list at all before this line existed, which is how a mailbox
@@ -334,7 +336,7 @@ fun MailboxScreen(
                         loading = state.loading,
                         failed = state.fatal != null,
                         noMailbox = state.noMailbox,
-                        empty = !state.hasRows,
+                        empty = !state.hasRows && !state.canLoadMore && !state.loadingMore,
                         boxTitle = state.box.title,
                         onRetry = { vm.load() },
                     ) {
@@ -415,11 +417,20 @@ fun MailboxScreen(
                                 Box(Modifier.fillMaxWidth().padding(horizontal = 16.dp)
                                     .height(1.dp).background(palette.border))
                             }
-                            if (state.loadingMore) {
+                            if (state.loadingMore || state.canLoadMore) {
                                 item {
-                                    Box(Modifier.fillMaxWidth().padding(20.dp),
-                                        contentAlignment = Alignment.Center) {
-                                        Text("Loading more…", fontSize = 13.sp, color = palette.textTertiary)
+                                    Column(Modifier.fillMaxWidth().padding(12.dp),
+                                        horizontalAlignment = Alignment.CenterHorizontally) {
+                                        if (state.loadingMore) {
+                                            Text("Loading more…", fontSize = 13.sp, color = palette.textTertiary)
+                                        } else {
+                                            state.appendError?.let {
+                                                Text(it, fontSize = 13.sp, color = palette.textSecondary)
+                                            }
+                                            androidx.compose.material3.TextButton(onClick = vm::loadMore) {
+                                                Text(if (state.appendError == null) "Load more" else "Retry")
+                                            }
+                                        }
                                     }
                                 }
                             }

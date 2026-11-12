@@ -291,7 +291,7 @@ struct MailboxView: View {
             loading: vm.state.loading,
             failed: vm.state.fatal != nil,
             noMailbox: vm.state.noMailbox,
-            empty: vm.state.rows.isEmpty,
+            empty: vm.state.rows.isEmpty && !vm.state.canLoadMore && !vm.state.loadingMore,
             boxTitle: vm.state.box.title,
             onRetry: { vm.load() }
         ) {
@@ -301,8 +301,7 @@ struct MailboxView: View {
     }
 
     /// `List` is lazy, which a mailbox needs and the wizard screens did not.
-    /// Pagination is driven by the last visible row rather than a "load more"
-    /// button, and the sentinel only asks when the server says more exists.
+    /// Prefetch at the last visible row, with a footer for manual loading and retry.
     private var messageList: some View {
         List {
             ForEach(vm.state.rows) { row in
@@ -355,7 +354,7 @@ struct MailboxView: View {
                     }
                 }
                 .onAppear {
-                    if row.id == vm.state.rows.last?.id { vm.loadMore() }
+                    if vm.state.appendError == nil, row.id == vm.state.rows.last?.id { vm.loadMore() }
                 }
             }
             if vm.state.loadingMore {
@@ -363,6 +362,16 @@ struct MailboxView: View {
                     .font(.system(size: 13)).foregroundColor(GM.textTertiary)
                     .frame(maxWidth: .infinity, alignment: .center)
                     .listRowSeparator(.hidden)
+            } else if vm.state.canLoadMore {
+                VStack(spacing: 4) {
+                    if let error = vm.state.appendError {
+                        Text(error).font(.system(size: 13)).foregroundColor(GM.textSecondary)
+                    }
+                    Button(vm.state.appendError == nil ? "Load more" : "Retry") { vm.loadMore() }
+                }
+                .frame(maxWidth: .infinity)
+                .listRowBackground(GM.bg)
+                .listRowSeparator(.hidden)
             }
         }
         .listStyle(.plain)
