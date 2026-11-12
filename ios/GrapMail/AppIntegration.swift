@@ -200,4 +200,210 @@ enum MailPoll {
         // own patterns allow — often less often than this. The app never
         // promises a minute, so no screen says "every 15 minutes"; the
         // schedule is the system's, and DATA-FLOW.md says so.
-        request.earliestBeginDat
+        request.earliestBeginDate = Date(timeIntervalSinceNow: 15 * 60)
+        try? BGTaskScheduler.shared.submit(request)
+    }
+}
+
+// ── push registration ───────────────────────────────────────────────────────
+
+/// The device's push token and its registration with the GrapMail backend.
+///
+/// The token is an opaque identifier Apple issues per app install; the backend
+/// needs it (`POST /grapsee/grapmail/push/register`) to wake this device when
+/// mail reaches the mailbox. The call carries the same bearer every other
+/// authenticated call does, so a token is only ever attached to the account
+/// that was signed in when it was issued — and sign-out removes it again
+/// (`DELETE` the same path, same payload). The token is never logged, never
+/// persisted (a fresh one arrives at every launch), and a refused write is
+/// never reported anywhere as a working notification: BGAppRefresh polling
+/// stays the fallback either way.
+@MainActor
+final class NotificationRegistration {
+    static let shared = NotificationRegistration()
+    private(set) var deviceToken: Data?
+    private(set) var registrationFailed = false
+    private var registerTask: Task<Void, Never>?
+
+    func reconcile() async {
+        let generation = SessionStore.generation
+        let settings = await UNUserNotificationCenter.current().notificationSettings()
+        guard generation == SessionStore.generation else { return }
+        guard SessionStore.token != nil,
+              settings.authorizationStatus == .authorized || settings.authorizationStatus == .provisional else {
+            clear()
+            return
+        }
+        UIApplication.shared.registerForRemoteNotifications()
+    }
+
+    func registered(_ token: Data) {
+        guard SessionStore.token != nil else { clear(); return }
+        deviceToken = token
+        registrationFailed = false
+        postRegistration()
+    }
+
+    func failed(_ error: Error) {
+        deviceToken = nil
+        registrationFailed = true
+        // Honest log, nothing on screen: the system refused the registration
+        // (no entitlement on the profile, no network, a simulator). The poll
+        // still runs, so nothing promised was quietly dropped.
+        print("Push registration refused: \(error.localizedDescription)")
+    }
+
+    /// Sign-out and account deletion. The authenticated DELETE has to run while
+    /// this session's bearer is still in the Keychain, so `SessionStore.clear()`
+    /// calls this BEFORE its own deletes. The device-side teardown stays
+    /// deferred, so a sign-in that completed while clear() was running keeps
+    /// its registration — its own reconcile re-registers anyway.
+    func sessionEnding() {
+        let bearer = SessionStore.token
+        let token = deviceToken
+        deviceToken = nil
+        registrationFailed = false
+        registerTask?.cancel()
+        registerTask = nil
+        if let bearer, let token {
+            let hex = Self.hex(token)
+            Task {
+                do {
+                    try await ApiClient.unregisterPush(token: bearer, pushToken: hex)
+                } catch {
+                    // Best effort: the bearer may already be dead server-side
+                    // (account deletion invalidates tokens), which is not a
+                    // defect of the sign-out path.
+                    print("Push deregistration not confirmed: \(error.localizedDescription)")
+                }
+            }
+        }
+        DispatchQueue.main.async {
+            if SessionStore.token == nil {
+                UIApplication.shared.unregisterForRemoteNotifications()
+                UIApplication.shared.applicationIconBadgeNumber = 0
+                UNUserNotificationCenter.current().removeAllDeliveredNotifications()
+                UNUserNotificationCenter.current().removeAllPendingNotificationRequests()
+            }
+        }
+    }
+
+    /// Local-only teardown. Called from `reconcile` when there is no session or
+    /// no permission: no bearer exists to authenticate a DELETE with, so only
+    /// the device-side state goes.
+    func clear() {
+        deviceToken = nil
+        registrationFailed = false
+        registerTask?.cancel()
+        registerTask = nil
+        UIApplication.shared.unregisterForRemoteNotifications()
+        UIApplication.shared.applicationIconBadgeNumber = 0
+        UNUserNotificationCenter.current().removeAllDeliveredNotifications()
+        UNUserNotificationCenter.current().removeAllPendingNotificationRequests()
+    }
+
+    private func postRegistration() {
+        guard let bearer = SessionStore.token, let token = deviceToken else { return }
+        let hex = Self.hex(token)
+        registerTask?.cancel()
+        registerTask = Task {
+            do {
+                try await ApiClient.registerPush(token: bearer, pushToken: hex)
+                // No screen reports this and no wording announces push: the
+                // server accepted a token, and whether a wake ever arrives is
+                // not observable here. The poll remains the fallback.
+            } catch {
+                if !Task.isCancelled {
+                    print("Push registration not accepted: \(error.localizedDescription)")
+                }
+            }
+        }
+    }
+
+    /// The token travels as lowercase hex — the form the route reads.
+    private static func hex(_ data: Data) -> String {
+        data.map { String(format: "%02x", $0) }.joined()
+    }
+}
+
+// ── the app delegate ────────────────────────────────────────────────────────
+
+/// The UIKit hooks SwiftUI's `App` lifecycle does not expose: background task
+/// registration, shortcut delivery, and the reschedule on backgrounding.
+@MainActor
+final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDelegate {
+    /// App-lifetime observer. The token is never removed: the delegate object
+    /// lives for the whole process, and every future sign-in needs the hook.
+    private var sessionChangeObserver: NSObjectProtocol?
+
+    func application(_ application: UIApplication,
+                     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
+        UNUserNotificationCenter.current().delegate = self
+        BGTaskScheduler.shared.register(forTaskWithIdentifier: MailPoll.refreshIdentifier, using: .main) { task in
+            guard let refresh = task as? BGAppRefreshTask else { task.setTaskCompleted(success: false); return }
+            MailPoll.scheduleNext()
+            // Expiration cancels the URLSession task. Only the work closure completes
+            // the BGTask, exactly once, including cancellation and unchanged inboxes.
+            let work = Task { @MainActor in
+                let done = await MailPoll.runOnce()
+                refresh.setTaskCompleted(success: !Task.isCancelled && done)
+            }
+            refresh.expirationHandler = { work.cancel() }
+        }
+        Task { await NotificationRegistration.shared.reconcile() }
+        // save() posts .gmSessionChanged: a fresh sign-in re-registers so the
+        // push token attaches to the account that just signed in, not to the
+        // previous one. Restore-at-launch is covered by the reconcile above.
+        sessionChangeObserver = NotificationCenter.default.addObserver(
+            forName: .gmSessionChanged, object: nil, queue: .main) { _ in
+            Task { @MainActor in await NotificationRegistration.shared.reconcile() }
+        }
+        // A shortcut that cold-starts the app arrives here, before any view is
+        // alive to route it, so it is parked and RootView picks it up.
+        if let item = launchOptions?[.shortcutItem] as? UIApplicationShortcutItem {
+            _ = ShortcutRouter.shared.receive(item.type)
+        }
+        return true
+    }
+
+    func application(_ application: UIApplication,
+                     performActionFor shortcutItem: UIApplicationShortcutItem,
+                     completionHandler: @escaping (Bool) -> Void) {
+        completionHandler(ShortcutRouter.shared.receive(shortcutItem.type))
+    }
+
+    func applicationDidEnterBackground(_ application: UIApplication) {
+        MailPoll.scheduleNext()
+    }
+
+    func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
+        NotificationRegistration.shared.registered(deviceToken)
+    }
+
+    func application(_ application: UIApplication, didFailToRegisterForRemoteNotificationsWithError error: Error) {
+        NotificationRegistration.shared.failed(error)
+    }
+
+    func application(_ application: UIApplication,
+                     didReceiveRemoteNotification userInfo: [AnyHashable: Any],
+                     fetchCompletionHandler completionHandler: @escaping (UIBackgroundFetchResult) -> Void) {
+        // A wake is a hint, never trusted mailbox data: whatever the payload
+        // claims, the app re-reads the authenticated stats the poll uses, and
+        // only that read's answer is announced.
+        Task { completionHandler(await MailPoll.runOnce() ? .newData : .noData) }
+    }
+
+    func userNotificationCenter(_ center: UNUserNotificationCenter,
+                                willPresent notification: UNNotification,
+                                withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void) {
+        completionHandler(SessionStore.token == nil ? [] : [.banner, .sound, .badge])
+    }
+
+    func userNotificationCenter(_ center: UNUserNotificationCenter,
+                                didReceive response: UNNotificationResponse,
+                                withCompletionHandler completionHandler: @escaping () -> Void) {
+        // No backend payload/deep-link contract exists. Never navigate to an
+        // untrusted message identifier or URL supplied by a notification.
+        completionHandler()
+    }
+}
