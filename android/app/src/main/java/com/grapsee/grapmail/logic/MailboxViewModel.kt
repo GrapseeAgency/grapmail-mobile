@@ -470,21 +470,22 @@ class MailboxViewModel @JvmOverloads constructor(
             try {
                 val resp = Api.mailInbox(t, box, page = page, q = term)
                 MailStore.putPage(box, term, resp, replace)
-                if (term == null) {
+                reproject()
+                _state.update { it.copy(loading = false, loadingMore = false, fatal = null,
+                    staleError = null, settleGeneration = it.settleGeneration + 1) }
+                if (replace && term == null) {
                     // A side read. If it fails the list above still says what it
                     // knows, so nothing here raises an error; a cancelled one is
                     // rethrown like the outer call's.
                     try {
                         MailStore.putStats(Api.mailStats(t))
+                        reproject()
                     } catch (e: kotlinx.coroutines.CancellationException) {
                         throw e
                     } catch (e: Exception) {
                         // Counts stay null, which draws no badge, rather than 0.
                     }
                 }
-                _state.update { it.copy(loading = false, loadingMore = false, fatal = null,
-                    staleError = null, settleGeneration = it.settleGeneration + 1) }
-                reproject()
             } catch (e: kotlinx.coroutines.CancellationException) {
                 throw e            // superseded: the read that replaced this one reports
             } catch (e: Exception) {

@@ -56,6 +56,8 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.SheetState
 import androidx.compose.material3.SwipeToDismissBox
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.material3.rememberDrawerState
@@ -75,6 +77,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.testTagsAsResourceId
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -95,7 +98,6 @@ import com.grapsee.grapmail.ui.components.CountBadge
 import com.grapsee.grapmail.ui.components.GrapMailLogo
 import com.grapsee.grapmail.ui.components.LabelChip
 import com.grapsee.grapmail.ui.components.MailFab
-import com.grapsee.grapmail.ui.components.MailGreeting
 import com.grapsee.grapmail.ui.components.MailStateBlock
 import com.grapsee.grapmail.ui.components.MessageRow
 import com.grapsee.grapmail.ui.components.SenderAvatar
@@ -234,11 +236,11 @@ fun MailboxScreen(
                 } else {
                     MailTopBar(
                         onMenu = { scope.launch { drawer.open() } },
-                        onSearch = { /* search field below owns the query */ },
-                    )
-                    Column(Modifier.padding(horizontal = 16.dp)) {
-                        MailGreeting(state.accountName, state.accountAddress)
-                        Spacer(Modifier.height(14.dp))
+                        accountName = state.accountName.orEmpty(),
+                        accountAddress = state.accountAddress,
+                        onSettings = onSettings,
+                        onSignOut = onSignOut,
+                    ) {
                         SearchField(
                             query = state.query,
                             onQuery = vm::query,
@@ -249,9 +251,9 @@ fun MailboxScreen(
                                 state.advSubject.isNotBlank() || state.advFiles ||
                                 state.advAfter.isNotBlank() || state.advBefore.isNotBlank(),
                         )
-                        Spacer(Modifier.height(12.dp))
+                    }
+                    Column(Modifier.padding(horizontal = 16.dp)) {
                         LabelStrip(state)
-                        Spacer(Modifier.height(6.dp))
                     }
                     BoxTabRow(state, onSelect = { vm.open(it) })
                 }
@@ -546,20 +548,43 @@ internal fun drawerBoxes(s: MailboxViewModel.MailboxUiState): List<MailBox> =
 // ── chrome ───────────────────────────────────────────────────────────────────
 
 @Composable
-private fun MailTopBar(onMenu: () -> Unit, onSearch: () -> Unit) {
+private fun MailTopBar(
+    onMenu: () -> Unit,
+    accountName: String,
+    accountAddress: String?,
+    onSettings: () -> Unit,
+    onSignOut: () -> Unit,
+    search: @Composable () -> Unit,
+) {
     val palette = LocalPalette.current
+    var accountOpen by remember { mutableStateOf(false) }
     Row(
         Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(Icons.Rounded.Menu, "Open folders", tint = palette.textPrimary,
-            modifier = Modifier.size(24.dp).clip(CircleShape).clickable(onClick = onMenu)
-                .padding(2.dp).testTag("mail-menu"))
-        Spacer(Modifier.width(10.dp))
-        GrapMailLogo(size = 30.dp, wordmark = true)
-        Spacer(Modifier.weight(1f))
-        Icon(Icons.Rounded.Search, "Search", tint = palette.textPrimary,
-            modifier = Modifier.size(22.dp).clip(CircleShape).clickable(onClick = onSearch))
+        androidx.compose.material3.IconButton(onClick = onMenu, modifier = Modifier.testTag("mail-menu")) {
+            Icon(Icons.Rounded.Menu, "Open folders", tint = palette.textPrimary)
+        }
+        Box(Modifier.weight(1f)) { search() }
+        Box {
+            androidx.compose.material3.IconButton(
+                onClick = { accountOpen = true },
+                modifier = Modifier.semantics { contentDescription = "Account" },
+            ) { SenderAvatar(accountName, accountAddress, size = 32.dp) }
+            DropdownMenu(expanded = accountOpen, onDismissRequest = { accountOpen = false }) {
+                if (!accountAddress.isNullOrBlank()) {
+                    Text(accountAddress, modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
+                }
+                DropdownMenuItem(text = { Text("Settings") }, onClick = {
+                    accountOpen = false
+                    onSettings()
+                })
+                DropdownMenuItem(text = { Text("Sign out") }, onClick = {
+                    accountOpen = false
+                    onSignOut()
+                })
+            }
+        }
     }
 }
 
@@ -584,11 +609,12 @@ private fun SearchField(query: String, onQuery: (String) -> Unit, onFilter: () -
             onValueChange = onQuery,
             maxLines = 1,
             textStyle = androidx.compose.ui.text.TextStyle(fontSize = 14.sp, color = palette.textPrimary),
-            modifier = Modifier.weight(1f).testTag("mail-search"),
+            modifier = Modifier.weight(1f).testTag("mail-search")
+                .semantics { contentDescription = "Search subject, body or sender" },
             decorationBox = { inner ->
                 Box {
                     if (query.isEmpty()) {
-                        Text("Search subject, body or sender\u2026", fontSize = 14.sp, color = palette.textTertiary)
+                        Text("Search mail", fontSize = 14.sp, color = palette.textTertiary)
                     }
                     inner()
                 }
@@ -695,7 +721,7 @@ private fun SwipeableMessageRow(
         when (state.currentValue) {
             SwipeToDismissBoxValue.StartToEnd -> if (leadingTo != null) onLeading()
             SwipeToDismissBoxValue.EndToStart -> if (trailingTo != null) onTrailing()
-            SwipeToDismissBoxValue.Settled -> Unit
+            SwipeToDismissBoxValue.Settled -> return@LaunchedEffect
         }
         state.snapTo(SwipeToDismissBoxValue.Settled)
     }
@@ -705,24 +731,30 @@ private fun SwipeableMessageRow(
         enableDismissFromStartToEnd = leadingTo != null,
         enableDismissFromEndToStart = trailingTo != null,
         backgroundContent = {
-            val toLeading = state.targetValue == SwipeToDismissBoxValue.StartToEnd
+            val direction = state.dismissDirection
+            val toLeading = direction == SwipeToDismissBoxValue.StartToEnd
+            val swiping = direction != SwipeToDismissBoxValue.Settled
             val label = if (toLeading) leadingTo else trailingTo
             Row(
                 Modifier.fillMaxSize()
-                    .background(if (toLeading) palette.swipeArchive else palette.swipeTrash)
+                    .background(when {
+                        !swiping -> Color.Transparent
+                        toLeading -> palette.swipeArchive
+                        else -> palette.swipeTrash
+                    })
                     .padding(horizontal = 24.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = if (toLeading) Arrangement.Start else Arrangement.End,
             ) {
                 // Nothing at all while the row is at rest: a coloured band behind an
                 // untouched row would read as a state the message is not in.
-                if (state.targetValue != SwipeToDismissBoxValue.Settled && label != null) {
+                if (swiping && label != null) {
                     Text(label, fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
                         color = Color.White)
                 }
             }
         },
-    ) { content() }
+    ) { Box(Modifier.fillMaxWidth().background(palette.bg)) { content() } }
 }
 
 /**

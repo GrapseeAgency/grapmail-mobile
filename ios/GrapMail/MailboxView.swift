@@ -140,28 +140,35 @@ struct MailboxView: View {
             )
         } else {
             VStack(spacing: 0) {
-                HStack(spacing: 10) {
+                HStack(spacing: 6) {
                     Button { toggleDrawer() } label: {
                         Image(systemName: "line.3.horizontal")
                             .font(.system(size: 19))
                             .foregroundColor(GM.textPrimary)
-                            .frame(width: 32, height: 32)
+                            .frame(width: 44, height: 44)
                     }
                     .accessibilityLabel("Open folders")
                     .accessibilityIdentifier("mail-menu")
-                    Wordmark()
-                    Spacer()
+                    searchField
+                    Menu {
+                        if let address = vm.state.accountAddress, !address.isEmpty {
+                            Text(address)
+                        }
+                        Button("Settings", action: onSettings)
+                        Button("Sign out", action: onSignOut)
+                    } label: {
+                        SenderAvatar(display: vm.state.accountName ?? "",
+                                     address: vm.state.accountAddress ?? "", size: 32)
+                            .frame(width: 44, height: 44)
+                    }
+                    .accessibilityLabel("Account")
                 }
                 .padding(.horizontal, 12)
                 .padding(.vertical, 8)
 
-                VStack(spacing: 12) {
-                    MailGreeting(name: vm.state.accountName, address: vm.state.accountAddress)
-                    searchField
-                    LabelStrip(labels: vm.state.labels, unread: vm.state.unreadCount,
-                               query: vm.state.query, filter: vm.state.filter)
-                }
-                .padding(.horizontal, 16)
+                LabelStrip(labels: vm.state.labels, unread: vm.state.unreadCount,
+                           query: vm.state.query, filter: vm.state.filter)
+                    .padding(.horizontal, 16)
 
                 BoxTabRow(state: vm.state, onSelect: { open($0) })
             }
@@ -176,12 +183,13 @@ struct MailboxView: View {
             // subject, body, sender (`grapmail-search.ts:110-118`) -- because
             // a placeholder promising "people or files" would advertise a
             // search the route does not run. Android's field says the same.
-            TextField("Search subject, body or sender…",
+            TextField("Search mail",
                       text: Binding(
                         get: { vm.state.query },
                         set: { vm.query($0) }))
                 .font(.system(size: 14))
                 .foregroundColor(GM.textPrimary)
+                .accessibilityLabel("Search subject, body or sender")
                 .accessibilityIdentifier("mail-search")
             Button { sheet = .advanced } label: {
                 Image(systemName: "slider.horizontal.3")

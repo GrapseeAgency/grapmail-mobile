@@ -341,11 +341,7 @@ final class MailboxModel: ObservableObject {
                     return
                 }
                 await MailStore.shared.putPage(box, term, resp, replace: replace)
-                if term == nil {
-                    if let s = try? await ApiClient.mailStats(token) {
-                        await MailStore.shared.putStats(s)
-                    }
-                }
+                guard !Task.isCancelled, sessionIsLive else { return }
                 self.loadedBoxes.insert(box)
                 self.state.loading = false
                 self.state.loadingMore = false
@@ -353,6 +349,12 @@ final class MailboxModel: ObservableObject {
                 self.state.staleError = nil
                 self.state.settleGeneration += 1
                 self.reproject()
+                if replace, term == nil,
+                   let stats = try? await ApiClient.mailStats(token),
+                   !Task.isCancelled, sessionIsLive {
+                    await MailStore.shared.putStats(stats)
+                    self.reproject()
+                }
             } catch {
                 // A superseded read says nothing. `load()` cancels the previous task
                 // on every call, so a box switch or one keystroke past the debounce
