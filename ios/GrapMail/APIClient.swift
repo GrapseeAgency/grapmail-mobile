@@ -992,6 +992,7 @@ struct ApiClient {
     }
 
     private static func performRenewPair() async -> String? {
+        let generation = await MainActor.run { SessionStore.generation }
         guard let refresh = SessionStore.refreshToken,
               let url = URL(string: "\(base)/grapsee/auth/refresh") else { return nil }
         struct RefreshBody: Encodable { let refreshToken: String }
@@ -1007,12 +1008,15 @@ struct ApiClient {
               (200..<300).contains(http.statusCode),
               let pair = try? decoder.decode(SignInResponse.self, from: data),
               let access = pair.accessToken ?? pair.token else { return nil }
-        SessionStore.updateTokens(
-            token: access,
-            refreshToken: pair.refreshToken,
-            expiresAtRaw: pair.expiresAtMillis
-        )
-        return access
+        return await MainActor.run {
+            guard SessionStore.generation == generation else { return nil }
+            SessionStore.updateTokens(
+                token: access,
+                refreshToken: pair.refreshToken,
+                expiresAtRaw: pair.expiresAtMillis
+            )
+            return access
+        }
     }
 
     /// Shares one renewal between every caller that arrived while it ran.
@@ -1033,8 +1037,9 @@ struct ApiClient {
     /// One definition of "the server no longer knows us", shared by the JSON
     /// path and the binary attachment path. A second copy of this block is how a
     /// download could silently keep a revoked session alive.
-    static func signalUnauthorized() {
+    static func signalUnauthorized(rejectedBearer: String) {
         DispatchQueue.main.async {
+            guard SessionStore.token == rejectedBearer else { return }
             SessionStore.clear()
             NotificationCenter.default.post(name: .gmSessionExpired, object: nil)
         }
@@ -1054,6 +1059,7 @@ struct ApiClient {
     }
 
     static func request<T: Decodable>(_ path: String, method: String = "GET", body: Data? = nil, bearer: String? = nil, retried: Bool = false) async throws -> T {
+        let generation: UUID? = bearer == nil ? nil : await MainActor.run { SessionStore.generation }
         guard var components = URLComponents(string: "\(base)\(path)") else {
             throw ApiError.http(status: -1, code: nil, message: "Bad URL")
         }
@@ -1108,11 +1114,13 @@ struct ApiClient {
             // reason Android's is: the mailbox and the account routes now
             // verify the same token, so exempting mail would keep an expired
             // session alive behind a screen that cannot load.
-            if http.statusCode == 401, bearer != nil, !path.contains("/auth/refresh") {
-                if !retried, let renewed = await Self.renewPair() {
+            if http.statusCode == 401, let bearer, !path.contains("/auth/refresh"),
+               await MainActor.run(body: { SessionStore.generation == generation }) {
+                if !retried, let renewed = await Self.renewPair(),
+                   await MainActor.run(body: { SessionStore.generation == generation }) {
                     return try await request(path, method: method, body: body, bearer: renewed, retried: true)
                 }
-                Self.signalUnauthorized()
+                Self.signalUnauthorized(rejectedBearer: bearer)
             }
             let carrier = try? decoder.decode(ErrorCarrier.self, from: data)
             throw ApiError.http(
@@ -1399,7 +1407,7 @@ struct ApiClient {
         guard let http = response as? HTTPURLResponse else {
             throw ApiError.http(status: -1, code: nil, message: "No response")
         }
-        if http.statusCode == 401 { signalUnauthorized() }
+        if http.statusCode == 401 { signalUnauthorized(rejectedBearer: bearer) }
         return (data, http)
     }
 

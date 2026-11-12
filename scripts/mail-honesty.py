@@ -900,7 +900,7 @@ pin("iOS's mail routes end no account session on a 401",
     "signalUnauthorized" not in code_only(SW_API))
 pin("iOS signals a dead session on every authenticated 401",
     "!path.hasPrefix(mailBase)" not in code_only(ios("APIClient.swift"))
-    and "signalUnauthorized()" in code_only(ios("APIClient.swift")))
+    and "signalUnauthorized(rejectedBearer: bearer)" in code_only(ios("APIClient.swift")))
 pin("Android signals a dead session on every authenticated 401",
     "!isMailCall" not in code_only(KT_API)
     and 'removePrefix("Bearer ")' in code_only(KT_API)
