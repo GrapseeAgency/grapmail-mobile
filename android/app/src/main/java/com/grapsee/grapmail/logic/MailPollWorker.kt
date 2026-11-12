@@ -45,6 +45,7 @@ class MailPollWorker(
         /** One unique schedule, named once: the app enqueues it and the system
          *  keeps exactly one of it across launches and reboots. */
         const val NAME = "grapmail-mail-poll"
+        const val PUSH_NAME = "grapmail-push-refresh"
         /** The logcat tag the CI walk greps. Named here so the walk and the
          *  worker cannot drift apart without the pin noticing. */
         const val LOG_TAG = "GrapMailPoll"
@@ -56,13 +57,15 @@ class MailPollWorker(
     }
 
     override suspend fun doWork(): Result {
-        val token = SessionStore.token(applicationContext)
-        if (token == null) {
+        val session = SessionStore.snapshot(applicationContext)
+        if (session == null) {
             report("silent signed-out")
             return Result.success()
         }
+        val token = session.token
         val stats = runCatching { Api.mailStats(token) }
             .onFailure { error ->
+                if (error is kotlinx.coroutines.CancellationException) throw error
                 // The status is the server's answer, not something this file
                 // invented: a refused read is the branch a person would call
                 // "the app stopped telling me", and it is also the branch that
@@ -74,6 +77,10 @@ class MailPollWorker(
             // person never asked for: the next scheduled run asks again, and
             // nothing is announced meanwhile.
             .getOrNull() ?: return Result.success()
+        if (SessionStore.snapshot(applicationContext)?.id != session.id) {
+            report("silent session changed")
+            return Result.success()
+        }
         val unread = stats.inbox?.unread
         if (unread == null) {
             report("silent no-inbox-count")

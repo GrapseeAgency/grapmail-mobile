@@ -85,7 +85,10 @@ final class NetworkMonitor: ObservableObject {
     func start() {
         monitor.pathUpdateHandler = { [weak self] path in
             let available = path.status == .satisfied
-            Task { @MainActor in self?.online = available }
+            Task { @MainActor in
+                guard let self, self.online != available else { return }
+                self.online = available
+            }
         }
         monitor.start(queue: queue)
     }
@@ -133,11 +136,17 @@ enum MailPoll {
     static let refreshIdentifier = "com.grapsee.grapmail.inbox-refresh"
     private static let lastSeenKey = "grapmail.poll.lastUnread"
     static let channelName = "New mail"
+    @MainActor private static var activeGeneration: UUID?
 
     @MainActor
     static func runOnce() async -> Bool {
         guard let token = SessionStore.token else { return false }
         let generation = SessionStore.generation
+        guard activeGeneration != generation else { return false }
+        activeGeneration = generation
+        defer {
+            if activeGeneration == generation { activeGeneration = nil }
+        }
         let unread: Int?
         do {
             unread = try await ApiClient.mailStats(token).inbox?.unread

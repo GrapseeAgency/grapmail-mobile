@@ -1,6 +1,7 @@
 package com.grapsee.grapmail.logic
 
 import android.content.Context
+import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import com.google.firebase.FirebaseApp
@@ -54,7 +55,11 @@ class PushService : FirebaseMessagingService() {
         // The same refresh the poll does: the worker reads /stats, compares
         // with what this device last saw and announces a real difference.
         // Nothing here trusts the push as mailbox data.
-        WorkManager.getInstance(context).enqueue(OneTimeWorkRequestBuilder<MailPollWorker>().build())
+        WorkManager.getInstance(context).enqueueUniqueWork(
+            MailPollWorker.PUSH_NAME,
+            ExistingWorkPolicy.KEEP,
+            OneTimeWorkRequestBuilder<MailPollWorker>().build(),
+        )
     }
 }
 
