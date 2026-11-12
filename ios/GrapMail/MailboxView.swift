@@ -322,6 +322,7 @@ struct MailboxView: View {
                     onStar: { vm.actOn(row.id, row.isStarred ? .unstar : .star) }
                 )
                 .listRowInsets(EdgeInsets())
+                .listRowBackground(GM.bg)
                 .listRowSeparator(.hidden)
                 // Swipe files, and only in the directions that mean something
                 // where the message already is. Same two directions and same two

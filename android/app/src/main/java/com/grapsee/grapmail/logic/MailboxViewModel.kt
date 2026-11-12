@@ -485,8 +485,9 @@ class MailboxViewModel @JvmOverloads constructor(
                     // knows, so nothing here raises an error; a cancelled one is
                     // rethrown like the outer call's.
                     try {
-                        MailStore.putStats(Api.mailStats(t))
-                        reproject()
+                        val stats = Api.mailStats(t)
+                        MailStore.putStats(stats)
+                        _state.update { it.withFolderCounts(stats) }
                     } catch (e: kotlinx.coroutines.CancellationException) {
                         throw e
                     } catch (e: Exception) {
@@ -563,15 +564,22 @@ class MailboxViewModel @JvmOverloads constructor(
         }
 
         val stats = runCatching { MailStore.stats() }.getOrNull()
-        _state.update { it.copy(
-            rows = rows,
-            total = total,
-            loaded = cache?.messages?.size ?: it.loaded,
-            pages = cache?.pages ?: it.pages,
-            // The scope the sheet prints: how many loaded rows the filters ran
-            // over BEFORE filtering, so "12 of 40" cannot be read as the
-            // server's answer about the whole box.
-            advScope = cache?.messages?.size ?: it.loaded,
+        _state.update {
+            if (it.box != s.box || it.query.trim().takeIf { term -> term.length >= 3 } !=
+                s.query.trim().takeIf { term -> term.length >= 3 } ||
+                it.filter != s.filter || it.sort != s.sort) return@update it
+            it.copy(
+                rows = rows,
+                total = total,
+                loaded = cache?.messages?.size ?: it.loaded,
+                pages = cache?.pages ?: it.pages,
+                advScope = cache?.messages?.size ?: it.loaded,
+            ).withFolderCounts(stats)
+        }
+    }
+
+    private fun MailboxUiState.withFolderCounts(stats: com.grapsee.grapmail.data.MailStatsResponse?) =
+        copy(
             // Each stays null when the server did not answer it. A null draws no
             // badge; a 0 would claim an empty folder.
             unreadCount = stats?.inbox?.unread,
@@ -583,8 +591,7 @@ class MailboxViewModel @JvmOverloads constructor(
             statsArchive = stats?.archive,
             statsOthers = stats?.others,
             statsSnoozed = stats?.snoozed,
-        ) }
-    }
+        )
 
     // ── selection ────────────────────────────────────────────────────────────
 

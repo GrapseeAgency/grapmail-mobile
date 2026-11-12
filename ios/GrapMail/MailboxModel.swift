@@ -382,7 +382,10 @@ final class MailboxModel: ObservableObject {
                    let stats = try? await ApiClient.mailStats(token),
                    !Task.isCancelled, sessionIsLive {
                     await MailStore.shared.putStats(stats)
-                    self.reproject()
+                    guard !Task.isCancelled, sessionIsLive else { return }
+                    var updated = self.state
+                    self.applyFolderCounts(stats, to: &updated)
+                    self.state = updated
                 }
             } catch {
                 // A superseded read says nothing. `load()` cancels the previous task
@@ -505,19 +508,21 @@ final class MailboxModel: ObservableObject {
             // over BEFORE filtering, so "12 of 40" cannot be read as the
             // server's answer about the whole box.
             updated.advScope = cache?.messages.count ?? updated.loaded
-            // Each stays nil when the server did not answer it. A nil draws no
-            // badge; a 0 would claim an empty folder.
-            updated.unreadCount = stats?.inbox?.unread
-            updated.statsSent = stats?.sent
-            updated.statsDrafts = stats?.drafts
-            updated.statsSpam = stats?.spam
-            updated.statsTrash = stats?.trash
-            updated.statsStarred = stats?.starred
-            updated.statsArchive = stats?.archive
-            updated.statsOthers = stats?.others
-            updated.statsSnoozed = stats?.snoozed
+            self.applyFolderCounts(stats, to: &updated)
             self.state = updated
         }
+    }
+
+    private func applyFolderCounts(_ stats: MailStatsResponse?, to state: inout State) {
+        state.unreadCount = stats?.inbox?.unread
+        state.statsSent = stats?.sent
+        state.statsDrafts = stats?.drafts
+        state.statsSpam = stats?.spam
+        state.statsTrash = stats?.trash
+        state.statsStarred = stats?.starred
+        state.statsArchive = stats?.archive
+        state.statsOthers = stats?.others
+        state.statsSnoozed = stats?.snoozed
     }
 
     /// How many rows the chosen sort actually re-ordered. The sort sheet prints
