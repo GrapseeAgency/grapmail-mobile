@@ -3027,9 +3027,14 @@ pin("the iOS app icon points at a file that exists",
     and (ICON_SET / "AppIcon-1024.png").exists()
     and (ICON_SET / "AppIcon-1024.png").stat().st_size > 4096)
 
-pin("the iOS launch screen is branded, not the system default",
-    "UILaunchScreen:" in YML and "UIImageName: LaunchBrand" in YML
-    and "UIColorName: LaunchBackground" in YML
+IOS_LAUNCH = (ROOT / "ios/GrapMail/LaunchScreen.storyboard").read_text(encoding="utf-8")
+pin("the iOS launch storyboard shows the icon and Grapsee",
+    "UILaunchStoryboardName: LaunchScreen" in YML
+    and 'launchScreen="YES"' in IOS_LAUNCH
+    and 'image="LaunchBrand"' in IOS_LAUNCH
+    and 'text="Grapsee"' in IOS_LAUNCH
+    and 'key="backgroundColor" name="LaunchBackground"' in IOS_LAUNCH
+    and not (ROOT / "ios/GrapMail/LaunchSplashView.swift").exists()
     and (ROOT / "ios/GrapMail/Assets.xcassets/LaunchBrand.imageset/LaunchBrand.png").exists()
     and (ROOT / "ios/GrapMail/Assets.xcassets/LaunchBackground.colorset/Contents.json").exists()
     and "INFOPLIST_KEY_UILaunchScreen_Generation" not in YML)
@@ -3047,6 +3052,10 @@ pin("Android's splash theme is installed before the window content exists",
     # rather than crashing the gate — a Python ValueError here would abort the
     # run before any other pin reported, which is how a section goes quiet.
     and splash_before_super(code_only(KT_MAIN))
+    and 'android:windowSplashScreenBrandingImage">@drawable/grapsee_splash_branding' in
+        (ROOT / "android/app/src/main/res/values-v31/splash.xml").read_text(encoding="utf-8")
+    and (ROOT / "android/app/src/main/res/drawable/grapsee_splash_branding.xml").is_file()
+    and "LaunchSplash" not in code_only(KT_MAIN)
     # The theme the manifest points at is what the system draws the splash
     # from; installing the library under a theme that does not declare it shows
     # the blank window and nothing says so.

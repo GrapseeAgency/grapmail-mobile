@@ -356,7 +356,7 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
         // previous one. Restore-at-launch is covered by the reconcile above.
         sessionChangeObserver = NotificationCenter.default.addObserver(
             forName: .gmSessionChanged, object: nil, queue: .main) { _ in
-            Task { @MainActor in NotificationRegistration.shared.reconcile() }
+            Task { @MainActor in await NotificationRegistration.shared.reconcile() }
         }
         // A shortcut that cold-starts the app arrives here, before any view is
         // alive to route it, so it is parked and RootView picks it up.

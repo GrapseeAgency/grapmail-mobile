@@ -25,10 +25,11 @@
         Theme.GrapMail, and `windowSplashScreenAnimatedIcon` lets the system
         animate the icon out rather than cutting it.
     -->
-    <style name="Theme.GrapMail.Splash" parent="Theme.SplashScreen">
+    <style name="Theme.GrapMail.Splash.Base" parent="Theme.SplashScreen">
         <item name="windowSplashScreenBackground">@color/ic_launcher_background</item>
         <item name="windowSplashScreenAnimatedIcon">@mipmap/ic_launcher</item>
         <item name="windowSplashScreenAnimationDuration">300</item>
         <item name="postSplashScreenTheme">@style/Theme.GrapMail</item>
     </style>
+    <style name="Theme.GrapMail.Splash" parent="Theme.GrapMail.Splash.Base" />
 </resources>

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.GrapMail.Splash" parent="Theme.GrapMail.Splash.Base">
+        <item name="android:windowSplashScreenBrandingImage">@drawable/grapsee_splash_branding</item>
+    </style>
+</resources>

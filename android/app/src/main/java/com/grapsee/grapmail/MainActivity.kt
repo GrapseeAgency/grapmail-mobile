@@ -181,27 +181,6 @@ class MainActivity : ComponentActivity() {
                             onComposeRequestConsumed = { composeRequest.value = false },
                         )
                     }
-
-                    // The launch splash: the new mark and the brand's nine-slice
-                    // "Grapsee" shimmer, once per process, while the session
-                    // restores underneath. The navigation is composed the whole
-                    // time — the splash only delays what the person sees first.
-                    var splashVisible by androidx.compose.runtime.remember {
-                        androidx.compose.runtime.mutableStateOf(!LaunchGate.shown)
-                    }
-                    if (splashVisible) LaunchGate.shown = true
-                    androidx.compose.animation.AnimatedVisibility(
-                        visible = splashVisible,
-                        enter = androidx.compose.animation.EnterTransition.None,
-                        exit = androidx.compose.animation.fadeOut(
-                            androidx.compose.animation.core.tween(420),
-                        ),
-                        modifier = Modifier.fillMaxSize(),
-                    ) {
-                        com.grapsee.grapmail.ui.screens.LaunchSplash(
-                            onFinished = { splashVisible = false },
-                        )
-                    }
                 }
             }
         }
@@ -225,12 +204,6 @@ class MainActivity : ComponentActivity() {
          *  the manifest's intent filter and here. */
         const val COMPOSE_ACTION = "com.grapsee.grapmail.COMPOSE"
     }
-}
-
-/** Once-per-process gate for the launch splash: a night-mode recreation must
- *  not replay a two-second animation the person already saw this session. */
-object LaunchGate {
-    var shown: Boolean = false
 }
 
 object Routes {

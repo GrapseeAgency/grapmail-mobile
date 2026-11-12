@@ -1399,7 +1399,7 @@ extension ApiClient {
     /// reader falls back to (the stripped-text branch it always had).
     static func mailBody(token: String, id: String, allowImages: Bool) async throws -> MailBodyResponse {
         let query = allowImages ? "?images=1" : ""
-        try await mailGet("/message/\(id.percentEncodedPath())/body\(query)", bearer: token)
+        return try await mailGet("/message/\(id.percentEncodedPath())/body\(query)", bearer: token)
     }
 
     /// `PATCH /message/:id/:action` — path-carried action. Only `snooze` reads a
