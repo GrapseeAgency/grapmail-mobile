@@ -17,6 +17,11 @@ class GrapMailApp : Application() {
         // application context for the token authenticator, which rotates the
         // gateway pair from an OkHttp thread when a call 401s.
         com.grapsee.grapmail.data.Api.init(this)
+        // Offline boot: reload the last session's mailbox snapshot off disk so
+        // the first frame of a cold open shows mail instead of a spinner. The
+        // network refresh still runs on top of it; the snapshot only decides
+        // what the first paint holds.
+        com.grapsee.grapmail.data.MailStore.initDisk(this)
         // The channel exists before anything can post to it. Creating it here
         // rather than at first notify means a notification raised by a process
         // the person never opened — the poll, woken by the system — is not

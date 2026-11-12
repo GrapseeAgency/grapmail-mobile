@@ -1,7 +1,14 @@
 package com.grapsee.grapmail.data
 
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
 
 /**
  * The mailbox's process-lifetime cache: the last page of each box, the last
@@ -28,6 +35,7 @@ import kotlinx.coroutines.sync.withLock
 object MailStore {
 
     /** One box's loaded pages, in arrival order, oldest page first. */
+    @Serializable
     data class PageCache(
         val messages: List<MailMessageDto> = emptyList(),
         val total: Int = 0,
@@ -42,6 +50,115 @@ object MailStore {
 
     private val mutex = Mutex()
     private const val MAX_CACHED_SEARCHES = 8
+
+    // ── disk snapshot: offline boot ─────────────────────────────────────────
+    //
+    // The store above is process-lifetime, which made a cold app open a blank
+    // screen until the network answered — on a distant server that is seconds
+    // of nothing, twice a day, forever. This snapshot writes the same state to
+    // one file (atomic rename, debounced bursts) and reloads it at boot, so
+    // the first frame of a cold open is the mail that was on screen when the
+    // process died. The network still runs after it; the snapshot only decides
+    // what the FIRST paint shows, and every refetch rule that guards staleness
+    // (reuseRecentFolder, refreshOnResume) keeps working on top of it.
+    //
+    // Bodies are deliberately not persisted: they are payload-heavy, they
+    // warm through prefetch the moment a page lands, and a snapshot that grew
+    // unbounded would outlive its welcome on a 32GB device.
+
+    private const val SNAPSHOT_VERSION = 1
+
+    @Serializable
+    private data class DiskSnapshot(
+        val version: Int,
+        val pages: Map<String, PageCache>,
+        val stats: MailStatsResponse? = null,
+        val labels: List<MailLabelDto>? = null,
+        val aliases: List<MailAliasDto>? = null,
+        val me: MailMeResponse? = null,
+        val assignments: Map<String, Set<String>>? = null,
+    )
+
+    private const val SNAPSHOT_FILE = "mailbox-snapshot.json"
+    private val snapshotJson = Json { ignoreUnknownKeys = true }
+    private val snapshotScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    @Volatile private var snapshotWriteScheduled = false
+    @Volatile private var appContext: android.content.Context? = null
+
+    /**
+     * Called once from the Application at process start, before any screen.
+     * Loads the previous session's snapshot into memory so the first mailbox
+     * frame has mail on it. Only an EMPTY store accepts a snapshot: this runs
+     * before any network write could have landed, so anything already in
+     * memory is by definition fresher than the file.
+     */
+    fun initDisk(app: android.content.Context) {
+        if (appContext != null) return
+        appContext = app.applicationContext
+        snapshotScope.launch {
+            val ctx = appContext ?: return@launch
+            val text = try {
+                java.io.File(ctx.filesDir, SNAPSHOT_FILE).takeIf { it.exists() }?.readText()
+            } catch (_: Exception) { null } ?: return@launch
+            val snap = try {
+                snapshotJson.decodeFromString(DiskSnapshot.serializer(), text)
+            } catch (_: Exception) { null } ?: return@launch
+            if (snap.version != SNAPSHOT_VERSION) return@launch
+            mutex.withLock {
+                if (pages.isEmpty() && stats == null && me == null && assignments == null) {
+                    pages = snap.pages
+                    stats = snap.stats
+                    labels = snap.labels
+                    aliases = snap.aliases
+                    me = snap.me
+                    assignments = snap.assignments
+                }
+            }
+        }
+    }
+
+    /**
+     * Coalesce write bursts: a page load touches putPage + putStats + putMe;
+     * one write 1.5s after the burst settles is one disk tick, not three.
+     */
+    private fun scheduleSnapshotWrite() {
+        if (snapshotWriteScheduled) return
+        snapshotWriteScheduled = true
+        snapshotScope.launch {
+            delay(1_500)
+            snapshotWriteScheduled = false
+            writeSnapshotNow()
+        }
+    }
+
+    private suspend fun writeSnapshotNow() {
+        val ctx = appContext ?: return
+        mutex.withLock {
+            val snap = DiskSnapshot(
+                version = SNAPSHOT_VERSION,
+                pages = pages,
+                stats = stats,
+                labels = labels,
+                aliases = aliases,
+                me = me,
+                assignments = assignments,
+            )
+            try {
+                // Atomic by rename: a process death mid-write leaves the
+                // previous snapshot intact rather than a truncated file.
+                val tmp = java.io.File(ctx.filesDir, "$SNAPSHOT_FILE.tmp")
+                tmp.writeText(snapshotJson.encodeToString(DiskSnapshot.serializer(), snap))
+                val dst = java.io.File(ctx.filesDir, SNAPSHOT_FILE)
+                if (!tmp.renameTo(dst)) {
+                    dst.writeText(tmp.readText())
+                    tmp.delete()
+                }
+            } catch (_: Exception) {
+                // The snapshot is a boost, never a duty: a failed write costs
+                // one cold boot its warm start, and nothing else.
+            }
+        }
+    }
 
     private var pages: Map<String, PageCache> = emptyMap()
     private var stats: MailStatsResponse? = null
@@ -103,19 +220,19 @@ object MailStore {
                 if (oldSearches.isNotEmpty()) pages = pages - oldSearches.map { it.key }.toSet()
             }
             merged.size > (prior?.messages?.size ?: 0)
-        }
+        }.also { scheduleSnapshotWrite() }
 
     suspend fun stats(): MailStatsResponse? = mutex.withLock { stats }
-    suspend fun putStats(v: MailStatsResponse) = mutex.withLock { stats = v }
+    suspend fun putStats(v: MailStatsResponse) = mutex.withLock { stats = v }.also { scheduleSnapshotWrite() }
 
     suspend fun labels(): List<MailLabelDto>? = mutex.withLock { labels }
-    suspend fun putLabels(v: List<MailLabelDto>) = mutex.withLock { labels = v }
+    suspend fun putLabels(v: List<MailLabelDto>) = mutex.withLock { labels = v }.also { scheduleSnapshotWrite() }
 
     suspend fun aliases(): List<MailAliasDto>? = mutex.withLock { aliases }
-    suspend fun putAliases(v: List<MailAliasDto>) = mutex.withLock { aliases = v }
+    suspend fun putAliases(v: List<MailAliasDto>) = mutex.withLock { aliases = v }.also { scheduleSnapshotWrite() }
 
     suspend fun me(): MailMeResponse? = mutex.withLock { me }
-    suspend fun putMe(v: MailMeResponse) = mutex.withLock { me = v }
+    suspend fun putMe(v: MailMeResponse) = mutex.withLock { me = v }.also { scheduleSnapshotWrite() }
 
     /** Null until the first successful `GET /labels/assignments`. */
     suspend fun assignments(): Map<String, Set<String>>? = mutex.withLock { assignments }
@@ -132,7 +249,7 @@ object MailStore {
             }
         }
         assignments = built.toMap()
-    }
+    }.also { scheduleSnapshotWrite() }
 
     /**
      * Patch one pair after a write the server accepted.
@@ -148,20 +265,20 @@ object MailStore {
         val next = cur.toMutableMap()
         next[messageId] = (next[messageId] ?: emptySet()) + labelId
         assignments = next
-    }
+    }.also { scheduleSnapshotWrite() }
 
     suspend fun markUnassigned(messageId: String, labelId: String) = mutex.withLock {
         val cur = assignments ?: return@withLock
         val next = cur.toMutableMap()
         next[messageId] = (next[messageId] ?: emptySet()) - labelId
         assignments = next
-    }
+    }.also { scheduleSnapshotWrite() }
 
     /** Drop a message's pairs when the message itself goes away, so a permanent
      *  delete cannot leave a ghost label keyed on an id nothing has any more. */
     suspend fun forgetAssignments(messageId: String) = mutex.withLock {
         assignments = assignments?.minus(messageId)
-    }
+    }.also { scheduleSnapshotWrite() }
 
     /** Opened bodies, memoised by id. A body is fetched once: the list payload
      *  has none, and re-reading a payload to redraw a row is the over-fetch the
@@ -254,7 +371,7 @@ object MailStore {
                 messages = cache.messages.toMutableList().apply { this[index] = updated },
             )
         }
-    }
+    }.also { scheduleSnapshotWrite() }
 
     /** Drop a message from the cached pages after it has been filed elsewhere.
      *  The box it moved *to* is invalidated rather than inserted into, because
@@ -266,17 +383,17 @@ object MailStore {
                 messages = cache.messages.toMutableList().apply { removeAt(index) },
             )
         }
-    }
+    }.also { scheduleSnapshotWrite() }
 
     /** Forget one box so the next visit refetches it. Used after filing, where
      *  the destination's contents genuinely changed. */
     suspend fun invalidate(box: MailBox) = mutex.withLock {
         pages = pages.filterKeys { !it.startsWith(box.apiValue + "|") }
-    }
+    }.also { scheduleSnapshotWrite() }
 
     suspend fun invalidateAllBoxes() = mutex.withLock {
         pages = emptyMap()
-    }
+    }.also { scheduleSnapshotWrite() }
 
     suspend fun clear() = mutex.withLock {
         // Takes the same lock every mutator takes. It did not: `clear()` was a
@@ -296,5 +413,11 @@ object MailStore {
         // Back to null, not to an empty map: the next account has not been asked
         // anything, and an empty map would claim its mail carries no labels.
         assignments = null
+        // The snapshot dies with the session: a cached mailbox on disk is the
+        // same cross-account leak the in-memory clear exists to prevent — the
+        // first thing the next account on this device would see.
+        appContext?.let {
+            try { java.io.File(it.filesDir, SNAPSHOT_FILE).delete() } catch (_: Exception) {}
+        }
     }
 }

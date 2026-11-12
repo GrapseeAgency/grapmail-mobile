@@ -1360,6 +1360,10 @@ class MailboxViewModel @JvmOverloads constructor(
          *  one updates that row. */
         val draftId: String = "",
         val sending: Boolean = false,
+        /** The undo-send window: the message is held on-device for five
+         *  seconds after Send, with Undo offered the whole time. Nothing is
+         *  on the wire and nothing claims sent during it. */
+        val pendingSend: Boolean = false,
         /** The server's own verdict, shown verbatim. Never a local "Sent". */
         val result: String? = null,
         val resultStatus: String? = null,
@@ -1590,9 +1594,28 @@ class MailboxViewModel @JvmOverloads constructor(
      * and saying otherwise is the exact dishonesty the send-status test exists to
      * pin.
      */
+    // ── undo send ────────────────────────────────────────────────────────────
+    //
+    // The reference's signature safety net, and the one guarantee a mail app
+    // can make that nothing else can: for five seconds after Send the message
+    // exists ONLY on this device. Nothing is on the wire, nothing is claimed
+    // sent, and the composer offers Undo the whole time. Undo restores the
+    // text exactly as Send left it; the window's end fires the real send, and
+    // only the server's own answer produces a receipt.
+
+    private data class HeldSend(
+        val to: String, val cc: String, val bcc: String,
+        val subject: String, val body: String, val inReplyTo: String?,
+        val draftId: String, val e2eEnvelope: String?, val attachmentIds: List<String>,
+        val generation: Long,
+    )
+
+    private var undoSendJob: kotlinx.coroutines.Job? = null
+    private var heldSend: HeldSend? = null
+
     fun send(e2eEnvelope: String? = null, attachmentIds: List<String> = emptyList()) {
         val s = _compose.value
-        if (s.sending || s.accepted) return
+        if (s.sending || s.accepted || s.pendingSend) return
         // An empty To is refused here, not by the server: a message with no
         // recipient is not a send, and a receipt naming the server's 422 after
         // the person pressed Send twice is worse than a button that says why
@@ -1601,46 +1624,85 @@ class MailboxViewModel @JvmOverloads constructor(
             _compose.update { it.copy(error = "Add at least one recipient in To.") }
             return
         }
-        val generation = composeGeneration
+        val held = HeldSend(
+            to = s.to, cc = s.cc, bcc = s.bcc, subject = s.subject, body = s.body,
+            inReplyTo = s.inReplyTo, draftId = _compose.value.draftId,
+            e2eEnvelope = e2eEnvelope, attachmentIds = attachmentIds,
+            generation = composeGeneration,
+        )
+        heldSend = held
+        stopAutosaveDebounce()
+        // sending stays FALSE through the window: no network call is in
+        // flight, and the composer's own text is left untouched so Undo hands
+        // back exactly what the person wrote.
+        _compose.update { it.copy(pendingSend = true, error = null, result = null, resultStatus = null) }
+        undoSendJob?.cancel()
+        undoSendJob = viewModelScope.launch {
+            kotlinx.coroutines.delay(5_000)
+            executeSend(held)
+        }
+    }
+
+    /** The undo-send window's tap. Cancels the held send before it touches the
+     *  network; the composer text was never cleared, so this hands back the
+     *  message exactly as Send received it — editable, re-sendable. */
+    fun undoSend() {
+        undoSendJob?.cancel()
+        undoSendJob = null
+        heldSend = null
+        _compose.update { it.copy(pendingSend = false) }
+        GMHaptics.marking()
+    }
+
+    private fun executeSend(held: HeldSend) {
+        if (held.generation != composeGeneration) return
+        heldSend = null
+        undoSendJob = null
         val pending = stopAutosaveDebounce()
-        _compose.update { it.copy(sending = true, error = null, result = null, resultStatus = null) }
+        _compose.update { it.copy(pendingSend = false, sending = true, error = null, result = null, resultStatus = null) }
         viewModelScope.launch {
             pending?.join()
-            if (generation != composeGeneration) return@launch
-            val draftId = _compose.value.draftId
+            // No generation gate here on purpose: once the window expired
+            // without Undo, the send is owed — a composer the person closed
+            // in the meantime must not swallow the mail. Only the UI updates
+            // below are generation-gated.
+            val draftId = held.draftId
             val t = token() ?: run {
-                if (generation == composeGeneration) _compose.update { it.copy(sending = false, error = "Sign in again.") }
+                if (held.generation == composeGeneration) _compose.update { it.copy(sending = false, error = "Sign in again.") }
                 return@launch
             }
-            if (generation != composeGeneration) return@launch
             // The envelope goes on the wire as the JSON OBJECT the route
             // parses — a string is silently dropped by sanitiseE2eEnvelope
             // and the sealed send would then 400 on its deliberate empty
             // body. Unparseable text refuses the send whole: the alternative
             // reading of "no envelope" would send the plaintext the envelope
             // exists to keep private.
-            val envelope = e2eEnvelope?.let {
+            val envelope = held.e2eEnvelope?.let {
                 try { Json.parseToJsonElement(it).jsonObject }
                 catch (e: Exception) {
                     _compose.update { s -> s.copy(sending = false, error = "The encrypted envelope could not be prepared — nothing was sent.") }
                     null
                 }
             }
-            if (e2eEnvelope != null && envelope == null) return@launch
+            if (held.e2eEnvelope != null && envelope == null) return@launch
             runCatching {
                 Api.mailSend(t, MailSendRequest(
-                    to = splitAddresses(s.to), cc = splitAddresses(s.cc),
-                    bcc = splitAddresses(s.bcc), subject = s.subject,
+                    to = splitAddresses(held.to), cc = splitAddresses(held.cc),
+                    bcc = splitAddresses(held.bcc), subject = held.subject,
                     // With an envelope the plaintext does not travel: the
                     // route stores its notice in place of a body, and a
                     // client that sent both would leak exactly what the
                     // envelope exists to keep private.
-                    bodyText = if (envelope != null) "" else s.body,
-                    inReplyTo = s.inReplyTo,
+                    bodyText = if (envelope != null) "" else held.body,
+                    inReplyTo = held.inReplyTo,
                     e2eEnvelope = envelope,
-                    attachmentIds = attachmentIds,
+                    attachmentIds = held.attachmentIds,
                 ))
             }.onSuccess { r ->
+                val generation = held.generation
+                if (generation == composeGeneration) _compose.update { it.copy(sending = false,
+                    result = r.message ?: r.error, resultStatus = r.status,
+                    error = r.deliveryError ?: r.error) }
                 if (generation == composeGeneration) _compose.update { it.copy(sending = false,
                     result = r.message ?: r.error, resultStatus = r.status,
                     error = r.deliveryError ?: r.error) }
@@ -1681,7 +1743,7 @@ class MailboxViewModel @JvmOverloads constructor(
                 if (sent) GMHaptics.success() else GMHaptics.failure()
             }.onFailure { e ->
                 if (e is kotlinx.coroutines.CancellationException) throw e
-                if (generation != composeGeneration) return@onFailure
+                if (held.generation != composeGeneration) return@onFailure
                 _compose.update { it.copy(sending = false,
                     error = e.message ?: "The message could not be sent.") }
                 GMHaptics.failure()

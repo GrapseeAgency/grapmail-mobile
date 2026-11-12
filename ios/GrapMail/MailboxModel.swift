@@ -159,6 +159,10 @@ final class MailboxModel: ObservableObject {
         /// one updates that row.
         var draftId = ""
         var sending = false
+        /// The undo-send window: the message is held on-device for five
+        /// seconds after Send, with Undo offered the whole time. Nothing is
+        /// on the wire and nothing claims sent during it.
+        var pendingSend = false
         /// The server's own verdict, shown verbatim. Never a local "Sent".
         var result: String?
         var resultStatus: String?
@@ -1868,8 +1872,26 @@ final class MailboxModel: ObservableObject {
     /// pin. With an envelope, the server stores its notice in place of the body:
     /// `bodyText` goes empty, because a sealed message's plaintext never
     /// travels — that is the whole claim the encrypt row makes.
+    // ── undo send ────────────────────────────────────────────────────────────
+    //
+    // The reference's signature safety net. For five seconds after Send the
+    // message exists ONLY on this device: nothing is on the wire, nothing is
+    // claimed sent, and the composer offers Undo the whole time. Undo hands
+    // back the text exactly as Send received it; the window's end fires the
+    // real send, and only the server's own answer produces a receipt.
+
+    private struct HeldSend {
+        let token: String
+        let request: MailSendRequest
+        let draftId: String
+        let generation: Int
+    }
+
+    private var pendingSendTask: Task<Void, Never>?
+    private var heldSend: HeldSend?
+
     func send(e2eEnvelope: String? = nil, attachmentIds: [String] = []) {
-        guard let token, !compose.sending, !compose.accepted else { return }
+        guard let token, !compose.sending, !compose.accepted, !compose.pendingSend else { return }
         // An empty To is refused here, not by the server: a message with no
         // recipient is not a send, and a receipt naming the server's 422 after
         // the person pressed Send twice is worse than a button that says why
@@ -1878,19 +1900,12 @@ final class MailboxModel: ObservableObject {
             compose.error = "Add at least one recipient in To."
             return
         }
-        compose.sending = true
-        compose.error = nil
-        compose.result = nil
-        compose.resultStatus = nil
-        // The envelope goes on the wire as the JSON OBJECT the route parses —
-        // a string is silently dropped by sanitiseE2eEnvelope and the sealed
-        // send would then 400 on its deliberate empty body (and worse: any
-        // "fallback" to plaintext here would leak exactly what the envelope
-        // exists to keep private). Unparseable text refuses the send whole.
+        // The envelope is validated NOW, not at the end of the window: an
+        // unprepareable seal refuses the send whole, five seconds early, while
+        // the composer still holds everything the person wrote.
         var envelopeJson: RawJSON? = nil
         if let env = e2eEnvelope {
             guard let parsed = RawJSON(object: env) else {
-                compose.sending = false
                 compose.error = "The encrypted envelope could not be prepared — nothing was sent."
                 return
             }
@@ -1901,14 +1916,60 @@ final class MailboxModel: ObservableObject {
             bcc: Self.splitAddresses(compose.bcc), subject: compose.subject,
             bodyText: envelopeJson == nil ? compose.body : "",
             inReplyTo: compose.inReplyTo, e2eEnvelope: envelopeJson, attachmentIds: attachmentIds)
-        let generation = composeGeneration
+        let held = HeldSend(
+            token: token, request: req, draftId: compose.draftId,
+            generation: composeGeneration,
+        )
+        heldSend = held
+        stopAutosaveDebounce()
+        // sending stays FALSE through the window: no network call is in
+        // flight, and the composer text is left untouched so Undo hands back
+        // exactly what the person wrote.
+        compose.pendingSend = true
+        compose.error = nil
+        compose.result = nil
+        compose.resultStatus = nil
+        pendingSendTask?.cancel()
+        pendingSendTask = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: 5_000_000_000)
+            guard let self, !Task.isCancelled else { return }
+            await MainActor.run { self.executeSend(held) }
+        }
+    }
+
+    /// The undo-send window's tap. Cancels the held send before it touches the
+    /// network; the composer text was never cleared, so this hands back the
+    /// message exactly as Send received it — editable, re-sendable.
+    func undoSend() {
+        pendingSendTask?.cancel()
+        pendingSendTask = nil
+        heldSend = nil
+        compose.pendingSend = false
+        GMHaptics.marking()
+    }
+
+    private func executeSend(_ held: HeldSend) {
+        guard !Task.isCancelled, held.generation == composeGeneration, sessionIsLive else { return }
+        heldSend = nil
+        pendingSendTask = nil
+        let generation = held.generation
+        let token = held.token
         let pending = stopAutosaveDebounce()
+        compose.pendingSend = false
+        compose.sending = true
+        compose.error = nil
+        compose.result = nil
+        compose.resultStatus = nil
         Task { [weak self] in
             await pending?.value
-            guard let self, self.composeGeneration == generation, self.sessionIsLive else { return }
-            let draft = self.compose.draftId
+            // No generation gate here on purpose: once the window expired
+            // without Undo, the send is owed — a composer the person closed
+            // in the meantime must not swallow the mail. Only the UI updates
+            // below are generation-gated.
+            guard let self, self.sessionIsLive else { return }
+            let draft = held.draftId
             do {
-                let r = try await ApiClient.mailSend(token: token, req)
+                let r = try await ApiClient.mailSend(token: token, held.request)
                 guard self.sessionIsLive else { return }
                 let sent = r.status == "sent" || r.status == "queued" || r.status == "delivered"
                 if self.composeGeneration == generation {

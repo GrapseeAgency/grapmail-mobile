@@ -863,6 +863,28 @@ struct ComposeView: View {
             .accessibilityIdentifier("mail-send")
         }
         .padding(.horizontal, 12).padding(.vertical, 10)
+        // The undo-send window: the message is held on this device for five
+        // seconds, and this bar is its whole story — nothing has been sent,
+        // nothing is claimed sent, and the word names exactly what the tap
+        // does. After the window the normal send flow takes over and the
+        // server's own answer becomes the receipt.
+        if vm.compose.pendingSend {
+            HStack {
+                Text("Sending…")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(.white)
+                Spacer()
+                Button { vm.undoSend() } label: {
+                    Text("Undo")
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundColor(.white)
+                }
+                .accessibilityIdentifier("mail-undo-send")
+            }
+            .padding(.horizontal, 14).padding(.vertical, 10)
+            .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(GM.primarySolid))
+            .padding(.horizontal, 12).padding(.vertical, 6)
+        }
     }
 
     @ViewBuilder private var fields: some View {
@@ -1045,7 +1067,7 @@ struct ComposeView: View {
     /// message half built is the failure mode this gate exists to stop.
     /// Mirror of Android's compose send-icon logic.
     private var sendEnabled: Bool {
-        !vm.compose.sending && !vm.compose.accepted && !preparingSend && !uploading
+        !vm.compose.sending && !vm.compose.accepted && !vm.compose.pendingSend && !preparingSend && !uploading
     }
 
     private func saveDraft(onSaved: @escaping () -> Void = {}) {

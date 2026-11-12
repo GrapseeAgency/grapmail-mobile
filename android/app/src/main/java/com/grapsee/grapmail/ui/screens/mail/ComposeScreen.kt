@@ -240,9 +240,31 @@ fun ComposeScreen(
             }
         }
     }
-    val sendEnabled = !state.sending && !state.accepted && !preparingSend && !uploading
+    val sendEnabled = !state.sending && !state.accepted && !preparingSend && !uploading && !state.pendingSend
 
     Column(Modifier.fillMaxSize().background(palette.bg).statusBarsPadding().imePadding()) {
+        // The undo-send window: the message is held on this device for five
+        // seconds, and this bar is its whole story — nothing has been sent,
+        // nothing is claimed sent, and the word names exactly what the tap
+        // does. After the window the normal send flow takes over and the
+        // server's own answer becomes the receipt.
+        if (state.pendingSend) {
+            Row(
+                Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)
+                    .clip(RoundedCornerShape(10.dp)).background(palette.primarySolid)
+                    .padding(horizontal = 14.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text("Sending…", fontSize = 14.sp, fontWeight = FontWeight.SemiBold,
+                    color = palette.onPrimary, modifier = Modifier.weight(1f))
+                Text(
+                    "Undo",
+                    fontSize = 14.sp, fontWeight = FontWeight.Bold, color = palette.onPrimary,
+                    modifier = Modifier.clip(CircleShape).clickable { vm.undoSend() }
+                        .padding(horizontal = 8.dp, vertical = 4.dp).testTag("mail-undo-send"),
+                )
+            }
+        }
         Row(
             Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
