@@ -458,6 +458,7 @@ final class MailboxModel: ObservableObject {
                 updated.staleError = nil
                 self.state = updated
                 if replace, term == nil { self.refreshCounts(token, force: forceCounts) }
+                if replace { self.prefetchBodies() }
             } catch {
                 // A superseded read says nothing. `load()` cancels the previous task
                 // on every call, so a box switch or one keystroke past the debounce
@@ -1585,6 +1586,31 @@ final class MailboxModel: ObservableObject {
         cache.totalCostLimit = 8 * 1024 * 1024
         return cache
     }()
+
+    private var prefetchTask: Task<Void, Never>?
+
+    /// The first screen's bodies, fetched before anyone taps a row.
+    ///
+    /// A reader open used to pay one round trip for the formatted body on every
+    /// message — dead air a mail app does not need, because the rows a person
+    /// is most likely to open are knowable the moment the page lands. This
+    /// fills the same cache `loadBody` reads, with the same images-blocked
+    /// render the reader defaults to, so the first open is a cache hit and the
+    /// round trip happens while the list is being read. Sequential: the server
+    /// rate-limits bursts, and the point is warmth, not speed of warmth.
+    private func prefetchBodies() {
+        guard !snapshotSeeded, prefetchTask == nil, let token else { return }
+        let ids = state.rows.prefix(6).map(\.id)
+        guard !ids.isEmpty else { return }
+        prefetchTask = Task { [weak self] in
+            defer { self?.prefetchTask = nil }
+            for id in ids {
+                guard let self, !Task.isCancelled, self.sessionIsLive else { return }
+                if self.formattedBodyCache.object(forKey: id as NSString) != nil { continue }
+                _ = try? await self.loadBody(id, allowImages: false)
+            }
+        }
+    }
 
     func loadBody(_ messageId: String, allowImages: Bool) async throws -> BodyRender {
         if snapshotSeeded { return mailSnapshotBodyRender(id: messageId) }

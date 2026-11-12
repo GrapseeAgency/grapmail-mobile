@@ -559,6 +559,7 @@ class MailboxViewModel @JvmOverloads constructor(
                     staleError = null, appendError = null, endOfPages = !addedRows,
                     settleGeneration = it.settleGeneration + 1) }
                 if (replace && term == null) refreshCounts(session, force = forceCounts)
+                if (replace) prefetchVisibleBodies()
             } catch (e: kotlinx.coroutines.CancellationException) {
                 throw e            // superseded: the read that replaced this one reports
             } catch (e: Exception) {
@@ -1940,6 +1941,41 @@ class MailboxViewModel @JvmOverloads constructor(
      *  the images-off render the body endpoint would have answered. */
     fun seedBodyForSnapshot(messageId: String, render: BodyRender) {
         snapshotBodies[messageId] = render
+    }
+
+    private var prefetchJob: Job? = null
+
+    /**
+     * The first screen's bodies, fetched before anyone taps a row.
+     *
+     * A reader open used to pay one round trip for the formatted body on every
+     * message — dead air a mail app does not need, because the rows a person is
+     * most likely to open are knowable the moment the page lands. This fills
+     * the same cache [loadBody] reads, with the same images-blocked render the
+     * reader defaults to, so the first open is a cache hit and the round trip
+     * happens while the list is being read. Sequential, not parallel: a burst
+     * of body reads is exactly what the server rate-limits, and the point is
+     * warmth, not speed of warmth.
+     */
+    private fun prefetchVisibleBodies() {
+        if (snapshotMode) return
+        val ids = _state.value.rows.take(6).map { it.id }
+        if (ids.isEmpty() || prefetchJob?.isActive == true) return
+        prefetchJob = viewModelScope.launch {
+            for (id in ids) {
+                ensureActive()
+                if (formattedBodyCache.get(id) != null) continue
+                try {
+                    loadBody(id, allowImages = false)
+                } catch (e: kotlinx.coroutines.CancellationException) {
+                    throw e
+                } catch (_: Exception) {
+                    // A body that will not prefetch now loads on tap, exactly as
+                    // it always has. The list does not wait for this.
+                    break
+                }
+            }
+        }
     }
 
     suspend fun loadBody(messageId: String, allowImages: Boolean): BodyRender {
