@@ -49,6 +49,7 @@ import com.grapsee.grapmail.ui.theme.LocalPalette
 private class HtmlFeedState {
     var html: String? = null
     var allowImages: Boolean? = null
+    var measurement: Runnable? = null
 }
 
 private fun hex(c: androidx.compose.ui.graphics.Color): String =
@@ -94,6 +95,12 @@ internal fun HtmlMailBody(
     // without a second finish event.
     var contentHeightDp by remember { mutableFloatStateOf(0f) }
     val feed = remember { HtmlFeedState() }
+    val measureHeight = remember {
+        { view: WebView -> Runnable {
+            val height = view.contentHeight.toFloat()
+            if (height > 0f && height != contentHeightDp) contentHeightDp = height
+        } }
+    }
 
     AndroidView(
         modifier = modifier
@@ -139,8 +146,11 @@ internal fun HtmlMailBody(
 
                     override fun onPageFinished(view: WebView?, url: String?) {
                         view ?: return
-                        view.postDelayed({ contentHeightDp = view.contentHeight.toFloat() }, 60)
-                        view.postDelayed({ contentHeightDp = view.contentHeight.toFloat() }, 650)
+                        feed.measurement?.let { view.removeCallbacks(it) }
+                        val measure = measureHeight(view)
+                        feed.measurement = measure
+                        view.postDelayed(measure, 60)
+                        if (feed.allowImages == true) view.postDelayed(measure, 650)
                     }
                 }
             }
@@ -149,6 +159,7 @@ internal fun HtmlMailBody(
             // Re-feed only on a real change: update runs on every recomposition,
             // and loadHTML-style reloads would restart rendering mid-scroll.
             if (feed.html != html || feed.allowImages != allowImages) {
+                feed.measurement?.let { webView.removeCallbacks(it) }
                 feed.html = html
                 feed.allowImages = allowImages
                 webView.settings.blockNetworkImage = !allowImages
@@ -167,6 +178,13 @@ internal fun HtmlMailBody(
                     null,
                 )
             }
+        },
+        onRelease = { webView ->
+            feed.measurement?.let { webView.removeCallbacks(it) }
+            feed.measurement = null
+            webView.stopLoading()
+            webView.webViewClient = WebViewClient()
+            webView.destroy()
         },
     )
 }

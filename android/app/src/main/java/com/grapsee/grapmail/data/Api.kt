@@ -11,6 +11,8 @@ import kotlinx.serialization.json.JsonObject
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.Call
 import okhttp3.Callback
+import okhttp3.Authenticator
+import okhttp3.Dispatcher
 import okhttp3.MultipartBody
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -672,9 +674,9 @@ object Api {
             val original = runBlocking { SessionStore.snapshot(ctx) } ?: return@authenticator null
             val rejected = response.request.header("Authorization")?.removePrefix("Bearer ")
             if (original.token != rejected) return@authenticator null
-            if (!runBlocking { SessionRefresh.refresh(ctx, rejected) }) return@authenticator null
+            val refreshed = runBlocking { SessionRefresh.refresh(ctx, rejected) }
             val renewed = runBlocking { SessionStore.snapshot(ctx) } ?: return@authenticator null
-            if (renewed.id != original.id) return@authenticator null
+            if (renewed.id != original.id || (!refreshed && renewed.token == rejected)) return@authenticator null
             response.request.newBuilder().header("Authorization", "Bearer ${renewed.token}").build()
         }
         .connectTimeout(15, TimeUnit.SECONDS)
@@ -682,9 +684,15 @@ object Api {
         .writeTimeout(20, TimeUnit.SECONDS)
         .build()
 
-    private suspend fun execute(request: Request): Pair<Int, String> =
+    // An authenticator can occupy all of the normal client's per-host slots.
+    // Token rotation needs its own dispatcher so it can finish those calls.
+    private val refreshClient by lazy {
+        client.newBuilder().dispatcher(Dispatcher()).authenticator(Authenticator.NONE).build()
+    }
+
+    private suspend fun execute(request: Request, httpClient: OkHttpClient = client): Pair<Int, String> =
         suspendCancellableCoroutine { continuation ->
-            val call = client.newCall(request)
+            val call = httpClient.newCall(request)
             continuation.invokeOnCancellation { call.cancel() }
             call.enqueue(object : Callback {
                 override fun onFailure(call: Call, e: IOException) {
@@ -806,7 +814,7 @@ object Api {
             .header("x-device-id", DeviceId.value)
             .post(postBody(json.encodeToString(RefreshRequest.serializer(), RefreshRequest(refreshToken))))
             .build()
-        val (status, body) = execute(request)
+        val (status, body) = execute(request, refreshClient)
         if (status >= 400) fail(status, body)
         return json.decodeFromString<SignInResponse>(body)
     }

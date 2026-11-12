@@ -55,33 +55,47 @@ struct MailHtmlBodyView: UIViewRepresentable {
         if context.coordinator.loadedHtml != html || context.coordinator.loadedAllow != allowImages {
             context.coordinator.loadedHtml = html
             context.coordinator.loadedAllow = allowImages
-            webView.loadHTMLString(mailDocument(html: html), baseURL: nil)
+            context.coordinator.navigation = webView.loadHTMLString(mailDocument(html: html), baseURL: nil)
         }
+    }
+
+    static func dismantleUIView(_ webView: WKWebView, coordinator: Coordinator) {
+        coordinator.navigation = nil
+        webView.navigationDelegate = nil
+        webView.stopLoading()
     }
 
     final class Coordinator: NSObject, WKNavigationDelegate {
         var parent: MailHtmlBodyView
         var loadedHtml: String?
         var loadedAllow: Bool?
+        var navigation: WKNavigation?
 
         init(_ parent: MailHtmlBodyView) { self.parent = parent }
 
-        private func measure(_ webView: WKWebView) {
+        private func measure(_ webView: WKWebView, navigation: WKNavigation) {
+            guard self.navigation === navigation else { return }
             webView.evaluateJavaScript(
                 "Math.max(document.documentElement.scrollHeight, document.body ? document.body.scrollHeight : 0)",
-            ) { value, _ in
+            ) { [weak self] value, _ in
                 if let height = value as? CGFloat, height > 0 {
-                    DispatchQueue.main.async { self.parent.contentHeight = height }
+                    DispatchQueue.main.async {
+                        guard let self, self.navigation === navigation,
+                              self.parent.contentHeight != height else { return }
+                        self.parent.contentHeight = height
+                    }
                 }
             }
         }
 
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
-            measure(webView)
+            guard let navigation, self.navigation === navigation else { return }
+            measure(webView, navigation: navigation)
             // Images land after the document does; one more measure after a
             // beat catches the growth without polling.
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.65) { [weak webView] in
-                if let webView { self.measure(webView) }
+            guard loadedAllow == true else { return }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.65) { [weak self, weak webView] in
+                if let webView { self?.measure(webView, navigation: navigation) }
             }
         }
 
