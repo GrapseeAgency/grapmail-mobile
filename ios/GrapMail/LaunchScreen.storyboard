@@ -1,39 +1,41 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<document type="com.apple.InterfaceBuilder3.CocoaTouch.Storyboard.XIB" version="3.0" targetRuntime="iOS.CocoaTouch" useAutolayout="YES" launchScreen="YES" useTraitCollections="YES" useSafeAreas="YES" initialViewController="launch-controller">
+<document type="com.apple.InterfaceBuilder3.CocoaTouch.Storyboard.XIB" version="3.0" targetRuntime="iOS.CocoaTouch" useAutolayout="YES" launchScreen="YES" useTraitCollections="YES" useSafeAreas="YES" initialViewController="GM2-Ls-002">
     <dependencies>
+        <deployment identifier="iOS"/>
         <plugIn identifier="com.apple.InterfaceBuilder.IBCocoaTouchPlugin" version="21507"/>
         <capability name="Safe area layout guides" minToolsVersion="9.0"/>
         <capability name="Named colors" minToolsVersion="9.0"/>
+        <capability name="documents saved in the Xcode 8 format" minToolsVersion="8.0"/>
     </dependencies>
     <scenes>
-        <scene sceneID="launch-scene">
+        <scene sceneID="GM1-Ls-001">
             <objects>
-                <viewController id="launch-controller" sceneMemberID="viewController">
-                    <view key="view" contentMode="scaleToFill" id="launch-view">
+                <viewController id="GM2-Ls-002" sceneMemberID="viewController">
+                    <view key="view" contentMode="scaleToFill" id="GM3-Ls-003">
                         <rect key="frame" x="0.0" y="0.0" width="390" height="844"/>
                         <subviews>
-                            <imageView userInteractionEnabled="NO" contentMode="scaleAspectFit" image="GrapMailLogo" translatesAutoresizingMaskIntoConstraints="NO" id="launch-icon">
+                            <imageView userInteractionEnabled="NO" contentMode="scaleAspectFit" image="GrapMailLogo" translatesAutoresizingMaskIntoConstraints="NO" id="GM4-Ls-004">
                                 <constraints>
-                                    <constraint firstAttribute="width" constant="56" id="icon-width"/>
-                                    <constraint firstAttribute="height" constant="56" id="icon-height"/>
+                                    <constraint firstAttribute="width" constant="56" id="GM5-Ls-005"/>
+                                    <constraint firstAttribute="height" constant="56" id="GM6-Ls-006"/>
                                 </constraints>
                             </imageView>
-                            <label opaque="NO" userInteractionEnabled="NO" text="Grapsee" textAlignment="center" translatesAutoresizingMaskIntoConstraints="NO" id="launch-wordmark">
+                            <label opaque="NO" userInteractionEnabled="NO" text="Grapsee" textAlignment="center" translatesAutoresizingMaskIntoConstraints="NO" id="GM7-Ls-007">
                                 <fontDescription key="fontDescription" type="boldSystem" pointSize="12"/>
                                 <color key="textColor" white="1" alpha="1" colorSpace="custom" customColorSpace="genericGamma22GrayColorSpace"/>
                             </label>
                         </subviews>
-                        <viewLayoutGuide key="safeArea" id="launch-safe-area"/>
+                        <viewLayoutGuide key="safeArea" id="GM8-Ls-008"/>
                         <color key="backgroundColor" name="LaunchBackground"/>
                         <constraints>
-                            <constraint firstItem="launch-icon" firstAttribute="centerX" secondItem="launch-view" secondAttribute="centerX" id="icon-center-x"/>
-                            <constraint firstItem="launch-icon" firstAttribute="centerY" secondItem="launch-view" secondAttribute="centerY" id="icon-center-y"/>
-                            <constraint firstItem="launch-wordmark" firstAttribute="centerX" secondItem="launch-view" secondAttribute="centerX" id="wordmark-center-x"/>
-                            <constraint firstItem="launch-safe-area" firstAttribute="bottom" secondItem="launch-wordmark" secondAttribute="bottom" constant="24" id="wordmark-bottom"/>
+                            <constraint firstItem="GM4-Ls-004" firstAttribute="centerX" secondItem="GM3-Ls-003" secondAttribute="centerX" id="GM9-Ls-009"/>
+                            <constraint firstItem="GM4-Ls-004" firstAttribute="centerY" secondItem="GM3-Ls-003" secondAttribute="centerY" id="GMa-Ls-010"/>
+                            <constraint firstItem="GM7-Ls-007" firstAttribute="centerX" secondItem="GM3-Ls-003" secondAttribute="centerX" id="GMb-Ls-011"/>
+                            <constraint firstItem="GM8-Ls-008" firstAttribute="bottom" secondItem="GM7-Ls-007" secondAttribute="bottom" constant="24" id="GMc-Ls-012"/>
                         </constraints>
                     </view>
                 </viewController>
-                <placeholder placeholderIdentifier="IBFirstResponder" id="launch-first-responder" sceneMemberID="firstResponder"/>
+                <placeholder placeholderIdentifier="IBFirstResponder" id="GMd-Ls-013" sceneMemberID="firstResponder"/>
             </objects>
         </scene>
     </scenes>

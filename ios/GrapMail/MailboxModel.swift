@@ -464,25 +464,30 @@ final class MailboxModel: ObservableObject {
             }
 
             let stats = await MailStore.shared.stats()
-            self.state.rows = rows
-            self.state.total = total
-            self.state.loaded = cache?.messages.count ?? self.state.loaded
-            self.state.pages = cache?.pages ?? self.state.pages
+            guard self.state.box == box,
+                  self.state.query.trimmingCharacters(in: .whitespaces)
+                    .nilIfBlank().flatMap({ $0.count >= 3 ? $0 : nil }) == term else { return }
+            var updated = self.state
+            updated.rows = rows
+            updated.total = total
+            updated.loaded = cache?.messages.count ?? updated.loaded
+            updated.pages = cache?.pages ?? updated.pages
             // The scope the sheet prints: how many loaded rows the filters ran
             // over BEFORE filtering, so "12 of 40" cannot be read as the
             // server's answer about the whole box.
-            self.state.advScope = cache?.messages.count ?? self.state.loaded
+            updated.advScope = cache?.messages.count ?? updated.loaded
             // Each stays nil when the server did not answer it. A nil draws no
             // badge; a 0 would claim an empty folder.
-            self.state.unreadCount = stats?.inbox?.unread
-            self.state.statsSent = stats?.sent
-            self.state.statsDrafts = stats?.drafts
-            self.state.statsSpam = stats?.spam
-            self.state.statsTrash = stats?.trash
-            self.state.statsStarred = stats?.starred
-            self.state.statsArchive = stats?.archive
-            self.state.statsOthers = stats?.others
-            self.state.statsSnoozed = stats?.snoozed
+            updated.unreadCount = stats?.inbox?.unread
+            updated.statsSent = stats?.sent
+            updated.statsDrafts = stats?.drafts
+            updated.statsSpam = stats?.spam
+            updated.statsTrash = stats?.trash
+            updated.statsStarred = stats?.starred
+            updated.statsArchive = stats?.archive
+            updated.statsOthers = stats?.others
+            updated.statsSnoozed = stats?.snoozed
+            self.state = updated
         }
     }
 
