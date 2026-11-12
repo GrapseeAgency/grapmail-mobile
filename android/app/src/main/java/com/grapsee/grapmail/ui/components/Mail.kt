@@ -54,6 +54,7 @@ import com.grapsee.grapmail.ui.theme.GrapMailAvatarRampDark
 import com.grapsee.grapmail.ui.theme.GrapMailAvatarRampLight
 import com.grapsee.grapmail.ui.theme.LocalPalette
 import java.text.SimpleDateFormat
+import java.util.TimeZone
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
@@ -308,25 +309,36 @@ fun mailTime(iso: String?, now: Date = Date()): String? {
     val today = Calendar.getInstance().apply { time = now }
     val sameYear = then.get(Calendar.YEAR) == today.get(Calendar.YEAR)
     val sameDay = sameYear && then.get(Calendar.DAY_OF_YEAR) == today.get(Calendar.DAY_OF_YEAR)
-    if (sameDay) return SimpleDateFormat("h:mm a", Locale.US).format(Date(millis))
+    if (sameDay) return mailDateFormatter("h:mm a").format(Date(millis))
     val yesterday = (today.clone() as Calendar).apply { add(Calendar.DAY_OF_YEAR, -1) }
-    if (sameYear && then.get(Calendar.DAY_OF_YEAR) == yesterday.get(Calendar.DAY_OF_YEAR))
+    if (then.get(Calendar.YEAR) == yesterday.get(Calendar.YEAR) &&
+        then.get(Calendar.DAY_OF_YEAR) == yesterday.get(Calendar.DAY_OF_YEAR))
         return "Yesterday"
     if (then.get(Calendar.YEAR) == today.get(Calendar.YEAR))
-        return SimpleDateFormat("MMM d", Locale.US).format(Date(millis))
-    return SimpleDateFormat("MMM d, yyyy", Locale.US).format(Date(millis))
+        return mailDateFormatter("MMM d").format(Date(millis))
+    return mailDateFormatter("MMM d, yyyy").format(Date(millis))
 }
+
+private val mailDateFormatters = ThreadLocal.withInitial { mutableMapOf<String, SimpleDateFormat>() }
+
+private fun mailDateFormatter(pattern: String): SimpleDateFormat =
+    mailDateFormatters.get()!!.getOrPut(pattern) {
+        SimpleDateFormat(pattern, Locale.US).apply { isLenient = true }
+    }.apply {
+        timeZone = TimeZone.getDefault()
+    }
+
+private val mailDatePatterns = listOf(
+    "yyyy-MM-dd'T'HH:mm:ss.SSSXXX", "yyyy-MM-dd'T'HH:mm:ssXXX",
+    "yyyy-MM-dd'T'HH:mm:ss'Z'", "yyyy-MM-dd'T'HH:mm:ssZ", "yyyy-MM-dd HH:mm:ss",
+)
 
 /** ISO-8601 with or without fractional seconds and zone; null if unparseable. */
 private fun parseMailIso(iso: String?): Long? {
     if (iso.isNullOrBlank()) return null
-    val patterns = listOf(
-        "yyyy-MM-dd'T'HH:mm:ss.SSSXXX", "yyyy-MM-dd'T'HH:mm:ssXXX",
-        "yyyy-MM-dd'T'HH:mm:ss'Z'", "yyyy-MM-dd'T'HH:mm:ssZ", "yyyy-MM-dd HH:mm:ss",
-    )
-    for (p in patterns) {
+    for (p in mailDatePatterns) {
         runCatching {
-            SimpleDateFormat(p, Locale.US).apply { isLenient = true }.parse(iso)?.time
+            mailDateFormatter(p).parse(iso)?.time
         }.getOrNull()?.let { return it }
     }
     return null
@@ -342,7 +354,7 @@ private fun parseMailIso(iso: String?): Long? {
  */
 fun absoluteDateTimeOrRaw(iso: String): String {
     val millis = parseMailIso(iso) ?: return iso
-    return SimpleDateFormat("EEEE, MMMM d, yyyy · h:mm a", Locale.US).format(Date(millis))
+    return mailDateFormatter("EEEE, MMMM d, yyyy · h:mm a").format(Date(millis))
 }
 
 // ── the row ──────────────────────────────────────────────────────────────────

@@ -149,29 +149,37 @@ enum MailTime {
         return fmt("EEEE, MMMM d, yyyy 'at' h:mm a", date)
     }
 
-    private static func parse(_ iso: String?) -> Date? {
-        guard let iso, !iso.isEmpty else { return nil }
-        for pattern in [
+    private static let parsers = [
             "yyyy-MM-dd'T'HH:mm:ss.SSSZZZZZ", "yyyy-MM-dd'T'HH:mm:ssZZZZZ",
             "yyyy-MM-dd'T'HH:mm:ss'Z'", "yyyy-MM-dd'T'HH:mm:ssZ",
             "yyyy-MM-dd HH:mm:ss",
-        ] {
-            let f = DateFormatter()
-            f.locale = Locale(identifier: "en_US")
-            f.dateFormat = pattern
-            f.isLenient = true
-            if let d = f.date(from: iso) { return d }
+    ].map { makeFormatter($0, lenient: true) }
+
+    private static let formatters = Dictionary(uniqueKeysWithValues: [
+        "h:mm a", "MMM d", "MMM d, yyyy", "EEEE, MMMM d, yyyy 'at' h:mm a",
+    ].map { ($0, makeFormatter($0)) })
+
+    private static func parse(_ iso: String?) -> Date? {
+        guard let iso, !iso.isEmpty else { return nil }
+        for parser in parsers {
+            if let d = parser.date(from: iso) { return d }
         }
         let iso8601 = ISO8601DateFormatter()
         iso8601.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
         return iso8601.date(from: iso) ?? ISO8601DateFormatter().date(from: iso)
     }
 
-    private static func fmt(_ pattern: String, _ date: Date) -> String {
+    private static func makeFormatter(_ pattern: String, lenient: Bool = false) -> DateFormatter {
         let f = DateFormatter()
         f.locale = Locale(identifier: "en_US")
         f.dateFormat = pattern
-        return f.string(from: date)
+        f.timeZone = .autoupdatingCurrent
+        f.isLenient = lenient
+        return f
+    }
+
+    private static func fmt(_ pattern: String, _ date: Date) -> String {
+        (formatters[pattern] ?? makeFormatter(pattern)).string(from: date)
     }
 }
 
