@@ -299,7 +299,7 @@ final class MailboxModel: ObservableObject {
         updated.fatal = nil
         updated.staleError = nil
         state = updated
-        load(replace: true)
+        load(replace: true, reuseRecentFolder: true)
     }
 
     /// Fetch the current box when it has never been fetched. The home screen's
@@ -334,7 +334,7 @@ final class MailboxModel: ObservableObject {
 
     /// Load a page. `replace` restarts the box (refresh, new search, new box);
     /// otherwise the page is appended, which is what makes scrolling cheap.
-    func load(replace: Bool = true) {
+    func load(replace: Bool = true, reuseRecentFolder: Bool = false) {
         loadTask?.cancel()
         loadTask = Task { [weak self] in
             guard let self else { return }
@@ -365,10 +365,15 @@ final class MailboxModel: ObservableObject {
 
             do {
                 if replace, self.state.rows.isEmpty,
-                   await MailStore.shared.page(box, term) != nil,
+                   let cached = await MailStore.shared.page(box, term),
                    !Task.isCancelled, sessionIsLive {
                     self.reproject()
                     self.state.loading = false
+                    let age = Date().timeIntervalSince(cached.loadedAt)
+                    if reuseRecentFolder, term == nil, (0...15).contains(age) {
+                        self.state.settleGeneration += 1
+                        return
+                    }
                 }
                 guard !Task.isCancelled else { return }
                 let resp = try await ApiClient.mailInbox(
@@ -543,33 +548,20 @@ final class MailboxModel: ObservableObject {
 
     // ── identity ─────────────────────────────────────────────────────────────
 
-    /// The mailbox's own identity and its label strip. Idempotent: the home
-    /// screen calls it on entry, and a screen that re-enters on every return from
-    /// a thread must not re-read the same two documents each time.
+    /// The mailbox identity is shared by the account menu and compose.
     func loadAccount() {
         guard !snapshotSeeded, let token, !accountLoaded else { return }
         accountLoaded = true
         Task { [weak self] in
             guard let self else { return }
-            if let me = try? await ApiClient.mailMe(token) {
+            if let me = try? await ApiClient.mailMe(token), self.sessionIsLive {
                 await MailStore.shared.putMe(me)
-                self.state.accountName = me.name
-                self.state.accountAddress = me.address
-                self.state.accountStatus = me.status
-                self.state.memberSince = me.memberSince
-            }
-            // A refused label read is recorded rather than swallowed. `labels`
-            // staying empty is not evidence that the mailbox has no labels, and the
-            // Label sheet says "No labels yet" only when somebody actually answered.
-            do {
-                let labels = try await ApiClient.mailLabels(token)
-                guard sessionIsLive else { return }
-                await MailStore.shared.putLabels(labels.labels)
-                self.state.labels = labels.labels
-                self.state.labelsRead = .read
-                self.labelState.labels = labels.labels
-            } catch {
-                self.state.labelsRead = .failed
+                var updated = self.state
+                updated.accountName = me.name
+                updated.accountAddress = me.address
+                updated.accountStatus = me.status
+                updated.memberSince = me.memberSince
+                self.state = updated
             }
         }
     }
@@ -879,6 +871,7 @@ final class MailboxModel: ObservableObject {
     /// contain, and a sheet that re-read on every appearance inherits the hub's
     /// defect — a failed refresh presenting itself as a failed load.
     func ensureAssignments() {
+        if state.labelsRead != .read, !labelState.loading { refreshLabels() }
         // A note from the previous selection must not still be there when the sheet
         // opens for a different set of messages.
         state.labelNote = nil
@@ -1722,6 +1715,7 @@ final class MailboxModel: ObservableObject {
         // passes a file-count gate. Android models this with a constructor flag.
         guard !snapshotSeeded, let token else { return }
         labelState.loading = true
+        state.labelsRead = .reading
         Task { [weak self] in
             guard let self else { return }
             do {

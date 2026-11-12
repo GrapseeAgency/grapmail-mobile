@@ -1200,9 +1200,11 @@ internal fun AssignLabelContent(
         // mailbox with no labels, and "create one from the drawer" is advice to
         // act on. Same rule the sheet already applies to the assignment read.
         Text(
-            if (labelsRead == com.grapsee.grapmail.data.AssignmentsRead.Failed)
-                "Couldn't read your labels."
-            else "No labels yet. Create one from the drawer.",
+            when (labelsRead) {
+                com.grapsee.grapmail.data.AssignmentsRead.Failed -> "Couldn't read your labels."
+                com.grapsee.grapmail.data.AssignmentsRead.Read -> "No labels yet. Create one from the drawer."
+                else -> "Loading labels…"
+            },
             fontSize = 13.sp, color = palette.textSecondary,
             modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp))
     }

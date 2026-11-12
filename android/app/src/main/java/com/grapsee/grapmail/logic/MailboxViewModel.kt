@@ -370,21 +370,6 @@ class MailboxViewModel @JvmOverloads constructor(
         viewModelScope.launch {
             if (snapshotMode) return@launch
             val t = token() ?: return@launch
-            // The label strip is the reference's only backed substitute for the
-            // personal/work chips, so it loads with the list rather than waiting
-            // for the labels screen.
-            runCatching { Api.mailLabels(t) }
-                .onSuccess {
-                    MailStore.putLabels(it.labels)
-                    _state.update { s -> s.copy(labels = it.labels, labelsRead = AssignmentsRead.Read) }
-                }
-                // An empty label list and a refused label list are different facts.
-                // Without this the sheet says "No labels yet. Create one from the
-                // drawer." for a mailbox whose labels simply could not be read -- the
-                // same invented-negative the assignments read refuses to make.
-                .onFailure {
-                    _state.update { s -> s.copy(labelsRead = AssignmentsRead.Failed) }
-                }
             // `/me` answers with the mailbox's own name and address. A failure
             // here is not an error screen: the greeting falls back to no name,
             // which is honest, and the list is what matters.
@@ -409,7 +394,7 @@ class MailboxViewModel @JvmOverloads constructor(
         _state.update { it.copy(box = box, selection = emptySet(), rows = emptyList(),
             pages = 0, loaded = 0, total = 0, advScope = 0, loading = true,
             loadingMore = false, noMailbox = false, fatal = null, staleError = null) }
-        load(replace = true)
+        load(replace = true, reuseRecentFolder = true)
     }
 
     /// Fetch the current box when it has never been fetched. Called on entry to
@@ -457,7 +442,7 @@ class MailboxViewModel @JvmOverloads constructor(
      * Load a page. `replace` restarts the box (refresh, new search, new box);
      * otherwise the page is appended, which is what makes scrolling cheap.
      */
-    fun load(replace: Boolean = true) {
+    fun load(replace: Boolean = true, reuseRecentFolder: Boolean = false) {
         loadJob?.cancel()
         loadJob = viewModelScope.launch {
             val box = _state.value.box
@@ -485,9 +470,18 @@ class MailboxViewModel @JvmOverloads constructor(
             // Throwable. A box switch or a new search cancels the previous read,
             // which should leave error reporting to the request that replaced it.
             try {
-                if (replace && !_state.value.hasRows && MailStore.page(box, term) != null) {
-                    reproject()
-                    _state.update { it.copy(loading = false) }
+                if (replace && !_state.value.hasRows) {
+                    val cached = MailStore.page(box, term)
+                    if (cached != null) {
+                        reproject()
+                        val age = System.currentTimeMillis() - cached.loadedAtMillis
+                        if (reuseRecentFolder && term == null && age in 0L..15_000L) {
+                            _state.update { it.copy(loading = false,
+                                settleGeneration = it.settleGeneration + 1) }
+                            return@launch
+                        }
+                        _state.update { it.copy(loading = false) }
+                    }
                 }
                 val resp = Api.mailInbox(t, box, page = page, q = term)
                 MailStore.putPage(box, term, resp, replace)
@@ -935,6 +929,7 @@ class MailboxViewModel @JvmOverloads constructor(
      * defect — a failed refresh that reads as a failed load.
      */
     fun ensureAssignments() {
+        if (_state.value.labelsRead != AssignmentsRead.Read && !_labels.value.loading) refreshLabels()
         // A note from the previous selection must not be sitting there when the
         // sheet opens for a different set of messages.
         _state.update { it.copy(labelNote = null) }
@@ -1849,6 +1844,7 @@ class MailboxViewModel @JvmOverloads constructor(
             if (snapshotMode) return@launch
             val t = token() ?: return@launch
             _labels.update { it.copy(loading = true, error = null) }
+            _state.update { it.copy(labelsRead = AssignmentsRead.Reading) }
             runCatching { Api.mailLabels(t) }
                 .onSuccess {
                     MailStore.putLabels(it.labels)

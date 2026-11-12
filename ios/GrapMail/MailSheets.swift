@@ -177,9 +177,7 @@ struct AssignLabelSheet: View {
         VStack(alignment: .leading, spacing: 0) {
             SheetTitle(text: "Label")
             if labels.isEmpty {
-                Text(labelsRead == .failed
-                     ? "Couldn't read your labels."
-                     : "No labels yet. Create one from the drawer.")
+                Text(labelListStatus)
                     .font(.system(size: 13)).foregroundColor(GM.textSecondary)
                     .padding(.horizontal, 20).padding(.vertical, 10)
             }
@@ -205,6 +203,14 @@ struct AssignLabelSheet: View {
         }
         .padding(.bottom, 24)
         .accessibilityIdentifier("gm-sheets-label")
+    }
+
+    private var labelListStatus: String {
+        switch labelsRead {
+        case .failed: return "Couldn't read your labels."
+        case .read: return "No labels yet. Create one from the drawer."
+        default: return "Loading labels…"
+        }
     }
 
     private var explanation: String {
