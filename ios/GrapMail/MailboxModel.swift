@@ -1933,7 +1933,14 @@ final class MailboxModel: ObservableObject {
         pendingSendTask = Task { [weak self] in
             try? await Task.sleep(nanoseconds: 5_000_000_000)
             guard let self, !Task.isCancelled else { return }
-            await MainActor.run { self.executeSend(held) }
+            // In-flight autosave settles first, then the draft id is captured
+            // live — the receipt's cleanup targets the row that exists NOW.
+            let pending = self.stopAutosaveDebounce()
+            await pending?.value
+            let draft = self.compose.draftId
+            let refreshed = HeldSend(token: held.token, request: held.request,
+                                     draftId: draft, generation: held.generation)
+            await MainActor.run { self.executeSend(refreshed) }
         }
     }
 

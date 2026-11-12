@@ -1529,14 +1529,6 @@ data class MailSendRequest(
      */
     val e2eEnvelope: JsonObject? = null,
     val attachmentIds: List<String> = emptyList(),
-    /**
-     * Schedule the send for a future instant (ISO-8601). `grapmail.ts:888`
-     * `parseScheduledFor(body.sendAt)` validates it and the row is stored
-     * with status 'scheduled' — the worker promotes it to 'queued' when the
-     * time comes. Absent means send-now. The undo-send window does not
-     * apply to a scheduled send: scheduling IS the reconsider window.
-     */
-    val sendAt: String? = null,
 )
 
 /** One future send, as `GET /grapmail/scheduled` answers it. */

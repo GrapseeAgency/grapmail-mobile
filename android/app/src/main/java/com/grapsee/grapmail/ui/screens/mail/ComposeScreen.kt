@@ -242,35 +242,6 @@ fun ComposeScreen(
         }
     }
     val sendEnabled = !state.sending && !state.accepted && !preparingSend && !uploading && !state.pendingSend
-    var showSendLater by remember { mutableStateOf(false) }
-    if (showSendLater) {
-        androidx.compose.material3.AlertDialog(
-            onDismissRequest = { showSendLater = false },
-            title = { Text("Send later", fontSize = 17.sp, fontWeight = FontWeight.SemiBold) },
-            text = {
-                Column {
-                    vm.sendLaterPresets().forEach { (label, iso) ->
-                        Text(
-                            label, fontSize = 15.sp, color = palette.textPrimary,
-                            modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp))
-                                .clickable {
-                                    showSendLater = false
-                                    vm.scheduleSend(iso)
-                                }
-                                .padding(horizontal = 4.dp, vertical = 12.dp),
-                        )
-                    }
-                }
-            },
-            confirmButton = {},
-            dismissButton = {
-                androidx.compose.material3.TextButton(onClick = { showSendLater = false }) {
-                    Text("Cancel", color = palette.textSecondary)
-                }
-            },
-        )
-    }
-
     Column(Modifier.fillMaxSize().background(palette.bg).statusBarsPadding().imePadding()) {
         // The undo-send window: the message is held on this device for five
         // seconds, and this bar is its whole story — nothing has been sent,
@@ -308,18 +279,7 @@ fun ComposeScreen(
             Spacer(Modifier.width(12.dp))
             Text("Compose", fontSize = 17.sp, fontWeight = FontWeight.SemiBold, color = palette.textPrimary)
             Spacer(Modifier.weight(1f))
-            // Send later: the server holds the message with status 'scheduled'
-            // and the worker delivers it at the chosen instant — a contract the
-            // backend ships and this screen finally surfaces. Presets, not a
-            // picker: three honest instants beat a wheel nobody can proof.
-            androidx.compose.material3.Icon(
-                Icons.Rounded.Schedule, "Send later",
-                tint = palette.textSecondary,
-                modifier = Modifier.size(22.dp).clip(CircleShape)
-                    .clickable(enabled = sendEnabled, onClick = { showSendLater = true })
-                    .padding(2.dp).testTag("mail-send-later"),
-            )
-            Spacer(Modifier.width(10.dp))
+Spacer(Modifier.width(10.dp))
             Icon(Icons.Rounded.Send, "Send", tint = palette.primarySolid,
                 modifier = Modifier.size(22.dp).clip(CircleShape)
                     .clickable(enabled = sendEnabled, onClick = sendMessage)

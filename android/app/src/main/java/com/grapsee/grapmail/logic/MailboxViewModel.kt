@@ -1640,7 +1640,12 @@ class MailboxViewModel @JvmOverloads constructor(
         undoSendJob?.cancel()
         undoSendJob = viewModelScope.launch {
             kotlinx.coroutines.delay(5_000)
-            executeSend(held)
+            // In-flight autosave settles first, then the draft id is captured
+            // live — the receipt's cleanup targets the row that exists NOW.
+            val pending = stopAutosaveDebounce()
+            pending?.join()
+            val draftId = _compose.value.draftId
+            executeSend(held.copy(draftId = draftId))
         }
     }
 
@@ -1653,78 +1658,6 @@ class MailboxViewModel @JvmOverloads constructor(
         heldSend = null
         _compose.update { it.copy(pendingSend = false) }
         GMHaptics.marking()
-    }
-
-    // ── scheduled send ───────────────────────────────────────────────────────
-    //
-    // The server holds a send with status 'scheduled' and the worker delivers
-    // it at `sendAt` (grapmail-scheduled.ts). The undo window does not apply:
-    // choosing a future instant IS the reconsideration. The receipt names the
-    // instant — a send that has not happened yet may not read like one that
-    // has, and `status: 'scheduled'` is the server's own word for it.
-
-    fun scheduleSend(at: String) {
-        val s = _compose.value
-        if (s.sending || s.accepted || s.pendingSend) return
-        if (splitAddresses(s.to).isEmpty()) {
-            _compose.update { it.copy(error = "Add at least one recipient in To.") }
-            return
-        }
-        val generation = composeGeneration
-        val pending = stopAutosaveDebounce()
-        _compose.update { it.copy(sending = true, error = null, result = null, resultStatus = null) }
-        viewModelScope.launch {
-            pending?.join()
-            if (generation != composeGeneration) return@launch
-            val t = token() ?: run {
-                _compose.update { it.copy(sending = false, error = "Sign in again.") }
-                return@launch
-            }
-            runCatching {
-                Api.mailSend(t, MailSendRequest(
-                    to = splitAddresses(s.to), cc = splitAddresses(s.cc),
-                    bcc = splitAddresses(s.bcc), subject = s.subject,
-                    bodyText = s.body, inReplyTo = s.inReplyTo,
-                    sendAt = at,
-                ))
-            }.onSuccess { r ->
-                val scheduled = r.status == "scheduled"
-                val draftId = _compose.value.draftId
-                if (generation == composeGeneration) _compose.update { it.copy(sending = false,
-                    result = r.message ?: r.error, resultStatus = r.status,
-                    error = r.deliveryError ?: r.error) }
-                if (scheduled && draftId.isNotEmpty()) {
-                    // The scheduled message is not a draft anymore: the server
-                    // holds its own copy, so the local draft row would twin it.
-                    runCatching { Api.mailDeleteMessage(t, draftId) }.onFailure { }
-                    if (generation == composeGeneration) _compose.update { it.copy(draftId = "") }
-                    loadedBoxes.remove(MailBox.Drafts)
-                    MailStore.invalidate(MailBox.Drafts)
-                }
-                if (scheduled) GMHaptics.success() else GMHaptics.failure()
-            }.onFailure { e ->
-                if (e is kotlinx.coroutines.CancellationException) throw e
-                if (generation != composeGeneration) return@onFailure
-                _compose.update { it.copy(sending = false, error = e.message ?: "The message could not be scheduled.") }
-                GMHaptics.failure()
-            }
-        }
-    }
-
-    /** The compose screen's Send-later presets, computed fresh each open so a
-     *  "tomorrow 8:00" chosen at 23:00 means tomorrow, not today. */
-    fun sendLaterPresets(): List<Pair<String, String>> {
-        val zone = java.time.ZoneId.systemDefault()
-        val fmt = java.time.format.DateTimeFormatter.ISO_OFFSET_DATE_TIME
-        val tomorrow = java.time.LocalDate.now().plusDays(1)
-        var monday = tomorrow
-        while (monday.dayOfWeek != java.time.DayOfWeek.MONDAY) monday = monday.plusDays(1)
-        val mondayLabel = if (monday == tomorrow) "Monday 8:00" else "Next Monday 8:00"
-        return listOf(
-            "In 1 hour" to java.time.ZonedDateTime.now().plusHours(1).format(fmt),
-            "Tomorrow 8:00" to tomorrow.atTime(8, 0).atZone(zone).format(fmt),
-            mondayLabel to monday.atTime(8, 0).atZone(zone).format(fmt),
-        )
     }
 
     // ── scheduled send list ──────────────────────────────────────────────────
@@ -1791,6 +1724,7 @@ class MailboxViewModel @JvmOverloads constructor(
 
     private fun executeSend(held: HeldSend) {
         if (held.generation != composeGeneration) return
+        val s = held
         heldSend = null
         undoSendJob = null
         val pending = stopAutosaveDebounce()
@@ -1828,7 +1762,7 @@ class MailboxViewModel @JvmOverloads constructor(
                     // route stores its notice in place of a body, and a
                     // client that sent both would leak exactly what the
                     // envelope exists to keep private.
-                    bodyText = if (envelope != null) "" else held.body,
+                    bodyText = if (envelope != null) "" else s.body,
                     inReplyTo = held.inReplyTo,
                     e2eEnvelope = envelope,
                     attachmentIds = held.attachmentIds,
