@@ -216,6 +216,18 @@ final class MailboxModel: ObservableObject {
     /// egress discipline the list keeps — and a snapshot that seeded a body must
     /// not have it fetched away on appear.
     private var threadLoadedFor: String?
+    private var readerTask: Task<Void, Never>?
+    private var readerTarget: MailStep?
+
+    private func loadReader(_ id: String, isThread: Bool, read: @escaping @MainActor () async -> Void) {
+        if let target = readerTarget, target.id == id, target.isThread == isThread,
+           threadLoadedFor == id || thread.loading { return }
+        readerTask?.cancel()
+        readerTarget = MailStep(id: id, isThread: isThread)
+        threadLoadedFor = nil
+        thread = ThreadState(loading: true)
+        readerTask = Task { await read() }
+    }
     private var accountLoaded = false
 
     /// Test-only seam for the snapshot host. The mailbox's state is written by
@@ -1173,13 +1185,14 @@ final class MailboxModel: ObservableObject {
     /// Opening marks the message read server-side (`grapmail.ts:750-757`), so no
     /// second `read` action is sent: it would be redundant and would race the GET.
     func openThread(_ threadId: String) {
-        guard let token, threadLoadedFor != threadId else { return }
-        thread = ThreadState(loading: true)
-        Task { [weak self] in
+        guard let token, readerTarget != nil || threadLoadedFor != threadId else { return }
+        loadReader(threadId, isThread: true) { [weak self] in
             guard let self else { return }
             do {
                 let resp = try await ApiClient.mailThread(token: token, threadId: threadId)
-                for m in resp.messages { await MailStore.shared.putBody(m) }
+                guard !Task.isCancelled, self.sessionIsLive else { return }
+                await MailStore.shared.putBodies(resp.messages)
+                guard !Task.isCancelled, self.sessionIsLive else { return }
                 self.thread = ThreadState(messages: resp.messages)
                 self.threadLoadedFor = threadId
                 if let first = resp.messages.first {
@@ -1187,6 +1200,7 @@ final class MailboxModel: ObservableObject {
                 }
                 self.reproject()
             } catch {
+                guard !Task.isCancelled, self.sessionIsLive else { return }
                 self.thread = ThreadState(error: Self.describe(error))
             }
         }
@@ -1264,11 +1278,11 @@ final class MailboxModel: ObservableObject {
     }
 
     func openMessage(_ id: String) {
-        guard let token, threadLoadedFor != id else { return }
-        thread = ThreadState(loading: true)
-        Task { [weak self] in
+        guard let token, readerTarget != nil || threadLoadedFor != id else { return }
+        loadReader(id, isThread: false) { [weak self] in
             guard let self else { return }
             if let cached = await MailStore.shared.body(id) {
+                guard !Task.isCancelled, self.sessionIsLive else { return }
                 // Recorded on the hit as well as the fetch, because this field IS the
                 // memo: without it the guard above never fires and every return to an
                 // already-read message costs another actor hop. What is deliberately
@@ -1284,14 +1298,19 @@ final class MailboxModel: ObservableObject {
             }
             do {
                 let resp = try await ApiClient.mailMessage(token: token, id: id)
+                guard !Task.isCancelled, self.sessionIsLive else { return }
                 if let m = resp.message {
                     await MailStore.shared.putBody(m)
+                    guard !Task.isCancelled, self.sessionIsLive else { return }
                     self.threadLoadedFor = id
                     self.thread = ThreadState(messages: [m])
                     await MailStore.shared.patchFlags(id: m.id, read: true)
+                } else {
+                    self.thread = ThreadState(error: "This message could not be opened.")
                 }
                 self.reproject()
             } catch {
+                guard !Task.isCancelled, self.sessionIsLive else { return }
                 self.thread = ThreadState(error: Self.describe(error))
             }
         }
@@ -1380,6 +1399,7 @@ final class MailboxModel: ObservableObject {
     /// afternoon is ONE draft, not one draft per keystroke batch.
     private var autosaveTask: Task<Void, Never>?
     private var autosaveInFlight = false
+    private var autosaveNeedsFollowUp = false
 
     /// The rules the debounce obeys, each one a refusal rather than a feature:
     /// an EMPTY compose saves nothing (a person opening the composer and
@@ -1390,13 +1410,17 @@ final class MailboxModel: ObservableObject {
     private func scheduleAutosave() {
         let s = compose
         if s.sending { return }
+        if autosaveInFlight {
+            autosaveNeedsFollowUp = true
+            return
+        }
+        autosaveTask?.cancel()
         if s.to.trimmingCharacters(in: .whitespaces).isEmpty
             && s.cc.trimmingCharacters(in: .whitespaces).isEmpty
             && s.subject.trimmingCharacters(in: .whitespaces).isEmpty
             && s.body.trimmingCharacters(in: .whitespaces).isEmpty {
             return
         }
-        autosaveTask?.cancel()
         autosaveTask = Task { [weak self] in
             guard let self else { return }
             do {
@@ -1406,6 +1430,14 @@ final class MailboxModel: ObservableObject {
             }
             guard let token = self.token, !self.compose.sending, !self.autosaveInFlight else { return }
             self.autosaveInFlight = true
+            self.autosaveNeedsFollowUp = false
+            defer {
+                self.autosaveInFlight = false
+                if self.autosaveNeedsFollowUp, !Task.isCancelled {
+                    self.autosaveNeedsFollowUp = false
+                    self.scheduleAutosave()
+                }
+            }
             self.compose.autosaving = true
             do {
                 let resp = try await ApiClient.mailDraft(
@@ -1416,15 +1448,16 @@ final class MailboxModel: ObservableObject {
                         inReplyTo: self.compose.inReplyTo,
                         id: self.compose.draftId.nilIfBlank(),
                     ))
+                guard !Task.isCancelled, self.sessionIsLive else { return }
                 self.compose.autosaving = false
                 self.compose.autosaveNote = "Draft saved"
                 if let newId = resp.id { self.compose.draftId = newId }
                 await MailStore.shared.invalidate(.drafts)
             } catch {
+                guard !Task.isCancelled, self.sessionIsLive else { return }
                 self.compose.autosaving = false
                 self.compose.autosaveNote = "Draft not saved — it will be saved on the next change."
             }
-            self.autosaveInFlight = false
         }
     }
 
@@ -1540,7 +1573,11 @@ final class MailboxModel: ObservableObject {
         return "Re: \(t)"
     }
 
-    func resetCompose() { compose = ComposeState() }
+    func resetCompose() {
+        autosaveNeedsFollowUp = false
+        autosaveTask?.cancel()
+        compose = ComposeState()
+    }
 
     /// The compose-time plan, asked by the send path: mode and the keys to
     /// seal to. Nil when the directory did not answer — which the send treats
@@ -1566,8 +1603,6 @@ final class MailboxModel: ObservableObject {
         // the message that was just sent. Cancelling here closes the client
         // side of that race; the route's own owner-scoped select closes the
         // server side.
-        autosaveTask?.cancel()
-        autosaveInFlight = false
         // An empty To is refused here, not by the server: a message with no
         // recipient is not a send, and a receipt naming the server's 422 after
         // the person pressed Send twice is worse than a button that says why
@@ -1576,6 +1611,9 @@ final class MailboxModel: ObservableObject {
             compose.error = "Add at least one recipient in To."
             return
         }
+        autosaveNeedsFollowUp = false
+        autosaveTask?.cancel()
+        compose.autosaving = false
         compose.sending = true
         compose.error = nil
         compose.result = nil

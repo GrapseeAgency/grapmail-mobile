@@ -168,6 +168,10 @@ object MailStore {
         bodies = bodies + (v.id to v)
     }
 
+    suspend fun putBodies(messages: List<MailMessageFullDto>) = mutex.withLock {
+        bodies = bodies + messages.associateBy { it.id }
+    }
+
     /**
      * Take one attachment out of every cached body.
      *

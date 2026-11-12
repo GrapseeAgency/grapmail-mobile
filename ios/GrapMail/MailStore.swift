@@ -141,6 +141,9 @@ actor MailStore {
     /// shape was designed to avoid.
     func body(_ id: String) -> MailMessageFull? { bodies[id] }
     func putBody(_ v: MailMessageFull) { bodies[v.id] = v }
+    func putBodies(_ messages: [MailMessageFull]) {
+        for message in messages { bodies[message.id] = message }
+    }
 
     /// Take one attachment out of every cached body.
     ///

@@ -28,6 +28,8 @@ import com.grapsee.grapmail.data.pastLine
 import com.grapsee.grapmail.data.SessionStore
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -271,6 +273,18 @@ class MailboxViewModel @JvmOverloads constructor(
     /// already has must not cost another payload read, and a snapshot that seeded
     /// a body must not have it fetched away on appear.
     private var threadLoadedFor: String? = null
+    private var readerJob: Job? = null
+    private var readerTarget: Pair<String, Boolean>? = null
+
+    private fun loadReader(id: String, isThread: Boolean, read: suspend () -> Unit) {
+        val target = id to isThread
+        if (readerTarget == target && (threadLoadedFor == id || readerJob?.isActive == true)) return
+        readerJob?.cancel()
+        readerTarget = target
+        threadLoadedFor = null
+        _thread.value = ThreadState(loading = true)
+        readerJob = viewModelScope.launch { read() }
+    }
 
     /**
      * The stored bearer, or null when there is none. Every loader treats null as
@@ -1100,6 +1114,7 @@ class MailboxViewModel @JvmOverloads constructor(
 
     private var autosaveJob: kotlinx.coroutines.Job? = null
     private var autosaveInFlight = false
+    private var autosaveNeedsFollowUp = false
 
     /**
      * The rules the debounce obeys, each one a refusal rather than a feature:
@@ -1112,14 +1127,19 @@ class MailboxViewModel @JvmOverloads constructor(
     private fun scheduleAutosave() {
         val s = _compose.value
         if (s.sending) return
-        if (s.to.isBlank() && s.cc.isBlank() && s.subject.isBlank() && s.body.isBlank()) return
+        if (autosaveInFlight) {
+            autosaveNeedsFollowUp = true
+            return
+        }
         autosaveJob?.cancel()
+        if (s.to.isBlank() && s.cc.isBlank() && s.subject.isBlank() && s.body.isBlank()) return
         autosaveJob = viewModelScope.launch {
             kotlinx.coroutines.delay(2_000)
             val t = token() ?: return@launch
             val cur = _compose.value
             if (cur.sending || autosaveInFlight) return@launch
             autosaveInFlight = true
+            autosaveNeedsFollowUp = false
             _compose.update { it.copy(autosaving = true) }
             try {
                 val r = Api.mailDraft(t, MailDraftRequest(
@@ -1127,6 +1147,7 @@ class MailboxViewModel @JvmOverloads constructor(
                     subject = cur.subject, bodyText = cur.body, inReplyTo = cur.inReplyTo,
                     id = cur.draftId.takeIf { it.isNotEmpty() },
                 ))
+                kotlinx.coroutines.currentCoroutineContext().ensureActive()
                 _compose.update {
                     it.copy(
                         autosaving = false,
@@ -1136,11 +1157,16 @@ class MailboxViewModel @JvmOverloads constructor(
                 }
                 MailStore.invalidate(MailBox.Drafts)
             } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) throw e
                 _compose.update {
                     it.copy(autosaving = false, autosaveNote = "Draft not saved — it will be saved on the next change.")
                 }
             } finally {
                 autosaveInFlight = false
+                if (autosaveNeedsFollowUp && kotlinx.coroutines.currentCoroutineContext().isActive) {
+                    autosaveNeedsFollowUp = false
+                    scheduleAutosave()
+                }
             }
         }
     }
@@ -1262,7 +1288,11 @@ class MailboxViewModel @JvmOverloads constructor(
         return "Re: $t"
     }
 
-    fun resetCompose() { _compose.value = ComposeState() }
+    fun resetCompose() {
+        autosaveNeedsFollowUp = false
+        autosaveJob?.cancel()
+        _compose.value = ComposeState()
+    }
 
     /**
      * Send. The receipt shows `status` and `deliveryError` as the server reported
@@ -1278,7 +1308,6 @@ class MailboxViewModel @JvmOverloads constructor(
         // the message that was just sent. Cancelling here closes the client
         // side of that race; the route's own owner-scoped select closes the
         // server side.
-        autosaveJob?.cancel()
         // An empty To is refused here, not by the server: a message with no
         // recipient is not a send, and a receipt naming the server's 422 after
         // the person pressed Send twice is worse than a button that says why
@@ -1287,6 +1316,9 @@ class MailboxViewModel @JvmOverloads constructor(
             _compose.update { it.copy(error = "Add at least one recipient in To.") }
             return
         }
+        autosaveNeedsFollowUp = false
+        autosaveJob?.cancel()
+        _compose.update { it.copy(autosaving = false) }
         viewModelScope.launch {
             val t = token() ?: run { _compose.update { it.copy(error = "Sign in again.") }; return@launch }
             // The envelope goes on the wire as the JSON OBJECT the route
@@ -1649,10 +1681,13 @@ class MailboxViewModel @JvmOverloads constructor(
      * read here and memoised — a row re-rendering must not re-read a payload.
      */
     fun openThread(threadId: String) {
-        if (threadLoadedFor == threadId) return
-        viewModelScope.launch {
-            val t = token() ?: return@launch
-            _thread.update { it.copy(loading = true, error = null) }
+        if (readerTarget == null && threadLoadedFor == threadId) return
+        loadReader(threadId, isThread = true) {
+            val t = token()
+            if (t == null) {
+                _thread.value = ThreadState(error = "Sign in again.")
+                return@loadReader
+            }
             runCatching { Api.mailThread(t, threadId) }
                 .onSuccess { r ->
                     // Remembered on success, because this field IS the memo: without
@@ -1661,8 +1696,9 @@ class MailboxViewModel @JvmOverloads constructor(
                     // is the over-fetch the field's own comment promises not to do,
                     // and iOS does not. A failure deliberately does not record it, so
                     // re-opening retries instead of caching an empty conversation.
+                    MailStore.putBodies(r.messages)
+                    kotlinx.coroutines.currentCoroutineContext().ensureActive()
                     threadLoadedFor = threadId
-                    r.messages.forEach { MailStore.putBody(it) }
                     _thread.update { it.copy(messages = r.messages, loading = false) }
                     // Opening marks read server-side; mirror it locally so the
                     // list it came from agrees without a second write.
@@ -1670,6 +1706,7 @@ class MailboxViewModel @JvmOverloads constructor(
                     reproject()
                 }
                 .onFailure { e ->
+                    if (e is kotlinx.coroutines.CancellationException) throw e
                     _thread.update { it.copy(loading = false,
                         error = e.message ?: "This conversation could not be opened.") }
                 }
@@ -1756,30 +1793,39 @@ class MailboxViewModel @JvmOverloads constructor(
     }
 
     fun openMessage(id: String) {
-        if (threadLoadedFor == id) return
-        viewModelScope.launch {
-            val t = token() ?: return@launch
-            _thread.update { it.copy(loading = true, error = null) }
+        if (readerTarget == null && threadLoadedFor == id) return
+        loadReader(id, isThread = false) {
+            val t = token()
+            if (t == null) {
+                _thread.value = ThreadState(error = "Sign in again.")
+                return@loadReader
+            }
             val cached = MailStore.body(id)
             if (cached != null) {
+                kotlinx.coroutines.currentCoroutineContext().ensureActive()
                 threadLoadedFor = id
                 _thread.update { it.copy(messages = listOf(cached), loading = false) }
-                return@launch
+                return@loadReader
             }
             runCatching { Api.mailMessage(t, id) }
                 .onSuccess { r ->
                     // Recorded only when a body actually arrived: caching the id for
                     // an empty response would make the guard above skip the retry and
                     // leave the screen showing nothing for a message that exists.
-                    r.message?.let {
+                    val message = r.message
+                    if (message == null) {
+                        _thread.value = ThreadState(error = "This message could not be opened.")
+                    } else {
+                        MailStore.putBody(message)
+                        kotlinx.coroutines.currentCoroutineContext().ensureActive()
                         threadLoadedFor = id
-                        MailStore.putBody(it)
-                        _thread.update { s -> s.copy(messages = listOf(it), loading = false) }
-                        MailStore.patchFlags(it.id, read = true)
+                        _thread.update { s -> s.copy(messages = listOf(message), loading = false) }
+                        MailStore.patchFlags(message.id, read = true)
                     }
                     reproject()
                 }
                 .onFailure { e ->
+                    if (e is kotlinx.coroutines.CancellationException) throw e
                     _thread.update { it.copy(loading = false,
                         error = e.message ?: "This message could not be opened.") }
                 }
