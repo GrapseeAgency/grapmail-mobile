@@ -857,7 +857,16 @@ private fun TabItem(icon: ImageVector, label: String, active: Boolean, badge: In
             Icon(icon, null, tint = if (active) palette.primarySolid else palette.textTertiary,
                 modifier = Modifier.size(22.dp))
             if (badge != null && badge > 0) {
-                Box(Modifier.size(8.dp).clip(CircleShape).background(palette.primarySolid))
+                // The count pill the reference draws, not a bare dot: a number
+                // the server answered, capped the way Gmail caps it.
+                Text(
+                    if (badge >= 100) "99+" else badge.toString(),
+                    fontSize = 10.sp, fontWeight = FontWeight.SemiBold,
+                    color = palette.onPrimary,
+                    modifier = Modifier.clip(RoundedCornerShape(50))
+                        .background(palette.primarySolid)
+                        .padding(horizontal = 5.dp, vertical = 2.dp),
+                )
             }
         }
         Spacer(Modifier.height(3.dp))

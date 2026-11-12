@@ -281,8 +281,15 @@ struct MailBottomBar: View {
                     .font(.system(size: 19))
                     .foregroundColor(active ? GM.primarySolid : GM.textTertiary)
                 if let badge, badge > 0 {
-                    Circle().fill(GM.primarySolid).frame(width: 8, height: 8)
-                        .offset(x: 4, y: -2)
+                    // The count pill the reference draws, not a bare dot: a
+                    // number the server answered, capped the way Gmail caps it.
+                    Text(badge >= 100 ? "99+" : String(badge))
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 5)
+                        .padding(.vertical, 2)
+                        .background(Capsule().fill(GM.primarySolid))
+                        .offset(x: 6, y: -4)
                 }
             }
             Text(label)

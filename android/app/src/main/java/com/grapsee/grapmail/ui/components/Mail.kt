@@ -23,6 +23,7 @@ import androidx.compose.material.icons.rounded.Archive
 import androidx.compose.material.icons.rounded.AttachFile
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.DoneAll
 import androidx.compose.material.icons.rounded.Label
@@ -571,15 +572,19 @@ fun BoxTab(title: String, count: Int?, active: Boolean, onClick: () -> Unit, mod
 @Composable
 fun MailFab(onClick: () -> Unit, modifier: Modifier = Modifier) {
     val palette = LocalPalette.current
-    Box(
+    // The extended pill, as the reference draws it: glyph + word, not a bare
+    // circle. The word names the affordance a 56dp dot never said out loud.
+    Row(
         modifier
-            .size(56.dp)
-            .clip(CircleShape)
+            .clip(RoundedCornerShape(16.dp))
             .background(palette.primarySolid)
-            .clickable(onClick = onClick),
-        contentAlignment = Alignment.Center,
+            .clickable(onClick = onClick)
+            .padding(horizontal = 20.dp, vertical = 16.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(Icons.Rounded.Mail, "Compose", tint = palette.onPrimary, modifier = Modifier.size(24.dp))
+        Icon(Icons.Rounded.Edit, "Compose", tint = palette.onPrimary, modifier = Modifier.size(20.dp))
+        Spacer(Modifier.width(10.dp))
+        Text("Compose", fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = palette.onPrimary)
     }
 }
 

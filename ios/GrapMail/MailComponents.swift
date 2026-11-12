@@ -365,12 +365,20 @@ struct MailFab: View {
 
     var body: some View {
         Button(action: onClick) {
-            Image(systemName: "pencil")
-                .font(.system(size: 19, weight: .semibold))
-                .foregroundColor(.white)
-                .frame(width: 56, height: 56)
-                .background(Circle().fill(GM.primarySolid))
-                .shadow(color: Color.black.opacity(0.18), radius: 10, x: 0, y: 4)
+            // The extended pill the reference draws: glyph + word, not a bare
+            // circle. The word names the affordance a 56pt dot never said out
+            // loud.
+            HStack(spacing: 10) {
+                Image(systemName: "pencil")
+                    .font(.system(size: 17, weight: .semibold))
+                Text("Compose")
+                    .font(.system(size: 16, weight: .semibold))
+            }
+            .foregroundColor(.white)
+            .padding(.horizontal, 20)
+            .padding(.vertical, 15)
+            .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(GM.primarySolid))
+            .shadow(color: Color.black.opacity(0.18), radius: 10, x: 0, y: 4)
         }
         .buttonStyle(.plain)
         .accessibilityIdentifier("mail-compose")
