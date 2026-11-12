@@ -32,6 +32,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.Canvas
 import com.grapsee.grapmail.ui.theme.LocalPalette
+import com.grapsee.grapmail.R
 import com.grapsee.grapmail.ui.theme.Palette
 
 /**
@@ -60,34 +61,15 @@ fun GrapMailLogo(size: Dp = 44.dp, wordmark: Boolean = false) {
 
 @Composable
 private fun Mark(size: Dp, palette: Palette) {
-    Canvas(modifier = Modifier.size(size)) {
-        val s = this.size.minDimension
-        val corner = CornerRadius(s * 0.28f, s * 0.28f)
-        drawRoundRect(
-            brush = Brush.verticalGradient(listOf(palette.primaryTop, palette.primaryBottom)),
-            cornerRadius = corner,
-        )
-        // Envelope body
-        val bodyLeft = s * 0.22f; val bodyTop = s * 0.30f
-        val bodyRight = s * 0.78f; val bodyBottom = s * 0.70f
-        drawRoundRect(
-            color = Color.White,
-            topLeft = Offset(bodyLeft, bodyTop),
-            size = androidx.compose.ui.geometry.Size(bodyRight - bodyLeft, bodyBottom - bodyTop),
-            cornerRadius = CornerRadius(s * 0.06f, s * 0.06f),
-        )
-        // Flap
-        val flap = Path().apply {
-            moveTo(bodyLeft, bodyTop + s * 0.02f)
-            lineTo((bodyLeft + bodyRight) / 2f, (bodyTop + bodyBottom) / 2f + s * 0.02f)
-            lineTo(bodyRight, bodyTop + s * 0.02f)
-        }
-        drawPath(
-            flap,
-            color = palette.primaryBottom,
-            style = Stroke(width = s * 0.045f, pathEffect = PathEffect.cornerPathEffect(s * 0.02f)),
-        )
-    }
+    // The founder's real mark — the actual logo file, never a drawn imitation.
+    // ContentScale.Fit: the whole logo is always visible, uncropped, at every
+    // size and on every screen shape; its own transparency is the shape.
+    androidx.compose.foundation.Image(
+        painter = androidx.compose.ui.res.painterResource(R.drawable.grapmail_logo),
+        contentDescription = null,
+        modifier = Modifier.size(size),
+        contentScale = androidx.compose.ui.layout.ContentScale.Fit,
+    )
 }
 
 /** The eyebrow label used across the design ("STEP 1 OF 5", "ACCOUNT CREATED"). */

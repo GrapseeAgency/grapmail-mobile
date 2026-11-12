@@ -40,7 +40,10 @@ struct WelcomeView: View {
                     // headline and subcopy baked in, duplicating the text.
                     // Now drawn: no raster, no baked words, no second dark
                     // crop.
-                    Art.view("welcome", width: 300)
+                    Image("GrapMailLogo")
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 220)
                         .padding(.top, 18)
 
                     Spacer(minLength: 10)

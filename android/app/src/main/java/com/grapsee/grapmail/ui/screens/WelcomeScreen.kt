@@ -73,11 +73,14 @@ fun WelcomeScreen(onCreateAccount: () -> Unit, onSignIn: () -> Unit) {
         )
 
         Spacer(Modifier.height(18.dp))
-        com.grapsee.grapmail.ui.artwork.Artwork(
-            "welcome",
-            // Bounded: the scene must never grow tall enough to push the
-            // Create Account button off a short screen.
-            modifier = Modifier.width(200.dp).aspectRatio(2f),
+        // The founder's real logo, uncropped — ContentScale.Fit inside a
+        // bounded box so the Create Account button never leaves a short screen.
+        androidx.compose.foundation.Image(
+            painter = androidx.compose.ui.res.painterResource(
+                com.grapsee.grapmail.R.drawable.grapmail_logo),
+            contentDescription = null,
+            modifier = Modifier.width(150.dp),
+            contentScale = androidx.compose.ui.layout.ContentScale.Fit,
         )
 
         Spacer(Modifier.height(48.dp))

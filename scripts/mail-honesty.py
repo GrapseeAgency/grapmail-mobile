@@ -2575,7 +2575,8 @@ pin("no UI screen reads an illustration raster anymore",
 
 pin("the illustration mapper and its raster pipeline are gone, not shadowed",
     not (ROOT / "android/app/src/main/java/com/grapsee/grapmail/ui/components/IllRes.kt").exists()
-    and not (ROOT / "android/app/src/main/res/drawable-nodpi").exists()
+    and sorted(f.name for f in (ROOT / "android/app/src/main/res/drawable-nodpi").glob("*"))
+        == ["grapmail_logo.png"]
     and not list((ROOT / "ios/GrapMail/Assets.xcassets").glob("ill_*.imageset"))
     and not list((ROOT / "ios/GrapMail/Assets.xcassets").glob("puzzle_photo.imageset")))
 
@@ -2615,11 +2616,16 @@ pin("the artwork settles instead of animating forever",
 _ART_SITES = [android(p) for p in (
     "ui/screens/HumanVerifyScreen.kt", "ui/screens/CreatedScreens.kt",
     "ui/screens/NameStepScreen.kt", "ui/screens/WelcomeScreen.kt")]
+# The welcome call site now renders the founder's real logo (bounded at 150dp,
+# ContentScale.Fit — never cropped); the remaining Artwork scenes keep their
+# bounds, and the iOS fill helper still caps the height.
 pin("artwork call sites are bounded, never a screen-width fraction",
     all("fillMaxWidth(0." not in code_only(s) or "Artwork(" not in code_only(s)
         for s in _ART_SITES)
-    and all("aspectRatio(2f)" in code_only(s) for s in _ART_SITES)
-    and "Modifier.width(180.dp).aspectRatio(2f)" in code_only(_ART_SITES[0])
+    and all("aspectRatio(2f)" in code_only(s) for s in _ART_SITES
+            if s != android("ui/screens/WelcomeScreen.kt"))
+    and "Modifier.width(150.dp)" in code_only(android("ui/screens/WelcomeScreen.kt"))
+    and "ContentScale.Fit" in code_only(android("ui/screens/WelcomeScreen.kt"))
     and ".frame(maxHeight: 200)" in code_only(SW_ART))
 
 # The old illRes table named every scene; the dispatch must still answer each
@@ -3072,7 +3078,8 @@ pin("the new logo is the launcher on every density, themed, round, iOS and splas
     and "@mipmap/ic_launcher" in (ROOT / "android/app/src/main/res/values/themes.xml")
         .read_text(encoding="utf-8")
     and not (ROOT / "android/app/src/main/res/drawable/splash_logo.xml").exists()
-    and not (ROOT / "android/app/src/main/res/drawable-nodpi").exists()
+    and sorted(f.name for f in (ROOT / "android/app/src/main/res/drawable-nodpi").glob("*"))
+        == ["grapmail_logo.png"]
     and _debug_src.exists()
     and (_debug_src / "java/com/grapsee/grapmail/DebugPollReceiver.kt").exists()
     and (_debug_src / "AndroidManifest.xml").exists()

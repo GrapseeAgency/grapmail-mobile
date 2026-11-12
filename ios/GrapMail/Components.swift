@@ -2,20 +2,16 @@ import SwiftUI
 
 // The GrapMail mark — rounded square, brand gradient, white envelope glyph.
 struct GrapMailMark: View {
-    var size: CGFloat = 44
+    var size: CGFloat = 40
 
     var body: some View {
-        ZStack {
-            RoundedRectangle(cornerRadius: size * 0.28, style: .continuous)
-                .fill(Color.brandGradient)
-            EnvelopeGlyph()
-                .fill(Color.white)
-                .frame(width: size * 0.56, height: size * 0.4)
-            EnvelopeFlap()
-                .stroke(GM.primaryBottom, lineWidth: size * 0.045)
-                .frame(width: size * 0.56, height: size * 0.4)
-        }
-        .frame(width: size, height: size)
+        // The founder's real mark — the actual logo file, never a drawn
+        // imitation. scaledToFit: the whole logo is always visible, uncropped,
+        // at every size and on every screen shape.
+        Image("GrapMailLogo")
+            .resizable()
+            .scaledToFit()
+            .frame(width: size, height: size)
     }
 }
 
