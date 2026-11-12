@@ -173,7 +173,10 @@ fun MailboxScreen(
     // The screen's first ask: the box that has never been fetched. Nothing here
     // fetched the list at all before this line existed, which is how a mailbox
     // renders "Inbox is empty" having never asked the server anything.
-    LaunchedEffect(Unit) { vm.ensureLoaded() }
+    LaunchedEffect(vm) {
+        vm.ensureLoaded()
+        vm.loadAccount()
+    }
 
     var refreshing by remember { mutableStateOf(false) }
     // The gesture's spinner is released by the load SETTLING, not by `loading`
@@ -719,6 +722,7 @@ private fun SwipeableMessageRow(
 ) {
     val palette = LocalPalette.current
     val state = rememberSwipeToDismissBoxState()
+    val direction by remember(state) { derivedStateOf { state.dismissDirection } }
 
     LaunchedEffect(state.currentValue) {
         when (state.currentValue) {
@@ -734,7 +738,6 @@ private fun SwipeableMessageRow(
         enableDismissFromStartToEnd = leadingTo != null,
         enableDismissFromEndToStart = trailingTo != null,
         backgroundContent = {
-            val direction = state.dismissDirection
             val toLeading = direction == SwipeToDismissBoxValue.StartToEnd
             val swiping = direction != SwipeToDismissBoxValue.Settled
             val label = if (toLeading) leadingTo else trailingTo

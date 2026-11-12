@@ -5,9 +5,15 @@ import UIKit
 // without this.
 import Combine
 
+@MainActor
+private final class MailboxOwner: ObservableObject {
+    let model = MailboxModel()
+}
+
 /// The root navigation for the account sector: welcome → wizard (5 steps) →
 /// human verification → account created, plus sign-in, two-step verification
 /// and the whole recovery/security arc beside it.
+@MainActor
 struct RootView: View {
     @StateObject private var model = SignUpModel()
     @StateObject private var recovery = RecoveryModel()
@@ -80,7 +86,10 @@ struct RootView: View {
     /// and the secondary screens all read and write this, so starring a message
     /// in the list is visible in the thread that opens next, and a body read in
     /// the thread is not fetched again by the Files screen.
-    @StateObject private var mail = MailboxModel()
+    // Destinations observe the mailbox directly. Owning it here without
+    // forwarding its publications keeps draft edits out of navigation updates.
+    @StateObject private var mailboxOwner = MailboxOwner()
+    private var mail: MailboxModel { mailboxOwner.model }
 
     /// The account record every account-band screen reads and writes. One
     /// instance for the stack: the screens are eight views of one document,

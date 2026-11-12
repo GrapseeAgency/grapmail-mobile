@@ -117,6 +117,7 @@ fun ComposeScreen(
 
     LaunchedEffect(Unit) { profile.load() }
     LaunchedEffect(Unit) { e2e.load() }
+    LaunchedEffect(vm) { vm.loadAccount() }
 
     // A prepared compose (reply / reply-all / forward from the thread) builds
     // its fields from the full server row; a blank one gets the signature

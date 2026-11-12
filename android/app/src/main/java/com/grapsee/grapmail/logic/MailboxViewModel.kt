@@ -367,22 +367,41 @@ class MailboxViewModel @JvmOverloads constructor(
 
     init {
         watchNetwork()
-        viewModelScope.launch {
-            if (snapshotMode) return@launch
-            val t = token() ?: return@launch
-            // `/me` answers with the mailbox's own name and address. A failure
-            // here is not an error screen: the greeting falls back to no name,
-            // which is honest, and the list is what matters.
-            runCatching { Api.mailMe(t) }.onSuccess { me ->
-                MailStore.putMe(me)
-                _state.update { it.copy(
-                    accountName = me.name,
-                    accountAddress = me.address,
-                    accountStatus = me.status,
-                    memberSince = me.memberSince,
-                ) }
+    }
+
+    private var accountLoadJob: Job? = null
+
+    fun loadAccount() {
+        if (snapshotMode || accountLoadJob?.isActive == true) return
+        accountLoadJob = viewModelScope.launch {
+            val context = getApplication<Application>()
+            val current = com.grapsee.grapmail.data.SessionStore.snapshot(context) ?: return@launch
+            val cached = MailStore.me()
+            if (cached != null && cached.address.equals(current.address, ignoreCase = true)) {
+                applyAccount(cached)
+                return@launch
             }
+            val me = try {
+                Api.mailMe(current.token)
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                return@launch
+            }
+            val active = com.grapsee.grapmail.data.SessionStore.snapshot(context)
+            if (active?.id != current.id) return@launch
+            MailStore.putMe(me)
+            applyAccount(me)
         }
+    }
+
+    private fun applyAccount(me: com.grapsee.grapmail.data.MailMeResponse) {
+        _state.update { it.copy(
+            accountName = me.name,
+            accountAddress = me.address,
+            accountStatus = me.status,
+            memberSince = me.memberSince,
+        ) }
     }
 
     // ── list ─────────────────────────────────────────────────────────────────
