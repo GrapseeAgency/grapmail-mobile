@@ -3,17 +3,24 @@ package com.grapsee.grapmail.data
 import android.content.Context
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.Call
+import okhttp3.Callback
 import okhttp3.MultipartBody
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
+import okhttp3.Response
+import java.io.IOException
 import java.net.URLEncoder
 import java.util.concurrent.TimeUnit
+import kotlin.coroutines.resume
+import kotlin.coroutines.resumeWithException
 
 /**
  * The real GrapMail account API — the same contract the website uses,
@@ -675,11 +682,26 @@ object Api {
         .writeTimeout(20, TimeUnit.SECONDS)
         .build()
 
-    private suspend fun execute(request: Request): Pair<Int, String> = withContext(Dispatchers.IO) {
-        client.newCall(request).execute().use { resp ->
-            resp.code to (resp.body?.string() ?: "")
+    private suspend fun execute(request: Request): Pair<Int, String> =
+        suspendCancellableCoroutine { continuation ->
+            val call = client.newCall(request)
+            continuation.invokeOnCancellation { call.cancel() }
+            call.enqueue(object : Callback {
+                override fun onFailure(call: Call, e: IOException) {
+                    continuation.resumeWithException(e)
+                }
+
+                override fun onResponse(call: Call, response: Response) {
+                    val result = try {
+                        response.use { it.code to (it.body?.string() ?: "") }
+                    } catch (e: Exception) {
+                        continuation.resumeWithException(e)
+                        return
+                    }
+                    continuation.resume(result)
+                }
+            })
         }
-    }
 
     private fun postBody(payload: String) = payload.toRequestBody(JSON_MEDIA)
 
@@ -911,10 +933,10 @@ object Api {
             .header("x-device-id", DeviceId.value)
             .header("authorization", "Bearer $token")
 
-    private suspend fun <T> read(request: Request, decode: (String) -> T): T {
+    private suspend fun <T> read(request: Request, decode: (String) -> T): T = withContext(Dispatchers.IO) {
         val (status, body) = execute(request)
         if (status >= 400) fail(status, body)
-        return decode(body)
+        decode(body)
     }
 
     suspend fun profile(token: String): ProfileResponse = read(authed("$AUTH/account/profile", token).get().build()) {

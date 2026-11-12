@@ -269,6 +269,9 @@ final class MailboxModel: ObservableObject {
     // ── list ─────────────────────────────────────────────────────────────────
 
     func open(_ box: MailBox) {
+        guard state.box != box else { return }
+        searchTask?.cancel()
+        searchTask = nil
         loadedBoxes.insert(box)
         state.box = box
         state.selection = []
@@ -287,11 +290,17 @@ final class MailboxModel: ObservableObject {
     /// device: a one-character `q` scans the whole mailbox server-side
     /// (`grapmail.ts:688`), so every keystroke would be a full-table read.
     func query(_ text: String) {
+        let previous = state.query
+        guard previous != text else { return }
         state.query = text
+        let oldTerm = previous.trimmingCharacters(in: .whitespacesAndNewlines)
+        let newTerm = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard (oldTerm.count >= 3 ? oldTerm : "") != (newTerm.count >= 3 ? newTerm : "") else { return }
         searchTask?.cancel()
         searchTask = Task { [weak self] in
             try? await Task.sleep(nanoseconds: 350_000_000)
             guard !Task.isCancelled else { return }
+            self?.searchTask = nil
             self?.load(replace: true)
         }
     }
@@ -333,6 +342,7 @@ final class MailboxModel: ObservableObject {
             do {
                 let resp = try await ApiClient.mailInbox(
                     token: token, box: box, page: page, query: term)
+                guard !Task.isCancelled else { return }
                 guard sessionIsLive else {
                     // Signed out mid-flight: the same rule as the token guard above.
                     self.state.loading = false
@@ -405,7 +415,7 @@ final class MailboxModel: ObservableObject {
     }
 
     func loadMore() {
-        guard state.loaded < state.total, !state.loadingMore else { return }
+        guard searchTask == nil, !state.loading, !state.loadingMore, state.loaded < state.total else { return }
         load(replace: false)
     }
 

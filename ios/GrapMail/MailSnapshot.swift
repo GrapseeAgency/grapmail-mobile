@@ -730,8 +730,6 @@ struct MailSnapshotView: View {
         rows: [MailMessage], loading: Bool, failed: Bool, noMailbox: Bool, box: MailBox,
     ) -> some View {
         VStack(spacing: 0) {
-            MailGreeting(name: "Amira Rahman", address: "amira@grapmail.com")
-                .padding(.horizontal, 16).padding(.top, 10)
             MailStateBlock(
                 loading: loading, failed: failed, noMailbox: noMailbox,
                 empty: rows.isEmpty, boxTitle: box.title, onRetry: {}

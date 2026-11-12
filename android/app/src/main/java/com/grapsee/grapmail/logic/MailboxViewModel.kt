@@ -389,6 +389,8 @@ class MailboxViewModel @JvmOverloads constructor(
     // ── list ─────────────────────────────────────────────────────────────────
 
     fun open(box: MailBox) {
+        if (_state.value.box == box) return
+        searchJob?.cancel()
         loadedBoxes.add(box)
         _state.update { it.copy(box = box, selection = emptySet()) }
         load(replace = true)
@@ -414,7 +416,10 @@ class MailboxViewModel @JvmOverloads constructor(
      * (`grapmail.ts:688`), so every keystroke would be a full-table read.
      */
     fun query(text: String) {
+        val previous = _state.value.query
+        if (previous == text) return
         _state.update { it.copy(query = text) }
+        if (previous.trim().takeIf { it.length >= 3 } == text.trim().takeIf { it.length >= 3 }) return
         searchJob?.cancel()
         searchJob = viewModelScope.launch {
             delay(350)
@@ -461,12 +466,8 @@ class MailboxViewModel @JvmOverloads constructor(
             }
 
             // Not `runCatching`: it swallows `CancellationException` like any other
-            // Throwable, and this method cancels the previous read on every call. So a
-            // box switch, or one keystroke past the search debounce, ran the failure
-            // arm for a read that was stopped on purpose — and because the blocked
-            // OkHttp call only notices the cancellation when its response lands, the
-            // superseded read can finish AFTER the newer one, printing "couldn't reach
-            // the server" over the list the newer read had just filled.
+            // Throwable. A box switch or a new search cancels the previous read,
+            // which should leave error reporting to the request that replaced it.
             try {
                 val resp = Api.mailInbox(t, box, page = page, q = term)
                 MailStore.putPage(box, term, resp, replace)
@@ -508,7 +509,7 @@ class MailboxViewModel @JvmOverloads constructor(
     }
 
     fun loadMore() {
-        if (!_state.value.canLoadMore) return
+        if (searchJob?.isActive == true || _state.value.loading || !_state.value.canLoadMore) return
         load(replace = false)
     }
 
