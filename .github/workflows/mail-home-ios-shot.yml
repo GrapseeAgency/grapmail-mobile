@@ -16,6 +16,7 @@ on:
       - "ios/GrapMail/MailChrome.swift"
       - "ios/GrapMail/MailSnapshot.swift"
       - "ios/GrapMail/MailSheets.swift"
+      - "ios/GrapMail/Assets.xcassets/**"
 
 concurrency:
   group: mail-home-ios-shot-${{ github.ref }}
