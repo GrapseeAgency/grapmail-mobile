@@ -43,25 +43,41 @@ wait_for_art() {
 }
 
 adb install -r "$APK"
+# A fresh boot on the CI emulator's software renderer can starve the launcher
+# long enough for a system ANR dialog to cover the app. These two settings
+# suppress error dialogs and background ANRs; the wait loop below also
+# dismisses any dialog that still gets through.
 adb shell settings put global hide_error_dialogs 1 || true
+adb shell settings put secure anr_show_background 0 || true
 adb shell pm clear "$PKG"
 adb shell cmd uimode night yes
 adb shell am start -n "$PKG/.MainActivity"
 
 # Wait for the welcome copy to exist in the real hierarchy, not for a guessed
-# number of seconds.
-READY=0
-for _ in $(seq 1 30); do
-  adb shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1 || true
-  adb pull /sdcard/ui.xml "$OUT/ui.xml" >/dev/null 2>&1 || true
-  if grep -q 'text="Welcome to"' "$OUT/ui.xml" 2>/dev/null; then READY=1; break; fi
-  sleep 2
-done
-if [ "$READY" -ne 1 ]; then
-  echo "::error::the welcome screen never appeared"
-  adb exec-out screencap -p > "$OUT/stuck.png" || true
-  exit 1
-fi
+# number of seconds. A system dialog in front of the app is dismissed and the
+# activity brought forward again rather than failing the walk.
+wait_for_welcome() {
+  local label=$1 ready=0
+  for _ in $(seq 1 40); do
+    adb shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1 || true
+    adb pull /sdcard/ui.xml "$OUT/ui.xml" >/dev/null 2>&1 || true
+    if grep -q 'text="Welcome to"' "$OUT/ui.xml" 2>/dev/null; then ready=1; break; fi
+    if grep -qE "isn't responding|Not responding|Close app" "$OUT/ui.xml" 2>/dev/null; then
+      echo "dismissing a system dialog while waiting for the $label screen"
+      adb shell input keyevent KEYCODE_BACK || true
+      sleep 2
+      adb shell am start -n "$PKG/.MainActivity" >/dev/null 2>&1 || true
+    fi
+    sleep 2
+  done
+  if [ "$ready" -ne 1 ]; then
+    echo "::error::the welcome screen never appeared ($label)"
+    adb exec-out screencap -p > "$OUT/stuck-$label.png" || true
+    return 1
+  fi
+}
+
+wait_for_welcome dark
 
 # Dark theme (the founder's frame): a run of frames across the tour, plus a
 # short recording so motion can be judged, not just layout.
@@ -84,18 +100,7 @@ adb shell am force-stop "$PKG"
 adb shell cmd uimode night no
 sleep 2
 adb shell am start -n "$PKG/.MainActivity"
-READY=0
-for _ in $(seq 1 30); do
-  adb shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1 || true
-  adb pull /sdcard/ui.xml "$OUT/ui.xml" >/dev/null 2>&1 || true
-  if grep -q 'text="Welcome to"' "$OUT/ui.xml" 2>/dev/null; then READY=1; break; fi
-  sleep 2
-done
-if [ "$READY" -ne 1 ]; then
-  echo "::error::the welcome screen never appeared in light mode"
-  adb exec-out screencap -p > "$OUT/light-stuck.png" || true
-  exit 1
-fi
+wait_for_welcome light
 wait_for_art "$OUT/welcome-light-1.png"
 for i in 2 3 4; do
   adb exec-out screencap -p > "$OUT/welcome-light-$i.png"
