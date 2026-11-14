@@ -18,6 +18,30 @@ APK=android/app/build/outputs/apk/debug/app-debug.apk
 OUT=welcome-shots
 mkdir -p "$OUT"
 
+if ! command -v compare >/dev/null || ! command -v convert >/dev/null; then
+  sudo apt-get update -qq && sudo apt-get install -y -qq imagemagick
+fi
+
+# The artwork occupies the same box on the walk's Pixel 6 (measured below); a
+# flat crop means the WebView has not painted yet. On the CI emulator's
+# software renderer that first paint can lag several seconds behind the Compose
+# text, so every phase waits for pixels, not for a guessed sleep.
+wait_for_art() {
+  local shot=$1 dev
+  for _ in $(seq 1 15); do
+    adb exec-out screencap -p > "$shot" 2>/dev/null || true
+    dev=$(convert "$shot" -crop 900x900+90+700 +repage \
+          -format "%[fx:standard_deviation]" info: 2>/dev/null || echo 0)
+    if awk "BEGIN{exit !($dev > 0.02)}"; then
+      echo "artwork painted (crop deviation $dev)"
+      return 0
+    fi
+    sleep 2
+  done
+  echo "::error::the hero stayed blank for 30 seconds"
+  return 1
+}
+
 adb install -r "$APK"
 adb shell settings put global hide_error_dialogs 1 || true
 adb shell pm clear "$PKG"
@@ -41,8 +65,8 @@ fi
 
 # Dark theme (the founder's frame): a run of frames across the tour, plus a
 # short recording so motion can be judged, not just layout.
-sleep 2
-for i in 1 2 3 4 5 6 7 8; do
+wait_for_art "$OUT/welcome-dark-1.png"
+for i in 2 3 4 5 6 7 8; do
   adb exec-out screencap -p > "$OUT/welcome-dark-$i.png"
   sleep 2
 done
@@ -72,8 +96,8 @@ if [ "$READY" -ne 1 ]; then
   adb exec-out screencap -p > "$OUT/light-stuck.png" || true
   exit 1
 fi
-sleep 6
-for i in 1 2 3 4; do
+wait_for_art "$OUT/welcome-light-1.png"
+for i in 2 3 4; do
   adb exec-out screencap -p > "$OUT/welcome-light-$i.png"
   sleep 2
 done
@@ -85,10 +109,6 @@ cp "$OUT/welcome-light-4.png" "$OUT/welcome-light.png"
 # before the animation was mounted.
 adb shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1
 adb pull /sdcard/ui.xml "$OUT/ui.xml" >/dev/null 2>&1
-
-if ! command -v compare >/dev/null || ! command -v convert >/dev/null; then
-  sudo apt-get update -qq && sudo apt-get install -y -qq imagemagick
-fi
 
 python3 - <<'PY'
 import re, subprocess, sys, xml.etree.ElementTree as ET
