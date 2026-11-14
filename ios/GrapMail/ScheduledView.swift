@@ -18,64 +18,14 @@ struct ScheduledView: View {
     @State private var cancellingId: String?
     @State private var note: String?
 
+    // The three pieces are computed properties, not one nested expression: the
+    // single-body version of this screen exceeded the compiler's type-check
+    // budget ("unable to type-check this expression in reasonable time" at
+    // `var body`), which is a compile error, not a warning.
     var body: some View {
         VStack(spacing: 0) {
-            HStack(spacing: 12) {
-                Button { onBack() } label: {
-                    Image(systemName: "chevron.left").font(.system(size: 17))
-                        .foregroundColor(GM.textPrimary)
-                }
-                .accessibilityLabel("Back")
-                Text("Scheduled")
-                    .font(.system(size: 17, weight: .semibold))
-                    .foregroundColor(GM.textPrimary)
-                Spacer()
-            }
-            .padding(.horizontal, 12).padding(.vertical, 10)
-
-            if loading {
-                Spacer()
-                ProgressView()
-                Spacer()
-            } else if let error {
-                Text(error).font(.system(size: 14)).foregroundColor(GM.textSecondary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(20)
-            } else if messages.isEmpty && loaded {
-                Text("Nothing scheduled.")
-                    .font(.system(size: 14)).foregroundColor(GM.textTertiary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(20)
-            } else {
-                List {
-                    ForEach(messages) { m in
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(m.subject?.nilIfBlank() ?? "(no subject)")
-                                .font(.system(size: 15, weight: .semibold))
-                                .foregroundColor(GM.textPrimary)
-                                .lineLimit(1)
-                            Text("To " + (m.to ?? []).joined(separator: ", ").ifEmpty("—"))
-                                .font(.system(size: 13)).foregroundColor(GM.textSecondary)
-                                .lineLimit(1)
-                            if let when = m.scheduledFor {
-                                Text("Sends " + ScheduledView.whenText(when))
-                                    .font(.system(size: 12)).foregroundColor(GM.textTertiary)
-                            }
-                            Button(cancellingId == m.id ? "Cancelling…" : "Cancel") {
-                                cancel(m.id)
-                            }
-                            .font(.system(size: 13, weight: .semibold))
-                            .foregroundColor(GM.primarySolid)
-                            .disabled(cancellingId != nil)
-                        }
-                        .padding(.vertical, 6)
-                        .listRowSeparator(.hidden)
-                        .listRowBackground(GM.bg)
-                    }
-                }
-                .listStyle(.plain)
-                .scrollContentBackground(.hidden)
-            }
+            header
+            content
             if let note {
                 Text(note).font(.system(size: 13)).foregroundColor(GM.textSecondary)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -84,6 +34,75 @@ struct ScheduledView: View {
         }
         .background(GM.bg.ignoresSafeArea())
         .task { await load() }
+    }
+
+    private var header: some View {
+        HStack(spacing: 12) {
+            Button { onBack() } label: {
+                Image(systemName: "chevron.left").font(.system(size: 17))
+                    .foregroundColor(GM.textPrimary)
+            }
+            .accessibilityLabel("Back")
+            Text("Scheduled")
+                .font(.system(size: 17, weight: .semibold))
+                .foregroundColor(GM.textPrimary)
+            Spacer()
+        }
+        .padding(.horizontal, 12).padding(.vertical, 10)
+    }
+
+    @ViewBuilder private var content: some View {
+        if loading {
+            Spacer()
+            ProgressView()
+            Spacer()
+        } else if let error {
+            Text(error).font(.system(size: 14)).foregroundColor(GM.textSecondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(20)
+        } else if messages.isEmpty && loaded {
+            Text("Nothing scheduled.")
+                .font(.system(size: 14)).foregroundColor(GM.textTertiary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(20)
+        } else {
+            List {
+                ForEach(messages) { m in
+                    row(m)
+                }
+            }
+            .listStyle(.plain)
+            .scrollContentBackground(.hidden)
+        }
+    }
+
+    private func row(_ message: MailScheduledMessage) -> some View {
+        // The server's recipient list, or an em dash when it is empty — the
+        // `ifEmpty` helper this line used to call does not exist.
+        let recipients = (message.to ?? []).joined(separator: ", ")
+
+        return VStack(alignment: .leading, spacing: 4) {
+            Text(message.subject?.nilIfBlank() ?? "(no subject)")
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundColor(GM.textPrimary)
+                .lineLimit(1)
+            Text("To " + (recipients.isEmpty ? "—" : recipients))
+                .font(.system(size: 13)).foregroundColor(GM.textSecondary)
+                .lineLimit(1)
+            if let when = message.scheduledFor {
+                Text("Sends " + ScheduledView.whenText(when))
+                    .font(.system(size: 12)).foregroundColor(GM.textTertiary)
+            }
+            Button(cancellingId == message.id ? "Cancelling…" : "Cancel") {
+                cancel(message.id)
+            }
+            .font(.system(size: 13, weight: .semibold))
+            .foregroundColor(GM.primarySolid)
+            .disabled(cancellingId != nil)
+        }
+        .padding(.vertical, 6)
+        .listRowSeparator(.hidden)
+        .listRowBackground(GM.bg)
     }
 
     private func load() async {
