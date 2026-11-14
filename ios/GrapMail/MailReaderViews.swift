@@ -834,7 +834,7 @@ struct ComposeView: View {
         .accessibilityIdentifier("mail-compose-screen")
     }
 
-    private var header: some View {
+    @ViewBuilder private var header: some View {
         HStack(spacing: 12) {
             Button {
                 guard !vm.compose.sending, !preparingSend, !uploading else { return }
