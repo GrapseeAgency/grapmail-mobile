@@ -52,10 +52,32 @@ sleep 12
 wait "$REC" || true
 adb pull /sdcard/welcome.mp4 "$OUT/welcome-tour.mp4" >/dev/null 2>&1 || true
 
-# Light theme: the same screen on the app's light surface.
+# Light theme on a clean launch. Flipping uiMode mid-run recreates the
+# activity, and on the software-rendered CI emulator the reattached WebView was
+# still blank four seconds later. A fresh start is both the reliable shot and
+# the honest one: it is what a person in light mode actually sees.
+adb shell am force-stop "$PKG"
 adb shell cmd uimode night no
-sleep 4
-adb exec-out screencap -p > "$OUT/welcome-light.png"
+sleep 2
+adb shell am start -n "$PKG/.MainActivity"
+READY=0
+for _ in $(seq 1 30); do
+  adb shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1 || true
+  adb pull /sdcard/ui.xml "$OUT/ui.xml" >/dev/null 2>&1 || true
+  if grep -q 'text="Welcome to"' "$OUT/ui.xml" 2>/dev/null; then READY=1; break; fi
+  sleep 2
+done
+if [ "$READY" -ne 1 ]; then
+  echo "::error::the welcome screen never appeared in light mode"
+  adb exec-out screencap -p > "$OUT/light-stuck.png" || true
+  exit 1
+fi
+sleep 6
+for i in 1 2 3 4; do
+  adb exec-out screencap -p > "$OUT/welcome-light-$i.png"
+  sleep 2
+done
+cp "$OUT/welcome-light-4.png" "$OUT/welcome-light.png"
 
 # Re-read the hierarchy at the end: the dump that proved the screen was ready
 # happened on the first frame, and the hero is a native view attached by the
@@ -128,33 +150,53 @@ if not (y1 > welcome[3] and y2 < create[1]):
 if w < 600 or h < 660:
     sys.exit(f"FAIL: hero is too small to be the screen's artwork ({w}x{h})")
 
-a = subprocess.run(
-    ["compare", "-metric", "AE", "-fuzz", "2%",
-     f"{out}/welcome-dark-1.png", f"{out}/welcome-dark-5.png", "null:"],
-    capture_output=True, text=True,
-)
-# `compare` may report the AE count with a fractional part under
-# -fuzz; Python 3's int() rejects the string, so read it as a float.
-changed = int(float((a.stderr or a.stdout).strip().split()[0]))
-print(f"pixels changed across the tour: {changed}")
-if changed < 1000:
-    sys.exit("FAIL: the hero did not move between frames")
+CROP = "900x900+90+700"
 
-sd = subprocess.run(
-    ["convert", f"{out}/welcome-dark-3.png", "-crop", "900x900+90+700",
-     "+repage", "-format", "%[fx:standard_deviation]", "info:"],
-    capture_output=True, text=True,
-)
-deviation = float(sd.stdout.strip())
-print(f"hero crop standard deviation: {deviation:.4f}")
+
+def changed_pixels(first, second):
+    r = subprocess.run(
+        ["compare", "-metric", "AE", "-fuzz", "2%", first, second, "null:"],
+        capture_output=True, text=True,
+    )
+    # `compare` can report the AE count with a fractional part under -fuzz.
+    return int(float((r.stderr or r.stdout).strip().split()[0]))
+
+
+def crop_deviation(path):
+    r = subprocess.run(
+        ["convert", path, "-crop", CROP, "+repage",
+         "-format", "%[fx:standard_deviation]", "info:"],
+        capture_output=True, text=True,
+    )
+    return float(r.stdout.strip())
+
+
+changed = changed_pixels(f"{out}/welcome-dark-1.png", f"{out}/welcome-dark-5.png")
+print(f"dark: {changed} pixels changed across the tour")
+if changed < 1000:
+    sys.exit("FAIL: the hero did not move between dark frames")
+
+deviation = crop_deviation(f"{out}/welcome-dark-3.png")
+print(f"dark hero crop standard deviation: {deviation:.4f}")
 if deviation < 0.02:
-    sys.exit("FAIL: the hero crop is blank")
+    sys.exit("FAIL: the dark hero crop is blank")
+
+light_changed = changed_pixels(f"{out}/welcome-light-1.png", f"{out}/welcome-light-4.png")
+print(f"light: {light_changed} pixels changed across the tour")
+if light_changed < 1000:
+    sys.exit("FAIL: the hero did not move between light frames")
+
+light_deviation = crop_deviation(f"{out}/welcome-light-4.png")
+print(f"light hero crop standard deviation: {light_deviation:.4f}")
+if light_deviation < 0.02:
+    sys.exit("FAIL: the light hero crop is blank")
 
 with open("welcome-shots/verdict.txt", "w") as f:
     f.write(f"hero {w}x{h} ratio {ratio:.4f}\n")
-    f.write(f"{changed} pixels changed across 8 seconds\n")
-    f.write("exactly one hero, one WebView, centred, between copy and CTA\n")
-print("PASS: hero placement, ratio, singleness and motion")
+    f.write(f"dark: {changed} pixels changed; light: {light_changed}\n")
+    f.write(f"crop deviation dark {deviation:.4f}, light {light_deviation:.4f}\n")
+    f.write("exactly one hosted WebView, centred, between copy and CTA\n")
+print("PASS: hero placement, ratio, singleness, and motion in both themes")
 PY
 
 ls -la "$OUT"
