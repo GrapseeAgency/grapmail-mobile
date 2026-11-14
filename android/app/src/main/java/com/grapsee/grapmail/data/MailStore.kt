@@ -66,11 +66,12 @@ object MailStore {
     // warm through prefetch the moment a page lands, and a snapshot that grew
     // unbounded would outlive its welcome on a 32GB device.
 
-    private const val SNAPSHOT_VERSION = 1
+    private const val SNAPSHOT_VERSION = 2
 
     @Serializable
     private data class DiskSnapshot(
         val version: Int,
+        val sessionId: String,
         val pages: Map<String, PageCache>,
         val stats: MailStatsResponse? = null,
         val labels: List<MailLabelDto>? = null,
@@ -82,8 +83,16 @@ object MailStore {
     private const val SNAPSHOT_FILE = "mailbox-snapshot.json"
     private val snapshotJson = Json { ignoreUnknownKeys = true }
     private val snapshotScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-    @Volatile private var snapshotWriteScheduled = false
+    private val snapshotWriter = Mutex()
+    private var snapshotGeneration = 0L
+    private val snapshotWriteScheduled = java.util.concurrent.atomic.AtomicBoolean(false)
     @Volatile private var appContext: android.content.Context? = null
+    private val diskReady = kotlinx.coroutines.CompletableDeferred<Unit>()
+
+    /** Wait until the one cold-start snapshot read has either loaded or declined. */
+    suspend fun awaitDiskReady() {
+        diskReady.await()
+    }
 
     /**
      * Called once from the Application at process start, before any screen.
@@ -96,23 +105,28 @@ object MailStore {
         if (appContext != null) return
         appContext = app.applicationContext
         snapshotScope.launch {
-            val ctx = appContext ?: return@launch
-            val text = try {
-                java.io.File(ctx.filesDir, SNAPSHOT_FILE).takeIf { it.exists() }?.readText()
-            } catch (_: Exception) { null } ?: return@launch
-            val snap = try {
-                snapshotJson.decodeFromString(DiskSnapshot.serializer(), text)
-            } catch (_: Exception) { null } ?: return@launch
-            if (snap.version != SNAPSHOT_VERSION) return@launch
-            mutex.withLock {
-                if (pages.isEmpty() && stats == null && me == null && assignments == null) {
-                    pages = snap.pages
-                    stats = snap.stats
-                    labels = snap.labels
-                    aliases = snap.aliases
-                    me = snap.me
-                    assignments = snap.assignments
+            try {
+                val ctx = appContext ?: return@launch
+                val text = try {
+                    java.io.File(ctx.filesDir, SNAPSHOT_FILE).takeIf { it.exists() }?.readText()
+                } catch (_: Exception) { null } ?: return@launch
+                val snap = try {
+                    snapshotJson.decodeFromString(DiskSnapshot.serializer(), text)
+                } catch (_: Exception) { null } ?: return@launch
+                if (snap.version != SNAPSHOT_VERSION) return@launch
+                mutex.withLock {
+                    if (!SessionStore.isCurrent(ctx, snap.sessionId)) return@withLock
+                    if (pages.isEmpty() && stats == null && me == null && assignments == null) {
+                        pages = snap.pages
+                        stats = snap.stats
+                        labels = snap.labels
+                        aliases = snap.aliases
+                        me = snap.me
+                        assignments = snap.assignments
+                    }
                 }
+            } finally {
+                diskReady.complete(Unit)
             }
         }
     }
@@ -122,20 +136,24 @@ object MailStore {
      * one write 1.5s after the burst settles is one disk tick, not three.
      */
     private fun scheduleSnapshotWrite() {
-        if (snapshotWriteScheduled) return
-        snapshotWriteScheduled = true
+        if (!snapshotWriteScheduled.compareAndSet(false, true)) return
         snapshotScope.launch {
-            delay(1_500)
-            snapshotWriteScheduled = false
+            try {
+                delay(1_500)
+            } finally {
+                snapshotWriteScheduled.set(false)
+            }
             writeSnapshotNow()
         }
     }
 
-    private suspend fun writeSnapshotNow() {
-        val ctx = appContext ?: return
-        mutex.withLock {
-            val snap = DiskSnapshot(
+    private suspend fun writeSnapshotNow() = snapshotWriter.withLock writer@{
+        val ctx = appContext ?: return@writer
+        val session = SessionStore.snapshot(ctx) ?: return@writer
+        val (generation, snap) = mutex.withLock {
+            snapshotGeneration to DiskSnapshot(
                 version = SNAPSHOT_VERSION,
+                sessionId = session.id,
                 pages = pages,
                 stats = stats,
                 labels = labels,
@@ -143,14 +161,21 @@ object MailStore {
                 me = me,
                 assignments = assignments,
             )
+        }
+        val encoded = try {
+            snapshotJson.encodeToString(DiskSnapshot.serializer(), snap)
+        } catch (_: Exception) {
+            return@writer
+        }
+        mutex.withLock commit@{
+            if (generation != snapshotGeneration || !SessionStore.isCurrent(ctx, session.id)) return@commit
             try {
                 // Atomic by rename: a process death mid-write leaves the
                 // previous snapshot intact rather than a truncated file.
                 val tmp = java.io.File(ctx.filesDir, "$SNAPSHOT_FILE.tmp")
-                tmp.writeText(snapshotJson.encodeToString(DiskSnapshot.serializer(), snap))
+                tmp.writeText(encoded)
                 val dst = java.io.File(ctx.filesDir, SNAPSHOT_FILE)
                 if (!tmp.renameTo(dst)) {
-                    dst.writeText(tmp.readText())
                     tmp.delete()
                 }
             } catch (_: Exception) {
@@ -169,6 +194,23 @@ object MailStore {
         override fun sizeOf(key: String, value: MailMessageFullDto): Int =
             maxOf(1_024, value.sizeBytes ?: 0, (value.bodyText.orEmpty().length + value.bodyHtml.orEmpty().length) * 2)
     }
+    // Thread metadata only. The payload remains in [bodies], whose byte-cost
+    // limit controls memory. This bounded id index makes switching back to a
+    // recent conversation a memory hit without duplicating message bodies.
+    data class ThreadPage(
+        val messages: List<MailMessageFullDto>,
+        val nextCursor: String?,
+        val hasMore: Boolean,
+    )
+    private data class ThreadIndex(
+        val messageIds: List<String>,
+        val loadedAtMillis: Long,
+        val nextCursor: String?,
+        val hasMore: Boolean,
+    )
+    private val threadMessageIds = linkedMapOf<String, ThreadIndex>()
+    private const val MAX_CACHED_THREADS = 24
+    private const val THREAD_FRESHNESS_MS = 30_000L
 
     data class IndexedAttachment(val attachment: MailAttachmentDto, val subject: String?)
     private val attachmentsByMessage = mutableMapOf<String, List<IndexedAttachment>>()
@@ -200,14 +242,17 @@ object MailStore {
      * Merge a fetched page. `replace` is true for page 1 (a refresh or a new
      * search), false for a later page appended to what is already shown.
      */
-    suspend fun putPage(box: MailBox, query: String?, resp: MailInboxResponse, replace: Boolean) =
+    suspend fun putPage(box: MailBox, query: String?, resp: MailInboxResponse, replace: Boolean,
+                        sessionContext: android.content.Context? = null, sessionId: String? = null) =
         mutex.withLock {
+            if (sessionId != null && (sessionContext == null || !SessionStore.isCurrent(sessionContext, sessionId)))
+                return@withLock false
             val k = key(box, query)
             val prior = if (replace) null else pages[k]
             val merged = ((prior?.messages ?: emptyList()) + resp.messages).distinctBy { it.id }
             pages = pages + (k to PageCache(
                 messages = merged,
-                total = if (resp.total > 0) resp.total else prior?.total ?: 0,
+                total = resp.total,
                 pages = (prior?.pages ?: 0) + 1,
                 query = query?.trim()?.takeIf { it.isNotEmpty() },
                 loadedAtMillis = System.currentTimeMillis(),
@@ -219,20 +264,35 @@ object MailStore {
                     .drop(MAX_CACHED_SEARCHES - 1)
                 if (oldSearches.isNotEmpty()) pages = pages - oldSearches.map { it.key }.toSet()
             }
-            merged.size > (prior?.messages?.size ?: 0)
+            resp.messages.isNotEmpty()
         }.also { scheduleSnapshotWrite() }
 
     suspend fun stats(): MailStatsResponse? = mutex.withLock { stats }
-    suspend fun putStats(v: MailStatsResponse) = mutex.withLock { stats = v }.also { scheduleSnapshotWrite() }
+    suspend fun putStats(v: MailStatsResponse, sessionContext: android.content.Context? = null, sessionId: String? = null) =
+        mutex.withLock {
+            if (sessionId != null && (sessionContext == null || !SessionStore.isCurrent(sessionContext, sessionId)))
+                return@withLock false
+            stats = v
+            true
+        }.also { if (it) scheduleSnapshotWrite() }
 
     suspend fun labels(): List<MailLabelDto>? = mutex.withLock { labels }
-    suspend fun putLabels(v: List<MailLabelDto>) = mutex.withLock { labels = v }.also { scheduleSnapshotWrite() }
+    suspend fun putLabels(v: List<MailLabelDto>, context: android.content.Context? = null, sessionId: String? = null) = mutex.withLock {
+        if (sessionId != null && (context == null || !SessionStore.isCurrent(context, sessionId))) return@withLock false
+        labels = v; true
+    }.also { if (it) scheduleSnapshotWrite() }
 
     suspend fun aliases(): List<MailAliasDto>? = mutex.withLock { aliases }
-    suspend fun putAliases(v: List<MailAliasDto>) = mutex.withLock { aliases = v }.also { scheduleSnapshotWrite() }
+    suspend fun putAliases(v: List<MailAliasDto>, context: android.content.Context? = null, sessionId: String? = null) = mutex.withLock {
+        if (sessionId != null && (context == null || !SessionStore.isCurrent(context, sessionId))) return@withLock false
+        aliases = v; true
+    }.also { if (it) scheduleSnapshotWrite() }
 
     suspend fun me(): MailMeResponse? = mutex.withLock { me }
-    suspend fun putMe(v: MailMeResponse) = mutex.withLock { me = v }.also { scheduleSnapshotWrite() }
+    suspend fun putMe(v: MailMeResponse, context: android.content.Context? = null, sessionId: String? = null) = mutex.withLock {
+        if (sessionId != null && (context == null || !SessionStore.isCurrent(context, sessionId))) return@withLock false
+        me = v; true
+    }.also { if (it) scheduleSnapshotWrite() }
 
     /** Null until the first successful `GET /labels/assignments`. */
     suspend fun assignments(): Map<String, Set<String>>? = mutex.withLock { assignments }
@@ -241,7 +301,8 @@ object MailStore {
      *  successful read supersedes the previous answer completely rather than adding
      *  to it. Holding a stale pair alongside a fresh one would show a label the
      *  server has since un-tagged, in another box, on a row the user can see. */
-    suspend fun putAssignments(rows: List<MailAssignmentDto>) = mutex.withLock {
+    suspend fun putAssignments(rows: List<MailAssignmentDto>, context: android.content.Context? = null, sessionId: String? = null) = mutex.withLock {
+        if (sessionId != null && (context == null || !SessionStore.isCurrent(context, sessionId))) return@withLock false
         val built = mutableMapOf<String, MutableSet<String>>()
         rows.forEach { r ->
             if (r.messageId.isNotEmpty() && r.labelId.isNotEmpty()) {
@@ -249,7 +310,8 @@ object MailStore {
             }
         }
         assignments = built.toMap()
-    }.also { scheduleSnapshotWrite() }
+        true
+    }.also { if (it) scheduleSnapshotWrite() }
 
     /**
      * Patch one pair after a write the server accepted.
@@ -305,7 +367,10 @@ object MailStore {
         }
     }
 
-    suspend fun putBody(message: MailMessageFullDto) = mutex.withLock { cacheBody(message) }
+    suspend fun putBody(message: MailMessageFullDto, sessionContext: android.content.Context? = null, sessionId: String? = null) = mutex.withLock {
+        if (sessionId != null && (sessionContext == null || !SessionStore.isCurrent(sessionContext, sessionId))) return@withLock
+        cacheBody(message)
+    }
 
     suspend fun putBodies(messages: List<MailMessageFullDto>): List<MailMessageFullDto> = mutex.withLock {
         messages.map { message ->
@@ -317,6 +382,45 @@ object MailStore {
             merged
         }
     }
+
+    suspend fun thread(id: String): ThreadPage? = mutex.withLock {
+        val index = threadMessageIds.remove(id) ?: return@withLock null
+        if (System.currentTimeMillis() - index.loadedAtMillis > THREAD_FRESHNESS_MS) return@withLock null
+        val messages = index.messageIds.mapNotNull(bodies::get)
+        if (messages.size != index.messageIds.size) return@withLock null
+        // LinkedHashMap insertion order is the recency order: remove/reinsert
+        // moves the hit to the back without a second data structure.
+        threadMessageIds[id] = index
+        ThreadPage(messages, index.nextCursor, index.hasMore)
+    }
+
+    suspend fun putThread(
+        id: String,
+        messages: List<MailMessageFullDto>,
+        nextCursor: String?,
+        hasMore: Boolean,
+        sessionContext: android.content.Context? = null,
+        sessionId: String? = null,
+    ): ThreadPage = mutex.withLock {
+            if (sessionId != null && (sessionContext == null || !SessionStore.isCurrent(sessionContext, sessionId)))
+                return@withLock ThreadPage(messages, nextCursor, hasMore)
+            val merged = messages.map { message ->
+                val known = attachmentsByMessage[message.id]
+                val row = if (message.hasAttachments && message.attachments.isEmpty() && known != null) {
+                    message.copy(attachments = known.map { it.attachment })
+                } else message
+                cacheBody(row)
+                row
+            }
+            threadMessageIds.remove(id)
+            threadMessageIds[id] = ThreadIndex(
+                merged.map { it.id }, System.currentTimeMillis(), nextCursor, hasMore,
+            )
+            while (threadMessageIds.size > MAX_CACHED_THREADS) {
+                threadMessageIds.remove(threadMessageIds.keys.first())
+            }
+            ThreadPage(merged, nextCursor, hasMore)
+        }
 
     suspend fun forgetBody(id: String) = mutex.withLock {
         bodies.remove(id)
@@ -354,7 +458,11 @@ object MailStore {
         id: String,
         read: Boolean? = null,
         starred: Boolean? = null,
+        sessionContext: android.content.Context? = null,
+        sessionId: String? = null,
     ) = mutex.withLock {
+        if (sessionId != null && (sessionContext == null || !SessionStore.isCurrent(sessionContext, sessionId)))
+            return@withLock
         bodies.get(id)?.let { message ->
             val updated = message.copy(isRead = read ?: message.isRead, isStarred = starred ?: message.isStarred)
             if (updated != message) bodies.put(id, updated)
@@ -373,29 +481,43 @@ object MailStore {
         }
     }.also { scheduleSnapshotWrite() }
 
-    /** Drop a message from the cached pages after it has been filed elsewhere.
-     *  The box it moved *to* is invalidated rather than inserted into, because
-     *  the app cannot know that box's ordering without asking the server. */
-    suspend fun removeEverywhere(id: String) = mutex.withLock {
-        pages = pages.mapValues { (_, cache) ->
+    /** Remove a filed row only from the box currently being viewed.
+     *
+     * Archive remains in All Mail and a flagged message remains in Starred, so
+     * deleting it from every cached page made those derived views lie. The
+     * model invalidates overlapping/destination boxes; this patches the source
+     * box immediately and rebases its exact total. */
+    suspend fun remove(id: String, from: MailBox,
+                       sessionContext: android.content.Context? = null, sessionId: String? = null) = mutex.withLock {
+        if (sessionId != null && (sessionContext == null || !SessionStore.isCurrent(sessionContext, sessionId)))
+            return@withLock
+        val prefix = from.apiValue + "|"
+        pages = pages.mapValues { (key, cache) ->
+            if (!key.startsWith(prefix)) return@mapValues cache
             val index = cache.messages.indexOfFirst { it.id == id }
             if (index < 0) cache else cache.copy(
                 messages = cache.messages.toMutableList().apply { removeAt(index) },
+                total = maxOf(0, cache.total - 1),
             )
         }
     }.also { scheduleSnapshotWrite() }
 
     /** Forget one box so the next visit refetches it. Used after filing, where
      *  the destination's contents genuinely changed. */
-    suspend fun invalidate(box: MailBox) = mutex.withLock {
+    suspend fun invalidate(box: MailBox, sessionContext: android.content.Context? = null, sessionId: String? = null) = mutex.withLock {
+        if (sessionId != null && (sessionContext == null || !SessionStore.isCurrent(sessionContext, sessionId)))
+            return@withLock
         pages = pages.filterKeys { !it.startsWith(box.apiValue + "|") }
     }.also { scheduleSnapshotWrite() }
 
-    suspend fun invalidateAllBoxes() = mutex.withLock {
+    suspend fun invalidateAllBoxes(sessionContext: android.content.Context? = null, sessionId: String? = null) = mutex.withLock {
+        if (sessionId != null && (sessionContext == null || !SessionStore.isCurrent(sessionContext, sessionId)))
+            return@withLock
         pages = emptyMap()
     }.also { scheduleSnapshotWrite() }
 
     suspend fun clear() = mutex.withLock {
+        snapshotGeneration++
         // Takes the same lock every mutator takes. It did not: `clear()` was a
         // plain function writing seven fields that coroutines on other dispatchers
         // mutate under the mutex, so a sign-out racing an in-flight `putPage` had no
@@ -409,6 +531,7 @@ object MailStore {
         aliases = null
         me = null
         bodies.evictAll()
+        threadMessageIds.clear()
         attachmentsByMessage.clear()
         // Back to null, not to an empty map: the next account has not been asked
         // anything, and an empty map would claim its mail carries no labels.

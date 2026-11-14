@@ -17,6 +17,7 @@ import okhttp3.MultipartBody
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
+import okhttp3.RequestBody.Companion.asRequestBody
 import okhttp3.Response
 import java.io.IOException
 import java.net.URLEncoder
@@ -973,7 +974,7 @@ object Api {
 
     /**
      * The profile photo, as multipart — the same field name (`file`) and the
-     * same 256 KB ceiling the route enforces (`auth-account-profile.ts:256`).
+     * same 10 MB ceiling the route enforces (`auth-account-profile.ts`).
      * The answer's `avatarUrl` carries a cache nonce; storing it is what makes a
      * replaced photo show immediately instead of after a kill and relaunch.
      */
@@ -1136,10 +1137,12 @@ object Api {
      * the second write is redundant and races the first.
      */
     suspend fun mailMessage(token: String, id: String): MailMessageResponse =
-        read(authed("$MAIL/message/${enc(id)}", token).get().build()) { json.decodeFromString(it) }
+        read(authed("$MAIL/message/${enc(id)}?native=1", token).get().build()) { json.decodeFromString(it) }
 
-    suspend fun mailThread(token: String, threadId: String): MailThreadResponse =
-        read(authed("$MAIL/thread/${enc(threadId)}", token).get().build()) { json.decodeFromString(it) }
+    suspend fun mailThread(token: String, threadId: String, before: String? = null): MailThreadResponse {
+        val url = "$MAIL/thread/${enc(threadId)}?native=1" + (before?.let { "&before=${enc(it)}" } ?: "")
+        return read(authed(url, token).get().build()) { json.decodeFromString(it) }
+    }
 
     /**
      * `GET /message/:id/body` — the reader's render body. The web app
@@ -1152,7 +1155,10 @@ object Api {
      */
     suspend fun mailBody(token: String, id: String, allowImages: Boolean): MailBodyResponse =
         read(
-            authed("$MAIL/message/${enc(id)}/body" + if (allowImages) "?images=1" else "", token).get().build(),
+            authed(
+                "$MAIL/message/${enc(id)}/html" + if (allowImages) "?remoteImages=true" else "",
+                token,
+            ).get().build(),
         ) { json.decodeFromString(it) }
 
     /**
@@ -1414,6 +1420,21 @@ object Api {
             resp.body?.bytes() ?: ByteArray(0)
         }
 
+    /** Stream an attachment to disk without retaining its entire body in memory. */
+    suspend fun mailAttachmentToFile(token: String, id: String, destination: java.io.File) {
+        executeResponse(authed("$MAIL/attachments/${enc(id)}", token).get().build()) { resp ->
+            if (resp.code >= 400) fail(resp.code, resp.body?.string() ?: "")
+            try {
+                destination.outputStream().buffered().use { output ->
+                    resp.body?.byteStream()?.use { input -> input.copyTo(output) }
+                }
+            } catch (error: Exception) {
+                destination.delete()
+                throw error
+            }
+        }
+    }
+
     /**
      * `POST /attachments` — multipart, with the field names the route reads:
      * `file` and `messageId` (`grapmail-attachments.ts:225,236`).
@@ -1433,6 +1454,17 @@ object Api {
         return read(req) {
             json.decodeFromString(MailAttachmentResponseJson.serializer(), it).attachment
         }
+    }
+
+    suspend fun mailAttachmentUploadFile(
+        token: String, file: java.io.File, filename: String, mimeType: String,
+    ): MailAttachmentDto {
+        val body = MultipartBody.Builder().setType(MultipartBody.FORM)
+            .addFormDataPart("file", filename, file.asRequestBody(mimeType.toMediaType()))
+            .addFormDataPart("messageId", "")
+            .build()
+        val req = authed("$MAIL/attachments", token).post(body).build()
+        return read(req) { json.decodeFromString(MailAttachmentResponseJson.serializer(), it).attachment }
     }
     /**
      * The screener queue's own settings. Note `?box=screener` is the queue

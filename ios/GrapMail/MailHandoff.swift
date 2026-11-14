@@ -33,7 +33,7 @@ import UIKit
 /// that, rather than inventing a sentence for the gap, and a message whose only
 /// part is HTML says it was printed as plain text — the same admission the
 /// screen makes, one step further out.
-func messageShareText(_ message: MailMessageFull) -> String {
+func messageShareText(_ message: MailMessageFull, formattedText: String? = nil) -> String {
     var lines: [String] = []
     lines.append(message.subject?.nilIfBlank() ?? "(no subject)")
     let from = message.from?.display.nilIfBlank() ?? (message.from?.address ?? "").nilIfBlank()
@@ -42,12 +42,8 @@ func messageShareText(_ message: MailMessageFull) -> String {
     if !message.cc.isEmpty { lines.append("Cc: \(message.cc.joined(separator: ", "))") }
     lines.append("Date: \(message.createdAt ?? "Not recorded")")
     lines.append("")
-    if let text = message.bodyText?.nilIfBlank() {
+    if let text = message.bodyText?.nilIfBlank() ?? formattedText?.nilIfBlank() {
         lines.append(text)
-    } else if let html = message.bodyHtml?.nilIfBlank() {
-        lines.append(HtmlStripper.strip(html))
-        lines.append("")
-        lines.append("(Printed as plain text: GrapMail does not render the sender's HTML.)")
     } else {
         lines.append("This message has no text body.")
     }
@@ -252,7 +248,11 @@ struct MessageActivityView: UIViewControllerRepresentable {
 /// error — gets said, because a button that appeared to do nothing reads as a
 /// broken app.
 @MainActor
-func printMessageText(_ message: MailMessageFull, onOutcome: @escaping (String?) -> Void) {
+func printMessageText(
+    _ message: MailMessageFull,
+    formattedText: String? = nil,
+    onOutcome: @escaping (String?) -> Void
+) {
     let controller = UIPrintInteractionController.shared
     let info = UIPrintInfo(dictionary: nil)
     info.outputType = .grayscale
@@ -260,7 +260,7 @@ func printMessageText(_ message: MailMessageFull, onOutcome: @escaping (String?)
     info.jobName = String((message.subject?.nilIfBlank() ?? "GrapMail message").prefix(60))
     controller.printInfo = info
     controller.printFormatter = UISimpleTextPrintFormatter(
-        text: messageShareText(message))
+        text: messageShareText(message, formattedText: formattedText))
 
     guard let view = frontView() else {
         onOutcome("This device could not open its print screen.")

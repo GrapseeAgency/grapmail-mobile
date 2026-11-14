@@ -36,27 +36,62 @@ private val Context.sessionStore by preferencesDataStore("grapmail_session")
  * reason the access token is — it is a bearer credential that can mint new
  * sessions.
  */
-// Not a data class: diagnostics must never print credentials.
-class SessionSnapshot(val id: String, val token: String, val address: String, val unexpired: Boolean)
+// Not a data class: diagnostics must never print credentials. Expiry stays as
+// the instant, not a boolean captured at read time, so a process-lifetime cache
+// cannot keep saying an hour-old access token is fresh after the hour passes.
+class SessionSnapshot(
+    val id: String,
+    val token: String,
+    val address: String,
+    private val expiresAtMillis: Long,
+) {
+    val unexpired: Boolean get() = expiresAtMillis <= 0L || expiresAtMillis > System.currentTimeMillis()
+}
 
 object SessionStore {
     private val writes = Mutex()
     private val KEY_SESSION = stringPreferencesKey("session_id")
+
+    // A mailbox action used to read DataStore and ask Android Keystore to
+    // decrypt the same bearer again — 37 call sites ask for snapshot/token.
+    // The encrypted record remains the durable source; this is only the
+    // process-lifetime plaintext already held by every authenticated request.
+    // Every writer below updates or clears it while holding [writes], so a
+    // sign-out cannot leave a usable cached bearer behind.
+    @Volatile private var cachedSession: SessionSnapshot? = null
+    @Volatile private var sessionCacheKnown = false
 
     private fun sessionId(prefs: Preferences): String? =
         if (prefs[KEY_TOKEN] == null) null else prefs[KEY_SESSION] ?: prefs[KEY_IV]
 
     fun sessionIds(context: Context) = context.sessionStore.data.map(::sessionId).distinctUntilChanged()
 
-    suspend fun snapshot(context: Context): SessionSnapshot? = withContext(Dispatchers.IO) {
-        val prefs = context.sessionStore.data.first()
-        val id = sessionId(prefs) ?: return@withContext null
-        val token = open(prefs[KEY_TOKEN], prefs[KEY_IV]) ?: return@withContext null
-        SessionSnapshot(id, token, prefs[KEY_ADDRESS] ?: "", isUnexpired(prefs))
+    suspend fun snapshot(context: Context): SessionSnapshot? {
+        if (sessionCacheKnown) return cachedSession
+        return withContext(Dispatchers.IO) {
+            writes.withLock {
+                if (sessionCacheKnown) return@withLock cachedSession
+                val prefs = context.sessionStore.data.first()
+                val id = sessionId(prefs)
+                val token = open(prefs[KEY_TOKEN], prefs[KEY_IV])
+                cachedSession = if (id != null && token != null) {
+                    SessionSnapshot(id, token, prefs[KEY_ADDRESS] ?: "", expiryMillis(prefs))
+                } else null
+                sessionCacheKnown = true
+                cachedSession
+            }
+        }
     }
 
-    suspend fun isCurrent(context: Context, id: String): Boolean =
-        sessionId(context.sessionStore.data.first()) == id
+    suspend fun isCurrent(context: Context, id: String): Boolean {
+        if (sessionCacheKnown) return cachedSession?.id == id
+        // Do not acquire [writes] here. MailStore validates its disk snapshot
+        // while holding its own mutex; sign-in/sign-out hold [writes] and then
+        // clear MailStore. Taking the locks in both orders would deadlock a
+        // launch racing a session change. This cold-path DataStore read is
+        // safe: edit is atomic, and a stale answer only discards a cache file.
+        return sessionId(context.sessionStore.data.first()) == id
+    }
 
     private val KEY_TOKEN = stringPreferencesKey("token_enc")
     private val KEY_IV = stringPreferencesKey("token_iv")
@@ -105,25 +140,39 @@ object SessionStore {
         writes.withLock {
             val (encrypted, iv) = seal(token)
             val previousAddress = context.sessionStore.data.first()[KEY_ADDRESS]
-            if (previousAddress != null && !previousAddress.equals(address, ignoreCase = true)) {
-                MailStore.clear()
-                SecurityProfileCache.clear()
-            }
-            context.sessionStore.edit { prefs ->
-                prefs[KEY_TOKEN] = encrypted
-                prefs[KEY_IV] = iv
-                // Never inherit a different sign-in's refresh token.
-                prefs.remove(KEY_REFRESH)
-                prefs.remove(KEY_REFRESH_IV)
-                if (refreshToken != null) {
-                    val (refreshEnc, refreshIv) = seal(refreshToken)
-                    prefs[KEY_REFRESH] = refreshEnc
-                    prefs[KEY_REFRESH_IV] = refreshIv
+            // Retire the old in-memory session before clearing its mailbox.
+            // Otherwise an old response waiting on MailStore's mutex can write
+            // after the clear but before the new credentials become visible.
+            cachedSession = null
+            sessionCacheKnown = true
+            var committed = false
+            try {
+                if (previousAddress != null && !previousAddress.equals(address, ignoreCase = true)) {
+                    MailStore.clear()
+                    SecurityProfileCache.clear()
                 }
-                prefs[KEY_SESSION] = UUID.randomUUID().toString()
-                prefs[KEY_ADDRESS] = address
-                prefs[KEY_NAME] = name
-                prefs[KEY_EXPIRES] = expiresAt.toString()
+                val id = UUID.randomUUID().toString()
+                context.sessionStore.edit { prefs ->
+                    prefs[KEY_TOKEN] = encrypted
+                    prefs[KEY_IV] = iv
+                    // Never inherit a different sign-in's refresh token.
+                    prefs.remove(KEY_REFRESH)
+                    prefs.remove(KEY_REFRESH_IV)
+                    if (refreshToken != null) {
+                        val (refreshEnc, refreshIv) = seal(refreshToken)
+                        prefs[KEY_REFRESH] = refreshEnc
+                        prefs[KEY_REFRESH_IV] = refreshIv
+                    }
+                    prefs[KEY_SESSION] = id
+                    prefs[KEY_ADDRESS] = address
+                    prefs[KEY_NAME] = name
+                    prefs[KEY_EXPIRES] = expiresAt.toString()
+                }
+                cachedSession = SessionSnapshot(id, token, address, normaliseExpiry(expiresAt))
+                committed = true
+            } finally {
+                // A failed or cancelled save leaves DataStore authoritative.
+                if (!committed) sessionCacheKnown = false
             }
         }
     }
@@ -157,6 +206,10 @@ object SessionStore {
                     prefs[KEY_REFRESH_IV] = refreshIv
                 }
                 prefs[KEY_EXPIRES] = expiresAt.toString()
+                cachedSession = SessionSnapshot(
+                    id, token, prefs[KEY_ADDRESS] ?: "", normaliseExpiry(expiresAt),
+                )
+                sessionCacheKnown = true
                 updated = true
             }
             updated
@@ -184,10 +237,7 @@ object SessionStore {
         }
     }
 
-    suspend fun token(context: Context): String? = withContext(Dispatchers.IO) {
-        val prefs = context.sessionStore.data.first()
-        open(prefs[KEY_TOKEN], prefs[KEY_IV])
-    }
+    suspend fun token(context: Context): String? = snapshot(context)?.token
 
     /** The refresh token, or null for a session stored before the migration. */
     suspend fun refreshToken(context: Context): String? = withContext(Dispatchers.IO) {
@@ -206,16 +256,17 @@ object SessionStore {
     /** A stored session counts as signed-in only while unexpired. 0 means
      *  the server supplied no expiry — keep the session. Values below the
      *  epoch-milliseconds threshold are seconds, not milliseconds. */
-    suspend fun hasValidSession(context: Context): Boolean = withContext(Dispatchers.IO) {
-        val prefs = context.sessionStore.data.first()
-        prefs[KEY_TOKEN] != null && isUnexpired(prefs)
-    }
+    suspend fun hasValidSession(context: Context): Boolean = snapshot(context)?.unexpired == true
+
+    private fun normaliseExpiry(raw: Long): Long =
+        if (raw in 1 until 100_000_000_000L) raw * 1000L else raw
+
+    private fun expiryMillis(prefs: Preferences): Long =
+        normaliseExpiry(prefs[KEY_EXPIRES]?.toLongOrNull() ?: 0L)
 
     private fun isUnexpired(prefs: Preferences): Boolean {
-        val raw = prefs[KEY_EXPIRES]?.toLongOrNull() ?: 0L
-        if (raw <= 0L) return true
-        val millis = if (raw < 100_000_000_000L) raw * 1000L else raw
-        return millis > System.currentTimeMillis()
+        val millis = expiryMillis(prefs)
+        return millis <= 0L || millis > System.currentTimeMillis()
     }
 
     suspend fun clear(context: Context) { clearMatching(context) { true } }
@@ -232,6 +283,8 @@ object SessionStore {
                 var cleared = false
                 context.sessionStore.edit { if (matches(it)) { it.clear(); cleared = true } }
                 if (cleared) {
+                    cachedSession = null
+                    sessionCacheKnown = true
                     SecurityProfileCache.clear()
                     MailStore.clear()
                     context.getSystemService(android.app.NotificationManager::class.java)?.cancelAll()

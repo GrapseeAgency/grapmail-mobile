@@ -337,6 +337,113 @@ struct MailboxView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
+    private func boxCategoryIcon(_ box: MailBox) -> String {
+        switch box {
+        case .starred:  return "star"
+        case .snoozed:  return "clock"
+        case .sent:     return "paperplane.fill"
+        case .drafts:   return "doc.text"
+        case .archive:  return "archivebox"
+        case .spam:     return "exclamationmark.triangle"
+        case .others:   return "tray.full"
+        default:        return "trash"
+        }
+    }
+
+    private func boxCategoryTint(_ box: MailBox) -> Color {
+        switch box {
+        case .starred:  return GM.star
+        case .snoozed:  return GM.primarySolid
+        case .sent:     return GM.success
+        case .drafts:   return GM.textSecondary
+        case .archive:  return GM.primarySolid
+        case .spam:     return GM.warnInk
+        case .others:   return GM.textSecondary
+        default:        return GM.error
+        }
+    }
+
+    @ViewBuilder
+    private var categoryRows: some View {
+        let boxes = drawerBoxes(vm.state)
+            .filter { $0 != vm.state.box && $0 != .screener && $0 != .others }
+        let counts = drawerCounts(vm.state)
+        ForEach(boxes, id: \.self) { box in
+            BoxCategoryRow(
+                title: box.title,
+                count: counts[box] ?? nil,
+                icon: boxCategoryIcon(box),
+                tint: boxCategoryTint(box),
+                onTap: { vm.open(box) }
+            )
+            .listRowBackground(Color.clear)
+            .listRowSeparator(.hidden)
+        }
+    }
+
+    @ViewBuilder
+    private func rowView(for row: MailMessage, prefetchIDs: Set<String>) -> some View {
+        MessageRow(
+            message: row,
+            selecting: !vm.state.selection.isEmpty,
+            selected: vm.state.selection.contains(row.id),
+            onSelect: { vm.toggleSelect(row.id) },
+            onOpen: {
+                if vm.state.box == .drafts { onDraft(row.id) }
+                else { onThread(row.threadId ?? row.id, row.threadId != nil) }
+            },
+            onStar: { vm.actOn(row.id, row.isStarred ? .unstar : .star) }
+        )
+        .equatable()
+        .listRowInsets(EdgeInsets())
+        .listRowBackground(Color.clear)
+        .listRowSeparator(.hidden)
+        .swipeActions(edge: .leading, allowsFullSwipe: true) {
+            if vm.state.box == .trash || vm.state.box == .spam {
+                Button("Back to Inbox") { vm.actOn(row.id, .restore) }
+                    .tint(GM.swipeArchive)
+            } else if vm.state.box != .archive {
+                Button("Archive") { vm.actOn(row.id, .archive) }
+                    .tint(GM.swipeArchive)
+            }
+        }
+        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+            if vm.state.box != .trash && vm.state.box != .spam {
+                Button("Trash") { vm.actOn(row.id, .trash) }
+                    .tint(GM.swipeTrash)
+            }
+        }
+        .onAppear {
+            if vm.state.rows.first?.id == row.id { isAtTop = true }
+        }
+        .task(id: prefetchIDs.contains(row.id) ? vm.state.pages : -1) {
+            if prefetchIDs.contains(row.id) { await vm.loadMoreWhenReady() }
+        }
+        .onDisappear {
+            if vm.state.rows.first?.id == row.id { isAtTop = false }
+        }
+    }
+
+    @ViewBuilder
+    private var listFooter: some View {
+        if vm.state.loadingMore {
+            Text("Loading more…")
+                .font(.system(size: 13)).foregroundColor(GM.textTertiary)
+                .frame(maxWidth: .infinity, alignment: .center)
+                .listRowSeparator(.hidden)
+        } else if vm.state.canLoadMore {
+            VStack(spacing: 4) {
+                if let error = vm.state.appendError {
+                    Text(error).font(.system(size: 13)).foregroundColor(GM.textSecondary)
+                }
+                Button(vm.state.appendError == nil ? "Load more" : "Retry") { vm.loadMore() }
+            }
+            .frame(maxWidth: .infinity)
+            .listRowBackground(Color.clear)
+            .listRowSeparator(.hidden)
+        }
+    }
+
     /// `List` is lazy, which a mailbox needs and the wizard screens did not.
     /// Prefetch near the end, with a footer for manual loading and retry.
     ///
@@ -346,121 +453,12 @@ struct MailboxView: View {
     /// the only corners on screen are the container's.
     private var messageList: some View {
         let prefetchIDs = Set(vm.state.rows.suffix(4).map(\.id))
-        // The reference's category rows live inside the card, above the mail
-        // list: one row per other box, the server's own unread count as the
-        // pill, and `vm.open` behind the tap. The screen's own box is the list
-        // below, so it is the one row not shown here.
-        let boxes = drawerBoxes(vm.state)
-            .filter { $0 != vm.state.box && $0 != .screener && $0 != .others }
-        let counts = drawerCounts(vm.state)
         return List {
-            // The box's own name is drawn above the card by the header, not as
-            // a scrolling row here: a title that scrolls away leaves the card
-            // unlabelled.
-            ForEach(boxes, id: \.self) { box in
-                BoxCategoryRow(
-                    title: box.title,
-                    count: counts[box] ?? nil,
-                    icon: {
-                        switch box {
-                        case .starred:  return "star"
-                        case .snoozed:  return "clock"
-                        case .sent:     return "paperplane.fill"
-                        case .drafts:   return "doc.text"
-                        case .archive:  return "archivebox"
-                        case .spam:     return "exclamationmark.triangle"
-                        case .others:   return "tray.full"
-                        default:        return "trash"
-                        }
-                    }(),
-                    tint: {
-                        switch box {
-                        case .starred:  return GM.star
-                        case .snoozed:  return GM.primarySolid
-                        case .sent:     return GM.success
-                        case .drafts:   return GM.textSecondary
-                        case .archive:  return GM.primarySolid
-                        case .spam:     return GM.warnInk
-                        case .others:   return GM.textSecondary
-                        default:        return GM.error
-                        }
-                    }(),
-                    onTap: { vm.open(box) }
-                )
-                .listRowBackground(Color.clear)
-                .listRowSeparator(.hidden)
-            }
+            categoryRows
             ForEach(vm.state.rows) { row in
-                MessageRow(
-                    message: row,
-                    selecting: !vm.state.selection.isEmpty,
-                    selected: vm.state.selection.contains(row.id),
-                    onSelect: { vm.toggleSelect(row.id) },
-                    onOpen: {
-                        if vm.state.box == .drafts { onDraft(row.id) }
-                        else { onThread(row.threadId ?? row.id, row.threadId != nil) }
-                    },
-                    onStar: { vm.actOn(row.id, row.isStarred ? .unstar : .star) }
-                )
-                .equatable()
-                .listRowInsets(EdgeInsets())
-                .listRowBackground(Color.clear)
-                .listRowSeparator(.hidden)
-                // Swipe files, and only in the directions that mean something
-                // where the message already is. Same two directions and same two
-                // colours as Android's `SwipeableMessageRow`: leading is archive
-                // (or back out of Trash/Spam), trailing is trash, and neither
-                // destroys — permanent deletion stays behind its confirmation
-                // sheet, so no gesture here can erase mail.
-                //
-                // `allowsFullSwipe` is the one mechanic Android cannot match:
-                // Material3 fires on crossing the halfway threshold, with no
-                // "stay open until tapped" mode. So a fling toward Trash is
-                // refused here and accepted there — which is why neither
-                // direction is allowed to be irreversible.
-                .swipeActions(edge: .leading, allowsFullSwipe: true) {
-                    if vm.state.box == .trash || vm.state.box == .spam {
-                        Button("Back to Inbox") { vm.actOn(row.id, .restore) }
-                            .tint(GM.swipeArchive)
-                    } else if vm.state.box != .archive {
-                        Button("Archive") { vm.actOn(row.id, .archive) }
-                            .tint(GM.swipeArchive)
-                    }
-                }
-                .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-                    if vm.state.box != .trash && vm.state.box != .spam {
-                        // Not `.destructive` role: that draws the system red and
-                        // implies irreversibility, and trashing undoes.
-                        Button("Trash") { vm.actOn(row.id, .trash) }
-                            .tint(GM.swipeTrash)
-                    }
-                }
-                .onAppear {
-                    if vm.state.rows.first?.id == row.id { isAtTop = true }
-                }
-                .task(id: prefetchIDs.contains(row.id) ? vm.state.pages : -1) {
-                    if prefetchIDs.contains(row.id) { await vm.loadMoreWhenReady() }
-                }
-                .onDisappear {
-                    if vm.state.rows.first?.id == row.id { isAtTop = false }
-                }
+                rowView(for: row, prefetchIDs: prefetchIDs)
             }
-            if vm.state.loadingMore {
-                Text("Loading more…")
-                    .font(.system(size: 13)).foregroundColor(GM.textTertiary)
-                    .frame(maxWidth: .infinity, alignment: .center)
-                    .listRowSeparator(.hidden)
-            } else if vm.state.canLoadMore {
-                VStack(spacing: 4) {
-                    if let error = vm.state.appendError {
-                        Text(error).font(.system(size: 13)).foregroundColor(GM.textSecondary)
-                    }
-                    Button(vm.state.appendError == nil ? "Load more" : "Retry") { vm.loadMore() }
-                }
-                .frame(maxWidth: .infinity)
-                .listRowBackground(Color.clear)
-                .listRowSeparator(.hidden)
-            }
+            listFooter
         }
         .listStyle(.plain)
         .id(vm.state.box)
@@ -497,13 +495,14 @@ struct MailboxView: View {
                 note: vm.state.labelNote,
                 selectedCount: vm.state.selection.count,
                 busy: vm.state.busy,
-            ) { id in
-                // Not dismissed on pick, unlike the move and snooze sheets. Those
-                // change the list under the user, which is the feedback; a label
-                // changes nothing visible on this screen, so the sheet has to stay
-                // open and show its own result line.
-                vm.toggleLabel(id)
-            }
+                onPick: { id in
+                    // Not dismissed on pick, unlike the move and snooze sheets. Those
+                    // change the list under the user, which is the feedback; a label
+                    // changes nothing visible on this screen, so the sheet has to stay
+                    // open and show its own result line.
+                    vm.toggleLabel(id)
+                }
+            )
         case .snooze:
             SnoozeSheet { until in vm.act(.snooze, until: until); sheet = nil }
         case .sender:

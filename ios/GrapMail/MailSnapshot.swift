@@ -480,7 +480,9 @@ struct MailSnapshotView: View {
                     read: .read,
                     note: nil,
                     selectedCount: 3,
-                    busy: false) { _ in })
+                    busy: false,
+                    onPick: { _ in }
+                ))
                 )
             case "mail-snooze-sheet":
                 return AnyView(

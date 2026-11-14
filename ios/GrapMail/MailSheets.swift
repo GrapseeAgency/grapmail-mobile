@@ -171,6 +171,7 @@ struct AssignLabelSheet: View {
     let read: AssignmentsRead
     let note: String?
     let selectedCount: Int
+    let busy: Bool
     let onPick: (String) -> Void
 
     var body: some View {
@@ -192,8 +193,10 @@ struct AssignLabelSheet: View {
             ForEach(labels) { l in
                 let m = marks[l.id] ?? .unknown
                 SheetOption(label: l.name, active: m == .on, mixed: m == .mixed) {
-                    onPick(l.id)
+                    if !busy { onPick(l.id) }
                 }
+                .disabled(busy)
+                .opacity(busy ? 0.55 : 1)
             }
             if let note {
                 Text(note)

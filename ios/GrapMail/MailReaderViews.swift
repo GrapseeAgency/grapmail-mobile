@@ -40,6 +40,7 @@ struct ThreadView: View {
     /// earlier success on screen.
     @State private var notices: [String: String] = [:]
     @State private var busy: String?
+    @State private var expandedMessageId: String?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -51,12 +52,24 @@ struct ThreadView: View {
             } else {
                 ScrollView {
                     LazyVStack(spacing: 0) {
+                        if isThread && (vm.thread.hasMore || vm.thread.loadingEarlier) {
+                            ReaderOutlineButton(
+                                vm.thread.loadingEarlier
+                                    ? "Loading earlier messages…"
+                                    : "Load earlier messages",
+                                identifier: "mail-thread-load-earlier",
+                                action: { vm.loadEarlierThread(id) }
+                            )
+                            .disabled(vm.thread.loadingEarlier)
+                            .padding(.horizontal, 16).padding(.vertical, 10)
+                        }
                         ForEach(Array(vm.thread.messages.enumerated()), id: \.element.id) { index, m in
                             ThreadMessageCard(
                                 vm: vm,
                                 message: m,
                                 e2e: e2e,
-                                expanded: index == vm.thread.messages.count - 1,
+                                expanded: expandedMessageId == m.id,
+                                onExpand: { expandedMessageId = m.id },
                                 busy: busy == m.id,
                                 notices: notices,
                                 onReply: { mode in onReply(m.id, mode) },
@@ -82,7 +95,14 @@ struct ThreadView: View {
             }
         }
         .background(GM.bg)
-        .onAppear { isThread ? vm.openThread(id) : vm.openMessage(id) }
+        .task(id: MailStep(id: id, isThread: isThread)) {
+            expandedMessageId = nil
+            isThread ? vm.openThread(id) : vm.openMessage(id)
+        }
+        .task(id: vm.thread.messages.last?.id) {
+            if expandedMessageId == nil { expandedMessageId = vm.thread.messages.last?.id }
+        }
+        .onDisappear { vm.leaveReader(id, isThread: isThread) }
         .accessibilityIdentifier("mail-thread")
     }
 
@@ -160,6 +180,7 @@ private struct ThreadMessageCard: View {
     let message: MailMessageFull
     let e2e: E2eModel
     let expanded: Bool
+    let onExpand: () -> Void
     let busy: Bool
     let notices: [String: String]
     let onReply: (String) -> Void
@@ -188,25 +209,14 @@ private struct ThreadMessageCard: View {
     /// asked for them. Both belong to the message, and the card is rebuilt per
     /// message -- an opt-in given for one mail must not travel to the next.
     @State private var shownImages = false
-    @State private var openEarlierMessage = false
-    private var showsBody: Bool { expanded || openEarlierMessage }
+    private var showsBody: Bool { expanded }
     @State private var detailsError: String?
     @State private var detailsAttempt = 0
     private var needsFormattedBody: Bool {
         showsBody && !message.isE2eEncrypted && message.e2eEnvelope == nil
-            && message.bodyHtml?.nilIfBlank() != nil
+            && message.hasHtml
     }
-    @State private var hiddenImages: [String] = []
     @State private var formattedBody: MailboxModel.BodyRender?
-    @State private var fallbackText = ""
-
-    private nonisolated static func findRemoteImages(in html: String?) async -> [String] {
-        remoteImageUrls(html)
-    }
-
-    private nonisolated static func plainText(from html: String) async -> String {
-        HtmlStripper.strip(html)
-    }
     /// The formatted body's measured height. The web view sizes itself to its
     /// document and the reader owns scrolling, so this is the frame the island
     /// renders inside; it resets with each message.
@@ -255,7 +265,7 @@ private struct ThreadMessageCard: View {
                     Button("Retry") { detailsAttempt += 1 }
                 }
             } else {
-                Button("Show message") { openEarlierMessage = true }
+                Button("Show message", action: onExpand)
                     .font(.system(size: 13, weight: .medium))
             }
 
@@ -331,7 +341,9 @@ private struct ThreadMessageCard: View {
                     // succeeds, so only a refusal needs a line here — and a
                     // refusal is a real state, not an error to swallow.
                     ReaderOutlineButton("Print", identifier: "mail-print") {
-                        printMessageText(message) { outcome in handoffNote = outcome }
+                        printMessageText(message, formattedText: formattedBody?.bodyText) {
+                            outcome in handoffNote = outcome
+                        }
                     }
                 }
                 if unreadDone {
@@ -415,7 +427,8 @@ private struct ThreadMessageCard: View {
         // print uses too, so the two handoffs cannot drift into describing
         // different messages.
         .sheet(isPresented: $showShare) {
-            MessageActivityView(text: messageShareText(message))
+            MessageActivityView(text: messageShareText(
+                message, formattedText: formattedBody?.bodyText))
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -432,12 +445,6 @@ private struct ThreadMessageCard: View {
                   !Task.isCancelled else { return }
             formattedBody = render
         }
-        .task(id: needsFormattedBody ? message.bodyHtml : nil) {
-            guard needsFormattedBody else { return }
-            let images = await Self.findRemoteImages(in: message.bodyHtml)
-            guard !Task.isCancelled else { return }
-            hiddenImages = images
-        }
     }
 
     @ViewBuilder private var bodyView: some View {
@@ -453,8 +460,8 @@ private struct ThreadMessageCard: View {
     }
 
     @ViewBuilder private var bodyText: some View {
-        if let html = message.bodyHtml?.nilIfBlank() {
-            htmlBody(html)
+        if message.hasHtml {
+            htmlBody
         } else if let text = message.bodyText?.nilIfBlank() {
             Text(text)
                 .font(.system(size: 15))
@@ -474,7 +481,7 @@ private struct ThreadMessageCard: View {
     /// While the fetch is in flight, and if it fails, the stripped-text branch
     /// the card always had is the visible fallback, said per message rather
     /// than hidden.
-    @ViewBuilder private func htmlBody(_ html: String) -> some View {
+    @ViewBuilder private var htmlBody: some View {
         let render = formattedBody.flatMap { $0.allowImages == shownImages ? $0 : nil }
         if let clean = render?.html?.nilIfBlank() {
             MailHtmlBodyView(
@@ -493,18 +500,14 @@ private struct ThreadMessageCard: View {
             // The formatted view is unavailable: say what failed and fall back
             // to the plain rendering — the honest downgrade, still stated.
             VStack(alignment: .leading, spacing: 6) {
-                HtmlStrippedNotice()
                 Text(failure)
                     .font(.system(size: 12)).foregroundColor(GM.textTertiary)
                     .fixedSize(horizontal: false, vertical: true)
-                Text(fallbackText)
-                    .font(.system(size: 15)).foregroundColor(GM.textSecondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            .task(id: html) {
-                let text = await Self.plainText(from: html)
-                guard !Task.isCancelled else { return }
-                fallbackText = text
+                if let text = message.bodyText?.nilIfBlank() {
+                    Text(text)
+                        .font(.system(size: 15)).foregroundColor(GM.textSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             }
         } else {
             Text("Loading formatted message…")
@@ -520,18 +523,14 @@ private struct ThreadMessageCard: View {
     /// named here and fails on its own line below, which is the honest order of
     /// the two facts.
     @ViewBuilder private var imagesGate: some View {
-        let hidden = hiddenImages
-        if !hidden.isEmpty {
+        let blocked = formattedBody?.blockedImages ?? 0
+        if blocked > 0 {
             VStack(alignment: .leading, spacing: 8) {
                 if shownImages {
-                    // Said once, because the requests have already left by the
-                    // time this line draws — the images now load inside the
-                    // formatted body itself, so there is no per-image row to
-                    // draw below it.
                     Text("These images load from the sender's server.")
                         .font(.system(size: 12)).foregroundColor(GM.textTertiary)
                 } else {
-                    Text("\(hidden.count) image\(hidden.count == 1 ? "" : "s") in this "
+                    Text("\(blocked) image\(blocked == 1 ? "" : "s") in this "
                          + "message load from the sender's server, not from GrapMail. "
                          + "Loading them tells the sender this message was opened.")
                         .font(.system(size: 12)).foregroundColor(GM.textSecondary)
@@ -1142,22 +1141,24 @@ struct ComposeView: View {
             return
         }
         uploading = true
+        let generation = SessionStore.generation
         Task { @MainActor in
             let name = url.lastPathComponent
             notice = "Reading \(name)…"
             let result = await Self.readPickedFile(url)
-            guard let bytes = result.bytes else {
+            guard let file = result.file else {
                 uploading = false
                 notice = result.error
                 return
             }
-            guard !bytes.isEmpty else {
+            guard SessionStore.generation == generation else {
+                try? FileManager.default.removeItem(at: file)
                 uploading = false
-                notice = "That file is empty."
+                notice = "The account changed before this file could be attached."
                 return
             }
             notice = "Uploading \(name)…"
-            vm.uploadAttachment(bytes: bytes, filename: name,
+            vm.uploadAttachment(file: file, filename: name,
                                 mimeType: MimeType.of(filename: name)) { a, message in
                 uploading = false
                 notice = message
@@ -1166,30 +1167,39 @@ struct ComposeView: View {
         }
     }
 
-    private nonisolated static func readPickedFile(_ url: URL) async -> (bytes: Data?, error: String?) {
+    private nonisolated static func readPickedFile(_ url: URL) async -> (file: URL?, error: String?) {
         await withCheckedContinuation { continuation in
             DispatchQueue.global(qos: .userInitiated).async {
-                guard url.startAccessingSecurityScopedResource() else {
-                    continuation.resume(returning: (nil, "The app could not be given permission to read that file."))
-                    return
-                }
-                defer { url.stopAccessingSecurityScopedResource() }
+                let scoped = url.startAccessingSecurityScopedResource()
+                defer { if scoped { url.stopAccessingSecurityScopedResource() } }
+                let staged = FileManager.default.temporaryDirectory.appendingPathComponent("upload-\(UUID().uuidString)")
                 do {
                     let maxBytes = 25 * 1024 * 1024
                     let file = try FileHandle(forReadingFrom: url)
                     defer { try? file.close() }
-                    var bytes = Data()
-                    while bytes.count <= maxBytes {
-                        let count = min(64 * 1024, maxBytes + 1 - bytes.count)
-                        guard let chunk = try file.read(upToCount: count), !chunk.isEmpty else { break }
-                        bytes.append(chunk)
+                    guard FileManager.default.createFile(atPath: staged.path, contents: nil) else {
+                        throw CocoaError(.fileWriteUnknown)
                     }
-                    if bytes.count > maxBytes {
+                    let output = try FileHandle(forWritingTo: staged)
+                    defer { try? output.close() }
+                    var size = 0
+                    while size <= maxBytes {
+                        let count = min(64 * 1024, maxBytes + 1 - size)
+                        guard let chunk = try file.read(upToCount: count), !chunk.isEmpty else { break }
+                        try output.write(contentsOf: chunk)
+                        size += chunk.count
+                    }
+                    if size > maxBytes {
+                        try? FileManager.default.removeItem(at: staged)
                         continuation.resume(returning: (nil, "That file exceeds the 25 MB attachment limit."))
+                    } else if size == 0 {
+                        try? FileManager.default.removeItem(at: staged)
+                        continuation.resume(returning: (nil, "That file is empty."))
                     } else {
-                        continuation.resume(returning: (bytes, nil))
+                        continuation.resume(returning: (staged, nil))
                     }
                 } catch {
+                    try? FileManager.default.removeItem(at: staged)
                     continuation.resume(returning: (nil, "That file could not be read."))
                 }
             }
@@ -1366,34 +1376,5 @@ struct ReaderOutlineButton: View {
         }
         .buttonStyle(.plain)
         .accessibilityIdentifier(identifier)
-    }
-}
-
-enum HtmlStripper {
-    /// Tags out, text out. This is a display fallback, not a sanitiser, and the
-    /// screen labels it as a plain-text view so nobody mistakes it for the
-    /// message as authored.
-    static func strip(_ html: String) -> String {
-        var out = html
-        if let r = try? NSRegularExpression(pattern: "<(script|style)[^>]*>.*?</\\1>",
-                                            options: [.caseInsensitive, .dotMatchesLineSeparators]) {
-            out = r.stringByReplacingMatches(in: out, range: NSRange(location: 0, length: out.utf16.count),
-                                             withTemplate: "")
-        }
-        if let r = try? NSRegularExpression(pattern: "<[^>]+>", options: [.dotMatchesLineSeparators]) {
-            out = r.stringByReplacingMatches(in: out, range: NSRange(location: 0, length: out.utf16.count),
-                                             withTemplate: " ")
-        }
-        out = out
-            .replacingOccurrences(of: "&nbsp;", with: " ")
-            .replacingOccurrences(of: "&amp;", with: "&")
-            .replacingOccurrences(of: "&lt;", with: "<")
-            .replacingOccurrences(of: "&gt;", with: ">")
-            .replacingOccurrences(of: "&quot;", with: "\"")
-        return out
-            .components(separatedBy: "\n")
-            .map { $0.trimmingCharacters(in: .whitespaces) }
-            .filter { !$0.isEmpty }
-            .joined(separator: "\n")
     }
 }

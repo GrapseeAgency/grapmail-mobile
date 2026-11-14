@@ -118,6 +118,7 @@ internal fun HtmlMailBody(
                 settings.blockNetworkImage = !allowImages
                 settings.mixedContentMode = WebSettings.MIXED_CONTENT_NEVER_ALLOW
                 settings.cacheMode = WebSettings.LOAD_NO_CACHE
+                settings.loadsImagesAutomatically = allowImages
                 settings.mediaPlaybackRequiresUserGesture = true
                 settings.builtInZoomControls = true
                 settings.displayZoomControls = false
@@ -163,6 +164,7 @@ internal fun HtmlMailBody(
                 feed.html = html
                 feed.allowImages = allowImages
                 webView.settings.blockNetworkImage = !allowImages
+                webView.settings.loadsImagesAutomatically = allowImages
                 webView.loadDataWithBaseURL(
                     null,
                     mailDocument(

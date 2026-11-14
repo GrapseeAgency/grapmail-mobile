@@ -101,6 +101,18 @@ fun MailSnapshotScreen(name: String) {
     // and the walk waits for that settled state before it photographs.
     LaunchedEffect(name) {
         when (name) {
+            // The real home, not a frame of its rows: its chrome, its one
+            // rounded card and its real LazyColumn are the things under test,
+            // and a stand-in list would photograph a shape the screen does not
+            // draw. `snapshotMode` keeps every boot read from overwriting the
+            // seed; the rows and account are literals below.
+            "mail-home" -> {
+                seedRows(vm)
+                vm.seedForSnapshot {
+                    it.copy(accountName = "Amira Rahman",
+                        accountAddress = "amira@grapmail.com")
+                }
+            }
             // The id goes with the body: the thread screen asks the model for its
             // conversation on appear, and the model has to know this one is already
             // here rather than fetching over it and landing on an error state.
@@ -216,8 +228,7 @@ fun MailSnapshotScreen(name: String) {
             // name for it would be a second copy of a screen rather than a second
             // piece of data — and it was one, launched by nothing, until the name-set
             // pin in `scripts/mail-honesty.py` made an unlaunched case illegal.
-            "mail-home" -> listFrame(rows, MailBox.Inbox, loading = false,
-                failed = false, noMailbox = false)
+            "mail-home" -> liveHomeFrame(vm)
             // No `mail-drawer`, `mail-search` or `mail-sort-filter` case, and no
             // `drawerFrame`/`searchFrame` to draw them: frames 62, 67 and 69 are
             // photographed from the LIVE screen on both platforms (the walk opens the
@@ -723,6 +734,32 @@ private fun seedThread(vm: MailboxViewModel, id: String, encrypted: Boolean) {
 }
 
 // ── frames ───────────────────────────────────────────────────────────────────
+
+/// The live mailbox home over the seeded state: the screen a person opens, with
+/// every door wired to nothing. Rendering it here is what lets the frame
+/// photograph — and measure — the actual LazyColumn and the actual card rather
+/// than a look-alike list. It was added after the rounded card landed, when the
+/// old host photograph turned out to be a picture of a different list.
+@Composable
+private fun liveHomeFrame(vm: MailboxViewModel) {
+    MailboxScreen(
+        vm = vm,
+        onOpenThread = { _, _ -> },
+        onCompose = {},
+        onOpenDraft = {},
+        onProfile = {},
+        onSettings = {},
+        onSecurity = {},
+        onHelp = {},
+        onLabels = {},
+        onContacts = {},
+        onFiles = {},
+        onScreener = {},
+        onSubscriptions = {},
+        onScheduled = {},
+        onSignOut = {},
+    )
+}
 
 /// The list states, drawn by the same [MailStateBlock] the live screen uses. The
 /// difference between empty, failed and no-mailbox is the thing being

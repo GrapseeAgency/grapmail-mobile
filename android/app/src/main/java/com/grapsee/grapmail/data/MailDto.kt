@@ -1,5 +1,6 @@
 package com.grapsee.grapmail.data
 
+import androidx.compose.runtime.Immutable
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
@@ -26,6 +27,7 @@ import kotlinx.serialization.Serializable
  */
 
 /** `publicRow.from` — `grapmail.ts:583`. Both halves are separately optional. */
+@Immutable
 @Serializable
 data class MailPersonDto(
     val address: String? = null,
@@ -56,6 +58,7 @@ data class MailPersonDto(
  * its fallback: an older row may still hold the comma-separated bracket list,
  * and the existing header parser is honest about that shape.
  */
+@Immutable
 @Serializable(with = MailUnsubscribeSerializer::class)
 data class MailUnsubscribeDto(
     val offers: List<MailUnsubscribeOfferDto> = emptyList(),
@@ -64,6 +67,7 @@ data class MailUnsubscribeDto(
     val raw: String? = null,
 )
 
+@Immutable
 @Serializable
 data class MailUnsubscribeOfferDto(val url: String = "", val oneClick: Boolean = false)
 
@@ -135,6 +139,7 @@ private object MailUnsubscribeSerializer : kotlinx.serialization.KSerializer<Mai
  * no body: a listing renders fifty previews and none of them shows a message, so
  * fetching bodies here would read fifty payloads to draw fifty rows.
  */
+@Immutable
 @Serializable
 data class MailMessageDto(
     val id: String = "",
@@ -169,6 +174,7 @@ data class MailMessageDto(
  * `fullRow` — `grapmail.ts:609-623`, plus the attachment rows the single-message
  * route bolts on (`grapmail.ts:769-774`).
  */
+@Immutable
 @Serializable
 data class MailMessageFullDto(
     val id: String = "",
@@ -188,6 +194,7 @@ data class MailMessageFullDto(
     val createdAt: String? = null,
     val bodyText: String? = null,
     val bodyHtml: String? = null,
+    val hasHtml: Boolean = !bodyHtml.isNullOrBlank(),
     val inReplyTo: String? = null,
     val sizeBytes: Int? = null,
     /**
@@ -212,6 +219,7 @@ data class MailMessageFullDto(
  * and `storageKey` is server-generated so a client filename can never become a
  * path. Never sent to the UI: it is a server-side key, not a display field.
  */
+@Immutable
 @Serializable
 data class MailAttachmentDto(
     val id: String = "",
@@ -270,6 +278,8 @@ data class MailMessageResponse(
 data class MailThreadResponse(
     val success: Boolean = false,
     val messages: List<MailMessageFullDto> = emptyList(),
+    val nextCursor: String? = null,
+    val hasMore: Boolean = false,
 )
 
 /**
@@ -289,12 +299,18 @@ data class MailThreadResponse(
  * the row's plain part echoed back for the no-HTML case, so a null `bodyHtml`
  * means "there is no formatted view", not "the field went missing".
  */
+@OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
 @Serializable
 data class MailBodyResponse(
-    val success: Boolean = false,
+    @kotlinx.serialization.json.JsonNames("success")
+    val success: Boolean = true,
+    @kotlinx.serialization.json.JsonNames("bodyHtml", "html")
     val bodyHtml: String? = null,
+    @kotlinx.serialization.json.JsonNames("bodyText", "text")
     val bodyText: String? = null,
+    @kotlinx.serialization.json.JsonNames("blockedImages", "remoteImageCount")
     val blockedImages: Int = 0,
+    val hasHtml: Boolean = !bodyHtml.isNullOrBlank(),
 )
 
 /**

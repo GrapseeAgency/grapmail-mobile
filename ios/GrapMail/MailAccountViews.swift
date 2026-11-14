@@ -1073,8 +1073,8 @@ struct ProfileEditView: View {
                 return
             }
             guard !Task.isCancelled else { return }
-            if bytes.count > 256 * 1024 {
-                photoError = "That photo is too large. A profile photo can be up to 256 KB."
+            if bytes.count > 10 * 1024 * 1024 {
+                photoError = "That photo is too large. A profile photo can be up to 10 MB."
                 return
             }
             guard let image = await Self.avatarType(bytes) else {

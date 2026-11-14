@@ -45,6 +45,8 @@ struct MailHtmlBodyView: UIViewRepresentable {
         webView.scrollView.backgroundColor = .clear
         // The reader owns scrolling; this view is sized to its document.
         webView.scrollView.isScrollEnabled = false
+        webView.scrollView.contentInsetAdjustmentBehavior = .never
+        webView.scrollView.decelerationRate = .fast
         return webView
     }
 

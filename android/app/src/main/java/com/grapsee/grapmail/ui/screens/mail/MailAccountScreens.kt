@@ -315,7 +315,7 @@ fun MailPrefsScreen(vm: ProfileViewModel, onBack: () -> Unit) {
                 BasicTextField(signature, { signature = it },
                     textStyle = TextStyle(fontSize = 15.sp, color = palette.textPrimary,
                         lineHeight = 22.sp),
-                    cursorBrush = SolidColor(palette.primarySolid),
+                    cursorBrush = androidx.compose.ui.graphics.SolidColor(LocalPalette.current.cursor),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
                     decorationBox = { inner ->
                         if (signature.isEmpty()) Text("— none —", fontSize = 15.sp,
@@ -354,7 +354,7 @@ fun MailPrefsScreen(vm: ProfileViewModel, onBack: () -> Unit) {
                         { v -> overrides = overrides + (address to v) },
                         textStyle = TextStyle(fontSize = 14.sp, color = palette.textPrimary,
                             lineHeight = 20.sp),
-                        cursorBrush = SolidColor(palette.primarySolid),
+                        cursorBrush = androidx.compose.ui.graphics.SolidColor(LocalPalette.current.cursor),
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
                         decorationBox = { inner ->
                             if (overrides[address].isNullOrEmpty()) Text("Uses the main signature",
@@ -851,7 +851,7 @@ fun ProfileEditScreen(vm: ProfileViewModel, onBack: () -> Unit) {
                 val resolver = ctx.contentResolver
                 val bytes = runCatching {
                     resolver.openInputStream(uri)?.use { stream ->
-                        val buffer = ByteArray(256 * 1024 + 1)
+                        val buffer = ByteArray(10 * 1024 * 1024 + 1)
                         var count = 0
                         while (count < buffer.size) {
                             val read = stream.read(buffer, count, buffer.size - count)
@@ -861,7 +861,7 @@ fun ProfileEditScreen(vm: ProfileViewModel, onBack: () -> Unit) {
                         buffer.copyOf(count)
                     }
                 }.getOrNull()
-                val mime = bytes?.takeIf { it.isNotEmpty() && it.size <= 256 * 1024 }?.let {
+                val mime = bytes?.takeIf { it.isNotEmpty() && it.size <= 10 * 1024 * 1024 }?.let {
                     val options = android.graphics.BitmapFactory.Options().apply { inJustDecodeBounds = true }
                     android.graphics.BitmapFactory.decodeByteArray(it, 0, it.size, options)
                     options.outMimeType
@@ -870,8 +870,8 @@ fun ProfileEditScreen(vm: ProfileViewModel, onBack: () -> Unit) {
             }
             when {
                 bytes == null || bytes.isEmpty() -> photoError = "That file could not be read."
-                bytes.size > 256 * 1024 ->
-                    photoError = "That photo is too large. A profile photo can be up to 256 KB."
+                bytes.size > 10 * 1024 * 1024 ->
+                    photoError = "That photo is too large. A profile photo can be up to 10 MB."
                 mime == null || mime !in setOf("image/png", "image/jpeg", "image/webp", "image/gif") ->
                     photoError = "Choose a PNG, JPEG, WebP or GIF image."
                 else -> {

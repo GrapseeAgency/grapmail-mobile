@@ -344,6 +344,18 @@ fun GrapMailNav(
     onComposeRequestConsumed: () -> Unit = {},
 ) {
     val nav = rememberNavController()
+    // The runtime notification ask (Android 13+). Registered here, in the
+    // navigation scope where maybeAskNotifications lives, because the ask fires
+    // at the moments that scope owns: a completed sign-in, or the first cold
+    // start into a session that already exists. The answer changes nothing
+    // here — the notification settings screen reads the live state and stays
+    // the place to turn alerts on or off, so the dialog only ever introduces
+    // the choice.
+    val askNotifications =
+        androidx.activity.compose.rememberLauncherForActivityResult(
+            androidx.activity.result.contract.ActivityResultContracts.RequestPermission(),
+        ) {
+        }
     val vm: SignUpViewModel = viewModel()
     val flow: AccountFlowViewModel = viewModel()
     // The encryption sector's state: the device's identity, the in-memory
@@ -369,6 +381,21 @@ fun GrapMailNav(
         }
     }
 
+    // The one honest moment to ask for the notification permission is when mail
+    // is about to start arriving: a completed sign-in, or the first cold start
+    // into a session that already exists. Once per install — the flag records
+    // "asked", not "granted", so a denial stays a state the notification settings
+    // screen can reverse without this dialog repeating at the person.
+    fun maybeAskNotifications() {
+        val ctx = nav.context.applicationContext
+        com.grapsee.grapmail.logic.Notifications.ensureChannel(ctx)
+        if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.TIRAMISU) return
+        if (com.grapsee.grapmail.logic.Notifications.allowed(ctx) ||
+            com.grapsee.grapmail.logic.Notifications.wasPermissionAsked(ctx)) return
+        com.grapsee.grapmail.logic.Notifications.markPermissionAsked(ctx)
+        askNotifications.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+    }
+
     // One place for a completed sign-in, whichever door finished it (password,
     // factor code, email code, backup code, the wizard's auto sign-in): the
     // session is stored by the door itself; this announces the device to the
@@ -376,7 +403,14 @@ fun GrapMailNav(
     // client config this is a quiet no-op and the poll remains the delivery.
     fun signedIn(address: String) {
         com.grapsee.grapmail.logic.PushSync.registerAsync(nav.context.applicationContext)
-        nav.navigate(Routes.HOME) { popUpTo(Routes.WELCOME) }
+        maybeAskNotifications()
+        if (composeRequest) {
+            onComposeRequestConsumed()
+            nav.navigate(Routes.HOME) { popUpTo(Routes.WELCOME) }
+            nav.navigate(Routes.mailCompose("", "reply"))
+        } else {
+            nav.navigate(Routes.HOME) { popUpTo(Routes.WELCOME) }
+        }
     }
 
     // Sign-out and deletion share the same teardown: the push registration is
@@ -398,21 +432,33 @@ fun GrapMailNav(
         }
     }
 
-    // A stored, unexpired session opens the app signed-in — the encrypted
-    // token has to be read at launch, not just written.
+    // A stored session opens the app signed-in as soon as the encrypted local
+    // record is available. Token rotation is deliberately NOT part of deciding
+    // whether the navigation graph may exist: the access token is one hour,
+    // while the refresh token is thirty days, and awaiting that network call
+    // here kept the whole app behind the splash for up to the HTTP timeout.
+    //
+    // Home can render its disk mailbox snapshot immediately. Rotation continues
+    // behind the first frame; concurrent API calls share SessionRefresh's
+    // single-flight mutex, and a genuinely dead session still reaches the
+    // existing bearer-401 collector below, which clears it and opens sign-in.
     var startDest by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(Unit) {
         val ctx = nav.context.applicationContext
         val stored = SessionStore.snapshot(ctx)
-        val unexpired = stored?.unexpired == true
-        // The gateway's access token is an hour old at most; the refresh token
-        // is good for thirty days. A stored pair whose access token has aged out
-        // is a session to renew silently, not a person to send back to sign-in —
-        // otherwise every launch the morning after a sign-in looks signed out.
-        val renewed = if (!unexpired && stored != null) {
-            com.grapsee.grapmail.data.SessionRefresh.refresh(ctx)
-        } else false
-        startDest = if (unexpired || renewed) Routes.HOME else Routes.WELCOME
+        if (stored != null) {
+            startDest = Routes.HOME
+            // A session came back from disk: for the notification ask this is
+            // the same moment as a completed sign-in — mail is already chosen.
+            maybeAskNotifications()
+        } else {
+            startDest = Routes.WELCOME
+        }
+        if (stored != null && !stored.unexpired) {
+            // A child task, not another await in the navigation gate: returning
+            // from this effect lets Compose build Home immediately from disk.
+            launch { com.grapsee.grapmail.data.SessionRefresh.refresh(ctx) }
+        }
     }
     val dest = startDest ?: return
 
@@ -422,10 +468,18 @@ fun GrapMailNav(
     // pretends. Consumed on the way out either way.
     LaunchedEffect(composeRequest, dest) {
         if (!composeRequest) return@LaunchedEffect
-        onComposeRequestConsumed()
-        if (SessionStore.snapshot(nav.context.applicationContext)?.unexpired == true) {
+        val ctx = nav.context.applicationContext
+        val stored = SessionStore.snapshot(ctx)
+        val ready = stored?.unexpired == true ||
+            (stored != null && com.grapsee.grapmail.data.SessionRefresh.refresh(ctx))
+        if (ready) {
+            onComposeRequestConsumed()
             nav.navigate(Routes.mailCompose("", "reply"))
         } else {
+            // Keep the request pending. If this was a transient refresh failure,
+            // sign-in can still recover; if the refresh token was rejected, the
+            // sticky expiry path lands here too. In both cases [signedIn] consumes
+            // the shortcut only after a fresh session exists.
             nav.navigate(Routes.SIGN_IN) { popUpTo(Routes.WELCOME) }
         }
     }

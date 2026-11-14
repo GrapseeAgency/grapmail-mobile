@@ -63,8 +63,6 @@ import com.grapsee.grapmail.ui.components.absoluteDateTimeOrRaw
 import com.grapsee.grapmail.ui.components.mailTime
 import com.grapsee.grapmail.ui.theme.LocalPalette
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 
 /**
  * Reference 74 — a conversation. 75 is the same screen with an encrypted message
@@ -109,12 +107,19 @@ fun ThreadScreen(
     val palette = LocalPalette.current
     val thread by vm.thread.collectAsStateWithLifecycle()
     var busy by remember { mutableStateOf<String?>(null) }
+    var expandedMessageId by remember(threadId) { mutableStateOf<String?>(null) }
+    LaunchedEffect(thread.messages.lastOrNull()?.id) {
+        if (expandedMessageId == null) expandedMessageId = thread.messages.lastOrNull()?.id
+    }
     // Per-message, not global: a download result belongs to the row that asked
     // for it, and a shared variable would let a later failure overwrite an
     // earlier success on screen.
     val notices = remember { mutableStateMapOf<String, String>() }
 
     LaunchedEffect(threadId, isThread) { if (isThread) vm.openThread(threadId) else vm.openMessage(threadId) }
+    androidx.compose.runtime.DisposableEffect(vm, threadId, isThread) {
+        onDispose { vm.leaveReader(threadId, isThread) }
+    }
 
     Column(Modifier.fillMaxSize().background(palette.bg).statusBarsPadding()) {
         Row(
@@ -182,11 +187,26 @@ fun ThreadScreen(
         }
 
         LazyColumn(Modifier.fillMaxSize()) {
+            if (isThread && (thread.hasMore || thread.loadingEarlier)) {
+                item(key = "load-earlier") {
+                    Row(
+                        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
+                        horizontalArrangement = Arrangement.Center,
+                    ) {
+                        com.grapsee.grapmail.ui.components.OutlineButton(
+                            if (thread.loadingEarlier) "Loading earlier messages…" else "Load earlier messages",
+                            onClick = { if (!thread.loadingEarlier) vm.loadEarlierThread(threadId) },
+                            fill = false,
+                        )
+                    }
+                }
+            }
             itemsIndexed(thread.messages, key = { _, message -> message.id }) { index, message ->
                 ThreadMessageCard(
                     vm = vm,
                     message = message,
-                    expanded = index == thread.messages.lastIndex,
+                    expanded = expandedMessageId == message.id,
+                    onExpand = { expandedMessageId = message.id },
                     busy = busy == message.id,
                     e2e = e2e,
                     onReply = { mode -> onReply(message, mode) },
@@ -218,6 +238,7 @@ private fun ThreadMessageCard(
     vm: MailboxViewModel,
     message: MailMessageFullDto,
     expanded: Boolean,
+    onExpand: () -> Unit,
     busy: Boolean,
     e2e: com.grapsee.grapmail.logic.E2eViewModel,
     onReply: (String) -> Unit,
@@ -250,23 +271,26 @@ private fun ThreadMessageCard(
     // The formatted body is fetched when the card composes and again when the
     // images gate is answered — the two variants are different renders, and
     // the model memoises both per message.
-    var openEarlierMessage by remember(message.id) { mutableStateOf(false) }
-    val showsBody = expanded || openEarlierMessage
+    val showsBody = expanded
     var detailsError by remember(message.id) { mutableStateOf<String?>(null) }
     var detailsAttempt by remember(message.id) { mutableStateOf(0) }
     LaunchedEffect(message.id, showsBody, detailsAttempt) {
         if (showsBody) detailsError = vm.viewMessage(message.id)
     }
     val needsFormattedBody = showsBody && !message.isE2eEncrypted && message.e2eEnvelope == null &&
-        !message.bodyHtml.isNullOrBlank()
-    val render by produceState<MailboxViewModel.BodyRender?>(null, message.id, shownImages, needsFormattedBody) {
-        value = null
-        if (needsFormattedBody) value = vm.loadBody(message.id, shownImages)
-    }
-    val hiddenImages by produceState(emptyList<String>(), message.bodyHtml, needsFormattedBody) {
-        value = if (needsFormattedBody) {
-            withContext(Dispatchers.Default) { remoteImageUrls(message.bodyHtml) }
-        } else emptyList()
+        message.hasHtml
+    var render by remember(message.id) { mutableStateOf<MailboxViewModel.BodyRender?>(null) }
+    var renderLoading by remember(message.id) { mutableStateOf(false) }
+    LaunchedEffect(message.id, shownImages, needsFormattedBody) {
+        if (!needsFormattedBody) {
+            render = null
+            renderLoading = false
+            return@LaunchedEffect
+        }
+        renderLoading = true
+        val loaded = vm.loadBody(message.id, shownImages)
+        if (loaded.error == null || render == null) render = loaded
+        renderLoading = false
     }
     // The sender's own `List-Unsubscribe` offer, narrowed to an http(s) address by
     // the same rule iOS applies. Null means show nothing: a button that opens a
@@ -323,7 +347,7 @@ private fun ThreadMessageCard(
         // ciphertext is never shown at all: only an opened body is.
         if (!showsBody) {
             com.grapsee.grapmail.ui.components.OutlineButton(
-                "Show message", onClick = { openEarlierMessage = true }, fill = false,
+                "Show message", onClick = onExpand, fill = false,
             )
         } else if (message.isE2eEncrypted || message.e2eEnvelope != null) {
             EncryptedBlock(message, e2e)
@@ -335,34 +359,36 @@ private fun ThreadMessageCard(
             // string is never a render input. While the fetch is in flight,
             // and if it fails, the stripped-text branch the screen always had
             // is the visible fallback, said per message rather than hidden.
-            val htmlPart = message.bodyHtml?.takeIf { it.isNotBlank() }
-            val formatted = render?.takeIf { it.allowImages == shownImages }
-            if (htmlPart != null) {
+            val formatted = render
+            if (message.hasHtml) {
                 when {
                     formatted?.html != null -> {
                         HtmlMailBody(
                             html = formatted.html,
-                            allowImages = shownImages,
+                            allowImages = formatted.allowImages,
                             onOpenLink = { url -> openExternally(context, url) },
                             modifier = Modifier.testTag("mail-body"),
                         )
                     }
                     formatted?.error != null -> {
-                        HtmlStrippedNotice()
-                        Spacer(Modifier.height(6.dp))
                         Text(formatted.error, fontSize = 12.sp, color = palette.textTertiary)
-                        Spacer(Modifier.height(8.dp))
-                        val fallback by produceState("", htmlPart) {
-                            value = withContext(Dispatchers.Default) { stripHtml(htmlPart) }
+                        message.bodyText?.takeIf { it.isNotBlank() }?.let { text ->
+                            Spacer(Modifier.height(8.dp))
+                            Text(text, fontSize = 15.sp,
+                                color = palette.textPrimary, lineHeight = 22.sp)
                         }
-                        Text(fallback, fontSize = 15.sp,
-                            color = palette.textPrimary, lineHeight = 22.sp)
                     }
                     else -> {
                         Text("Loading formatted message…", fontSize = 13.sp,
                             color = palette.textTertiary,
                             modifier = Modifier.testTag("mail-body-loading"))
                     }
+                }
+                if (renderLoading && formatted?.html != null) {
+                    Text("Loading images…", fontSize = 11.sp,
+                        color = palette.textTertiary,
+                        modifier = Modifier.padding(top = 4.dp)
+                            .testTag("mail-body-images-loading"))
                 }
             } else {
                 val text = message.bodyText
@@ -380,12 +406,13 @@ private fun ThreadMessageCard(
             // The count is what the part references, not what arrives: an image
             // the sender withdrew is still named here and fails on its own line
             // below, which is the honest order of the two facts.
-            if (hiddenImages.isNotEmpty()) {
+            val blockedImages = formatted?.blockedImages ?: 0
+            if (blockedImages > 0) {
                 Spacer(Modifier.height(12.dp))
                 if (!shownImages) {
                     Text(
-                        "${hiddenImages.size} image" +
-                            (if (hiddenImages.size == 1) "" else "s") +
+                        "$blockedImages image" +
+                            (if (blockedImages == 1) "" else "s") +
                             " in this message load from the sender's server, not " +
                             "from GrapMail. " +
                             "Loading them tells the sender this message was opened.",
@@ -510,7 +537,8 @@ private fun ThreadMessageCard(
                 val intent = android.content.Intent(android.content.Intent.ACTION_SEND)
                     .setType("text/plain")
                     .putExtra(android.content.Intent.EXTRA_SUBJECT, message.subject ?: "")
-                    .putExtra(android.content.Intent.EXTRA_TEXT, messageShareText(message))
+                    .putExtra(android.content.Intent.EXTRA_TEXT,
+                        messageShareText(message, render?.bodyText))
                 try {
                     context.startActivity(
                         android.content.Intent.createChooser(intent, "Share message"))
@@ -526,7 +554,7 @@ private fun ThreadMessageCard(
                 // succeeds, so only a refusal needs a line here — and a
                 // refusal is a real state on a device with no print service,
                 // not an error to swallow.
-                printMessageText(context, message) { outcome -> shareNote = outcome }
+                printMessageText(context, message, render?.bodyText) { outcome -> shareNote = outcome }
             }, fill = false, modifier = Modifier.testTag("mail-print"))
         }
         if (unreadDone) {
@@ -643,21 +671,6 @@ private fun EncryptedNotice() {
 }
 
 @Composable
-private fun HtmlStrippedNotice() {
-    val palette = LocalPalette.current
-    Row(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(palette.warnChipBg)
-            .padding(horizontal = 12.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Icon(Icons.Rounded.AttachFile, null, tint = palette.warnInk, modifier = Modifier.size(15.dp))
-        Spacer(Modifier.width(8.dp))
-        Text("Plain-text view of an HTML message. Remote images and markup are not loaded.",
-            fontSize = 12.sp, color = palette.warnInk, modifier = Modifier.weight(1f))
-    }
-}
-
-@Composable
 private fun AttachmentRow(a: MailAttachmentDto, busy: Boolean, notice: String?, onDownload: () -> Unit) {
     val palette = LocalPalette.current
     Column(Modifier.fillMaxWidth()) {
@@ -703,23 +716,6 @@ fun humanBytes(n: Int): String = when {
     n < 1024 * 1024 -> "%.0f KB".format(n / 1024.0)
     else -> "%.1f MB".format(n / (1024.0 * 1024.0))
 }
-
-/**
- * Tags stripped for display only.
- *
- * This is not a sanitiser and is not used to make HTML safe to render — the
- * output is plain text, so markup cannot act on anything. It exists so a message
- * with only an HTML part is still readable instead of blank.
- */
-private fun stripHtml(html: String): String =
-    html.replace(Regex("(?is)<(script|style)[^>]*>.*?</\\1>"), "")
-        .replace(Regex("(?is)<br\\s*/?>"), "\n")
-        .replace(Regex("(?is)</p>"), "\n\n")
-        .replace(Regex("(?is)<[^>]+>"), "")
-        .replace("&nbsp;", " ").replace("&amp;", "&").replace("&lt;", "<")
-        .replace("&gt;", ">").replace("&quot;", "\"")
-        .replace(Regex("\n{3,}"), "\n\n")
-        .trim()
 
 /**
  * The unsubscribe confirmation. Reached only from a message that actually carries

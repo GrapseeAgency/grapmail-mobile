@@ -379,6 +379,7 @@ Spacer(Modifier.width(10.dp))
             // paints inside it at the same insets as before.
             Box(Modifier.weight(1f).heightIn(min = 240.dp)) {
                 BasicTextField(
+                    cursorBrush = androidx.compose.ui.graphics.SolidColor(LocalPalette.current.cursor),
                     value = state.body,
                     onValueChange = { vm.composeUpdate { s -> s.copy(body = it) } },
                     // The tag names the signed state because the walk needs a
@@ -526,6 +527,7 @@ private fun FieldRow(
     ) {
         Text(label, fontSize = 14.sp, color = palette.textSecondary, modifier = Modifier.width(56.dp))
         BasicTextField(
+            cursorBrush = androidx.compose.ui.graphics.SolidColor(LocalPalette.current.cursor),
             value = value,
             onValueChange = onValue,
             maxLines = 3,
@@ -607,42 +609,51 @@ private suspend fun uploadOne(
     report: (String) -> Unit,
 ) {
     val maxBytes = 25 * 1024 * 1024
-    val (name, mime, bytes) = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-        val resolver = context.contentResolver
-        val name = queryName(context, uri) ?: uri.lastPathSegment ?: "attachment"
-        val mime = runCatching { resolver.getType(uri) }.getOrNull() ?: "application/octet-stream"
-        val bytes = runCatching {
-            resolver.openInputStream(uri)?.use { stream ->
-                val output = java.io.ByteArrayOutputStream()
-                val buffer = ByteArray(32 * 1024)
-                var remaining = maxBytes + 1
-                while (remaining > 0) {
-                    kotlinx.coroutines.currentCoroutineContext().ensureActive()
-                    val count = stream.read(buffer, 0, minOf(buffer.size, remaining))
-                    if (count < 0) break
-                    output.write(buffer, 0, count)
-                    remaining -= count
-                }
-                output.toByteArray()
-            }
-        }.getOrElse { error ->
-            if (error is kotlinx.coroutines.CancellationException) throw error
-            null
-        }
-        Triple(name, mime, bytes)
-    }
-    if (bytes == null) { report("That file could not be read."); return }
-    if (bytes.size > maxBytes) { report("That file exceeds the 25 MB attachment limit."); return }
-    if (bytes.isEmpty()) { report("That file is empty."); return }
-    report("Uploading ${name}…")
+    val session = com.grapsee.grapmail.data.SessionStore.snapshot(context)
+        ?: run { report("Sign in again to attach a file."); return }
+    val temporary = java.io.File(context.cacheDir, "upload-${java.util.UUID.randomUUID()}")
     try {
-        val attachment = vm.uploadAttachment(bytes, name, mime)
+        val (name, mime, size) = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            val resolver = context.contentResolver
+            val name = queryName(context, uri) ?: uri.lastPathSegment ?: "attachment"
+            val mime = runCatching { resolver.getType(uri) }.getOrNull() ?: "application/octet-stream"
+            val size = runCatching {
+                val stream = resolver.openInputStream(uri) ?: return@runCatching null
+                stream.use { input ->
+                    temporary.outputStream().buffered().use { output ->
+                        val buffer = ByteArray(32 * 1024)
+                        var remaining = maxBytes + 1
+                        while (remaining > 0) {
+                            kotlinx.coroutines.currentCoroutineContext().ensureActive()
+                            val count = input.read(buffer, 0, minOf(buffer.size, remaining))
+                            if (count < 0) break
+                            output.write(buffer, 0, count)
+                            remaining -= count
+                        }
+                        maxBytes + 1 - remaining
+                    }
+                }
+            }.getOrElse { error ->
+                if (error is kotlinx.coroutines.CancellationException) throw error
+                null
+            }
+            Triple(name, mime, size)
+        }
+        if (size == null) { report("That file could not be read."); return }
+        if (size > maxBytes) { report("That file exceeds the 25 MB attachment limit."); return }
+        if (size == 0) { report("That file is empty."); return }
+        report("Uploading ${name}…")
+        val attachment = vm.uploadAttachment(temporary, name, mime, session.id)
         into.add(attachment)
         report("Attached ${attachment.name ?: name}.")
     } catch (error: kotlinx.coroutines.CancellationException) {
         throw error
     } catch (error: Exception) {
         report(error.message ?: "This file could not be attached.")
+    } finally {
+        kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable + kotlinx.coroutines.Dispatchers.IO) {
+            temporary.delete()
+        }
     }
 }
 

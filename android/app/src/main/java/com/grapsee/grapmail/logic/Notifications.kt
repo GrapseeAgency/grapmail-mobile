@@ -75,6 +75,23 @@ object Notifications {
         }
     }
 
+    // The entry-path ask is a once-per-install event. The flag records "asked",
+    // never "granted" — the system owns that answer — so a denial stays a state
+    // the notification settings screen can reverse without this ask repeating
+    // at the person, and a grant never gets asked about again.
+    private const val ASK_PREFS = "grapmail-notify-ask"
+    private const val ASKED_KEY = "asked"
+
+    /** True once per install, after the entry path has asked for the permission. */
+    fun wasPermissionAsked(context: Context): Boolean =
+        context.getSharedPreferences(ASK_PREFS, Context.MODE_PRIVATE).getBoolean(ASKED_KEY, false)
+
+    /** Record that the entry-path ask happened, whatever the person answered. */
+    fun markPermissionAsked(context: Context) {
+        context.getSharedPreferences(ASK_PREFS, Context.MODE_PRIVATE)
+            .edit().putBoolean(ASKED_KEY, true).apply()
+    }
+
     /**
      * Say what arrived. Returns false when nothing was posted — a denied
      * permission, or a system that would not take it — which the caller reports

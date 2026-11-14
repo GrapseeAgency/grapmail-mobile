@@ -991,6 +991,18 @@ struct ApiClient {
         case renewed(String), rejected, unavailable
     }
 
+    enum RenewalStatus {
+        case renewed, rejected, unavailable
+    }
+
+    static func renewPairStatus() async -> RenewalStatus {
+        switch await renewal(for: nil, generation: SessionStore.generation) {
+        case .renewed: return .renewed
+        case .rejected: return .rejected
+        case .unavailable: return .unavailable
+        }
+    }
+
     static func renewPair() async -> String? {
         if case let .renewed(token) = await renewal(for: nil, generation: SessionStore.generation) {
             return token
@@ -1124,6 +1136,97 @@ struct ApiClient {
                 }
             }
             signalUnauthorized(rejectedBearer: rejected, generation: generation)
+            return (data, http)
+        }
+        throw ApiError.http(status: 401, code: nil, message: "Sign in again.")
+    }
+
+    /// Download to a temporary file while applying the same renewal rules as JSON requests.
+    static func authenticatedDownload(for request: URLRequest, bearer: String?) async throws -> (URL, HTTPURLResponse) {
+        let generation = SessionStore.generation
+        var request = request
+        var sentBearer = bearer
+        for attempt in 0...1 {
+            try Task.checkCancellation()
+            let file: URL
+            let response: URLResponse
+            do {
+                (file, response) = try await URLSession.shared.download(for: request)
+            } catch {
+                try Task.checkCancellation()
+                throw ApiError.network(error)
+            }
+            guard let http = response as? HTTPURLResponse else {
+                try? FileManager.default.removeItem(at: file)
+                throw ApiError.http(status: -1, code: nil, message: "No response")
+            }
+            if Task.isCancelled {
+                try? FileManager.default.removeItem(at: file)
+                throw CancellationError()
+            }
+            guard http.statusCode == 401, let rejected = sentBearer, generation == SessionStore.generation else {
+                return (file, http)
+            }
+            if attempt == 0 {
+                try? FileManager.default.removeItem(at: file)
+                let result = await renewal(for: rejected, generation: generation)
+                try Task.checkCancellation()
+                switch result {
+                case let .renewed(token):
+                    if SessionStore.replacementToken(for: rejected, generation: generation) == token {
+                        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+                        sentBearer = token
+                        continue
+                    }
+                case .unavailable:
+                    throw ApiError.http(status: 503, code: nil, message: "The session could not be refreshed. Try again.")
+                case .rejected:
+                    break
+                }
+                signalUnauthorized(rejectedBearer: rejected, generation: generation)
+                throw ApiError.http(status: 401, code: nil, message: "Sign in again.")
+            }
+            signalUnauthorized(rejectedBearer: rejected, generation: generation)
+            return (file, http)
+        }
+        throw ApiError.http(status: 401, code: nil, message: "Sign in again.")
+    }
+
+    static func authenticatedUpload(for request: URLRequest, file: URL, bearer: String) async throws -> (Data, HTTPURLResponse) {
+        let generation = SessionStore.generation
+        var request = request
+        var sentBearer = bearer
+        for attempt in 0...1 {
+            try Task.checkCancellation()
+            let data: Data
+            let response: URLResponse
+            do {
+                (data, response) = try await URLSession.shared.upload(for: request, fromFile: file)
+            } catch {
+                try Task.checkCancellation()
+                throw ApiError.network(error)
+            }
+            guard let http = response as? HTTPURLResponse else {
+                throw ApiError.http(status: -1, code: nil, message: "No response")
+            }
+            guard http.statusCode == 401, generation == SessionStore.generation else { return (data, http) }
+            if attempt == 0 {
+                let result = await renewal(for: sentBearer, generation: generation)
+                try Task.checkCancellation()
+                switch result {
+                case let .renewed(token):
+                    if SessionStore.replacementToken(for: sentBearer, generation: generation) == token {
+                        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+                        sentBearer = token
+                        continue
+                    }
+                case .unavailable:
+                    throw ApiError.http(status: 503, code: nil, message: "The session could not be refreshed. Try again.")
+                case .rejected:
+                    break
+                }
+            }
+            signalUnauthorized(rejectedBearer: sentBearer, generation: generation)
             return (data, http)
         }
         throw ApiError.http(status: 401, code: nil, message: "Sign in again.")
@@ -1367,7 +1470,7 @@ struct ApiClient {
     }
 
     /// Multipart with the field name the route reads (`file`), the same shapes
-    /// the compose attachment upload uses. The 256 KB ceiling is checked by the
+    /// the compose attachment upload uses. The 10 MB ceiling is checked by the
     /// screen in the person's own words before these bytes exist on the wire.
     static func uploadAvatar(token: String, bytes: Data, filename: String, mime: String) async throws -> AvatarResponse {
         let boundary = "----GrapMail\(UUID().uuidString)"

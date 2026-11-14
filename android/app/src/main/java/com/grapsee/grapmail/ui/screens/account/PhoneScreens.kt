@@ -296,6 +296,7 @@ fun PhoneVerificationScreen(
                 Column(Modifier.weight(1f).padding(vertical = 9.dp)) {
                     Text("Phone number", fontSize = 12.sp, color = palette.textTertiary)
                     BasicTextField(
+                        cursorBrush = androidx.compose.ui.graphics.SolidColor(LocalPalette.current.cursor),
                         value = national,
                         onValueChange = { national = it.filter { c -> c.isDigit() || c == ' ' }.take(16); error = null },
                         modifier = Modifier.fillMaxWidth().heightIn(min = 22.dp),
