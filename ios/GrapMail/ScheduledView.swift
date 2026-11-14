@@ -92,7 +92,7 @@ struct ScheduledView: View {
         error = nil
         defer { loading = false }
         do {
-            let r = try await ApiClient.mailScheduledList(token ?? "")
+            let r = try await ApiClient.mailScheduledList(apiToken)
             messages = r.messages ?? []
             loaded = true
         } catch {
@@ -106,7 +106,7 @@ struct ScheduledView: View {
         cancellingId = id
         Task {
             do {
-                _ = try await ApiClient.mailScheduledCancel(token ?? "", id: id)
+                _ = try await ApiClient.mailScheduledCancel(apiToken, id: id)
                 messages.removeAll { $0.id == id }
                 note = "Cancelled — it will not be sent."
             } catch {
