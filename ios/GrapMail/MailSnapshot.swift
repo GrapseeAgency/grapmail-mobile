@@ -373,8 +373,8 @@ struct MailSnapshotView: View {
          "from":{"name":"The Weekly Draft","address":"hello@newsletter.example"},
          "to":["you@grapmail.com"],"subject":"This week in letterforms",
          "isRead":true,"isStarred":false,"hasAttachments":false,
+         "hasHtml":true,
          "createdAt":"2026-10-28T08:00:00Z",
-         "bodyHtml":"<html><body><p>The kerning quarrels, mostly, and one risograph plate that printed better than the mockup.</p><img src='https://images.newsletter.example/plate-1.png'><img src='https://images.newsletter.example/pixel.gif?m=n2'></body></html>",
          "attachments":[]}
         """
         return (try? JSONDecoder().decode(MailMessageFull.self, from: Data(json.utf8)))
@@ -479,7 +479,8 @@ struct MailSnapshotView: View {
                     marks: Self.labelMarks,
                     read: .read,
                     note: nil,
-                    selectedCount: 3) { _ in })
+                    selectedCount: 3,
+                    busy: false) { _ in })
                 )
             case "mail-snooze-sheet":
                 return AnyView(
@@ -726,25 +727,69 @@ struct MailSnapshotView: View {
     /// The list states, drawn by the same `MailStateBlock` the live screen uses.
     /// The distinction between empty, failed and no-mailbox is the thing being
     /// photographed, so it must not be re-implemented here.
+    ///
+    /// The frame draws the live home chrome — top bar, search pill, the one
+    /// rounded card, the floating bottom bar, the compose pill — because the
+    /// shape of the card IS the screen now. Photographing only the rows left the
+    /// container, the thing the design is made of, out of every picture.
     private func listFrame(
         rows: [MailMessage], loading: Bool, failed: Bool, noMailbox: Bool, box: MailBox,
     ) -> some View {
-        VStack(spacing: 0) {
-            MailStateBlock(
-                loading: loading, failed: failed, noMailbox: noMailbox,
-                empty: rows.isEmpty, boxTitle: box.title, onRetry: {}
-            ) {
-                VStack(spacing: 0) {
-                    ForEach(rows) { m in
-                        MessageRow(message: m, selecting: false, selected: false,
-                                   onSelect: {}, onOpen: {}, onStar: {})
-                        Rectangle().fill(GM.border).frame(height: 1)
-                            .padding(.horizontal, 16)
+        ZStack(alignment: .bottomTrailing) {
+            GM.bg.ignoresSafeArea()
+            VStack(spacing: 0) {
+                MailHomeTopBar(
+                    boxTitle: box.title,
+                    accountName: "Amira Rahman",
+                    accountAddress: "amira@grapmail.com",
+                    onMenu: {}, onProfile: {}, onSettings: {}, onSignOut: {},
+                    search: {
+                        HStack(spacing: 10) {
+                            Text("Search in mail")
+                                .font(.system(size: 14))
+                                .foregroundColor(GM.textTertiary)
+                            Spacer(minLength: 0)
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 13)
+                        .background(GM.softFill)
+                        .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
+                    }
+                )
+                MailStateBlock(
+                    loading: loading, failed: failed, noMailbox: noMailbox,
+                    empty: rows.isEmpty, boxTitle: box.title, onRetry: {}
+                ) {
+                    ScrollView {
+                        VStack(spacing: 0) {
+                            // Two folded-box rows above the mail, the way the
+                            // reference leads its card. They open real boxes on
+                            // the live screen; here they are only photographed.
+                            BoxCategoryRow(title: "Starred", count: 3, icon: "star",
+                                           tint: GM.star, onTap: {})
+                            BoxCategoryRow(title: "Sent", count: nil, icon: "paperplane.fill",
+                                           tint: GM.success, onTap: {})
+                            ForEach(rows) { m in
+                                MessageRow(message: m, selecting: false, selected: false,
+                                           onSelect: {}, onOpen: {}, onStar: {})
+                            }
+                        }
                     }
                 }
+                .background(GM.cardAlt)
+                .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 28, style: .continuous)
+                        .stroke(GM.border, lineWidth: 1)
+                )
+                .padding(.horizontal, 12)
+                .padding(.bottom, 10)
+                MailBottomBar(unread: 7, onContacts: {}, onFiles: {}, onMore: {})
             }
+            MailFab(onClick: {})
+                .padding(.trailing, 20)
+                .padding(.bottom, 96)
         }
-        .background(GM.bg)
     }
 
     private var selectionFrame: some View {

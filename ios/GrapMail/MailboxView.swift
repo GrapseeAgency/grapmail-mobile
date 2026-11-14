@@ -47,6 +47,9 @@ struct MailboxView: View {
     @State private var drawerOpen = false
     @State private var sheet: MailSheet?
     @State private var decisionResult: String?
+    @State private var searchDraft = ""
+    @State private var searchTask: Task<Void, Never>?
+    @State private var searchRevision = 0
 
     enum MailSheet: String, Identifiable {
         case sortFilter, move, label, snooze, permanent, sender, advanced
@@ -83,6 +86,13 @@ struct MailboxView: View {
         // and a bottom bar drawn under the indicator is a defect for a person,
         // not only for the test. The background may still bleed past it.
         .sheet(item: $sheet) { which in sheetContent(which) }
+        .onAppear {
+            if searchDraft != vm.state.query { searchDraft = vm.state.query }
+        }
+        .onDisappear {
+            searchTask?.cancel()
+            searchTask = nil
+        }
         .task {
             // Ask for the box only when it has never been asked for, and read
             // `/me` once. Returning from a thread re-enters this task.
@@ -94,6 +104,14 @@ struct MailboxView: View {
         .onDisappear { isVisible = false }
         .onChange(of: scenePhase) { phase in
             if phase == .active, isVisible { vm.refreshOnResume(atTop: isAtTop || vm.state.rows.isEmpty) }
+        }
+        .onChange(of: network.online) { online in
+            if online == true, scenePhase == .active, isVisible,
+               !vm.state.loading, !vm.state.loadingMore, !vm.state.busy,
+               vm.state.selection.isEmpty, vm.state.pages <= 1,
+               vm.state.fatal != nil || vm.state.staleError != nil {
+                vm.load(forceCounts: false)
+            }
         }
         .onReceive(NotificationCenter.default.publisher(for: MailPoll.didReadStats)) { notification in
             guard scenePhase == .active, isVisible, let result = notification.object as? MailPoll.PollResult else { return }
@@ -159,49 +177,16 @@ struct MailboxView: View {
                 onSender: vm.state.box == .screener ? { sheet = .sender } : nil
             )
         } else {
-            VStack(spacing: 0) {
-                HStack(spacing: 6) {
-                    Button { toggleDrawer() } label: {
-                        Image(systemName: "line.3.horizontal")
-                            .font(.system(size: 19))
-                            .foregroundColor(GM.textPrimary)
-                            .frame(width: 44, height: 44)
-                    }
-                    .accessibilityLabel("Open folders")
-                    .accessibilityIdentifier("mail-menu")
-                    searchField
-                    Menu {
-                        if let address = vm.state.accountAddress, !address.isEmpty {
-                            Text(address)
-                        }
-                        Button("Profile", action: onProfile)
-                        Button("Settings", action: onSettings)
-                        Button("Sign out", action: onSignOut)
-                    } label: {
-                        Group {
-                            if vm.state.accountName?.nilIfBlank() != nil || vm.state.accountAddress?.nilIfBlank() != nil {
-                                SenderAvatar(display: vm.state.accountName ?? "",
-                                             address: vm.state.accountAddress ?? "", size: 32)
-                            } else {
-                                Image(systemName: "person.crop.circle")
-                                    .font(.system(size: 27))
-                                    .foregroundColor(GM.textSecondary)
-                            }
-                        }
-                        .frame(width: 44, height: 44)
-                    }
-                    .accessibilityLabel("Account")
-                }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
-
-                Text(vm.state.box.title)
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundColor(GM.textSecondary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, 16)
-                    .padding(.bottom, 6)
-            }
+            MailHomeTopBar(
+                boxTitle: vm.state.box.title,
+                accountName: vm.state.accountName,
+                accountAddress: vm.state.accountAddress,
+                onMenu: { toggleDrawer() },
+                onProfile: onProfile,
+                onSettings: onSettings,
+                onSignOut: onSignOut,
+                search: { searchField }
+            )
         }
     }
 
@@ -211,10 +196,24 @@ struct MailboxView: View {
             // subject, body, sender (`grapmail-search.ts:110-118`) -- because
             // a placeholder promising "people or files" would advertise a
             // search the route does not run. Android's field says the same.
-            TextField("Search mail",
-                      text: Binding(
-                        get: { vm.state.query },
-                        set: { vm.query($0) }))
+            TextField("Search in mail", text: $searchDraft)
+                .onChange(of: searchDraft) { text in
+                    searchTask?.cancel()
+                    searchRevision &+= 1
+                    let revision = searchRevision
+                    searchTask = Task {
+                        try? await Task.sleep(nanoseconds: 350_000_000)
+                        guard !Task.isCancelled else { return }
+                        await MainActor.run {
+                            guard !Task.isCancelled, revision == searchRevision,
+                                  text == searchDraft else { return }
+                            vm.query(text)
+                        }
+                    }
+                }
+                .onChange(of: vm.state.query) { query in
+                    if searchDraft != query { searchDraft = query }
+                }
                 .font(.system(size: 14))
                 .foregroundColor(GM.textPrimary)
                 .accessibilityLabel("Search subject, body or sender")
@@ -224,11 +223,12 @@ struct MailboxView: View {
             // clean "Search in mail", and every tool stays one tap away where
             // the other tools live.
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 11)
-        .background(GM.card)
-        .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous)
-            .stroke(GM.border, lineWidth: 1))
+        .padding(.horizontal, 16)
+        .padding(.vertical, 13)
+        // The reference's search pill: tinted, fully rounded, and deliberately
+        // borderless — a control, not a boxed field.
+        .background(GM.softFill)
+        .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
     }
 
     private var advActive: Bool {
@@ -313,19 +313,83 @@ struct MailboxView: View {
             failed: vm.state.fatal != nil,
             noMailbox: vm.state.noMailbox,
             empty: vm.state.rows.isEmpty && !vm.state.canLoadMore && !vm.state.loadingMore,
+            filtered: vm.state.query.trimmed.count >= 3 || vm.state.filter != .all ||
+                !vm.state.advFrom.trimmed.isEmpty || !vm.state.advTo.trimmed.isEmpty ||
+                !vm.state.advSubject.trimmed.isEmpty || vm.state.advFiles ||
+                !vm.state.advAfter.trimmed.isEmpty || !vm.state.advBefore.trimmed.isEmpty,
             boxTitle: vm.state.box.title,
             onRetry: { vm.load() }
         ) {
             messageList
         }
+        // The reference's defining shape: ONE rounded, bordered container
+        // holding every row, fixed while the mail scrolls inside it. The clip
+        // belongs to this container, not to each row — a row-level shape per
+        // row is also a row-level compositing cost on the scroll path.
+        .background(GM.cardAlt)
+        .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 28, style: .continuous)
+                .stroke(GM.border, lineWidth: 1)
+        )
+        .padding(.horizontal, 12)
+        .padding(.bottom, 10)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     /// `List` is lazy, which a mailbox needs and the wizard screens did not.
     /// Prefetch near the end, with a footer for manual loading and retry.
+    ///
+    /// The rows sit inside ONE rounded card, the way the reference draws it —
+    /// and that card is drawn by `listArea`, once, around this whole list.
+    /// The list itself keeps a clear background and hides its separators, so
+    /// the only corners on screen are the container's.
     private var messageList: some View {
         let prefetchIDs = Set(vm.state.rows.suffix(4).map(\.id))
+        // The reference's category rows live inside the card, above the mail
+        // list: one row per other box, the server's own unread count as the
+        // pill, and `vm.open` behind the tap. The screen's own box is the list
+        // below, so it is the one row not shown here.
+        let boxes = drawerBoxes(vm.state)
+            .filter { $0 != vm.state.box && $0 != .screener && $0 != .others }
+        let counts = drawerCounts(vm.state)
         return List {
+            // The box's own name is drawn above the card by the header, not as
+            // a scrolling row here: a title that scrolls away leaves the card
+            // unlabelled.
+            ForEach(boxes, id: \.self) { box in
+                BoxCategoryRow(
+                    title: box.title,
+                    count: counts[box] ?? nil,
+                    icon: {
+                        switch box {
+                        case .starred:  return "star"
+                        case .snoozed:  return "clock"
+                        case .sent:     return "paperplane.fill"
+                        case .drafts:   return "doc.text"
+                        case .archive:  return "archivebox"
+                        case .spam:     return "exclamationmark.triangle"
+                        case .others:   return "tray.full"
+                        default:        return "trash"
+                        }
+                    }(),
+                    tint: {
+                        switch box {
+                        case .starred:  return GM.star
+                        case .snoozed:  return GM.primarySolid
+                        case .sent:     return GM.success
+                        case .drafts:   return GM.textSecondary
+                        case .archive:  return GM.primarySolid
+                        case .spam:     return GM.warnInk
+                        case .others:   return GM.textSecondary
+                        default:        return GM.error
+                        }
+                    }(),
+                    onTap: { vm.open(box) }
+                )
+                .listRowBackground(Color.clear)
+                .listRowSeparator(.hidden)
+            }
             ForEach(vm.state.rows) { row in
                 MessageRow(
                     message: row,
@@ -333,18 +397,14 @@ struct MailboxView: View {
                     selected: vm.state.selection.contains(row.id),
                     onSelect: { vm.toggleSelect(row.id) },
                     onOpen: {
-                        // Drafts are the person's own unfinished mail:
-                        // tapping one continues it in the composer. Opening
-                        // the reader instead — what this did — shows a
-                        // message you cannot edit or send, which is a draft
-                        // that does not draft.
                         if vm.state.box == .drafts { onDraft(row.id) }
                         else { onThread(row.threadId ?? row.id, row.threadId != nil) }
                     },
                     onStar: { vm.actOn(row.id, row.isStarred ? .unstar : .star) }
                 )
+                .equatable()
                 .listRowInsets(EdgeInsets())
-                .listRowBackground(GM.bg)
+                .listRowBackground(Color.clear)
                 .listRowSeparator(.hidden)
                 // Swipe files, and only in the directions that mean something
                 // where the message already is. Same two directions and same two
@@ -377,7 +437,9 @@ struct MailboxView: View {
                 }
                 .onAppear {
                     if vm.state.rows.first?.id == row.id { isAtTop = true }
-                    if vm.state.appendError == nil, prefetchIDs.contains(row.id) { vm.loadMore() }
+                }
+                .task(id: prefetchIDs.contains(row.id) ? vm.state.pages : -1) {
+                    if prefetchIDs.contains(row.id) { await vm.loadMoreWhenReady() }
                 }
                 .onDisappear {
                     if vm.state.rows.first?.id == row.id { isAtTop = false }
@@ -396,7 +458,7 @@ struct MailboxView: View {
                     Button(vm.state.appendError == nil ? "Load more" : "Retry") { vm.loadMore() }
                 }
                 .frame(maxWidth: .infinity)
-                .listRowBackground(GM.bg)
+                .listRowBackground(Color.clear)
                 .listRowSeparator(.hidden)
             }
         }
@@ -434,6 +496,7 @@ struct MailboxView: View {
                 read: vm.state.assignmentsRead,
                 note: vm.state.labelNote,
                 selectedCount: vm.state.selection.count,
+                busy: vm.state.busy,
             ) { id in
                 // Not dismissed on pick, unlike the move and snooze sheets. Those
                 // change the list under the user, which is the feedback; a label

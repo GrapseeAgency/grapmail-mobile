@@ -333,14 +333,22 @@ private val mailDatePatterns = listOf(
     "yyyy-MM-dd'T'HH:mm:ss.SSSXXX", "yyyy-MM-dd'T'HH:mm:ssXXX",
     "yyyy-MM-dd'T'HH:mm:ss'Z'", "yyyy-MM-dd'T'HH:mm:ssZ", "yyyy-MM-dd HH:mm:ss",
 )
+private val parsedMailDates = android.util.LruCache<String, Long>(1_024)
 
 /** ISO-8601 with or without fractional seconds and zone; null if unparseable. */
 private fun parseMailIso(iso: String?): Long? {
     if (iso.isNullOrBlank()) return null
+    // Zone-less server dates use the current local zone, so changing zones must
+    // not reuse a value parsed under the previous one.
+    val cacheKey = TimeZone.getDefault().id + '\u0000' + iso
+    parsedMailDates.get(cacheKey)?.let { return it }
     for (p in mailDatePatterns) {
         runCatching {
             mailDateFormatter(p).parse(iso)?.time
-        }.getOrNull()?.let { return it }
+        }.getOrNull()?.let {
+            parsedMailDates.put(cacheKey, it)
+            return it
+        }
     }
     return null
 }
@@ -389,8 +397,9 @@ fun MessageRow(
             .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.Top,
     ) {
-        // Selection checkbox or the unread dot — the same slot, because a row is
-        // either being read or being picked.
+        // Selection checkbox or nothing — the unread dot moved to the time
+        // column, where the reference puts it (beside the clock), so this slot
+        // is only ever a picking affordance.
         if (selecting) {
             Box(Modifier.size(22.dp).clip(RoundedCornerShape(6.dp))
                 .border(1.5.dp, if (selected) palette.primarySolid else palette.border, RoundedCornerShape(6.dp))
@@ -400,10 +409,7 @@ fun MessageRow(
             }
             Spacer(Modifier.width(10.dp))
         } else {
-            Box(Modifier.padding(top = 15.dp).size(8.dp), contentAlignment = Alignment.Center) {
-                if (!message.isRead) Box(Modifier.size(8.dp).clip(CircleShape).background(palette.primarySolid))
-            }
-            Spacer(Modifier.width(8.dp))
+            Spacer(Modifier.width(4.dp))
         }
 
         SenderAvatar(message.from?.display ?: "", message.from?.address)
@@ -421,10 +427,10 @@ fun MessageRow(
                     modifier = Modifier.weight(1f),
                 )
                 Spacer(Modifier.width(8.dp))
-                val time = mailTime(message.createdAt)
-                if (time != null) {
-                    Text(time, fontSize = 12.sp, color = palette.textTertiary, maxLines = 1)
-                }
+                // The clock and the unread dot live in the right-hand column
+                // now, the reference's own position: date at the top of the
+                // row, dot beside it, star underneath. One fixed-width column
+                // also means a long date can no longer squeeze the sender line.
             }
             Text(
                 message.subjectOrNone,
@@ -453,22 +459,35 @@ fun MessageRow(
         }
 
         Spacer(Modifier.width(8.dp))
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            if (message.hasAttachments) {
-                Icon(Icons.Rounded.AttachFile, "Has attachments", tint = palette.textTertiary,
-                    modifier = Modifier.size(16.dp))
-                Spacer(Modifier.height(6.dp))
+        Column(horizontalAlignment = Alignment.End) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (!message.isRead) {
+                    Box(Modifier.size(8.dp).clip(CircleShape).background(palette.primarySolid))
+                    Spacer(Modifier.width(5.dp))
+                }
+                val time = mailTime(message.createdAt)
+                if (time != null) {
+                    Text(time, fontSize = 12.sp, color = palette.textTertiary, maxLines = 1)
+                }
             }
-            Icon(
-                if (message.isStarred) Icons.Rounded.Star else Icons.Rounded.StarBorder,
-                if (message.isStarred) "Starred" else "Star",
-                // The token, not a literal. This row is what the dark screenshot of
-                // the home photographs, and a hardcoded light amber renders a
-                // different star from the thread's for the very same message.
-                tint = if (message.isStarred) palette.star else palette.textTertiary,
-                modifier = Modifier.size(20.dp).clip(CircleShape)
-                    .clickable { onStar() }.padding(2.dp),
-            )
+            Spacer(Modifier.height(6.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (message.hasAttachments) {
+                    Icon(Icons.Rounded.AttachFile, "Has attachments", tint = palette.textTertiary,
+                        modifier = Modifier.size(15.dp))
+                    Spacer(Modifier.width(5.dp))
+                }
+                Icon(
+                    if (message.isStarred) Icons.Rounded.Star else Icons.Rounded.StarBorder,
+                    if (message.isStarred) "Starred" else "Star",
+                    // The token, not a literal. This row is what the dark screenshot of
+                    // the home photographs, and a hardcoded light amber renders a
+                    // different star from the thread's for the very same message.
+                    tint = if (message.isStarred) palette.star else palette.textTertiary,
+                    modifier = Modifier.size(20.dp).clip(CircleShape)
+                        .clickable { onStar() }.padding(2.dp),
+                )
+            }
         }
     }
 }
@@ -576,10 +595,10 @@ fun MailFab(onClick: () -> Unit, modifier: Modifier = Modifier) {
     // circle. The word names the affordance a 56dp dot never said out loud.
     Row(
         modifier
-            .clip(RoundedCornerShape(16.dp))
+            .clip(RoundedCornerShape(24.dp))
             .background(palette.primarySolid)
             .clickable(onClick = onClick)
-            .padding(horizontal = 20.dp, vertical = 16.dp),
+            .padding(horizontal = 20.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(Icons.Rounded.Edit, "Compose", tint = palette.onPrimary, modifier = Modifier.size(20.dp))
@@ -675,6 +694,7 @@ fun MailStateBlock(
     failed: Boolean,
     noMailbox: Boolean,
     empty: Boolean,
+    filtered: Boolean = false,
     boxTitle: String,
     onRetry: () -> Unit,
     content: @Composable () -> Unit,
@@ -699,8 +719,8 @@ fun MailStateBlock(
         )
 
         else -> CenteredState(
-            "$boxTitle is empty",
-            "No messages here yet.",
+            if (filtered) "No matching messages" else "$boxTitle is empty",
+            if (filtered) "Try changing your search or filters." else "No messages here yet.",
             palette,
         )
     }

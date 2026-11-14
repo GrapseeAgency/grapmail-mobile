@@ -2,6 +2,7 @@ package com.grapsee.grapmail.ui.screens.mail
 
 import android.app.Application
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -10,7 +11,11 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Send
+import androidx.compose.material.icons.rounded.Star
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -19,6 +24,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
@@ -248,6 +254,7 @@ fun MailSnapshotScreen(name: String) {
                     read = com.grapsee.grapmail.data.AssignmentsRead.Read,
                     note = null,
                     selectedCount = 3,
+                    busy = false,
                 ) { }
             }
             "mail-snooze-sheet" -> sheetHost { SnoozeContent { } }
@@ -659,10 +666,7 @@ private fun seedHtmlThread(vm: MailboxViewModel) {
             subject = "This week in letterforms",
             isRead = true,
             createdAt = "2026-10-28T08:00:00Z",
-            bodyHtml = "<html><body><p>The kerning quarrels, mostly, and one " +
-                "risograph plate that printed better than the mockup.</p>" +
-                "<img src=\"https://images.newsletter.example/plate-1.png\">" +
-                "<img src=\"https://images.newsletter.example/pixel.gif?m=n2\"></body></html>",
+            hasHtml = true,
         ),
     ))
     // The formatted body is planted beside the row: the images-off variant the
@@ -732,31 +736,77 @@ private fun listFrame(
     noMailbox: Boolean,
 ) {
     val palette = LocalPalette.current
-    // The frame takes its values as arguments instead of seeding the view model:
-    // writing a flow during composition is a side effect in the wrong place, and
-    // this screen is the one place that already knows exactly what it wants to
-    // draw. The components are the live ones, so the photograph is of them.
-    Column(Modifier.fillMaxSize()) {
-        Box(Modifier.fillMaxWidth().weight(1f)) {
-            MailStateBlock(
-                loading = loading,
-                failed = failed,
-                noMailbox = noMailbox,
-                empty = shown.isEmpty(),
-                boxTitle = box.title,
-                onRetry = {},
+    // The frame draws the live home chrome — top bar, search pill, the one
+    // rounded card, the floating bottom bar, the compose pill — because the
+    // shape of the card IS the screen now. Photographing only the rows left the
+    // container, the thing the design is made of, out of every picture. The
+    // components are the live ones: only the data is literal.
+    Box(Modifier.fillMaxSize().background(palette.bg)) {
+        Column(Modifier.fillMaxSize()) {
+            MailTopBar(
+                onMenu = {}, onProfile = {}, accountName = "Amira Rahman",
+                accountAddress = "amira@grapmail.com", onSettings = {}, onSignOut = {},
             ) {
-                Column(Modifier.verticalScroll(rememberScrollState())) {
-                    shown.forEach { row ->
-                        MessageRow(
-                            message = row, selected = false,
-                            onSelect = {}, onOpen = {}, onStar = {}, selecting = false,
+                SearchField(query = "", onQuery = {}, onFilter = {}, filterActive = false,
+                    onAdvanced = {}, advActive = false)
+            }
+            Text(
+                box.title,
+                modifier = Modifier.padding(start = 16.dp, bottom = 8.dp),
+                color = palette.textSecondary,
+                fontSize = 13.sp,
+                fontWeight = androidx.compose.ui.text.font.FontWeight.Medium,
+            )
+            Box(
+                Modifier.fillMaxWidth().weight(1f)
+                    .padding(start = 12.dp, end = 12.dp, bottom = 10.dp)
+                    .clip(RoundedCornerShape(28.dp))
+                    .background(palette.cardAlt)
+                    .border(1.dp, palette.border, RoundedCornerShape(28.dp)),
+            ) {
+                MailStateBlock(
+                    loading = loading,
+                    failed = failed,
+                    noMailbox = noMailbox,
+                    empty = shown.isEmpty(),
+                    boxTitle = box.title,
+                    onRetry = {},
+                ) {
+                    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+                        // Two folded-box rows above the mail, the way the
+                        // reference leads its card. They open real boxes on the
+                        // live screen; here they are only photographed.
+                        BoxCategoryRow(
+                            title = "Starred",
+                            count = 3,
+                            icon = Icons.Rounded.Star,
+                            tint = palette.star,
+                            onClick = {},
                         )
-                        Box(Modifier.fillMaxWidth().padding(horizontal = 16.dp)
-                            .height(1.dp).background(palette.border))
+                        BoxCategoryRow(
+                            title = "Sent",
+                            count = null,
+                            icon = Icons.Rounded.Send,
+                            tint = palette.success,
+                            onClick = {},
+                        )
+                        shown.forEach { row ->
+                            MessageRow(
+                                message = row, selected = false,
+                                onSelect = {}, onOpen = {}, onStar = {}, selecting = false,
+                            )
+                        }
                     }
                 }
             }
+            MailBottomBar(selected = 0, unread = 7,
+                onContacts = {}, onFiles = {}, onMore = {})
+        }
+        Box(
+            Modifier.fillMaxSize().padding(end = 20.dp, bottom = 96.dp),
+            contentAlignment = Alignment.BottomEnd,
+        ) {
+            com.grapsee.grapmail.ui.components.MailFab({})
         }
     }
 }

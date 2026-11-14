@@ -167,7 +167,8 @@ enum MailTime {
 
     private static func parse(_ iso: String?) -> Date? {
         guard let iso, !iso.isEmpty else { return nil }
-        let key = iso as NSString
+        // Zone-less timestamps are parsed in the current local zone.
+        let key = "\(TimeZone.current.identifier)\u{0}\(iso)" as NSString
         if let cached = parsedDates.object(forKey: key) { return cached as Date }
         for parser in parsers {
             if let date = parser.date(from: iso) {
@@ -203,13 +204,27 @@ enum MailTime {
 /// The unread dot, the star and the attachment glyph all come from `publicRow`;
 /// none is inferred. `isE2eEncrypted` is shown too, because a lock is the only
 /// honest signal that the body will not open here.
-struct MessageRow: View {
+struct MessageRow: View, Equatable {
     let message: MailMessage
     let selecting: Bool
     let selected: Bool
     let onSelect: () -> Void
     let onOpen: () -> Void
     let onStar: () -> Void
+
+    static func == (lhs: MessageRow, rhs: MessageRow) -> Bool {
+        lhs.message.id == rhs.message.id &&
+        lhs.message.isRead == rhs.message.isRead &&
+        lhs.message.isStarred == rhs.message.isStarred &&
+        lhs.message.hasAttachments == rhs.message.hasAttachments &&
+        lhs.message.isE2eEncrypted == rhs.message.isE2eEncrypted &&
+        lhs.message.from?.display == rhs.message.from?.display &&
+        lhs.message.from?.address == rhs.message.from?.address &&
+        lhs.message.subject == rhs.message.subject &&
+        lhs.message.snippet == rhs.message.snippet &&
+        lhs.message.createdAt == rhs.message.createdAt &&
+        lhs.selecting == rhs.selecting && lhs.selected == rhs.selected
+    }
 
     private var unread: Bool { !message.isRead }
 
@@ -220,12 +235,10 @@ struct MessageRow: View {
                     .foregroundColor(selected ? GM.primarySolid : GM.textTertiary)
                     .font(.system(size: 20))
                     .padding(.top, 10)
-            } else {
-                Circle()
-                    .fill(unread ? GM.primarySolid : Color.clear)
-                    .frame(width: 8, height: 8)
-                    .padding(.top, 17)
             }
+            // The unread dot lives in the time column now (the reference draws
+            // it beside the clock), so this slot is only ever a picking
+            // affordance.
 
             SenderAvatar(display: message.from?.display ?? "",
                          address: message.from?.address ?? "")
@@ -240,10 +253,6 @@ struct MessageRow: View {
                         .foregroundColor(GM.textPrimary)
                         .lineLimit(1)
                     Spacer(minLength: 8)
-                    if let time = MailTime.short(message.createdAt) {
-                        Text(time).font(.system(size: 12)).foregroundColor(GM.textTertiary)
-                            .lineLimit(1)
-                    }
                 }
                 Text(message.subjectOrNone)
                     .font(.system(size: 14, weight: unread ? .medium : .regular))
@@ -259,27 +268,86 @@ struct MessageRow: View {
                 }
             }
 
-            VStack(spacing: 6) {
-                if message.hasAttachments {
-                    Image(systemName: "paperclip").font(.system(size: 13))
-                        .foregroundColor(GM.textTertiary)
+            VStack(alignment: .trailing, spacing: 6) {
+                // The clock and the unread dot, in the reference's own column:
+                // date at the top of the row, dot beside it, star underneath.
+                // A fixed minimum width keeps a long date from squeezing the
+                // sender line, and right alignment keeps the stars in one line.
+                HStack(spacing: 5) {
+                    if unread {
+                        Circle().fill(GM.primarySolid).frame(width: 8, height: 8)
+                    }
+                    if let time = MailTime.short(message.createdAt) {
+                        Text(time).font(.system(size: 12)).foregroundColor(GM.textTertiary)
+                            .lineLimit(1)
+                    }
                 }
-                Image(systemName: message.isStarred ? "star.fill" : "star")
-                    .font(.system(size: 16))
-                    // The star token, not `GM.warning`: this is the row the dark
-                    // home screenshot photographs, and `warning` carries a single
-                    // value with no dark counterpart, so the list and the thread of
-                    // the same starred message showed two different ambers.
-                    .foregroundColor(message.isStarred ? GM.star : GM.textTertiary)
-                    .onTapGesture(perform: onStar)
+                HStack(spacing: 5) {
+                    if message.hasAttachments {
+                        Image(systemName: "paperclip").font(.system(size: 12))
+                            .foregroundColor(GM.textTertiary)
+                    }
+                    Image(systemName: message.isStarred ? "star.fill" : "star")
+                        .font(.system(size: 16))
+                        // The star token, not `GM.warning`: this is the row the dark
+                        // home screenshot photographs, and `warning` carries a single
+                        // value with no dark counterpart, so the list and the thread of
+                        // the same starred message showed two different ambers.
+                        .foregroundColor(message.isStarred ? GM.star : GM.textTertiary)
+                        .onTapGesture(perform: onStar)
+                }
             }
-            .frame(width: 24)
+            .frame(minWidth: 44, alignment: .trailing)
         }
         .padding(.horizontal, 16).padding(.vertical, 12)
         .contentShape(Rectangle())
         .onTapGesture { selecting ? onSelect() : onOpen() }
         .onLongPressGesture(perform: onSelect)
         .accessibilityIdentifier(selecting ? "mail-row-select" : "mail-row")
+    }
+}
+
+/// The reference's category row, as the card's leading rows: an icon in a
+/// tinted rounded square, the box's name, and a "N new" pill carrying the
+/// server's own unread count. Every row is real navigation — `vm.open`, the
+/// same door the drawer uses — so the look never ships a control that goes
+/// nowhere. Android's `BoxCategoryRow` is the same row.
+struct BoxCategoryRow: View {
+    let title: String
+    let count: Int?
+    let icon: String
+    let tint: Color
+    let onTap: () -> Void
+
+    var body: some View {
+        Button(action: onTap) {
+            HStack(spacing: 12) {
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .fill(tint.opacity(0.16))
+                    .frame(width: 34, height: 34)
+                    .overlay(
+                        Image(systemName: icon)
+                            .font(.system(size: 15, weight: .medium))
+                            .foregroundColor(tint)
+                    )
+                Text(title)
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundColor(GM.textPrimary)
+                    .lineLimit(1)
+                Spacer(minLength: 8)
+                if let count = count, count > 0 {
+                    Text(count >= 100 ? "99+ new" : "\(count) new")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 3)
+                        .background(Capsule().fill(tint))
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 9)
+        }
+        .buttonStyle(.plain)
     }
 }
 
@@ -376,8 +444,8 @@ struct MailFab: View {
             }
             .foregroundColor(.white)
             .padding(.horizontal, 20)
-            .padding(.vertical, 15)
-            .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(GM.primarySolid))
+            .padding(.vertical, 13)
+            .background(RoundedRectangle(cornerRadius: 24, style: .continuous).fill(GM.primarySolid))
             .shadow(color: Color.black.opacity(0.18), radius: 10, x: 0, y: 4)
         }
         .buttonStyle(.plain)
@@ -476,6 +544,7 @@ struct MailStateBlock<Content: View>: View {
     let failed: Bool
     let noMailbox: Bool
     let empty: Bool
+    var filtered: Bool = false
     let boxTitle: String
     let onRetry: () -> Void
     @ViewBuilder let content: Content
@@ -497,8 +566,8 @@ struct MailStateBlock<Content: View>: View {
                     detail: "Your mailbox could not be reached. Nothing has been deleted.",
                     action: ("Try again", onRetry))
             } else {
-                CenteredState(title: "\(boxTitle) is empty",
-                              detail: "No messages here yet.")
+                CenteredState(title: filtered ? "No matching messages" : "\(boxTitle) is empty",
+                              detail: filtered ? "Try changing your search or filters." : "No messages here yet.")
             }
         }
     }

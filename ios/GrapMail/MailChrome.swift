@@ -253,6 +253,69 @@ struct LabelStrip: View {
     }
 }
 
+/// The home's top chrome: the menu, the wide search pill and the account
+/// avatar, over the box's own name. Extracted from `MailboxView` so the
+/// snapshot host photographs the control the live screen draws rather than a
+/// look-alike built for the camera.
+struct MailHomeTopBar<Search: View>: View {
+    let boxTitle: String
+    let accountName: String?
+    let accountAddress: String?
+    let onMenu: () -> Void
+    let onProfile: () -> Void
+    let onSettings: () -> Void
+    let onSignOut: () -> Void
+    @ViewBuilder let search: () -> Search
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 6) {
+                Button(action: onMenu) {
+                    Image(systemName: "line.3.horizontal")
+                        .font(.system(size: 19))
+                        .foregroundColor(GM.textPrimary)
+                        .frame(width: 44, height: 44)
+                }
+                .accessibilityLabel("Open folders")
+                .accessibilityIdentifier("mail-menu")
+
+                search()
+
+                Menu {
+                    if let address = accountAddress, !address.isEmpty {
+                        Text(address)
+                    }
+                    Button("Profile", action: onProfile)
+                    Button("Settings", action: onSettings)
+                    Button("Sign out", action: onSignOut)
+                } label: {
+                    Group {
+                        if accountName?.nilIfBlank() != nil || accountAddress?.nilIfBlank() != nil {
+                            SenderAvatar(display: accountName ?? "",
+                                         address: accountAddress ?? "", size: 36)
+                        } else {
+                            Image(systemName: "person.crop.circle")
+                                .font(.system(size: 30))
+                                .foregroundColor(GM.textSecondary)
+                        }
+                    }
+                    .frame(width: 44, height: 44)
+                }
+                .accessibilityLabel("Account")
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+
+            Text(boxTitle)
+                .font(.system(size: 13, weight: .medium))
+                .foregroundColor(GM.textSecondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 16)
+                .padding(.bottom, 8)
+        }
+    }
+}
+
 /// Four tabs, not five. The reference draws a Calendar tab and no calendar
 /// backend exists, so drawing it would ship a control that goes nowhere — the
 /// one thing this sector was told not to do. The Mail badge is the inbox's real
@@ -273,7 +336,16 @@ struct MailBottomBar: View {
         .frame(maxWidth: .infinity)
         .padding(.vertical, 8)
         .background(GM.card)
-        .overlay(Rectangle().frame(height: 1).foregroundColor(GM.border), alignment: .top)
+        // The reference's floating bar: inset from both edges, fully rounded,
+        // on the elevated card fill with a hairline border — a control surface
+        // hovering over the canvas, not a strip welded to the bottom.
+        .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 26, style: .continuous)
+                .stroke(GM.border, lineWidth: 1)
+        )
+        .padding(.horizontal, 12)
+        .padding(.bottom, 8)
         .accessibilityIdentifier("mail-tabs")
     }
 
