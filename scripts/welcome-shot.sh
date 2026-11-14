@@ -90,9 +90,25 @@ def one(predicate, label):
 
 hero = one(lambda n: (n.get("content-desc") or "").startswith("Animated preview"),
            "welcome hero")
+
+# The WebView is one native view, but uiautomator also lists the WebView's own
+# internal accessibility node as a child of the same class. Count the hosted
+# roots (WebViews that are not inside another WebView): that number must be 1,
+# and every one of them must sit inside the hero's box, so a second embedded
+# artwork cannot pass unnoticed.
+parents = {child: parent for parent in tree.iter() for child in parent}
 webviews = [n for n in nodes if n.get("class") == "android.webkit.WebView"]
-if len(webviews) != 1:
-    sys.exit(f"FAIL: expected exactly one WebView, found {len(webviews)}")
+roots = [n for n in webviews
+         if parents.get(n) is None or parents[n].get("class") != "android.webkit.WebView"]
+if len(roots) != 1:
+    sys.exit(f"FAIL: expected exactly one hosted WebView, found {len(roots)}")
+hx1, hy1, hx2, hy2 = hero
+for view in webviews:
+    b = bounds(view)
+    if b is None:
+        sys.exit("FAIL: a WebView has no bounds")
+    if not (b[0] >= hx1 - 4 and b[1] >= hy1 - 4 and b[2] <= hx2 + 4 and b[3] <= hy2 + 4):
+        sys.exit(f"FAIL: a WebView at {b} escapes the hero box {hero}")
 
 create = one(lambda n: n.get("text") == "Create Account", "Create Account")
 welcome = one(lambda n: n.get("text") == "Welcome to", "Welcome to")
@@ -117,7 +133,9 @@ a = subprocess.run(
      f"{out}/welcome-dark-1.png", f"{out}/welcome-dark-5.png", "null:"],
     capture_output=True, text=True,
 )
-changed = int((a.stderr or a.stdout).strip().split()[0])
+# `compare` may report the AE count with a fractional part under
+# -fuzz; Python 3's int() rejects the string, so read it as a float.
+changed = int(float((a.stderr or a.stdout).strip().split()[0]))
 print(f"pixels changed across the tour: {changed}")
 if changed < 1000:
     sys.exit("FAIL: the hero did not move between frames")
