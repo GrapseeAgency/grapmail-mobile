@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 /// The folder drawer, the box tab row, the label strip and the bottom bar.
 ///
@@ -21,6 +22,7 @@ struct MailDrawer: View {
     let onLabels: () -> Void
     let onScreener: () -> Void
     let onSubscriptions: () -> Void
+    let onFiles: () -> Void
     /// The two tools the search pill used to carry. The pill is the
     /// reference's own clean "Search in mail": one field, nothing else.
     let onSortFilter: () -> Void
@@ -62,6 +64,8 @@ struct MailDrawer: View {
                         section("Mail")
                         DrawerRow(label: "Subscriptions", icon: "envelope",
                                   count: nil, selected: false, onClick: onSubscriptions)
+                        DrawerRow(label: "Files", icon: "folder",
+                                  count: nil, selected: false, onClick: onFiles)
 
                         // The two tools the search pill used to carry, where
                         // every other tool lives. The pill stays the reference's
@@ -178,28 +182,28 @@ private func drawerIcon(_ b: MailBox) -> String {
     }
 }
 
-/// The five boxes the reference's tab row can honestly occupy. Category tabs are
-/// absent by design — see the README's honest-UI contract.
 struct BoxTabRow: View {
-    let state: MailboxModel.State
+    let activeBox: MailBox
+    let counts: [MailBox: Int?]
     let onSelect: (MailBox) -> Void
 
     var body: some View {
-        // Scrollable tabs, the same cure as Android's row: in the fixed
-        // HStack five labels shared the phone width equally and every word
-        // broke mid-spelling -- frame 60 photographed "In/bo/x" and
-        // "Starre/d". Labels stay one line and the row scrolls.
         ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 2) {
-                ForEach(MailBox.tabOrder) { box in
-                    BoxTab(title: box.title,
-                           count: drawerCounts(state)[box] ?? nil,
-                           active: box == state.box) { onSelect(box) }
-                }
+            HStack(spacing: 8) {
+                chip(.others, icon: "envelope", tint: GM.primarySolid, badge: Color(red: 0.08, green: 0.38, blue: 0.78))
+                chip(.starred, icon: "star", tint: GM.star, badge: Color(red: 0.59, green: 0.34, blue: 0.10))
+                chip(.sent, icon: "paperplane", tint: Color(red: 0.67, green: 0.39, blue: 1),
+                     badge: Color(red: 0.41, green: 0.16, blue: 0.80))
             }
-            .padding(.horizontal, 8)
+            .padding(.horizontal, 16)
         }
+        .padding(.bottom, 10)
         .accessibilityIdentifier("mail-box-tabs")
+    }
+
+    private func chip(_ box: MailBox, icon: String, tint: Color, badge: Color) -> some View {
+        BoxTab(title: box.title, icon: icon, tint: tint, badgeColor: badge,
+               count: counts[box] ?? nil, active: activeBox == box) { onSelect(box) }
     }
 }
 
@@ -316,86 +320,107 @@ struct MailHomeTopBar<Search: View>: View {
     }
 }
 
-/// Four tabs, not five. The reference draws a Calendar tab and no calendar
-/// backend exists, so drawing it would ship a control that goes nowhere — the
-/// one thing this sector was told not to do. The Mail badge is the inbox's real
-/// unread count, and a nil draws nothing rather than a zero.
-struct MailBottomBar: View {
+private struct MailListShape: Shape {
+    func path(in rect: CGRect) -> Path {
+        Path(UIBezierPath(roundedRect: rect, byRoundingCorners: [.topLeft, .topRight],
+                          cornerRadii: CGSize(width: 28, height: 28)).cgPath)
+    }
+}
+
+extension View {
+    func mailListSurface() -> some View {
+        let shape = MailListShape()
+        return background(GM.cardAlt)
+            .clipShape(shape)
+            .overlay(shape.stroke(GM.border, lineWidth: 1).allowsHitTesting(false))
+            .padding(.horizontal, 12)
+    }
+}
+
+struct MailBottomControls: View {
+    static let clearance: CGFloat = 76
+
+    let inboxSelected: Bool
     let unread: Int?
+    let onMail: () -> Void
+    let onCompose: () -> Void
     let onContacts: () -> Void
-    let onFiles: () -> Void
-    let onMore: () -> Void
+    var visible = true
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
-        HStack {
-            tabItem(icon: "tray.full", label: "Mail", active: true, badge: unread)
-            tabItem(icon: "person.2", label: "Contacts", active: false, onClick: onContacts)
-            tabItem(icon: "folder", label: "Files", active: false, onClick: onFiles)
-            tabItem(icon: "ellipsis", label: "More", active: false, onClick: onMore)
+        ZStack(alignment: .bottomTrailing) {
+            if visible {
+                MailBottomBar(inboxSelected: inboxSelected, unread: unread, onMail: onMail, onContacts: onContacts)
+                    .transition(reduceMotion ? .opacity : .move(edge: .bottom).combined(with: .opacity))
+            }
+            MailFab(onClick: onCompose, expanded: visible)
+                .padding(.trailing, 20)
+                .padding(.bottom, visible ? 96 : 20)
         }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 8)
-        .background(GM.card)
-        // The reference's floating bar: inset from both edges, fully rounded,
-        // on the elevated card fill with a hairline border — a control surface
-        // hovering over the canvas, not a strip welded to the bottom.
-        .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 26, style: .continuous)
-                .stroke(GM.border, lineWidth: 1)
-        )
-        .padding(.horizontal, 12)
-        .padding(.bottom, 8)
+        .frame(maxWidth: .infinity, alignment: .bottomTrailing)
+        .animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: visible)
+    }
+}
+
+private struct MailBottomBar: View {
+    let inboxSelected: Bool
+    let unread: Int?
+    let onMail: () -> Void
+    let onContacts: () -> Void
+
+    var body: some View {
+        HStack(spacing: 0) {
+            item(icon: "envelope.fill", label: "Mail", active: inboxSelected,
+                 unread: unread, action: inboxSelected ? nil : onMail)
+            item(icon: "person.crop.rectangle", label: "Contacts", action: onContacts)
+        }
+        .background(GM.card, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .padding(.bottom, 12)
+        .frame(maxWidth: .infinity, alignment: .center)
+        .background(alignment: .bottom) {
+            LinearGradient(colors: [.clear, GM.cardAlt], startPoint: .top, endPoint: .bottom)
+                .frame(height: MailBottomControls.clearance)
+                .padding(.horizontal, 13)
+                .allowsHitTesting(false)
+                .accessibilityHidden(true)
+        }
         .accessibilityIdentifier("mail-tabs")
     }
 
-    /// One tab in the bar.
-    ///
-    /// `onClick` is optional, and the tab naming the screen you are already on
-    /// passes nothing. A Button whose action does nothing is a control that goes
-    /// nowhere — the rule this sector exists to keep, and the reason the label
-    /// strip is not tappable either. The identifier is applied in both branches so
-    /// the walk's `mail-tab-<label>` handle does not depend on which one renders.
-    @ViewBuilder private func tabItem(
-        icon: String, label: String, active: Bool, badge: Int? = nil,
-        onClick: (() -> Void)? = nil,
+    @ViewBuilder private func item(
+        icon: String, label: String, active: Bool = false, unread: Int? = nil,
+        action: (() -> Void)?
     ) -> some View {
-        let visual = VStack(spacing: 3) {
-            ZStack(alignment: .topTrailing) {
-                Image(systemName: icon)
-                    .font(.system(size: 19))
-                    .foregroundColor(active ? GM.primarySolid : GM.textTertiary)
-                if let badge, badge > 0 {
-                    // The count pill the reference draws, not a bare dot: a
-                    // number the server answered, capped the way Gmail caps it.
-                    Text(badge >= 100 ? "99+" : String(badge))
+        let badgeCount = unread.flatMap { $0 > 0 ? $0 : nil }
+        let visual = Image(systemName: icon)
+            .font(.system(size: 22))
+            .foregroundColor(active ? GM.textPrimary : GM.textSecondary)
+            .frame(width: 84, height: 46)
+            .overlay(alignment: .top) {
+                if let badgeCount {
+                    Text(badgeCount > 99 ? "99+" : String(badgeCount))
                         .font(.system(size: 10, weight: .semibold))
                         .foregroundColor(.white)
                         .padding(.horizontal, 5)
-                        .padding(.vertical, 2)
-                        .background(Capsule().fill(GM.primarySolid))
-                        .offset(x: 6, y: -4)
+                        .padding(.vertical, 1)
+                        .background(Color(red: 0.74, green: 0.16, blue: 0.16), in: Capsule())
+                        .offset(x: 14, y: 2)
+                        .allowsHitTesting(false)
+                        .accessibilityHidden(true)
                 }
             }
-            Text(label)
-                .font(.system(size: 11, weight: active ? .medium : .regular))
-                .foregroundColor(active ? GM.primarySolid : GM.textTertiary)
-        }
-        .frame(maxWidth: .infinity)
-        .contentShape(Rectangle())
+            .contentShape(Rectangle())
 
-        // Wrapped in a Group: a leading-dot modifier written after an `if`/`else`
-        // block attaches to the last expression of the `else` branch rather than to
-        // the conditional, and the branch types then stop resolving — the compiler
-        // reports `type 'Any' has no member 'accessibilityIdentifier'` against a
-        // line that looks correct.
         Group {
-            if let onClick {
-                Button(action: onClick) { visual }.buttonStyle(.plain)
+            if let action {
+                Button(action: action) { visual }.buttonStyle(.plain)
             } else {
-                visual
+                visual.accessibilityAddTraits(.isSelected)
             }
         }
+        .accessibilityLabel(badgeCount.map { "\(label), \($0) unread" } ?? label)
         .accessibilityIdentifier("mail-tab-\(label)")
     }
 }

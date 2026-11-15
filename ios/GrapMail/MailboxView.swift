@@ -43,6 +43,10 @@ struct MailboxView: View {
     @Environment(\.scenePhase) private var scenePhase
     @State private var isAtTop = true
     @State private var isVisible = false
+    @State private var controlsVisible = true
+    @State private var isUserScrolling = false
+    @State private var lastScrollTranslation: CGFloat = 0
+    @GestureState private var scrollTranslation: CGSize? = nil
 
     @State private var drawerOpen = false
     @State private var sheet: MailSheet?
@@ -69,6 +73,7 @@ struct MailboxView: View {
                     onLabels: { drawerOpen = false; onLabels() },
                     onScreener: { drawerOpen = false; onScreener() },
                     onSubscriptions: { drawerOpen = false; onSubscriptions() },
+                    onFiles: { drawerOpen = false; onFiles() },
                     onSortFilter: { drawerOpen = false; sheet = .sortFilter },
                     onAdvanced: { drawerOpen = false; sheet = .advanced },
                     onSettings: { drawerOpen = false; onSettings() },
@@ -101,6 +106,9 @@ struct MailboxView: View {
             if scenePhase == .active { vm.refreshOnResume(atTop: isAtTop || vm.state.rows.isEmpty) }
         }
         .onAppear { isVisible = true }
+        .onChange(of: vm.state.box) { _ in controlsVisible = true }
+        .onChange(of: vm.state.query) { _ in controlsVisible = true }
+        .onChange(of: vm.state.filter) { _ in controlsVisible = true }
         .onDisappear { isVisible = false }
         .onChange(of: scenePhase) { phase in
             if phase == .active, isVisible { vm.refreshOnResume(atTop: isAtTop || vm.state.rows.isEmpty) }
@@ -128,24 +136,25 @@ struct MailboxView: View {
     // ── the column ───────────────────────────────────────────────────────────
 
     private var content: some View {
-        ZStack(alignment: .bottomTrailing) {
+        ZStack(alignment: .bottom) {
             GM.bg.ignoresSafeArea()
             VStack(spacing: 0) {
                 header
+                if vm.state.selection.isEmpty {
+                    BoxTabRow(activeBox: vm.state.box, counts: drawerCounts(vm.state), onSelect: open)
+                }
                 offlineBanner
                 staleBanner
                 listArea
-                MailBottomBar(
-                    unread: vm.state.unreadCount,
-                    onContacts: onContacts,
-                    onFiles: onFiles,
-                    onMore: { toggleDrawer() }
-                )
             }
-            MailFab(onClick: onCompose)
-                .padding(.trailing, 20)
-                .padding(.bottom, 96)
-                .accessibilityIdentifier("mail-compose")
+            MailBottomControls(
+                inboxSelected: vm.state.box == .inbox,
+                unread: vm.state.unreadCount,
+                onMail: { open(.inbox) },
+                onCompose: onCompose,
+                onContacts: onContacts,
+                visible: controlsVisible
+            )
         }
     }
 
@@ -322,63 +331,8 @@ struct MailboxView: View {
         ) {
             messageList
         }
-        // The reference's defining shape: ONE rounded, bordered container
-        // holding every row, fixed while the mail scrolls inside it. The clip
-        // belongs to this container, not to each row — a row-level shape per
-        // row is also a row-level compositing cost on the scroll path.
-        .background(GM.cardAlt)
-        .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 28, style: .continuous)
-                .stroke(GM.border, lineWidth: 1)
-        )
-        .padding(.horizontal, 12)
-        .padding(.bottom, 10)
+        .mailListSurface()
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-    }
-
-    private func boxCategoryIcon(_ box: MailBox) -> String {
-        switch box {
-        case .starred:  return "star"
-        case .snoozed:  return "clock"
-        case .sent:     return "paperplane.fill"
-        case .drafts:   return "doc.text"
-        case .archive:  return "archivebox"
-        case .spam:     return "exclamationmark.triangle"
-        case .others:   return "tray.full"
-        default:        return "trash"
-        }
-    }
-
-    private func boxCategoryTint(_ box: MailBox) -> Color {
-        switch box {
-        case .starred:  return GM.star
-        case .snoozed:  return GM.primarySolid
-        case .sent:     return GM.success
-        case .drafts:   return GM.textSecondary
-        case .archive:  return GM.primarySolid
-        case .spam:     return GM.warnInk
-        case .others:   return GM.textSecondary
-        default:        return GM.error
-        }
-    }
-
-    @ViewBuilder
-    private var categoryRows: some View {
-        let boxes = drawerBoxes(vm.state)
-            .filter { $0 != vm.state.box && $0 != .screener && $0 != .others }
-        let counts = drawerCounts(vm.state)
-        ForEach(boxes, id: \.self) { box in
-            BoxCategoryRow(
-                title: box.title,
-                count: counts[box] ?? nil,
-                icon: boxCategoryIcon(box),
-                tint: boxCategoryTint(box),
-                onTap: { vm.open(box) }
-            )
-            .listRowBackground(Color.clear)
-            .listRowSeparator(.hidden)
-        }
     }
 
     @ViewBuilder
@@ -451,20 +405,63 @@ struct MailboxView: View {
     /// and that card is drawn by `listArea`, once, around this whole list.
     /// The list itself keeps a clear background and hides its separators, so
     /// the only corners on screen are the container's.
-    private var messageList: some View {
+    @ViewBuilder private var messageList: some View {
         let prefetchIDs = Set(vm.state.rows.suffix(4).map(\.id))
-        return List {
-            categoryRows
+        let list = List {
             ForEach(vm.state.rows) { row in
                 rowView(for: row, prefetchIDs: prefetchIDs)
             }
             listFooter
+            Color.clear
+                .frame(height: MailBottomControls.clearance)
+                .listRowInsets(EdgeInsets())
+                .listRowBackground(Color.clear)
+                .listRowSeparator(.hidden)
+                .accessibilityHidden(true)
         }
         .listStyle(.plain)
         .id(vm.state.box)
         .scrollContentBackground(.hidden)
         .refreshable { await vm.loadAndSettle() }
         .accessibilityIdentifier("mail-list")
+
+        if #available(iOS 18.0, *) {
+            list
+                .onScrollPhaseChange { _, phase in
+                    isUserScrolling = phase == .interacting || phase == .decelerating
+                }
+                .onScrollGeometryChange(for: Int.self) { geometry in
+                    let inset = geometry.contentInsets
+                    let limit = max(0, geometry.contentSize.height + inset.top + inset.bottom - geometry.containerSize.height)
+                    let offset = min(limit, max(0, geometry.contentOffset.y + inset.top))
+                    return Int(offset / 8)
+                } action: { previous, current in
+                    if current == 0 { controlsVisible = true }
+                    else if isUserScrolling { controlsVisible = current < previous }
+                }
+        } else {
+            list
+                .simultaneousGesture(
+                    DragGesture(minimumDistance: 8, coordinateSpace: .global)
+                        .updating($scrollTranslation) { drag, translation, _ in
+                            translation = drag.translation
+                        }
+                )
+                .onChange(of: scrollTranslation, perform: updateScrollControls)
+        }
+    }
+
+    private func updateScrollControls(_ translation: CGSize?) {
+        guard let translation else {
+            lastScrollTranslation = 0
+            return
+        }
+        // The list also handles horizontal swipe actions on individual messages.
+        guard abs(translation.height) > abs(translation.width) else { return }
+        let distance = translation.height - lastScrollTranslation
+        guard abs(distance) >= 8 else { return }
+        lastScrollTranslation = translation.height
+        controlsVisible = distance > 0
     }
 
     @ViewBuilder private func sheetContent(_ which: MailSheet) -> some View {

@@ -1,10 +1,12 @@
 package com.grapsee.grapmail.ui.components
 
+import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -45,6 +47,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -557,26 +564,40 @@ fun LabelChip(
     }
 }
 
-/** A box tab with the underline the reference shows on the active one. */
 @Composable
-fun BoxTab(title: String, count: Int?, active: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
+fun BoxTab(
+    title: String,
+    icon: ImageVector,
+    tint: Color,
+    badgeColor: Color,
+    count: Int?,
+    active: Boolean,
+    onClick: () -> Unit,
+) {
     val palette = LocalPalette.current
-    Column(modifier.clickable(onClick = onClick).padding(horizontal = 14.dp, vertical = 10.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(title, fontSize = 14.sp,
-                fontWeight = if (active) FontWeight.SemiBold else FontWeight.Normal,
-                // One line, always: inside a scrollable tab row a wrapping
-                // label is the bug, not the fallback.
+    Row(
+        Modifier.testTag("mail-box-tab-$title")
+            .clip(CircleShape)
+            .background(if (active) tint.copy(alpha = 0.14f) else palette.card)
+            .border(1.dp, if (active) tint else palette.border, CircleShape)
+            .selectable(selected = active, role = Role.Tab, onClick = onClick)
+            .height(44.dp)
+            .padding(horizontal = 10.dp),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(icon, null, tint = tint, modifier = Modifier.size(17.dp))
+        Text(title, color = palette.textPrimary, fontSize = 13.sp,
+            fontWeight = FontWeight.Medium, softWrap = false, maxLines = 1)
+        if (count != null && count > 0) {
+            Text(
+                if (count > 99) "99+" else count.toString(),
+                color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.SemiBold,
                 softWrap = false, maxLines = 1,
-                color = if (active) palette.primarySolid else palette.textSecondary)
-            if (count != null) {
-                Spacer(Modifier.width(6.dp))
-                CountBadge(count)
-            }
+                modifier = Modifier.background(badgeColor, CircleShape)
+                    .padding(horizontal = 6.dp, vertical = 2.dp),
+            )
         }
-        Spacer(Modifier.height(6.dp))
-        Box(Modifier.fillMaxWidth().height(2.dp)
-            .background(if (active) palette.primarySolid else Color.Transparent))
     }
 }
 
@@ -589,21 +610,24 @@ fun BoxTab(title: String, count: Int?, active: Boolean, onClick: () -> Unit, mod
  * a walk that breaks whenever the list scrolls, so it names itself.
  */
 @Composable
-fun MailFab(onClick: () -> Unit, modifier: Modifier = Modifier) {
+fun MailFab(onClick: () -> Unit, modifier: Modifier = Modifier, expanded: Boolean = true) {
     val palette = LocalPalette.current
-    // The extended pill, as the reference draws it: glyph + word, not a bare
-    // circle. The word names the affordance a 56dp dot never said out loud.
     Row(
         modifier
             .clip(RoundedCornerShape(24.dp))
             .background(palette.primarySolid)
-            .clickable(onClick = onClick)
-            .padding(horizontal = 20.dp, vertical = 14.dp),
+            .clickable(role = Role.Button, onClick = onClick)
+            .semantics { contentDescription = "Compose" }
+            .animateContentSize(alignment = Alignment.CenterEnd)
+            .height(48.dp)
+            .padding(horizontal = if (expanded) 20.dp else 14.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(Icons.Rounded.Edit, "Compose", tint = palette.onPrimary, modifier = Modifier.size(20.dp))
-        Spacer(Modifier.width(10.dp))
-        Text("Compose", fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = palette.onPrimary)
+        Icon(Icons.Rounded.Edit, null, tint = palette.onPrimary, modifier = Modifier.size(20.dp))
+        if (expanded) {
+            Spacer(Modifier.width(10.dp))
+            Text("Compose", fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = palette.onPrimary)
+        }
     }
 }
 

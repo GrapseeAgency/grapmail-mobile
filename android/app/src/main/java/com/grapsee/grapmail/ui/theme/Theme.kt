@@ -46,6 +46,11 @@ data class Palette(
     // theme, dark ink in the light one — the one color whose job is contrast
     // against the field's own fill.
     val cursor: Color,
+    val tabBadgeAll: Color = Color(0xFF1560C7),
+    val tabBadgeStarred: Color = Color(0xFF975619),
+    val tabTintSent: Color = Color(0xFFAC63FE),
+    val tabBadgeSent: Color = Color(0xFF6928CC),
+    val unreadBadge: Color = Color(0xFFBC2828),
 )
 
 val LocalPalette = staticCompositionLocalOf {

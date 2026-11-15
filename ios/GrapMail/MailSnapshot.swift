@@ -737,7 +737,7 @@ struct MailSnapshotView: View {
     private func listFrame(
         rows: [MailMessage], loading: Bool, failed: Bool, noMailbox: Bool, box: MailBox,
     ) -> some View {
-        ZStack(alignment: .bottomTrailing) {
+        ZStack(alignment: .bottom) {
             GM.bg.ignoresSafeArea()
             VStack(spacing: 0) {
                 MailHomeTopBar(
@@ -758,39 +758,24 @@ struct MailSnapshotView: View {
                         .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
                     }
                 )
+                BoxTabRow(activeBox: box, counts: [.others: 12, .starred: 3, .sent: 24], onSelect: { _ in })
                 MailStateBlock(
                     loading: loading, failed: failed, noMailbox: noMailbox,
                     empty: rows.isEmpty, boxTitle: box.title, onRetry: {}
                 ) {
                     ScrollView {
                         VStack(spacing: 0) {
-                            // Two folded-box rows above the mail, the way the
-                            // reference leads its card. They open real boxes on
-                            // the live screen; here they are only photographed.
-                            BoxCategoryRow(title: "Starred", count: 3, icon: "star",
-                                           tint: GM.star, onTap: {})
-                            BoxCategoryRow(title: "Sent", count: nil, icon: "paperplane.fill",
-                                           tint: GM.success, onTap: {})
                             ForEach(rows) { m in
                                 MessageRow(message: m, selecting: false, selected: false,
                                            onSelect: {}, onOpen: {}, onStar: {})
                             }
+                            Color.clear.frame(height: MailBottomControls.clearance)
                         }
                     }
                 }
-                .background(GM.cardAlt)
-                .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 28, style: .continuous)
-                        .stroke(GM.border, lineWidth: 1)
-                )
-                .padding(.horizontal, 12)
-                .padding(.bottom, 10)
-                MailBottomBar(unread: 7, onContacts: {}, onFiles: {}, onMore: {})
+                .mailListSurface()
             }
-            MailFab(onClick: {})
-                .padding(.trailing, 20)
-                .padding(.bottom, 96)
+            MailBottomControls(inboxSelected: box == .inbox, unread: 7, onMail: {}, onCompose: {}, onContacts: {})
         }
     }
 

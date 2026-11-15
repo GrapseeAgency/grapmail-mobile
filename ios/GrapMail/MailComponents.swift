@@ -307,50 +307,6 @@ struct MessageRow: View, Equatable {
     }
 }
 
-/// The reference's category row, as the card's leading rows: an icon in a
-/// tinted rounded square, the box's name, and a "N new" pill carrying the
-/// server's own unread count. Every row is real navigation — `vm.open`, the
-/// same door the drawer uses — so the look never ships a control that goes
-/// nowhere. Android's `BoxCategoryRow` is the same row.
-struct BoxCategoryRow: View {
-    let title: String
-    let count: Int?
-    let icon: String
-    let tint: Color
-    let onTap: () -> Void
-
-    var body: some View {
-        Button(action: onTap) {
-            HStack(spacing: 12) {
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .fill(tint.opacity(0.16))
-                    .frame(width: 34, height: 34)
-                    .overlay(
-                        Image(systemName: icon)
-                            .font(.system(size: 15, weight: .medium))
-                            .foregroundColor(tint)
-                    )
-                Text(title)
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundColor(GM.textPrimary)
-                    .lineLimit(1)
-                Spacer(minLength: 8)
-                if let count = count, count > 0 {
-                    Text(count >= 100 ? "99+ new" : "\(count) new")
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundColor(.white)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 3)
-                        .background(Capsule().fill(tint))
-                }
-            }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 9)
-        }
-        .buttonStyle(.plain)
-    }
-}
-
 // ── header pieces ────────────────────────────────────────────────────────────
 
 // The time-of-day greeting view lived here and was removed: nothing composed
@@ -392,36 +348,44 @@ struct LabelChip: View {
     }
 }
 
-/// A box tab with the underline the reference shows on the active one.
 struct BoxTab: View {
     let title: String
+    let icon: String
+    let tint: Color
+    let badgeColor: Color
     let count: Int?
     let active: Bool
     let onClick: () -> Void
 
     var body: some View {
         Button(action: onClick) {
-            VStack(spacing: 6) {
-                HStack(spacing: 6) {
-                    Text(title)
-                        .font(.system(size: 14, weight: active ? .semibold : .regular))
-                        .foregroundColor(active ? GM.primarySolid : GM.textSecondary)
-                        // One line at the label's natural width: a horizontal
-                        // ScrollView compresses Text otherwise, and the old
-                        // fixed row wrapped every box name mid-word.
-                        .fixedSize()
-                    CountBadge(count: count)
+            HStack(spacing: 6) {
+                Image(systemName: icon)
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundColor(tint)
+                    .accessibilityHidden(true)
+                Text(title)
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundColor(GM.textPrimary)
+                if let count, count > 0 {
+                    Text(count > 99 ? "99+" : String(count))
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(badgeColor, in: Capsule())
                 }
-                Rectangle()
-                    .fill(active ? GM.primarySolid : Color.clear)
-                    .frame(height: 2)
             }
-            // The whole tab at natural size: inside the scrollable row the
-            // fill-first underline would otherwise collapse to nothing.
             .fixedSize(horizontal: true, vertical: false)
-            .padding(.horizontal, 14).padding(.vertical, 10)
+            .padding(.horizontal, 10)
+            .frame(height: 44)
+            .background(active ? tint.opacity(0.14) : GM.card, in: Capsule())
+            .overlay(Capsule().strokeBorder(active ? tint : GM.border).allowsHitTesting(false))
+            .contentShape(Capsule())
         }
         .buttonStyle(.plain)
+        .accessibilityAddTraits(active ? .isSelected : [])
+        .accessibilityIdentifier("mail-box-tab-\(title)")
     }
 }
 
@@ -430,25 +394,28 @@ struct BoxTab: View {
 /// scrolls.
 struct MailFab: View {
     let onClick: () -> Void
+    var expanded = true
 
     var body: some View {
         Button(action: onClick) {
-            // The extended pill the reference draws: glyph + word, not a bare
-            // circle. The word names the affordance a 56pt dot never said out
-            // loud.
             HStack(spacing: 10) {
                 Image(systemName: "pencil")
                     .font(.system(size: 17, weight: .semibold))
-                Text("Compose")
-                    .font(.system(size: 16, weight: .semibold))
+                    .frame(width: 20)
+                if expanded {
+                    Text("Compose")
+                        .font(.system(size: 16, weight: .semibold))
+                        .fixedSize(horizontal: true, vertical: false)
+                }
             }
             .foregroundColor(.white)
-            .padding(.horizontal, 20)
-            .padding(.vertical, 13)
+            .padding(.horizontal, expanded ? 20 : 14)
+            .frame(height: 48)
             .background(RoundedRectangle(cornerRadius: 24, style: .continuous).fill(GM.primarySolid))
             .shadow(color: Color.black.opacity(0.18), radius: 10, x: 0, y: 4)
         }
         .buttonStyle(.plain)
+        .accessibilityLabel("Compose")
         .accessibilityIdentifier("mail-compose")
     }
 }

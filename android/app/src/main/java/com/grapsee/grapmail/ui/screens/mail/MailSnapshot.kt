@@ -2,7 +2,6 @@ package com.grapsee.grapmail.ui.screens.mail
 
 import android.app.Application
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -11,11 +10,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Send
-import androidx.compose.material.icons.rounded.Star
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -24,7 +19,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
@@ -794,12 +788,10 @@ private fun listFrame(
                 fontSize = 13.sp,
                 fontWeight = androidx.compose.ui.text.font.FontWeight.Medium,
             )
+            BoxTabRow(box, mapOf(MailBox.All to 12, MailBox.Starred to 3, MailBox.Sent to 24), onSelect = {})
             Box(
                 Modifier.fillMaxWidth().weight(1f)
-                    .padding(start = 12.dp, end = 12.dp, bottom = 10.dp)
-                    .clip(RoundedCornerShape(28.dp))
-                    .background(palette.cardAlt)
-                    .border(1.dp, palette.border, RoundedCornerShape(28.dp)),
+                    .mailListSurface(),
             ) {
                 MailStateBlock(
                     loading = loading,
@@ -809,24 +801,8 @@ private fun listFrame(
                     boxTitle = box.title,
                     onRetry = {},
                 ) {
-                    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
-                        // Two folded-box rows above the mail, the way the
-                        // reference leads its card. They open real boxes on the
-                        // live screen; here they are only photographed.
-                        BoxCategoryRow(
-                            title = "Starred",
-                            count = 3,
-                            icon = Icons.Rounded.Star,
-                            tint = palette.star,
-                            onClick = {},
-                        )
-                        BoxCategoryRow(
-                            title = "Sent",
-                            count = null,
-                            icon = Icons.Rounded.Send,
-                            tint = palette.success,
-                            onClick = {},
-                        )
+                    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())
+                        .padding(bottom = MailBottomClearance)) {
                         shown.forEach { row ->
                             MessageRow(
                                 message = row, selected = false,
@@ -836,15 +812,9 @@ private fun listFrame(
                     }
                 }
             }
-            MailBottomBar(selected = 0, unread = 7,
-                onContacts = {}, onFiles = {}, onMore = {})
         }
-        Box(
-            Modifier.fillMaxSize().padding(end = 20.dp, bottom = 96.dp),
-            contentAlignment = Alignment.BottomEnd,
-        ) {
-            com.grapsee.grapmail.ui.components.MailFab({})
-        }
+        MailBottomControls(inboxSelected = box == MailBox.Inbox, unread = 7, onMail = {}, onCompose = {},
+            onContacts = {}, modifier = Modifier.align(Alignment.BottomCenter))
     }
 }
 

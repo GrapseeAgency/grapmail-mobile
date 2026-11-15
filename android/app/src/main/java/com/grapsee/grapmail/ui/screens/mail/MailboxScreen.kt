@@ -1,5 +1,11 @@
 package com.grapsee.grapmail.ui.screens.mail
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -10,6 +16,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -27,8 +34,12 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Archive
+import androidx.compose.material.icons.automirrored.rounded.Send
+import androidx.compose.material.icons.outlined.Mail
+import androidx.compose.material.icons.outlined.StarBorder
+import androidx.compose.material.icons.rounded.Email
 import androidx.compose.material.icons.rounded.AllInbox
+import androidx.compose.material.icons.rounded.Archive
 import androidx.compose.material.icons.rounded.AttachFile
 import androidx.compose.material.icons.rounded.Contacts
 import androidx.compose.material.icons.rounded.Delete
@@ -41,7 +52,6 @@ import androidx.compose.material.icons.rounded.MailOutline
 import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.Menu
 import androidx.compose.material.icons.rounded.Person
-import androidx.compose.material.icons.rounded.MoreHoriz
 import androidx.compose.material.icons.rounded.Report
 import androidx.compose.material.icons.rounded.Schedule
 import androidx.compose.material.icons.rounded.Check
@@ -83,8 +93,17 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.ExperimentalComposeUiApi
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.testTagsAsResourceId
 import androidx.compose.ui.draw.clip
@@ -155,6 +174,28 @@ fun MailboxScreen(
     val drawer = rememberDrawerState(DrawerValue.Closed)
     val scope = rememberCoroutineScope()
     val listState = key(state.box) { rememberLazyListState() }
+    var controlsVisible by remember(listState, state.query, state.filter) { mutableStateOf(true) }
+    val scrollThreshold = with(LocalDensity.current) { 8.dp.toPx() }
+    val controlsScroll = remember(listState, state.query, state.filter, scrollThreshold) {
+        object : NestedScrollConnection {
+            private var travel = 0f
+
+            override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset {
+                if (source != NestedScrollSource.UserInput) return Offset.Zero
+                if (!listState.canScrollBackward) {
+                    controlsVisible = true
+                    travel = 0f
+                } else if (consumed.y != 0f) {
+                    travel = if (travel * consumed.y > 0f) travel + consumed.y else consumed.y
+                    if (kotlin.math.abs(travel) >= scrollThreshold) {
+                        controlsVisible = travel > 0f
+                        travel = 0f
+                    }
+                }
+                return Offset.Zero
+            }
+        }
+    }
 
     var showSortSheet by remember { mutableStateOf(false) }
     var showAdvSheet by remember { mutableStateOf(false) }
@@ -244,6 +285,7 @@ fun MailboxScreen(
                 onLabels = { scope.launch { drawer.close() }; onLabels() },
                 onScreener = { scope.launch { drawer.close() }; onScreener() },
                 onSubscriptions = { scope.launch { drawer.close() }; onSubscriptions() },
+                onFiles = { scope.launch { drawer.close() }; onFiles() },
                 onScheduled = { scope.launch { drawer.close() }; onScheduled() },
                 onSortFilter = { scope.launch { drawer.close() }; showSortSheet = true },
                 onAdvanced = { scope.launch { drawer.close() }; showAdvSheet = true },
@@ -314,6 +356,7 @@ fun MailboxScreen(
                         fontSize = 13.sp,
                         fontWeight = FontWeight.Medium,
                     )
+                    BoxTabRow(state.box, drawerCounts(state), vm::open)
                 }
 
                 // The device's own path to the network, read before asking
@@ -386,17 +429,7 @@ fun MailboxScreen(
                 PullToRefreshBox(
                     isRefreshing = refreshing,
                     onRefresh = { refreshing = true; vm.load() },
-                    // The reference's defining shape: ONE rounded, bordered
-                    // container holding every row, fixed while the mail scrolls
-                    // inside it. The clip lives on the container, not on the
-                    // rows — a clip per row measured 35% janky frames on this
-                    // list against a 1.4% baseline, so the cheap version of this
-                    // shape is also the smooth one.
-                    modifier = Modifier.weight(1f)
-                        .padding(start = 12.dp, end = 12.dp, bottom = 10.dp)
-                        .clip(RoundedCornerShape(28.dp))
-                        .background(palette.cardAlt)
-                        .border(1.dp, palette.border, RoundedCornerShape(28.dp)),
+                    modifier = Modifier.weight(1f).mailListSurface().nestedScroll(controlsScroll),
                 ) {
                     MailStateBlock(
                         loading = state.loading,
@@ -418,10 +451,7 @@ fun MailboxScreen(
                         LazyColumn(
                             state = listState,
                             modifier = Modifier.fillMaxSize().testTag("mail-list"),
-                            // The card's corners are the container's, so the
-                            // list insets its own ends rather than painting into
-                            // them.
-                            contentPadding = androidx.compose.foundation.layout.PaddingValues(vertical = 6.dp),
+                            contentPadding = PaddingValues(top = 6.dp, bottom = MailBottomClearance),
                         ) {
                             // `key` and `contentType` are arguments of `items`, not
                             // of `LazyColumn` — the spec writes them as if they sat on
@@ -445,43 +475,6 @@ fun MailboxScreen(
                             // The box's own name is drawn above the card by the
                             // header, not as a scrolling row here: a title that
                             // scrolls away leaves the card unlabelled.
-                            // The reference's category rows live inside the card,
-                            // above the mail list: one row per other box, the
-                            // server's own unread count as the pill, and `vm.open`
-                            // behind the tap. The screen's own box is the list
-                            // below, so it is the one row not shown here.
-                            val categoryCounts = drawerCounts(state)
-                            MailBox.tabOrder
-                                .filter { it != visibleBox && it != MailBox.Screener && it != MailBox.All }
-                                .forEach { box ->
-                                    item(key = "box-" + box.name) {
-                                        BoxCategoryRow(
-                                                title = box.title,
-                                                count = categoryCounts[box],
-                                                icon = when (box) {
-                                                    MailBox.Starred -> Icons.Rounded.Star
-                                                    MailBox.Snoozed -> Icons.Rounded.Schedule
-                                                    MailBox.Sent -> Icons.Rounded.Send
-                                                    MailBox.Drafts -> Icons.Rounded.Description
-                                                    MailBox.Archive -> Icons.Rounded.Archive
-                                                    MailBox.Spam -> Icons.Rounded.Report
-                                                    MailBox.All -> Icons.Rounded.AllInbox
-                                                    else -> Icons.Rounded.Delete
-                                                },
-                                                tint = when (box) {
-                                                    MailBox.Starred -> palette.star
-                                                    MailBox.Snoozed -> palette.primarySolid
-                                                    MailBox.Sent -> palette.success
-                                                    MailBox.Drafts -> palette.textSecondary
-                                                    MailBox.Archive -> palette.primarySolid
-                                                    MailBox.Spam -> palette.warnInk
-                                                    MailBox.All -> palette.textSecondary
-                                                    else -> palette.error
-                                                },
-                                                onClick = { vm.open(box) },
-                                            )
-                                    }
-                                }
                             itemsIndexed(state.rows, key = { _, r -> r.id }, contentType = { _, _ -> "row" }) { _, row ->
                                 // No per-row clip and no per-row divider: the
                                 // card's one clip is on the container above, and
@@ -553,18 +546,17 @@ fun MailboxScreen(
                         }
                     }
                 }
-
-                MailBottomBar(selected = 0, unread = state.unreadCount,
-                    onContacts = onContacts, onFiles = onFiles,
-                    onMore = { scope.launch { drawer.open() } })
             }
 
-            // The FAB sits above the list but inside the content, so it survives
-            // the drawer opening and closing.
-            Box(Modifier.fillMaxSize().padding(end = 20.dp, bottom = 96.dp),
-                contentAlignment = Alignment.BottomEnd) {
-                MailFab(onCompose, modifier = Modifier.testTag("mail-compose"))
-            }
+            MailBottomControls(
+                modifier = Modifier.align(Alignment.BottomCenter),
+                visible = controlsVisible || !listState.canScrollBackward,
+                inboxSelected = state.box == MailBox.Inbox,
+                unread = state.unreadCount,
+                onMail = { vm.open(MailBox.Inbox) },
+                onCompose = onCompose,
+                onContacts = onContacts,
+            )
         }
     }
 
@@ -789,75 +781,22 @@ private fun LabelStrip(s: MailboxViewModel.MailboxUiState) {
     }
 }
 
-/**
- * The box tabs. Tappable, and they go to the same place the drawer rows do.
- *
- * These were inert once — the row drew the active underline and the drawer's
- * counts, so it read as the box switcher the reference shows, and a tap did
- * nothing. A control that only looks like a control is worse than no control:
- * the drawer works, so a person concludes the tab row is broken rather than
- * decorative. It now opens the box through the same `vm.open`, which means the
- * same fetch policy (a box already read is not re-read) and the same
- * selection-clearing as the drawer path.
- */
 @Composable
-private fun BoxTabRow(s: MailboxViewModel.MailboxUiState, onSelect: (MailBox) -> Unit) {
-    val counts = drawerCounts(s)
-    // Scrollable tabs, the Material answer to a tab bar wider than the
-    // screen. The fixed Row this replaces measured every label against an
-    // equal slice of width: on the 1080px phone "Inbox" wrapped to
-    // "In/bo/x" and Starred/Archive broke mid-word, and on the narrow
-    // walk device four of the five boxes fell off the row entirely --
-    // doors that exist must stay reachable at every width.
-    Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp)
-            .horizontalScroll(rememberScrollState())
-            .testTag("mail-box-tabs"),
-        horizontalArrangement = Arrangement.spacedBy(2.dp)) {
-        MailBox.tabOrder.forEach { box ->
-            BoxTab(box.title, counts[box], box == s.box, onClick = { onSelect(box) })
-        }
-    }
-}
-
-/**
- * The reference's category row, as the card's leading rows: an icon in a
- * tinted rounded square, the box's name, and a "N new" pill carrying the
- * server's own unread count. Every row is real navigation — `vm.open`, the
- * same door the drawer and the tab row use — so the look never ships a
- * control that goes nowhere.
- */
-@Composable
-internal fun BoxCategoryRow(
-    title: String,
-    count: Int?,
-    icon: ImageVector,
-    tint: Color,
-    onClick: () -> Unit,
-) {
+internal fun BoxTabRow(activeBox: MailBox, counts: Map<MailBox, Int?>, onSelect: (MailBox) -> Unit) {
     val palette = LocalPalette.current
     Row(
-        Modifier.fillMaxWidth().clickable(onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 9.dp),
-        verticalAlignment = Alignment.CenterVertically,
+        Modifier.fillMaxWidth()
+            .horizontalScroll(rememberScrollState())
+            .padding(start = 16.dp, end = 16.dp, bottom = 10.dp)
+            .testTag("mail-box-tabs"),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Box(
-            Modifier.size(34.dp).clip(RoundedCornerShape(10.dp)).background(tint.copy(alpha = 0.16f)),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(icon, null, tint = tint, modifier = Modifier.size(19.dp))
-        }
-        Spacer(Modifier.width(12.dp))
-        Text(title, fontSize = 15.sp, fontWeight = FontWeight.SemiBold,
-            color = palette.textPrimary, maxLines = 1)
-        Spacer(Modifier.weight(1f))
-        if (count != null && count > 0) {
-            Text(
-                if (count >= 100) "99+ new" else "$count new",
-                fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = palette.onPrimary,
-                modifier = Modifier.clip(RoundedCornerShape(50)).background(tint)
-                    .padding(horizontal = 8.dp, vertical = 3.dp),
-            )
-        }
+        BoxTab(MailBox.All.title, Icons.Outlined.Mail, palette.primarySolid, palette.tabBadgeAll,
+            counts[MailBox.All], activeBox == MailBox.All) { onSelect(MailBox.All) }
+        BoxTab(MailBox.Starred.title, Icons.Outlined.StarBorder, palette.star, palette.tabBadgeStarred,
+            counts[MailBox.Starred], activeBox == MailBox.Starred) { onSelect(MailBox.Starred) }
+        BoxTab(MailBox.Sent.title, Icons.AutoMirrored.Rounded.Send, palette.tabTintSent, palette.tabBadgeSent,
+            counts[MailBox.Sent], activeBox == MailBox.Sent) { onSelect(MailBox.Sent) }
     }
 }
 
@@ -942,75 +881,93 @@ private fun SwipeableMessageRow(
     ) { Box(Modifier.fillMaxWidth().background(palette.cardAlt)) { content() } }
 }
 
-/**
- * The bottom bar. Four tabs, not five: the reference draws a Calendar tab and
- * there is no calendar backend anywhere in the API, so drawing it would be a
- * control that goes nowhere — the one thing this sector was told not to ship.
- */
+internal val MailBottomClearance = 76.dp
+
 @Composable
-internal fun MailBottomBar(
-    selected: Int,
-    unread: Int?,
-    onContacts: () -> Unit,
-    onFiles: () -> Unit,
-    onMore: () -> Unit,
-) {
+internal fun Modifier.mailListSurface(): Modifier {
     val palette = LocalPalette.current
-    // The reference's floating bar: inset from both edges, fully rounded, on
-    // the elevated card fill with a hairline border — it reads as a control
-    // surface hovering over the canvas, not a strip welded to the bottom.
-    Box(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp)) {
-        Row(
-            Modifier.fillMaxWidth()
-                .clip(RoundedCornerShape(26.dp))
-                .background(palette.card)
-                .border(1.dp, palette.border, RoundedCornerShape(26.dp))
-                .padding(vertical = 8.dp).testTag("mail-tabs"),
-            horizontalArrangement = Arrangement.SpaceAround,
+    val shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
+    return padding(horizontal = 12.dp)
+        .clip(shape)
+        .background(palette.cardAlt)
+        .border(1.dp, palette.border, shape)
+}
+
+@Composable
+internal fun MailBottomControls(
+    inboxSelected: Boolean,
+    unread: Int?,
+    onMail: () -> Unit,
+    onCompose: () -> Unit,
+    onContacts: () -> Unit,
+    modifier: Modifier = Modifier,
+    visible: Boolean = true,
+) {
+    val fabBottom by animateDpAsState(if (visible) 96.dp else 20.dp, label = "compose bottom")
+    Box(modifier.fillMaxWidth(), contentAlignment = Alignment.BottomCenter) {
+        AnimatedVisibility(
+            visible = visible,
+            enter = fadeIn() + slideInVertically { it / 2 },
+            exit = fadeOut() + slideOutVertically { it / 2 },
         ) {
-            // No handler for Mail: it is the screen this bar is standing on.
-            TabItem(Icons.Rounded.Inbox, "Mail", selected == 0, unread)
-            TabItem(Icons.Rounded.Contacts, "Contacts", selected == 1) { onContacts() }
-            TabItem(Icons.Rounded.Description, "Files", selected == 2) { onFiles() }
-            TabItem(Icons.Rounded.MoreHoriz, "More", selected == 3) { onMore() }
+            MailBottomBar(inboxSelected, unread, onMail, onContacts)
+        }
+        MailFab(onCompose, Modifier.align(Alignment.BottomEnd)
+            .padding(end = 20.dp, bottom = fabBottom).testTag("mail-compose"), expanded = visible)
+    }
+}
+
+@Composable
+private fun MailBottomBar(inboxSelected: Boolean, unread: Int?, onMail: () -> Unit, onContacts: () -> Unit) {
+    val palette = LocalPalette.current
+    Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.BottomCenter) {
+        Box(
+            Modifier.fillMaxWidth().padding(horizontal = 13.dp).height(MailBottomClearance)
+                .background(Brush.verticalGradient(listOf(Color.Transparent, palette.cardAlt))),
+        )
+        Row(
+            Modifier.padding(bottom = 12.dp)
+                .clip(RoundedCornerShape(16.dp))
+                .background(palette.card)
+                .testTag("mail-tabs"),
+        ) {
+            MailBarItem(Icons.Rounded.Email, "Mail", "mail-tab-Mail", active = inboxSelected,
+                unread = unread, onClick = onMail.takeUnless { inboxSelected })
+            MailBarItem(Icons.Rounded.Contacts, "Contacts", "mail-tab-Contacts", onClick = onContacts)
         }
     }
 }
 
 @Composable
-private fun TabItem(icon: ImageVector, label: String, active: Boolean, badge: Int? = null,
-                    onClick: (() -> Unit)? = null) {
+private fun MailBarItem(
+    icon: ImageVector,
+    label: String,
+    tag: String,
+    active: Boolean = false,
+    unread: Int? = null,
+    onClick: (() -> Unit)? = null,
+) {
     val palette = LocalPalette.current
-    Column(
-        // A tab that names the screen you are already on is not a destination, so
-        // it takes no click and no `clickable` at all — no ripple, no accessibility
-        // action, nothing for a tap to fall through to. A Button wired to an empty
-        // lambda is precisely the control-that-goes-nowhere this sector was told
-        // not to ship, and it is invisible to a screenshot: the frame looks right.
-        Modifier.then(if (onClick == null) Modifier else Modifier.clickable(onClick = onClick))
-            .padding(horizontal = 14.dp, vertical = 4.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Box(contentAlignment = Alignment.TopEnd) {
-            Icon(icon, null, tint = if (active) palette.primarySolid else palette.textTertiary,
-                modifier = Modifier.size(22.dp))
-            if (badge != null && badge > 0) {
-                // The count pill the reference draws, not a bare dot: a number
-                // the server answered, capped the way Gmail caps it.
-                Text(
-                    if (badge >= 100) "99+" else badge.toString(),
-                    fontSize = 10.sp, fontWeight = FontWeight.SemiBold,
-                    color = palette.onPrimary,
-                    modifier = Modifier.clip(RoundedCornerShape(50))
-                        .background(palette.primarySolid)
-                        .padding(horizontal = 5.dp, vertical = 2.dp),
-                )
-            }
+    val action = if (onClick == null) Modifier.semantics { selected = active }
+        else Modifier.clickable(role = Role.Button, onClick = onClick)
+    Box(Modifier.size(width = 84.dp, height = 46.dp).testTag(tag).then(action),
+        contentAlignment = Alignment.Center) {
+        val badgeCount = unread?.takeIf { it > 0 }
+        val description = badgeCount?.let { "$label, $it unread" } ?: label
+        Icon(icon, description, tint = if (active) palette.textPrimary else palette.textSecondary,
+            modifier = Modifier.size(24.dp))
+        badgeCount?.let {
+            Text(
+                if (it > 99) "99+" else it.toString(),
+                modifier = Modifier.align(Alignment.TopCenter)
+                    .padding(start = 28.dp, top = 2.dp)
+                    .clearAndSetSemantics {}
+                    .background(palette.unreadBadge, CircleShape)
+                    .padding(horizontal = 5.dp, vertical = 1.dp),
+                fontSize = 10.sp, lineHeight = 13.sp, color = Color.White, fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+            )
         }
-        Spacer(Modifier.height(3.dp))
-        Text(label, fontSize = 11.sp,
-            fontWeight = if (active) FontWeight.Medium else FontWeight.Normal,
-            color = if (active) palette.primarySolid else palette.textTertiary)
     }
 }
 
@@ -1034,6 +991,7 @@ internal fun MailDrawer(
     onScreener: () -> Unit,
     onSubscriptions: () -> Unit,
     onScheduled: () -> Unit,
+    onFiles: () -> Unit,
     onSortFilter: () -> Unit,
     onAdvanced: () -> Unit,
     onSettings: () -> Unit,
@@ -1075,6 +1033,7 @@ internal fun MailDrawer(
         DrawerRow("Scheduled", Icons.Rounded.Schedule, null, selected = false) {
             onScheduled()
         }
+        DrawerRow("Files", Icons.Rounded.Description, null, selected = false) { onFiles() }
 
         // The search pill carries only the field now — the two glyphs that
         // cluttered it moved here, where every other tool lives. The pill is

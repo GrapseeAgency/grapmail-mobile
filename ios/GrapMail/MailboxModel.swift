@@ -1642,7 +1642,9 @@ final class MailboxModel: ObservableObject {
                 _ = try await ApiClient.mailAction(token: token, id: id,
                                                    action: .unread, until: nil)
                 await self.applyLocally(id: id, action: .unread)
+                guard self.sessionIsLive else { return }
                 self.reproject()
+                self.refreshCounts(token, force: true)
                 GMHaptics.marking()
                 onOutcome(nil)
             } catch {
@@ -1677,6 +1679,7 @@ final class MailboxModel: ObservableObject {
             if viewed.isRead {
                 await MailStore.shared.patchFlags(id: id, read: true, generation: self.sessionGeneration)
                 reproject()
+                if !message.isRead { refreshCounts(token, force: true) }
             }
             return nil
         } catch {

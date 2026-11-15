@@ -2345,6 +2345,7 @@ class MailboxViewModel @JvmOverloads constructor(
                     applyLocally(id, MailAction.Unread, session.id)
                     if (!SessionStore.isCurrent(app, session.id)) return@launch
                     reproject()
+                    refreshCounts(session, force = true)
                     GMHaptics.marking()
                     onOutcome(null)
                 }
@@ -2384,6 +2385,7 @@ class MailboxViewModel @JvmOverloads constructor(
             if (viewed.isRead) {
                 MailStore.patchFlags(id, read = true, sessionContext = context, sessionId = session.id)
                 reproject()
+                if (!message.isRead) refreshCounts(session, force = true)
             }
             null
         } catch (error: kotlinx.coroutines.CancellationException) {
