@@ -150,7 +150,11 @@ class MainActivity : ComponentActivity() {
                 // The root pads only the true system UI (bars + cutout); the
                 // keyboard (IME) is owned per-screen (WizardScaffold.imePadding,
                 // SignInScreen.imePadding) so it is never counted twice.
-                val bg = com.grapsee.grapmail.ui.theme.LocalPalette.current.bg
+                // A screen that is deliberately dark on both themes (the
+                // onboarding scenes) states its surface; everything else keeps
+                // the theme's, including behind the system bars.
+                val bg = com.grapsee.grapmail.ui.theme.ImmersiveSurface.color.value
+                    ?: com.grapsee.grapmail.ui.theme.LocalPalette.current.bg
                 Box(
                     Modifier.fillMaxSize().background(bg)
                         // Every `testTag` in the app is invisible to a uiautomator
@@ -684,6 +688,14 @@ fun GrapMailNav(
     // offline, with closures that do nothing. No real launch carries the extra.
     val snapshot = (nav.context as? android.app.Activity)?.intent?.getStringExtra("gmSnapshot")
     if (snapshot != null) {
+        // The onboarding pages are reachable in the real flow only after a
+        // signup write, so the walk opens them here: `onboarding-1` ..
+        // `onboarding-5`, one scene each, with the real pager state.
+        if (snapshot.startsWith("onboarding-")) {
+            val scene = snapshot.removePrefix("onboarding-").toIntOrNull() ?: 1
+            OnboardingScreen(onFinish = {}, initialScene = scene - 1)
+            return
+        }
         if (snapshot.startsWith("mail-") || snapshot.startsWith("account-") ||
             snapshot.startsWith("e2e-")) MailSnapshotScreen(snapshot)
         else SecuritySnapshotScreen(snapshot)
@@ -1104,7 +1116,14 @@ fun GrapMailNav(
                     val s = vm.state.value
                     val address = s.createdAddress ?: ""
                     val name = s.createdName ?: s.firstName
-                    nav.navigate(Routes.onboarding(address, name)) { popUpTo(Routes.HUMAN_VERIFY) { inclusive = true } }
+                    // The walkthrough belongs to the first account this device
+                    // ever created. A second account is somebody who has seen
+                    // it; showing it again is an interruption, not a welcome.
+                    if (com.grapsee.grapmail.ui.screens.OnboardingGate.isDone(nav.context)) {
+                        nav.navigate(Routes.HOME) { popUpTo(Routes.WELCOME) { inclusive = true } }
+                    } else {
+                        nav.navigate(Routes.onboarding(address, name)) { popUpTo(Routes.HUMAN_VERIFY) { inclusive = true } }
+                    }
                 },
             )
         }
@@ -1114,7 +1133,13 @@ fun GrapMailNav(
             AccountCreatedScreen(
                 address = address,
                 name = name,
-                onContinueOnboarding = { nav.navigate(Routes.onboarding(address, name)) },
+                onContinueOnboarding = {
+                    if (com.grapsee.grapmail.ui.screens.OnboardingGate.isDone(nav.context)) {
+                        nav.navigate(Routes.HOME) { popUpTo(Routes.WELCOME) { inclusive = true } }
+                    } else {
+                        nav.navigate(Routes.onboarding(address, name))
+                    }
+                },
             )
         }
         composable(Routes.CREATED_ALT) { entry ->
@@ -1124,12 +1149,19 @@ fun GrapMailNav(
                 address = address,
                 name = name,
                 onGoToMailbox = { nav.navigate(Routes.HOME) { popUpTo(Routes.WELCOME) } },
-                onContinueOnboarding = { nav.navigate(Routes.onboarding(address, name)) },
+                onContinueOnboarding = {
+                    if (com.grapsee.grapmail.ui.screens.OnboardingGate.isDone(nav.context)) {
+                        nav.navigate(Routes.HOME) { popUpTo(Routes.WELCOME) { inclusive = true } }
+                    } else {
+                        nav.navigate(Routes.onboarding(address, name))
+                    }
+                },
             )
         }
         composable(Routes.ONBOARDING) {
             OnboardingScreen(
                 onFinish = {
+                    com.grapsee.grapmail.ui.screens.OnboardingGate.markDone(nav.context)
                     nav.navigate(Routes.HOME) { popUpTo(Routes.WELCOME) { inclusive = true } }
                 },
             )

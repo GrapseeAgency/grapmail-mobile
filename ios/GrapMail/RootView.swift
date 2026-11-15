@@ -274,7 +274,15 @@ struct RootView: View {
             // ever carries the argument, and nothing here fetches or submits.
             if let snapshot = SecuritySnapshot.requested() {
                 Group {
-                    if snapshot.hasPrefix("mail-") || snapshot.hasPrefix("account-")
+                    // The onboarding pages are reachable in the real flow only
+                    // after a signup write, so the walk names one here:
+                    // `onboarding-1` .. `onboarding-5`, one scene each.
+                    if snapshot.hasPrefix("onboarding-") {
+                        OnboardingView(
+                            onFinish: {},
+                            initialScene: (Int(snapshot.dropFirst("onboarding-".count)) ?? 1) - 1
+                        )
+                    } else if snapshot.hasPrefix("mail-") || snapshot.hasPrefix("account-")
                         || snapshot.hasPrefix("e2e-") {
                         MailSnapshotView(name: snapshot)
                     } else {
@@ -632,6 +640,11 @@ struct RootView: View {
                 case .humanVerify:
                     HumanVerifyView(model: model, onBack: { path.removeLast() }) {
                         let s = model.state
+                        // The walkthrough belongs to the first account this
+                        // device ever created. A second account is somebody who
+                        // has already met the product; replaying it is an
+                        // interruption, not a welcome.
+                        guard !OnboardingGate.isDone else { return enterMailbox() }
                         path.append(.onboarding(
                             address: s.createdAddress ?? "",
                             name: s.createdName ?? s.firstName
@@ -639,25 +652,26 @@ struct RootView: View {
                     }
                 case let .created(address, name):
                     AccountCreatedView(address: address, name: name) {
+                        guard !OnboardingGate.isDone else { return enterMailbox() }
                         path.append(.onboarding(address: address, name: name))
                     }
                 case let .createdAlt(address, name):
                     AccountCreatedAltView(
                         address: address,
                         name: name,
-                        onGoToMailbox: {
-                            path.removeAll()
-                            path.append(.home)
-                        },
+                        onGoToMailbox: enterMailbox,
                         onContinueOnboarding: {
+                            guard !OnboardingGate.isDone else { return enterMailbox() }
                             path.append(.onboarding(address: address, name: name))
                         }
                     )
-                case let .onboarding(address, name):
+                case .onboarding:
                     OnboardingView(
                         onFinish: {
-                            path.removeAll()
-                            path.append(.home)
+                            // Finished or skipped: this device has now seen the
+                            // walkthrough, and no later account repeats it.
+                            OnboardingGate.markDone()
+                            enterMailbox()
                         }
                     )
             default:

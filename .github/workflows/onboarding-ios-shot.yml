@@ -1,0 +1,112 @@
+name: Onboarding scenes screenshot (iOS)
+
+# Build the app, open the test-only snapshot host on each of the five onboarding
+# scenes and photograph them on an iPhone simulator. These frames are the
+# evidence that the founder's standalone HTML animations render in the app on
+# iOS — the same files Android bundles, byte for byte — and that the host around
+# them (wordmark, Skip, headline, dots, CTA) is right.
+on:
+  workflow_dispatch:
+  push:
+    branches: ["welcome-living-mailbox", "codex/**", "feat/**"]
+    paths:
+      - ".github/workflows/onboarding-ios-shot.yml"
+      - "ios/GrapMail/OnboardingViews.swift"
+      - "ios/GrapMail/RootView.swift"
+      - "ios/GrapMail/onboarding/**"
+
+concurrency:
+  group: onboarding-ios-shot-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  screenshot:
+    name: Shoot the five onboarding scenes (iPhone simulator)
+    runs-on: macos-15
+    timeout-minutes: 40
+    env:
+      SCHEME: GrapMail
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        working-directory: ios
+        run: xcodegen generate
+
+      - name: Build for the simulator
+        working-directory: ios
+        run: |
+          set -o pipefail
+          xcodebuild build \
+            -project GrapMail.xcodeproj \
+            -scheme "$SCHEME" \
+            -configuration Debug \
+            -destination "generic/platform=iOS Simulator" \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO
+
+      - name: Resolve a simulator
+        id: sim
+        run: |
+          LINE=$(xcrun simctl list devices available | grep -m1 -E "iPhone 16 Pro \(|iPhone 16 \(|iPhone 15 \(" || true)
+          if [ -z "$LINE" ]; then
+            echo "::error::no iPhone simulator is available on this runner"
+            xcrun simctl list devices available >&2
+            exit 1
+          fi
+          UDID=$(echo "$LINE" | grep -oE "[0-9A-F-]{36}" | head -1)
+          echo "udid=$UDID" >> "$GITHUB_OUTPUT"
+          echo "Using simulator $LINE"
+
+      - name: Boot, install, launch each scene, photograph
+        run: |
+          set -euo pipefail
+          UDID="${{ steps.sim.outputs.udid }}"
+          APP="ios/build/Build/Products/Debug-iphonesimulator/GrapMail.app"
+          OUT="onboarding-shots-ios"
+          mkdir -p "$OUT"
+
+          xcrun simctl boot "$UDID" || true
+          xcrun simctl bootstatus "$UDID" -b
+          xcrun simctl install "$UDID" "$APP"
+
+          shoot() {
+            local name="$1" scene="$2"
+            xcrun simctl terminate "$UDID" com.grapsee.grapmail 2>/dev/null || true
+            xcrun simctl launch "$UDID" com.grapsee.grapmail -gmSnapshot "onboarding-$scene" >/dev/null
+            # Scenes animate on a loop, so "settled" never happens. Capture a
+            # fixed window instead: enough time for the web view to lay out and
+            # the scene to reach a legible frame, without waiting on the loop.
+            sleep 8
+            xcrun simctl io "$UDID" screenshot "$OUT/$name.png" >/dev/null 2>&1
+            test -s "$OUT/$name.png" || { echo "::error::$name was not captured"; exit 1; }
+            echo "captured $name"
+          }
+
+          shoot onboarding-1 1
+          shoot onboarding-2 2
+          shoot onboarding-3 3
+          shoot onboarding-4 4
+          shoot onboarding-5 5
+
+          # Five different scenes must not photograph as the same frame: that
+          # would mean the host is drawing but the artwork never changes.
+          DUPES=$(shasum "$OUT"/*.png | cut -d' ' -f1 | sort | uniq -d | wc -l | tr -d ' ')
+          if [ "$DUPES" != "0" ]; then
+            echo "::error::at least two scenes captured identical pixels"
+            shasum "$OUT"/*.png
+            exit 1
+          fi
+          echo "PASS: five distinct frames"
+          ls -la "$OUT"
+
+      - name: Upload the evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: onboarding-shots-ios
+          path: onboarding-shots-ios/
+          if-no-files-found: warn

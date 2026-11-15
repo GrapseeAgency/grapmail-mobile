@@ -8,8 +8,13 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Typography
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.platform.LocalView
+import androidx.core.view.WindowCompat
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -76,8 +81,11 @@ val LocalPalette = staticCompositionLocalOf {
 }
 
 @Composable
-fun GrapMailTheme(content: @Composable () -> Unit) {
-    val dark = isSystemInDarkTheme()
+fun GrapMailTheme(
+    darkTheme: Boolean = isSystemInDarkTheme(),
+    content: @Composable () -> Unit
+) {
+    val dark = darkTheme
     val base = LocalGrapMailColors.current
     val palette = if (dark) Palette(
         bg = base.bgDark, bgTinted = base.bgDark, card = base.cardDark, softFill = base.softFillDark, infoFill = base.softFillDark,
@@ -139,4 +147,39 @@ fun GrapMailTheme(content: @Composable () -> Unit) {
             content = content,
         )
     }
+}
+
+/**
+ * The one colour painted behind the system bars.
+ *
+ * The activity root paints the theme background behind the status and gesture
+ * bars, and a screen cannot paint there itself — it is already inset. A screen
+ * that is deliberately dark on both themes (the onboarding's cinematic scenes)
+ * therefore states its surface here, and the root adopts it for as long as that
+ * screen is on stage. Everything else leaves it null and keeps the theme.
+ */
+object ImmersiveSurface {
+    val color = mutableStateOf<Color?>(null)
+}
+
+@Composable
+fun ScreenBackground(color: Color, content: @Composable () -> Unit) {
+    val view = LocalView.current
+    DisposableEffect(color) {
+        val previous = ImmersiveSurface.color.value
+        ImmersiveSurface.color.value = color
+        val window = (view.context as? android.app.Activity)?.window
+        val controller = window?.let { WindowCompat.getInsetsController(it, view) }
+        val lightIcons = color.luminance() > 0.5f
+        val oldStatus = controller?.isAppearanceLightStatusBars
+        val oldNav = controller?.isAppearanceLightNavigationBars
+        controller?.isAppearanceLightStatusBars = lightIcons
+        controller?.isAppearanceLightNavigationBars = lightIcons
+        onDispose {
+            ImmersiveSurface.color.value = previous
+            if (oldStatus != null) controller?.isAppearanceLightStatusBars = oldStatus
+            if (oldNav != null) controller?.isAppearanceLightNavigationBars = oldNav
+        }
+    }
+    content()
 }
