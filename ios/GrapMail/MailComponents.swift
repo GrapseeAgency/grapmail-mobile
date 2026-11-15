@@ -88,10 +88,14 @@ struct UnreadPill: View {
 /// The initial comes from the display name when there is one and from the address
 /// when there is not — never from the address's first character, which would
 /// render every `@grapsee.com` sender under the same letter.
-struct SenderAvatar: View {
+struct SenderAvatar: View, Equatable {
     let display: String
     let address: String
     var size: CGFloat = 40
+
+    static func == (lhs: SenderAvatar, rhs: SenderAvatar) -> Bool {
+        lhs.display == rhs.display && lhs.address == rhs.address && lhs.size == rhs.size
+    }
 
     private var initial: String {
         let source = display.trimmingCharacters(in: .whitespacesAndNewlines)

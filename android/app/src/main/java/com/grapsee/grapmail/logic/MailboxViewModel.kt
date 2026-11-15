@@ -2120,6 +2120,7 @@ class MailboxViewModel @JvmOverloads constructor(
 
     // ── thread ──────────────────────────────────────────────────────────────
 
+    @androidx.compose.runtime.Immutable
     data class ThreadState(
         val messages: List<com.grapsee.grapmail.data.MailMessageFullDto> = emptyList(),
         val loading: Boolean = false,
