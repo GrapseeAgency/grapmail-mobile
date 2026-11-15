@@ -53,6 +53,7 @@ struct RootView: View {
         case secActivity, secAlert, secSecure
         case created(address: String, name: String)
         case createdAlt(address: String, name: String)
+        case onboarding(address: String, name: String)
         case home
         case mailThread(id: String, isThread: Bool)
         // Compose carries an optional reply target and mode: empty reply opens
@@ -646,6 +647,12 @@ struct RootView: View {
                             path.append(.home)
                         },
                         onContinueOnboarding: {
+                            path.append(.onboarding(address: address, name: name))
+                        }
+                    )
+                case let .onboarding(address, name):
+                    OnboardingView(
+                        onFinish: {
                             path.removeAll()
                             path.append(.home)
                         }

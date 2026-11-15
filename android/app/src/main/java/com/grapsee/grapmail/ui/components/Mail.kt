@@ -718,6 +718,12 @@ fun MailStateBlock(
             palette, action = "Try again" to onRetry,
         )
 
+        empty && boxTitle == "Inbox" && !filtered -> CenteredState(
+            "Welcome home to GrapMail",
+            "Your inbox is fresh, quiet, and completely protected.",
+            palette,
+        )
+
         else -> CenteredState(
             if (filtered) "No matching messages" else "$boxTitle is empty",
             if (filtered) "Try changing your search or filters." else "No messages here yet.",

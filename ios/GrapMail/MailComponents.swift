@@ -565,6 +565,9 @@ struct MailStateBlock<Content: View>: View {
                     title: "Couldn't load \(boxTitle)",
                     detail: "Your mailbox could not be reached. Nothing has been deleted.",
                     action: ("Try again", onRetry))
+            } else if empty && boxTitle == "Inbox" && !filtered {
+                CenteredState(title: "Welcome home to GrapMail",
+                              detail: "Your inbox is fresh, quiet, and completely protected.")
             } else {
                 CenteredState(title: filtered ? "No matching messages" : "\(boxTitle) is empty",
                               detail: filtered ? "Try changing your search or filters." : "No messages here yet.")

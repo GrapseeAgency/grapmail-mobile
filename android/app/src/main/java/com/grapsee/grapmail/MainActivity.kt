@@ -61,6 +61,7 @@ import com.grapsee.grapmail.ui.screens.mail.SubscriptionsScreen
 import com.grapsee.grapmail.ui.screens.mail.ThreadScreen
 import com.grapsee.grapmail.ui.screens.AccountCreatedAltScreen
 import com.grapsee.grapmail.ui.screens.AccountCreatedScreen
+import com.grapsee.grapmail.ui.screens.OnboardingScreen
 import com.grapsee.grapmail.ui.screens.AddressStepScreen
 import com.grapsee.grapmail.ui.screens.BasicInfoStepScreen
 import com.grapsee.grapmail.ui.screens.HumanVerifyScreen
@@ -256,6 +257,7 @@ object Routes {
     const val HUMAN_VERIFY = "signup/verify"
     const val CREATED = "signup/created/{address}/{name}"
     const val CREATED_ALT = "signup/created-alt/{address}/{name}"
+    const val ONBOARDING = "signup/onboarding/{address}/{name}"
     const val HOME = "home"
 
     // ── mailbox sector ───────────────────────────────────────────────────────
@@ -323,6 +325,7 @@ object Routes {
 
     fun created(address: String, name: String) = "signup/created/${encode(address)}/${encode(name)}"
     fun createdAlt(address: String, name: String) = "signup/created-alt/${encode(address)}/${encode(name)}"
+    fun onboarding(address: String, name: String) = "signup/onboarding/${encode(address)}/${encode(name)}"
     /** The device label rides the route beside the id: the confirmation names
      *  the session it is about, and the list the person tapped already knew it.
      *  Fetching the label a second time only added a way for the screen to open
@@ -1037,7 +1040,14 @@ fun GrapMailNav(
                 address = address,
                 name = name,
                 onGoToMailbox = { nav.navigate(Routes.HOME) { popUpTo(Routes.WELCOME) } },
-                onContinueOnboarding = { nav.navigate(Routes.HOME) { popUpTo(Routes.WELCOME) } },
+                onContinueOnboarding = { nav.navigate(Routes.onboarding(address, name)) },
+            )
+        }
+        composable(Routes.ONBOARDING) {
+            OnboardingScreen(
+                onFinish = {
+                    nav.navigate(Routes.HOME) { popUpTo(Routes.WELCOME) { inclusive = true } }
+                },
             )
         }
         composable(Routes.HOME) { entry ->
