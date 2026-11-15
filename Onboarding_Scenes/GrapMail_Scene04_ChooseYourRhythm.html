@@ -4,7 +4,7 @@
 :root{color-scheme:dark;font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;font-synthesis:none}
 *{box-sizing:border-box}html,body{height:100%;margin:0;overflow:hidden;background:#020b1d}body{display:grid;place-items:center;color:white;-webkit-tap-highlight-color:transparent}button{font:inherit;touch-action:manipulation}
 #universe{position:fixed;inset:0;pointer-events:none;background:radial-gradient(ellipse 65% 40% at 50% 53%,#114e9f35,transparent 78%),radial-gradient(ellipse 50% 25% at 58% 55%,#066bff1b,transparent 80%),#020b1d;transition:background 1s}
-#art{width:min(100vw,480px,calc(100dvh * .787));aspect-ratio:440/560;position:relative;isolation:isolate;overflow:visible}
+#art{width:100%;max-width:440px;height:100%;max-height:560px;aspect-ratio:440/560;margin:0 auto;position:relative;isolation:isolate;overflow:visible}
 #stage{position:absolute;width:440px;height:560px;transform-origin:top left;overflow:visible;isolation:isolate;--accent:#7cdaff;--text:#f2faff;--dim:#a5c5e6;--glass1:#134078;--glass2:#071831;--glare:#a1e5ff;--row:#23426c;--highlight:#0967f0;--badge:#082450;--sun:0;--moon:1;--light:0}
 #stage.day{--text:#243f69;--dim:#7790af;--glass1:#e2f3ff;--glass2:#a5d1f0;--row:#d3e6f8;--highlight:#3999fa;--glare:#fffdf1;--badge:#d9eaff;--sun:1;--moon:0;--light:1}
 #dust{position:absolute;inset:0;width:440px;height:560px;z-index:2;pointer-events:none}
@@ -51,7 +51,7 @@ const status=document.getElementById('status'),note=document.getElementById('not
 const themeButtons=[...document.querySelectorAll('[data-mode]')],notifyButtons=[...document.querySelectorAll('[data-notify]')],notifText=document.getElementById('notificationText'),tap=document.getElementById('tap');
 const dust=document.getElementById('dust'),c=dust.getContext('2d'),dots=Array.from({length:72},(_,i)=>({x:(i*127.51)%440,y:(i*82.31)%560,r:.5+(i%6===0?.7:0),phase:i*.7}));
 let mode='dark',notifyMode='important',timers=[],seq=0,manualUntil=0,active=false;
-function fit(){stage.style.transform=`scale(${art.getBoundingClientRect().width/440})`}fit();addEventListener('resize',fit,{passive:true});
+function fit(){let w=(art.getBoundingClientRect().width&&art.getBoundingClientRect().width>0)?art.getBoundingClientRect().width:440;stage.style.transform=`scale(${w/440})`}fit();addEventListener('resize',fit,{passive:true});
 function wait(fn,ms){let id=setTimeout(fn,ms);timers.push(id);return id}
 function clearAll(){timers.forEach(clearTimeout);timers=[];stage.classList.remove('transitioning');note.classList.remove('show');status.classList.remove('show')}
 function label(s){status.classList.remove('show');wait(()=>{status.textContent=s;status.classList.add('show')},45)}

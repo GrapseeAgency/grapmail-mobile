@@ -101,6 +101,7 @@ class MailboxViewModel @JvmOverloads constructor(
 ) :
     AndroidViewModel(app) {
 
+    @androidx.compose.runtime.Immutable
     data class MailboxUiState(
         val box: MailBox = MailBox.Inbox,
         val query: String = "",

@@ -8,7 +8,7 @@
 <style>
 :root{color-scheme:dark;--aqua:#8cfff7;--blue:#268dff;--white:#e9f9ff;--ease:cubic-bezier(.18,.85,.22,1)}
 *{box-sizing:border-box}html,body{margin:0;height:100%;width:100%;background:#020b1d;overflow:hidden}body{display:grid;place-items:center;font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:var(--white);-webkit-tap-highlight-color:transparent;user-select:none}body:before{content:"";position:fixed;inset:-20%;background:radial-gradient(ellipse at 50% 52%,#123c80 0,#081c41 25%,#030f29 48%,#010717 76%);pointer-events:none;animation:sky 12s ease-in-out infinite alternate}body:after{content:"";position:fixed;inset:0;background:radial-gradient(ellipse at 55% 61%,#0467f818,transparent 65%),linear-gradient(125deg,transparent 45%,#278afd0b 54%,transparent 60%);pointer-events:none}@keyframes sky{to{transform:scale(1.07) rotate(2deg)}}
-.viewport{position:relative;width:min(100vw,460px,calc(100dvh * .785));aspect-ratio:440 / 560;overflow:visible;isolation:isolate}
+.viewport{position:relative;width:100%;max-width:440px;height:100%;max-height:560px;aspect-ratio:440/560;margin:0 auto;overflow:visible;isolation:isolate}
 #stage{position:absolute;left:0;top:0;width:440px;height:560px;transform-origin:0 0;isolation:isolate;will-change:transform;overflow:visible}
 #sparks{width:440px;height:560px;position:absolute;inset:0;z-index:0;pointer-events:none}
 svg.art{position:absolute;inset:0;width:440px;height:560px;z-index:1;overflow:visible;pointer-events:none}
@@ -141,7 +141,7 @@ const result=document.getElementById('result'),choice=document.getElementById('c
 const tag=document.getElementById('choiceTag'),title=document.getElementById('choiceTitle'),desc=document.getElementById('choiceDesc');
 const featureTitle=document.getElementById('featureTitle'),featureDesc=document.getElementById('featureDesc'),featureIcon=document.getElementById('featureIcon');
 const btnSnooze=document.getElementById('snooze'),btnStop=document.getElementById('unsubscribe'),pointer=document.getElementById('ghostFinger'),ring=document.getElementById('touchRing');
-const fit=()=>{stage.style.transform=`scale(${viewport.getBoundingClientRect().width/440})`};fit();addEventListener('resize',fit,{passive:true});
+const fit=()=>{let w=(viewport.getBoundingClientRect().width&&viewport.getBoundingClientRect().width>0)?viewport.getBoundingClientRect().width:440;stage.style.transform=`scale(${w/440})`};fit();addEventListener('resize',fit,{passive:true});
 let sequence=0,phase='',step=0,autoAction=0,allTimers=[],particles=[],lastParticle=0;
 const after=(fn,ms)=>{const t=setTimeout(fn,ms);allTimers.push(t);return t};
 function clearTimers(){allTimers.forEach(clearTimeout);allTimers=[];if(autoAction)clearTimeout(autoAction);autoAction=0;}

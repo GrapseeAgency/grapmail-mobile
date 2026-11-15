@@ -13,7 +13,7 @@ body{display:grid;place-items:center;font-family:Inter,-apple-system,BlinkMacSys
 body::before{position:fixed;inset:-20%;content:"";pointer-events:none;background:radial-gradient(ellipse at 50% 49%,#12376e 0,#071a3c 27%,#020b1c 61%,#010613 100%);animation:sky 9s ease-in-out infinite alternate}
 body::after{content:"";position:fixed;inset:0;pointer-events:none;background:linear-gradient(138deg,transparent 43%,#0852a71a 50%,transparent 57%),radial-gradient(ellipse at 52% 62%,#1c6cf90b,transparent 63%);opacity:.8}
 @keyframes sky{0%{transform:scale(1) rotate(-1deg)}100%{transform:scale(1.08) rotate(1deg)}}
-.viewport{position:relative;width:min(100vw,500px,calc(100dvh * .785));aspect-ratio:440/560;isolation:isolate;overflow:visible}
+.viewport{position:relative;width:100%;max-width:440px;height:100%;max-height:560px;aspect-ratio:440/560;margin:0 auto;isolation:isolate;overflow:visible}
 #stage{width:440px;height:560px;position:absolute;left:0;top:0;transform-origin:0 0;will-change:transform;overflow:visible;isolation:isolate}
 #particleField{position:absolute;inset:0;width:440px;height:560px;pointer-events:none;z-index:0;opacity:.92}
 .scene{position:absolute;inset:0;width:440px;height:560px;overflow:visible;z-index:1;pointer-events:none}
@@ -196,7 +196,7 @@ const decline=document.getElementById('decline'),allow=document.getElementById('
 const pointer=document.getElementById('pointer'),touchwave=document.getElementById('touchwave');
 const canvas=document.getElementById('particleField'),cx=canvas.getContext('2d',{alpha:true});
 const reduce=window.matchMedia('(prefers-reduced-motion: reduce)');
-const fit=()=>{let size=viewport.getBoundingClientRect();stage.style.transform=`scale(${size.width/440})`};
+const fit=()=>{let size=viewport.getBoundingClientRect();let w=(size.width&&size.width>0)?size.width:440;stage.style.transform=`scale(${w/440})`};
 fit();window.addEventListener('resize',fit,{passive:true});
 let timers=[],current='intro',run=0,decisionMade=false;
 let flowParticles=[],shockwaves=[];

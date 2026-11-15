@@ -629,14 +629,14 @@ struct RootView: View {
                 case .humanVerify:
                     HumanVerifyView(model: model, onBack: { path.removeLast() }) {
                         let s = model.state
-                        path.append(.created(
+                        path.append(.onboarding(
                             address: s.createdAddress ?? "",
                             name: s.createdName ?? s.firstName
                         ))
                     }
                 case let .created(address, name):
                     AccountCreatedView(address: address, name: name) {
-                        path.append(.createdAlt(address: address, name: name))
+                        path.append(.onboarding(address: address, name: name))
                     }
                 case let .createdAlt(address, name):
                     AccountCreatedAltView(

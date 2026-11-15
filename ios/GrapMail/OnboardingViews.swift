@@ -174,10 +174,9 @@ struct OnboardingView: View {
                         filename: currentScene.filename,
                         onOpenMailbox: onFinish
                     )
-                    .frame(maxWidth: 440)
-                    .frame(height: min(viewport.size.height * 0.44, 380))
+                    .frame(maxWidth: 360)
                     .aspectRatio(440.0 / 560.0, contentMode: .fit)
-                    .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+                    .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
                     .padding(.horizontal, 20)
 
                     Spacer(minLength: 16)

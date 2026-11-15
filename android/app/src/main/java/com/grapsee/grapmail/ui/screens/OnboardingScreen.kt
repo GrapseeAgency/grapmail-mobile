@@ -5,7 +5,6 @@ import android.graphics.Color as AndroidColor
 import android.view.View
 import android.webkit.JavascriptInterface
 import android.webkit.WebResourceRequest
-import android.webkit.WebResourceResponse
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
@@ -20,12 +19,15 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.ArrowForward
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -48,7 +50,6 @@ import com.grapsee.grapmail.ui.components.GradientButton
 import com.grapsee.grapmail.ui.components.GrapMailLogo
 import com.grapsee.grapmail.ui.theme.H1
 import com.grapsee.grapmail.ui.theme.LocalPalette
-import java.io.ByteArrayInputStream
 
 data class OnboardingSceneData(
     val index: Int,
@@ -65,7 +66,7 @@ val ONBOARDING_SCENES = listOf(
         eyebrow = "WELCOME",
         title = "Welcome to Your Sanctuary",
         description = "Your new address is ready; welcome to a cleaner way to communicate.",
-        ctaText = "Get Started →",
+        ctaText = "Get Started",
         assetName = "onboarding/onboarding_scene_1.html",
     ),
     OnboardingSceneData(
@@ -73,7 +74,7 @@ val ONBOARDING_SCENES = listOf(
         eyebrow = "SCREENER GATE",
         title = "You Decide Who Reaches You",
         description = "Unknown senders wait in the Screener until you decide.",
-        ctaText = "Next →",
+        ctaText = "Next",
         assetName = "onboarding/onboarding_scene_2.html",
     ),
     OnboardingSceneData(
@@ -81,7 +82,7 @@ val ONBOARDING_SCENES = listOf(
         eyebrow = "SUBSCRIPTIONS",
         title = "Tame the Clutter",
         description = "Unsubscribe, snooze, and return to what matters.",
-        ctaText = "Next →",
+        ctaText = "Next",
         assetName = "onboarding/onboarding_scene_3.html",
     ),
     OnboardingSceneData(
@@ -89,7 +90,7 @@ val ONBOARDING_SCENES = listOf(
         eyebrow = "QUIET BY DEFAULT",
         title = "Choose Your Rhythm",
         description = "Set your theme and decide when GrapMail can interrupt you.",
-        ctaText = "Next →",
+        ctaText = "Next",
         assetName = "onboarding/onboarding_scene_4.html",
     ),
     OnboardingSceneData(
@@ -97,7 +98,7 @@ val ONBOARDING_SCENES = listOf(
         eyebrow = "YOUR SANCTUARY",
         title = "Your Inbox Is Yours Again",
         description = "Welcome home; your new mailbox is ready.",
-        ctaText = "Open My Mailbox →",
+        ctaText = "Open My Mailbox",
         assetName = "onboarding/onboarding_scene_5.html",
     ),
 )
@@ -116,24 +117,29 @@ fun OnboardingHero(
         AndroidView(
             modifier = Modifier.fillMaxSize(),
             factory = { ctx ->
-                val html = ctx.assets.open(assetName).bufferedReader().use { it.readText() }
                 WebView(ctx).apply {
                     setBackgroundColor(AndroidColor.TRANSPARENT)
                     isVerticalScrollBarEnabled = false
                     isHorizontalScrollBarEnabled = false
                     overScrollMode = View.OVER_SCROLL_NEVER
+
                     settings.apply {
                         javaScriptEnabled = true
-                        blockNetworkLoads = true
                         allowFileAccess = true
-                        allowContentAccess = false
+                        allowContentAccess = true
+                        @Suppress("DEPRECATION")
+                        allowFileAccessFromFileURLs = true
+                        @Suppress("DEPRECATION")
+                        allowUniversalAccessFromFileURLs = true
                         domStorageEnabled = true
-                        cacheMode = WebSettings.LOAD_NO_CACHE
+                        databaseEnabled = true
+                        cacheMode = WebSettings.LOAD_DEFAULT
                         setSupportZoom(false)
                         builtInZoomControls = false
                         displayZoomControls = false
                         textZoom = 100
                     }
+
                     addJavascriptInterface(object {
                         @JavascriptInterface
                         fun postMessage(msg: String) {
@@ -142,42 +148,30 @@ fun OnboardingHero(
                             }
                         }
                     }, "ReactNativeWebView")
+
                     webViewClient = object : WebViewClient() {
-                        override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
+                        override fun shouldOverrideUrlLoading(
+                            view: WebView?,
+                            request: WebResourceRequest?,
+                        ): Boolean {
                             val url = request?.url?.toString().orEmpty()
                             if (url.startsWith("grapmail:open-mailbox")) {
                                 view?.post { onOpenMailbox() }
                                 return true
                             }
-                            return true
-                        }
-
-                        override fun shouldInterceptRequest(
-                            view: WebView?,
-                            request: WebResourceRequest?,
-                        ): WebResourceResponse? {
-                            val url = request?.url?.toString().orEmpty()
-                            val allowed = url.startsWith("file:///android_asset/") ||
-                                url.startsWith("data:") ||
-                                url.startsWith("about:")
-                            return if (allowed) {
-                                null
-                            } else {
-                                WebResourceResponse(
-                                    "text/plain",
-                                    "utf-8",
-                                    ByteArrayInputStream(ByteArray(0)),
-                                )
-                            }
+                            return false
                         }
                     }
-                    loadDataWithBaseURL("file:///android_asset/", html, "text/html", "UTF-8", null)
+
+                    loadUrl("file:///android_asset/$assetName")
                     holder[0] = this
                 }
             },
             update = { wv ->
-                val html = wv.context.assets.open(assetName).bufferedReader().use { it.readText() }
-                wv.loadDataWithBaseURL("file:///android_asset/", html, "text/html", "UTF-8", null)
+                val targetUrl = "file:///android_asset/$assetName"
+                if (wv.url != targetUrl) {
+                    wv.loadUrl(targetUrl)
+                }
             }
         )
     }
@@ -225,6 +219,7 @@ fun OnboardingScreen(
         ) {
             GrapMailLogo(size = 32.dp, wordmark = true)
 
+            // Scene 1 is required (no skip). Scenes 2..5 allow skip directly to mailbox.
             if (sceneIndex > 0) {
                 Text(
                     text = "Skip",
@@ -241,25 +236,20 @@ fun OnboardingScreen(
             }
         }
 
-        Spacer(Modifier.height(12.dp))
-
-        // Center Animated Artifact
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .heightIn(max = 380.dp)
-                .aspectRatio(440f / 560f)
-                .clip(RoundedCornerShape(24.dp)),
-            contentAlignment = Alignment.Center,
-        ) {
-            OnboardingHero(
-                assetName = currentScene.assetName,
-                onOpenMailbox = onFinish,
-                modifier = Modifier.fillMaxSize(),
-            )
-        }
-
         Spacer(Modifier.height(16.dp))
+
+        // Center Animated Artifact: bounded exactly like WelcomeHero
+        OnboardingHero(
+            assetName = currentScene.assetName,
+            onOpenMailbox = onFinish,
+            modifier = Modifier
+                .widthIn(max = 360.dp)
+                .fillMaxWidth()
+                .aspectRatio(440f / 560f)
+                .clip(RoundedCornerShape(20.dp)),
+        )
+
+        Spacer(Modifier.height(20.dp))
 
         // Eyebrow
         Text(
@@ -322,6 +312,14 @@ fun OnboardingScreen(
                     onFinish()
                 }
             },
+            trailing = {
+                Spacer(Modifier.size(8.dp))
+                Icon(
+                    Icons.AutoMirrored.Rounded.ArrowForward,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp),
+                )
+            }
         )
 
         Spacer(Modifier.height(24.dp))

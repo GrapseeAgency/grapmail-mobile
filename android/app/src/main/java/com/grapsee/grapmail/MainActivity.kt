@@ -1020,7 +1020,7 @@ fun GrapMailNav(
                     val s = vm.state.value
                     val address = s.createdAddress ?: ""
                     val name = s.createdName ?: s.firstName
-                    nav.navigate(Routes.created(address, name)) { popUpTo(Routes.HUMAN_VERIFY) { inclusive = true } }
+                    nav.navigate(Routes.onboarding(address, name)) { popUpTo(Routes.HUMAN_VERIFY) { inclusive = true } }
                 },
             )
         }
@@ -1030,7 +1030,7 @@ fun GrapMailNav(
             AccountCreatedScreen(
                 address = address,
                 name = name,
-                onContinueOnboarding = { nav.navigate(Routes.createdAlt(address, name)) },
+                onContinueOnboarding = { nav.navigate(Routes.onboarding(address, name)) },
             )
         }
         composable(Routes.CREATED_ALT) { entry ->

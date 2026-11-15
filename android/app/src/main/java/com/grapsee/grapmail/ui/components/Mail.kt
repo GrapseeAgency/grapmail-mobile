@@ -312,21 +312,35 @@ fun SenderAvatar(display: String, address: String?, size: Dp = 40.dp, modifier: 
  * list is sorted by time, so an invented timestamp would also invent the order.
  */
 fun mailTime(iso: String?, now: Date = Date()): String? {
+    if (iso.isNullOrBlank()) return null
+    val tz = TimeZone.getDefault()
+    val nowMillis = now.time
+    val cacheKey = tz.id + '\u0000' + iso + '\u0000' + (nowMillis / 60_000)
+    formattedMailTimes.get(cacheKey)?.let { return it }
+
     val millis = parseMailIso(iso) ?: return null
     val then = Calendar.getInstance().apply { timeInMillis = millis }
     val today = Calendar.getInstance().apply { time = now }
     val sameYear = then.get(Calendar.YEAR) == today.get(Calendar.YEAR)
     val sameDay = sameYear && then.get(Calendar.DAY_OF_YEAR) == today.get(Calendar.DAY_OF_YEAR)
-    if (sameDay) return mailDateFormatter("h:mm a").format(Date(millis))
-    val yesterday = (today.clone() as Calendar).apply { add(Calendar.DAY_OF_YEAR, -1) }
-    if (then.get(Calendar.YEAR) == yesterday.get(Calendar.YEAR) &&
-        then.get(Calendar.DAY_OF_YEAR) == yesterday.get(Calendar.DAY_OF_YEAR))
-        return "Yesterday"
-    if (then.get(Calendar.YEAR) == today.get(Calendar.YEAR))
-        return mailDateFormatter("MMM d").format(Date(millis))
-    return mailDateFormatter("MMM d, yyyy").format(Date(millis))
+    val formatted = if (sameDay) {
+        mailDateFormatter("h:mm a").format(Date(millis))
+    } else {
+        val yesterday = (today.clone() as Calendar).apply { add(Calendar.DAY_OF_YEAR, -1) }
+        if (then.get(Calendar.YEAR) == yesterday.get(Calendar.YEAR) &&
+            then.get(Calendar.DAY_OF_YEAR) == yesterday.get(Calendar.DAY_OF_YEAR)) {
+            "Yesterday"
+        } else if (then.get(Calendar.YEAR) == today.get(Calendar.YEAR)) {
+            mailDateFormatter("MMM d").format(Date(millis))
+        } else {
+            mailDateFormatter("MMM d, yyyy").format(Date(millis))
+        }
+    }
+    formattedMailTimes.put(cacheKey, formatted)
+    return formatted
 }
 
+private val formattedMailTimes = android.util.LruCache<String, String>(2_048)
 private val mailDateFormatters = ThreadLocal.withInitial { mutableMapOf<String, SimpleDateFormat>() }
 
 private fun mailDateFormatter(pattern: String): SimpleDateFormat =

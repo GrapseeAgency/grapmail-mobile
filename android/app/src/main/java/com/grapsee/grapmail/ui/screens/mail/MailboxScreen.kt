@@ -481,8 +481,7 @@ fun MailboxScreen(
                                 // the rows read as one surface because they sit
                                 // on the same fill. Both omissions are the
                                 // smoothness fix as much as the look.
-                                val rowContent = @Composable {
-                                    SwipeableMessageRow(
+                                SwipeableMessageRow(
                                     leadingTo = if (inTrashOrSpam) "Back to Inbox"
                                         else if (inArchive) null else "Archive",
                                     trailingTo = if (inTrashOrSpam) null else "Trash",
@@ -523,8 +522,6 @@ fun MailboxScreen(
                                         selecting = selectingRows,
                                     )
                                 }
-                                }
-                                rowContent()
                             }
                             if (state.loadingMore || state.canLoadMore) {
                                 item {

@@ -13,7 +13,7 @@ body{background:radial-gradient(ellipse 78% 55% at 50% 47%,#0b2754 0%,#061732 30
 body::before{content:"";position:fixed;inset:-20%;pointer-events:none;background:radial-gradient(ellipse at 25% 35%,#095aff18 0,transparent 37%),radial-gradient(ellipse at 77% 67%,#0095e918 0,transparent 34%);animation:atmos 12s ease-in-out infinite alternate}
 body::after{content:"";position:fixed;inset:0;pointer-events:none;opacity:.24;background-image:linear-gradient(125deg,transparent 45%,#0734651b 46%,transparent 48%);mix-blend-mode:screen}
 @keyframes atmos{from{transform:translate(-2%,1%) scale(1)}to{transform:translate(3%,-2%) scale(1.06)}}
-.wrap{width:min(100vw,510px,calc(100dvh * .85));aspect-ratio:440/560;position:relative;touch-action:manipulation;isolation:isolate;outline:none;cursor:pointer}
+.wrap{width:100%;max-width:440px;height:100%;max-height:560px;aspect-ratio:440/560;margin:0 auto;position:relative;touch-action:manipulation;isolation:isolate;outline:none;cursor:pointer}
 .wrap svg{display:block;width:100%;height:100%;overflow:visible}
 .wrap:focus-visible{outline:2px solid #59c7ff;border-radius:14px}
 #field{position:absolute;inset:0;width:100%;height:100%;z-index:0;pointer-events:none}
@@ -264,7 +264,7 @@ body::after{content:"";position:fixed;inset:0;pointer-events:none;opacity:.24;ba
  }));
  let w=440,h=560,last=0,playing=!reduced.matches;
  function resize(){
-  const r=root.getBoundingClientRect();w=r.width;h=r.height;
+  const r=root.getBoundingClientRect();w=(r.width&&r.width>0)?r.width:440;h=(r.height&&r.height>0)?r.height:560;
   const scale=Math.min(2,devicePixelRatio||1);
   canvas.width=Math.round(w*scale);canvas.height=Math.round(h*scale);
   ctx.setTransform(scale,0,0,scale,0,0);
