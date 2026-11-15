@@ -32,6 +32,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.lifecycle.lifecycleScope
+import androidx.compose.runtime.collectAsState
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -136,6 +138,9 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         takeComposeRequest(intent)
+        lifecycleScope.launch {
+            com.grapsee.grapmail.logic.AppUpdate.checkOnOpen(this@MainActivity)
+        }
         setContent {
             GrapMailTheme {
                 // Edge-to-edge with the design's background behind the system
@@ -185,10 +190,30 @@ class MainActivity : ComponentActivity() {
                             notificationTarget = notificationTarget.value,
                             onNotificationConsumed = { notificationTarget.value = null },
                         )
+
+                        // The Play-driven update overlay: drawn above whatever
+                        // screen is up, offered only when the store itself says
+                        // a compatible update exists, closed by the person and
+                        // re-offered with tomorrow's daily check.
+                        val updateBannerVisible = com.grapsee.grapmail.logic.AppUpdate.bannerVisible
+                            .collectAsState().value
+                        if (updateBannerVisible) {
+                            com.grapsee.grapmail.ui.components.UpdateBanner(
+                                onUpdate = { com.grapsee.grapmail.logic.AppUpdate.startUpdate(this@MainActivity) },
+                                onDismiss = { com.grapsee.grapmail.logic.AppUpdate.dismiss() },
+                            )
+                        }
                     }
                 }
             }
         }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        // The review ask rides this moment: a person returning to the app
+        // after their third send is exactly who the store's flow is for.
+        com.grapsee.grapmail.logic.AppReview.maybeAsk(this)
     }
 
     override fun onNewIntent(intent: android.content.Intent) {

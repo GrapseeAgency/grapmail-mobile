@@ -147,6 +147,7 @@ class MailPollWorker(
             report("silent no-rise $previous->$unread")
             return Result.success()
         }
+        com.grapsee.grapmail.logic.MailboxEvents.emitInboxChanged()
         val message = pushedMessage ?: arrived?.singleOrNull()?.takeIf { grew == 1 }
         val threadId = message?.threadId
         val page = if (threadId != null) {

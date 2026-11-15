@@ -409,6 +409,16 @@ class MailboxViewModel @JvmOverloads constructor(
 
     init {
         watchNetwork()
+        // The live wire: whenever a worker read lands new mail — poll or push —
+        // the open mailbox answers by re-reading the inbox silently. Rows on
+        // screen stay put until the server answers; a read that fails changes
+        // nothing. With no mailbox open the emission is dropped.
+        viewModelScope.launch {
+            com.grapsee.grapmail.logic.MailboxEvents.inboxChanged.collect {
+                if (snapshotMode || _state.value.busy || _state.value.selecting) return@collect
+                load(replace = true, forceCounts = false)
+            }
+        }
     }
 
     private var accountLoadJob: Job? = null
@@ -1919,6 +1929,12 @@ class MailboxViewModel @JvmOverloads constructor(
                 if (generation == composeGeneration) _compose.update { it.copy(sending = false,
                     result = r.message ?: r.error, resultStatus = r.status,
                     error = r.deliveryError ?: r.error) }
+                if (accepted) {
+                    // A delivered send is the app having proven itself — the
+                    // review ask counts it and fires the store's flow when the
+                    // third send since the last ask lands.
+                    com.grapsee.grapmail.logic.AppReview.countSend(getApplication())
+                }
                 // A draft that was just sent is no longer a draft. The order
                 // is the whole point: the delete runs only AFTER the server
                 // accepted the message, so a failed send leaves the draft
