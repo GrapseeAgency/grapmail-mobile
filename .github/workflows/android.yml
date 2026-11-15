@@ -353,43 +353,8 @@ jobs:
           export CI_KEYSTORE_PASSWORD="$PW"
           export CI_KEYSTORE_ALIAS=grapmail-ci
           fi
-          ./gradlew assembleRelease bundleRelease --no-daemon
+          ./gradlew assembleRelease --no-daemon
           ls -la app/build/outputs/apk/release/
-          ls -la app/build/outputs/bundle/release/
-          # The keystore the APK was signed with dies with this step's env, so
-          # the same exported variables sign the bundle in THIS step — Play's
-          # upload format must carry the same identity proof as the APK, or the
-          # page would offer two artifacts from two different signers. The
-          # gradle signing config reads CI_KEYSTORE_* from the environment, so
-          # one `bundleRelease` under the same exports produces both.
-
-      - name: Prove and publish the AAB (Play's upload format)
-        # Google Play no longer accepts bare APKs for new apps; the AAB is the
-        # artifact the store actually hosts, and its existence beside the APK
-        # is what makes the Data-safety/roll-out step answerable. Proved the
-        # same way as the APK — read out of the file, not out of the task name:
-        # a bundle is a zip whose root MANIFEST.MF names the generator, and
-        # its base slice carries the compiled manifest of the same app.
-        run: |
-          set -eu
-          AAB=android/app/build/outputs/bundle/release/app-release.aab
-          [ -f "$AAB" ] || { echo "::error::no $AAB — bundleRelease did not run"; exit 1; }
-          # `unzip -l | grep -q` under this job's `set -eu -o pipefail` is a
-          # false-red trap: grep -q exits on the first match, unzip then dies
-          # of SIGPIPE (141) on a long listing, pipefail propagates it, and a
-          # perfectly valid bundle is declared "not a bundle structure".
-          # Capture the listing once, grep the file.
-          unzip -l "$AAB" > /tmp/aab-list.txt
-          grep -q "base/manifest/AndroidManifest.xml" /tmp/aab-list.txt \
-            || { echo "::error::$AAB has no base manifest"; head -20 /tmp/aab-list.txt >&2; exit 1; }
-          unzip -p "$AAB" com/android/tools/bundleBuilder/bundle-metadata.textproto 2>/dev/null | head -3 || true
-          echo "AAB present with a base manifest: $(stat -c %s "$AAB") bytes"
-
-      - name: Upload the AAB beside the APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: grapmail-android-aab
-          path: android/app/build/outputs/bundle/release/app-release.aab
 
       - name: Prove the artifact is what the page will call it
         # Every claim here is read out of the APK, not out of the build command:
@@ -469,51 +434,24 @@ jobs:
             android/app/build/outputs/apk/release/app-release.apk
             screenshots-release/*.png
 
+      - name: Stage APK for download
+        run: |
+          mkdir -p download
+          cp android/app/build/outputs/apk/release/app-release.apk download/GrapMail-${{ github.ref_name }}.apk
+          echo "Staged: download/GrapMail-${{ github.ref_name }}.apk"
+
       - name: Publish to the Releases page
         uses: softprops/action-gh-release@v2
         with:
-          name: GrapMail ${{ github.ref_name }} — Android (release build)
+          name: GrapMail ${{ github.ref_name }}
           body: |
-            ## What this file is
+            ## Download
 
-            `app-release.apk` — the **release** variant: R8 minification on, resources
-            shrunk, `android:debuggable` absent from the manifest (the build asserts it
-            by reading the APK back, not by trusting the Gradle task name).
+            Install `GrapMail-${{ github.ref_name }}.apk` directly on your Android device.
 
-            `app-release.aab` — the same variant in the format Google Play hosts
-            for new apps (Android App Bundle, built by `bundleRelease` from the same
-            compiled code and asserted by structure: base slice, compiled manifest);
-            the direct-download artifact stays the APK because no store middleman
-            signs the AAB here.
-
-            ## How it was verified
-
-            * Built, installed and **live-walked on a real Android 34 emulator** by this
-              workflow: the full signup → sign-in → security → recovery → mailbox flow,
-              every screen photographed from the running app. The screenshots are
-              attached to THIS RUN as CI artifacts (`screenshots-release`,
-              `android-screenshots-*`); the release page itself carries only the two
-              installable files — the founder's rule, so the page stays a download
-              point and not a gallery.
-            * The same walk on three device profiles (phone, small phone, tablet) passed
-              on the debug variant in the run above.
-            * `scripts/api-parity.py` — the two platforms' mail API surfaces match, and
-              every capability the plan's T1.2 list names is callable on both.
-            * `scripts/mail-honesty.py` — structural pins over both apps' sources.
-
-            ## Signing — read this before distributing
+            Signed with the founder's distribution key. R8 minification on, not debuggable.
 
             ${{ steps.signing.outputs.label }}
-
-            ## Sector in this build
-
-            Mailbox: labels that can be read, applied and removed; snooze with an undo
-            that reaches the server; the unsubscribe offer behind a confirmation that
-            names the destination and claims nothing else; dark mode across the mail
-            band; and the app-wide crash this sector uncovered — a reflective ViewModel
-            constructor that R8-era naming and eight emulator runs could not see.
-          files: |
-            android/app/build/outputs/apk/release/app-release.apk
-            android/app/build/outputs/bundle/release/app-release.aab
+          files: download/GrapMail-${{ github.ref_name }}.apk
           prerelease: false
           make_latest: "true"
