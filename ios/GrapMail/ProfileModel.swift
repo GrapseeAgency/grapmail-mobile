@@ -284,7 +284,7 @@ final class ProfileModel: ObservableObject {
             } catch {
                 guard generation == SessionStore.generation else { return }
                 state.busy = false
-                state.note = reason(error)
+                state.note = "Couldn’t update your profile photo. Try again."
                 state.noteIsBad = true
             }
         }

@@ -74,6 +74,10 @@
             never initialized and this service simply never fires; the poll
             remains the delivery the person actually gets.
         -->
+        <receiver
+            android:name=".logic.MailNotificationActionReceiver"
+            android:exported="false" />
+
         <service
             android:name=".logic.PushService"
             android:exported="false">

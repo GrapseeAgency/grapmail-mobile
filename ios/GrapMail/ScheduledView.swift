@@ -115,7 +115,7 @@ struct ScheduledView: View {
             messages = r.messages ?? []
             loaded = true
         } catch {
-            self.error = error.localizedDescription
+            self.error = apiMessage(error, fallback: "Could not update scheduled mail. Try again.")
             loaded = true
         }
     }
@@ -129,7 +129,7 @@ struct ScheduledView: View {
                 messages.removeAll { $0.id == id }
                 note = "Cancelled — it will not be sent."
             } catch {
-                note = error.localizedDescription
+                note = apiMessage(error, fallback: "Could not update scheduled mail. Try again.")
             }
             cancellingId = nil
         }

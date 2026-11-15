@@ -269,6 +269,9 @@ struct MailHomeTopBar<Search: View>: View {
     let onProfile: () -> Void
     let onSettings: () -> Void
     let onSignOut: () -> Void
+    var onAddAccount: () -> Void = {}
+    var onSwitchAccount: (String) -> Void = { _ in }
+    @State private var accountOpen = false
     @ViewBuilder let search: () -> Search
 
     var body: some View {
@@ -285,14 +288,7 @@ struct MailHomeTopBar<Search: View>: View {
 
                 search()
 
-                Menu {
-                    if let address = accountAddress, !address.isEmpty {
-                        Text(address)
-                    }
-                    Button("Profile", action: onProfile)
-                    Button("Settings", action: onSettings)
-                    Button("Sign out", action: onSignOut)
-                } label: {
+                Button { accountOpen.toggle() } label: {
                     Group {
                         if accountName?.nilIfBlank() != nil || accountAddress?.nilIfBlank() != nil {
                             SenderAvatar(display: accountName ?? "",
@@ -305,7 +301,20 @@ struct MailHomeTopBar<Search: View>: View {
                     }
                     .frame(width: 44, height: 44)
                 }
+                .buttonStyle(.plain)
                 .accessibilityLabel("Account")
+                .popover(isPresented: $accountOpen, attachmentAnchor: .rect(.bounds), arrowEdge: .top) {
+                    AccountSwitcher(
+                        activeAddress: accountAddress, accountName: accountName,
+                        onClose: { accountOpen = false },
+                        onSwitch: { accountOpen = false; onSwitchAccount($0) },
+                        onAdd: { accountOpen = false; onAddAccount() },
+                        onProfile: { accountOpen = false; onProfile() },
+                        onSettings: { accountOpen = false; onSettings() },
+                        onSignOut: { accountOpen = false; onSignOut() }
+                    )
+                    .keepAccountPopover()
+                }
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 8)

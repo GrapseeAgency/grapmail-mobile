@@ -113,6 +113,14 @@ final class ShortcutRouter: ObservableObject {
     static let composeType = "com.grapsee.grapmail.compose"
 
     @Published private(set) var pendingCompose = false
+    struct MailTarget: Equatable {
+        let messageId: String
+        let threadId: String?
+        let account: String
+        let reply: Bool
+        let more: Bool
+    }
+    @Published var pendingMail: MailTarget?
 
     func receive(_ type: String) -> Bool {
         guard type == ShortcutRouter.composeType else { return false }
@@ -138,6 +146,7 @@ enum MailPoll {
     private static let lastSeenKey = "grapmail.poll.lastUnread"
     private static let newestMessageKey = "grapmail.poll.inboxHead"
     static let channelName = "New mail"
+    static let actionCategory = "grapmail.message"
     @MainActor private static var activeGeneration: UUID?
 
     static let didReadStats = Notification.Name("grapmail.mailPoll.didReadStats")
@@ -148,7 +157,7 @@ enum MailPoll {
     }
 
     @MainActor
-    static func runOnce() async -> Bool {
+    static func runOnce(announceArrivals: Bool = true) async -> Bool {
         guard let token = SessionStore.token else { return false }
         let generation = SessionStore.generation
         guard activeGeneration != generation else { return false }
@@ -189,31 +198,62 @@ enum MailPoll {
         defaults.set(count, forKey: lastSeenKey)
         if let recent { defaults.set(recent.first?.id ?? "", forKey: newestMessageKey) }
         else { defaults.removeObject(forKey: newestMessageKey) }
-        guard didSee, count > previous else { return false }
-        guard canNotify else { return false }
+        guard didSee, canNotify else { return false }
+        guard announceArrivals else { return true }
 
-        let arrivals: [MailMessage]
+        let arrivals: [MailMessage]?
         if let priorHead, let recent, priorHead.isEmpty || recent.contains(where: { $0.id == priorHead }) {
             arrivals = recent.prefix(while: { $0.id != priorHead }).filter { !$0.isRead && $0.direction != "outbound" }
         } else {
-            arrivals = []
+            arrivals = nil
         }
-        let grew = max(count - previous, arrivals.count)
+        let grew = arrivals?.count ?? (count - previous)
         guard grew > 0 else { return false }
-        return await announce(grew: grew, total: count, message: grew == 1 ? arrivals.first : nil, generation: generation)
+        let message = grew == 1 ? arrivals?.first : nil
+        var previewFile: URL?
+        if let id = message?.id,
+           let details = await cacheNotificationMessage(id: id, token: token, generation: generation),
+           !details.isE2eEncrypted,
+           let item = details.attachments.first(where: {
+               !$0.id.isEmpty && ["image/jpeg", "image/png", "image/webp", "image/gif"].contains($0.mimeType ?? "") &&
+               (1...2_097_152).contains($0.sizeBytes ?? 0)
+           }) {
+            previewFile = await notificationImage(token: token, id: item.id)
+        }
+        defer { if let previewFile { try? FileManager.default.removeItem(at: previewFile) } }
+        guard !Task.isCancelled, generation == SessionStore.generation else { return false }
+        return await announce(grew: grew, total: count, message: message, previewFile: previewFile, generation: generation)
     }
 
     @MainActor
-    private static func announce(grew: Int, total: Int, message: MailMessage?, generation: UUID) async -> Bool {
+    static func cacheNotificationMessage(id: String, token: String, generation: UUID) async -> MailMessageFull? {
+        guard let (message, payload) = try? await ApiClient.notificationMessage(token: token, id: id),
+              !Task.isCancelled, generation == SessionStore.generation else { return nil }
+        await MailStore.shared.saveNotificationMessage(message, payload: payload, generation: generation)
+        return message
+    }
+
+    @MainActor
+    private static func announce(grew: Int, total: Int, message: MailMessage?, previewFile: URL?, generation: UUID) async -> Bool {
         let content = UNMutableNotificationContent()
         content.title = "\(grew) new message\(grew == 1 ? "" : "s")"
         content.body = "\(total) unread in the inbox"
         content.sound = .default
+        if let previewFile, let attachment = try? UNNotificationAttachment(identifier: "image", url: previewFile) {
+            content.attachments = [attachment]
+        }
+        if let message, let account = SessionStore.address, !account.isEmpty {
+            content.subtitle = account
+            content.categoryIdentifier = actionCategory
+            content.userInfo = ["messageId": message.id, "threadId": message.threadId ?? "", "account": account]
+        }
 
         var notification: UNNotificationContent = content
         if let message, let sender = message.from?.display.nilIfBlank() {
             content.title = sender
-            content.body = message.subject?.nilIfBlank() ?? "(no subject)"
+            let subject = message.isE2eEncrypted ? "New encrypted message" : (message.subject?.nilIfBlank() ?? "(no subject)")
+            let preview = message.isE2eEncrypted ? nil : message.snippet?.nilIfBlank()
+            content.body = [subject, preview].compactMap { $0 }.joined(separator: "\n")
             content.threadIdentifier = message.threadId ?? message.id
             if let address = message.from?.address?.nilIfBlank(),
                let avatar = senderAvatar(sender, address: address) {
@@ -241,6 +281,23 @@ enum MailPoll {
             return true
         } catch {
             return false
+        }
+    }
+
+    @MainActor
+    private static func notificationImage(token: String, id: String) async -> URL? {
+        guard let file = try? await ApiClient.mailAttachmentFile(token: token, id: id) else { return nil }
+        defer { try? FileManager.default.removeItem(at: file) }
+        guard let count = try? file.resourceValues(forKeys: [.fileSizeKey]).fileSize,
+              (1...2_097_152).contains(count), let data = try? Data(contentsOf: file),
+              let image = await AvatarThumbnail.decode(data, maxSize: 768),
+              let jpeg = UIImage(cgImage: image).jpegData(compressionQuality: 0.85) else { return nil }
+        let preview = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".jpg")
+        do {
+            try jpeg.write(to: preview)
+            return preview
+        } catch {
+            return nil
         }
     }
 
@@ -341,22 +398,33 @@ final class NotificationRegistration {
     /// deferred, so a sign-in that completed while clear() was running keeps
     /// its registration — its own reconcile re-registers anyway.
     func sessionEnding() {
+        let address = SessionStore.address
+        let registration = address.flatMap { PreviewCredential.read(mailbox: $0) }
+        if let address {
+            PreviewCredential.clear(mailbox: address)
+            let center = UNUserNotificationCenter.current()
+            center.getDeliveredNotifications { notifications in
+                let removed = notifications.filter {
+                    let info = $0.request.content.userInfo
+                    let owner = info["mailbox"] as? String ?? info["account"] as? String
+                    return owner?.caseInsensitiveCompare(address) == .orderedSame
+                }
+                center.removeDeliveredNotifications(withIdentifiers: removed.map { $0.request.identifier })
+            }
+        }
         let bearer = SessionStore.token
         let token = deviceToken
         deviceToken = nil
         registrationFailed = false
         registerTask?.cancel()
         registerTask = nil
-        if let bearer, let token {
-            let hex = Self.hex(token)
-            Task {
+        Task {
+            if let registration, await ApiClient.retireNotificationRegistration(registration) { return }
+            if let bearer, let token {
                 do {
-                    try await ApiClient.unregisterPush(token: bearer, pushToken: hex)
+                    try await ApiClient.unregisterPush(token: bearer, pushToken: Self.hex(token))
                 } catch {
-                    // Best effort: the bearer may already be dead server-side
-                    // (account deletion invalidates tokens), which is not a
-                    // defect of the sign-out path.
-                    print("Push deregistration not confirmed: \(error.localizedDescription)")
+                    print("Push deregistration not confirmed.")
                 }
             }
         }
@@ -385,18 +453,23 @@ final class NotificationRegistration {
     }
 
     private func postRegistration() {
-        guard let bearer = SessionStore.token, let token = deviceToken else { return }
+        guard let token = deviceToken else { return }
         let hex = Self.hex(token)
         registerTask?.cancel()
         registerTask = Task {
-            do {
-                try await ApiClient.registerPush(token: bearer, pushToken: hex)
-                // No screen reports this and no wording announces push: the
-                // server accepted a token, and whether a wake ever arrives is
-                // not observable here. The poll remains the fallback.
-            } catch {
-                if !Task.isCancelled {
-                    print("Push registration not accepted: \(error.localizedDescription)")
+            for account in SessionStore.accounts() {
+                guard !Task.isCancelled else { return }
+                guard let bearer = await ApiClient.pushBearer(for: account.address) else { continue }
+                do {
+                    let secret = try await ApiClient.registerPush(token: bearer, pushToken: hex)
+                    if SessionStore.account(account.address) == nil {
+                        try? await ApiClient.unregisterPush(token: bearer, pushToken: hex)
+                    } else if !Task.isCancelled, let secret,
+                              !PreviewCredential.store(secret, mailbox: account.address) {
+                        print("Push preview access could not be saved.")
+                    }
+                } catch {
+                    if !Task.isCancelled { print("Push registration failed for a saved account.") }
                 }
             }
         }
@@ -420,7 +493,16 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
 
     func application(_ application: UIApplication,
                      didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
-        UNUserNotificationCenter.current().delegate = self
+        let center = UNUserNotificationCenter.current()
+        center.delegate = self
+        center.setNotificationCategories([
+            UNNotificationCategory(identifier: MailPoll.actionCategory, actions: [
+                UNNotificationAction(identifier: "archive", title: "Archive"),
+                UNNotificationAction(identifier: "read", title: "Mark as read"),
+                UNNotificationAction(identifier: "reply", title: "Reply", options: [.foreground]),
+                UNNotificationAction(identifier: "more", title: "More", options: [.foreground]),
+            ], intentIdentifiers: [], options: [])
+        ])
         BGTaskScheduler.shared.register(forTaskWithIdentifier: MailPoll.refreshIdentifier, using: .main) { task in
             guard let refresh = task as? BGAppRefreshTask else { task.setTaskCompleted(success: false); return }
             MailPoll.scheduleNext()
@@ -469,23 +551,70 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
     func application(_ application: UIApplication,
                      didReceiveRemoteNotification userInfo: [AnyHashable: Any],
                      fetchCompletionHandler completionHandler: @escaping (UIBackgroundFetchResult) -> Void) {
-        // A wake is a hint, never trusted mailbox data: whatever the payload
-        // claims, the app re-reads the authenticated stats the poll uses, and
-        // only that read's answer is announced.
-        Task { completionHandler(await MailPoll.runOnce() ? .newData : .noData) }
+        // An alert has already been presented by APNs. Refresh the mailbox
+        // baseline in that case so the same arrival does not alert twice.
+        let hasAlert = (userInfo["aps"] as? [String: Any])?["alert"] != nil
+        let account = userInfo["mailbox"] as? String
+        let id = userInfo["messageId"] as? String
+        Task {
+            if let account, account.caseInsensitiveCompare(SessionStore.address ?? "") == .orderedSame,
+               let id, !id.isEmpty, let token = SessionStore.token {
+                _ = await MailPoll.cacheNotificationMessage(id: id, token: token, generation: SessionStore.generation)
+            }
+            completionHandler(await MailPoll.runOnce(announceArrivals: !hasAlert) ? .newData : .noData)
+        }
     }
 
     func userNotificationCenter(_ center: UNUserNotificationCenter,
                                 willPresent notification: UNNotification,
                                 withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void) {
-        completionHandler(SessionStore.token == nil ? [] : [.banner, .sound, .badge])
+        let request = notification.request
+        let info = request.content.userInfo
+        let account = info["mailbox"] as? String ?? info["account"] as? String
+        guard account.map({ SessionStore.account($0) != nil }) ?? (SessionStore.token != nil) else {
+            completionHandler([])
+            return
+        }
+        completionHandler([.banner, .sound, .badge])
     }
 
     func userNotificationCenter(_ center: UNUserNotificationCenter,
                                 didReceive response: UNNotificationResponse,
                                 withCompletionHandler completionHandler: @escaping () -> Void) {
-        // No backend payload/deep-link contract exists. Never navigate to an
-        // untrusted message identifier or URL supplied by a notification.
+        let request = response.notification.request
+        let info = request.content.userInfo
+        let isRemote = request.trigger is UNPushNotificationTrigger
+        let accountKey = isRemote ? "mailbox" : "account"
+        guard isRemote || request.content.categoryIdentifier == MailPoll.actionCategory,
+              let account = info[accountKey] as? String, SessionStore.account(account) != nil,
+              let messageId = info["messageId"] as? String, !messageId.isEmpty else {
+            completionHandler()
+            return
+        }
+        let action = response.actionIdentifier
+        if action == "archive" || action == "read" {
+            Task {
+                defer { completionHandler() }
+                guard let token = await ApiClient.pushBearer(for: account) else { return }
+                let generation = SessionStore.generation
+                let kind: MailAction = action == "archive" ? .archive : .read
+                if (try? await ApiClient.mailAction(token: token, id: messageId, action: kind)) != nil,
+                   account.caseInsensitiveCompare(SessionStore.address ?? "") == .orderedSame,
+                   generation == SessionStore.generation {
+                    await MailStore.shared.invalidate(.inbox, generation: generation)
+                    if kind == .read {
+                        await MailStore.shared.patchFlags(id: messageId, read: true, generation: generation)
+                    } else {
+                        await MailStore.shared.invalidate(.archive, generation: generation)
+                    }
+                }
+            }
+            return
+        }
+        if [UNNotificationDefaultActionIdentifier, "reply", "more"].contains(action) {
+            ShortcutRouter.shared.pendingMail = .init(messageId: messageId,
+                threadId: (info["threadId"] as? String)?.nilIfBlank(), account: account, reply: action == "reply", more: action == "more")
+        }
         completionHandler()
     }
 }

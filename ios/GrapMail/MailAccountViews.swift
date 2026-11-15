@@ -1,24 +1,46 @@
+import CoreTransferable
 import SwiftUI
 import PhotosUI
 import ImageIO
 import UniformTypeIdentifiers
 
 enum AvatarThumbnail {
-    static func decode(_ data: Data) async -> CGImage? {
+    static func decode(_ data: Data, maxSize: Int = 256) async -> CGImage? {
+        await decode(maxSize: maxSize) { CGImageSourceCreateWithData(data as CFData, nil) }
+    }
+
+    static func decode(_ url: URL, maxSize: Int) async -> CGImage? {
+        await decode(maxSize: maxSize) { CGImageSourceCreateWithURL(url as CFURL, nil) }
+    }
+
+    private static func decode(maxSize: Int, source: @escaping @Sendable () -> CGImageSource?) async -> CGImage? {
         await withCheckedContinuation { continuation in
             DispatchQueue.global(qos: .userInitiated).async {
-                let source = CGImageSourceCreateWithData(data as CFData, nil)
                 let options: [CFString: Any] = [
                     kCGImageSourceCreateThumbnailFromImageAlways: true,
                     kCGImageSourceCreateThumbnailWithTransform: true,
-                    kCGImageSourceThumbnailMaxPixelSize: 256,
+                    kCGImageSourceThumbnailMaxPixelSize: maxSize,
                     kCGImageSourceShouldCacheImmediately: true,
                 ]
-                let thumbnail = source.flatMap {
+                let thumbnail = source().flatMap {
                     CGImageSourceCreateThumbnailAtIndex($0, 0, options as CFDictionary)
                 }
                 continuation.resume(returning: thumbnail)
             }
+        }
+    }
+}
+
+private struct SelectedAvatar: Transferable {
+    let png: Data
+
+    static var transferRepresentation: some TransferRepresentation {
+        FileRepresentation(importedContentType: .image) { received in
+            guard let image = await AvatarThumbnail.decode(received.file, maxSize: 1024),
+                  let png = UIImage(cgImage: image).pngData() else {
+                throw CocoaError(.fileReadCorruptFile)
+            }
+            return Self(png: png)
         }
     }
 }
@@ -1068,35 +1090,13 @@ struct ProfileEditView: View {
         .task(id: photoItem) {
             guard let item = photoItem else { return }
             defer { if photoItem == item { photoItem = nil } }
-            guard let bytes = try? await item.loadTransferable(type: Data.self), !bytes.isEmpty else {
-                if !Task.isCancelled { photoError = "That image could not be read." }
-                return
-            }
-            guard !Task.isCancelled else { return }
-            if bytes.count > 10 * 1024 * 1024 {
-                photoError = "That photo is too large. A profile photo can be up to 10 MB."
-                return
-            }
-            guard let image = await Self.avatarType(bytes) else {
-                if !Task.isCancelled { photoError = "Choose a PNG, JPEG, WebP or GIF image." }
+            guard let selected = try? await item.loadTransferable(type: SelectedAvatar.self) else {
+                if !Task.isCancelled { photoError = "Couldn’t open that photo. Choose another image." }
                 return
             }
             guard !Task.isCancelled else { return }
             photoError = nil
-            vm.uploadAvatar(bytes: bytes, filename: "profile.\(image.ext)", mime: image.mime)
-        }
-    }
-
-    private nonisolated static func avatarType(_ bytes: Data) async -> (ext: String, mime: String)? {
-        guard let source = CGImageSourceCreateWithData(bytes as CFData, nil),
-              let identifier = CGImageSourceGetType(source),
-              let type = UTType(identifier as String), let mime = type.preferredMIMEType else { return nil }
-        switch mime {
-        case "image/jpeg": return ("jpg", mime)
-        case "image/png": return ("png", mime)
-        case "image/webp": return ("webp", mime)
-        case "image/gif": return ("gif", mime)
-        default: return nil
+            vm.uploadAvatar(bytes: selected.png, filename: "profile.png", mime: "image/png")
         }
     }
 
@@ -1277,6 +1277,7 @@ struct PrivacyView: View {
                 showDeletion = false
                 onDeleted()
             }
+            .grapMailSheetSurface()
         }
     }
 }
@@ -1337,7 +1338,7 @@ private struct DeleteAccountView: View {
                 URLCache.shared.removeAllCachedResponses()
                 onDeleted()
             } catch {
-                self.error = "Deletion was not confirmed. Check account status before retrying. " + error.localizedDescription
+                self.error = "Deletion was not confirmed. Check account status before retrying. " + apiMessage(error, fallback: "Try again in a moment.")
             }
         }
     }

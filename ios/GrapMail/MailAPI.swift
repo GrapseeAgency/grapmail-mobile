@@ -1235,6 +1235,7 @@ struct MailDraftRequest: Encodable {
     var cc: [String] = []
     var subject: String = ""
     var bodyText: String = ""
+    var bodyHtml: String? = nil
     var inReplyTo: String? = nil
     /// The draft row this save updates, when there is one. Absent on a first
     /// save (the route inserts), present on every autosave after it (the route
@@ -1363,6 +1364,16 @@ extension ApiClient {
         try await mailGet("/me", bearer: token)
     }
 
+    static func parkedAccountUnread(_ address: String) async -> Int? {
+        guard let token = SessionStore.unreadToken(for: address),
+              let url = URL(string: "\(base)\(mailBase)/stats") else { return nil }
+        var request = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 3)
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        guard let (data, response) = try? await URLSession.shared.data(for: request),
+              (response as? HTTPURLResponse)?.statusCode == 200 else { return nil }
+        return (try? decoder.decode(MailStatsResponse.self, from: data))?.inbox?.unread
+    }
+
     static func mailStats(_ token: String) async throws -> MailStatsResponse {
         try await mailGet("/stats", bearer: token)
     }
@@ -1395,6 +1406,16 @@ extension ApiClient {
 
     static func mailMessage(token: String, id: String) async throws -> MailMessageResponse {
         try await mailGet("/message/\(id.percentEncodedPath())?native=1", bearer: token)
+    }
+
+    static func notificationMessage(token: String, id: String) async throws -> (MailMessageFull, Data)? {
+        let (data, response) = try await mailBinary(
+            url: URL(string: "\(base)\(mailBase)/message/\(id.percentEncodedPath())/notification-preview"),
+            method: "GET", bearer: token, body: nil, contentType: nil)
+        guard (200..<300).contains(response.statusCode) else { throw mailFailure(data: data, http: response) }
+        guard let message = try decoder.decode(MailMessageResponse.self, from: data).message,
+              message.id == id else { return nil }
+        return (message, data)
     }
 
     static func mailThread(token: String, threadId: String, before: String? = nil) async throws -> MailThreadResponse {
@@ -1821,8 +1842,8 @@ struct MailScheduledMessage: Decodable, Identifiable {
 }
 
 struct MailScheduledResponse: Decodable {
-    let success: Bool?
-    let messages: [MailScheduledMessage]?
+    var success: Bool?
+    var messages: [MailScheduledMessage]?
 }
 
 extension ApiClient {

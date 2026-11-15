@@ -347,6 +347,57 @@ object MailStore {
      *  shape was designed to avoid. */
     suspend fun body(id: String): MailMessageFullDto? = mutex.withLock { bodies.get(id) }
 
+    private fun notificationDirectory(context: android.content.Context) =
+        java.io.File(context.noBackupFilesDir, "mail-notifications")
+
+    private fun notificationFile(context: android.content.Context, id: String, sessionId: String): java.io.File {
+        val digest = java.security.MessageDigest.getInstance("SHA-256")
+            .digest("$sessionId:$id".toByteArray())
+        return java.io.File(notificationDirectory(context), digest.joinToString("") { "%02x".format(it) })
+    }
+
+    suspend fun saveNotificationMessage(
+        context: android.content.Context, message: MailMessageFullDto, sessionId: String,
+    ) = kotlinx.coroutines.withContext(Dispatchers.IO) {
+        mutex.withLock {
+            if (!SessionStore.isCurrent(context, sessionId)) return@withLock
+            cacheBody(message)
+            val encoded = snapshotJson.encodeToString(MailMessageFullDto.serializer(), message).toByteArray()
+            if (encoded.size > 512 * 1024) return@withLock
+            runCatching {
+                val directory = notificationDirectory(context)
+                directory.mkdirs()
+                val file = android.util.AtomicFile(notificationFile(context, message.id, sessionId))
+                val stream = file.startWrite()
+                try {
+                    stream.write(encoded)
+                    file.finishWrite(stream)
+                } catch (error: java.io.IOException) {
+                    file.failWrite(stream)
+                    throw error
+                }
+                directory.listFiles()?.filter { it.isFile }?.sortedByDescending { it.lastModified() }
+                    ?.drop(12)?.forEach { it.delete() }
+            }.onFailure { android.util.Log.w("GrapMailNotify", "Preview cache write failed: ${it.javaClass.simpleName}") }
+        }
+    }
+
+    suspend fun notificationMessage(
+        context: android.content.Context, id: String, sessionId: String,
+    ): MailMessageFullDto? = kotlinx.coroutines.withContext(Dispatchers.IO) {
+        mutex.withLock {
+            if (!SessionStore.isCurrent(context, sessionId)) return@withLock null
+            val file = notificationFile(context, id, sessionId)
+            if (System.currentTimeMillis() - file.lastModified() > 7 * 24 * 60 * 60 * 1000L) return@withLock null
+            runCatching {
+                val bytes = android.util.AtomicFile(file).readFully()
+                if (bytes.size > 512 * 1024) return@withLock null
+                snapshotJson.decodeFromString(MailMessageFullDto.serializer(), bytes.decodeToString())
+                    .takeIf { it.id == id }?.also(::cacheBody)
+            }.getOrNull()
+        }
+    }
+
     suspend fun indexedAttachments(): List<IndexedAttachment> = mutex.withLock {
         attachmentsByMessage.values.flatten()
     }
@@ -422,10 +473,16 @@ object MailStore {
             ThreadPage(merged, nextCursor, hasMore)
         }
 
-    suspend fun forgetBody(id: String) = mutex.withLock {
-        bodies.remove(id)
-        attachmentsByMessage.remove(id)
-        Unit
+    suspend fun forgetBody(id: String) = kotlinx.coroutines.withContext(Dispatchers.IO) {
+        mutex.withLock {
+            bodies.remove(id)
+            attachmentsByMessage.remove(id)
+            appContext?.let { context ->
+                SessionStore.snapshot(context)?.let { session ->
+                    android.util.AtomicFile(notificationFile(context, id, session.id)).delete()
+                }
+            }
+        }
     }
 
     suspend fun forgetAttachment(attachmentId: String) = mutex.withLock {
@@ -540,7 +597,10 @@ object MailStore {
         // same cross-account leak the in-memory clear exists to prevent — the
         // first thing the next account on this device would see.
         appContext?.let {
-            try { java.io.File(it.filesDir, SNAPSHOT_FILE).delete() } catch (_: Exception) {}
+            try {
+                java.io.File(it.filesDir, SNAPSHOT_FILE).delete()
+                notificationDirectory(it).deleteRecursively()
+            } catch (_: Exception) {}
         }
     }
 }

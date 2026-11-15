@@ -123,6 +123,7 @@ class MainActivity : ComponentActivity() {
      * recomposition and open a composer nobody asked for.
      */
     private val composeRequest = androidx.compose.runtime.mutableStateOf(false)
+    private val notificationTarget = androidx.compose.runtime.mutableStateOf<com.grapsee.grapmail.logic.Notifications.MailTarget?>(null)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         // The system splash, before the window content exists at all. The
@@ -181,6 +182,8 @@ class MainActivity : ComponentActivity() {
                         GrapMailNav(
                             composeRequest = composeRequest.value,
                             onComposeRequestConsumed = { composeRequest.value = false },
+                            notificationTarget = notificationTarget.value,
+                            onNotificationConsumed = { notificationTarget.value = null },
                         )
                     }
                 }
@@ -199,6 +202,10 @@ class MainActivity : ComponentActivity() {
 
     private fun takeComposeRequest(intent: android.content.Intent?) {
         if (intent?.action == COMPOSE_ACTION) composeRequest.value = true
+        com.grapsee.grapmail.logic.Notifications.target(intent)?.let {
+            notificationTarget.value = it
+            intent?.action = null
+        }
     }
 
     companion object {
@@ -264,7 +271,7 @@ object Routes {
     // The ids ride the route the way the session ids do — encoded, then decoded
     // at the destination — so a thread opened from a list survives a recreate
     // with the conversation it was opened for.
-    const val MAIL_THREAD = "mail/thread/{id}/{thread}"
+    const val MAIL_THREAD = "mail/thread/{id}/{thread}?focus={focus}&more={more}"
     // Compose carries an optional reply target and mode: "mail/compose" opens
     // blank, "mail/compose?reply=<id>&mode=reply|all|forward" opens prepared.
     // The quote and the addressing are built from the FULL row at the
@@ -318,8 +325,9 @@ object Routes {
     const val E2E_REMOVE = "mail/encryption/remove"
     const val E2E_RECIPIENTS = "mail/encryption/recipients"
 
-    fun mailThread(id: String, isThread: Boolean) =
-        "mail/thread/${encode(id)}/${if (isThread) "1" else "0"}"
+    fun mailThread(id: String, isThread: Boolean, focus: String? = null, more: Boolean = false) =
+        "mail/thread/${encode(id)}/${if (isThread) "1" else "0"}" +
+            (focus?.let { "?focus=${encode(it)}&more=$more" } ?: "")
     fun mailContact(address: String) = "mail/contact/${encode(address)}"
     fun mailAttachment(id: String) = "mail/attachment/${encode(id)}"
 
@@ -345,6 +353,8 @@ object Routes {
 fun GrapMailNav(
     composeRequest: Boolean = false,
     onComposeRequestConsumed: () -> Unit = {},
+    notificationTarget: com.grapsee.grapmail.logic.Notifications.MailTarget? = null,
+    onNotificationConsumed: () -> Unit = {},
 ) {
     val nav = rememberNavController()
     // The runtime notification ask (Android 13+). Registered here, in the
@@ -357,7 +367,8 @@ fun GrapMailNav(
     val askNotifications =
         androidx.activity.compose.rememberLauncherForActivityResult(
             androidx.activity.result.contract.ActivityResultContracts.RequestPermission(),
-        ) {
+        ) { allowed ->
+            if (allowed) com.grapsee.grapmail.logic.PushSync.registerAsync(nav.context.applicationContext)
         }
     val vm: SignUpViewModel = viewModel()
     val flow: AccountFlowViewModel = viewModel()
@@ -407,12 +418,18 @@ fun GrapMailNav(
     fun signedIn(address: String) {
         com.grapsee.grapmail.logic.PushSync.registerAsync(nav.context.applicationContext)
         maybeAskNotifications()
+        val replacingAccount = runCatching { nav.getBackStackEntry(Routes.HOME) }.isSuccess
+        if (replacingAccount) {
+            e2e.clearForSignOut()
+            com.grapsee.grapmail.ui.screens.security.SecurityFlow.reset()
+        }
+        nav.navigate(Routes.HOME) {
+            if (replacingAccount) popUpTo(Routes.HOME) { inclusive = true }
+            else popUpTo(Routes.WELCOME)
+        }
         if (composeRequest) {
             onComposeRequestConsumed()
-            nav.navigate(Routes.HOME) { popUpTo(Routes.WELCOME) }
             nav.navigate(Routes.mailCompose("", "reply"))
-        } else {
-            nav.navigate(Routes.HOME) { popUpTo(Routes.WELCOME) }
         }
     }
 
@@ -422,7 +439,7 @@ fun GrapMailNav(
     // cache goes so the next account on this device never reads this one's
     // mail. The unregister is capped, so a slow server never delays the
     // sign-out itself — the navigation below runs regardless.
-    fun leaveSignedInState() {
+    fun leaveSignedInState(onCleared: (() -> Unit)? = null) {
         com.grapsee.grapmail.ui.screens.security.SecurityFlow.reset()
         e2e.clearForSignOut()
         scope.launch {
@@ -432,7 +449,23 @@ fun GrapMailNav(
                 com.grapsee.grapmail.logic.PushSync.unregister(context, session)
             }
             SessionStore.clearIfCurrent(context, session.id)
+            onCleared?.invoke()
         }
+    }
+
+    fun showRemainingAccount(context: android.content.Context, emptyDestination: String) {
+        scope.launch {
+            val next = SessionStore.snapshot(context)
+            if (next != null) com.grapsee.grapmail.logic.PushSync.registerAsync(context)
+            nav.navigate(if (next != null) Routes.HOME else emptyDestination) {
+                popUpTo(0) { inclusive = true }
+            }
+        }
+    }
+
+    fun signOutOfMailbox() {
+        val context = nav.context.applicationContext
+        leaveSignedInState { showRemainingAccount(context, Routes.WELCOME) }
     }
 
     // A stored session opens the app signed-in as soon as the encrypted local
@@ -487,6 +520,30 @@ fun GrapMailNav(
         }
     }
 
+    LaunchedEffect(notificationTarget, dest) {
+        val target = notificationTarget ?: return@LaunchedEffect
+        val context = nav.context.applicationContext
+        val session = SessionStore.snapshot(context)
+        if (session?.id != target.sessionId) {
+            val owner = SessionStore.snapshotAll(context).firstOrNull { it.id == target.sessionId }
+            if (owner == null || !SessionStore.switchTo(context, owner.address)) {
+                onNotificationConsumed()
+                return@LaunchedEffect
+            }
+            e2e.clearForSignOut()
+            SecurityFlow.reset()
+            nav.navigate(Routes.HOME) { popUpTo(Routes.HOME) { inclusive = true } }
+        }
+        when (target.action) {
+            "reply" -> nav.navigate(Routes.mailCompose(target.messageId, "reply")) { launchSingleTop = true }
+            "open", "more" -> nav.navigate(
+                Routes.mailThread(target.threadId ?: target.messageId, target.threadId != null,
+                    target.messageId, more = target.action == "more"),
+            ) { launchSingleTop = true }
+        }
+        onNotificationConsumed()
+    }
+
     // The device's feel of an action landing. The model publishes the result
     // (see `GMHaptics`) and it is played here, on the view Compose actually
     // owns, because `performHapticFeedback` needs one. The constants degrade
@@ -538,14 +595,16 @@ fun GrapMailNav(
             // The activity-scoped E2E view model outlives the nav graph: a
             // dead token must drop the unlocked private halves exactly like
             // a deliberate sign-out, or the next account inherits them.
-            if (SessionStore.clearIfToken(nav.context.applicationContext, rejectedToken)) {
+            val context = nav.context.applicationContext
+            if (SessionStore.snapshot(context)?.token == rejectedToken &&
+                SessionStore.clearIfToken(context, rejectedToken)) {
                 e2e.clearForSignOut()
                 SecurityFlow.reset()
                 // The bearer is dead, so the backend unregister has nothing to
                 // authenticate with; the local push record goes, and the next
                 // sign-in re-registers the same device token.
                 com.grapsee.grapmail.logic.PushSync.forget(nav.context.applicationContext)
-                nav.navigate(Routes.SIGN_IN) { popUpTo(0) { inclusive = true } }
+                showRemainingAccount(context, Routes.SIGN_IN)
             }
             // The flow replays its one pending signal to a fresh subscriber;
             // we have just acted on it, so take it out of the cache — the
@@ -1071,18 +1130,23 @@ fun GrapMailNav(
                 onScreener = { nav.navigate(Routes.MAIL_SCREENER) },
                 onSubscriptions = { nav.navigate(Routes.MAIL_SUBSCRIPTIONS) },
                 onScheduled = { nav.navigate(Routes.MAIL_SCHEDULED) },
-                onSignOut = {
-                    // The unlocked E2E halves drop HERE, visibly at the door,
-                    // not only inside the shared teardown: a sign-out that
-                    // leaves the key material reachable in memory is the
-                    // lifetime defect the §-pin counts at every door.
+                onAddAccount = { nav.navigate(Routes.SIGN_IN) },
+                onAccountSwitched = {
+                    com.grapsee.grapmail.ui.screens.security.SecurityFlow.reset()
                     e2e.clearForSignOut()
-                    leaveSignedInState()
-                    nav.navigate(Routes.WELCOME) { popUpTo(0) { inclusive = true } }
+                    nav.navigate(Routes.HOME) { popUpTo(Routes.HOME) { inclusive = true } }
                 },
+                onSignOut = ::signOutOfMailbox,
             )
         }
-        composable(Routes.MAIL_THREAD) { entry ->
+        composable(Routes.MAIL_THREAD, arguments = listOf(androidx.navigation.navArgument("focus") {
+            type = androidx.navigation.NavType.StringType
+            nullable = true
+            defaultValue = null
+        }, androidx.navigation.navArgument("more") {
+            type = androidx.navigation.NavType.BoolType
+            defaultValue = false
+        })) { entry ->
             val mail: MailboxViewModel = signedInViewModel(nav, entry)
             val id = entry.arguments?.getString("id")?.let(android.net.Uri::decode) ?: ""
             // A row that has no thread id is opened through the message route;
@@ -1094,6 +1158,8 @@ fun GrapMailNav(
                 e2e = e2e,
                 threadId = id,
                 isThread = isThread,
+                initialMessageId = entry.arguments?.getString("focus"),
+                openMessageActions = entry.arguments?.getBoolean("more") == true,
                 onBack = { nav.popBackStack() },
                 onContacts = { nav.navigate(Routes.MAIL_CONTACTS) },
                 onReply = { m, mode -> nav.navigate(Routes.mailCompose(m.id, mode)) },
@@ -1192,12 +1258,7 @@ fun GrapMailNav(
                 onPrivacy = { nav.navigate(Routes.ACCOUNT_PRIVACY) },
                 onEncryption = { nav.navigate(Routes.E2E_STATUS) },
                 onHelp = { nav.navigate(Routes.MAIL_SUPPORT) },
-                onSignOut = {
-                    // Same visible-at-the-door drop as the drawer's sign-out.
-                    e2e.clearForSignOut()
-                    leaveSignedInState()
-                    nav.navigate(Routes.WELCOME) { popUpTo(0) { inclusive = true } }
-                },
+                onSignOut = ::signOutOfMailbox,
             )
         }
         composable(Routes.MAIL_NOTES) { entry ->

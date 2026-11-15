@@ -755,6 +755,7 @@ private fun liveHomeFrame(vm: MailboxViewModel) {
         onSubscriptions = {},
         onScheduled = {},
         onSignOut = {},
+        onAddAccount = {},
     )
 }
 
@@ -780,6 +781,8 @@ private fun listFrame(
             MailTopBar(
                 onMenu = {}, onProfile = {}, accountName = "Amira Rahman",
                 accountAddress = "amira@grapmail.com", onSettings = {}, onSignOut = {},
+                loadUnreads = { emptyMap() },
+                onSwitchAccount = {}, onAddAccount = {},
             ) {
                 SearchField(query = "", onQuery = {}, onFilter = {}, filterActive = false,
                     onAdvanced = {}, advActive = false)

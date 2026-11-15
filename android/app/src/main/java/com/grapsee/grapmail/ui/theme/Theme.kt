@@ -1,6 +1,9 @@
 package com.grapsee.grapmail.ui.theme
 
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.darkColorScheme
+import androidx.compose.material3.lightColorScheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Typography
 import androidx.compose.runtime.Composable
@@ -9,6 +12,7 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
 // Type scale from DESIGN_TOKENS.md. Platform sans (Roboto) is the
@@ -106,11 +110,31 @@ fun GrapMailTheme(content: @Composable () -> Unit) {
     )
     CompositionLocalProvider(LocalPalette provides palette) {
         MaterialTheme(
-            colorScheme = MaterialTheme.colorScheme.copy(
-                primary = base.primarySolid,
+            colorScheme = (if (dark) darkColorScheme() else lightColorScheme()).copy(
+                primary = palette.primarySolid,
+                onPrimary = palette.onPrimary,
+                primaryContainer = palette.infoFill,
+                onPrimaryContainer = palette.textPrimary,
+                secondary = palette.textSecondary,
+                secondaryContainer = palette.softFill,
+                onSecondaryContainer = palette.textPrimary,
                 background = palette.bg,
+                onBackground = palette.textPrimary,
                 surface = palette.card,
+                surfaceTint = Color.Transparent,
+                onSurface = palette.textPrimary,
+                surfaceVariant = palette.softFill,
+                onSurfaceVariant = palette.textSecondary,
+                surfaceContainerLowest = palette.bg,
+                surfaceContainerLow = palette.cardAlt,
+                surfaceContainer = palette.card,
+                surfaceContainerHigh = palette.cardAlt,
+                surfaceContainerHighest = palette.softFill,
+                outline = palette.border,
+                outlineVariant = palette.borderSoft,
+                error = palette.error,
             ),
+            shapes = MaterialTheme.shapes.copy(extraSmall = RoundedCornerShape(13.dp)),
             typography = GrapMailTypography,
             content = content,
         )

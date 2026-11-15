@@ -1,3 +1,4 @@
+import CryptoKit
 import Foundation
 
 /// The mailbox's process-lifetime cache: the last page of each box, the last
@@ -384,6 +385,52 @@ actor MailStore {
         return bodies.object(forKey: id as NSString)?.message
     }
 
+    private static var notificationDirectory: URL? {
+        FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first?
+            .appendingPathComponent("grapmail-notifications", isDirectory: true)
+    }
+
+    private static func notificationURL(_ id: String) -> URL? {
+        guard let session = SessionStore.notificationSession, let directory = notificationDirectory else { return nil }
+        let digest = SHA256.hash(data: Data("\(session):\(id)".utf8))
+        return directory.appendingPathComponent(digest.map { String(format: "%02x", $0) }.joined())
+    }
+
+    func saveNotificationMessage(_ message: MailMessageFull, payload: Data, generation: UUID) {
+        ensureSession()
+        guard generation == cacheGeneration else { return }
+        putBody(message, generation: generation)
+        guard payload.count <= 512 * 1024, let url = Self.notificationURL(message.id),
+              let directory = Self.notificationDirectory else { return }
+        do {
+            let files = FileManager.default
+            try files.createDirectory(at: directory, withIntermediateDirectories: true)
+            try payload.write(to: url, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
+            let contents = try files.contentsOfDirectory(at: directory, includingPropertiesForKeys: [.contentModificationDateKey])
+            let byDate = contents.map { file in
+                let date = (try? file.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate
+                return (file, date ?? .distantPast)
+            }.sorted { $0.1 > $1.1 }
+            for (file, _) in byDate.dropFirst(12) { try? files.removeItem(at: file) }
+        } catch {
+            // Storage pressure or device protection can leave only the memory copy.
+        }
+    }
+
+    func notificationMessage(_ id: String) -> MailMessageFull? {
+        ensureSession()
+        if let message = body(id) { return message }
+        guard let url = Self.notificationURL(id),
+              let values = try? url.resourceValues(forKeys: [.fileSizeKey, .contentModificationDateKey]),
+              let size = values.fileSize, size <= 512 * 1024,
+              let modified = values.contentModificationDate, Date().timeIntervalSince(modified) < 7 * 24 * 60 * 60,
+              let data = try? Data(contentsOf: url),
+              let message = (try? JSONDecoder().decode(MailMessageResponse.self, from: data))?.message,
+              message.id == id else { return nil }
+        putBody(message)
+        return message
+    }
+
     func putBody(_ message: MailMessageFull, generation: UUID? = nil) {
         ensureSession()
         if let generation, generation != cacheGeneration { return }
@@ -459,6 +506,7 @@ actor MailStore {
         ensureSession()
         if let generation, generation != cacheGeneration { return }
         bodies.removeObject(forKey: id as NSString)
+        if let url = Self.notificationURL(id) { try? FileManager.default.removeItem(at: url) }
         attachmentsByMessage[id] = nil
     }
 
@@ -546,6 +594,7 @@ actor MailStore {
         snapshotWriteTask = nil
         snapshotRevision &+= 1
         if let url = Self.snapshotURL { try? FileManager.default.removeItem(at: url) }
+        if let url = Self.notificationDirectory { try? FileManager.default.removeItem(at: url) }
         pages = [:]
         statsValue = nil
         labelsValue = nil

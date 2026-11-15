@@ -24,6 +24,9 @@ struct ThreadView: View {
     let onStepPrev: (MailStep) -> Void
     let onStepNext: (MailStep) -> Void
     let onContacts: () -> Void
+    var initialMessageId: String? = nil
+    var openMessageActions = false
+    @State private var showNotificationActions = false
     @Environment(\.scenePhase) private var scenePhase
     /// Per-attachment, not global: a download result belongs to the row that
     /// asked for it, and a shared variable would let a later failure overwrite an
@@ -32,12 +35,13 @@ struct ThreadView: View {
     @State private var downloading: Set<String> = []
     @State private var isVisible = false
     @State private var expandedMessageId: String?
+    @State private var didFocus = false
     @State private var pendingAction = false
     @State private var filed: [String: MailAction] = [:]
     @State private var feedback: [String: (text: String, error: Bool)] = [:]
 
     private var activeMessage: MailMessageFull? {
-        vm.thread.messages.first { $0.id == expandedMessageId } ?? vm.thread.messages.last
+        vm.thread.messages.first { $0.id == (expandedMessageId ?? initialMessageId) } ?? vm.thread.messages.last
     }
 
     var body: some View {
@@ -45,43 +49,53 @@ struct ThreadView: View {
             header
             if vm.thread.loading && vm.thread.messages.isEmpty {
                 CenteredState(title: "Opening this conversation…")
-            } else if let error = vm.thread.error, vm.thread.messages.isEmpty {
-                failedBody(error)
+            } else if vm.thread.error != nil, vm.thread.messages.isEmpty {
+                failedBody
             } else {
-                ScrollView {
-                    LazyVStack(spacing: 8) {
-                        subjectHeader
-                        if isThread && (vm.thread.hasMore || vm.thread.loadingEarlier) {
-                            ReaderOutlineButton(
-                                vm.thread.loadingEarlier ? "Loading earlier messages…" : "Load earlier messages",
-                                identifier: "mail-thread-load-earlier",
-                                action: { vm.loadEarlierThread(id) }
-                            )
-                            .disabled(vm.thread.loadingEarlier)
-                        }
-                        ForEach(vm.thread.messages) { message in
-                            ThreadMessageCard(
-                                vm: vm,
-                                message: message,
-                                e2e: e2e,
-                                expanded: activeMessage?.id == message.id,
-                                onExpand: { expandedMessageId = message.id },
-                                downloading: downloading,
-                                notices: notices,
-                                onReply: { mode in onReply(message.id, mode) },
-                                onDownload: { attachment in
-                                    downloading.insert(attachment.id)
-                                    vm.downloadAttachment(attachment) { outcome in
-                                        downloading.remove(attachment.id)
-                                        notices[attachment.id] = outcome
+                ScrollViewReader { scroll in
+                    ScrollView {
+                        LazyVStack(spacing: 8) {
+                            subjectHeader
+                            if isThread && (vm.thread.hasMore || vm.thread.loadingEarlier) {
+                                ReaderOutlineButton(
+                                    vm.thread.loadingEarlier ? "Loading earlier messages…" : "Load earlier messages",
+                                    identifier: "mail-thread-load-earlier",
+                                    action: { vm.loadEarlierThread(id) }
+                                )
+                                .disabled(vm.thread.loadingEarlier)
+                            }
+                            ForEach(vm.thread.messages) { message in
+                                ThreadMessageCard(
+                                    vm: vm,
+                                    message: message,
+                                    e2e: e2e,
+                                    expanded: activeMessage?.id == message.id,
+                                    onExpand: { expandedMessageId = message.id },
+                                    downloading: downloading,
+                                    notices: notices,
+                                    onReply: { mode in onReply(message.id, mode) },
+                                    onDownload: { attachment in
+                                        downloading.insert(attachment.id)
+                                        vm.downloadAttachment(attachment) { outcome in
+                                            downloading.remove(attachment.id)
+                                            notices[attachment.id] = outcome
+                                        }
                                     }
-                                }
-                            )
+                                )
+                            }
                         }
+                        .padding(.horizontal, 12)
+                        .padding(.top, 8)
+                        .padding(.bottom, 16)
                     }
-                    .padding(.horizontal, 12)
-                    .padding(.top, 8)
-                    .padding(.bottom, 16)
+                    .task(id: vm.thread.messages.contains { $0.id == initialMessageId }) {
+                        guard let initialMessageId, !didFocus,
+                              vm.thread.messages.contains(where: { $0.id == initialMessageId }) else { return }
+                        expandedMessageId = initialMessageId
+                        scroll.scrollTo(initialMessageId, anchor: .top)
+                        didFocus = true
+                        if openMessageActions { showNotificationActions = true }
+                    }
                 }
                 if let activeMessage {
                     if let outcome = feedback[activeMessage.id] {
@@ -99,9 +113,15 @@ struct ThreadView: View {
             }
         }
         .background(GM.bg.ignoresSafeArea())
+        .confirmationDialog("Message actions", isPresented: $showNotificationActions, presenting: activeMessage) { message in
+            Button("Reply all") { onReply(message.id, "all") }
+            Button("Forward") { onReply(message.id, "forward") }
+            Button("Archive") { file(message, action: .archive, success: "Message archived.") }
+            Button("Move to Trash", role: .destructive) { file(message, action: .trash, success: "Message moved to Trash.") }
+        }
         .task(id: MailStep(id: id, isThread: isThread)) {
             expandedMessageId = nil
-            isThread ? vm.openThread(id) : vm.openMessage(id)
+            isThread ? vm.openThread(id, focusedID: initialMessageId) : vm.openMessage(id)
         }
         .onAppear { isVisible = true }
         .onReceive(NotificationCenter.default.publisher(for: MailPoll.didReadStats)) { notification in
@@ -237,14 +257,14 @@ struct ThreadView: View {
         }
     }
 
-    private func failedBody(_ error: String) -> some View {
+    private var failedBody: some View {
         VStack(spacing: 8) {
             Text("This conversation could not be opened.")
                 .font(.system(size: 17, weight: .semibold))
                 .foregroundColor(GM.textPrimary)
-            Text(error).font(.system(size: 14)).foregroundColor(GM.textSecondary)
+            Text("Check your connection and try again.").font(.system(size: 14)).foregroundColor(GM.textSecondary)
             GradientButton(title: "Try again",
-                           action: { isThread ? vm.openThread(id) : vm.openMessage(id) })
+                           action: { isThread ? vm.openThread(id, focusedID: initialMessageId) : vm.openMessage(id) })
                 .padding(.top, 8)
         }
         .padding(32)
@@ -343,8 +363,8 @@ private struct ThreadMessageCard: View {
                 if showDetails { recipientDetails }
                 bodyView
                 attachmentRows
-                if let detailsError {
-                    Text(detailsError).font(.system(size: 12)).foregroundColor(GM.textSecondary)
+                if detailsError != nil {
+                    Text("Couldn’t load message details.").font(.system(size: 12)).foregroundColor(GM.textSecondary)
                     Button("Retry") { detailsAttempt += 1 }
                 }
                 if let unsubNote {
@@ -600,24 +620,20 @@ private struct ThreadMessageCard: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .accessibilityIdentifier("mail-body")
         } else {
-            if let failure = formattedBody?.error {
-                HStack {
-                    Text("Formatting unavailable. \(failure)").font(.system(size: 12)).foregroundColor(GM.textSecondary)
-                    Spacer()
-                    Button("Retry") { renderAttempt += 1 }
-                        .disabled(renderLoading)
-                }
-            } else {
-                ProgressView().frame(maxWidth: .infinity)
-                    .accessibilityLabel("Loading formatted message")
-            }
-            if let text = formattedBody?.bodyText?.nilIfBlank() ?? message.bodyText?.nilIfBlank() {
+            let text = message.bodyText?.nilIfBlank() ?? formattedBody?.bodyText?.nilIfBlank()
+            if let text {
                 Text(text)
                     .font(.system(size: 15))
                     .foregroundColor(GM.textPrimary)
                     .lineSpacing(4)
                     .textSelection(.enabled)
                     .fixedSize(horizontal: false, vertical: true)
+            } else if formattedBody?.error != nil {
+                Text("Couldn’t display this message.").font(.system(size: 13)).foregroundColor(GM.textSecondary)
+                Button("Retry") { renderAttempt += 1 }.disabled(renderLoading)
+            } else {
+                ProgressView().frame(maxWidth: .infinity)
+                    .accessibilityLabel("Loading message")
             }
         }
     }
@@ -824,6 +840,7 @@ struct ComposeView: View {
     let mode: String
     let onBack: () -> Void
     var initialRecipient = ""
+    @State private var showFormatting = false
     @State private var attached: [MailAttachment] = []
     @State private var notice: String?
     @State private var showCc = false
@@ -850,56 +867,69 @@ struct ComposeView: View {
         // dead-zone layout the design audit set out to remove.
         VStack(spacing: 0) {
             header
-            VStack(alignment: .leading, spacing: 0) {
-                fields
-                suggestions
-                // GeometryReader, not the editor's own maxHeight: .infinity.
-                // The infinity proposal is greedy -- a VStack handed it also
-                // PROPOSED the leftover to its siblings, and frame 76's
-                // re-photograph showed the Send button grown to a 700pt blue
-                // block. Inside the reader the editor gets an exact height
-                // and everyone else keeps their own.
-                GeometryReader { g in
-                    bodyEditor.frame(height: max(240, g.size.height))
+            if waitingForDraft {
+                VStack(alignment: .leading, spacing: 10) {
+                    if let error = vm.compose.error {
+                        Text(error).foregroundStyle(GM.textPrimary)
+                        Button("Try again") { vm.prepareReply(id: replyId, mode: mode, signature: signature) }
+                    } else {
+                        ProgressView("Opening draft…")
+                    }
                 }
-            }
-            .padding(.horizontal, 16)
-            .frame(maxWidth: .infinity)
-            if let notice {
-                ScrollView(.vertical, showsIndicators: false) {
-                    Text(notice)
-                        .font(.system(size: 13)).foregroundColor(GM.textSecondary)
-                        .frame(maxWidth: .infinity, alignment: .leading)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                .padding(16)
+            } else {
+                VStack(alignment: .leading, spacing: 0) {
+                    fields
+                    suggestions
+                    // GeometryReader, not the editor's own maxHeight: .infinity.
+                    // The infinity proposal is greedy -- a VStack handed it also
+                    // PROPOSED the leftover to its siblings, and frame 76's
+                    // re-photograph showed the Send button grown to a 700pt blue
+                    // block. Inside the reader the editor gets an exact height
+                    // and everyone else keeps their own.
+                    GeometryReader { g in
+                        bodyEditor.frame(height: max(240, g.size.height))
+                    }
                 }
-                .frame(maxHeight: 60)
-                .padding(.top, 10)
-            }
-            if let status = vm.compose.resultStatus {
-                SendReceipt(status: status,
-                            detail: vm.compose.result,
-                            error: vm.compose.error)
-                    .padding(.top, 12)
-                    .padding(.horizontal, 16)
-            } else if let error = vm.compose.error {
-                Text(error).font(.system(size: 13)).foregroundColor(GM.error)
-                    .padding(.top, 12)
-                    .padding(.horizontal, 16)
-            } else if vm.compose.autosaving {
-                // The autosave's own quiet line, deliberately NOT the receipt:
-                // a background save is not an event the person acted on, so it
-                // draws smaller and duller than anything the buttons produce,
-                // and it yields to the receipt entirely when one exists.
-                Text("Saving draft…")
-                    .font(.system(size: 11)).foregroundColor(GM.textTertiary)
+                .padding(.horizontal, 16)
+                .frame(maxWidth: .infinity)
+                if let notice {
+                    ScrollView(.vertical, showsIndicators: false) {
+                        Text(notice)
+                            .font(.system(size: 13)).foregroundColor(GM.textSecondary)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    .frame(maxHeight: 60)
                     .padding(.top, 10)
-                    .padding(.horizontal, 16)
-            } else if let note = vm.compose.autosaveNote {
-                Text(note)
-                    .font(.system(size: 11)).foregroundColor(GM.textTertiary)
-                    .padding(.top, 10)
-                    .padding(.horizontal, 16)
+                }
+                if let status = vm.compose.resultStatus {
+                    SendReceipt(status: status,
+                                detail: vm.compose.result,
+                                error: vm.compose.error)
+                        .padding(.top, 12)
+                        .padding(.horizontal, 16)
+                } else if let error = vm.compose.error {
+                    Text(error).font(.system(size: 13)).foregroundColor(GM.error)
+                        .padding(.top, 12)
+                        .padding(.horizontal, 16)
+                } else if vm.compose.autosaving {
+                    // The autosave's own quiet line, deliberately NOT the receipt:
+                    // a background save is not an event the person acted on, so it
+                    // draws smaller and duller than anything the buttons produce,
+                    // and it yields to the receipt entirely when one exists.
+                    Text("Saving draft…")
+                        .font(.system(size: 11)).foregroundColor(GM.textTertiary)
+                        .padding(.top, 10)
+                        .padding(.horizontal, 16)
+                } else if let note = vm.compose.autosaveNote {
+                    Text(note)
+                        .font(.system(size: 11)).foregroundColor(GM.textTertiary)
+                        .padding(.top, 10)
+                        .padding(.horizontal, 16)
+                }
+                actions
             }
-            actions
         }
         .frame(maxHeight: .infinity, alignment: .top)
         .background(GM.bg)
@@ -942,7 +972,7 @@ struct ComposeView: View {
             Button {
                 guard !vm.compose.sending, !preparingSend, !uploading else { return }
                 let draft = vm.compose
-                if !draft.accepted && (!attached.isEmpty || [draft.to, draft.cc, draft.subject, draft.body].contains(where: { $0.nilIfBlank() != nil })) {
+                if !waitingForDraft && !draft.accepted && (!attached.isEmpty || [draft.to, draft.cc, draft.subject, draft.body].contains(where: { $0.nilIfBlank() != nil })) {
                     saveDraft(onSaved: onBack)
                 } else {
                     onBack()
@@ -1041,8 +1071,7 @@ struct ComposeView: View {
                     .font(.system(size: 12)).foregroundColor(GM.textTertiary)
                     .fixedSize(horizontal: false, vertical: true)
             } else if encryptOn {
-                Text("Only the recipients' published keys can open this. The server will "
-                     + "store a notice, not your text.")
+                Text("Only the recipients can open this message. Encrypted messages are sent as plain text.")
                     .font(.system(size: 12)).foregroundColor(GM.textTertiary)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -1096,22 +1125,39 @@ struct ComposeView: View {
 
     private var bodyEditor: some View {
         VStack(alignment: .leading, spacing: 6) {
-            TextEditor(text: Binding(
-                get: { vm.compose.body },
-                set: { value in vm.composeUpdate { $0.body = value } }))
-                .font(.system(size: 15))
-                .foregroundColor(GM.textPrimary)
-                .scrollContentBackground(.hidden)
-                // The floor only: the GeometryReader above hands this editor
-                // its exact grown height, so it never proposes infinity to
-                // the stack and inflate a sibling.
+            let formatting = showFormatting || vm.compose.bodyHtml != nil
+            Button(formatting ? "Switch to plain text" : "Format message") {
+                showFormatting = !formatting
+                if formatting { vm.composeUpdate { $0.bodyHtml = nil } }
+            }
+            .font(.system(size: 13, weight: .medium))
+            if formatting {
+                ComposeFormattingEditor(text: vm.compose.body, html: vm.compose.bodyHtml) { text, html in
+                    vm.composeUpdate {
+                        $0.body = text
+                        $0.bodyHtml = html
+                    }
+                }
                 .frame(minHeight: 240)
-                // The identifier names the signed state, not the field: frame
-                // 76's settled marker must flip when the signature lands, the
-                // same mechanism as Android's `gm-signed-body` testTag.
-                .accessibilityIdentifier(
-                    !signature.isEmpty && vm.compose.body.contains(signature)
-                        ? "gm-signed-body" : "mail-body-field")
+                .accessibilityIdentifier("mail-body-field")
+            } else {
+                TextEditor(text: Binding(
+                    get: { vm.compose.body },
+                    set: { value in vm.composeUpdate { $0.body = value } }))
+                    .font(.system(size: 15))
+                    .foregroundColor(GM.textPrimary)
+                    .scrollContentBackground(.hidden)
+                    // The floor only: the GeometryReader above hands this editor
+                    // its exact grown height, so it never proposes infinity to
+                    // the stack and inflate a sibling.
+                    .frame(minHeight: 240)
+                    // The identifier names the signed state, not the field: frame
+                    // 76's settled marker must flip when the signature lands, the
+                    // same mechanism as Android's `gm-signed-body` testTag.
+                    .accessibilityIdentifier(
+                        !signature.isEmpty && vm.compose.body.contains(signature)
+                            ? "gm-signed-body" : "mail-body-field")
+            }
             if !attached.isEmpty {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 8) {
@@ -1169,8 +1215,12 @@ struct ComposeView: View {
     /// key, or no answer at all stops the send with a sentence — an encrypted
     /// message half built is the failure mode this gate exists to stop.
     /// Mirror of Android's compose send-icon logic.
+    private var waitingForDraft: Bool {
+        mode == "draft" && !vm.compose.accepted && vm.compose.draftId != replyId
+    }
+
     private var sendEnabled: Bool {
-        !vm.compose.sending && !vm.compose.accepted && !vm.compose.pendingSend && !preparingSend && !uploading
+        !waitingForDraft && !vm.compose.sending && !vm.compose.accepted && !vm.compose.pendingSend && !preparingSend && !uploading
     }
 
     private func saveDraft(onSaved: @escaping () -> Void = {}) {
@@ -1236,7 +1286,7 @@ struct ComposeView: View {
 
     private func pick(_ result: Result<[URL], Error>) {
         guard case let .success(urls) = result, let url = urls.first else {
-            if case let .failure(e) = result { notice = e.localizedDescription }
+            if case let .failure(e) = result { notice = apiMessage(e, fallback: "Could not complete the message action. Try again.") }
             return
         }
         guard sendEnabled else { return }
@@ -1367,6 +1417,7 @@ struct UnsubscribeSheet: View {
         }
         .padding(.bottom, 24)
         .accessibilityIdentifier("gm-sheets-unsub")
+        .grapMailSheetSurface()
     }
 }
 
@@ -1414,7 +1465,7 @@ struct SendReceipt: View {
         case "queued": return "Queued for delivery"
         case "failed": return "Not delivered"
         case "draft": return "Saved to Drafts"
-        default: return "Server reported: \(status)"
+        default: return "Delivery could not be confirmed"
         }
     }
 

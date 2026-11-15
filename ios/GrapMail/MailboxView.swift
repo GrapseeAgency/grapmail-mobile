@@ -11,6 +11,8 @@ import Combine
 /// `GET /grapmail/labels`. The bottom bar carries no Calendar tab for the same
 /// reason. Each omission is recorded with its proof in the README.
 struct MailboxView: View {
+    @Environment(\.displayScale) private var displayScale
+
     /// Owned by `RootView`, not by this screen: the thread, compose and the
     /// secondary screens are separate destinations on the stack and must show
     /// the same mailbox the list is showing. A model per screen would mean a
@@ -39,6 +41,8 @@ struct MailboxView: View {
     let onContacts: () -> Void
     let onFiles: () -> Void
     let onSignOut: () -> Void
+    var onAddAccount: () -> Void = {}
+    var onSwitchAccount: (String) -> Void = { _ in }
 
     @Environment(\.scenePhase) private var scenePhase
     @State private var isAtTop = true
@@ -90,7 +94,7 @@ struct MailboxView: View {
         // indicator: the rows rendered, reported a frame, and could not be hit —
         // and a bottom bar drawn under the indicator is a defect for a person,
         // not only for the test. The background may still bleed past it.
-        .sheet(item: $sheet) { which in sheetContent(which) }
+        .sheet(item: $sheet) { which in sheetContent(which).grapMailSheetSurface() }
         .onAppear {
             if searchDraft != vm.state.query { searchDraft = vm.state.query }
         }
@@ -194,6 +198,8 @@ struct MailboxView: View {
                 onProfile: onProfile,
                 onSettings: onSettings,
                 onSignOut: onSignOut,
+                onAddAccount: onAddAccount,
+                onSwitchAccount: onSwitchAccount,
                 search: { searchField }
             )
         }
@@ -336,37 +342,42 @@ struct MailboxView: View {
     }
 
     @ViewBuilder
-    private func rowView(for row: MailMessage, prefetchIDs: Set<String>) -> some View {
-        MessageRow(
-            message: row,
-            selecting: !vm.state.selection.isEmpty,
-            selected: vm.state.selection.contains(row.id),
-            onSelect: { vm.toggleSelect(row.id) },
-            onOpen: {
-                if vm.state.box == .drafts { onDraft(row.id) }
-                else { onThread(row.threadId ?? row.id, row.threadId != nil) }
-            },
-            onStar: { vm.actOn(row.id, row.isStarred ? .unstar : .star) }
-        )
-        .equatable()
+    private func rowView(for row: MailMessage, prefetchIDs: Set<String>, showDivider: Bool) -> some View {
+        let box = vm.state.box
+        let canSwipe = vm.state.selection.isEmpty
+        let recovering = box == .trash || box == .spam
+        let right = canSwipe && box != .archive
+            ? MailSwipeAction(title: recovering ? "Back to Inbox" : "Archive", restoresToInbox: recovering) {
+                vm.actOn(row.id, recovering ? .restore : .archive)
+            } : nil
+        let left = canSwipe && !recovering
+            ? MailSwipeAction(title: "Trash") { vm.actOn(row.id, .trash) } : nil
+        MailSwipeRow(right: right, left: left) {
+            MessageRow(
+                message: row,
+                selecting: !vm.state.selection.isEmpty,
+                selected: vm.state.selection.contains(row.id),
+                onSelect: { vm.toggleSelect(row.id) },
+                onOpen: {
+                    if vm.state.box == .drafts { onDraft(row.id) }
+                    else { onThread(row.threadId ?? row.id, row.threadId != nil) }
+                },
+                onStar: { vm.actOn(row.id, row.isStarred ? .unstar : .star) }
+            )
+            .equatable()
+        }
+        .overlay(alignment: .bottom) {
+            if showDivider {
+                Rectangle()
+                    .fill(GM.border)
+                    .frame(height: 1 / displayScale)
+                    .allowsHitTesting(false)
+                    .accessibilityHidden(true)
+            }
+        }
         .listRowInsets(EdgeInsets())
         .listRowBackground(Color.clear)
         .listRowSeparator(.hidden)
-        .swipeActions(edge: .leading, allowsFullSwipe: true) {
-            if vm.state.box == .trash || vm.state.box == .spam {
-                Button("Back to Inbox") { vm.actOn(row.id, .restore) }
-                    .tint(GM.swipeArchive)
-            } else if vm.state.box != .archive {
-                Button("Archive") { vm.actOn(row.id, .archive) }
-                    .tint(GM.swipeArchive)
-            }
-        }
-        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-            if vm.state.box != .trash && vm.state.box != .spam {
-                Button("Trash") { vm.actOn(row.id, .trash) }
-                    .tint(GM.swipeTrash)
-            }
-        }
         .onAppear {
             if vm.state.rows.first?.id == row.id { isAtTop = true }
         }
@@ -407,9 +418,10 @@ struct MailboxView: View {
     /// the only corners on screen are the container's.
     @ViewBuilder private var messageList: some View {
         let prefetchIDs = Set(vm.state.rows.suffix(4).map(\.id))
+        let lastID = vm.state.rows.last?.id
         let list = List {
             ForEach(vm.state.rows) { row in
-                rowView(for: row, prefetchIDs: prefetchIDs)
+                rowView(for: row, prefetchIDs: prefetchIDs, showDivider: row.id != lastID)
             }
             listFooter
             Color.clear

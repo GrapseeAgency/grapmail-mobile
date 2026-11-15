@@ -262,16 +262,16 @@ for name, src in (("Android compose", KT_COMPOSE), ("iOS reader", SW_READER)):
         not COLLAPSED.search(src))
 
 # An unknown status must stay unknown rather than default to the good word.
-pin("Android prints an unrecognised status verbatim",
-    re.search(r'else\s*->\s*"Server reported', code_only(KT_COMPOSE)) is not None)
+pin("Android shows a neutral message for an unrecognised status",
+    re.search(r'else\s*->\s*"Delivery could not be confirmed', code_only(KT_COMPOSE)) is not None)
 # Anchored on the arm itself and run through `code_only`. The first version of
 # this pin was `re.search(r"(default|otherwise).*Server reported", re.S)`, which
 # matched the word "otherwise" in a doc comment 640 lines above the `default:`
 # arm — so deleting the arm that was being pinned left the gate green. That is
 # the same failure class the label read was: a check that cannot fail is worse
 # than no check, because it reports a covered surface.
-pin("iOS prints an unrecognised status verbatim",
-    re.search(r'default:\s*return\s*"Server reported', code_only(SW_READER)) is not None)
+pin("iOS shows a neutral message for an unrecognised status",
+    re.search(r'default:\s*return\s*"Delivery could not be confirmed', code_only(SW_READER)) is not None)
 
 # ── 1b. the receipt frame photographs the live renderer, not a copy of it ────
 #
@@ -300,7 +300,7 @@ pin("iOS's live receipt is visible to the snapshot host",
     re.search(r"^struct SendReceipt: View", SW_READER, re.M) is not None)
 
 for label, src in (("Android", KT_SNAP), ("iOS", SW_SNAP)):
-    for word in ("Queued for delivery", "Not delivered", "Server reported"):
+    for word in ("Queued for delivery", "Not delivered", "Delivery could not be confirmed"):
         pin(f"{label}'s host does not re-say the receipt wording ({word!r})",
             word not in src)
 
@@ -409,31 +409,23 @@ pin("iOS's bulk `actOn` cannot reach permanent deletion",
 # set of things it can do is the safety boundary. Archive, trash and restore all
 # undo; DELETE does not, and must not be reachable from a row gesture on either
 # platform however convenient that would look.
-KT_SWIPE = body_of(KT_BOX, "private fun SwipeableMessageRow")
-pin("Android's swipe component cannot reach permanent deletion",
-    "mailDeletePermanent" not in KT_SWIPE and "deletePermanently" not in KT_SWIPE)
+KT_SWIPE = android("ui/screens/mail/MailSwipeRow.kt")
+SW_SWIPE = ios("MailSwipeRow.swift")
+kt_wiring = KT_BOX.split("SwipeableMessageRow(", 1)[-1].split("MessageRow(", 1)[0]
+sw_wiring = body_of(ios("MailboxView.swift"), "private func rowView(")
+for platform, component, wiring in [
+    ("Android", KT_SWIPE, kt_wiring),
+    ("iOS", SW_SWIPE, sw_wiring),
+]:
+    pin(f"{platform}'s swipe actions cannot reach permanent deletion",
+        bool(component and wiring) and "deletePermanently" not in component + wiring
+        and "mailDeletePermanent" not in component + wiring)
 
-# The span has to cover BOTH swipeActions blocks. Bounding it at the first
-# closing brace at that indent — the obvious way to write it — stops after the
-# leading block, so the trailing "Trash" button, which is exactly where a
-# destructive edit would land, was outside what got checked. Caught by mutating
-# the Trash button to call deletePermanently and watching the gate stay green.
-SW_SWIPES = ios("MailboxView.swift")
-_start = SW_SWIPES.find("swipeActions(edge: .leading")
-_end = SW_SWIPES.find("onAppear", _start)
-swipe_span = SW_SWIPES[_start:_end] if _start != -1 and _end > _start else ""
-pin("iOS's swipe region was located (both blocks, not just the first)",
-    "swipeActions(edge: .trailing" in swipe_span)
-pin("iOS's swipe actions cannot reach permanent deletion",
-    bool(swipe_span) and "deletePermanently" not in swipe_span
-    and "mailDeletePermanent" not in swipe_span)
-# Both directions must be conditional: a swipe that fires in a box where the
-# action cannot change anything is a gesture wired to a no-op.
-pin("Android gates each swipe direction on the box", "leadingTo != null" in KT_SWIPE
-    and "trailingTo != null" in KT_SWIPE)
+pin("Android gates each swipe direction on the box",
+    "leadingTo != null" in KT_SWIPE and "trailingTo != null" in KT_SWIPE
+    and "inArchive -> null" in kt_wiring and "inTrashOrSpam || selectedIds.isNotEmpty()" in kt_wiring)
 pin("iOS gates each swipe direction on the box",
-    ios("MailboxView.swift").count("vm.state.box != .trash") >= 1
-    and ios("MailboxView.swift").count("vm.state.box != .archive") >= 1)
+    "canSwipe && box != .archive" in sw_wiring and "canSwipe && !recovering" in sw_wiring)
 
 # ── 4. only server-sanitized HTML reaches a renderer ────────────────────────
 # The reader renders the HTML part through one island per platform
@@ -442,18 +434,19 @@ pin("iOS gates each swipe direction on the box",
 # HTML leaves the app's origin. The raw `bodyHtml` the message row carries is never
 # a render input, page script is off at the engine level on both platforms,
 # and a failed fetch falls back to the stripped-text branch the reader always
-# had — never to raw HTML. A WebView anywhere else in mail code is still the
-# original defect: the print path must stay WebView-free.
+# had — never to raw HTML. The compose editor separately loads only its bundled
+# document and the print path remains WebView-free.
 MAIL_SOURCES = ([ANDROID / "ui/screens/mail" / p for p in
                  sorted((ANDROID / "ui/screens/mail").iterdir())]
                 + [ANDROID / "ui/components/Mail.kt"]
-                + [IOS / p for p in sorted(IOS.iterdir()) if p.name.startswith("Mail")])
+                + [IOS / p for p in sorted(IOS.iterdir()) if p.name.startswith("Mail") or p.name == "ComposeFormattingEditor.swift"])
 
 webview_files = sorted(f.name for f in MAIL_SOURCES
                        if "WebView" in code_only(f.read_text(encoding="utf-8", errors="ignore"))
                        or "loadHTMLString" in code_only(f.read_text(encoding="utf-8", errors="ignore")))
-pin("only the two reader islands carry a WebView",
-    webview_files == ["MailHtmlBody.kt", "MailHtmlBody.swift"])
+pin("mail WebViews are limited to the reader and local compose editor",
+    webview_files == ["ComposeFormattingEditor.kt", "ComposeFormattingEditor.swift", "MailHtmlBody.kt", "MailHtmlBody.swift"]
+    and "blockNetworkLoads = true" in code_only(android("ui/screens/mail/ComposeFormattingEditor.kt")))
 
 kt_island = code_only(android("ui/screens/mail/MailHtmlBody.kt"))
 sw_island = code_only(ios("MailHtmlBody.swift"))
@@ -490,12 +483,12 @@ pin("the islands take the images opt-in from the gate",
     and "allowImages: render.allowImages" in code_only(ios("MailReaderViews.swift"))
     and "vm.loadBody(message.id, shownImages)" in code_only(android("ui/screens/mail/ThreadScreen.kt")))
 
-# The thread view shows stripped text and says so, rather than silently
-# presenting a downgrade as the original — now the FALLBACK for a failed
-# formatted fetch, still stated rather than hidden.
-pin("Android explains an HTML-only body instead of hiding the fact",
-    re.search(r"(plain text|stripped|formatting)", KT_BOX if "stripHtml" in KT_BOX else
-              android("ui/screens/mail/ThreadScreen.kt"), re.I) is not None)
+# A readable text part is shown immediately, including when optional formatting fails.
+kt_thread_reader = code_only(android("ui/screens/mail/ThreadScreen.kt"))
+pin("Android keeps readable text when HTML is unavailable",
+    "message.bodyText?.takeIf" in kt_thread_reader
+    and "text != null || !message.hasHtml" in kt_thread_reader
+    and "Couldn’t display this message." in kt_thread_reader)
 
 # ── 5. the drawer offers only boxes the server can read back ────────────────
 #
@@ -833,7 +826,7 @@ pin("iOS's label swatch resolves a dark value",
 # names and DTO fields -- not the bodies of a `when` and a `switch`. Android
 # therefore handled sent/queued/failed while iOS also handled `draft`, the word
 # the draft-save path reports on success: on Android a successful draft save fell
-# through to "Server reported: draft" in warn ink, under a line that said "Saved
+# through to "Delivery could not be confirmed: draft" in warn ink, under a line that said "Saved
 # to Drafts". This is the same "both sides agree on the same wrong thing" hole the
 # label read was, caught from the other direction -- both sides work, the two
 # disagree.
@@ -1016,7 +1009,7 @@ pin("iOS's undo drops the ids that came back",
 pin("Android's home entry records the box it fetched",
     "loadedBoxes.add(_state.value.box)" in body_of(KT_VM, "fun ensureLoaded("))
 pin("iOS records a memoised body on the cache hit as well as the fetch",
-    re.search(r"if let cached = await MailStore\.shared\.body\(id\) {[\s\S]{0,700}?threadLoadedFor = id",
+    re.search(r"if let cached = await MailStore\.shared\.notificationMessage\(id\) {[\s\S]{0,1300}?threadLoadedFor = id",
               code_only(SW_MODEL)) is not None)
 
 # -- 18. the sender disc is a token, and it is the reference's token ------------
@@ -1534,11 +1527,12 @@ pin("Android adopts the upload's nonce-bearing avatar URL",
     re.search(r"profile = it\.profile\?\.copy\(avatarUrl = resp\.avatarUrl", code_only(KT_PVM)) is not None)
 pin("iOS adopts the upload's nonce-bearing avatar URL",
     re.search(r"state\.profile\?\.avatarUrl = url", code_only(SW_PVM)) is not None)
-# And the 10 MB ceiling is the route's (`auth-account-profile.ts`,
-# AVATAR_MAX_BYTES — raised from 256 KB by the founder's audit); the screen
-# quotes it before uploading, so a refusal is the person's words first.
-pin("both photo pickers honour the server's ceiling before uploading",
-    "10 * 1024 * 1024" in code_only(KT_ACCT) and "10 * 1024 * 1024" in code_only(SW_ACCT))
+# A bounded PNG is uploaded even when the original photo is larger or a different format.
+pin("both photo pickers resize and normalize uploads",
+    "1024f / maxOf(width, height)" in code_only(KT_ACCT)
+    and "Bitmap.CompressFormat.PNG" in code_only(KT_ACCT)
+    and "AvatarThumbnail.decode(received.file, maxSize: 1024)" in code_only(SW_ACCT)
+    and ".pngData()" in code_only(SW_ACCT))
 
 pin("opening a profile-backed screen does not fetch the avatar",
     "loadAvatar()" not in body_of(KT_PVM, "fun load(force")
@@ -2265,9 +2259,9 @@ pin("the icon-only actions carry words on both platforms",
     and 'Icons.Rounded.Delete, "Remove"' in code_only(KT_ACCT)
     and '.accessibilityLabel("Remove")' in code_only(SW_ACCT)
     and 'accessibilityLabel("Remove \\(a.address)")' in code_only(SW_ACCT))
-pin("the decorative icons are the four reviewed ones — no new silent icon",
-    len(re.findall(r",\s*null\b", code_only(KT_ACCT)))
-    + len(re.findall(r",\s*null\b", code_only(KT_E2ES))) == 4
+pin("the account and encryption screens use only the reviewed decorative icons",
+    len(re.findall(r"\bIcon\s*\(\s*[^,]{1,140},\s*(?:contentDescription\s*=\s*)?null\b",
+                   code_only(KT_ACCT) + code_only(KT_E2ES))) == 3
     and "Icons." not in code_only(KT_SUBS))
 # The subscriptions row says its action in a word, both platforms — the
 # capsule is Text("Unsubscribe"), never an icon nobody can name. Android
@@ -3226,20 +3220,23 @@ pin("the new-mail read is registered on both platforms",
 # Both read the same endpoint the mailbox badge already uses. Nothing here
 # invents a source of truth: `GET /stats` is the answer, and a count that came
 # from anywhere else would be a second, contradictory tally.
-pin("the poll asks the server's own unread count, nothing else",
+pin("the poll uses the server's unread count and authenticated inbox listing",
     "ApiClient.mailStats(token)" in code_only(SW_INT)
     and "Api.mailStats(token)" in code_only(KT_POLL)
     and "inbox?.unread" in code_only(SW_INT)
-    and "stats.inbox?.unread" in code_only(KT_POLL))
+    and "stats.inbox?.unread" in code_only(KT_POLL)
+    and "ApiClient.mailInbox(token: token, box: .inbox" in code_only(SW_INT)
+    and "Api.mailInbox(token, MailBox.Inbox" in code_only(KT_POLL))
 
 # The silence rules. A first read has no previous number, so no difference can
 # be named; a refused read saw nothing; and a count that did not rise saw no
 # arrivals. Announcing on any of those would tell the person the mailbox grew
 # when all that happened is that the app looked at it.
 pin("a poll that cannot name a difference says nothing",
-    "guard didSee, count > previous else { return false }" in code_only(SW_INT)
-    and 'if (!hadPrevious) {\n            report("silent first-read unread=$unread")\n            return Result.success()\n        }' in code_only(KT_POLL)
-    and 'if (unread <= previous) {\n            report("silent no-rise $previous->$unread")\n            return Result.success()\n        }' in code_only(KT_POLL))
+    "guard didSee, canNotify else { return false }" in code_only(SW_INT)
+    and "guard grew > 0 else { return false }" in code_only(SW_INT)
+    and 'if (!hadPrevious && pushedMessage == null) {\n            report("silent first-read unread=$unread")\n            return Result.success()\n        }' in code_only(KT_POLL)
+    and 'if (grew <= 0) {\n            report("silent no-rise $previous->$unread")\n            return Result.success()\n        }' in code_only(KT_POLL))
 
 # Both say what the notification is evidence of, in the same two numbers, and
 # neither claims delivery — the relay's queue is not the recipient's inbox. The

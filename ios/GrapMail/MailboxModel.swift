@@ -1,5 +1,6 @@
 import Foundation
 import Combine
+import OSLog
 
 /// What the reader's next/prev controls need to open a row: which resource, and
 /// whether it is a conversation.
@@ -154,6 +155,7 @@ final class MailboxModel: ObservableObject {
         var bcc = ""
         var subject = ""
         var body = ""
+        var bodyHtml: String?
         var inReplyTo: String?
         /// The draft row this compose was opened FROM. Non-empty means the
         /// person is continuing a saved message, and a successful send
@@ -1513,11 +1515,18 @@ final class MailboxModel: ObservableObject {
 
     /// Opening a thread. The list payload has no bodies by design, so the bodies
     /// are read here and memoised — a row re-rendering must not re-read a payload.
-    func openThread(_ threadId: String) {
+    func openThread(_ threadId: String, focusedID: String? = nil) {
         guard let token, readerTarget != nil || threadLoadedFor != threadId else { return }
         loadReader(threadId, isThread: true) { [weak self] in
             guard let self else { return }
             let cached = await MailStore.shared.thread(threadId)
+            let focused: MailMessageFull?
+            if let focusedID { focused = await MailStore.shared.notificationMessage(focusedID) }
+            else { focused = nil }
+            var initial = cached?.messages ?? []
+            if let focused, !initial.contains(where: { $0.id == focused.id }) { initial.append(focused) }
+            guard !Task.isCancelled, self.sessionIsLive else { return }
+            if !initial.isEmpty { self.thread = ThreadState(messages: initial, loading: true) }
             do {
                 let resp = try await ApiClient.mailThread(token: token, threadId: threadId)
                 guard !Task.isCancelled, self.sessionIsLive else { return }
@@ -1529,16 +1538,28 @@ final class MailboxModel: ObservableObject {
                     generation: self.sessionGeneration
                 )
                 guard !Task.isCancelled, self.sessionIsLive else { return }
+                var visible = page.messages
+                var exact = focused
+                if let focusedID, exact == nil, !visible.contains(where: { $0.id == focusedID }),
+                   let message = (try? await ApiClient.mailMessage(token: token, id: focusedID))?.message,
+                   message.threadId == threadId {
+                    exact = message
+                }
+                guard !Task.isCancelled, self.sessionIsLive else { return }
+                if let exact, !visible.contains(where: { $0.id == exact.id }) {
+                    visible.append(exact)
+                    visible.sort { ($0.createdAt ?? "") < ($1.createdAt ?? "") }
+                }
                 self.thread = ThreadState(
-                    messages: page.messages,
+                    messages: visible,
                     nextCursor: page.nextCursor,
                     hasMore: page.hasMore
                 )
                 self.threadLoadedFor = threadId
             } catch {
                 guard !Task.isCancelled, self.sessionIsLive else { return }
-                if let cached {
-                    self.thread = ThreadState(messages: cached.messages, nextCursor: cached.nextCursor, hasMore: cached.hasMore)
+                if !initial.isEmpty {
+                    self.thread = ThreadState(messages: initial, nextCursor: cached?.nextCursor, hasMore: cached?.hasMore ?? false)
                     self.threadLoadedFor = threadId
                 } else {
                     self.thread = ThreadState(error: Self.describe(error))
@@ -1697,7 +1718,7 @@ final class MailboxModel: ObservableObject {
         guard let token, readerTarget != nil || threadLoadedFor != id else { return }
         loadReader(id, isThread: false) { [weak self] in
             guard let self else { return }
-            if let cached = await MailStore.shared.body(id) {
+            if let cached = await MailStore.shared.notificationMessage(id) {
                 guard !Task.isCancelled, self.sessionIsLive else { return }
                 // Recorded on the hit as well as the fetch, because this field IS the
                 // memo: without it the guard above never fires and every return to an
@@ -1787,6 +1808,9 @@ final class MailboxModel: ObservableObject {
         } catch {
             try Task.checkCancellation()
             guard sessionIsLive else { throw CancellationError() }
+            let failure = error as NSError
+            Logger(subsystem: "com.grapsee.grapmail", category: "MailReader")
+                .error("Formatted body fetch failed: \(failure.domain, privacy: .public) \(failure.code, privacy: .public)")
             return BodyRender(html: nil, bodyText: nil, blockedImages: 0,
                               allowImages: allowImages, error: Self.describe(error))
         }
@@ -1853,7 +1877,7 @@ final class MailboxModel: ObservableObject {
                     token: token,
                     MailDraftRequest(
                         to: Self.splitAddresses(self.compose.to), cc: Self.splitAddresses(self.compose.cc),
-                        subject: self.compose.subject, bodyText: self.compose.body,
+                        subject: self.compose.subject, bodyText: self.compose.body, bodyHtml: self.compose.bodyHtml,
                         inReplyTo: self.compose.inReplyTo,
                         id: self.compose.draftId.nilIfBlank(),
                     ))
@@ -1891,9 +1915,25 @@ final class MailboxModel: ObservableObject {
         let generation = composeGeneration
         Task { [weak self] in
             guard let self else { return }
-            guard let full = try? await ApiClient.mailMessage(token: token, id: id),
-                  let m = full.message, self.composeGeneration == generation,
-                  self.sessionIsLive else { return }
+            self.compose.error = nil
+            let original: MailMessageFull?
+            if mode != "draft", let cached = await MailStore.shared.notificationMessage(id) {
+                original = cached
+            } else {
+                original = (try? await ApiClient.mailMessage(token: token, id: id))?.message
+            }
+            guard self.composeGeneration == generation, self.sessionIsLive else { return }
+            guard let m = original else {
+                self.compose.error = mode == "draft" ? "Could not open this draft." : "Could not load the original message."
+                return
+            }
+            let draftHtml = mode == "draft" && m.hasHtml
+                ? (try? await ApiClient.mailBody(token: token, id: id, allowImages: false))?.bodyHtml : nil
+            guard self.composeGeneration == generation, self.sessionIsLive else { return }
+            if mode == "draft", m.hasHtml, draftHtml?.nilIfBlank() == nil {
+                self.compose.error = "Could not load the draft formatting."
+                return
+            }
             let me = self.state.accountAddress?.lowercased()
             let quoted = Self.quoteOf(m)
             let sig = Self.signatureBlock(signature)
@@ -1914,6 +1954,7 @@ final class MailboxModel: ObservableObject {
                 // invented.
                 self.compose.subject = m.subject ?? ""
                 self.compose.body = m.bodyText ?? ""
+                self.compose.bodyHtml = draftHtml
                 self.compose.inReplyTo = m.inReplyTo
                 self.compose.draftId = m.id
                 self.compose.result = nil
@@ -2061,6 +2102,7 @@ final class MailboxModel: ObservableObject {
             to: Self.splitAddresses(compose.to), cc: Self.splitAddresses(compose.cc),
             bcc: Self.splitAddresses(compose.bcc), subject: compose.subject,
             bodyText: envelopeJson == nil ? compose.body : "",
+            bodyHtml: envelopeJson == nil ? compose.bodyHtml : nil,
             inReplyTo: compose.inReplyTo, e2eEnvelope: envelopeJson, attachmentIds: attachmentIds)
         let held = HeldSend(
             token: token, request: req, draftId: compose.draftId,
@@ -2128,9 +2170,9 @@ final class MailboxModel: ObservableObject {
                 if self.composeGeneration == generation {
                     var updated = self.compose
                     updated.sending = false
-                    updated.result = r.message ?? r.error
+                    updated.result = nil
                     updated.resultStatus = r.status
-                    updated.error = r.deliveryError ?? r.error
+                    updated.error = sent ? nil : "Could not send this message. Try again."
                     if sent { updated.draftId = "" }
                     self.compose = updated
                 }
@@ -2183,7 +2225,7 @@ final class MailboxModel: ObservableObject {
             guard let self, self.composeGeneration == generation, self.sessionIsLive else { return }
             let req = MailDraftRequest(
                 to: Self.splitAddresses(snapshot.to), cc: Self.splitAddresses(snapshot.cc),
-                subject: snapshot.subject, bodyText: snapshot.body, inReplyTo: snapshot.inReplyTo,
+                subject: snapshot.subject, bodyText: snapshot.body, bodyHtml: snapshot.bodyHtml, inReplyTo: snapshot.inReplyTo,
                 id: self.compose.draftId.nilIfBlank())
             do {
                 let resp = try await ApiClient.mailDraft(token: token, req)
@@ -2594,7 +2636,7 @@ final class MailboxModel: ObservableObject {
                    "You are still signed in to your account."
         }
         if let api = error as? ApiError { return api.userMessage }
-        return error.localizedDescription
+        return apiMessage(error, fallback: "Could not complete the mailbox request. Try again.")
     }
 }
 

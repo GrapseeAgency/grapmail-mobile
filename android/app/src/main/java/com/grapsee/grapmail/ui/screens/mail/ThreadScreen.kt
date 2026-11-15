@@ -99,11 +99,25 @@ fun ThreadScreen(
     onStepPrev: (MailStep) -> Unit,
     onStepNext: (MailStep) -> Unit,
     onContacts: () -> Unit,
+    initialMessageId: String? = null,
+    openMessageActions: Boolean = false,
 ) {
     val palette = LocalPalette.current
     val thread by vm.thread.collectAsStateWithLifecycle()
     val mailbox by vm.state.collectAsStateWithLifecycle()
-    var expandedMessageId by remember(threadId, isThread) { mutableStateOf<String?>(null) }
+    var expandedMessageId by remember(threadId, isThread, initialMessageId) { mutableStateOf(initialMessageId) }
+    val listState = androidx.compose.foundation.lazy.rememberLazyListState()
+    var didFocus by remember(threadId, initialMessageId) { mutableStateOf(false) }
+    var showInitialActions by androidx.compose.runtime.saveable.rememberSaveable(threadId, initialMessageId, openMessageActions) {
+        mutableStateOf(openMessageActions)
+    }
+    val focusIndex = if (initialMessageId == null) -1 else thread.messages.indexOfFirst { it.id == initialMessageId }
+    LaunchedEffect(focusIndex) {
+        if (focusIndex >= 0 && !didFocus) {
+            listState.scrollToItem(focusIndex + if (isThread && (thread.hasMore || thread.loadingEarlier)) 2 else 1)
+            didFocus = true
+        }
+    }
     val active = thread.messages.firstOrNull { it.id == expandedMessageId } ?: thread.messages.lastOrNull()
     val subject = thread.messages.firstOrNull()?.subject?.takeIf { it.isNotBlank() } ?: "(no subject)"
     var pendingAction by remember(threadId, isThread) { mutableStateOf(false) }
@@ -131,7 +145,7 @@ fun ThreadScreen(
         }
     }
 
-    LaunchedEffect(threadId, isThread) { if (isThread) vm.openThread(threadId) else vm.openMessage(threadId) }
+    LaunchedEffect(threadId, isThread) { if (isThread) vm.openThread(threadId, initialMessageId) else vm.openMessage(threadId) }
     androidx.compose.runtime.DisposableEffect(vm, threadId, isThread) {
         onDispose { vm.leaveReader(threadId, isThread) }
     }
@@ -170,7 +184,12 @@ fun ThreadScreen(
             if (prior != null || next != null) {
                 Box {
                     ReaderIcon(Icons.Rounded.MoreVert, "Navigate messages") { showNavigation = true }
-                    DropdownMenu(expanded = showNavigation, onDismissRequest = { showNavigation = false }) {
+                    DropdownMenu(
+                        expanded = showNavigation,
+                        onDismissRequest = { showNavigation = false },
+                        containerColor = palette.card,
+                        shape = RoundedCornerShape(16.dp),
+                    ) {
                         if (at > 0 && total > 1) {
                             Text("$at of $total loaded", fontSize = 12.sp, color = palette.textSecondary,
                                 modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp))
@@ -202,10 +221,10 @@ fun ThreadScreen(
                 Text("This conversation could not be opened.", fontSize = 17.sp,
                     fontWeight = FontWeight.SemiBold, color = palette.textPrimary)
                 Spacer(Modifier.height(8.dp))
-                Text(thread.error!!, fontSize = 14.sp, color = palette.textSecondary)
+                Text("Check your connection and try again.", fontSize = 14.sp, color = palette.textSecondary)
                 Spacer(Modifier.height(16.dp))
                 com.grapsee.grapmail.ui.components.GradientButton("Try again", onClick = {
-                    if (isThread) vm.openThread(threadId) else vm.openMessage(threadId)
+                    if (isThread) vm.openThread(threadId, initialMessageId) else vm.openMessage(threadId)
                 })
             }
             return@Column
@@ -213,6 +232,7 @@ fun ThreadScreen(
 
         LazyColumn(
             Modifier.weight(1f).fillMaxWidth(),
+            state = listState,
             contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 8.dp, bottom = 16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
@@ -269,6 +289,8 @@ fun ThreadScreen(
                         }
                     },
                     notice = notices,
+                    openActions = showInitialActions && message.id == initialMessageId,
+                    onActionsOpened = { showInitialActions = false },
                 )
             }
         }
@@ -342,6 +364,8 @@ private fun ThreadMessageCard(
     onReply: (String) -> Unit,
     onDownload: (MailAttachmentDto) -> Unit,
     notice: Map<String, String>,
+    openActions: Boolean = false,
+    onActionsOpened: () -> Unit = {},
 ) {
     val palette = LocalPalette.current
     val context = androidx.compose.ui.platform.LocalContext.current
@@ -357,6 +381,12 @@ private fun ThreadMessageCard(
     var shareNote by androidx.compose.runtime.remember(message.id) { mutableStateOf<String?>(null) }
     var showDetails by remember(message.id) { mutableStateOf(false) }
     var showActions by remember(message.id) { mutableStateOf(false) }
+    LaunchedEffect(openActions, expanded) {
+        if (openActions && expanded) {
+            showActions = true
+            onActionsOpened()
+        }
+    }
     var renderAttempt by remember(message.id) { mutableStateOf(0) }
     // The images the sender's HTML part points at, and whether this message has
     // asked for them. Both belong to the message: stepping from here must not
@@ -441,7 +471,12 @@ private fun ThreadMessageCard(
                 }
                 Box {
                     ReaderIcon(Icons.Rounded.MoreVert, "Message actions") { showActions = true }
-                    DropdownMenu(expanded = showActions, onDismissRequest = { showActions = false }) {
+                    DropdownMenu(
+                        expanded = showActions,
+                        onDismissRequest = { showActions = false },
+                        containerColor = palette.card,
+                        shape = RoundedCornerShape(16.dp),
+                    ) {
                         DropdownMenuItem(text = { Text("Reply") }, onClick = { showActions = false; onReply("reply") })
                         DropdownMenuItem(text = { Text("Share") }, modifier = Modifier.testTag("mail-share"), onClick = {
                             showActions = false
@@ -511,28 +546,24 @@ private fun ThreadMessageCard(
                     modifier = Modifier.testTag("mail-body"),
                 )
             } else {
-                if (message.hasHtml && formatted == null) {
-                    LinearProgressIndicator(Modifier.fillMaxWidth().testTag("mail-body-loading"))
-                    Spacer(Modifier.height(12.dp))
-                }
-                if (formatted?.error != null) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("Formatting unavailable. ${formatted.error}", fontSize = 12.sp, color = palette.textSecondary,
-                            modifier = Modifier.weight(1f))
+                val text = message.bodyText?.takeIf { it.isNotBlank() }
+                    ?: formatted?.bodyText?.takeIf { it.isNotBlank() }
+                when {
+                    text != null || !message.hasHtml -> Text(
+                        text ?: "This message has no text body.", fontSize = 15.sp, lineHeight = 23.sp,
+                        color = palette.textPrimary, modifier = Modifier.testTag("mail-body"),
+                    )
+                    formatted?.error != null -> {
+                        Text("Couldn’t display this message.", fontSize = 13.sp, color = palette.textSecondary)
                         TextButton(onClick = { renderAttempt++ }, enabled = !renderLoading) { Text("Retry") }
                     }
-                }
-                val text = formatted?.bodyText?.takeIf { it.isNotBlank() }
-                    ?: message.bodyText?.takeIf { it.isNotBlank() }
-                if (text != null || !message.hasHtml || formatted?.error != null) {
-                    Text(text ?: "This message has no text body.", fontSize = 15.sp, lineHeight = 23.sp,
-                        color = palette.textPrimary, modifier = Modifier.testTag("mail-body"))
+                    else -> LinearProgressIndicator(Modifier.fillMaxWidth().testTag("mail-body-loading"))
                 }
             }
         }
 
-        detailsError?.let { error ->
-            Text(error, fontSize = 12.sp, color = palette.textSecondary)
+        detailsError?.let {
+            Text("Couldn’t load message details.", fontSize = 12.sp, color = palette.textSecondary)
             androidx.compose.material3.TextButton(onClick = { detailsAttempt++ }) {
                 Text("Retry")
             }

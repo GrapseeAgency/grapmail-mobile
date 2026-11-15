@@ -272,7 +272,7 @@ func printMessageText(
             // not observable here, so nothing claims a page exists.
             onOutcome(nil)
         } else if let error = error {
-            onOutcome("The print panel closed with a problem: \(error.localizedDescription)")
+            onOutcome(apiMessage(error, fallback: "Could not print this message. Try again."))
         } else {
             onOutcome("The print was cancelled before it was sent.")
         }

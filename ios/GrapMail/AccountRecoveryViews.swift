@@ -1,3 +1,4 @@
+import OSLog
 import SwiftUI
 import UIKit
 
@@ -8,8 +9,11 @@ func apiCode(_ error: Error) -> String? {
 }
 
 func apiMessage(_ error: Error, fallback: String) -> String {
-    let text = error.localizedDescription
-    return text.isEmpty ? fallback : text
+    if let api = error as? ApiError { return api.userMessage }
+    let failure = error as NSError
+    Logger(subsystem: "com.grapsee.grapmail", category: "UI")
+        .error("Operation failed: \(failure.domain, privacy: .private) (\(failure.code))")
+    return fallback
 }
 
 /// Forgot password — one identifier field, the arrowed CTA, the support note.
