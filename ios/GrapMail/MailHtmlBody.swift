@@ -6,8 +6,7 @@ import WebKit
 ///
 /// ── WHAT MAY REACH THIS VIEW ────────────────────────────────────────────────
 /// Only the string the body endpoint answered with (`MailBodyResponse.bodyHtml`):
-/// the server sanitized the sender's HTML part with the web's
-/// `sanitizeEmailHtml` profile before it left the app's origin, so by the time
+/// the server sanitized the sender's HTML and filtered its inline styles, so by the time
 /// markup gets here there is no script, no iframe, no form, no event handler
 /// and no live remote image in it. The raw `message.bodyHtml` the row carries
 /// is never passed here — there is no sanitiser in this app's dependencies,
@@ -29,6 +28,7 @@ struct MailHtmlBodyView: UIViewRepresentable {
     let allowImages: Bool
     let onOpenLink: (String) -> Void
     @Binding var contentHeight: CGFloat
+    @Environment(\.colorScheme) private var colorScheme
 
     func makeCoordinator() -> Coordinator { Coordinator(self) }
 
@@ -54,10 +54,13 @@ struct MailHtmlBodyView: UIViewRepresentable {
         context.coordinator.parent = self
         // Re-feed only on a real change: update runs on every render pass, and
         // reloads would restart rendering mid-read.
-        if context.coordinator.loadedHtml != html || context.coordinator.loadedAllow != allowImages {
+        if context.coordinator.loadedHtml != html || context.coordinator.loadedAllow != allowImages
+            || context.coordinator.loadedScheme != colorScheme {
             context.coordinator.loadedHtml = html
             context.coordinator.loadedAllow = allowImages
-            context.coordinator.navigation = webView.loadHTMLString(mailDocument(html: html), baseURL: nil)
+            context.coordinator.loadedScheme = colorScheme
+            let traits = UITraitCollection(userInterfaceStyle: colorScheme == .dark ? .dark : .light)
+            context.coordinator.navigation = webView.loadHTMLString(mailDocument(html: html, allowImages: allowImages, traits: traits), baseURL: nil)
         }
     }
 
@@ -71,6 +74,7 @@ struct MailHtmlBodyView: UIViewRepresentable {
         var parent: MailHtmlBodyView
         var loadedHtml: String?
         var loadedAllow: Bool?
+        var loadedScheme: ColorScheme?
         var navigation: WKNavigation?
 
         init(_ parent: MailHtmlBodyView) { self.parent = parent }
@@ -78,7 +82,7 @@ struct MailHtmlBodyView: UIViewRepresentable {
         private func measure(_ webView: WKWebView, navigation: WKNavigation) {
             guard self.navigation === navigation else { return }
             webView.evaluateJavaScript(
-                "Math.max(document.documentElement.scrollHeight, document.body ? document.body.scrollHeight : 0)",
+                "document.body ? Math.ceil(Math.max(document.body.offsetHeight, document.body.scrollHeight)) : 0",
             ) { [weak self] value, _ in
                 if let height = value as? CGFloat, height > 0 {
                     DispatchQueue.main.async {
@@ -124,37 +128,38 @@ struct MailHtmlBodyView: UIViewRepresentable {
 
 /// App-authored, constant except for the palette colours interpolated into it —
 /// this is the island's own typography, not something a sender styled.
-private func mailDocument(html: String) -> String {
-    let text = GM.textPrimary.hexString
-    let muted = GM.textSecondary.hexString
-    let border = GM.border.hexString
-    let link = GM.primarySolid.hexString
-    let chip = GM.bgTinted.hexString
+private func mailDocument(html: String, allowImages: Bool, traits: UITraitCollection) -> String {
+    let imageSources = allowImages ? "https: http:" : "'none'"
+    let authoredColors = html.contains(" style=\"") || html.contains(" bgcolor=\"")
+    let canvas = authoredColors ? "#FFFFFF" : "transparent"
+    let text = authoredColors ? "#1F2937" : UIColor(GM.textPrimary).resolvedColor(with: traits).hexString
+    let muted = UIColor(GM.textSecondary).resolvedColor(with: traits).hexString
+    let border = UIColor(GM.border).resolvedColor(with: traits).hexString
+    let link = authoredColors ? "#174EA6" : UIColor(GM.primarySolid).resolvedColor(with: traits).hexString
+    let chip = UIColor(GM.bgTinted).resolvedColor(with: traits).hexString
     return "<!DOCTYPE html><html><head><meta charset=\"utf-8\"/>" +
         "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"/>" +
+        "<meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'none'; " +
+        "img-src \(imageSources); style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'\">" +
         "<style>" +
-        "html,body{margin:0;padding:0;background:transparent;}" +
+        "html,body{margin:0;padding:0;background:\(canvas);}" +
         "body{font-family:-apple-system,'Helvetica Neue',sans-serif;font-size:15px;line-height:1.55;color:" + text + ";" +
         "word-wrap:break-word;overflow-wrap:break-word;padding:0 2px;}" +
         "a{color:" + link + ";}" +
-        "img{max-width:100%;height:auto;}" +
-        "table{max-width:100%;border-collapse:collapse;}" +
-        "td,th{word-wrap:break-word;}" +
+        "img{max-width:100%!important;height:auto;}" +
+        "table{max-width:100%!important;}" +
+        "td,th{overflow-wrap:anywhere;}" +
         "pre,code{font-family:Menlo,monospace;font-size:13px;white-space:pre-wrap;}" +
         "blockquote{margin:8px 0;padding:2px 12px;border-left:3px solid " + border + ";color:" + muted + ";}" +
         // A blocked remote image has no `src` at all — WebKit draws its alt
         // text as an inline broken image, and this turns that into a
         // deliberate-looking chip instead of a broken-image glyph.
-        "img[data-grapmail-blocked-src]{display:inline-block;min-height:16px;padding:4px 10px;" +
+        "img[data-blocked-src],img[data-grapmail-blocked-src],img[data-cid-src]{display:inline-block;min-height:16px;padding:4px 10px;" +
         "border:1px dashed " + border + ";border-radius:8px;background:" + chip + ";color:" + muted + ";font-size:12px;}" +
         "</style></head><body>" + html + "</body></html>"
 }
 
 extension UIColor {
-    /// `#rrggbb` for the wrapper's CSS. Dynamic colours resolve to the CURRENT
-    /// trait collection: the document is re-fed on theme change because
-    /// `updateUIView` sees new html only — so the palette values are resolved
-    /// once per feed, which is correct for a document that is reloaded whole.
     fileprivate var hexString: String {
         var red: CGFloat = 0, green: CGFloat = 0, blue: CGFloat = 0, alpha: CGFloat = 0
         guard getRed(&red, green: &green, blue: &blue, alpha: &alpha) else { return "#000000" }
@@ -163,8 +168,4 @@ extension UIColor {
             Int(round(red * 255)), Int(round(green * 255)), Int(round(blue * 255))
         )
     }
-}
-
-extension Color {
-    fileprivate var hexString: String { UIColor(self).resolvedColor(with: UITraitCollection(userInterfaceStyle: UITraitCollection.current.userInterfaceStyle)).hexString }
 }

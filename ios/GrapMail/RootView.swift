@@ -714,7 +714,8 @@ struct RootView: View {
                         onStepNext: { step in
                             path.removeLast()
                             path.append(.mailThread(id: step.id, isThread: step.isThread))
-                        }
+                        },
+                        onContacts: { path.append(.mailContacts) }
                     )
                 case let .mailCompose(reply, mode, recipient):
                     ComposeView(vm: mail, account: account, e2e: e2e, replyId: reply, mode: mode,

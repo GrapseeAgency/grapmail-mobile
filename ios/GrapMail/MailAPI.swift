@@ -332,7 +332,7 @@ struct MailThreadResponse: Decodable {
 /// raw `message.bodyHtml` from the row is never a render input: no sanitiser
 /// ships in this app, and the correct one is not a regex. Remote images are
 /// already neutralised in the response (`src` moved to
-/// `data-grapmail-blocked-src`) unless `?images=1` accompanied the request —
+/// `data-grapmail-blocked-src`) unless `remoteImages=true` accompanied the request —
 /// `blockedImages` is the honest count of what was blocked, and `bodyText` is
 /// the row's plain part echoed back for the no-HTML case, so a null `bodyHtml`
 /// means "there is no formatted view", not "the field went missing".
@@ -1403,14 +1403,13 @@ extension ApiClient {
     }
 
     /// `GET /message/:id/body` — the reader's render body. The web app
-    /// sanitizes the message's HTML part with its own `sanitizeEmailHtml`
-    /// profile before answering, so this response is the only HTML a renderer
+    /// filters the message's HTML and applies the requested design profile before answering, so this response is the only HTML a renderer
     /// here may load; `allowImages` is the reader's images-gate opt-in, sent
-    /// as `?images=1` only when the person asked for this message's remote
+    /// as `remoteImages=true` only when the person asked for this message's remote
     /// images. Throws like every other call — the model decides what the
     /// reader falls back to (the stripped-text branch it always had).
     static func mailBody(token: String, id: String, allowImages: Bool) async throws -> MailBodyResponse {
-        let query = allowImages ? "?remoteImages=true" : ""
+        let query = "?preserveDesign=true" + (allowImages ? "&remoteImages=true" : "")
         return try await mailGet("/message/\(id.percentEncodedPath())/html\(query)", bearer: token)
     }
 

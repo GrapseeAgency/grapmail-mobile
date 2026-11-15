@@ -991,8 +991,15 @@ final class MailboxModel: ObservableObject {
 
     private var pendingRowActions: Set<String> = []
 
-    func actOn(_ id: String, _ action: MailAction) {
-        guard !state.busy, let token, pendingRowActions.insert(id).inserted else { return }
+    func actOn(_ id: String, _ action: MailAction, onOutcome: ((String?) -> Void)? = nil) {
+        guard let token else {
+            onOutcome?("You are signed out, so this could not be saved.")
+            return
+        }
+        guard !state.busy, pendingRowActions.insert(id).inserted else {
+            onOutcome?("A message action is already in progress.")
+            return
+        }
         Task { [weak self] in
             guard let self else { return }
             defer { self.pendingRowActions.remove(id) }
@@ -1056,6 +1063,7 @@ final class MailboxModel: ObservableObject {
                 } else {
                     self.scheduleReconciliation()
                 }
+                onOutcome?(nil)
             } catch {
                 GMHaptics.failure()
                 // The write was refused, so the optimistic move is not the truth.
@@ -1064,7 +1072,9 @@ final class MailboxModel: ObservableObject {
                 self.loadedBoxes.remove(self.state.box)
                 await MailStore.shared.invalidate(self.state.box, generation: self.sessionGeneration)
                 self.load(replace: true)
-                self.state.actionError = Self.describe(error)
+                let message = Self.describe(error)
+                self.state.actionError = message
+                onOutcome?(message)
             }
         }
     }
