@@ -97,7 +97,7 @@ struct OnboardingHeroView: UIViewRepresentable {
         configuration.userContentController.add(context.coordinator, name: "grapmail")
         configuration.userContentController.addUserScript(
             WKUserScript(
-                source: Self.fitScript,
+                source: OnboardingHeroView.fitScript,
                 injectionTime: .atDocumentEnd,
                 forMainFrameOnly: true
             )
@@ -168,9 +168,9 @@ struct OnboardingHeroView: UIViewRepresentable {
             }
             let html: String
             if let bodyEnd = source.range(of: "</body>") {
-                html = source.replacingCharacters(in: bodyEnd, with: "<script>\(Self.fitScript)</script></body>")
+                html = source.replacingCharacters(in: bodyEnd, with: "<script>\(OnboardingHeroView.fitScript)</script></body>")
             } else {
-                html = source + "<script>\(Self.fitScript)</script>"
+                html = source + "<script>\(OnboardingHeroView.fitScript)</script>"
             }
             webView.loadHTMLString(html, baseURL: url.deletingLastPathComponent())
         }
@@ -191,7 +191,7 @@ struct OnboardingHeroView: UIViewRepresentable {
             // Belt and braces for a first layout that arrives late: the injected
             // script already retried, this catches the case where the view was
             // still 0-sized then.
-            webView.evaluateJavaScript(Self.fitScript, completionHandler: nil)
+            webView.evaluateJavaScript(OnboardingHeroView.fitScript, completionHandler: nil)
         }
 
         func webView(
