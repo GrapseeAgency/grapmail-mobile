@@ -222,7 +222,7 @@ struct OnboardingView: View {
                     Spacer(minLength: 24)
 
                     // Primary CTA button
-                    PrimaryActionButton(
+                    GradientButton(
                         title: currentScene.ctaText,
                         action: {
                             if sceneIndex < 4 {
