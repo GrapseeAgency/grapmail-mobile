@@ -181,7 +181,7 @@ struct SignInView: View {
                 model.verificationEmail = email
                 onNeedEmailVerification()
             } catch {
-                self.error = error.localizedDescription
+                self.error = apiMessage(error, fallback: "Could not complete the account request. Try again.")
             }
         }
     }
@@ -235,7 +235,7 @@ struct EmailVerificationView: View {
                 otp = ""
                 model.clearSignInChallenge()
                 onSignedIn(address)
-            } catch { self.error = error.localizedDescription }
+            } catch { self.error = apiMessage(error, fallback: "Could not complete the account request. Try again.") }
         }
     }
 
@@ -250,7 +250,7 @@ struct EmailVerificationView: View {
                 // The endpoint deliberately returns the same answer on cooldown,
                 // existing codes, unknown accounts and provider failure. No countdown.
                 notice = "Request accepted. Check for an existing code; a new delivery is not confirmed."
-            } catch { self.error = error.localizedDescription }
+            } catch { self.error = apiMessage(error, fallback: "Could not complete the account request. Try again.") }
         }
     }
 }
@@ -354,7 +354,7 @@ struct TwoFactorView: View {
             } catch let apiError as ApiError {
                 error = message(for: apiError, code: code)
             } catch {
-                self.error = error.localizedDescription
+                self.error = apiMessage(error, fallback: "Could not complete the account request. Try again.")
             }
         }
     }
@@ -398,7 +398,7 @@ struct TwoFactorView: View {
             } catch let apiError as ApiError {
                 error = message(for: apiError, code: "")
             } catch {
-                self.error = error.localizedDescription
+                self.error = apiMessage(error, fallback: "Could not complete the account request. Try again.")
             }
         }
     }
@@ -515,7 +515,7 @@ struct BackupCodeView: View {
                     error = apiError.localizedDescription
                 }
             } catch {
-                self.error = error.localizedDescription
+                self.error = apiMessage(error, fallback: "Could not complete the account request. Try again.")
             }
         }
     }

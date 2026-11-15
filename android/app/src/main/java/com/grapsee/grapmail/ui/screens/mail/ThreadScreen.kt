@@ -6,6 +6,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -16,45 +17,58 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.ArrowBack
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.automirrored.rounded.Forward
+import androidx.compose.material.icons.automirrored.rounded.Reply
+import androidx.compose.material.icons.automirrored.rounded.ReplyAll
+import androidx.compose.material.icons.rounded.Archive
+import androidx.compose.material.icons.rounded.DeleteOutline
+import androidx.compose.material.icons.rounded.ExpandMore
+import androidx.compose.material.icons.rounded.MarkEmailUnread
+import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.AttachFile
-import androidx.compose.material.icons.rounded.ChevronLeft
-import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.Download
-import androidx.compose.material.icons.rounded.Forward
 import androidx.compose.material.icons.rounded.Lock
-import androidx.compose.material.icons.rounded.Reply
 import androidx.compose.material.icons.rounded.Star
 import androidx.compose.material.icons.rounded.StarBorder
-import androidx.compose.material.icons.rounded.SupervisedUserCircle
-import androidx.compose.material.icons.rounded.Unarchive
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.produceState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.compose.runtime.mutableStateMapOf
 import com.grapsee.grapmail.data.MailAction
+import com.grapsee.grapmail.data.MailBox
 import com.grapsee.grapmail.ui.components.AppTextField
 import com.grapsee.grapmail.data.MailAttachmentDto
 import com.grapsee.grapmail.data.MailMessageFullDto
+import com.grapsee.grapmail.logic.MailPollWorker
 import com.grapsee.grapmail.logic.MailboxViewModel
 import com.grapsee.grapmail.logic.MailStep
 import com.grapsee.grapmail.ui.components.SenderAvatar
@@ -63,28 +77,7 @@ import com.grapsee.grapmail.ui.components.absoluteDateTimeOrRaw
 import com.grapsee.grapmail.ui.components.mailTime
 import com.grapsee.grapmail.ui.theme.LocalPalette
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 
-/**
- * Reference 74 — a conversation. 75 is the same screen with an encrypted message
- * on it, which is why the encrypted branch is here rather than a separate screen:
- * it is one state of one layout.
- *
- * ── WHY THE HTML PART IS NOT RENDERED ───────────────────────────────────────
- * `fullRow` carries `bodyHtml` as the sender wrote it. Rendering it would hand a
- * remote message control of the app: a crafted body could load remote images (a
- * tracking pixel that tells the sender the mail was read, from a screen the user
- * never left), restyle the message to look like a system warning, or — with a
- * WebView — run script. There is no sanitiser in this app's dependencies, and the
- * correct one is not a regex.
- *
- * So the body comes from `bodyText`. When a message has only an HTML part, the
- * tags are stripped for display and the screen says it is showing a plain-text
- * rendering of an HTML message. That is a visible, honest downgrade rather than a
- * silent one, and it keeps the one thing a mail client must not outsource: trust
- * in what a message is allowed to do to the interface.
- */
 @Composable
 fun ThreadScreen(
     vm: MailboxViewModel,
@@ -105,58 +98,114 @@ fun ThreadScreen(
      *  the reader does not know the order, and it must not guess the route. */
     onStepPrev: (MailStep) -> Unit,
     onStepNext: (MailStep) -> Unit,
+    onContacts: () -> Unit,
+    initialMessageId: String? = null,
+    openMessageActions: Boolean = false,
 ) {
     val palette = LocalPalette.current
     val thread by vm.thread.collectAsStateWithLifecycle()
-    var busy by remember { mutableStateOf<String?>(null) }
-    // Per-message, not global: a download result belongs to the row that asked
-    // for it, and a shared variable would let a later failure overwrite an
-    // earlier success on screen.
-    val notices = remember { mutableStateMapOf<String, String>() }
+    val mailbox by vm.state.collectAsStateWithLifecycle()
+    var expandedMessageId by remember(threadId, isThread, initialMessageId) { mutableStateOf(initialMessageId) }
+    val listState = androidx.compose.foundation.lazy.rememberLazyListState()
+    var didFocus by remember(threadId, initialMessageId) { mutableStateOf(false) }
+    var showInitialActions by androidx.compose.runtime.saveable.rememberSaveable(threadId, initialMessageId, openMessageActions) {
+        mutableStateOf(openMessageActions)
+    }
+    val focusIndex = if (initialMessageId == null) -1 else thread.messages.indexOfFirst { it.id == initialMessageId }
+    LaunchedEffect(focusIndex) {
+        if (focusIndex >= 0 && !didFocus) {
+            listState.scrollToItem(focusIndex + if (isThread && (thread.hasMore || thread.loadingEarlier)) 2 else 1)
+            didFocus = true
+        }
+    }
+    val active = thread.messages.firstOrNull { it.id == expandedMessageId } ?: thread.messages.lastOrNull()
+    val subject = thread.messages.firstOrNull()?.subject?.takeIf { it.isNotBlank() } ?: "(no subject)"
+    var pendingAction by remember(threadId, isThread) { mutableStateOf(false) }
+    var showNavigation by remember { mutableStateOf(false) }
+    val filed = remember(threadId, isThread) { mutableStateMapOf<String, MailAction>() }
+    val feedback = remember(threadId, isThread) { mutableStateMapOf<String, Pair<String, Boolean>>() }
+    val notices = remember(threadId, isThread) { mutableStateMapOf<String, String>() }
+    val downloading = remember(threadId, isThread) { mutableStateMapOf<String, Boolean>() }
+    val (prior, next) = vm.neighboursOf(threadId)
+    val at = vm.loadedPositionOf(threadId)
+    val total = vm.loadedRowCount()
+    val owner = LocalLifecycleOwner.current
+    LaunchedEffect(vm, owner) {
+        owner.lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
+            MailPollWorker.results.collect { vm.acceptPoll(it, atTop = false) }
+        }
+    }
 
-    LaunchedEffect(threadId, isThread) { if (isThread) vm.openThread(threadId) else vm.openMessage(threadId) }
+    fun file(message: MailMessageFullDto, action: MailAction, success: String) {
+        pendingAction = true
+        vm.actOn(message.id, action) { error ->
+            pendingAction = false
+            if (error == null) filed[message.id] = action
+            feedback[message.id] = (error ?: success) to (error != null)
+        }
+    }
+
+    LaunchedEffect(threadId, isThread) { if (isThread) vm.openThread(threadId, initialMessageId) else vm.openMessage(threadId) }
+    androidx.compose.runtime.DisposableEffect(vm, threadId, isThread) {
+        onDispose { vm.leaveReader(threadId, isThread) }
+    }
 
     Column(Modifier.fillMaxSize().background(palette.bg).statusBarsPadding()) {
         Row(
-            Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
+            Modifier.fillMaxWidth().padding(horizontal = 6.dp, vertical = 2.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Icon(Icons.Rounded.ArrowBack, "Back", tint = palette.textPrimary,
-                modifier = Modifier.size(24.dp).clip(CircleShape).clickable(onClick = onBack).padding(2.dp))
-            Spacer(Modifier.width(12.dp))
-            Text(if (thread.messages.size > 1) "${thread.messages.size} messages" else "Message",
-                fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = palette.textPrimary)
+            ReaderIcon(Icons.AutoMirrored.Rounded.ArrowBack, "Back", onClick = onBack)
             Spacer(Modifier.weight(1f))
-            // Step through the mail the list already showed, without walking
-            // back to it. The label counts LOADED rows, not the box's total:
-            // the device has seen twelve, so twelve is the honest range, and
-            // a chevron that ran off the end of what is actually here would
-            // be a button that goes nowhere.
-            run {
-                val (prior, next) = vm.neighboursOf(threadId)
-                val at = vm.loadedPositionOf(threadId)
-                val total = vm.loadedRowCount()
-                if (at > 0 && total > 1) {
-                    Text("$at of $total loaded", fontSize = 12.sp,
-                        color = palette.textTertiary)
-                    Spacer(Modifier.width(10.dp))
-                    Icon(Icons.Rounded.ChevronLeft, "Previous message",
-                        tint = if (prior != null) palette.textPrimary else palette.textTertiary,
-                        modifier = Modifier.size(26.dp).clip(CircleShape)
-                            .clickable(enabled = prior != null) { prior?.let(onStepPrev) }
-                            .testTag("mail-thread-prev"))
-                    Spacer(Modifier.width(6.dp))
-                    Icon(Icons.Rounded.ChevronRight, "Next message",
-                        tint = if (next != null) palette.textPrimary else palette.textTertiary,
-                        modifier = Modifier.size(26.dp).clip(CircleShape)
-                            .clickable(enabled = next != null) { next?.let(onStepNext) }
-                            .testTag("mail-thread-next"))
-                    Spacer(Modifier.width(12.dp))
+            active?.let { message ->
+                if (mailbox.box !in listOf(MailBox.Archive, MailBox.Spam, MailBox.Trash)) {
+                    ReaderIcon(Icons.Rounded.Archive, "Archive message",
+                        enabled = !pendingAction && filed[message.id] == null) {
+                        file(message, MailAction.Archive, "Message archived.")
+                    }
+                }
+                if (mailbox.box != MailBox.Trash) {
+                    ReaderIcon(Icons.Rounded.DeleteOutline, "Move message to Trash",
+                        enabled = !pendingAction && filed[message.id] != MailAction.Trash) {
+                        file(message, MailAction.Trash, "Message moved to Trash.")
+                    }
+                }
+                if (message.isRead) {
+                    ReaderIcon(Icons.Rounded.MarkEmailUnread, "Mark unread",
+                        enabled = !pendingAction, modifier = Modifier.testTag("mail-mark-unread")) {
+                        pendingAction = true
+                        vm.markUnread(message.id) { error ->
+                            pendingAction = false
+                            feedback[message.id] = (error ?: "Marked unread.") to (error != null)
+                        }
+                    }
                 }
             }
-            if (thread.messages.firstOrNull()?.isStarred == true) {
-                Icon(Icons.Rounded.Star, "Starred", tint = palette.star, 
-                    modifier = Modifier.size(22.dp))
+            if (prior != null || next != null) {
+                Box {
+                    ReaderIcon(Icons.Rounded.MoreVert, "Navigate messages") { showNavigation = true }
+                    DropdownMenu(
+                        expanded = showNavigation,
+                        onDismissRequest = { showNavigation = false },
+                        containerColor = palette.card,
+                        shape = RoundedCornerShape(16.dp),
+                    ) {
+                        if (at > 0 && total > 1) {
+                            Text("$at of $total loaded", fontSize = 12.sp, color = palette.textSecondary,
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp))
+                        }
+                        DropdownMenuItem(text = { Text("Previous message") }, enabled = prior != null,
+                            modifier = Modifier.testTag("mail-thread-prev"), onClick = {
+                                showNavigation = false
+                                prior?.let(onStepPrev)
+                            })
+                        DropdownMenuItem(text = { Text("Next message") }, enabled = next != null,
+                            modifier = Modifier.testTag("mail-thread-next"), onClick = {
+                                showNavigation = false
+                                next?.let(onStepNext)
+                            })
+                    }
+                }
             }
         }
 
@@ -172,44 +221,135 @@ fun ThreadScreen(
                 Text("This conversation could not be opened.", fontSize = 17.sp,
                     fontWeight = FontWeight.SemiBold, color = palette.textPrimary)
                 Spacer(Modifier.height(8.dp))
-                Text(thread.error!!, fontSize = 14.sp, color = palette.textSecondary)
+                Text("Check your connection and try again.", fontSize = 14.sp, color = palette.textSecondary)
                 Spacer(Modifier.height(16.dp))
                 com.grapsee.grapmail.ui.components.GradientButton("Try again", onClick = {
-                    if (isThread) vm.openThread(threadId) else vm.openMessage(threadId)
+                    if (isThread) vm.openThread(threadId, initialMessageId) else vm.openMessage(threadId)
                 })
             }
             return@Column
         }
 
-        LazyColumn(Modifier.fillMaxSize()) {
-            itemsIndexed(thread.messages, key = { _, message -> message.id }) { index, message ->
+        LazyColumn(
+            Modifier.weight(1f).fillMaxWidth(),
+            state = listState,
+            contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 8.dp, bottom = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            item(key = "subject") {
+                Row(Modifier.fillMaxWidth().padding(start = 6.dp, end = 2.dp, bottom = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(subject, fontSize = 24.sp, lineHeight = 30.sp,
+                            fontWeight = FontWeight.SemiBold, color = palette.textPrimary)
+                        Text(mailbox.box.title, fontSize = 11.sp, fontWeight = FontWeight.Medium,
+                            color = palette.primarySolid,
+                            modifier = Modifier.background(palette.softFill, CircleShape)
+                                .padding(horizontal = 8.dp, vertical = 3.dp))
+                    }
+                    if (active != null) {
+                        ReaderIcon(
+                            if (active.isStarred) Icons.Rounded.Star else Icons.Rounded.StarBorder,
+                            if (active.isStarred) "Unstar message" else "Star message",
+                            tint = if (active.isStarred) palette.star else palette.textSecondary,
+                        ) {
+                            vm.actOn(active.id, if (active.isStarred) MailAction.Unstar else MailAction.Star)
+                        }
+                    }
+                }
+            }
+            if (isThread && (thread.hasMore || thread.loadingEarlier)) {
+                item(key = "load-earlier") {
+                    Row(
+                        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
+                        horizontalArrangement = Arrangement.Center,
+                    ) {
+                        com.grapsee.grapmail.ui.components.OutlineButton(
+                            if (thread.loadingEarlier) "Loading earlier messages…" else "Load earlier messages",
+                            onClick = { if (!thread.loadingEarlier) vm.loadEarlierThread(threadId) },
+                            fill = false,
+                        )
+                    }
+                }
+            }
+            items(thread.messages, key = { it.id }) { message ->
                 ThreadMessageCard(
                     vm = vm,
                     message = message,
-                    expanded = index == thread.messages.lastIndex,
-                    busy = busy == message.id,
+                    expanded = active?.id == message.id,
+                    onExpand = { expandedMessageId = message.id },
+                    downloading = downloading,
                     e2e = e2e,
                     onReply = { mode -> onReply(message, mode) },
-                    onStar = {
-                        busy = message.id
-                        vm.actOn(message.id, if (message.isStarred) MailAction.Unstar else MailAction.Star)
-                        busy = null
-                    },
                     onDownload = { a ->
-                        busy = a.id
+                        downloading[a.id] = true
                         vm.downloadAttachment(a) { outcome ->
-                            busy = null
+                            downloading.remove(a.id)
                             notices[a.id] = outcome
                         }
                     },
                     notice = notices,
+                    openActions = showInitialActions && message.id == initialMessageId,
+                    onActionsOpened = { showInitialActions = false },
                 )
-                if (index < thread.messages.lastIndex) {
-                    Box(Modifier.fillMaxWidth().height(1.dp).background(palette.border))
-                }
             }
-            item { Spacer(Modifier.height(80.dp)) }
         }
+        active?.let { message ->
+            feedback[message.id]?.let { (text, isError) ->
+                Text(text, fontSize = 12.sp, color = if (isError) palette.error else palette.textSecondary,
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 4.dp))
+            }
+            ReaderReplyBar { mode -> onReply(message, mode) }
+            MailBottomBar(inboxSelected = true, unread = mailbox.unreadCount, onMail = onBack,
+                onContacts = onContacts, overList = false)
+        }
+    }
+}
+
+@Composable
+private fun ReaderIcon(
+    icon: ImageVector,
+    label: String,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    tint: androidx.compose.ui.graphics.Color = LocalPalette.current.textPrimary,
+    onClick: () -> Unit,
+) {
+    val palette = LocalPalette.current
+    IconButton(onClick = onClick, modifier = modifier, enabled = enabled) {
+        Icon(icon, label, modifier = Modifier.size(21.dp),
+            tint = if (enabled) tint else palette.textTertiary.copy(alpha = 0.55f))
+    }
+}
+
+@Composable
+private fun ReaderReplyBar(onReply: (String) -> Unit) {
+    val palette = LocalPalette.current
+    Column(Modifier.fillMaxWidth().background(palette.bg)) {
+        Spacer(Modifier.fillMaxWidth().height(1.dp).background(palette.border))
+        Row(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            ReaderReplyButton("Reply", Icons.AutoMirrored.Rounded.Reply, Modifier.weight(1f)) { onReply("reply") }
+            ReaderReplyButton("Forward", Icons.AutoMirrored.Rounded.Forward, Modifier.weight(1f)) { onReply("forward") }
+            ReaderIcon(Icons.AutoMirrored.Rounded.ReplyAll, "Reply all",
+                modifier = Modifier.size(46.dp).background(palette.softFill, CircleShape),
+                tint = palette.primarySolid) { onReply("all") }
+        }
+    }
+}
+
+@Composable
+private fun ReaderReplyButton(label: String, icon: ImageVector, modifier: Modifier, onClick: () -> Unit) {
+    val palette = LocalPalette.current
+    Row(modifier.height(48.dp).clip(CircleShape).background(palette.softFill)
+        .clickable(role = Role.Button, onClick = onClick).padding(horizontal = 6.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
+        verticalAlignment = Alignment.CenterVertically) {
+        Icon(icon, null, tint = palette.primarySolid, modifier = Modifier.size(18.dp))
+        Text(label, fontSize = 14.sp, fontWeight = FontWeight.SemiBold,
+            color = palette.primarySolid, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }
 
@@ -218,12 +358,14 @@ private fun ThreadMessageCard(
     vm: MailboxViewModel,
     message: MailMessageFullDto,
     expanded: Boolean,
-    busy: Boolean,
+    onExpand: () -> Unit,
+    downloading: Map<String, Boolean>,
     e2e: com.grapsee.grapmail.logic.E2eViewModel,
     onReply: (String) -> Unit,
-    onStar: () -> Unit,
     onDownload: (MailAttachmentDto) -> Unit,
     notice: Map<String, String>,
+    openActions: Boolean = false,
+    onActionsOpened: () -> Unit = {},
 ) {
     val palette = LocalPalette.current
     val context = androidx.compose.ui.platform.LocalContext.current
@@ -237,12 +379,15 @@ private fun ThreadMessageCard(
     // "nothing received it" has to be said here rather than left as a button
     // that appeared to do nothing.
     var shareNote by androidx.compose.runtime.remember(message.id) { mutableStateOf<String?>(null) }
-    // The reader's own read/unread control reports into these two lines, not
-    // into the list's stale-read banner: the banner is on a screen the person
-    // has left. Accepted and refused are different sentences, so they are kept
-    // apart — an absent error is not evidence of a write.
-    var unreadDone by androidx.compose.runtime.remember(message.id) { mutableStateOf(false) }
-    var unreadNote by androidx.compose.runtime.remember(message.id) { mutableStateOf<String?>(null) }
+    var showDetails by remember(message.id) { mutableStateOf(false) }
+    var showActions by remember(message.id) { mutableStateOf(false) }
+    LaunchedEffect(openActions, expanded) {
+        if (openActions && expanded) {
+            showActions = true
+            onActionsOpened()
+        }
+    }
+    var renderAttempt by remember(message.id) { mutableStateOf(0) }
     // The images the sender's HTML part points at, and whether this message has
     // asked for them. Both belong to the message: stepping from here must not
     // carry an opt-in that was given for somebody else's mail.
@@ -250,166 +395,175 @@ private fun ThreadMessageCard(
     // The formatted body is fetched when the card composes and again when the
     // images gate is answered — the two variants are different renders, and
     // the model memoises both per message.
-    var openEarlierMessage by remember(message.id) { mutableStateOf(false) }
-    val showsBody = expanded || openEarlierMessage
+    val showsBody = expanded
     var detailsError by remember(message.id) { mutableStateOf<String?>(null) }
     var detailsAttempt by remember(message.id) { mutableStateOf(0) }
     LaunchedEffect(message.id, showsBody, detailsAttempt) {
         if (showsBody) detailsError = vm.viewMessage(message.id)
     }
     val needsFormattedBody = showsBody && !message.isE2eEncrypted && message.e2eEnvelope == null &&
-        !message.bodyHtml.isNullOrBlank()
-    val render by produceState<MailboxViewModel.BodyRender?>(null, message.id, shownImages, needsFormattedBody) {
-        value = null
-        if (needsFormattedBody) value = vm.loadBody(message.id, shownImages)
-    }
-    val hiddenImages by produceState(emptyList<String>(), message.bodyHtml, needsFormattedBody) {
-        value = if (needsFormattedBody) {
-            withContext(Dispatchers.Default) { remoteImageUrls(message.bodyHtml) }
-        } else emptyList()
+        message.hasHtml
+    var render by remember(message.id) { mutableStateOf<MailboxViewModel.BodyRender?>(null) }
+    var renderLoading by remember(message.id) { mutableStateOf(false) }
+    LaunchedEffect(message.id, shownImages, needsFormattedBody, renderAttempt) {
+        if (!needsFormattedBody) {
+            render = null
+            renderLoading = false
+            return@LaunchedEffect
+        }
+        renderLoading = true
+        val loaded = vm.loadBody(message.id, shownImages)
+        if (loaded.error == null || render == null) render = loaded
+        renderLoading = false
     }
     // The sender's own `List-Unsubscribe` offer, narrowed to an http(s) address by
     // the same rule iOS applies. Null means show nothing: a button that opens a
     // broken or dangerous URL is worse than no button, and most mail simply has no
     // such header.
     val unsubUrl = unsubscribeTarget(message.unsubscribe)
-    Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 16.dp)) {
-        Text(
-            message.subject?.takeIf { it.isNotBlank() } ?: "(no subject)",
-            fontSize = 19.sp, fontWeight = FontWeight.Bold, color = palette.textPrimary,
-        )
-        Spacer(Modifier.height(2.dp))
-        Text(
-            message.createdAt?.let { absoluteDateTimeOrRaw(it) } ?: "Time not recorded",
-            fontSize = 12.sp, color = palette.textTertiary,
-        )
-
-        Spacer(Modifier.height(14.dp))
+    val shape = RoundedCornerShape(20.dp)
+    val sender = message.from?.display?.takeIf { it.isNotBlank() }
+        ?: message.from?.address?.takeIf { it.isNotBlank() } ?: "Unknown sender"
+    val recipient = message.to.firstOrNull().orEmpty()
+    Column(
+        Modifier.fillMaxWidth().clip(shape).background(palette.card).border(1.dp, palette.border, shape)
+            .then(if (!expanded) Modifier.clickable(role = Role.Button, onClick = onExpand) else Modifier)
+            .padding(horizontal = 14.dp, vertical = 14.dp),
+    ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            SenderAvatar(message.from?.display ?: "", message.from?.address, size = 38.dp)
-            Spacer(Modifier.width(10.dp))
+            SenderAvatar(sender, message.from?.address, size = 44.dp)
+            Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
-                Text(message.from?.display?.takeIf { it.isNotBlank() } ?: "Unknown sender",
-                    fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = palette.textPrimary)
-                message.from?.address?.let {
-                    Text(it, fontSize = 12.sp, color = palette.textSecondary, maxLines = 1,
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                    Text(sender, modifier = Modifier.weight(1f, fill = false), fontSize = 15.sp,
+                        fontWeight = FontWeight.SemiBold, color = palette.textPrimary, maxLines = 1,
                         overflow = TextOverflow.Ellipsis)
+                    mailTime(message.createdAt)?.let { date ->
+                        Text(date, fontSize = 11.sp, color = palette.textSecondary, maxLines = 1)
+                    }
+                }
+                if (expanded) {
+                    Row(Modifier.clickable(role = Role.Button) { showDetails = !showDetails }
+                        .padding(vertical = 5.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Text(if (recipient.isBlank()) "Message details" else "To $recipient",
+                            modifier = Modifier.weight(1f, fill = false), fontSize = 12.sp,
+                            color = palette.textSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Icon(Icons.Rounded.ExpandMore, null, tint = palette.textSecondary,
+                            modifier = Modifier.size(16.dp))
+                    }
+                } else {
+                    Text(
+                        if (message.isE2eEncrypted || message.e2eEnvelope != null) "Encrypted message"
+                        else message.bodyText?.takeIf { it.isNotBlank() } ?: "Show message",
+                        fontSize = 13.sp, lineHeight = 18.sp, color = palette.textSecondary,
+                        maxLines = 2, overflow = TextOverflow.Ellipsis,
+                    )
                 }
             }
-            Icon(
-                if (message.isStarred) Icons.Rounded.Star else Icons.Rounded.StarBorder,
-                if (message.isStarred) "Starred" else "Star",
-                tint = if (message.isStarred) palette.star else palette.textTertiary,
-                modifier = Modifier.size(20.dp).clip(CircleShape).clickable(onClick = onStar).padding(2.dp),
-            )
+            if (!expanded) {
+                Icon(Icons.Rounded.ExpandMore, "Show message", tint = palette.textSecondary,
+                    modifier = Modifier.padding(start = 8.dp).size(20.dp))
+            } else {
+                if (unsubUrl != null) {
+                    TextButton(onClick = { showUnsub = true }, modifier = Modifier.testTag("mail-unsubscribe")) {
+                        Text("Unsubscribe", fontSize = 12.sp, maxLines = 1)
+                    }
+                }
+                Box {
+                    ReaderIcon(Icons.Rounded.MoreVert, "Message actions") { showActions = true }
+                    DropdownMenu(
+                        expanded = showActions,
+                        onDismissRequest = { showActions = false },
+                        containerColor = palette.card,
+                        shape = RoundedCornerShape(16.dp),
+                    ) {
+                        DropdownMenuItem(text = { Text("Reply") }, onClick = { showActions = false; onReply("reply") })
+                        DropdownMenuItem(text = { Text("Share") }, modifier = Modifier.testTag("mail-share"), onClick = {
+                            showActions = false
+                            val intent = android.content.Intent(android.content.Intent.ACTION_SEND)
+                                .setType("text/plain")
+                                .putExtra(android.content.Intent.EXTRA_SUBJECT, message.subject.orEmpty())
+                                .putExtra(android.content.Intent.EXTRA_TEXT, messageShareText(message, render?.bodyText))
+                            try {
+                                context.startActivity(android.content.Intent.createChooser(intent, "Share message"))
+                            } catch (_: android.content.ActivityNotFoundException) {
+                                shareNote = "Nothing on this device can receive shared text."
+                            }
+                        })
+                        DropdownMenuItem(text = { Text("Print") }, modifier = Modifier.testTag("mail-print"), onClick = {
+                            showActions = false
+                            printMessageText(context, message, render?.bodyText) { outcome -> shareNote = outcome }
+                        })
+                    }
+                }
+            }
         }
 
-        Spacer(Modifier.height(10.dp))
-        Text("To", fontSize = 12.sp, color = palette.textTertiary)
-        Text(message.to.joinToString(", ").ifBlank { "Not recorded" },
-            fontSize = 13.sp, color = palette.textSecondary, maxLines = 2,
-            overflow = TextOverflow.Ellipsis)
-        if (message.cc.isNotEmpty()) {
-            Spacer(Modifier.height(4.dp))
-            Text("Cc ${message.cc.joinToString(", ")}", fontSize = 12.sp, color = palette.textSecondary)
+        if (!expanded) return@Column
+        if (showDetails) {
+            Column(Modifier.fillMaxWidth().padding(top = 10.dp).background(palette.bgTinted, RoundedCornerShape(12.dp))
+                .padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                message.from?.address?.let { Text("From $it", fontSize = 12.sp, color = palette.textSecondary) }
+                if (message.to.isNotEmpty()) Text("To ${message.to.joinToString(", ")}", fontSize = 12.sp, color = palette.textSecondary)
+                if (message.cc.isNotEmpty()) Text("Cc ${message.cc.joinToString(", ")}", fontSize = 12.sp, color = palette.textSecondary)
+                message.createdAt?.let { Text(absoluteDateTimeOrRaw(it), fontSize = 12.sp, color = palette.textSecondary) }
+            }
         }
-
         Spacer(Modifier.height(16.dp))
 
-        // The encrypted branch is a state of this layout, not another screen.
-        // The flag is the claim — the server sets `isE2eEncrypted` and stores
-        // its notice in place of the body, and the envelope is the ciphertext.
-        // The notice is never shown as if it were the message, and the
-        // ciphertext is never shown at all: only an opened body is.
-        if (!showsBody) {
-            com.grapsee.grapmail.ui.components.OutlineButton(
-                "Show message", onClick = { openEarlierMessage = true }, fill = false,
-            )
-        } else if (message.isE2eEncrypted || message.e2eEnvelope != null) {
+        if (message.isE2eEncrypted || message.e2eEnvelope != null) {
             EncryptedBlock(message, e2e)
         } else {
-            // HTML-first, matching the web's SafeEmailBody: when the message
-            // carries an HTML part, the reader renders the SERVER-sanitized
-            // body the endpoint answered with, never this row's raw markup —
-            // there is no sanitiser in this app's dependencies, and the raw
-            // string is never a render input. While the fetch is in flight,
-            // and if it fails, the stripped-text branch the screen always had
-            // is the visible fallback, said per message rather than hidden.
-            val htmlPart = message.bodyHtml?.takeIf { it.isNotBlank() }
-            val formatted = render?.takeIf { it.allowImages == shownImages }
-            if (htmlPart != null) {
-                when {
-                    formatted?.html != null -> {
-                        HtmlMailBody(
-                            html = formatted.html,
-                            allowImages = shownImages,
-                            onOpenLink = { url -> openExternally(context, url) },
-                            modifier = Modifier.testTag("mail-body"),
-                        )
+            val formatted = render
+            val blockedImages = formatted?.blockedImages ?: 0
+            if (blockedImages > 0 && formatted?.allowImages != true) {
+                Row(
+                    Modifier.fillMaxWidth().background(palette.bgTinted, RoundedCornerShape(12.dp))
+                        .padding(start = 12.dp, end = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Column(Modifier.weight(1f).padding(vertical = 8.dp)) {
+                        Text(if (shownImages && !renderLoading) "Images couldn’t load."
+                             else "$blockedImages remote image${if (blockedImages == 1) "" else "s"} hidden",
+                            fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = palette.textPrimary)
+                        Text("Loading them tells the sender this message was opened.",
+                            fontSize = 11.sp, lineHeight = 15.sp, color = palette.textSecondary)
                     }
-                    formatted?.error != null -> {
-                        HtmlStrippedNotice()
-                        Spacer(Modifier.height(6.dp))
-                        Text(formatted.error, fontSize = 12.sp, color = palette.textTertiary)
-                        Spacer(Modifier.height(8.dp))
-                        val fallback by produceState("", htmlPart) {
-                            value = withContext(Dispatchers.Default) { stripHtml(htmlPart) }
-                        }
-                        Text(fallback, fontSize = 15.sp,
-                            color = palette.textPrimary, lineHeight = 22.sp)
-                    }
-                    else -> {
-                        Text("Loading formatted message…", fontSize = 13.sp,
-                            color = palette.textTertiary,
-                            modifier = Modifier.testTag("mail-body-loading"))
-                    }
-                }
-            } else {
-                val text = message.bodyText
-                if (text.isNullOrBlank()) {
-                    Text("This message has no text body.", fontSize = 14.sp, color = palette.textSecondary)
-                } else {
-                    Text(text, fontSize = 15.sp, color = palette.textPrimary, lineHeight = 22.sp,
-                        modifier = Modifier.testTag("mail-body"))
-                }
-            }
-            // An HTML part can point at images that live on the SENDER's
-            // server. Fetching one is a request that carries this device's
-            // address to them and tells them the mail was opened, so nothing
-            // here is fetched until the person asks, for this message alone.
-            // The count is what the part references, not what arrives: an image
-            // the sender withdrew is still named here and fails on its own line
-            // below, which is the honest order of the two facts.
-            if (hiddenImages.isNotEmpty()) {
-                Spacer(Modifier.height(12.dp))
-                if (!shownImages) {
-                    Text(
-                        "${hiddenImages.size} image" +
-                            (if (hiddenImages.size == 1) "" else "s") +
-                            " in this message load from the sender's server, not " +
-                            "from GrapMail. " +
-                            "Loading them tells the sender this message was opened.",
-                        fontSize = 12.sp, color = palette.textSecondary,
-                    )
-                    Spacer(Modifier.height(8.dp))
-                    com.grapsee.grapmail.ui.components.OutlineButton(
-                        "Show images",
-                        onClick = { shownImages = true },
+                    TextButton(
+                        onClick = { if (shownImages) renderAttempt++ else shownImages = true },
+                        enabled = !shownImages || !renderLoading,
                         modifier = Modifier.testTag("mail-show-images"),
+                    ) { Text(if (shownImages && renderLoading) "Loading…" else "Show images", fontSize = 12.sp) }
+                }
+                Spacer(Modifier.height(10.dp))
+            }
+            if (message.hasHtml && formatted?.html != null) {
+                HtmlMailBody(
+                    html = formatted.html,
+                    allowImages = formatted.allowImages,
+                    onOpenLink = { url -> openExternally(context, url) },
+                    modifier = Modifier.testTag("mail-body"),
+                )
+            } else {
+                val text = message.bodyText?.takeIf { it.isNotBlank() }
+                    ?: formatted?.bodyText?.takeIf { it.isNotBlank() }
+                when {
+                    text != null || !message.hasHtml -> Text(
+                        text ?: "This message has no text body.", fontSize = 15.sp, lineHeight = 23.sp,
+                        color = palette.textPrimary, modifier = Modifier.testTag("mail-body"),
                     )
-                } else {
-                    // Said once, because the requests have already left by the
-                    // time this line draws — the images now load inside the
-                    // formatted body itself, so there is no per-image row to
-                    // draw below it.
-                    Text("These images load from the sender's server.",
-                        fontSize = 12.sp, color = palette.textTertiary)
+                    formatted?.error != null -> {
+                        Text("Couldn’t display this message.", fontSize = 13.sp, color = palette.textSecondary)
+                        TextButton(onClick = { renderAttempt++ }, enabled = !renderLoading) { Text("Retry") }
+                    }
+                    else -> LinearProgressIndicator(Modifier.fillMaxWidth().testTag("mail-body-loading"))
                 }
             }
         }
 
-        detailsError?.let { error ->
-            Text(error, fontSize = 12.sp, color = palette.textSecondary)
+        detailsError?.let {
+            Text("Couldn’t load message details.", fontSize = 12.sp, color = palette.textSecondary)
             androidx.compose.material3.TextButton(onClick = { detailsAttempt++ }) {
                 Text("Retry")
             }
@@ -422,19 +576,8 @@ private fun ThreadMessageCard(
                 fontSize = 12.sp, fontWeight = FontWeight.Bold, color = palette.textTertiary)
             Spacer(Modifier.height(8.dp))
             message.attachments.forEach { a ->
-                AttachmentRow(a, busy = busy, notice = notice[a.id], onDownload = { onDownload(a) })
+                AttachmentRow(a, busy = downloading[a.id] == true, notice = notice[a.id], onDownload = { onDownload(a) })
                 Spacer(Modifier.height(6.dp))
-            }
-        }
-
-        if (unsubUrl != null) {
-            Spacer(Modifier.height(12.dp))
-            com.grapsee.grapmail.ui.components.OutlineButton(
-                "Unsubscribe from this sender", onClick = { showUnsub = true },
-            )
-            unsubNote?.let {
-                Spacer(Modifier.height(6.dp))
-                Text(it, fontSize = 12.sp, color = palette.error)
             }
         }
 
@@ -462,87 +605,8 @@ private fun ThreadMessageCard(
             }
         }
 
-        Spacer(Modifier.height(14.dp))
-        // Three doors, same words as iOS's thread. `fill = false` is the fix,
-        // not a style choice: `OutlineButton` fills its width by default, and a
-        // Row measures each unweighted child against the space LEFT — so the
-        // first button took the whole row and "Reply all" and "Forward" were
-        // photographed at zero width in 74-mail-thread while iOS showed all
-        // three. Content-sized buttons fit the row (330dp of content in 379dp
-        // on the walk's device), and the trailing icons go with the fill: iOS
-        // draws these three as words alone, and two platforms disagreeing about
-        // which actions exist is the drift this sector's gates exist to catch.
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            com.grapsee.grapmail.ui.components.OutlineButton("Reply",
-                { onReply("reply") }, fill = false)
-            com.grapsee.grapmail.ui.components.OutlineButton("Reply all",
-                { onReply("all") }, fill = false)
-            com.grapsee.grapmail.ui.components.OutlineButton("Forward",
-                { onReply("forward") }, fill = false)
-        }
-        // Opening a message marks it read — the thread route does that on the
-        // server. Without a way back out of that state from here, reading one
-        // thing commits the person to having read it, and the only undo lives
-        // in the list's selection toolbar they have now left. Same route that
-        // toolbar uses, offered where the read actually happened, and only
-        // while the message is actually read: a "mark unread" button on mail
-        // that is already unread is a control wired to nothing.
-        Spacer(Modifier.height(10.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            if (message.isRead) {
-                com.grapsee.grapmail.ui.components.OutlineButton("Mark unread", {
-                    vm.markUnread(message.id) { outcome ->
-                        // Accepted and refused are different sentences, so they
-                        // are different states. Nothing here reads as success
-                        // because no error arrived.
-                        unreadDone = outcome == null
-                        unreadNote = outcome
-                    }
-                }, fill = false, modifier = Modifier.testTag("mail-mark-unread"))
-            }
-            com.grapsee.grapmail.ui.components.OutlineButton("Share", {
-                // The text the server actually holds, handed to the system
-                // chooser. Nothing is invented for the share card: an empty
-                // body shares the header and the subject, because that is
-                // what the message is. The HTML part is never the shared item
-                // — a receiving app would then be doing the rendering this app
-                // refused to do.
-                val intent = android.content.Intent(android.content.Intent.ACTION_SEND)
-                    .setType("text/plain")
-                    .putExtra(android.content.Intent.EXTRA_SUBJECT, message.subject ?: "")
-                    .putExtra(android.content.Intent.EXTRA_TEXT, messageShareText(message))
-                try {
-                    context.startActivity(
-                        android.content.Intent.createChooser(intent, "Share message"))
-                } catch (e: android.content.ActivityNotFoundException) {
-                    // No app to hand it to is a real state and gets said, not
-                    // swallowed: a button that appears to do nothing reads as
-                    // a broken app.
-                    shareNote = "Nothing on this device can receive shared text."
-                }
-            }, fill = false, modifier = Modifier.testTag("mail-share"))
-            com.grapsee.grapmail.ui.components.OutlineButton("Print", {
-                // The system's own print screen is the feedback when this
-                // succeeds, so only a refusal needs a line here — and a
-                // refusal is a real state on a device with no print service,
-                // not an error to swallow.
-                printMessageText(context, message) { outcome -> shareNote = outcome }
-            }, fill = false, modifier = Modifier.testTag("mail-print"))
-        }
-        if (unreadDone) {
-            Spacer(Modifier.height(8.dp))
-            // The button above has already gone: the thread's own copy of the
-            // message is flagged unread, so the control for the state that
-            // ended is not left on screen offering it again.
-            Text("Marked unread.", fontSize = 12.sp, color = palette.textSecondary)
-        }
-        unreadNote?.let {
-            Spacer(Modifier.height(8.dp))
-            Text(it, fontSize = 12.sp, color = palette.error)
-        }
-        shareNote?.let {
-            Spacer(Modifier.height(8.dp))
-            Text(it, fontSize = 12.sp, color = palette.error)
+        listOfNotNull(unsubNote, shareNote).forEach {
+            Text(it, fontSize = 12.sp, color = palette.textSecondary, modifier = Modifier.padding(top = 8.dp))
         }
     }
 }
@@ -643,21 +707,6 @@ private fun EncryptedNotice() {
 }
 
 @Composable
-private fun HtmlStrippedNotice() {
-    val palette = LocalPalette.current
-    Row(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(palette.warnChipBg)
-            .padding(horizontal = 12.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Icon(Icons.Rounded.AttachFile, null, tint = palette.warnInk, modifier = Modifier.size(15.dp))
-        Spacer(Modifier.width(8.dp))
-        Text("Plain-text view of an HTML message. Remote images and markup are not loaded.",
-            fontSize = 12.sp, color = palette.warnInk, modifier = Modifier.weight(1f))
-    }
-}
-
-@Composable
 private fun AttachmentRow(a: MailAttachmentDto, busy: Boolean, notice: String?, onDownload: () -> Unit) {
     val palette = LocalPalette.current
     Column(Modifier.fillMaxWidth()) {
@@ -703,23 +752,6 @@ fun humanBytes(n: Int): String = when {
     n < 1024 * 1024 -> "%.0f KB".format(n / 1024.0)
     else -> "%.1f MB".format(n / (1024.0 * 1024.0))
 }
-
-/**
- * Tags stripped for display only.
- *
- * This is not a sanitiser and is not used to make HTML safe to render — the
- * output is plain text, so markup cannot act on anything. It exists so a message
- * with only an HTML part is still readable instead of blank.
- */
-private fun stripHtml(html: String): String =
-    html.replace(Regex("(?is)<(script|style)[^>]*>.*?</\\1>"), "")
-        .replace(Regex("(?is)<br\\s*/?>"), "\n")
-        .replace(Regex("(?is)</p>"), "\n\n")
-        .replace(Regex("(?is)<[^>]+>"), "")
-        .replace("&nbsp;", " ").replace("&amp;", "&").replace("&lt;", "<")
-        .replace("&gt;", ">").replace("&quot;", "\"")
-        .replace(Regex("\n{3,}"), "\n\n")
-        .trim()
 
 /**
  * The unsubscribe confirmation. Reached only from a message that actually carries

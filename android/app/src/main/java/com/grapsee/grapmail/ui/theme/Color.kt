@@ -46,25 +46,31 @@ data class GrapMailColors(
      * dark value is the web theme's lifted star (`--gm-star`, `grapmail.css:111`).
      */
     val star: Color = Color(0xFFF5A623),
-    // Dark theme
-    val bgDark: Color = Color(0xFF070F18),
-    val cardDark: Color = Color(0xFF0C182A),
-    val inputFillDark: Color = Color(0xFF0D1521),
-    val borderDark: Color = Color(0xFF1B2A44),
-    val softFillDark: Color = Color(0xFF12233C),
+    // Dark theme. Repainted 2026-11-14 to the founder's mailbox reference: a
+    // neutral near-black canvas with clearly lighter cards, so the rounded card
+    // group the design centres on is actually visible — the old navy pair
+    // (#070F18 / #0C182A) differed by so little the rounding could not read.
+    // Brand blues and accents are untouched; only the neutral surfaces and
+    // their greys moved, from blue-tinted to warm-neutral (matching iOS's
+    // Theme.swift, same values).
+    val bgDark: Color = Color(0xFF0A0A0C),
+    val cardDark: Color = Color(0xFF141416),
+    val inputFillDark: Color = Color(0xFF1A1A1E),
+    val borderDark: Color = Color(0xFF2C2C31),
+    val softFillDark: Color = Color(0xFF232327),
     val buttonDisabledDark: Color = Color(0xFF1E3A66),
-    val textPrimaryDark: Color = Color(0xFFF1F5F9),
-    val textSecondaryDark: Color = Color(0xFF8FA3C0),
-    val textTertiaryDark: Color = Color(0xFF5E7290),
+    val textPrimaryDark: Color = Color(0xFFEAEAEA),
+    val textSecondaryDark: Color = Color(0xFF9E9EA5),
+    val textTertiaryDark: Color = Color(0xFF67676D),
     val successDark: Color = Color(0xFF34D399),
     val errorDark: Color = Color(0xFFF87171),
-    val stepInactiveDark: Color = Color(0xFF1B2A44),
+    val stepInactiveDark: Color = Color(0xFF2C2C31),
     val successChipBgDark: Color = Color(0xFF0A2A23),
     val successInkDark: Color = Color(0xFF34D399),
     val warnChipBgDark: Color = Color(0xFF2B1F0B),
     val warnInkDark: Color = Color(0xFFF5A623),
-    val cardAltDark: Color = Color(0xFF0B1626),
-    val otpFillDark: Color = Color(0xFF0A1220),
+    val cardAltDark: Color = Color(0xFF1C1C20),
+    val otpFillDark: Color = Color(0xFF141418),
     // Dark variants lifted for the same reason the light pair exists: a swipe
     // background sits behind a row that is sliding away, so it has to read as a
     // deliberate colour on both themes rather than as a dark rectangle.

@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
+<meta name="theme-color" content="#020b1d"/>
+<title>GrapMail — Scene 03 · Tame the Clutter</title>
+<style>
+:root{color-scheme:dark;--aqua:#8cfff7;--blue:#268dff;--white:#e9f9ff;--ease:cubic-bezier(.18,.85,.22,1)}
+*{box-sizing:border-box}html,body{margin:0;height:100%;width:100%;background:#020b1d;overflow:hidden}body{display:grid;place-items:center;font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:var(--white);-webkit-tap-highlight-color:transparent;user-select:none}body:before{content:"";position:fixed;inset:-20%;background:radial-gradient(ellipse at 50% 52%,#123c80 0,#081c41 25%,#030f29 48%,#010717 76%);pointer-events:none;animation:sky 12s ease-in-out infinite alternate}body:after{content:"";position:fixed;inset:0;background:radial-gradient(ellipse at 55% 61%,#0467f818,transparent 65%),linear-gradient(125deg,transparent 45%,#278afd0b 54%,transparent 60%);pointer-events:none}@keyframes sky{to{transform:scale(1.07) rotate(2deg)}}
+.viewport{position:relative;width:100%;max-width:440px;height:100%;max-height:560px;aspect-ratio:440/560;margin:0 auto;overflow:visible;isolation:isolate}
+#stage{position:absolute;left:0;top:0;width:440px;height:560px;transform-origin:0 0;isolation:isolate;will-change:transform;overflow:visible}
+#sparks{width:440px;height:560px;position:absolute;inset:0;z-index:0;pointer-events:none}
+svg.art{position:absolute;inset:0;width:440px;height:560px;z-index:1;overflow:visible;pointer-events:none}
+#ambientRing{transform-origin:220px 250px;animation:spin 38s linear infinite}#innerRing{transform-origin:220px 250px;animation:spin 26s linear infinite reverse}#tracer{stroke-dasharray:42 740;animation:travel 6s linear infinite}@keyframes spin{to{transform:rotate(360deg)}}@keyframes travel{to{stroke-dashoffset:-782}}
+#portal{opacity:0;transform:translateY(20px) scale(.8);transform-origin:220px 245px;transition:transform 1.15s var(--ease),opacity .8s}
+.phase-entry #portal,.phase-flood #portal,.phase-sort #portal,.phase-action #portal,.phase-effect #portal,.phase-finale #portal{opacity:1;transform:translateY(0) scale(1)}
+#letterGlyph{opacity:.65;transform-origin:220px 252px;animation:softBreath 3.7s ease-in-out infinite alternate}@keyframes softBreath{to{transform:scale(1.05);opacity:1}}
+#floorLight{transform-origin:220px 462px;animation:floorPulse 3.8s ease-in-out infinite alternate}@keyframes floorPulse{to{transform:scaleX(1.15);opacity:.95}}
+#mailbox{opacity:0;transform:translateY(35px) scale(.91);transform-origin:220px 414px;transition:transform 1.1s var(--ease),opacity .8s}
+.phase-entry #mailbox,.phase-flood #mailbox,.phase-sort #mailbox,.phase-action #mailbox,.phase-effect #mailbox,.phase-finale #mailbox{opacity:1;transform:translateY(0) scale(1)}
+#drawer{opacity:0;transform:translateY(48px) scale(.65);transform-origin:220px 307px;transition:opacity .43s ease,transform .68s cubic-bezier(.2,.9,.24,1)}
+.phase-sort #drawer,.phase-action #drawer,.phase-effect #drawer{opacity:1;transform:translateY(0) scale(1)}
+.phase-finale #drawer{opacity:0;transform:translateY(32px) scale(.65)}
+#stacklines{animation:shimmer 3.1s ease-in-out infinite alternate}@keyframes shimmer{to{opacity:.42}}
+#cleanRays{opacity:0;transform-origin:220px 270px;transform:scale(.6);transition:transform .7s var(--ease),opacity .55s}
+.phase-finale #cleanRays{opacity:1;transform:scale(1)}
+.newsletter{position:absolute;width:142px;height:101px;border-radius:17px;z-index:4;overflow:hidden;opacity:0;transform:var(--arrive);background:linear-gradient(148deg,#79d4ff32 0,#21599eeb 42%,#0a2049f7 100%);border:1px solid #b4eeff95;box-shadow:inset 0 1px #ffffffa6,0 18px 33px #000d2ba6,0 0 17px #2a83ff50;backdrop-filter:blur(5px);-webkit-backdrop-filter:blur(5px);transition:transform .74s cubic-bezier(.18,.85,.2,1),opacity .38s,filter .38s;will-change:transform,opacity}
+.newsletter:before{content:"";position:absolute;left:-38px;top:-70px;width:90px;height:225px;transform:rotate(28deg);background:linear-gradient(90deg,transparent,#e1f9ff25,transparent)}
+.newsletter .stripe{height:3px;background:linear-gradient(90deg,#1177ff,#89faff,#167aff);opacity:.9}
+.newsletter .n-inner{padding:11px 10px;display:flex;align-items:center;gap:8px}
+.n-mark{height:32px;width:32px;border-radius:10px;display:grid;place-items:center;flex:none;font-size:15px;font-weight:800;color:white;background:linear-gradient(135deg,var(--mark1),var(--mark2));box-shadow:0 0 16px #4b8eff69}
+.n-info{min-width:0}.n-info strong{display:block;font-size:10px;letter-spacing:.02em;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}.n-info small{display:block;font-size:8.4px;color:#b9d5f5;margin-top:4px;white-space:nowrap}.n-line{height:3px;position:absolute;bottom:14px;left:50px;right:15px;border-radius:5px;background:#a5d1ff4c}.n-line.short{bottom:8px;right:39px;opacity:.65}
+#m1{left:59px;top:147px;--arrive:translate(-240px,-95px) rotate(-41deg) scale(.5);--flood:translate(0,0) rotate(-18deg) scale(1);--sort:translate(91px,89px) rotate(-6deg) scale(.61)}
+#m2{left:200px;top:138px;--arrive:translate(270px,-140px) rotate(39deg) scale(.52);--flood:translate(0,0) rotate(15deg) scale(1);--sort:translate(-39px,94px) rotate(5deg) scale(.61)}
+#m3{left:132px;top:189px;--arrive:translate(0,-300px) rotate(-35deg) scale(.5);--flood:translate(0,0) rotate(-5deg) scale(1);--sort:translate(18px,46px) rotate(0) scale(.61)}
+#m4{left:55px;top:254px;--arrive:translate(-240px,120px) rotate(-49deg) scale(.4);--flood:translate(0,0) rotate(-16deg) scale(.95);--sort:translate(102px,-10px) rotate(-3deg) scale(.61)}
+#m5{left:202px;top:253px;--arrive:translate(230px,170px) rotate(47deg) scale(.5);--flood:translate(0,0) rotate(17deg) scale(.97);--sort:translate(-43px,-16px) rotate(3deg) scale(.61)}
+#m6{left:135px;top:272px;--arrive:translate(10px,270px) rotate(30deg) scale(.5);--flood:translate(0,0) rotate(1deg) scale(.95);--sort:translate(15px,-25px) rotate(0) scale(.61)}
+.phase-flood .newsletter{opacity:1;transform:var(--flood)}
+.phase-sort .newsletter{opacity:.7;transform:var(--sort);filter:brightness(.85)}
+.phase-action .newsletter,.phase-effect .newsletter{opacity:0;transform:var(--sort) scale(.2);filter:brightness(1.8)}
+.phase-finale .newsletter{opacity:0;transform:var(--sort) scale(.1)}
+#featured{position:absolute;z-index:6;left:122px;top:181px;width:196px;height:119px;padding:15px 14px 10px;border-radius:22px;opacity:0;pointer-events:none;transform:translateY(47px) rotate(-8deg) scale(.62);background:linear-gradient(136deg,#95e0ff50,#1c61b2f2 35%,#081a3eed);border:1px solid #b9f0ffbd;box-shadow:inset 0 1px #efffffa3,0 20px 40px #00122cb3,0 0 38px #278aff6b;backdrop-filter:blur(13px);-webkit-backdrop-filter:blur(13px);transition:transform .7s var(--ease),opacity .45s,filter .3s;will-change:transform,opacity}
+#featured:before{content:"";position:absolute;inset:5px;border-radius:18px;border:1px solid #9fe8ff26;pointer-events:none}
+#featured .feature-top{display:flex;align-items:center;gap:10px}
+#featured .feature-icon{width:39px;height:39px;border-radius:12px;background:linear-gradient(130deg,#6ad0ff,#2566c3);display:grid;place-items:center;flex:none;font-weight:800;font-size:20px;color:#fff}
+#featured h2{font-size:13px;line-height:1.18;font-weight:750;letter-spacing:.04px;margin:0 0 4px;white-space:nowrap}#featured p{font-size:10px;margin:0;color:#bfd9f6}#featured .fake-line{height:4px;background:#d1efff44;border-radius:5px;margin:15px 3px 0 48px}#featured .fake-line.last{width:58%;margin-top:7px}
+.phase-action #featured{opacity:1;transform:translateY(0) rotate(-2deg) scale(1)}
+.phase-effect #featured{opacity:0;transform:translateY(-59px) rotate(11deg) scale(.32);filter:brightness(2.1)}
+#choice{position:absolute;left:77px;top:416px;width:286px;z-index:10;opacity:0;transform:translateY(35px) scale(.9);pointer-events:none;padding:12px 13px 13px;border-radius:22px;background:linear-gradient(133deg,#255ca8e8,#0a2955f2 44%,#091a3bfa);border:1px solid #a4dcff91;box-shadow:inset 0 1px #edffff9e,0 15px 40px #000c2bbf,0 0 27px #278cff42;backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);transition:opacity .32s,transform .53s var(--ease)}
+.phase-action #choice{opacity:1;transform:translateY(0) scale(1);pointer-events:auto}
+#choice .choice-title{font-size:12px;font-weight:750;display:flex;gap:7px;align-items:center;color:#f2fdff}#choice .pill{font-size:8px;letter-spacing:1px;padding:4px 7px;border-radius:12px;background:#1868bd;color:#c3eeff}#choice .choice-desc{font-size:10px;color:#aacbea;margin:6px 0 11px}
+.buttons{display:flex;gap:8px}.buttons button{flex:1;height:35px;border-radius:10px;font-family:inherit;font-size:11px;font-weight:720;cursor:pointer;touch-action:manipulation;transition:transform .16s ease,filter .2s;border:1px solid #84d6ffc4;background:#133b72;color:#e6faff}.buttons button.primary{background:linear-gradient(120deg,#b2fff3,#49d5ff);color:#053452;border-color:#aafff1}.buttons button:active{transform:scale(.94)}.buttons button:focus-visible{outline:2px solid white;outline-offset:2px}
+#dial{position:absolute;z-index:9;left:145px;top:179px;width:152px;height:152px;opacity:0;pointer-events:none;transform:scale(.6) rotate(-35deg);transition:opacity .35s,transform .75s var(--ease);filter:drop-shadow(0 0 19px #66cbffac)}.phase-effect.snoozed #dial{opacity:1;transform:scale(1) rotate(0)}
+#result{position:absolute;z-index:12;left:50%;top:106px;transform:translate(-50%,17px);font-size:10px;text-transform:uppercase;font-weight:750;letter-spacing:2.5px;color:#bdf9ff;text-shadow:0 0 14px #25c9ffbb;opacity:0;white-space:nowrap;pointer-events:none;transition:transform .45s var(--ease),opacity .35s}#result.show{opacity:1;transform:translate(-50%,0)}
+#finalCard{position:absolute;z-index:7;top:218px;left:112px;width:216px;text-align:center;opacity:0;transform:translateY(28px) scale(.82);transition:opacity .65s,transform .68s var(--ease);pointer-events:none}#finalCard .check{width:54px;height:54px;border-radius:17px;margin:0 auto 12px;background:linear-gradient(135deg,#a1fff2,#2493ff 65%,#1252b3);box-shadow:0 0 30px #41baffae, inset 0 1px 0 #f7ffff;border:1px solid #d5ffff;display:grid;place-items:center}#finalCard strong{display:block;font-size:16px;letter-spacing:.1px}#finalCard small{display:block;color:#b0d6f6;font-size:10px;margin-top:7px}.phase-finale #finalCard{opacity:1;transform:translateY(0) scale(1)}
+#ghostFinger{position:absolute;z-index:12;left:263px;top:480px;width:24px;height:27px;opacity:0;pointer-events:none;filter:drop-shadow(0 0 8px #a7ffff99);transform:translate(43px,20px) scale(.78);transition:opacity .21s,transform .47s var(--ease)}#ghostFinger.show{opacity:1;transform:translate(0) scale(1)}#touchRing{position:absolute;z-index:11;left:257px;top:463px;width:42px;height:42px;border:2px solid #b6ffff;border-radius:50%;opacity:0;pointer-events:none}#touchRing.pop{animation:pop .58s ease-out}@keyframes pop{0%{opacity:.9;transform:scale(.2)}100%{opacity:0;transform:scale(1.35)}}
+#replay{position:absolute;right:62px;top:74px;z-index:15;width:27px;height:27px;background:#16488a67;border:1px solid #b0eaff5c;border-radius:50%;color:#aee9ff;display:grid;place-items:center;font-size:17px;cursor:pointer;opacity:.42;transition:opacity .2s;touch-action:manipulation}#replay:hover,#replay:focus-visible{opacity:1}#replay:focus-visible{outline:2px solid white}
+.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap}
+@media (prefers-reduced-motion:reduce){*,*:before,*:after{animation-duration:.001ms!important;animation-iteration-count:1!important;transition-duration:.001ms!important}#sparks{display:none}}
+</style>
+</head>
+<body>
+<main id="viewport" class="viewport" aria-label="GrapMail animated scene three: Tame the Clutter">
+<div id="stage">
+<canvas id="sparks" width="880" height="1120" aria-hidden="true"></canvas>
+<svg class="art" viewBox="0 0 440 560" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+<defs>
+  <radialGradient id="air"><stop stop-color="#1d73eb" stop-opacity=".46"/><stop offset=".46" stop-color="#1554b3" stop-opacity=".15"/><stop offset="1" stop-color="#135dbe" stop-opacity="0"/></radialGradient>
+  <radialGradient id="ground"><stop stop-color="#3bdcff" stop-opacity=".85"/><stop offset=".44" stop-color="#127fff" stop-opacity=".37"/><stop offset="1" stop-color="#137dff" stop-opacity="0"/></radialGradient>
+  <linearGradient id="circleEdge" x1="0" x2="1" y1="0" y2="1"><stop stop-color="#2277ef" stop-opacity=".12"/><stop offset=".45" stop-color="#a5faff" stop-opacity=".91"/><stop offset=".6" stop-color="#3a8fff" stop-opacity=".64"/><stop offset="1" stop-color="#1654d3" stop-opacity=".17"/></linearGradient>
+  <linearGradient id="glassShell" x1="0" x2=".9" y1="0" y2="1"><stop stop-color="#68c9ff" stop-opacity=".32"/><stop offset=".43" stop-color="#1b5fb0" stop-opacity=".14"/><stop offset="1" stop-color="#031a40" stop-opacity=".2"/></linearGradient>
+  <linearGradient id="mailBack" x1="0" x2="1" y1="0" y2="1"><stop stop-color="#5cc4ff"/><stop offset=".34" stop-color="#1686f6"/><stop offset="1" stop-color="#0c3ea7"/></linearGradient>
+  <linearGradient id="mailFront" x1="0" x2="1" y1="0" y2="1"><stop stop-color="#62c9ff"/><stop offset=".3" stop-color="#1c8fff"/><stop offset="1" stop-color="#063caa"/></linearGradient>
+  <linearGradient id="foldL" x1="0" x2="1" y1="0" y2="1"><stop stop-color="#83dfff"/><stop offset=".43" stop-color="#197ce7"/><stop offset="1" stop-color="#0b419d"/></linearGradient>
+  <linearGradient id="foldR" x1="1" x2="0" y1="0" y2="1"><stop stop-color="#299eff"/><stop offset="1" stop-color="#08439f"/></linearGradient>
+  <linearGradient id="baseFold" x1="0" x2="1" y1="0" y2="1"><stop stop-color="#3799ff"/><stop offset=".58" stop-color="#0762d2"/><stop offset="1" stop-color="#063b98"/></linearGradient>
+  <linearGradient id="drawerGrad" x1="0" x2="1" y1="0" y2="1"><stop stop-color="#bcf4ff" stop-opacity=".62"/><stop offset=".4" stop-color="#2a8ff3" stop-opacity=".58"/><stop offset="1" stop-color="#0b356f" stop-opacity=".94"/></linearGradient>
+  <filter id="blur8" x="-100%" y="-100%" width="300%" height="300%"><feGaussianBlur stdDeviation="8"/></filter>
+  <filter id="blur16" x="-100%" y="-100%" width="300%" height="300%"><feGaussianBlur stdDeviation="16"/></filter>
+</defs>
+<ellipse cx="220" cy="252" rx="193" ry="239" fill="url(#air)" opacity=".83"/>
+<path d="M12 173 C84 128 147 85 240 120 S376 108 431 63" stroke="#278cff" stroke-opacity=".23" stroke-width="1" fill="none"/>
+<path d="M17 471 C155 515 290 520 425 467" stroke="#4796ff" stroke-opacity=".24" stroke-width=".8" fill="none"/>
+<g id="ambientRing"><ellipse cx="220" cy="252" rx="178" ry="91" transform="rotate(-31 220 252)" stroke="url(#circleEdge)" stroke-width="1.5" fill="none"/></g>
+<g id="innerRing"><ellipse cx="220" cy="252" rx="146" ry="145" transform="rotate(27 220 252)" stroke="url(#circleEdge)" stroke-width="1" stroke-dasharray="1 13" fill="none" opacity=".5"/></g>
+<g id="portal">
+  <ellipse cx="220" cy="252" rx="123" ry="149" fill="none" stroke="#288aff" stroke-width="24" opacity=".17" filter="url(#blur16)"/>
+  <ellipse cx="220" cy="252" rx="125" ry="151" fill="url(#glassShell)" stroke="url(#circleEdge)" stroke-width="1.5"/>
+  <ellipse cx="220" cy="252" rx="112" ry="139" fill="none" stroke="#87d7ff" stroke-opacity=".3" stroke-width=".7"/>
+  <ellipse cx="220" cy="252" rx="97" ry="125" fill="#04326b" opacity=".14"/>
+  <path id="tracer" d="M220 101 A125 151 0 1 1 219.9 101" fill="none" stroke="#b2ffff" stroke-width="2.8" stroke-linecap="round" filter="url(#blur8)"/>
+  <g id="letterGlyph" opacity=".7"><rect x="176" y="212" width="88" height="63" rx="13" fill="#136fe2" fill-opacity=".15" stroke="#91e9ff" stroke-opacity=".6" stroke-width="2"/><path d="M178 217 L220 246 L262 217" fill="none" stroke="#d6faff" stroke-width="2.3"/></g>
+</g>
+<g id="drawer">
+  <rect x="145" y="277" width="150" height="108" rx="21" fill="#208fff" opacity=".23" filter="url(#blur16)"/>
+  <rect x="140" y="274" width="160" height="102" rx="21" fill="url(#drawerGrad)" stroke="#9ff3ff" stroke-opacity=".65" stroke-width="1.4"/>
+  <rect x="150" y="282" width="140" height="90" rx="16" fill="#061e40" fill-opacity=".92" stroke="#69c2fa" stroke-opacity=".5"/>
+  <g id="stacklines" opacity=".83"><path d="M164 308 H276" stroke="#a1d9ff" stroke-opacity=".38" stroke-width="5" stroke-linecap="round"/><path d="M164 324 H250" stroke="#a1d9ff" stroke-opacity=".3" stroke-width="4" stroke-linecap="round"/><path d="M164 339 H272" stroke="#a1d9ff" stroke-opacity=".23" stroke-width="4" stroke-linecap="round"/></g>
+  <path d="M161 293 H279" stroke="#c2ffff" stroke-opacity=".56" stroke-width="1.4"/><rect x="183" y="351" width="74" height="15" rx="7.5" fill="#1587ed" fill-opacity=".34" stroke="#a1e9ff" stroke-opacity=".48"/>
+  <text x="220" y="361.5" font-family="Arial,sans-serif" font-size="8.8" text-anchor="middle" fill="#dafcff" letter-spacing="1.1">SUBSCRIPTIONS</text>
+</g>
+<g id="mailbox">
+  <ellipse id="floorLight" cx="220" cy="455" rx="131" ry="27" fill="url(#ground)"/>
+  <ellipse cx="220" cy="456" rx="92" ry="7" fill="#5edbff" opacity=".45" filter="url(#blur8)"/>
+  <path d="M91 378 L192 313 Q220 297 248 313 L349 378 V427 Q349 451 325 451 H115 Q91 451 91 427 Z" fill="url(#mailBack)" stroke="#79deff" stroke-width="1.5"/>
+  <path d="M121 362 L220 319 L319 362 V395 H121 Z" fill="#07295b" fill-opacity=".86" stroke="#79b8ed" stroke-opacity=".55"/>
+  <path d="M91 379 L213 415 Q220 418 227 415 L349 379 V427 Q349 451 326 451 H114 Q91 451 91 427Z" fill="url(#mailFront)" stroke="#70d9ff" stroke-width="1.7"/>
+  <path d="M93 380 L220 417 L92 438Z" fill="url(#foldL)"/>
+  <path d="M348 380 L220 417 L348 438Z" fill="url(#foldR)"/>
+  <path d="M92 437 L211 412 Q220 408 229 412 L347 437 Q343 451 326 451H114Q98 451 92 437 Z" fill="url(#baseFold)"/>
+  <path d="M92 379 L214 415 Q220 418 226 415 L348 379" stroke="#b9f7ff" stroke-width="1.5" stroke-opacity=".72" fill="none"/>
+  <path d="M102 443 C170 435 268 435 337 443" stroke="#b3efff" stroke-width="1" stroke-opacity=".4" fill="none"/>
+</g>
+<g id="cleanRays"><circle cx="220" cy="258" r="89" fill="none" stroke="#79eeff" stroke-opacity=".36" stroke-width="1"/><circle cx="220" cy="258" r="107" fill="none" stroke="#86beff" stroke-opacity=".19" stroke-width="1"/><path d="M220 137V151M220 367V381M99 257H112M328 257H341M134 172L144 182M295 333L305 343M305 172L295 182M145 333L135 343" stroke="#87ddff" stroke-width="2" stroke-linecap="round" opacity=".54"/></g>
+</svg>
+<div class="newsletter" id="m1" aria-hidden="true"><div class="stripe"></div><div class="n-inner"><div class="n-mark" style="--mark1:#6edcff;--mark2:#2679e8">M</div><div class="n-info"><strong>Morning Edit</strong><small>Today's highlights</small></div></div><div class="n-line"></div><div class="n-line short"></div></div>
+<div class="newsletter" id="m2" aria-hidden="true"><div class="stripe"></div><div class="n-inner"><div class="n-mark" style="--mark1:#ed97ff;--mark2:#8268ed">N</div><div class="n-info"><strong>News Weekly</strong><small>Issue #48 is here</small></div></div><div class="n-line"></div><div class="n-line short"></div></div>
+<div class="newsletter" id="m3" aria-hidden="true"><div class="stripe"></div><div class="n-inner"><div class="n-mark" style="--mark1:#77eeec;--mark2:#139ca9">D</div><div class="n-info"><strong>Design Notes</strong><small>Fresh inspiration</small></div></div><div class="n-line"></div><div class="n-line short"></div></div>
+<div class="newsletter" id="m4" aria-hidden="true"><div class="stripe"></div><div class="n-inner"><div class="n-mark" style="--mark1:#ffae8c;--mark2:#d463ad">S</div><div class="n-info"><strong>Shop Digest</strong><small>A special offer</small></div></div><div class="n-line"></div><div class="n-line short"></div></div>
+<div class="newsletter" id="m5" aria-hidden="true"><div class="stripe"></div><div class="n-inner"><div class="n-mark" style="--mark1:#a5c9ff;--mark2:#5d6ccf">C</div><div class="n-info"><strong>Creator Club</strong><small>Your weekly news</small></div></div><div class="n-line"></div><div class="n-line short"></div></div>
+<div class="newsletter" id="m6" aria-hidden="true"><div class="stripe"></div><div class="n-inner"><div class="n-mark" style="--mark1:#f5bd69;--mark2:#cd6e7f">P</div><div class="n-info"><strong>Product Letter</strong><small>Stories you'll love</small></div></div><div class="n-line"></div><div class="n-line short"></div></div>
+<div id="featured" aria-hidden="true"><div class="feature-top"><div class="feature-icon" id="featureIcon">M</div><div><h2 id="featureTitle">Morning Edit</h2><p id="featureDesc">Daily newsletter</p></div></div><div class="fake-line"></div><div class="fake-line last"></div></div>
+<div id="result" role="status" aria-live="polite">THE NOISE SETTLES</div>
+<div id="choice" role="group" aria-label="Demo newsletter actions" aria-hidden="true"><div class="choice-title"><span class="pill" id="choiceTag">SUBSCRIPTION</span><span id="choiceTitle">Take back your inbox</span></div><div class="choice-desc" id="choiceDesc">Keep the good mail. Quiet everything else.</div><div class="buttons"><button type="button" id="snooze" tabindex="-1">◷ &nbsp; Snooze</button><button type="button" id="unsubscribe" class="primary" tabindex="-1">✕ &nbsp; Unsubscribe</button></div></div>
+<svg id="dial" viewBox="0 0 152 152" aria-hidden="true"><defs><radialGradient id="dialGlass"><stop stop-color="#1d7bcb" stop-opacity=".82"/><stop offset="1" stop-color="#082c71" stop-opacity=".66"/></radialGradient></defs><circle cx="76" cy="76" r="70" fill="url(#dialGlass)" stroke="#a8efff" stroke-width="1.6"/><circle cx="76" cy="76" r="54" fill="none" stroke="#91dfff" stroke-opacity=".56" stroke-dasharray="2 7" stroke-width="1.2"/><path d="M76 39V76L104 92" stroke="#edffff" stroke-width="5" stroke-linecap="round" fill="none"/><circle cx="76" cy="76" r="5" fill="#e8ffff"/><text x="76" y="129" text-anchor="middle" font-size="10" font-family="Arial,sans-serif" letter-spacing=".9" fill="#d9faff">TOMORROW</text></svg>
+<div id="finalCard"><div class="check"><svg width="37" height="37" viewBox="0 0 37 37"><path d="M8 19L15 26L29 11" fill="none" stroke="#fff" stroke-width="4.2" stroke-linecap="round" stroke-linejoin="round"/></svg></div><strong>Room to breathe.</strong><small>Your attention is yours again.</small></div>
+<div id="ghostFinger" aria-hidden="true"><svg width="24" height="27" viewBox="0 0 26 28"><path d="M4 2V22L10 17L15 26L20 23L15 15L24 14Z" fill="#f2ffff" stroke="#0e3265" stroke-width="1.7" stroke-linejoin="round"/></svg></div>
+<div id="touchRing" aria-hidden="true"></div>
+<button id="replay" type="button" aria-label="Replay animation">↻</button>
+</div>
+</main>
+<p class="sr-only">A cinematic demonstration of GrapMail's newsletter and clutter controls. Incoming newsletters gather into a crowded inbox, organize into Subscriptions, and present options to Unsubscribe or Snooze. The demo runs automatically and repeats. Its interactions affect fictional messages only.</p>
+<script>
+(()=>{'use strict';
+const stage=document.getElementById('stage'),viewport=document.getElementById('viewport');
+const canvas=document.getElementById('sparks'),ctx=canvas.getContext('2d');
+const reduced=matchMedia('(prefers-reduced-motion: reduce)');
+const result=document.getElementById('result'),choice=document.getElementById('choice');
+const tag=document.getElementById('choiceTag'),title=document.getElementById('choiceTitle'),desc=document.getElementById('choiceDesc');
+const featureTitle=document.getElementById('featureTitle'),featureDesc=document.getElementById('featureDesc'),featureIcon=document.getElementById('featureIcon');
+const btnSnooze=document.getElementById('snooze'),btnStop=document.getElementById('unsubscribe'),pointer=document.getElementById('ghostFinger'),ring=document.getElementById('touchRing');
+const fit=()=>{let w=(viewport.getBoundingClientRect().width&&viewport.getBoundingClientRect().width>0)?viewport.getBoundingClientRect().width:440;stage.style.transform=`scale(${w/440})`};fit();addEventListener('resize',fit,{passive:true});
+let sequence=0,phase='',step=0,autoAction=0,allTimers=[],particles=[],lastParticle=0;
+const after=(fn,ms)=>{const t=setTimeout(fn,ms);allTimers.push(t);return t};
+function clearTimers(){allTimers.forEach(clearTimeout);allTimers=[];if(autoAction)clearTimeout(autoAction);autoAction=0;}
+function setPhase(next){phase=next;stage.classList.remove('phase-entry','phase-flood','phase-sort','phase-action','phase-effect','phase-finale','snoozed');stage.classList.add('phase-'+next)}
+function say(s){result.classList.remove('show');after(()=>{result.textContent=s;result.classList.add('show')},70)}
+function burst(x,y,amount=28,c='#91eaff',energy=2){const now=performance.now();for(let i=0;i<amount;i++){let a=Math.random()*Math.PI*2,v=(.35+Math.random())*energy;particles.push({x,y,vx:Math.cos(a)*v,vy:Math.sin(a)*v,born:now,ttl:600+Math.random()*850,size:.7+Math.random()*2,kind:c})}}
+function scatter(x,y){burst(x,y,52,'#80f9ff',4.2)}
+function reset(){sequence++;clearTimers();step=0;choice.setAttribute('aria-hidden','true');btnSnooze.tabIndex=-1;btnStop.tabIndex=-1;pointer.classList.remove('show');result.classList.remove('show');ring.classList.remove('pop');stage.className='';setPhase('entry');after(()=>say('INCOMING MAIL'),350);after(()=>{setPhase('flood');burst(211,225,34,'#7acbff',2.3)},850);after(()=>{setPhase('sort');say('EVERYTHING IN ITS PLACE');burst(220,307,40,'#88faff',2.2)},2600);after(()=>showFeature(1),3880)}
+function showFeature(index){step=index;setPhase('action');if(index===1){featureTitle.textContent='Morning Edit';featureDesc.textContent='Daily newsletter';featureIcon.textContent='M';featureIcon.style.background='linear-gradient(135deg,#5bd9ff,#2674d7)';tag.textContent='SUBSCRIPTION';title.textContent='Clean up in one tap';desc.textContent='Stop recurring mail, or save it for later';}else{featureTitle.textContent='Design Notes';featureDesc.textContent='Worth reading · tomorrow';featureIcon.textContent='D';featureIcon.style.background='linear-gradient(135deg,#73f0ec,#2675e8)';tag.textContent='FOR LATER';title.textContent='Not the right moment?';desc.textContent='Let this message return when you are ready';}result.classList.remove('show');choice.setAttribute('aria-hidden','false');btnSnooze.tabIndex=0;btnStop.tabIndex=0;autoAction=after(()=>take(index===1?'unsubscribe':'snooze',false),reduced.matches?1000:2100)}
+function automaticTap(type){pointer.classList.add('show');pointer.style.left=type==='snooze'?'159px':'293px';ring.style.left=type==='snooze'?'151px':'279px';after(()=>{ring.classList.remove('pop');void ring.offsetWidth;ring.classList.add('pop')},180);after(()=>pointer.classList.remove('show'),600)}
+function take(which,manual=true){if(phase!=='action')return;clearTimeout(autoAction);autoAction=0;choice.setAttribute('aria-hidden','true');btnSnooze.tabIndex=-1;btnStop.tabIndex=-1;if(!manual)automaticTap(which);const offset=manual?0:330;after(()=>{setPhase('effect');if(which==='snooze'){stage.classList.add('snoozed');say('BACK WHEN YOU ARE READY');burst(220,252,32,'#a7baff',1.6)}else{say('UNSUBSCRIBED');scatter(220,226)}},offset);after(()=>{if(step===1)showFeature(2);else finish()},reduced.matches?900:1590)}
+function finish(){setPhase('finale');say('YOUR INBOX. YOUR TERMS.');burst(220,263,48,'#8ffff1',2.9);after(()=>{result.classList.remove('show')},1700);after(reset,reduced.matches?2550:3550)}
+btnSnooze.addEventListener('click',()=>take('snooze'));btnStop.addEventListener('click',()=>take('unsubscribe'));document.getElementById('replay').addEventListener('click',reset);
+reduced.addEventListener?.('change',reset);
+function draw(t){if(document.hidden){requestAnimationFrame(draw);return}ctx.setTransform(2,0,0,2,0,0);ctx.clearRect(0,0,440,560);let time=t*.001;
+ for(let i=0;i<46;i++){let x=((i*97.213+Math.sin(time*.19+i)*11)%440),y=((i*74.91+Math.cos(time*.3+i)*9)%560),alpha=.17+.11*Math.sin(time*.7+i),size=i%9===0?1.2:.6;ctx.beginPath();ctx.arc(x,y,size,0,7);ctx.fillStyle=`rgba(141,210,255,${Math.max(0,alpha)})`;ctx.fill()}
+ let dt=Math.min(32,t-(lastParticle||t))/16.666;lastParticle=t;
+ if(!reduced.matches){for(let i=particles.length-1;i>=0;i--){let p=particles[i],age=t-p.born;if(age>p.ttl){particles.splice(i,1);continue}p.x+=p.vx*dt;p.y+=p.vy*dt;p.vx*=.989;p.vy=p.vy*.986+.008;let fade=(1-age/p.ttl);ctx.shadowBlur=11;ctx.shadowColor=p.kind;ctx.fillStyle=p.kind;ctx.globalAlpha=Math.max(0,fade*.88);ctx.beginPath();ctx.arc(p.x,p.y,p.size*fade,0,7);ctx.fill();ctx.globalAlpha=1;ctx.shadowBlur=0}}
+ requestAnimationFrame(draw)}
+if(!reduced.matches)requestAnimationFrame(draw);reset();
+})();
+</script>
+</body>
+</html>

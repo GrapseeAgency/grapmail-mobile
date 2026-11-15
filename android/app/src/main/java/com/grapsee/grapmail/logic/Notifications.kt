@@ -4,15 +4,29 @@ import android.Manifest
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.Color
+import android.graphics.Paint
+import android.graphics.Typeface
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import com.grapsee.grapmail.MainActivity
 import com.grapsee.grapmail.R
+import com.grapsee.grapmail.data.MailMessageDto
+import com.grapsee.grapmail.data.Api
+import com.grapsee.grapmail.data.MailAction
+import com.grapsee.grapmail.data.MailBox
+import com.grapsee.grapmail.data.MailStore
+import com.grapsee.grapmail.data.SessionStore
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 
 /**
  * The mail channel and the two producers it carries.
@@ -75,27 +89,79 @@ object Notifications {
         }
     }
 
+    // The entry-path ask is a once-per-install event. The flag records "asked",
+    // never "granted" — the system owns that answer — so a denial stays a state
+    // the notification settings screen can reverse without this ask repeating
+    // at the person, and a grant never gets asked about again.
+    private const val ASK_PREFS = "grapmail-notify-ask"
+    private const val ASKED_KEY = "asked"
+
+    /** True once per install, after the entry path has asked for the permission. */
+    fun wasPermissionAsked(context: Context): Boolean =
+        context.getSharedPreferences(ASK_PREFS, Context.MODE_PRIVATE).getBoolean(ASKED_KEY, false)
+
+    /** Record that the entry-path ask happened, whatever the person answered. */
+    fun markPermissionAsked(context: Context) {
+        context.getSharedPreferences(ASK_PREFS, Context.MODE_PRIVATE)
+            .edit().putBoolean(ASKED_KEY, true).apply()
+    }
+
     /**
      * Say what arrived. Returns false when nothing was posted — a denied
      * permission, or a system that would not take it — which the caller reports
      * as "nothing announced", never as a success.
      */
-    fun newMail(context: Context, grew: Int, total: Int): Boolean {
+    data class MailTarget(val messageId: String, val threadId: String?, val sessionId: String, val action: String)
+
+    const val OPEN_MAIL = "com.grapsee.grapmail.OPEN_MAIL"
+
+    fun target(intent: Intent?): MailTarget? {
+        if (intent?.action != OPEN_MAIL) return null
+        val id = intent.getStringExtra("messageId")?.takeIf { it.isNotBlank() } ?: return null
+        val session = intent.getStringExtra("sessionId") ?: return null
+        return MailTarget(id, intent.getStringExtra("threadId"), session, intent.getStringExtra("mailAction") ?: "open")
+    }
+
+    fun newMail(context: Context, grew: Int, total: Int, message: MailMessageDto? = null,
+                account: String? = null, sessionId: String? = null, image: Bitmap? = null): Boolean {
         if (!allowed(context)) return false
         ensureChannel(context)
+        val sender = message?.let { it.from?.display?.trim()?.takeIf(String::isNotEmpty) ?: "New sender" }
+        val summary = "$total unread in the inbox"
+        val subject = if (message?.isE2eEncrypted == true) "New encrypted message"
+        else message?.subject?.takeIf { it.isNotBlank() } ?: "(no subject)"
+        val target = if (message != null && sessionId != null) MailTarget(message.id, message.threadId, sessionId, "open") else null
+        val preview = message?.snippet?.trim()?.takeIf { it.isNotEmpty() && !message.isE2eEncrypted }
+        val expandedText = if (sender != null) listOfNotNull(subject, preview).joinToString("\n") else summary
+        val compactText = if (sender != null) listOfNotNull(subject, preview).joinToString(" · ") else summary
         val content = NotificationCompat.Builder(context, CHANNEL_NEW_MAIL)
             // The small icon is a monochrome alpha silhouette — the platform tints it;
             // the full-color mark only ever appears on the launcher and the splash.
             .setSmallIcon(R.mipmap.ic_launcher_monochrome)
-            .setContentTitle("$grew new message" + (if (grew == 1) "" else "s"))
-            .setContentText("$total unread in the inbox")
-            .setStyle(androidx.core.app.NotificationCompat.InboxStyle()
-                .setSummaryText("$total unread in the inbox"))
-            .setContentIntent(pendingOpen(context))
+            .setContentTitle(sender ?: "$grew new message" + (if (grew == 1) "" else "s"))
+            .setContentText(compactText)
+            .setSubText(account?.takeIf { it.isNotBlank() })
+            .setStyle(if (image != null) {
+                NotificationCompat.BigPictureStyle().bigPicture(image).setSummaryText(expandedText)
+            } else {
+                NotificationCompat.BigTextStyle().bigText(expandedText)
+            })
+            .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
+            .addExtras(android.os.Bundle().apply { putString("grapmail.session", sessionId) })
+            .apply {
+                if (sender != null) setLargeIcon(senderAvatar(sender, message?.from?.address ?: sender))
+                if (target != null) {
+                    addAction(0, "Archive", pendingUpdate(context, target.copy(action = "archive")))
+                    addAction(0, "Mark as read", pendingUpdate(context, target.copy(action = "read")))
+                    addAction(0, "Reply", pendingOpen(context, target.copy(action = "reply")))
+                    addAction(0, "More", pendingOpen(context, target.copy(action = "more")))
+                }
+            }
+            .setContentIntent(pendingOpen(context, target))
             .setAutoCancel(true)
             .build()
         return try {
-            NotificationManagerCompat.from(context).notify(NOTIFICATION_ID, content)
+            NotificationManagerCompat.from(context).notify(message?.id, NOTIFICATION_ID, content)
             true
         } catch (e: SecurityException) {
             // The grant can disappear between the check and the post. Said as a
@@ -105,39 +171,89 @@ object Notifications {
         }
     }
 
-    /**
-     * The push path's placeholder. The payload carries no content, so the only
-     * true sentence available is that the server sent a signal; the counted
-     * summary that follows replaces this under the same id. Returns false when
-     * the permission or the channel refused, exactly like [newMail].
-     */
-    fun pushSignal(context: Context, address: String?): Boolean {
-        if (!allowed(context)) return false
-        ensureChannel(context)
-        val content = NotificationCompat.Builder(context, CHANNEL_NEW_MAIL)
-            // The small icon is a monochrome alpha silhouette — the platform tints it;
-            // the full-color mark only ever appears on the launcher and the splash.
-            .setSmallIcon(R.mipmap.ic_launcher_monochrome)
-            .setContentTitle("New mail")
-            .setContentText(if (address.isNullOrBlank()) "A new-mail signal arrived for this account."
-            else "A new-mail signal arrived for $address.")
-            .setContentIntent(pendingOpen(context))
-            .setAutoCancel(true)
-            .build()
-        return try {
-            NotificationManagerCompat.from(context).notify(NOTIFICATION_ID, content)
-            true
-        } catch (e: SecurityException) {
-            false
-        }
+    private fun senderAvatar(sender: String, identity: String): Bitmap {
+        val bitmap = Bitmap.createBitmap(128, 128, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(bitmap)
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+        paint.color = Color.HSVToColor(floatArrayOf(Math.floorMod(identity.lowercase().hashCode(), 360).toFloat(), 0.65f, 0.63f))
+        canvas.drawCircle(64f, 64f, 64f, paint)
+        paint.color = Color.WHITE
+        paint.textSize = 56f
+        paint.textAlign = Paint.Align.CENTER
+        paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        val initial = String(Character.toChars(sender.codePointAt(0))).uppercase()
+        canvas.drawText(initial, 64f, 64f - (paint.ascent() + paint.descent()) / 2f, paint)
+        return bitmap
     }
 
-    private fun pendingOpen(context: Context) = PendingIntent.getActivity(
-        context, 0,
+    fun dismiss(context: Context, id: String) {
+        NotificationManagerCompat.from(context).cancel(id, NOTIFICATION_ID)
+    }
+
+    private fun pendingUpdate(context: Context, target: MailTarget) = PendingIntent.getBroadcast(
+        context, target.hashCode(),
+        Intent(context, MailNotificationActionReceiver::class.java).apply {
+            action = OPEN_MAIL
+            data = android.net.Uri.Builder().scheme("grapmail").authority("notification")
+                .appendPath(target.messageId).appendPath(target.action).build()
+            putExtra("messageId", target.messageId)
+            putExtra("sessionId", target.sessionId)
+            putExtra("mailAction", target.action)
+        },
+        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+    )
+
+    private fun pendingOpen(context: Context, target: MailTarget? = null) = PendingIntent.getActivity(
+        context, target?.hashCode() ?: 0,
         Intent(context, MainActivity::class.java).apply {
-            action = Intent.ACTION_MAIN
+            action = if (target == null) Intent.ACTION_MAIN else OPEN_MAIL
+            target?.let {
+                data = android.net.Uri.Builder().scheme("grapmail").authority("notification")
+                    .appendPath(it.messageId).appendPath(it.action).build()
+                putExtra("messageId", it.messageId)
+                putExtra("threadId", it.threadId)
+                putExtra("sessionId", it.sessionId)
+                putExtra("mailAction", it.action)
+            }
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
         },
         PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
     )
+}
+
+class MailNotificationActionReceiver : BroadcastReceiver() {
+    override fun onReceive(context: Context, intent: Intent) {
+        val target = Notifications.target(intent) ?: return
+        val action = when (target.action) {
+            "archive" -> MailAction.Archive
+            "read" -> MailAction.Read
+            else -> return
+        }
+        val pending = goAsync()
+        val app = context.applicationContext
+        PushSync.scope.launch {
+            try {
+                withTimeoutOrNull(8_000) {
+                    val session = com.grapsee.grapmail.data.SessionRefresh.forAccount(app, target.sessionId)
+                        ?: return@withTimeoutOrNull
+                    Api.mailAction(session.token, target.messageId, action)
+                    Notifications.dismiss(app, target.messageId)
+                    if (!SessionStore.isCurrent(app, session.id)) return@withTimeoutOrNull
+                    if (action == MailAction.Read) {
+                        MailStore.patchFlags(target.messageId, read = true, sessionContext = app, sessionId = session.id)
+                    } else {
+                        MailStore.remove(target.messageId, MailBox.Inbox, app, session.id)
+                        MailStore.invalidate(MailBox.Archive, app, session.id)
+                    }
+                    MailStore.invalidate(MailBox.Inbox, app, session.id)
+                    Notifications.dismiss(app, target.messageId)
+                }
+            } catch (error: Exception) {
+                if (error is kotlinx.coroutines.CancellationException) throw error
+                android.util.Log.w("GrapMailNotify", "Notification action failed: ${error.javaClass.simpleName}")
+            } finally {
+                pending.finish()
+            }
+        }
+    }
 }

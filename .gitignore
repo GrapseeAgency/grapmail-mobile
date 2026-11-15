@@ -1,5 +1,6 @@
 # Android
 android/.gradle/
+android/.kotlin/
 android/build/
 android/app/build/
 android/local.properties
@@ -14,6 +15,9 @@ ios/**/xcuserdata/
 
 # Screenshots from local runs (CI uploads them as artifacts)
 screenshots/
+welcome-shots/
+walk-shots-*/
+mail-home-shots-*/
 
 # OS
 .DS_Store

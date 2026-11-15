@@ -136,6 +136,7 @@ struct MailMessageFull: Decodable, Identifiable {
     var createdAt: String?
     var bodyText: String?
     var bodyHtml: String?
+    var hasHtml = false
     var inReplyTo: String?
     var sizeBytes: Int?
     /// The sealed envelope, opaque to the server and returned byte for byte.
@@ -147,7 +148,7 @@ struct MailMessageFull: Decodable, Identifiable {
     private enum CodingKeys: String, CodingKey {
         case id, threadId, direction, status, from, to, cc, subject, snippet,
              isRead, isStarred, hasAttachments, unsubscribe, isE2eEncrypted,
-             createdAt, bodyText, bodyHtml, inReplyTo, sizeBytes, e2eEnvelope,
+             createdAt, bodyText, bodyHtml, hasHtml, inReplyTo, sizeBytes, e2eEnvelope,
              attachments
     }
     init(from decoder: Decoder) throws {
@@ -169,6 +170,7 @@ struct MailMessageFull: Decodable, Identifiable {
         createdAt = c.lenientOpt(.createdAt)
         bodyText = c.lenientOpt(.bodyText)
         bodyHtml = c.lenientOpt(.bodyHtml)
+        hasHtml = c.lenient(.hasHtml, !(bodyHtml?.isEmpty ?? true))
         inReplyTo = c.lenientOpt(.inReplyTo)
         sizeBytes = c.lenientOpt(.sizeBytes)
         // The envelope is a JSON OBJECT on the wire — the server stores it
@@ -306,12 +308,16 @@ struct MailMessageResponse: Decodable {
 struct MailThreadResponse: Decodable {
     var success = false
     var messages: [MailMessageFull] = []
+    var nextCursor: String?
+    var hasMore = false
 
-    private enum CodingKeys: String, CodingKey { case success, messages }
+    private enum CodingKeys: String, CodingKey { case success, messages, nextCursor, hasMore }
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         success = c.lenient(.success, false)
         messages = c.lenient(.messages, [])
+        nextCursor = c.lenientOpt(.nextCursor)
+        hasMore = c.lenient(.hasMore, false)
     }
 }
 
@@ -326,23 +332,27 @@ struct MailThreadResponse: Decodable {
 /// raw `message.bodyHtml` from the row is never a render input: no sanitiser
 /// ships in this app, and the correct one is not a regex. Remote images are
 /// already neutralised in the response (`src` moved to
-/// `data-grapmail-blocked-src`) unless `?images=1` accompanied the request —
+/// `data-grapmail-blocked-src`) unless `remoteImages=true` accompanied the request —
 /// `blockedImages` is the honest count of what was blocked, and `bodyText` is
 /// the row's plain part echoed back for the no-HTML case, so a null `bodyHtml`
 /// means "there is no formatted view", not "the field went missing".
 struct MailBodyResponse: Decodable {
-    var success = false
+    var success = true
     var bodyHtml: String?
     var bodyText: String?
     var blockedImages = 0
+    var hasHtml = false
 
-    private enum CodingKeys: String, CodingKey { case success, bodyHtml, bodyText, blockedImages }
+    private enum CodingKeys: String, CodingKey {
+        case success, bodyHtml, html, bodyText, text, blockedImages, remoteImageCount, hasHtml
+    }
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
-        success = c.lenient(.success, false)
-        bodyHtml = c.lenientOpt(.bodyHtml)
-        bodyText = c.lenientOpt(.bodyText)
-        blockedImages = c.lenient(.blockedImages, 0)
+        success = c.lenient(.success, true)
+        bodyHtml = c.lenientOpt(.bodyHtml) ?? c.lenientOpt(.html)
+        bodyText = c.lenientOpt(.bodyText) ?? c.lenientOpt(.text)
+        blockedImages = c.lenientOpt(.blockedImages) ?? c.lenient(.remoteImageCount, 0)
+        hasHtml = c.lenient(.hasHtml, !(bodyHtml?.isEmpty ?? true))
     }
 }
 
@@ -1225,6 +1235,7 @@ struct MailDraftRequest: Encodable {
     var cc: [String] = []
     var subject: String = ""
     var bodyText: String = ""
+    var bodyHtml: String? = nil
     var inReplyTo: String? = nil
     /// The draft row this save updates, when there is one. Absent on a first
     /// save (the route inserts), present on every autosave after it (the route
@@ -1353,6 +1364,16 @@ extension ApiClient {
         try await mailGet("/me", bearer: token)
     }
 
+    static func parkedAccountUnread(_ address: String) async -> Int? {
+        guard let token = SessionStore.unreadToken(for: address),
+              let url = URL(string: "\(base)\(mailBase)/stats") else { return nil }
+        var request = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 3)
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        guard let (data, response) = try? await URLSession.shared.data(for: request),
+              (response as? HTTPURLResponse)?.statusCode == 200 else { return nil }
+        return (try? decoder.decode(MailStatsResponse.self, from: data))?.inbox?.unread
+    }
+
     static func mailStats(_ token: String) async throws -> MailStatsResponse {
         try await mailGet("/stats", bearer: token)
     }
@@ -1384,23 +1405,33 @@ extension ApiClient {
     }
 
     static func mailMessage(token: String, id: String) async throws -> MailMessageResponse {
-        try await mailGet("/message/\(id.percentEncodedPath())", bearer: token)
+        try await mailGet("/message/\(id.percentEncodedPath())?native=1", bearer: token)
     }
 
-    static func mailThread(token: String, threadId: String) async throws -> MailThreadResponse {
-        try await mailGet("/thread/\(threadId.percentEncodedPath())", bearer: token)
+    static func notificationMessage(token: String, id: String) async throws -> (MailMessageFull, Data)? {
+        let (data, response) = try await mailBinary(
+            url: URL(string: "\(base)\(mailBase)/message/\(id.percentEncodedPath())/notification-preview"),
+            method: "GET", bearer: token, body: nil, contentType: nil)
+        guard (200..<300).contains(response.statusCode) else { throw mailFailure(data: data, http: response) }
+        guard let message = try decoder.decode(MailMessageResponse.self, from: data).message,
+              message.id == id else { return nil }
+        return (message, data)
+    }
+
+    static func mailThread(token: String, threadId: String, before: String? = nil) async throws -> MailThreadResponse {
+        let cursor = before.map { "&before=\($0.percentEncodedQuery())" } ?? ""
+        return try await mailGet("/thread/\(threadId.percentEncodedPath())?native=1\(cursor)", bearer: token)
     }
 
     /// `GET /message/:id/body` — the reader's render body. The web app
-    /// sanitizes the message's HTML part with its own `sanitizeEmailHtml`
-    /// profile before answering, so this response is the only HTML a renderer
+    /// filters the message's HTML and applies the requested design profile before answering, so this response is the only HTML a renderer
     /// here may load; `allowImages` is the reader's images-gate opt-in, sent
-    /// as `?images=1` only when the person asked for this message's remote
+    /// as `remoteImages=true` only when the person asked for this message's remote
     /// images. Throws like every other call — the model decides what the
     /// reader falls back to (the stripped-text branch it always had).
     static func mailBody(token: String, id: String, allowImages: Bool) async throws -> MailBodyResponse {
-        let query = allowImages ? "?images=1" : ""
-        return try await mailGet("/message/\(id.percentEncodedPath())/body\(query)", bearer: token)
+        let query = "?preserveDesign=true" + (allowImages ? "&remoteImages=true" : "")
+        return try await mailGet("/message/\(id.percentEncodedPath())/html\(query)", bearer: token)
     }
 
     /// `PATCH /message/:id/:action` — path-carried action. Only `snooze` reads a
@@ -1591,13 +1622,7 @@ extension ApiClient {
     /// `GET /attachments/:id` — the bytes, not JSON. Separate from `request`,
     /// which decodes and would corrupt binary by round-tripping it as text.
     ///
-    /// A 401 here does NOT end the account session, and that is deliberate: these
-    /// are `mailBase` paths, and every other mail route on both platforms carves
-    /// them out because the mail service refuses a bearer the account endpoints
-    /// still accept. The status is thrown to the caller as itself, so the file
-    /// screen says what happened. A revoked token is not kept alive by this — the
-    /// next account call rejects it and lands the person on sign-in the way it
-    /// already does for every other screen.
+    /// Authentication and token renewal follow the same rules as other mail calls.
     static func mailAttachmentBytes(token: String, id: String) async throws -> Data {
         let (data, http) = try await mailBinary(
             url: URL(string: "\(base)\(mailBase)/attachments/\(id.percentEncodedPath())"),
@@ -1606,6 +1631,22 @@ extension ApiClient {
             throw mailFailure(data: data, http: http)
         }
         return data
+    }
+
+    static func mailAttachmentFile(token: String, id: String) async throws -> URL {
+        guard let url = URL(string: "\(base)\(mailBase)/attachments/\(id.percentEncodedPath())") else {
+            throw ApiError.http(status: -1, code: nil, message: "Bad URL")
+        }
+        let request = mailRequest(url: url, method: "GET", bearer: token)
+        let (file, http) = try await authenticatedDownload(for: request, bearer: token)
+        guard http.statusCode < 400 else {
+            defer { try? FileManager.default.removeItem(at: file) }
+            let handle = try? FileHandle(forReadingFrom: file)
+            defer { try? handle?.close() }
+            let data = (try? handle?.read(upToCount: 65_536)) ?? Data()
+            throw mailFailure(data: data, http: http)
+        }
+        return file
     }
 
     /// `POST /attachments` — multipart, with the field names the route reads:
@@ -1647,6 +1688,41 @@ extension ApiClient {
                                 message: r.error ?? "The server stored no attachment.")
         }
         return a
+    }
+
+    static func mailAttachmentUploadFile(token: String, file: URL, filename: String, mimeType: String) async throws -> MailAttachment {
+        let boundary = "----GrapMail\(UUID().uuidString)"
+        let safeName = filename.replacingOccurrences(of: "\"", with: "")
+            .replacingOccurrences(of: "\r", with: "").replacingOccurrences(of: "\n", with: "")
+        let body = FileManager.default.temporaryDirectory.appendingPathComponent("upload-body-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: body) }
+        guard FileManager.default.createFile(atPath: body.path, contents: nil) else {
+            throw CocoaError(.fileWriteUnknown)
+        }
+        let output = try FileHandle(forWritingTo: body)
+        defer { try? output.close() }
+        try output.write(contentsOf: Data("--\(boundary)\r\nContent-Disposition: form-data; name=\"file\"; filename=\"\(safeName)\"\r\nContent-Type: \(mimeType.isEmpty ? "application/octet-stream" : mimeType)\r\n\r\n".utf8))
+        let input = try FileHandle(forReadingFrom: file)
+        defer { try? input.close() }
+        while let chunk = try input.read(upToCount: 64 * 1024), !chunk.isEmpty {
+            try Task.checkCancellation()
+            try output.write(contentsOf: chunk)
+        }
+        try output.write(contentsOf: Data("\r\n--\(boundary)\r\nContent-Disposition: form-data; name=\"messageId\"\r\n\r\n\r\n--\(boundary)--\r\n".utf8))
+        try output.close()
+        guard let url = URL(string: "\(base)\(mailBase)/attachments") else {
+            throw ApiError.http(status: -1, code: nil, message: "Bad URL")
+        }
+        var request = mailRequest(url: url, method: "POST", bearer: token)
+        request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+        let (data, http) = try await authenticatedUpload(for: request, file: body, bearer: token)
+        guard http.statusCode < 400 else { throw mailFailure(data: data, http: http) }
+        let response = try decoder.decode(MailAttachmentResponse.self, from: data)
+        guard let attachment = response.attachment else {
+            throw ApiError.http(status: http.statusCode, code: response.code,
+                                message: response.error ?? "The server stored no attachment.")
+        }
+        return attachment
     }
 
     /// The transport the two attachment calls share. Kept private and tiny: it
@@ -1766,8 +1842,8 @@ struct MailScheduledMessage: Decodable, Identifiable {
 }
 
 struct MailScheduledResponse: Decodable {
-    let success: Bool?
-    let messages: [MailScheduledMessage]?
+    var success: Bool?
+    var messages: [MailScheduledMessage]?
 }
 
 extension ApiClient {

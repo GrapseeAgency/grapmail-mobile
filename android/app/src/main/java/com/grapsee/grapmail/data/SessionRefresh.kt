@@ -43,6 +43,18 @@ object SessionRefresh {
         }
     }
 
+    suspend fun forAccount(context: Context, sessionId: String): SessionSnapshot? = mutex.withLock {
+        val original = SessionStore.snapshotAll(context).firstOrNull { it.id == sessionId } ?: return@withLock null
+        if (!original.unexpired) {
+            try {
+                if (rotate(context, original) == null) return@withLock null
+            } catch (_: java.io.IOException) {
+                return@withLock null
+            }
+        }
+        SessionStore.snapshotAll(context).firstOrNull { it.id == sessionId }
+    }
+
     suspend fun retryToken(context: Context, rejected: String): String? = mutex.withLock {
         val current = SessionStore.snapshot(context) ?: return@withLock null
         if (current.token == rejected) return@withLock rotate(context, current)
@@ -60,7 +72,7 @@ object SessionRefresh {
         if (unavailable != null && unavailable.sessionId == original.id && unavailable.bearer == original.token &&
             now - unavailable.atMillis < 2_000
         ) throw java.io.IOException("The session could not be refreshed. Try again.")
-        val refresh = SessionStore.refreshToken(context) ?: return null
+        val refresh = original.refreshToken ?: return null
         val pair = try {
             Api.refreshSession(refresh)
         } catch (e: kotlinx.coroutines.CancellationException) {

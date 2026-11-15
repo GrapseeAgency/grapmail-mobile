@@ -11,6 +11,8 @@ import Combine
 /// `GET /grapmail/labels`. The bottom bar carries no Calendar tab for the same
 /// reason. Each omission is recorded with its proof in the README.
 struct MailboxView: View {
+    @Environment(\.displayScale) private var displayScale
+
     /// Owned by `RootView`, not by this screen: the thread, compose and the
     /// secondary screens are separate destinations on the stack and must show
     /// the same mailbox the list is showing. A model per screen would mean a
@@ -39,14 +41,23 @@ struct MailboxView: View {
     let onContacts: () -> Void
     let onFiles: () -> Void
     let onSignOut: () -> Void
+    var onAddAccount: () -> Void = {}
+    var onSwitchAccount: (String) -> Void = { _ in }
 
     @Environment(\.scenePhase) private var scenePhase
     @State private var isAtTop = true
     @State private var isVisible = false
+    @State private var controlsVisible = true
+    @State private var isUserScrolling = false
+    @State private var lastScrollTranslation: CGFloat = 0
+    @GestureState private var scrollTranslation: CGSize? = nil
 
     @State private var drawerOpen = false
     @State private var sheet: MailSheet?
     @State private var decisionResult: String?
+    @State private var searchDraft = ""
+    @State private var searchTask: Task<Void, Never>?
+    @State private var searchRevision = 0
 
     enum MailSheet: String, Identifiable {
         case sortFilter, move, label, snooze, permanent, sender, advanced
@@ -66,6 +77,7 @@ struct MailboxView: View {
                     onLabels: { drawerOpen = false; onLabels() },
                     onScreener: { drawerOpen = false; onScreener() },
                     onSubscriptions: { drawerOpen = false; onSubscriptions() },
+                    onFiles: { drawerOpen = false; onFiles() },
                     onSortFilter: { drawerOpen = false; sheet = .sortFilter },
                     onAdvanced: { drawerOpen = false; sheet = .advanced },
                     onSettings: { drawerOpen = false; onSettings() },
@@ -82,7 +94,14 @@ struct MailboxView: View {
         // indicator: the rows rendered, reported a frame, and could not be hit —
         // and a bottom bar drawn under the indicator is a defect for a person,
         // not only for the test. The background may still bleed past it.
-        .sheet(item: $sheet) { which in sheetContent(which) }
+        .sheet(item: $sheet) { which in sheetContent(which).grapMailSheetSurface() }
+        .onAppear {
+            if searchDraft != vm.state.query { searchDraft = vm.state.query }
+        }
+        .onDisappear {
+            searchTask?.cancel()
+            searchTask = nil
+        }
         .task {
             // Ask for the box only when it has never been asked for, and read
             // `/me` once. Returning from a thread re-enters this task.
@@ -91,9 +110,20 @@ struct MailboxView: View {
             if scenePhase == .active { vm.refreshOnResume(atTop: isAtTop || vm.state.rows.isEmpty) }
         }
         .onAppear { isVisible = true }
+        .onChange(of: vm.state.box) { _ in controlsVisible = true }
+        .onChange(of: vm.state.query) { _ in controlsVisible = true }
+        .onChange(of: vm.state.filter) { _ in controlsVisible = true }
         .onDisappear { isVisible = false }
         .onChange(of: scenePhase) { phase in
             if phase == .active, isVisible { vm.refreshOnResume(atTop: isAtTop || vm.state.rows.isEmpty) }
+        }
+        .onChange(of: network.online) { online in
+            if online == true, scenePhase == .active, isVisible,
+               !vm.state.loading, !vm.state.loadingMore, !vm.state.busy,
+               vm.state.selection.isEmpty, vm.state.pages <= 1,
+               vm.state.fatal != nil || vm.state.staleError != nil {
+                vm.load(forceCounts: false)
+            }
         }
         .onReceive(NotificationCenter.default.publisher(for: MailPoll.didReadStats)) { notification in
             guard scenePhase == .active, isVisible, let result = notification.object as? MailPoll.PollResult else { return }
@@ -110,24 +140,25 @@ struct MailboxView: View {
     // ── the column ───────────────────────────────────────────────────────────
 
     private var content: some View {
-        ZStack(alignment: .bottomTrailing) {
+        ZStack(alignment: .bottom) {
             GM.bg.ignoresSafeArea()
             VStack(spacing: 0) {
                 header
+                if vm.state.selection.isEmpty {
+                    BoxTabRow(activeBox: vm.state.box, counts: drawerCounts(vm.state), onSelect: open)
+                }
                 offlineBanner
                 staleBanner
                 listArea
-                MailBottomBar(
-                    unread: vm.state.unreadCount,
-                    onContacts: onContacts,
-                    onFiles: onFiles,
-                    onMore: { toggleDrawer() }
-                )
             }
-            MailFab(onClick: onCompose)
-                .padding(.trailing, 20)
-                .padding(.bottom, 96)
-                .accessibilityIdentifier("mail-compose")
+            MailBottomControls(
+                inboxSelected: vm.state.box == .inbox,
+                unread: vm.state.unreadCount,
+                onMail: { open(.inbox) },
+                onCompose: onCompose,
+                onContacts: onContacts,
+                visible: controlsVisible
+            )
         }
     }
 
@@ -159,49 +190,18 @@ struct MailboxView: View {
                 onSender: vm.state.box == .screener ? { sheet = .sender } : nil
             )
         } else {
-            VStack(spacing: 0) {
-                HStack(spacing: 6) {
-                    Button { toggleDrawer() } label: {
-                        Image(systemName: "line.3.horizontal")
-                            .font(.system(size: 19))
-                            .foregroundColor(GM.textPrimary)
-                            .frame(width: 44, height: 44)
-                    }
-                    .accessibilityLabel("Open folders")
-                    .accessibilityIdentifier("mail-menu")
-                    searchField
-                    Menu {
-                        if let address = vm.state.accountAddress, !address.isEmpty {
-                            Text(address)
-                        }
-                        Button("Profile", action: onProfile)
-                        Button("Settings", action: onSettings)
-                        Button("Sign out", action: onSignOut)
-                    } label: {
-                        Group {
-                            if vm.state.accountName?.nilIfBlank() != nil || vm.state.accountAddress?.nilIfBlank() != nil {
-                                SenderAvatar(display: vm.state.accountName ?? "",
-                                             address: vm.state.accountAddress ?? "", size: 32)
-                            } else {
-                                Image(systemName: "person.crop.circle")
-                                    .font(.system(size: 27))
-                                    .foregroundColor(GM.textSecondary)
-                            }
-                        }
-                        .frame(width: 44, height: 44)
-                    }
-                    .accessibilityLabel("Account")
-                }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
-
-                Text(vm.state.box.title)
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundColor(GM.textSecondary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, 16)
-                    .padding(.bottom, 6)
-            }
+            MailHomeTopBar(
+                boxTitle: vm.state.box.title,
+                accountName: vm.state.accountName,
+                accountAddress: vm.state.accountAddress,
+                onMenu: { toggleDrawer() },
+                onProfile: onProfile,
+                onSettings: onSettings,
+                onSignOut: onSignOut,
+                onAddAccount: onAddAccount,
+                onSwitchAccount: onSwitchAccount,
+                search: { searchField }
+            )
         }
     }
 
@@ -211,10 +211,24 @@ struct MailboxView: View {
             // subject, body, sender (`grapmail-search.ts:110-118`) -- because
             // a placeholder promising "people or files" would advertise a
             // search the route does not run. Android's field says the same.
-            TextField("Search mail",
-                      text: Binding(
-                        get: { vm.state.query },
-                        set: { vm.query($0) }))
+            TextField("Search in mail", text: $searchDraft)
+                .onChange(of: searchDraft) { text in
+                    searchTask?.cancel()
+                    searchRevision &+= 1
+                    let revision = searchRevision
+                    searchTask = Task {
+                        try? await Task.sleep(nanoseconds: 350_000_000)
+                        guard !Task.isCancelled else { return }
+                        await MainActor.run {
+                            guard !Task.isCancelled, revision == searchRevision,
+                                  text == searchDraft else { return }
+                            vm.query(text)
+                        }
+                    }
+                }
+                .onChange(of: vm.state.query) { query in
+                    if searchDraft != query { searchDraft = query }
+                }
                 .font(.system(size: 14))
                 .foregroundColor(GM.textPrimary)
                 .accessibilityLabel("Search subject, body or sender")
@@ -224,11 +238,12 @@ struct MailboxView: View {
             // clean "Search in mail", and every tool stays one tap away where
             // the other tools live.
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 11)
-        .background(GM.card)
-        .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous)
-            .stroke(GM.border, lineWidth: 1))
+        .padding(.horizontal, 16)
+        .padding(.vertical, 13)
+        // The reference's search pill: tinted, fully rounded, and deliberately
+        // borderless — a control, not a boxed field.
+        .background(GM.softFill)
+        .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
     }
 
     private var advActive: Bool {
@@ -313,98 +328,169 @@ struct MailboxView: View {
             failed: vm.state.fatal != nil,
             noMailbox: vm.state.noMailbox,
             empty: vm.state.rows.isEmpty && !vm.state.canLoadMore && !vm.state.loadingMore,
+            filtered: vm.state.query.trimmed.count >= 3 || vm.state.filter != .all ||
+                !vm.state.advFrom.trimmed.isEmpty || !vm.state.advTo.trimmed.isEmpty ||
+                !vm.state.advSubject.trimmed.isEmpty || vm.state.advFiles ||
+                !vm.state.advAfter.trimmed.isEmpty || !vm.state.advBefore.trimmed.isEmpty,
             boxTitle: vm.state.box.title,
             onRetry: { vm.load() }
         ) {
             messageList
         }
+        .mailListSurface()
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    @ViewBuilder
+    private func rowView(for row: MailMessage, prefetchIDs: Set<String>, showDivider: Bool) -> some View {
+        let box = vm.state.box
+        let canSwipe = vm.state.selection.isEmpty
+        let recovering = box == .trash || box == .spam
+        let right = canSwipe && box != .archive
+            ? MailSwipeAction(title: recovering ? "Back to Inbox" : "Archive", restoresToInbox: recovering) {
+                vm.actOn(row.id, recovering ? .restore : .archive)
+            } : nil
+        let left = canSwipe && !recovering
+            ? MailSwipeAction(title: "Trash") { vm.actOn(row.id, .trash) } : nil
+        MailSwipeRow(right: right, left: left) {
+            MessageRow(
+                message: row,
+                selecting: !vm.state.selection.isEmpty,
+                selected: vm.state.selection.contains(row.id),
+                onSelect: { vm.toggleSelect(row.id) },
+                onOpen: {
+                    if vm.state.box == .drafts { onDraft(row.id) }
+                    else { onThread(row.threadId ?? row.id, row.threadId != nil) }
+                },
+                onStar: { vm.actOn(row.id, row.isStarred ? .unstar : .star) }
+            )
+            .equatable()
+        }
+        .overlay(alignment: .bottom) {
+            if showDivider {
+                Rectangle()
+                    .fill(GM.border)
+                    .frame(height: 1 / displayScale)
+                    .allowsHitTesting(false)
+                    .accessibilityHidden(true)
+            }
+        }
+        .listRowInsets(EdgeInsets())
+        .listRowBackground(Color.clear)
+        .listRowSeparator(.hidden)
+        .onAppear {
+            if vm.state.rows.first?.id == row.id { isAtTop = true }
+        }
+        .task(id: prefetchIDs.contains(row.id) ? vm.state.pages : -1) {
+            if prefetchIDs.contains(row.id) { await vm.loadMoreWhenReady() }
+        }
+        .onDisappear {
+            if vm.state.rows.first?.id == row.id { isAtTop = false }
+        }
+    }
+
+    @ViewBuilder
+    private var listFooter: some View {
+        if vm.state.loadingMore {
+            Text("Loading more…")
+                .font(.system(size: 13)).foregroundColor(GM.textTertiary)
+                .frame(maxWidth: .infinity, alignment: .center)
+                .listRowSeparator(.hidden)
+        } else if vm.state.canLoadMore {
+            VStack(spacing: 4) {
+                if let error = vm.state.appendError {
+                    Text(error).font(.system(size: 13)).foregroundColor(GM.textSecondary)
+                }
+                Button(vm.state.appendError == nil ? "Load more" : "Retry") { vm.loadMore() }
+            }
+            .frame(maxWidth: .infinity)
+            .listRowBackground(Color.clear)
+            .listRowSeparator(.hidden)
+        }
     }
 
     /// `List` is lazy, which a mailbox needs and the wizard screens did not.
     /// Prefetch near the end, with a footer for manual loading and retry.
-    private var messageList: some View {
+    ///
+    /// The rows sit inside ONE rounded card, the way the reference draws it —
+    /// and that card is drawn by `listArea`, once, around this whole list.
+    /// The list itself keeps a clear background and hides its separators, so
+    /// the only corners on screen are the container's.
+    @ViewBuilder private var messageList: some View {
         let prefetchIDs = Set(vm.state.rows.suffix(4).map(\.id))
-        return List {
+        let lastID = vm.state.rows.last?.id
+        let list = List {
             ForEach(vm.state.rows) { row in
-                MessageRow(
-                    message: row,
-                    selecting: !vm.state.selection.isEmpty,
-                    selected: vm.state.selection.contains(row.id),
-                    onSelect: { vm.toggleSelect(row.id) },
-                    onOpen: {
-                        // Drafts are the person's own unfinished mail:
-                        // tapping one continues it in the composer. Opening
-                        // the reader instead — what this did — shows a
-                        // message you cannot edit or send, which is a draft
-                        // that does not draft.
-                        if vm.state.box == .drafts { onDraft(row.id) }
-                        else { onThread(row.threadId ?? row.id, row.threadId != nil) }
-                    },
-                    onStar: { vm.actOn(row.id, row.isStarred ? .unstar : .star) }
-                )
+                rowView(for: row, prefetchIDs: prefetchIDs, showDivider: row.id != lastID)
+            }
+            listFooter
+            Color.clear
+                .frame(height: MailBottomControls.clearance)
                 .listRowInsets(EdgeInsets())
-                .listRowBackground(GM.bg)
+                .listRowBackground(Color.clear)
                 .listRowSeparator(.hidden)
-                // Swipe files, and only in the directions that mean something
-                // where the message already is. Same two directions and same two
-                // colours as Android's `SwipeableMessageRow`: leading is archive
-                // (or back out of Trash/Spam), trailing is trash, and neither
-                // destroys — permanent deletion stays behind its confirmation
-                // sheet, so no gesture here can erase mail.
-                //
-                // `allowsFullSwipe` is the one mechanic Android cannot match:
-                // Material3 fires on crossing the halfway threshold, with no
-                // "stay open until tapped" mode. So a fling toward Trash is
-                // refused here and accepted there — which is why neither
-                // direction is allowed to be irreversible.
-                .swipeActions(edge: .leading, allowsFullSwipe: true) {
-                    if vm.state.box == .trash || vm.state.box == .spam {
-                        Button("Back to Inbox") { vm.actOn(row.id, .restore) }
-                            .tint(GM.swipeArchive)
-                    } else if vm.state.box != .archive {
-                        Button("Archive") { vm.actOn(row.id, .archive) }
-                            .tint(GM.swipeArchive)
-                    }
-                }
-                .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-                    if vm.state.box != .trash && vm.state.box != .spam {
-                        // Not `.destructive` role: that draws the system red and
-                        // implies irreversibility, and trashing undoes.
-                        Button("Trash") { vm.actOn(row.id, .trash) }
-                            .tint(GM.swipeTrash)
-                    }
-                }
-                .onAppear {
-                    if vm.state.rows.first?.id == row.id { isAtTop = true }
-                    if vm.state.appendError == nil, prefetchIDs.contains(row.id) { vm.loadMore() }
-                }
-                .onDisappear {
-                    if vm.state.rows.first?.id == row.id { isAtTop = false }
-                }
-            }
-            if vm.state.loadingMore {
-                Text("Loading more…")
-                    .font(.system(size: 13)).foregroundColor(GM.textTertiary)
-                    .frame(maxWidth: .infinity, alignment: .center)
-                    .listRowSeparator(.hidden)
-            } else if vm.state.canLoadMore {
-                VStack(spacing: 4) {
-                    if let error = vm.state.appendError {
-                        Text(error).font(.system(size: 13)).foregroundColor(GM.textSecondary)
-                    }
-                    Button(vm.state.appendError == nil ? "Load more" : "Retry") { vm.loadMore() }
-                }
-                .frame(maxWidth: .infinity)
-                .listRowBackground(GM.bg)
-                .listRowSeparator(.hidden)
-            }
+                .accessibilityHidden(true)
         }
         .listStyle(.plain)
         .id(vm.state.box)
         .scrollContentBackground(.hidden)
         .refreshable { await vm.loadAndSettle() }
         .accessibilityIdentifier("mail-list")
+
+        if #available(iOS 18.0, *) {
+            list
+                .onScrollPhaseChange { _, phase in
+                    isUserScrolling = phase == .interacting || phase == .decelerating
+                }
+                .onScrollGeometryChange(for: Int.self) { geometry in
+                    let inset = geometry.contentInsets
+                    let limit = max(0, geometry.contentSize.height + inset.top + inset.bottom - geometry.containerSize.height)
+                    let offset = min(limit, max(0, geometry.contentOffset.y + inset.top))
+                    return Int(offset / 8)
+                } action: { previous, current in
+                    if current == 0 {
+                        if !controlsVisible {
+                            withAnimation(.spring(response: 0.35, dampingFraction: 0.82)) {
+                                controlsVisible = true
+                            }
+                        }
+                    } else if isUserScrolling {
+                        let shouldShow = current < previous
+                        if shouldShow != controlsVisible {
+                            withAnimation(.spring(response: 0.35, dampingFraction: 0.82)) {
+                                controlsVisible = shouldShow
+                            }
+                        }
+                    }
+                }
+        } else {
+            list
+                .simultaneousGesture(
+                    DragGesture(minimumDistance: 8, coordinateSpace: .global)
+                        .updating($scrollTranslation) { drag, translation, _ in
+                            translation = drag.translation
+                        }
+                )
+                .onChange(of: scrollTranslation, perform: updateScrollControls)
+        }
+    }
+
+    private func updateScrollControls(_ translation: CGSize?) {
+        guard let translation else {
+            lastScrollTranslation = 0
+            return
+        }
+        // The list also handles horizontal swipe actions on individual messages.
+        guard abs(translation.height) > abs(translation.width) else { return }
+        let distance = translation.height - lastScrollTranslation
+        guard abs(distance) >= 8 else { return }
+        lastScrollTranslation = translation.height
+        let shouldShow = distance > 0
+        if shouldShow != controlsVisible {
+            withAnimation(.spring(response: 0.35, dampingFraction: 0.82)) {
+                controlsVisible = shouldShow
+            }
+        }
     }
 
     @ViewBuilder private func sheetContent(_ which: MailSheet) -> some View {
@@ -434,13 +520,15 @@ struct MailboxView: View {
                 read: vm.state.assignmentsRead,
                 note: vm.state.labelNote,
                 selectedCount: vm.state.selection.count,
-            ) { id in
-                // Not dismissed on pick, unlike the move and snooze sheets. Those
-                // change the list under the user, which is the feedback; a label
-                // changes nothing visible on this screen, so the sheet has to stay
-                // open and show its own result line.
-                vm.toggleLabel(id)
-            }
+                busy: vm.state.busy,
+                onPick: { id in
+                    // Not dismissed on pick, unlike the move and snooze sheets. Those
+                    // change the list under the user, which is the feedback; a label
+                    // changes nothing visible on this screen, so the sheet has to stay
+                    // open and show its own result line.
+                    vm.toggleLabel(id)
+                }
+            )
         case .snooze:
             SnoozeSheet { until in vm.act(.snooze, until: until); sheet = nil }
         case .sender:

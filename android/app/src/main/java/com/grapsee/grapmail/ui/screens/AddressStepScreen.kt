@@ -172,6 +172,8 @@ fun AddressStepScreen(vm: SignUpViewModel, onBack: () -> Unit, onSignIn: () -> U
                     androidx.compose.material3.DropdownMenu(
                         expanded = domainMenuOpen,
                         onDismissRequest = { domainMenuOpen = false },
+                        containerColor = palette.card,
+                        shape = RoundedCornerShape(16.dp),
                     ) {
                         androidx.compose.material3.DropdownMenuItem(
                             text = { Text("@grapsee.com") },

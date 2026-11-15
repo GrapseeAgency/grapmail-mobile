@@ -271,7 +271,7 @@ class ProfileViewModel @JvmOverloads constructor(
                 }
                 .onFailure { e ->
                     if (e is kotlinx.coroutines.CancellationException) throw e
-                    _state.update { it.copy(busy = false, note = reason(e), noteIsBad = true) }
+                    _state.update { it.copy(busy = false, note = "Couldn’t update your profile photo. Try again.", noteIsBad = true) }
                 }
         }
     }

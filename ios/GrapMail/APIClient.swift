@@ -1,4 +1,5 @@
 import Foundation
+import OSLog
 import UIKit
 
 /// Posted when a call that carried our bearer token comes back 401: the
@@ -66,13 +67,47 @@ enum ApiError: Error, LocalizedError {
     /// same rejection.
     var userMessage: String {
         switch self {
-        case let .http(status, code, message):
-            if code == "TOO_MANY_ATTEMPTS" {
-                return "Too many failed attempts. Try again in about 15 minutes."
+        case let .http(status, code, _):
+            switch code {
+            case "TOO_MANY_ATTEMPTS": return "Too many failed attempts. Try again in about 15 minutes."
+            case "RATE_LIMITED": return "Too many requests. Try again in a few minutes."
+            case "WRONG_PASSWORD": return "Check your password and try again."
+            case "INVALID_CREDENTIALS": return "Check your email address and password."
+            case "WEAK_PASSWORD": return "Use at least 8 characters with a letter, a number and a symbol."
+            case "INVALID_RESET_CHALLENGE": return "Request a new password reset code and try again."
+            case "TWO_FACTOR_REJECTED": return "Check your verification code and try again."
+            case "INVALID_PHONE": return "Check the phone number and country code."
+            case "PHONE_IN_USE": return "That phone number is already linked to another account."
+            case "PHONE_NOT_VERIFIED": return "Verify your phone number to continue."
+            case "PHONE_PROOF_REQUIRED": return "Verify your phone number to continue."
+            case "NO_RECOVERY_CHANNEL": return "There is no verified recovery method for this account."
+            case "SMS_DELIVERY_UNAVAILABLE": return "The code could not be sent. Try again in a moment."
+            case "BAD_ADDRESS": return "Check the email address and try again."
+            case "ADDRESS_REJECTED": return "That email address is unavailable."
+            case "ALIAS_REJECTED": return "That email address is unavailable."
+            case "NO_RECIPIENT": return "Add at least one recipient."
+            case "TOO_MANY_RECIPIENTS": return "Remove some recipients and try again."
+            case "EMPTY_BODY": return "Write a message before sending."
+            case "QUOTA_EXCEEDED": return "Your mailbox is full. Free up some storage and try again."
+            case "BODY_TOO_LARGE": return "Shorten your message or remove large attachments."
+            case "TOO_LARGE": return "Choose a smaller file and try again."
+            case "CANNOT_REVOKE_CURRENT": return "Sign out to end this session."
+            case "TWOFA_REQUIRED_FOR_BACKUP_CODES": return "Turn on two-step verification to use backup codes."
+            case "NO_MAILBOX": return "Your GrapMail inbox is not ready yet."
+            default: break
             }
-            return message.isEmpty ? "Request failed (\(status))." : message
+            switch status {
+            case 401: return "Check your sign-in details or sign in again."
+            case 403: return "This action is unavailable for your account."
+            case 404: return "This item is no longer available."
+            case 409: return "Refresh and try again."
+            case 413: return "Choose a smaller file and try again."
+            case 429: return "Too many requests. Try again in a few minutes."
+            case 500...599: return "GrapMail is temporarily unavailable. Try again in a moment."
+            default: return "Please try again."
+            }
         case .network:
-            return "Network error. Please try again."
+            return "Check your connection and try again."
         case .emailVerificationRequired:
             return "Email verification is required to finish signing in."
         }
@@ -991,6 +1026,18 @@ struct ApiClient {
         case renewed(String), rejected, unavailable
     }
 
+    enum RenewalStatus {
+        case renewed, rejected, unavailable
+    }
+
+    static func renewPairStatus() async -> RenewalStatus {
+        switch await renewal(for: nil, generation: SessionStore.generation) {
+        case .renewed: return .renewed
+        case .rejected: return .rejected
+        case .unavailable: return .unavailable
+        }
+    }
+
     static func renewPair() async -> String? {
         if case let .renewed(token) = await renewal(for: nil, generation: SessionStore.generation) {
             return token
@@ -1013,30 +1060,56 @@ struct ApiClient {
             return SessionStore.replacementToken(for: rejectedBearer, generation: generation)
                 .map { .renewed($0) } ?? .rejected
         }
-        guard let refresh = SessionStore.refreshToken else { return .rejected }
-        guard let url = URL(string: "\(base)/grapsee/auth/refresh") else { return .unavailable }
-        struct RefreshBody: Encodable { let refreshToken: String }
-        var req = URLRequest(url: url)
-        req.httpMethod = "POST"
-        req.timeoutInterval = 20
-        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        req.setValue(DeviceId.value, forHTTPHeaderField: "x-device-id")
-        req.setValue(userAgent, forHTTPHeaderField: "User-Agent")
-        req.httpBody = try? encoder.encode(RefreshBody(refreshToken: refresh))
-        guard let (data, response) = try? await URLSession.shared.data(for: req),
-              let http = response as? HTTPURLResponse else { return .unavailable }
-        if http.statusCode == 401 || http.statusCode == 403 { return .rejected }
-        guard (200..<300).contains(http.statusCode),
-              let pair = try? decoder.decode(SignInResponse.self, from: data),
-              let access = pair.accessToken ?? pair.token else { return .unavailable }
-        return await MainActor.run {
-            guard SessionStore.generation == generation else { return .rejected }
-            SessionStore.updateTokens(
-                token: access,
-                refreshToken: pair.refreshToken,
-                expiresAtRaw: pair.expiresAtMillis
-            )
-            return SessionStore.token == access ? .renewed(access) : .unavailable
+        guard let address = SessionStore.address, let account = SessionStore.account(address),
+              account.token == SessionStore.token, SessionStore.generation == generation else { return .rejected }
+        return await rotateSavedAccount(account)
+    }
+
+    static func pushBearer(for address: String) async -> String? {
+        guard let account = SessionStore.account(address) else { return nil }
+        let seconds = account.expiresAt < 1e11 ? account.expiresAt : account.expiresAt / 1000
+        if seconds <= 0 || seconds > Date().timeIntervalSince1970 + 15 { return account.token }
+        if case let .renewed(token) = await rotateSavedAccount(account) { return token }
+        return nil
+    }
+
+    private static func rotateSavedAccount(_ account: SessionStore.Account) async -> RenewalResult {
+        await AccountRotationGate.shared.run(account.token) {
+            guard let current = SessionStore.account(account.address) else { return .rejected }
+            if current.token != account.token { return .renewed(current.token) }
+            guard let refresh = account.refreshToken,
+                  let url = URL(string: "\(base)/grapsee/auth/refresh") else { return .rejected }
+            struct RefreshBody: Encodable { let refreshToken: String }
+            var req = URLRequest(url: url)
+            req.httpMethod = "POST"
+            req.timeoutInterval = 12
+            req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            req.setValue(DeviceId.value, forHTTPHeaderField: "x-device-id")
+            req.setValue(userAgent, forHTTPHeaderField: "User-Agent")
+            req.httpBody = try? encoder.encode(RefreshBody(refreshToken: refresh))
+            guard let (data, response) = try? await URLSession.shared.data(for: req),
+                  let http = response as? HTTPURLResponse else { return .unavailable }
+            if http.statusCode == 401 || http.statusCode == 403 { return .rejected }
+            guard (200..<300).contains(http.statusCode),
+                  let pair = try? decoder.decode(SignInResponse.self, from: data),
+                  let access = pair.accessToken ?? pair.token,
+                  let stored = SessionStore.recordRotation(account: account, token: access,
+                    refresh: pair.refreshToken, expiry: pair.expiresAtMillis) else { return .unavailable }
+            return .renewed(stored)
+        }
+    }
+
+    private actor AccountRotationGate {
+        static let shared = AccountRotationGate()
+        private var tasks: [String: Task<RenewalResult, Never>] = [:]
+
+        func run(_ token: String, _ operation: @escaping () async -> RenewalResult) async -> RenewalResult {
+            if let task = tasks[token] { return await task.value }
+            let task = Task { await operation() }
+            tasks[token] = task
+            let result = await task.value
+            tasks[token] = nil
+            return result
         }
     }
 
@@ -1098,7 +1171,7 @@ struct ApiClient {
                 (data, response) = try await URLSession.shared.data(for: request)
             } catch {
                 try Task.checkCancellation()
-                throw ApiError.network(error)
+                throw networkFailure(error)
             }
             guard let http = response as? HTTPURLResponse else {
                 throw ApiError.http(status: -1, code: nil, message: "No response")
@@ -1129,6 +1202,97 @@ struct ApiClient {
         throw ApiError.http(status: 401, code: nil, message: "Sign in again.")
     }
 
+    /// Download to a temporary file while applying the same renewal rules as JSON requests.
+    static func authenticatedDownload(for request: URLRequest, bearer: String?) async throws -> (URL, HTTPURLResponse) {
+        let generation = SessionStore.generation
+        var request = request
+        var sentBearer = bearer
+        for attempt in 0...1 {
+            try Task.checkCancellation()
+            let file: URL
+            let response: URLResponse
+            do {
+                (file, response) = try await URLSession.shared.download(for: request)
+            } catch {
+                try Task.checkCancellation()
+                throw networkFailure(error)
+            }
+            guard let http = response as? HTTPURLResponse else {
+                try? FileManager.default.removeItem(at: file)
+                throw ApiError.http(status: -1, code: nil, message: "No response")
+            }
+            if Task.isCancelled {
+                try? FileManager.default.removeItem(at: file)
+                throw CancellationError()
+            }
+            guard http.statusCode == 401, let rejected = sentBearer, generation == SessionStore.generation else {
+                return (file, http)
+            }
+            if attempt == 0 {
+                try? FileManager.default.removeItem(at: file)
+                let result = await renewal(for: rejected, generation: generation)
+                try Task.checkCancellation()
+                switch result {
+                case let .renewed(token):
+                    if SessionStore.replacementToken(for: rejected, generation: generation) == token {
+                        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+                        sentBearer = token
+                        continue
+                    }
+                case .unavailable:
+                    throw ApiError.http(status: 503, code: nil, message: "The session could not be refreshed. Try again.")
+                case .rejected:
+                    break
+                }
+                signalUnauthorized(rejectedBearer: rejected, generation: generation)
+                throw ApiError.http(status: 401, code: nil, message: "Sign in again.")
+            }
+            signalUnauthorized(rejectedBearer: rejected, generation: generation)
+            return (file, http)
+        }
+        throw ApiError.http(status: 401, code: nil, message: "Sign in again.")
+    }
+
+    static func authenticatedUpload(for request: URLRequest, file: URL, bearer: String) async throws -> (Data, HTTPURLResponse) {
+        let generation = SessionStore.generation
+        var request = request
+        var sentBearer = bearer
+        for attempt in 0...1 {
+            try Task.checkCancellation()
+            let data: Data
+            let response: URLResponse
+            do {
+                (data, response) = try await URLSession.shared.upload(for: request, fromFile: file)
+            } catch {
+                try Task.checkCancellation()
+                throw networkFailure(error)
+            }
+            guard let http = response as? HTTPURLResponse else {
+                throw ApiError.http(status: -1, code: nil, message: "No response")
+            }
+            guard http.statusCode == 401, generation == SessionStore.generation else { return (data, http) }
+            if attempt == 0 {
+                let result = await renewal(for: sentBearer, generation: generation)
+                try Task.checkCancellation()
+                switch result {
+                case let .renewed(token):
+                    if SessionStore.replacementToken(for: sentBearer, generation: generation) == token {
+                        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+                        sentBearer = token
+                        continue
+                    }
+                case .unavailable:
+                    throw ApiError.http(status: 503, code: nil, message: "The session could not be refreshed. Try again.")
+                case .rejected:
+                    break
+                }
+            }
+            signalUnauthorized(rejectedBearer: sentBearer, generation: generation)
+            return (data, http)
+        }
+        throw ApiError.http(status: 401, code: nil, message: "Sign in again.")
+    }
+
     static func request<T: Decodable>(_ path: String, method: String = "GET", body: Data? = nil, bearer: String? = nil) async throws -> T {
         guard let components = URLComponents(string: "\(base)\(path)") else {
             throw ApiError.http(status: -1, code: nil, message: "Bad URL")
@@ -1152,12 +1316,7 @@ struct ApiClient {
             throw ApiError.emailVerificationRequired(email: challenge.email)
         }
         if http.statusCode >= 400 {
-            let carrier = try? decoder.decode(ErrorCarrier.self, from: data)
-            throw ApiError.http(
-                status: http.statusCode,
-                code: carrier?.code,
-                message: carrier?.message ?? carrier?.error ?? ""
-            )
+            throw requestFailure(data: data, http: http)
         }
         // A 2xx with an unexpected shape (HTML error page, gateway stub)
         // must surface as a clean ApiError, not raw DecodingError text —
@@ -1215,9 +1374,15 @@ struct ApiClient {
     /// The backend keeps this device's push token so it can wake the app when
     /// mail reaches the mailbox. `deviceId` is the same `x-device-id` the other
     /// routes carry, so the server can tell one install from another.
-    static func registerPush(token: String, pushToken: String) async throws {
+    static func registerPush(token: String, pushToken: String) async throws -> String? {
         struct Body: Encodable { let token: String; let platform: String; let deviceId: String }
-        let response: AccountActionResponse = try await request(
+        struct Registration: Decodable {
+            let success: Bool
+            let message: String?
+            let previewSecret: String?
+            let previewDevice: String?
+        }
+        let response: Registration = try await request(
             "/grapsee/grapmail/push/register", method: "POST",
             body: encoder.encode(Body(token: pushToken, platform: "ios", deviceId: DeviceId.value)),
             bearer: token)
@@ -1225,6 +1390,18 @@ struct ApiClient {
             throw ApiError.http(status: 200, code: nil,
                                 message: response.message ?? "Push registration was not confirmed.")
         }
+        guard let secret = response.previewSecret else { return nil }
+        return response.previewDevice.map { "\($0).\(secret)" } ?? secret
+    }
+
+    static func retireNotificationRegistration(_ registration: String) async -> Bool {
+        guard registration.contains("."),
+              let url = URL(string: "\(base)\(mailBase)/notification-preview") else { return false }
+        var request = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 5)
+        request.httpMethod = "DELETE"
+        request.setValue("GrapMailDevice \(registration)", forHTTPHeaderField: "Authorization")
+        guard let (_, response) = try? await URLSession.shared.data(for: request) else { return false }
+        return (response as? HTTPURLResponse)?.statusCode == 204
     }
 
     /// Sign-out removes the token so the server stops waking this device. The
@@ -1367,7 +1544,7 @@ struct ApiClient {
     }
 
     /// Multipart with the field name the route reads (`file`), the same shapes
-    /// the compose attachment upload uses. The 256 KB ceiling is checked by the
+    /// the compose attachment upload uses. The 10 MB ceiling is checked by the
     /// screen in the person's own words before these bytes exist on the wire.
     static func uploadAvatar(token: String, bytes: Data, filename: String, mime: String) async throws -> AvatarResponse {
         let boundary = "----GrapMail\(UUID().uuidString)"
@@ -1409,8 +1586,17 @@ struct ApiClient {
 
     /// The same envelope the JSON `request` builds its errors from, shared by
     /// the binary calls so a refused upload reports the server's reason.
+    private static func networkFailure(_ error: Error) -> ApiError {
+        let reason = error as NSError
+        Logger(subsystem: "com.grapsee.grapmail", category: "API")
+            .error("Network request failed: \(reason.domain, privacy: .private) (\(reason.code))")
+        return .network(error)
+    }
+
     private static func requestFailure(data: Data, http: HTTPURLResponse) -> ApiError {
         let carrier = try? decoder.decode(ErrorCarrier.self, from: data)
+        Logger(subsystem: "com.grapsee.grapmail", category: "API")
+            .error("HTTP \(http.statusCode) code=\(carrier?.code ?? "-", privacy: .private)")
         return ApiError.http(
             status: http.statusCode,
             code: carrier?.code,

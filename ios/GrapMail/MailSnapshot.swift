@@ -373,8 +373,8 @@ struct MailSnapshotView: View {
          "from":{"name":"The Weekly Draft","address":"hello@newsletter.example"},
          "to":["you@grapmail.com"],"subject":"This week in letterforms",
          "isRead":true,"isStarred":false,"hasAttachments":false,
+         "hasHtml":true,
          "createdAt":"2026-10-28T08:00:00Z",
-         "bodyHtml":"<html><body><p>The kerning quarrels, mostly, and one risograph plate that printed better than the mockup.</p><img src='https://images.newsletter.example/plate-1.png'><img src='https://images.newsletter.example/pixel.gif?m=n2'></body></html>",
          "attachments":[]}
         """
         return (try? JSONDecoder().decode(MailMessageFull.self, from: Data(json.utf8)))
@@ -479,7 +479,10 @@ struct MailSnapshotView: View {
                     marks: Self.labelMarks,
                     read: .read,
                     note: nil,
-                    selectedCount: 3) { _ in })
+                    selectedCount: 3,
+                    busy: false,
+                    onPick: { _ in }
+                ))
                 )
             case "mail-snooze-sheet":
                 return AnyView(
@@ -521,13 +524,13 @@ struct MailSnapshotView: View {
                 return AnyView(
                 secondary(ThreadView(vm: model, e2e: e2e, id: "t-m1",
                                      isThread: true, onBack: {}, onReply: { _, _ in },
-                                     onStepPrev: { _ in }, onStepNext: { _ in }))
+                                     onStepPrev: { _ in }, onStepNext: { _ in }, onContacts: {}))
                 )
             case "mail-thread-encrypted":
                 return AnyView(
                 secondary(ThreadView(vm: model, e2e: e2e, id: "t-m9",
                                      isThread: true, onBack: {}, onReply: { _, _ in },
-                                     onStepPrev: { _ in }, onStepNext: { _ in }))
+                                     onStepPrev: { _ in }, onStepNext: { _ in }, onContacts: {}))
                 )
             // The live reader again, over a message whose only part is HTML: the
             // frame photographs the images gate, the stepper's honest range and
@@ -539,7 +542,7 @@ struct MailSnapshotView: View {
                 return AnyView(
                 secondary(ThreadView(vm: model, e2e: e2e, id: "t-n2",
                                      isThread: true, onBack: {}, onReply: { _, _ in },
-                                     onStepPrev: { _ in }, onStepNext: { _ in }))
+                                     onStepPrev: { _ in }, onStepNext: { _ in }, onContacts: {}))
                 )
             case "mail-compose":
                 return AnyView(
@@ -726,25 +729,54 @@ struct MailSnapshotView: View {
     /// The list states, drawn by the same `MailStateBlock` the live screen uses.
     /// The distinction between empty, failed and no-mailbox is the thing being
     /// photographed, so it must not be re-implemented here.
+    ///
+    /// The frame draws the live home chrome — top bar, search pill, the one
+    /// rounded card, the floating bottom bar, the compose pill — because the
+    /// shape of the card IS the screen now. Photographing only the rows left the
+    /// container, the thing the design is made of, out of every picture.
     private func listFrame(
         rows: [MailMessage], loading: Bool, failed: Bool, noMailbox: Bool, box: MailBox,
     ) -> some View {
-        VStack(spacing: 0) {
-            MailStateBlock(
-                loading: loading, failed: failed, noMailbox: noMailbox,
-                empty: rows.isEmpty, boxTitle: box.title, onRetry: {}
-            ) {
-                VStack(spacing: 0) {
-                    ForEach(rows) { m in
-                        MessageRow(message: m, selecting: false, selected: false,
-                                   onSelect: {}, onOpen: {}, onStar: {})
-                        Rectangle().fill(GM.border).frame(height: 1)
-                            .padding(.horizontal, 16)
+        ZStack(alignment: .bottom) {
+            GM.bg.ignoresSafeArea()
+            VStack(spacing: 0) {
+                MailHomeTopBar(
+                    boxTitle: box.title,
+                    accountName: "Amira Rahman",
+                    accountAddress: "amira@grapmail.com",
+                    onMenu: {}, onProfile: {}, onSettings: {}, onSignOut: {},
+                    search: {
+                        HStack(spacing: 10) {
+                            Text("Search in mail")
+                                .font(.system(size: 14))
+                                .foregroundColor(GM.textTertiary)
+                            Spacer(minLength: 0)
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 13)
+                        .background(GM.softFill)
+                        .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
+                    }
+                )
+                BoxTabRow(activeBox: box, counts: [.others: 12, .starred: 3, .sent: 24], onSelect: { _ in })
+                MailStateBlock(
+                    loading: loading, failed: failed, noMailbox: noMailbox,
+                    empty: rows.isEmpty, boxTitle: box.title, onRetry: {}
+                ) {
+                    ScrollView {
+                        VStack(spacing: 0) {
+                            ForEach(rows) { m in
+                                MessageRow(message: m, selecting: false, selected: false,
+                                           onSelect: {}, onOpen: {}, onStar: {})
+                            }
+                            Color.clear.frame(height: MailBottomControls.clearance)
+                        }
                     }
                 }
+                .mailListSurface()
             }
+            MailBottomControls(inboxSelected: box == .inbox, unread: 7, onMail: {}, onCompose: {}, onContacts: {})
         }
-        .background(GM.bg)
     }
 
     private var selectionFrame: some View {
@@ -857,23 +889,23 @@ extension MailboxModel {
     }
 }
 
-/// The formatted body the snapshot host answers with: the images-off variant of
-/// the seeded newsletter's HTML part exactly as the body endpoint would return
-/// it — sanitized markup with the remote sources already moved to
-/// `data-grapmail-blocked-src` (one real image, one tracking pixel, both
-/// blocked, both rendered as alt-text chips by the island). No sanitizer runs
-/// here: the string is a developer-authored sample of the endpoint's output,
-/// not a processing of the seed's raw HTML, which stays in the row for the
-/// images-gate count.
+/// A branded newsletter and two blocked images as returned by the body endpoint.
 func mailSnapshotBodyRender(id: String) -> MailboxModel.BodyRender {
-    let html: String? = id == "n2"
-        ? "<p>The kerning quarrels, mostly, and one risograph plate that printed "
-            + "better than the mockup.</p>"
-            + "<img alt=\"Risograph plate 1\" "
-            + "data-grapmail-blocked-src=\"https://images.newsletter.example/plate-1.png\">"
-            + "<img alt=\"Open-rate pixel\" "
-            + "data-grapmail-blocked-src=\"https://images.newsletter.example/pixel.gif?m=n2\">"
-        : nil
+    let html: String? = id == "n2" ? """
+        <table width="600" cellpadding="0" cellspacing="0" style="width:100%;border-collapse:separate;background-color:#f5f1ed;border-radius:18px">
+          <tr><td style="padding:24px;background-color:#202936;border-radius:18px;color:#ffffff;font-family:Arial,sans-serif">
+            <p style="margin:0;color:#f9c9b0;font-size:12px;font-weight:700;letter-spacing:2px">THE WEEKLY DRAFT</p>
+            <h1 style="margin:12px 0;font-size:34px;line-height:1.1">This week in letterforms.</h1>
+            <p style="margin:0;color:#e2e8f0;font-size:15px;line-height:1.6">A new set of experiments in type, texture, and print.</p>
+          </td></tr>
+          <tr><td style="padding:24px;color:#202936;font-family:Arial,sans-serif">
+            <h2 style="margin:0 0 8px;font-size:20px">From the studio</h2>
+            <p style="margin:0 0 18px;font-size:15px;line-height:1.6">The kerning quarrels, mostly, and one risograph plate that printed better than the mockup.</p>
+            <a href="https://newsletter.example/design" target="_blank" rel="noopener noreferrer nofollow" style="display:inline-block;padding:10px 16px;border-radius:8px;background-color:#202936;color:#ffffff;text-decoration:none;font-weight:600">Explore the design ↗</a>
+          </td></tr>
+        </table>
+        <p><img alt="Risograph plate 1" data-blocked-src="https://images.newsletter.example/plate-1.png"><img alt="Open-rate pixel" data-blocked-src="https://images.newsletter.example/pixel.gif?m=n2"></p>
+        """ : nil
     return MailboxModel.BodyRender(
         html: html,
         bodyText: nil,

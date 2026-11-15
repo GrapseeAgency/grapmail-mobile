@@ -262,16 +262,16 @@ for name, src in (("Android compose", KT_COMPOSE), ("iOS reader", SW_READER)):
         not COLLAPSED.search(src))
 
 # An unknown status must stay unknown rather than default to the good word.
-pin("Android prints an unrecognised status verbatim",
-    re.search(r'else\s*->\s*"Server reported', code_only(KT_COMPOSE)) is not None)
+pin("Android shows a neutral message for an unrecognised status",
+    re.search(r'else\s*->\s*"Delivery could not be confirmed', code_only(KT_COMPOSE)) is not None)
 # Anchored on the arm itself and run through `code_only`. The first version of
 # this pin was `re.search(r"(default|otherwise).*Server reported", re.S)`, which
 # matched the word "otherwise" in a doc comment 640 lines above the `default:`
 # arm — so deleting the arm that was being pinned left the gate green. That is
 # the same failure class the label read was: a check that cannot fail is worse
 # than no check, because it reports a covered surface.
-pin("iOS prints an unrecognised status verbatim",
-    re.search(r'default:\s*return\s*"Server reported', code_only(SW_READER)) is not None)
+pin("iOS shows a neutral message for an unrecognised status",
+    re.search(r'default:\s*return\s*"Delivery could not be confirmed', code_only(SW_READER)) is not None)
 
 # ── 1b. the receipt frame photographs the live renderer, not a copy of it ────
 #
@@ -300,7 +300,7 @@ pin("iOS's live receipt is visible to the snapshot host",
     re.search(r"^struct SendReceipt: View", SW_READER, re.M) is not None)
 
 for label, src in (("Android", KT_SNAP), ("iOS", SW_SNAP)):
-    for word in ("Queued for delivery", "Not delivered", "Server reported"):
+    for word in ("Queued for delivery", "Not delivered", "Delivery could not be confirmed"):
         pin(f"{label}'s host does not re-say the receipt wording ({word!r})",
             word not in src)
 
@@ -409,52 +409,44 @@ pin("iOS's bulk `actOn` cannot reach permanent deletion",
 # set of things it can do is the safety boundary. Archive, trash and restore all
 # undo; DELETE does not, and must not be reachable from a row gesture on either
 # platform however convenient that would look.
-KT_SWIPE = body_of(KT_BOX, "private fun SwipeableMessageRow")
-pin("Android's swipe component cannot reach permanent deletion",
-    "mailDeletePermanent" not in KT_SWIPE and "deletePermanently" not in KT_SWIPE)
+KT_SWIPE = android("ui/screens/mail/MailSwipeRow.kt")
+SW_SWIPE = ios("MailSwipeRow.swift")
+kt_wiring = KT_BOX.split("SwipeableMessageRow(", 1)[-1].split("MessageRow(", 1)[0]
+sw_wiring = body_of(ios("MailboxView.swift"), "private func rowView(")
+for platform, component, wiring in [
+    ("Android", KT_SWIPE, kt_wiring),
+    ("iOS", SW_SWIPE, sw_wiring),
+]:
+    pin(f"{platform}'s swipe actions cannot reach permanent deletion",
+        bool(component and wiring) and "deletePermanently" not in component + wiring
+        and "mailDeletePermanent" not in component + wiring)
 
-# The span has to cover BOTH swipeActions blocks. Bounding it at the first
-# closing brace at that indent — the obvious way to write it — stops after the
-# leading block, so the trailing "Trash" button, which is exactly where a
-# destructive edit would land, was outside what got checked. Caught by mutating
-# the Trash button to call deletePermanently and watching the gate stay green.
-SW_SWIPES = ios("MailboxView.swift")
-_start = SW_SWIPES.find("swipeActions(edge: .leading")
-_end = SW_SWIPES.find("onAppear", _start)
-swipe_span = SW_SWIPES[_start:_end] if _start != -1 and _end > _start else ""
-pin("iOS's swipe region was located (both blocks, not just the first)",
-    "swipeActions(edge: .trailing" in swipe_span)
-pin("iOS's swipe actions cannot reach permanent deletion",
-    bool(swipe_span) and "deletePermanently" not in swipe_span
-    and "mailDeletePermanent" not in swipe_span)
-# Both directions must be conditional: a swipe that fires in a box where the
-# action cannot change anything is a gesture wired to a no-op.
-pin("Android gates each swipe direction on the box", "leadingTo != null" in KT_SWIPE
-    and "trailingTo != null" in KT_SWIPE)
+pin("Android gates each swipe direction on the box",
+    "leadingTo != null" in KT_SWIPE and "trailingTo != null" in KT_SWIPE
+    and "inArchive -> null" in kt_wiring and "inTrashOrSpam || selectedIds.isNotEmpty()" in kt_wiring)
 pin("iOS gates each swipe direction on the box",
-    ios("MailboxView.swift").count("vm.state.box != .trash") >= 1
-    and ios("MailboxView.swift").count("vm.state.box != .archive") >= 1)
+    "canSwipe && box != .archive" in sw_wiring and "canSwipe && !recovering" in sw_wiring)
 
 # ── 4. only server-sanitized HTML reaches a renderer ────────────────────────
 # The reader renders the HTML part through one island per platform
 # (`MailHtmlBody.kt` / `MailHtmlBody.swift`). The ONLY string that may reach a
-# WebView is the body endpoint's response — the same DOMPurify email profile
-# the web's SafeEmailBody renders with, applied server-side before the HTML
-# leaves the app's origin. The raw `bodyHtml` the message row carries is never
+# WebView is the body endpoint's response, sanitized server-side before the
+# HTML leaves the app's origin. The raw `bodyHtml` the message row carries is never
 # a render input, page script is off at the engine level on both platforms,
 # and a failed fetch falls back to the stripped-text branch the reader always
-# had — never to raw HTML. A WebView anywhere else in mail code is still the
-# original defect: the print path must stay WebView-free.
+# had — never to raw HTML. The compose editor separately loads only its bundled
+# document and the print path remains WebView-free.
 MAIL_SOURCES = ([ANDROID / "ui/screens/mail" / p for p in
                  sorted((ANDROID / "ui/screens/mail").iterdir())]
                 + [ANDROID / "ui/components/Mail.kt"]
-                + [IOS / p for p in sorted(IOS.iterdir()) if p.name.startswith("Mail")])
+                + [IOS / p for p in sorted(IOS.iterdir()) if p.name.startswith("Mail") or p.name == "ComposeFormattingEditor.swift"])
 
 webview_files = sorted(f.name for f in MAIL_SOURCES
                        if "WebView" in code_only(f.read_text(encoding="utf-8", errors="ignore"))
                        or "loadHTMLString" in code_only(f.read_text(encoding="utf-8", errors="ignore")))
-pin("only the two reader islands carry a WebView",
-    webview_files == ["MailHtmlBody.kt", "MailHtmlBody.swift"])
+pin("mail WebViews are limited to the reader and local compose editor",
+    webview_files == ["ComposeFormattingEditor.kt", "ComposeFormattingEditor.swift", "MailHtmlBody.kt", "MailHtmlBody.swift"]
+    and "blockNetworkLoads = true" in code_only(android("ui/screens/mail/ComposeFormattingEditor.kt")))
 
 kt_island = code_only(android("ui/screens/mail/MailHtmlBody.kt"))
 sw_island = code_only(ios("MailHtmlBody.swift"))
@@ -466,16 +458,37 @@ pin("iOS's island is fed only from the fetched body",
     "message.bodyHtml" not in sw_island)
 pin("Android's model loads the body endpoint", "Api.mailBody(" in KT_VM)
 pin("iOS's model loads the body endpoint", "ApiClient.mailBody(" in ios("MailboxModel.swift"))
+pin("both readers request the design profile and isolate the document",
+    "?preserveDesign=true" in code_only(KT_API)
+    and "?preserveDesign=true" in code_only(SW_API)
+    and all("default-src 'none'" in island and "form-action 'none'" in island
+            for island in (kt_island, sw_island)))
+pin("body prefetch never opens the read-marking message route",
+    '"$MAIL/message/${enc(id)}/html?preserveDesign=true"' in code_only(KT_API)
+    and '"/message/\\(id.percentEncodedPath())/html\\(query)"' in code_only(SW_API))
+pin("native thread pages never carry raw sender HTML",
+    "?native=1" in code_only(KT_API)
+    and "?native=1" in code_only(SW_API)
+    and "message.bodyHtml" not in code_only(android("ui/screens/mail/ThreadScreen.kt"))
+    and "message.bodyHtml" not in code_only(ios("MailReaderViews.swift")))
+pin("long threads page without hiding earlier mail",
+    "nextCursor" in code_only(android("data/MailDto.kt"))
+    and "nextCursor" in code_only(SW_API)
+    and "loadEarlierThread" in code_only(KT_VM)
+    and "loadEarlierThread" in code_only(ios("MailboxModel.swift"))
+    and '"Load earlier messages"' in code_only(android("ui/screens/mail/ThreadScreen.kt"))
+    and '"Load earlier messages"' in code_only(ios("MailReaderViews.swift")))
 pin("the islands take the images opt-in from the gate",
-    "allowImages = shownImages" in android("ui/screens/mail/ThreadScreen.kt")
-    and "allowImages: shownImages" in ios("MailReaderViews.swift"))
+    "allowImages = formatted.allowImages" in code_only(android("ui/screens/mail/ThreadScreen.kt"))
+    and "allowImages: render.allowImages" in code_only(ios("MailReaderViews.swift"))
+    and "vm.loadBody(message.id, shownImages)" in code_only(android("ui/screens/mail/ThreadScreen.kt")))
 
-# The thread view shows stripped text and says so, rather than silently
-# presenting a downgrade as the original — now the FALLBACK for a failed
-# formatted fetch, still stated rather than hidden.
-pin("Android explains an HTML-only body instead of hiding the fact",
-    re.search(r"(plain text|stripped|formatting)", KT_BOX if "stripHtml" in KT_BOX else
-              android("ui/screens/mail/ThreadScreen.kt"), re.I) is not None)
+# A readable text part is shown immediately, including when optional formatting fails.
+kt_thread_reader = code_only(android("ui/screens/mail/ThreadScreen.kt"))
+pin("Android keeps readable text when HTML is unavailable",
+    "message.bodyText?.takeIf" in kt_thread_reader
+    and "text != null || !message.hasHtml" in kt_thread_reader
+    and "Couldn’t display this message." in kt_thread_reader)
 
 # ── 5. the drawer offers only boxes the server can read back ────────────────
 #
@@ -660,7 +673,7 @@ def call_lines(src, needle):
 pin("Android's model detaches on a live branch",
     any("remove" in ln for ln in call_lines(KT_VM, "Api.mailLabelDetach")))
 pin("iOS's model detaches on a live branch",
-    any("remove" in ln for ln in call_lines(SW_VM, "mailLabelDetach")))
+    bool(re.search(r"if\s+remove\s*\{[^{}]*mailLabelDetach\s*\(", code_only(SW_VM))))
 
 # When the read fails, the sheet says so rather than showing a clean list.
 pin("Android's sheet states a failed read",
@@ -813,7 +826,7 @@ pin("iOS's label swatch resolves a dark value",
 # names and DTO fields -- not the bodies of a `when` and a `switch`. Android
 # therefore handled sent/queued/failed while iOS also handled `draft`, the word
 # the draft-save path reports on success: on Android a successful draft save fell
-# through to "Server reported: draft" in warn ink, under a line that said "Saved
+# through to "Delivery could not be confirmed: draft" in warn ink, under a line that said "Saved
 # to Drafts". This is the same "both sides agree on the same wrong thing" hole the
 # label read was, caught from the other direction -- both sides work, the two
 # disagree.
@@ -996,7 +1009,7 @@ pin("iOS's undo drops the ids that came back",
 pin("Android's home entry records the box it fetched",
     "loadedBoxes.add(_state.value.box)" in body_of(KT_VM, "fun ensureLoaded("))
 pin("iOS records a memoised body on the cache hit as well as the fetch",
-    re.search(r"if let cached = await MailStore\.shared\.body\(id\) {[\s\S]{0,700}?threadLoadedFor = id",
+    re.search(r"if let cached = await MailStore\.shared\.notificationMessage\(id\) {[\s\S]{0,1300}?threadLoadedFor = id",
               code_only(SW_MODEL)) is not None)
 
 # -- 18. the sender disc is a token, and it is the reference's token ------------
@@ -1177,7 +1190,7 @@ SW_CHROME = ios("MailChrome.swift")
 pin("iOS's Inbox pill mirrors the list's query and filter",
     re.search(r'selected:\s*query\.isEmpty && filter == \.all', code_only(SW_CHROME)) is not None)
 pin("the inbox header shows the current folder without repeating drawer navigation",
-    "Text(vm.state.box.title)" in code_only(SW_BOX)
+    ("Text(vm.state.box.title)" in code_only(SW_BOX) or "boxTitle: vm.state.box.title" in code_only(SW_BOX))
     and "LabelStrip(labels:" not in code_only(SW_BOX)
     and "BoxTabRow(state:" not in code_only(SW_BOX)
     and "state.box.title" in code_only(KT_BOX)
@@ -1514,10 +1527,12 @@ pin("Android adopts the upload's nonce-bearing avatar URL",
     re.search(r"profile = it\.profile\?\.copy\(avatarUrl = resp\.avatarUrl", code_only(KT_PVM)) is not None)
 pin("iOS adopts the upload's nonce-bearing avatar URL",
     re.search(r"state\.profile\?\.avatarUrl = url", code_only(SW_PVM)) is not None)
-# And the 256 KB ceiling is the route's (`auth-account-profile.ts:256`); the
-# screen quotes it before uploading, so a refusal is the person's words first.
-pin("both photo pickers honour the server's ceiling before uploading",
-    "256 * 1024" in code_only(KT_ACCT) and "256 * 1024" in code_only(SW_ACCT))
+# A bounded PNG is uploaded even when the original photo is larger or a different format.
+pin("both photo pickers resize and normalize uploads",
+    "1024f / maxOf(width, height)" in code_only(KT_ACCT)
+    and "Bitmap.CompressFormat.PNG" in code_only(KT_ACCT)
+    and "AvatarThumbnail.decode(received.file, maxSize: 1024)" in code_only(SW_ACCT)
+    and ".pngData()" in code_only(SW_ACCT))
 
 pin("opening a profile-backed screen does not fetch the avatar",
     "loadAvatar()" not in body_of(KT_PVM, "fun load(force")
@@ -1643,7 +1658,7 @@ pin("attachment delete asks first and drops the cached row, both platforms",
     "mail-attachment-confirm" in code_only(android("ui/screens/mail/MailSecondaryScreens.kt"))
     and "mail-attachment-confirm" in code_only(SW_SECOND)
     and "MailStore.forgetAttachment(id)" in code_only(KT_VM)
-    and "MailStore.shared.forgetAttachment(id)" in code_only(SW_VM))
+    and bool(re.search(r"MailStore\.shared\.forgetAttachment\(id\s*[,)]", code_only(SW_VM))))
 
 pin("attachment removal only leaves the preview after confirmed deletion",
     "deleted = removed" in body_of(android("ui/screens/mail/MailSecondaryScreens.kt"), "fun AttachmentPreviewScreen")
@@ -2244,9 +2259,9 @@ pin("the icon-only actions carry words on both platforms",
     and 'Icons.Rounded.Delete, "Remove"' in code_only(KT_ACCT)
     and '.accessibilityLabel("Remove")' in code_only(SW_ACCT)
     and 'accessibilityLabel("Remove \\(a.address)")' in code_only(SW_ACCT))
-pin("the decorative icons are the four reviewed ones — no new silent icon",
-    len(re.findall(r",\s*null\b", code_only(KT_ACCT)))
-    + len(re.findall(r",\s*null\b", code_only(KT_E2ES))) == 4
+pin("the account and encryption screens use only the reviewed decorative icons",
+    len(re.findall(r"\bIcon\s*\(\s*[^,]{1,140},\s*(?:contentDescription\s*=\s*)?null\b",
+                   code_only(KT_ACCT) + code_only(KT_E2ES))) == 3
     and "Icons." not in code_only(KT_SUBS))
 # The subscriptions row says its action in a word, both platforms — the
 # capsule is Text("Unsubscribe"), never an icon nobody can name. Android
@@ -2660,16 +2675,18 @@ pin("the artwork settles instead of animating forever",
 _ART_SITES = [android(p) for p in (
     "ui/screens/HumanVerifyScreen.kt", "ui/screens/CreatedScreens.kt",
     "ui/screens/NameStepScreen.kt", "ui/screens/WelcomeScreen.kt")]
-# The welcome call site now renders the founder's real logo (bounded at 150dp,
-# ContentScale.Fit — never cropped); the remaining Artwork scenes keep their
-# bounds, and the iOS fill helper still caps the height.
+# The welcome call site renders the founder's living mailbox animation hero
+# (bounded at 360dp, aspectRatio 400/440); the remaining Artwork scenes keep
+# their bounds, and the iOS fill helper still caps the height.
 pin("artwork call sites are bounded, never a screen-width fraction",
     all("fillMaxWidth(0." not in code_only(s) or "Artwork(" not in code_only(s)
         for s in _ART_SITES)
     and all("aspectRatio(2f)" in code_only(s) for s in _ART_SITES
             if s != android("ui/screens/WelcomeScreen.kt"))
-    and "Modifier.width(150.dp)" in code_only(android("ui/screens/WelcomeScreen.kt"))
-    and "ContentScale.Fit" in code_only(android("ui/screens/WelcomeScreen.kt"))
+    and ("Modifier.width(150.dp)" in code_only(android("ui/screens/WelcomeScreen.kt"))
+         or "widthIn(max = 360.dp)" in code_only(android("ui/screens/WelcomeScreen.kt")))
+    and ("ContentScale.Fit" in code_only(android("ui/screens/WelcomeScreen.kt"))
+         or "WelcomeHero(" in code_only(android("ui/screens/WelcomeScreen.kt")))
     and ".frame(maxHeight: 200)" in code_only(SW_ART))
 
 # The old illRes table named every scene; the dispatch must still answer each
@@ -2708,7 +2725,7 @@ pin("the artwork takes its colors from the palette, not from literals",
 # app was missing, and the cleanup after sending is the half that keeps the
 # Drafts box honest.
 pin("a draft row opens the composer, never the reader",
-    "state.box == MailBox.Drafts" in code_only(KT_BOX)
+    "visibleBox == MailBox.Drafts" in code_only(KT_BOX)
     and "onOpenDraft(row.id)" in code_only(KT_BOX)
     and "onOpenDraft: (id: String) -> Unit" in code_only(KT_BOX)
     and 'mode: "draft"' in code_only(ios("RootView.swift"))
@@ -2869,7 +2886,7 @@ pin("the reader can mark its own message unread",
 pin("the unread control appears only while the message is read",
     "if (message.isRead) {" in code_only(KT_THREAD)
     and "if message.isRead {" in code_only(SW_READ)
-    and "applyLocally(id, MailAction.Unread)" in body_of(KT_VM, "fun markUnread")
+    and bool(re.search(r"applyLocally\(id,\s*MailAction\.Unread\s*[,)]", body_of(KT_VM, "fun markUnread")))
     and "applyLocally(id: id, action: .unread)" in body_of(SW_MODEL, "func markUnread")
     and "isRead = read ?: message.isRead" in body_of(KT_VM, "private suspend fun applyLocally")
     and "message.isRead = flags.read ?? message.isRead" in body_of(SW_MODEL, "private func applyLocally"))
@@ -2878,8 +2895,8 @@ pin("the unread control appears only while the message is read",
 # stale-read banner, which is not on screen here — so a refused write would have
 # looked exactly like an accepted one.
 pin("accepted and refused are two different sentences in the reader",
-    'Text("Marked unread."' in code_only(KT_THREAD)
-    and 'Text("Marked unread.")' in code_only(SW_READ)
+    'error ?: "Marked unread."' in code_only(KT_THREAD)
+    and 'error ?? "Marked unread."' in code_only(SW_READ)
     and "You are signed out, so this could not be saved." in code_only(KT_VM)
     and "You are signed out, so this could not be saved." in code_only(SW_MODEL))
 
@@ -2890,15 +2907,16 @@ pin("accepted and refused are two different sentences in the reader",
 # names the count, says whose server they live on, says what loading them
 # reveals, and asks.
 pin("remote images are named and gated, per message",
-    "withContext(Dispatchers.Default) { remoteImageUrls(message.bodyHtml) }" in code_only(KT_THREAD)
-    and "await Self.findRemoteImages(in: message.bodyHtml)" in code_only(SW_READ)
+    "formatted?.blockedImages ?: 0" in code_only(KT_THREAD)
+    and "render.blockedImages > 0, !render.allowImages" in code_only(SW_READ)
     and "tells the sender this message was opened" in code_only(KT_THREAD)
     and "tells the sender this message was opened" in code_only(SW_READ))
 
 pin("Both readers load bodies only for open conversation cards",
     "val needsFormattedBody = showsBody &&" in code_only(KT_THREAD)
     and "showsBody && !message.isE2eEncrypted" in code_only(SW_READ)
-    and ".task(id: needsFormattedBody ? message.bodyHtml : nil)" in code_only(SW_READ))
+    and ".task(id: needsFormattedBody ? RenderRequest(allowImages: shownImages, attempt: renderAttempt) : nil)"
+        in code_only(SW_READ))
 
 # The opt-in starts closed and belongs to one message. A shared flag would carry
 # a consent given for one sender's mail to the next one's, and Android's card is
@@ -2909,7 +2927,7 @@ pin("the opt-in starts closed and is keyed to its own message",
 
 # Nothing reaches the sender's server until the person asks — and the engine
 # agrees with the reader now: the sanctioned HTML carries no remote `src` until
-# the opt-in re-fetches the body with `?images=1`, and the island's own
+# the opt-in re-fetches the body with `remoteImages=true`, and the island's own
 # settings refuse remote image loads while the gate is closed. The images-gate
 # fetch is keyed on the opt-in itself, so a closed gate cannot produce a body
 # variant with live images in it. The standalone loader the print/share handoff
@@ -2917,7 +2935,8 @@ pin("the opt-in starts closed and is keyed to its own message",
 pin("no image is fetched before the person asks",
     "blockNetworkImage = !allowImages" in code_only(android("ui/screens/mail/MailHtmlBody.kt"))
     and "vm.loadBody(message.id, shownImages)" in code_only(KT_THREAD)
-    and ".task(id: needsFormattedBody ? shownImages : nil)" in code_only(SW_READ)
+    and ".task(id: needsFormattedBody ? RenderRequest(allowImages: shownImages, attempt: renderAttempt) : nil)"
+        in code_only(SW_READ)
     and "vm.loadBody(message.id, allowImages: allowImages)" in code_only(SW_READ))
 
 # The extraction rule, not the markup: only an absolute http(s) `img src` is
@@ -2964,12 +2983,13 @@ pin("a failed image says which kind of failure it was",
 # once and reaches it from both controls.
 pin("Android shares and prints the same one document",
     re.search(r"^fun messageShareText", code_only(KT_HANDOFF), re.M) is not None
-    and "TextPrintAdapter(messageShareText(message), docName)" in code_only(KT_HANDOFF)
-    and "EXTRA_TEXT, messageShareText(message)" in code_only(KT_THREAD))
+    and "TextPrintAdapter(messageShareText(message, formattedText), docName)" in code_only(KT_HANDOFF)
+    and "EXTRA_TEXT," in code_only(KT_THREAD)
+    and "messageShareText(message, render?.bodyText)" in code_only(KT_THREAD))
 pin("iOS shares and prints the same one document",
     re.search(r"^func messageShareText", code_only(SW_HANDOFF), re.M) is not None
-    and "text: messageShareText(message))" in code_only(SW_HANDOFF)
-    and "MessageActivityView(text: messageShareText(message))" in code_only(SW_READ))
+    and "text: messageShareText(message, formattedText: formattedText))" in code_only(SW_HANDOFF)
+    and "MessageActivityView(text: messageShareText(" in code_only(SW_READ))
 
 # The print path has no renderer in it, on either platform. The usual recipe —
 # an off-screen web view of the HTML part, or `printHTMLURL` — is the exact thing
@@ -2994,8 +3014,10 @@ pin("a handoff the device refuses is reported, not swallowed",
 pin("what leaves the app is text, never the HTML part",
     '.setType("text/plain")' in code_only(KT_THREAD)
     and "UIActivityViewController(activityItems: [text]" in code_only(SW_HANDOFF)
-    and "EXTRA_TEXT, messageShareText(message)" in code_only(KT_THREAD)
-    and "MessageActivityView(text: messageShareText(message))" in code_only(SW_READ))
+    and "EXTRA_TEXT," in code_only(KT_THREAD)
+    and "messageShareText(message, render?.bodyText)" in code_only(KT_THREAD)
+    and "bodyHtml" not in code_only(KT_HANDOFF)
+    and "message.bodyHtml" not in code_only(SW_HANDOFF))
 
 # One affordance, one name on both platforms — the rule every other interactive
 # screen in this sector follows, so a walk or an assistive reader finds the same
@@ -3008,15 +3030,15 @@ for ident in ("mail-thread-prev", "mail-thread-next", "mail-mark-unread",
         and (f'accessibilityIdentifier("{ident}")' in code_only(SW_READ)
              or f'identifier: "{ident}"' in code_only(SW_READ)))
 
-# The greedy-width defect 74-mail-thread photographed: `OutlineButton` fills its
-# width, a Row measures each unweighted child against the space LEFT, and two of
-# the reader's three reply doors were drawn at zero width while iOS showed all
-# three. The fix is content-sized buttons; a pin keeps it from being "tidied"
-# back, because the regression is invisible to every other gate in CI.
-pin("the reader's action rows size their buttons to their content",
-    code_only(KT_THREAD).count("fill = false") == 7
-    and code_only(KT_THREAD).count("OutlineButton(") == 9
-    and "trailing = { Icon(Icons.Rounded.Reply" not in code_only(KT_THREAD))
+# The pinned Android footer must fit both main actions alongside Reply all.
+# A fill-width action used to crowd the other controls completely off screen.
+kt_reader_code = code_only(KT_THREAD)
+pin("the reader reserves space for all three reply actions",
+    all(re.search(rf'ReaderReplyButton\("{label}"[^\n]*Modifier.weight\(1f\)', kt_reader_code)
+        for label in ("Reply", "Forward"))
+    and 'ReplyAll, "Reply all"' in kt_reader_code
+    and 'ReaderIconButton("Reply all"' in code_only(SW_READ)
+    and '"Load earlier messages"' in kt_reader_code)
 
 # The frame that proves all of this composes: an HTML-only message opened in the
 # middle of a seeded list, named the same on both platforms and launched by both
@@ -3198,20 +3220,23 @@ pin("the new-mail read is registered on both platforms",
 # Both read the same endpoint the mailbox badge already uses. Nothing here
 # invents a source of truth: `GET /stats` is the answer, and a count that came
 # from anywhere else would be a second, contradictory tally.
-pin("the poll asks the server's own unread count, nothing else",
+pin("the poll uses the server's unread count and authenticated inbox listing",
     "ApiClient.mailStats(token)" in code_only(SW_INT)
     and "Api.mailStats(token)" in code_only(KT_POLL)
     and "inbox?.unread" in code_only(SW_INT)
-    and "stats.inbox?.unread" in code_only(KT_POLL))
+    and "stats.inbox?.unread" in code_only(KT_POLL)
+    and "ApiClient.mailInbox(token: token, box: .inbox" in code_only(SW_INT)
+    and "Api.mailInbox(token, MailBox.Inbox" in code_only(KT_POLL))
 
 # The silence rules. A first read has no previous number, so no difference can
 # be named; a refused read saw nothing; and a count that did not rise saw no
 # arrivals. Announcing on any of those would tell the person the mailbox grew
 # when all that happened is that the app looked at it.
 pin("a poll that cannot name a difference says nothing",
-    "guard didSee, count > previous else { return false }" in code_only(SW_INT)
-    and 'if (!hadPrevious) {\n            report("silent first-read unread=$unread")\n            return Result.success()\n        }' in code_only(KT_POLL)
-    and 'if (unread <= previous) {\n            report("silent no-rise $previous->$unread")\n            return Result.success()\n        }' in code_only(KT_POLL))
+    "guard didSee, canNotify else { return false }" in code_only(SW_INT)
+    and "guard grew > 0 else { return false }" in code_only(SW_INT)
+    and 'if (!hadPrevious && pushedMessage == null) {\n            report("silent first-read unread=$unread")\n            return Result.success()\n        }' in code_only(KT_POLL)
+    and 'if (grew <= 0) {\n            report("silent no-rise $previous->$unread")\n            return Result.success()\n        }' in code_only(KT_POLL))
 
 # Both say what the notification is evidence of, in the same two numbers, and
 # neither claims delivery — the relay's queue is not the recipient's inbox. The
@@ -3278,19 +3303,22 @@ pin("Compose mail is reachable from the home screen, both platforms",
     and 'android:name="android.app.shortcuts"' in KT_MANIFEST
     and "COMPOSE_ACTION" in code_only(KT_MAIN))
 
-# A shortcut pressed while signed out goes to sign-in on both platforms. Landing
-# on a composer that cannot send is a screen that pretends to work.
+# A shortcut pressed with a stored but expired access token waits for the
+# single-flight refresh before opening Compose. A session that cannot renew is
+# never handed a composer that only looks able to send.
 #
-# Scoped to the shortcut's own effect, not counted across the file: MainActivity
-# navigates to sign-in from half a dozen places, so a global "contains SIGN_IN"
-# check stayed green when the mutation replaced exactly the one branch that
-# decides what a shortcut means.
+# Scoped to the shortcut paths, not counted across the file: both navigation
+# roots contain several unrelated sign-in and refresh calls.
 kt_shortcut_block = re.search(
     r"LaunchedEffect\(composeRequest, dest\) \{(.*?)\n    \}", code_only(KT_MAIN), re.S)
 pin("the shortcut never lands on a composer that cannot send",
     kt_shortcut_block is not None
+    and "SessionRefresh.refresh(ctx)" in kt_shortcut_block.group(1)
+    and "if (ready)" in kt_shortcut_block.group(1)
     and "Routes.SIGN_IN" in kt_shortcut_block.group(1)
-    and "SessionStore.snapshot(nav.context.applicationContext)?.unexpired == true" in kt_shortcut_block.group(1)
+    and "let renewal = await ApiClient.renewPairStatus()" in code_only(SW_ROOT)
+    and "renewal == .renewed" in code_only(SW_ROOT)
+    and "renewal == .rejected" in code_only(SW_ROOT)
     and "guard SessionStore.hasValidSession else {" in code_only(SW_ROOT)
     and ".signIn]" in code_only(SW_ROOT))
 

@@ -168,7 +168,7 @@ final class SignUpModel: ObservableObject {
                 }
             } catch {
                 update { $0.creating = false }
-                onError(error.localizedDescription)
+                onError(apiMessage(error, fallback: "Could not create your account. Try again."))
             }
         }
     }

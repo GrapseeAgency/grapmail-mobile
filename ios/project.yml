@@ -22,8 +22,8 @@ settings:
     # tag (v0.3.0's first run refused a disagreeing build), and an iOS build of
     # the same commit self-reporting 0.0.0.1 is the same disagreement kept
     # quiet only because no iOS badging check exists yet.
-    MARKETING_VERSION: "0.6.1"
-    CURRENT_PROJECT_VERSION: "10"
+    MARKETING_VERSION: "0.6.3"
+    CURRENT_PROJECT_VERSION: "12"
     # Empty on purpose for local development: a simulator build needs no team.
     # CI's release job injects the team per invocation with
     # DEVELOPMENT_TEAM="$APPLE_TEAM_ID" on the xcodebuild command line —
@@ -37,7 +37,10 @@ targets:
     platform: iOS
     sources:
       - GrapMail
+      - NotificationShared
     dependencies:
+      - target: GrapMailNotificationService
+        embed: true
       - package: Crypto
         product: Crypto
     settings:
@@ -60,18 +63,25 @@ targets:
       path: GrapMail/GrapMail.entitlements
       properties:
         aps-environment: $(APS_ENVIRONMENT)
+        keychain-access-groups:
+          - $(AppIdentifierPrefix)com.grapsee.grapmail
+          - $(DEVELOPMENT_TEAM).com.grapsee.grapmail.notifications
+        com.apple.developer.usernotifications.communication: true
     # XcodeGen writes the native launch configuration and other Info.plist entries.
     info:
       path: GrapMail/Info.plist
       properties:
+        PreviewTeamIdentifier: $(DEVELOPMENT_TEAM)
         UILaunchScreen:
           UIColorName: LaunchBackground
           UIImageName: LaunchBrand
           UIImageRespectsSafeAreaInsets: true
         # Must exactly match MailPoll.refreshIdentifier's registration/submission.
+        NSUserActivityTypes:
+          - INSendMessageIntent
         BGTaskSchedulerPermittedIdentifiers:
           - com.grapsee.grapmail.inbox-refresh
-        # Polling remains the delivery path until a backend APNs provider exists.
+        # Background fetch also covers devices where APNs delivery is unavailable.
         UIBackgroundModes:
           - fetch
           - remote-notification
@@ -79,6 +89,31 @@ targets:
           - UIApplicationShortcutItemType: com.grapsee.grapmail.compose
             UIApplicationShortcutItemTitle: "Compose mail"
             UIApplicationShortcutItemIconType: UIApplicationShortcutIconTypeCompose
+
+  GrapMailNotificationService:
+    type: app-extension
+    platform: iOS
+    sources:
+      - NotificationService
+      - NotificationShared
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.grapsee.grapmail.NotificationService
+        SKIP_INSTALL: YES
+        APPLICATION_EXTENSION_API_ONLY: YES
+    info:
+      path: NotificationService/Info.plist
+      properties:
+        PreviewTeamIdentifier: $(DEVELOPMENT_TEAM)
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.usernotifications.service
+          NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).NotificationService
+    entitlements:
+      path: NotificationService/NotificationService.entitlements
+      properties:
+        keychain-access-groups:
+          - $(DEVELOPMENT_TEAM).com.grapsee.grapmail.notifications
+        com.apple.developer.usernotifications.communication: true
 
   GrapMailUITests:
     type: bundle.ui-testing

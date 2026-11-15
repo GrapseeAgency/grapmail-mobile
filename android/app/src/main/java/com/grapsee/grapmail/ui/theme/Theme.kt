@@ -1,6 +1,9 @@
 package com.grapsee.grapmail.ui.theme
 
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.darkColorScheme
+import androidx.compose.material3.lightColorScheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Typography
 import androidx.compose.runtime.Composable
@@ -9,6 +12,7 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
 // Type scale from DESIGN_TOKENS.md. Platform sans (Roboto) is the
@@ -40,6 +44,17 @@ data class Palette(
     val cardAlt: Color, val otpFill: Color,
     val swipeArchive: Color, val swipeTrash: Color,
     val star: Color,
+    // The text caret. It is set on every field explicitly because a caret
+    // inherits no visibility from anything else on the screen: the audit found
+    // the default one black on the dark compose bar. Light ink in the dark
+    // theme, dark ink in the light one — the one color whose job is contrast
+    // against the field's own fill.
+    val cursor: Color,
+    val tabBadgeAll: Color = Color(0xFF1560C7),
+    val tabBadgeStarred: Color = Color(0xFF975619),
+    val tabTintSent: Color = Color(0xFFAC63FE),
+    val tabBadgeSent: Color = Color(0xFF6928CC),
+    val unreadBadge: Color = Color(0xFFBC2828),
 )
 
 val LocalPalette = staticCompositionLocalOf {
@@ -56,6 +71,7 @@ val LocalPalette = staticCompositionLocalOf {
         cardAlt = Color(0xFFF5F9FE), otpFill = Color.White,
         swipeArchive = Color(0xFF1A6DF0), swipeTrash = Color(0xFFDC2626),
         star = Color(0xFFF5A623),
+        cursor = Color(0xFF1A6DF0),
     )
 }
 
@@ -76,6 +92,7 @@ fun GrapMailTheme(content: @Composable () -> Unit) {
         cardAlt = base.cardAltDark, otpFill = base.otpFillDark,
         swipeArchive = base.swipeArchiveDark, swipeTrash = base.swipeTrashDark,
         star = base.starDark,
+        cursor = base.textPrimaryDark,
     ) else Palette(
         bg = base.bg, bgTinted = base.bgTinted, card = base.card, softFill = base.softFill, infoFill = base.infoFill,
         border = base.border, borderSoft = base.borderSoft,
@@ -89,14 +106,35 @@ fun GrapMailTheme(content: @Composable () -> Unit) {
         cardAlt = base.cardAlt, otpFill = base.otpFill,
         swipeArchive = base.swipeArchive, swipeTrash = base.swipeTrash,
         star = base.star,
+        cursor = base.primarySolid,
     )
     CompositionLocalProvider(LocalPalette provides palette) {
         MaterialTheme(
-            colorScheme = MaterialTheme.colorScheme.copy(
-                primary = base.primarySolid,
+            colorScheme = (if (dark) darkColorScheme() else lightColorScheme()).copy(
+                primary = palette.primarySolid,
+                onPrimary = palette.onPrimary,
+                primaryContainer = palette.infoFill,
+                onPrimaryContainer = palette.textPrimary,
+                secondary = palette.textSecondary,
+                secondaryContainer = palette.softFill,
+                onSecondaryContainer = palette.textPrimary,
                 background = palette.bg,
+                onBackground = palette.textPrimary,
                 surface = palette.card,
+                surfaceTint = Color.Transparent,
+                onSurface = palette.textPrimary,
+                surfaceVariant = palette.softFill,
+                onSurfaceVariant = palette.textSecondary,
+                surfaceContainerLowest = palette.bg,
+                surfaceContainerLow = palette.cardAlt,
+                surfaceContainer = palette.card,
+                surfaceContainerHigh = palette.cardAlt,
+                surfaceContainerHighest = palette.softFill,
+                outline = palette.border,
+                outlineVariant = palette.borderSoft,
+                error = palette.error,
             ),
+            shapes = MaterialTheme.shapes.copy(extraSmall = RoundedCornerShape(13.dp)),
             typography = GrapMailTypography,
             content = content,
         )

@@ -101,6 +101,7 @@ class MailboxViewModel @JvmOverloads constructor(
 ) :
     AndroidViewModel(app) {
 
+    @androidx.compose.runtime.Immutable
     data class MailboxUiState(
         val box: MailBox = MailBox.Inbox,
         val query: String = "",
@@ -267,7 +268,20 @@ class MailboxViewModel @JvmOverloads constructor(
     private var projectedTerm: String? = null
     private val searchTerm: String?
         get() = _state.value.query.trim().takeIf { it.length >= 3 }
-    private var searchJob: Job? = null
+    private var reconcileJob: Job? = null
+
+    /**
+     * Rebase page-one totals, offsets and badges once after a burst of accepted
+     * filing writes. The optimistic row move remains immediate; this delayed
+     * list+stats read is bookkeeping and multiple swipes collapse into one.
+     */
+    private fun scheduleReconciliation() {
+        reconcileJob?.cancel()
+        reconcileJob = viewModelScope.launch {
+            delay(400)
+            load(replace = true, forceCounts = true)
+        }
+    }
 
     /**
      * The boxes this session has already asked the server about.
@@ -286,16 +300,29 @@ class MailboxViewModel @JvmOverloads constructor(
     /// a body must not have it fetched away on appear.
     private var threadLoadedFor: String? = null
     private var readerJob: Job? = null
+    private var earlierThreadJob: Job? = null
     private var readerTarget: Pair<String, Boolean>? = null
 
     private fun loadReader(id: String, isThread: Boolean, read: suspend () -> Unit) {
         val target = id to isThread
         if (readerTarget == target && (threadLoadedFor == id || readerJob?.isActive == true)) return
         readerJob?.cancel()
+        earlierThreadJob?.cancel()
+        earlierThreadJob = null
         readerTarget = target
         threadLoadedFor = null
         _thread.value = ThreadState(loading = true)
         readerJob = viewModelScope.launch { read() }
+    }
+
+    fun leaveReader(id: String, isThread: Boolean) {
+        if (readerTarget != (id to isThread)) return
+        readerJob?.cancel()
+        earlierThreadJob?.cancel()
+        readerJob = null
+        earlierThreadJob = null
+        readerTarget = null
+        _thread.value = ThreadState()
     }
 
     /**
@@ -324,6 +351,10 @@ class MailboxViewModel @JvmOverloads constructor(
      * that has been offline for an hour should say so on its first frame, not
      * after the next transition.
      */
+    private fun setOnline(value: Boolean?) {
+        _state.update { current -> if (current.online == value) current else current.copy(online = value) }
+    }
+
     private fun watchNetwork() {
         val manager = getApplication<android.app.Application>()
             .getSystemService(android.content.Context.CONNECTIVITY_SERVICE)
@@ -331,10 +362,10 @@ class MailboxViewModel @JvmOverloads constructor(
         val active = manager.activeNetwork
             ?.let { manager.getNetworkCapabilities(it) }
             ?.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_INTERNET)
-        _state.update { it.copy(online = active) }
+        setOnline(active)
         val callback = object : android.net.ConnectivityManager.NetworkCallback() {
             override fun onAvailable(network: android.net.Network) {
-                _state.update { it.copy(online = true) }
+                setOnline(true)
             }
 
             override fun onLost(network: android.net.Network) {
@@ -346,17 +377,16 @@ class MailboxViewModel @JvmOverloads constructor(
                 val still = manager.activeNetwork
                     ?.let { manager.getNetworkCapabilities(it) }
                     ?.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_INTERNET)
-                _state.update { it.copy(online = still == true) }
+                setOnline(still == true)
             }
 
             override fun onCapabilitiesChanged(
                 network: android.net.Network,
                 capabilities: android.net.NetworkCapabilities,
             ) {
-                _state.update {
-                    it.copy(online = capabilities
-                        .hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_INTERNET))
-                }
+                setOnline(
+                    capabilities.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_INTERNET),
+                )
             }
         }
         runCatching { manager.registerDefaultNetworkCallback(callback) }
@@ -390,6 +420,7 @@ class MailboxViewModel @JvmOverloads constructor(
             val current = com.grapsee.grapmail.data.SessionStore.snapshot(context) ?: return@launch
             val cached = MailStore.me()
             if (cached != null && cached.address.equals(current.address, ignoreCase = true)) {
+                if (!SessionStore.isCurrent(context, current.id)) return@launch
                 applyAccount(cached)
                 return@launch
             }
@@ -402,7 +433,8 @@ class MailboxViewModel @JvmOverloads constructor(
             }
             val active = com.grapsee.grapmail.data.SessionStore.snapshot(context)
             if (active?.id != current.id) return@launch
-            MailStore.putMe(me)
+            if (!MailStore.putMe(me, context, current.id)) return@launch
+            if (!SessionStore.isCurrent(context, current.id)) return@launch
             applyAccount(me)
         }
     }
@@ -420,7 +452,7 @@ class MailboxViewModel @JvmOverloads constructor(
 
     fun open(box: MailBox) {
         if (_state.value.box == box) return
-        searchJob?.cancel()
+        reconcileJob?.cancel()
         loadedBoxes.add(box)
         _state.update { it.copy(box = box, selection = emptySet(), rows = emptyList(),
             pages = 0, loaded = 0, total = 0, advScope = 0, loading = true,
@@ -433,14 +465,15 @@ class MailboxViewModel @JvmOverloads constructor(
     /// the home screen — see `loadedBoxes` for why this is not just `load()`.
     fun ensureLoaded() {
         if (loadedBoxes.contains(_state.value.box)) return
-        // Recorded before the request, the way `open()` records it. Testing the set
-        // and never writing to it left the default Inbox permanently absent from it,
-        // so every return from a thread, a reader or Settings paid for a full page-1
-        // read — the exact over-fetch this field's own comment says it exists to
-        // prevent — and one of those reads failing raises a stale-list banner over
-        // mail that is already on screen. iOS inserts here and did not need fixing.
         loadedBoxes.add(_state.value.box)
-        load(replace = true)
+        viewModelScope.launch {
+            // `Application.onCreate` starts the disk read, but it is asynchronous.
+            // Let that local read finish before the first page load so cached mail
+            // wins first paint instead of losing a race to the network response.
+            MailStore.awaitDiskReady()
+            reproject()
+            load(replace = true)
+        }
     }
 
     private var lastFirstPageAttempt: Long? = null
@@ -459,7 +492,8 @@ class MailboxViewModel @JvmOverloads constructor(
         val inbox = result.stats.inbox
         val changed = inbox?.unread?.let { it != previous.unreadCount } == true ||
             (previous.box == MailBox.Inbox && inbox?.total?.let { it != previous.total } == true)
-        MailStore.putStats(result.stats)
+        if (!MailStore.putStats(result.stats, getApplication(), result.sessionId)) return
+        if (!SessionStore.isCurrent(getApplication(), result.sessionId)) return
         countsLoadedAt = android.os.SystemClock.elapsedRealtime()
         _state.update { it.withFolderCounts(result.stats) }
         if (changed && canRefreshInBackground(atTop) && _state.value.box == MailBox.Inbox) {
@@ -469,7 +503,7 @@ class MailboxViewModel @JvmOverloads constructor(
 
     private fun canRefreshInBackground(atTop: Boolean): Boolean {
         val current = _state.value
-        return atTop && loadJob?.isActive != true && searchJob?.isActive != true &&
+        return atTop && loadJob?.isActive != true &&
             searchTerm == null && current.online != false && current.pages <= 1 && !current.selecting
     }
 
@@ -483,11 +517,14 @@ class MailboxViewModel @JvmOverloads constructor(
         if (previous == text) return
         _state.update { it.copy(query = text) }
         if (previous.trim().takeIf { it.length >= 3 } == text.trim().takeIf { it.length >= 3 }) return
-        searchJob?.cancel()
-        searchJob = viewModelScope.launch {
-            delay(350)
-            load(replace = true)
+        loadJob?.cancel()
+        projectionGeneration++
+        _state.update {
+            it.copy(rows = emptyList(), selection = emptySet(), pages = 0, loaded = 0,
+                total = 0, advScope = 0, loading = true, loadingMore = false,
+                endOfPages = false, noMailbox = false, appendError = null, fatal = null, staleError = null)
         }
+        load(replace = true)
     }
 
     fun setSortAndFilter(sort: MailSort, filter: MailFilter) {
@@ -495,6 +532,39 @@ class MailboxViewModel @JvmOverloads constructor(
         if (current.sort == sort && current.filter == filter) return
         _state.update { it.copy(sort = sort, filter = filter) }
         viewModelScope.launch { reproject() }
+    }
+
+    /**
+     * Swap the active signed-in account and reload everything it owns. The
+     * store clears the mailbox caches on the switch — list, thread cache, disk
+     * snapshot are per-account — so the fresh load reads the new account's
+     * mail, never the previous one's.
+     */
+    fun switchAccount(address: String, onSwitched: () -> Unit) {
+        viewModelScope.launch {
+            val context = getApplication<Application>()
+            if (!SessionStore.switchTo(context, address)) return@launch
+            loadJob?.cancel()
+            onSwitched()
+            com.grapsee.grapmail.logic.PushSync.registerAsync(context)
+        }
+    }
+
+    suspend fun accountUnreads(
+        sessions: List<com.grapsee.grapmail.data.SessionSnapshot>,
+    ): Map<String, Int?> = kotlinx.coroutines.coroutineScope {
+        sessions.map { snapshot ->
+            async {
+                val unread = try {
+                    Api.parkedAccountUnread(snapshot.token)
+                } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                    throw cancelled
+                } catch (_: Exception) {
+                    null
+                }
+                snapshot.address to unread
+            }
+        }.awaitAll().toMap()
     }
 
     /**
@@ -551,16 +621,16 @@ class MailboxViewModel @JvmOverloads constructor(
                 if (term != searchTerm) return@launch
                 val addedRows = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
                     if (!SessionStore.isCurrent(context, session.id)) return@withContext null
-                    MailStore.putPage(box, term, resp, replace)
+                    MailStore.putPage(box, term, resp, replace, context, session.id)
                 } ?: return@launch
+                if (!SessionStore.isCurrent(context, session.id)) return@launch
                 if (term != searchTerm) return@launch
                 reproject()
                 if (term != searchTerm) return@launch
-                _state.update { it.copy(loading = false, loadingMore = false, fatal = null,
+                _state.update { it.copy(loading = false, loadingMore = false, noMailbox = false, fatal = null,
                     staleError = null, appendError = null, endOfPages = !addedRows,
                     settleGeneration = it.settleGeneration + 1) }
                 if (replace && term == null) refreshCounts(session, force = forceCounts)
-                if (replace) prefetchVisibleBodies()
             } catch (e: kotlinx.coroutines.CancellationException) {
                 throw e            // superseded: the read that replaced this one reports
             } catch (e: Exception) {
@@ -604,17 +674,24 @@ class MailboxViewModel @JvmOverloads constructor(
                 return@launch
             }
             if (!SessionStore.isCurrent(getApplication(), session.id)) return@launch
-            MailStore.putStats(stats)
+            if (!MailStore.putStats(stats, getApplication(), session.id)) return@launch
+            if (!SessionStore.isCurrent(getApplication(), session.id)) return@launch
             countsLoadedAt = android.os.SystemClock.elapsedRealtime()
             _state.update { it.withFolderCounts(stats) }
         }
     }
 
     fun loadMore() {
-        if (searchJob?.isActive == true || loadJob?.isActive == true ||
+        if (loadJob?.isActive == true ||
             projectedTerm != searchTerm || !_state.value.canLoadMore
         ) return
         load(replace = false)
+    }
+
+    /** Wait for the current request to finish before attempting automatic pagination. */
+    suspend fun loadMoreWhenReady() {
+        loadJob?.join()
+        if (_state.value.appendError == null) loadMore()
     }
 
     /**
@@ -642,16 +719,19 @@ class MailboxViewModel @JvmOverloads constructor(
                 s.advSubject.isNotBlank() || s.advFiles ||
                 s.advAfter.isNotBlank() || s.advBefore.isNotBlank()
             if (advOn) {
+                val from = s.advFrom.trim()
+                val to = s.advTo.trim()
+                val subject = s.advSubject.trim()
+                val after = s.advAfter.trim()
+                val before = s.advBefore.trim()
                 rows = rows.filter { m ->
-                    (s.advFrom.isBlank() ||
-                        (m.from?.display ?: "").contains(s.advFrom.trim(), ignoreCase = true)) &&
-                    (s.advTo.isBlank() || m.to.any { it.contains(s.advTo.trim(), ignoreCase = true) } ||
-                        m.cc.any { it.contains(s.advTo.trim(), ignoreCase = true) }) &&
-                    (s.advSubject.isBlank() ||
-                        (m.subject ?: "").contains(s.advSubject.trim(), ignoreCase = true)) &&
+                    (from.isEmpty() || (m.from?.display ?: "").contains(from, ignoreCase = true)) &&
+                    (to.isEmpty() || m.to.any { it.contains(to, ignoreCase = true) } ||
+                        m.cc.any { it.contains(to, ignoreCase = true) }) &&
+                    (subject.isEmpty() || (m.subject ?: "").contains(subject, ignoreCase = true)) &&
                     (!s.advFiles || m.hasAttachments) &&
-                    (s.advAfter.isBlank() || (m.createdAt ?: "").take(10) >= s.advAfter.trim()) &&
-                    (s.advBefore.isBlank() || (m.createdAt ?: "").take(10) <= s.advBefore.trim())
+                    (after.isEmpty() || (m.createdAt ?: "").take(10) >= after) &&
+                    (before.isEmpty() || (m.createdAt ?: "").take(10) <= before)
                 }
             }
 
@@ -659,10 +739,15 @@ class MailboxViewModel @JvmOverloads constructor(
                 // The server's own order: covers the whole box, not just the pages.
                 MailSort.Newest -> rows
                 MailSort.Oldest -> rows.reversed()
-                MailSort.SenderAsc -> rows.sortedBy { it.from?.display.orEmpty().lowercase() }
-                MailSort.SenderDesc -> rows.sortedByDescending { it.from?.display.orEmpty().lowercase() }
-                MailSort.SubjectAsc -> rows.sortedBy { (it.subject ?: "").lowercase() }
-                MailSort.SubjectDesc -> rows.sortedByDescending { (it.subject ?: "").lowercase() }
+                MailSort.SenderAsc, MailSort.SenderDesc, MailSort.SubjectAsc, MailSort.SubjectDesc -> {
+                    val sender = s.sort == MailSort.SenderAsc || s.sort == MailSort.SenderDesc
+                    val descending = s.sort == MailSort.SenderDesc || s.sort == MailSort.SubjectDesc
+                    val keyed = rows.map { row ->
+                        row to (if (sender) row.from?.display.orEmpty() else row.subject.orEmpty()).lowercase()
+                    }
+                    (if (descending) keyed.sortedByDescending { it.second } else keyed.sortedBy { it.second })
+                        .map { it.first }
+                }
             }
         }
 
@@ -726,7 +811,8 @@ class MailboxViewModel @JvmOverloads constructor(
         if (ids.isEmpty() || _state.value.busy || pendingRowActions.isNotEmpty()) return
         _state.update { it.copy(busy = true) }
         viewModelScope.launch {
-            val t = token() ?: run {
+            val app = getApplication<Application>()
+            val session = SessionStore.snapshot(app) ?: run {
                 _state.update { it.copy(busy = false, actionError = "Sign in again.") }
                 return@launch
             }
@@ -747,24 +833,18 @@ class MailboxViewModel @JvmOverloads constructor(
             // takes the message out of every box's view, and a restore-style
             // action takes it out of the box it is being seen in. Rows leave as
             // their own write lands, not when the whole selection has settled.
-            val source = when (action) {
-                MailAction.Unstar -> MailBox.Starred
-                MailAction.Restore -> MailBox.Trash
-                MailAction.Unarchive -> MailBox.Archive
-                MailAction.Unspam -> MailBox.Spam
-                MailAction.Unsnooze -> MailBox.Snoozed
-                else -> null
-            }
-            val removesRow = action == MailAction.Trash || action == MailAction.Archive ||
-                action == MailAction.Spam || action == MailAction.Snooze || source == _state.value.box
+            val removesRow = actionRemovesFromBox(action, _state.value.box)
             coroutineScope {
                 ids.map { id ->
                     async {
                         writePermits.withPermit {
                             try {
-                                Api.mailAction(t, id, action, until)
+                                if (!SessionStore.isCurrent(app, session.id)) return@withPermit
+                                Api.mailAction(session.token, id, action, until)
+                                if (!SessionStore.isCurrent(app, session.id)) return@withPermit
                                 done.add(id)
-                                applyLocally(id, action)
+                                applyLocally(id, action, session.id)
+                                if (!SessionStore.isCurrent(app, session.id)) return@withPermit
                                 _state.update { s ->
                                     if (removesRow) s.copy(
                                         selection = s.selection - id,
@@ -780,7 +860,9 @@ class MailboxViewModel @JvmOverloads constructor(
                     }
                 }.awaitAll()
             }
-            if (done.isNotEmpty()) invalidateFor(action)
+            if (!SessionStore.isCurrent(app, session.id)) return@launch
+            if (done.isNotEmpty()) invalidateFor(action, session.id)
+            if (!SessionStore.isCurrent(app, session.id)) return@launch
             _state.update { it.copy(busy = false, selection = it.selection - done, actionError = failure) }
             // Same rule as the undo below, and the same rule iOS's `act`
             // learned: the tap belongs to the write. A partial failure is a
@@ -821,18 +903,18 @@ class MailboxViewModel @JvmOverloads constructor(
                     undoNote = action.pastLine(done.size))
             }
             if (done.isEmpty()) return@launch
+            // Every accepted write already patched MailStore and the visible
+            // rows above. Re-downloading page 1 here made one toolbar action
+            // become N writes + one list read (+ stats elsewhere), and the
+            // second render visibly chased the optimistic one. Re-project only
+            // the actions whose rows stay in this box; filing rows are already
+            // gone, and invalidated destination boxes refetch when opened.
             when (action) {
                 MailAction.Read, MailAction.Unread -> reproject()
                 MailAction.Star, MailAction.Unstar -> {
-                    if (_state.value.box == MailBox.Starred) {
-                        if (action == MailAction.Unstar) {
-                            val removed = done.toHashSet()
-                            _state.update { it.copy(rows = it.rows.filterNot { row -> row.id in removed }) }
-                        }
-                        load(forceCounts = false)
-                    } else reproject()
+                    if (!removesRow) reproject()
                 }
-                else -> load(replace = true)
+                else -> scheduleReconciliation()
             }
         }
     }
@@ -864,21 +946,25 @@ class MailboxViewModel @JvmOverloads constructor(
         if (ids.isEmpty() || _state.value.busy || pendingRowActions.isNotEmpty()) return
         _state.update { it.copy(busy = true) }
         viewModelScope.launch {
-            val t = token() ?: run {
+            val app = getApplication<Application>()
+            val session = SessionStore.snapshot(app) ?: run {
                 _state.update { it.copy(busy = false, actionError = "Sign in again.") }
                 return@launch
             }
             var failure: String? = null
             val restored = mutableListOf<String>()
             for (id in ids) {
-                runCatching { Api.mailAction(t, id, MailAction.Unsnooze, null) }
+                if (!SessionStore.isCurrent(app, session.id)) return@launch
+                runCatching { Api.mailAction(session.token, id, MailAction.Unsnooze, null) }
                     .onSuccess { restored.add(id) }
                     .onFailure {
                         if (it is kotlinx.coroutines.CancellationException) throw it
                         failure = it.message ?: "That action didn't go through."
                     }
             }
-            if (restored.isNotEmpty()) invalidateFor(MailAction.Unsnooze)
+            if (!SessionStore.isCurrent(app, session.id)) return@launch
+            if (restored.isNotEmpty()) invalidateFor(MailAction.Unsnooze, session.id)
+            if (!SessionStore.isCurrent(app, session.id)) return@launch
             _state.update { s ->
                 s.copy(
                     busy = false,
@@ -918,21 +1004,28 @@ class MailboxViewModel @JvmOverloads constructor(
         if (ids.isEmpty() || inv == null || _state.value.busy || pendingRowActions.isNotEmpty()) return
         _state.update { it.copy(busy = true) }
         viewModelScope.launch {
-            val t = token() ?: run {
+            val app = getApplication<Application>()
+            val session = SessionStore.snapshot(app) ?: run {
                 _state.update { it.copy(busy = false, actionError = "Sign in again.") }
                 return@launch
             }
             var failure: String? = null
             val redone = mutableListOf<String>()
             for (id in ids) {
-                runCatching { Api.mailAction(t, id, inv, null) }
-                    .onSuccess { redone.add(id); applyLocally(id, inv) }
+                if (!SessionStore.isCurrent(app, session.id)) return@launch
+                runCatching { Api.mailAction(session.token, id, inv, null) }
+                    .onSuccess {
+                        if (!SessionStore.isCurrent(app, session.id)) return@launch
+                        redone.add(id); applyLocally(id, inv, session.id)
+                    }
                     .onFailure {
                         if (it is kotlinx.coroutines.CancellationException) throw it
                         failure = it.message ?: "That action didn't go through."
                     }
             }
-            if (redone.isNotEmpty()) invalidateFor(inv)
+            if (!SessionStore.isCurrent(app, session.id)) return@launch
+            if (redone.isNotEmpty()) invalidateFor(inv, session.id)
+            if (!SessionStore.isCurrent(app, session.id)) return@launch
             _state.update { s ->
                 val left = s.undoIds - redone
                 s.copy(
@@ -965,13 +1058,33 @@ class MailboxViewModel @JvmOverloads constructor(
 
     fun clearAdvanced() = setAdvanced("", "", "", false, "", "")
 
+    private fun actionRemovesFromBox(action: MailAction, box: MailBox): Boolean = when (action) {
+        MailAction.Archive -> box != MailBox.Starred && box != MailBox.All && box != MailBox.Archive
+        MailAction.Trash -> box != MailBox.Starred && box != MailBox.Trash
+        MailAction.Spam -> box != MailBox.Starred && box != MailBox.Spam
+        MailAction.Snooze -> box == MailBox.Inbox
+        MailAction.Unstar -> box == MailBox.Starred
+        MailAction.Restore -> box == MailBox.Trash
+        MailAction.Unarchive -> box == MailBox.Archive
+        MailAction.Unspam -> box == MailBox.Spam
+        MailAction.Unsnooze -> box == MailBox.Snoozed
+        else -> false
+    }
+
     private val pendingRowActions = mutableSetOf<String>()
 
-    fun actOn(id: String, action: MailAction) {
-        if (_state.value.busy) return
+    fun actOn(id: String, action: MailAction, onOutcome: ((String?) -> Unit)? = null) {
         viewModelScope.launch {
-            val t = token() ?: return@launch
-            if (_state.value.busy || !pendingRowActions.add(id)) return@launch
+            val app = getApplication<Application>()
+            val session = SessionStore.snapshot(app)
+            if (session == null) {
+                onOutcome?.invoke("You are signed out, so this could not be saved.")
+                return@launch
+            }
+            if (_state.value.busy || !pendingRowActions.add(id)) {
+                onOutcome?.invoke("A message action is already in progress.")
+                return@launch
+            }
             try {
                 // ── Optimistic first paint ──────────────────────────────────────
                 // The row answers the gesture before the network does: the flag
@@ -981,18 +1094,10 @@ class MailboxViewModel @JvmOverloads constructor(
                 // and the error names what did not go through. Nothing here
                 // claims a delivery: the undo banner is raised only after the
                 // server accepted, the same rule the bulk path keeps.
-                applyLocally(id, action)
-                val source = when (action) {
-                    MailAction.Unstar -> MailBox.Starred
-                    MailAction.Restore -> MailBox.Trash
-                    MailAction.Unarchive -> MailBox.Archive
-                    MailAction.Unspam -> MailBox.Spam
-                    MailAction.Unsnooze -> MailBox.Snoozed
-                    else -> null
-                }
+                applyLocally(id, action, session.id)
+                if (!SessionStore.isCurrent(app, session.id)) return@launch
                 val box = _state.value.box
-                val removesRow = action == MailAction.Trash || action == MailAction.Archive ||
-                    action == MailAction.Spam || action == MailAction.Snooze || source == box
+                val removesRow = actionRemovesFromBox(action, box)
                 if (removesRow) {
                     _state.update { s -> s.copy(rows = s.rows.filterNot { it.id == id }) }
                 } else {
@@ -1024,10 +1129,10 @@ class MailboxViewModel @JvmOverloads constructor(
                     else -> GMHaptics.filing()
                 }
                 try {
-                    Api.mailAction(t, id, action, null)
-                    invalidateFor(action)
-                    com.grapsee.grapmail.data.SessionStore.snapshot(getApplication())
-                        ?.let { refreshCounts(it, force = false) }
+                    Api.mailAction(session.token, id, action, null)
+                    if (!SessionStore.isCurrent(app, session.id)) return@launch
+                    invalidateFor(action, session.id)
+                    if (!SessionStore.isCurrent(app, session.id)) return@launch
                     // A single-message action supersedes the undo offer for THAT
                     // message. Without this, snooze three, swipe one of them to
                     // Trash, press Undo, and the trashed message is
@@ -1054,30 +1159,18 @@ class MailboxViewModel @JvmOverloads constructor(
                             undoNote = action.pastLine(1),
                         )
                     }
-                    // Reconcile the bookkeeping the optimistic paint could not
-                    // know: the box's totals and the neighbouring pages. First
-                    // paint comes from the cache, so this lands behind the row
-                    // the person already saw move.
-                    val sourceAfter = when (action) {
-                        MailAction.Unstar -> MailBox.Starred
-                        MailAction.Restore -> MailBox.Trash
-                        MailAction.Unarchive -> MailBox.Archive
-                        MailAction.Unspam -> MailBox.Spam
-                        MailAction.Unsnooze -> MailBox.Snoozed
-                        else -> null
-                    }
-                    if (sourceAfter == _state.value.box) {
-                        load(forceCounts = false)
-                    } else if (action == MailAction.Restore || action == MailAction.Unarchive ||
-                        action == MailAction.Unspam || action == MailAction.Unsnooze
-                    ) {
-                        load(forceCounts = false)
-                    } else {
-                        reproject()
-                    }
+                    // The accepted write is already visible. Re-project flags
+                    // in place; filing schedules one delayed page-one/stat read
+                    // to rebase totals and future offsets without blocking the
+                    // gesture that moved the row.
+                    if (action == MailAction.Star || action == MailAction.Unstar ||
+                        action == MailAction.Read || action == MailAction.Unread
+                    ) reproject() else scheduleReconciliation()
+                    onOutcome?.invoke(null)
                 } catch (e: kotlinx.coroutines.CancellationException) {
                     throw e
                 } catch (e: Exception) {
+                    if (!SessionStore.isCurrent(app, session.id)) return@launch
                     GMHaptics.failure()
                     // The write was refused, so the optimistic move is not the
                     // truth. Re-read the box — the row returns exactly where
@@ -1085,10 +1178,9 @@ class MailboxViewModel @JvmOverloads constructor(
                     loadedBoxes.remove(_state.value.box)
                     MailStore.invalidate(_state.value.box)
                     load(forceCounts = false)
-                    _state.update { s ->
-                        s.copy(actionError = (e as? ApiException)?.message
-                            ?: "That action didn't go through.")
-                    }
+                    val error = (e as? ApiException)?.message ?: "That action didn't go through."
+                    _state.update { it.copy(actionError = error) }
+                    onOutcome?.invoke(error)
                 }
             } finally {
                 pendingRowActions.remove(id)
@@ -1096,7 +1188,7 @@ class MailboxViewModel @JvmOverloads constructor(
         }
     }
 
-    private suspend fun applyLocally(id: String, action: MailAction) {
+    private suspend fun applyLocally(id: String, action: MailAction, sessionId: String? = null) {
         val read = when (action) {
             MailAction.Read -> true
             MailAction.Unread -> false
@@ -1108,7 +1200,9 @@ class MailboxViewModel @JvmOverloads constructor(
             else -> null
         }
         if (read != null || starred != null) {
-            MailStore.patchFlags(id, read = read, starred = starred)
+            MailStore.patchFlags(id, read = read, starred = starred,
+                sessionContext = getApplication(), sessionId = sessionId)
+            if (sessionId != null && !SessionStore.isCurrent(getApplication(), sessionId)) return
             _thread.update { state ->
                 val index = state.messages.indexOfFirst { it.id == id }
                 if (index < 0) state else {
@@ -1124,34 +1218,44 @@ class MailboxViewModel @JvmOverloads constructor(
         } else {
             when (action) {
                 MailAction.Trash, MailAction.Archive, MailAction.Spam, MailAction.Snooze ->
-                    MailStore.removeEverywhere(id)
+                    if (actionRemovesFromBox(action, _state.value.box)) {
+                        MailStore.remove(id, _state.value.box, getApplication(), sessionId)
+                    }
                 else -> Unit
             }
         }
     }
 
-    private suspend fun invalidateFor(action: MailAction) {
+    private suspend fun invalidateFor(action: MailAction, sessionId: String? = null) {
+        val context = getApplication<Application>()
+        if (sessionId != null && !SessionStore.isCurrent(context, sessionId)) return
         when (action) {
             MailAction.Star, MailAction.Unstar -> {
                 loadedBoxes.remove(MailBox.Starred)
-                MailStore.invalidate(MailBox.Starred)
+                MailStore.invalidate(MailBox.Starred, context, sessionId)
             }
-            MailAction.Trash -> MailStore.invalidate(MailBox.Trash)
-            MailAction.Archive -> MailStore.invalidate(MailBox.Archive)
-            MailAction.Spam -> MailStore.invalidate(MailBox.Spam)
+            MailAction.Trash -> {
+                MailStore.invalidate(MailBox.Trash, context, sessionId)
+                MailStore.invalidate(MailBox.All, context, sessionId)
+            }
+            MailAction.Archive -> MailStore.invalidate(MailBox.Archive, context, sessionId)
+            MailAction.Spam -> {
+                MailStore.invalidate(MailBox.Spam, context, sessionId)
+                MailStore.invalidate(MailBox.All, context, sessionId)
+            }
             MailAction.Restore, MailAction.Unarchive, MailAction.Unspam ->
-                MailStore.invalidateAllBoxes()
+                MailStore.invalidateAllBoxes(context, sessionId)
             // A snooze moves the message out of the inbox's view and into the
             // snoozed box's (`grapmail-boxes.ts:178` lists it over every folder),
             // so both listings are wrong the moment the action succeeds and
             // neither may be shown from the cache it just invalidated.
-            MailAction.Snooze -> MailStore.invalidate(MailBox.Snoozed)
+            MailAction.Snooze -> MailStore.invalidate(MailBox.Snoozed, context, sessionId)
             // Undoing a snooze returns the mail to the listing it was hidden from,
             // which is the inbox — so that is the box that must be re-read, and the
             // snoozed box loses it at the same moment.
             MailAction.Unsnooze -> {
-                MailStore.invalidate(MailBox.Inbox)
-                MailStore.invalidate(MailBox.Snoozed)
+                MailStore.invalidate(MailBox.Inbox, context, sessionId)
+                MailStore.invalidate(MailBox.Snoozed, context, sessionId)
             }
             else -> Unit
         }
@@ -1179,7 +1283,7 @@ class MailboxViewModel @JvmOverloads constructor(
                 runCatching { Api.mailDeletePermanent(t, id) }
                     .onSuccess {
                         removed.add(id)
-                        MailStore.removeEverywhere(id)
+                        MailStore.remove(id, MailBox.Trash)
                         MailStore.forgetBody(id)
                         // The message is gone, so its label pairs are gone with it.
                         // Left in the map they would be resurrected if the same id
@@ -1224,15 +1328,19 @@ class MailboxViewModel @JvmOverloads constructor(
         val ids = _state.value.selection.toList()
         if (ids.isEmpty()) return
         viewModelScope.launch {
-            val t = token() ?: return@launch
+            val context = getApplication<Application>()
+            val session = SessionStore.snapshot(context) ?: return@launch
             _state.update { it.copy(assignmentsRead = AssignmentsRead.Reading, labelNote = null) }
-            runCatching { Api.mailLabelAssignments(t) }
+            runCatching { Api.mailLabelAssignments(session.token) }
                 .onSuccess {
-                    MailStore.putAssignments(it.assignments)
+                    if (!MailStore.putAssignments(it.assignments, context, session.id)) return@launch
+                    if (!SessionStore.isCurrent(context, session.id)) return@launch
                     _state.update { s -> s.copy(assignmentsRead = AssignmentsRead.Read) }
                     applyMarks()
                 }
                 .onFailure { e ->
+                    if (e is kotlinx.coroutines.CancellationException) throw e
+                    if (!SessionStore.isCurrent(context, session.id)) return@launch
                     // Either way the flag has to leave `Reading`, or a second failure
                     // is impossible to notice: `ensureAssignments` short-circuits on
                     // Reading, so a state left there silently stops every later read
@@ -1296,7 +1404,7 @@ class MailboxViewModel @JvmOverloads constructor(
      */
     fun toggleLabel(labelId: String) {
         val ids = _state.value.selection.toList()
-        if (ids.isEmpty()) return
+        if (ids.isEmpty() || _state.value.busy || pendingRowActions.isNotEmpty()) return
         val mark = _state.value.labelMarks[labelId] ?: LabelMark.Unknown
         val remove = mark == LabelMark.On
         viewModelScope.launch {
@@ -1316,16 +1424,27 @@ class MailboxViewModel @JvmOverloads constructor(
             var done = 0
             var failure: String? = null
             val labelName = _state.value.labels.firstOrNull { it.id == labelId }?.name ?: "label"
-            targets.forEach { id ->
-                runCatching { if (remove) Api.mailLabelDetach(t, id, labelId)
-                              else Api.mailLabelAssign(t, id, labelId) }
-                    .onSuccess {
-                        done++
-                        if (remove) MailStore.markUnassigned(id, labelId)
-                        else MailStore.markAssigned(id, labelId)
+            val permits = Semaphore(4)
+            coroutineScope {
+                targets.map { id ->
+                    async {
+                        permits.withPermit {
+                            try {
+                                if (remove) Api.mailLabelDetach(t, id, labelId)
+                                else Api.mailLabelAssign(t, id, labelId)
+                                if (remove) MailStore.markUnassigned(id, labelId)
+                                else MailStore.markAssigned(id, labelId)
+                                true to null
+                            } catch (e: kotlinx.coroutines.CancellationException) {
+                                throw e
+                            } catch (e: Exception) {
+                                false to ((e as? ApiException)?.message ?: "The label was not saved.")
+                            }
+                        }
                     }
-                    .onFailure { failure = (it as? ApiException)?.message
-                        ?: "The label was not saved." }
+                }.awaitAll().forEach { (accepted, error) ->
+                    if (accepted) done++ else if (failure == null) failure = error
+                }
             }
             _state.update { s ->
                 s.copy(
@@ -1353,6 +1472,7 @@ class MailboxViewModel @JvmOverloads constructor(
     data class ComposeState(
         val to: String = "", val cc: String = "", val bcc: String = "",
         val subject: String = "", val body: String = "",
+        val bodyHtml: String? = null,
         val inReplyTo: String? = null,
         /** The draft row this compose was opened FROM. Non-empty means the
          *  person is continuing a saved message, and a successful send
@@ -1426,7 +1546,7 @@ class MailboxViewModel @JvmOverloads constructor(
             try {
                 val r = Api.mailDraft(t, MailDraftRequest(
                     to = splitAddresses(cur.to), cc = splitAddresses(cur.cc),
-                    subject = cur.subject, bodyText = cur.body, inReplyTo = cur.inReplyTo,
+                    subject = cur.subject, bodyText = cur.body, bodyHtml = cur.bodyHtml, inReplyTo = cur.inReplyTo,
                     id = cur.draftId.takeIf { it.isNotEmpty() },
                 ))
                 kotlinx.coroutines.currentCoroutineContext().ensureActive()
@@ -1476,9 +1596,29 @@ class MailboxViewModel @JvmOverloads constructor(
         val generation = composeGeneration
         viewModelScope.launch {
             val t = token() ?: return@launch
-            val full = runCatching { Api.mailMessage(t, id) }.getOrNull()?.message
-                ?: return@launch
+            _compose.update { it.copy(error = null) }
+            val cached = if (mode == "draft") null else MailStore.body(id)
+                ?: getApplication<Application>().let { context ->
+                    SessionStore.snapshot(context)?.let { MailStore.notificationMessage(context, id, it.id) }
+                }
+            val full = cached ?: runCatching { Api.mailMessage(t, id) }
+                .onFailure { if (it is kotlinx.coroutines.CancellationException) throw it }
+                .getOrNull()?.message
             if (generation != composeGeneration) return@launch
+            if (full == null) {
+                _compose.update { it.copy(error = if (mode == "draft") "Could not open this draft." else "Could not load the original message.") }
+                return@launch
+            }
+            val draftHtml = if (mode == "draft" && full.hasHtml) {
+                runCatching { Api.mailBody(t, id, false).bodyHtml }
+                    .onFailure { if (it is kotlinx.coroutines.CancellationException) throw it }
+                    .getOrNull()
+            } else null
+            if (generation != composeGeneration) return@launch
+            if (mode == "draft" && full.hasHtml && draftHtml.isNullOrBlank()) {
+                _compose.update { it.copy(error = "Could not load the draft formatting.") }
+                return@launch
+            }
             val me = _state.value.accountAddress?.lowercase()
             val quoted = quoteOf(full)
             when (mode) {
@@ -1499,6 +1639,7 @@ class MailboxViewModel @JvmOverloads constructor(
                     // to a Bcc they cannot see would be the worse error.
                     subject = full.subject ?: "",
                     body = full.bodyText ?: "",
+                    bodyHtml = draftHtml,
                     inReplyTo = full.inReplyTo,
                     draftId = full.id,
                     result = null, resultStatus = null, error = null,
@@ -1606,7 +1747,7 @@ class MailboxViewModel @JvmOverloads constructor(
 
     private data class HeldSend(
         val to: String, val cc: String, val bcc: String,
-        val subject: String, val body: String, val inReplyTo: String?,
+        val subject: String, val body: String, val bodyHtml: String?, val inReplyTo: String?,
         val draftId: String, val e2eEnvelope: String?, val attachmentIds: List<String>,
         val generation: Long,
     )
@@ -1626,7 +1767,7 @@ class MailboxViewModel @JvmOverloads constructor(
             return
         }
         val held = HeldSend(
-            to = s.to, cc = s.cc, bcc = s.bcc, subject = s.subject, body = s.body,
+            to = s.to, cc = s.cc, bcc = s.bcc, subject = s.subject, body = s.body, bodyHtml = s.bodyHtml,
             inReplyTo = s.inReplyTo, draftId = _compose.value.draftId,
             e2eEnvelope = e2eEnvelope, attachmentIds = attachmentIds,
             generation = composeGeneration,
@@ -1763,15 +1904,18 @@ class MailboxViewModel @JvmOverloads constructor(
                     // client that sent both would leak exactly what the
                     // envelope exists to keep private.
                     bodyText = if (envelope != null) "" else s.body,
+                    bodyHtml = if (envelope != null) null else held.bodyHtml,
                     inReplyTo = held.inReplyTo,
                     e2eEnvelope = envelope,
                     attachmentIds = held.attachmentIds,
                 ))
             }.onSuccess { r ->
                 val generation = held.generation
+                val accepted = r.status in listOf("sent", "queued", "delivered")
+                if (!accepted) android.util.Log.w("GrapMailApi", "Send was not accepted; delivery error present=${r.deliveryError != null}")
                 if (generation == composeGeneration) _compose.update { it.copy(sending = false,
-                    result = r.message ?: r.error, resultStatus = r.status,
-                    error = r.deliveryError ?: r.error) }
+                    result = null, resultStatus = r.status,
+                    error = if (accepted) null else "Could not send this message. Try again.") }
                 if (generation == composeGeneration) _compose.update { it.copy(sending = false,
                     result = r.message ?: r.error, resultStatus = r.status,
                     error = r.deliveryError ?: r.error) }
@@ -1841,7 +1985,7 @@ class MailboxViewModel @JvmOverloads constructor(
             runCatching {
                 Api.mailDraft(t, MailDraftRequest(
                     to = splitAddresses(s.to), cc = splitAddresses(s.cc),
-                    subject = s.subject, bodyText = s.body, inReplyTo = s.inReplyTo,
+                    subject = s.subject, bodyText = s.body, bodyHtml = s.bodyHtml, inReplyTo = s.inReplyTo,
                     id = draftId.takeIf { it.isNotEmpty() },
                 ))
             }.onSuccess { r ->
@@ -1887,19 +2031,17 @@ class MailboxViewModel @JvmOverloads constructor(
      */
     fun downloadAttachment(a: MailAttachmentDto, then: (String) -> Unit) {
         viewModelScope.launch {
-            val t = token() ?: run { then("Sign in again to save this."); return@launch }
-            runCatching { Api.mailAttachmentBytes(t, a.id) }
-                .onSuccess { bytes ->
-                    val outcome = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-                        runCatching {
-                            val dir = getApplication<android.app.Application>()
-                                .getExternalFilesDir(null) ?: return@runCatching "No app storage available."
-                            val file = java.io.File(dir, attachmentFilename(a.name))
-                            file.writeBytes(bytes)
-                            "Saved to ${file.absolutePath}"
-                        }.getOrElse { "Downloaded, but the file could not be written." }
-                    }
-                    then(outcome)
+            val app = getApplication<android.app.Application>()
+            val session = SessionStore.snapshot(app) ?: run { then("Sign in again to save this."); return@launch }
+            val dir = app.getExternalFilesDir(null)
+                ?: run { then("No app storage available."); return@launch }
+            val file = java.io.File(dir, "${java.util.UUID.randomUUID()}-${attachmentFilename(a.name)}")
+            runCatching { Api.mailAttachmentFile(session.token, a.id, file) }
+                .onSuccess {
+                    if (!SessionStore.isCurrent(app, session.id)) {
+                        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { file.delete() }
+                        then("The account changed before this file could be saved.")
+                    } else then("Saved to ${file.absolutePath}")
                 }
                 .onFailure { e ->
                     if (e is kotlinx.coroutines.CancellationException) throw e
@@ -1926,19 +2068,18 @@ class MailboxViewModel @JvmOverloads constructor(
      */
     fun openAttachment(a: MailAttachmentDto, then: (String) -> Unit) {
         viewModelScope.launch {
-            val t = token() ?: run { then("Sign in again to open this."); return@launch }
-            val bytes = runCatching { Api.mailAttachmentBytes(t, a.id) }
-                .getOrElse { e ->
-                    if (e is kotlinx.coroutines.CancellationException) throw e
-                    then((e as? ApiException)?.message ?: "This attachment could not be downloaded.")
-                    return@launch
-                }
             val app = getApplication<android.app.Application>()
+            val session = SessionStore.snapshot(app) ?: run { then("Sign in again to open this."); return@launch }
             val outcome = runCatching {
                 val file = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
                     val root = java.io.File(app.cacheDir, "attachments").apply { mkdirs() }
                     val dir = java.nio.file.Files.createTempDirectory(root.toPath(), "preview-").toFile()
-                    java.io.File(dir, attachmentFilename(a.name)).apply { writeBytes(bytes) }
+                    java.io.File(dir, attachmentFilename(a.name))
+                }
+                Api.mailAttachmentFile(session.token, a.id, file)
+                if (!SessionStore.isCurrent(app, session.id)) {
+                    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { file.delete() }
+                    return@runCatching "The account changed before this file could be opened."
                 }
                 val uri = androidx.core.content.FileProvider.getUriForFile(
                     app, "${app.packageName}.fileprovider", file)
@@ -1963,6 +2104,7 @@ class MailboxViewModel @JvmOverloads constructor(
                 }
             }.getOrElse { error ->
                 if (error is kotlinx.coroutines.CancellationException) throw error
+                if (error is ApiException) return@getOrElse error.message ?: "This attachment could not be downloaded."
                 "This attachment could not be handed to another app."
             }
             then(outcome)
@@ -2025,16 +2167,25 @@ class MailboxViewModel @JvmOverloads constructor(
      * it wrote, and the returned id is what a send carries — an attachment that
      * was never uploaded is a filename the recipient cannot open.
      */
-    suspend fun uploadAttachment(bytes: ByteArray, filename: String, mimeType: String): MailAttachmentDto {
-        val bearer = token() ?: throw IllegalStateException("Sign in again to attach a file.")
-        return Api.mailAttachmentUpload(bearer, bytes, filename, mimeType, null)
+    suspend fun uploadAttachment(file: java.io.File, filename: String, mimeType: String, sessionId: String): MailAttachmentDto {
+        val app = getApplication<android.app.Application>()
+        val session = SessionStore.snapshot(app) ?: throw IllegalStateException("Sign in again to attach a file.")
+        check(session.id == sessionId) { "The account changed before this file could be attached." }
+        val attachment = Api.mailAttachmentUploadFile(session.token, file, filename, mimeType)
+        check(SessionStore.isCurrent(app, session.id)) { "The account changed before this file could be attached." }
+        return attachment
     }
 
     // ── thread ──────────────────────────────────────────────────────────────
 
+    @androidx.compose.runtime.Immutable
     data class ThreadState(
         val messages: List<com.grapsee.grapmail.data.MailMessageFullDto> = emptyList(),
-        val loading: Boolean = false, val error: String? = null,
+        val loading: Boolean = false,
+        val loadingEarlier: Boolean = false,
+        val nextCursor: String? = null,
+        val hasMore: Boolean = false,
+        val error: String? = null,
     )
 
     private val _thread = MutableStateFlow(ThreadState())
@@ -2074,41 +2225,6 @@ class MailboxViewModel @JvmOverloads constructor(
         snapshotBodies[messageId] = render
     }
 
-    private var prefetchJob: Job? = null
-
-    /**
-     * The first screen's bodies, fetched before anyone taps a row.
-     *
-     * A reader open used to pay one round trip for the formatted body on every
-     * message — dead air a mail app does not need, because the rows a person is
-     * most likely to open are knowable the moment the page lands. This fills
-     * the same cache [loadBody] reads, with the same images-blocked render the
-     * reader defaults to, so the first open is a cache hit and the round trip
-     * happens while the list is being read. Sequential, not parallel: a burst
-     * of body reads is exactly what the server rate-limits, and the point is
-     * warmth, not speed of warmth.
-     */
-    private fun prefetchVisibleBodies() {
-        if (snapshotMode) return
-        val ids = _state.value.rows.take(6).map { it.id }
-        if (ids.isEmpty() || prefetchJob?.isActive == true) return
-        prefetchJob = viewModelScope.launch {
-            for (id in ids) {
-                ensureActive()
-                if (formattedBodyCache.get(id) != null) continue
-                try {
-                    loadBody(id, allowImages = false)
-                } catch (e: kotlinx.coroutines.CancellationException) {
-                    throw e
-                } catch (_: Exception) {
-                    // A body that will not prefetch now loads on tap, exactly as
-                    // it always has. The list does not wait for this.
-                    break
-                }
-            }
-        }
-    }
-
     suspend fun loadBody(messageId: String, allowImages: Boolean): BodyRender {
         if (snapshotMode) return snapshotBodies[messageId] ?: BodyRender()
         if (!allowImages) formattedBodyCache.get(messageId)?.let { return it }
@@ -2118,6 +2234,7 @@ class MailboxViewModel @JvmOverloads constructor(
             kotlinx.coroutines.currentCoroutineContext().ensureActive()
             val render = BodyRender(
                 html = response.bodyHtml,
+                bodyText = response.bodyText,
                 blockedImages = response.blockedImages,
                 allowImages = allowImages,
                 error = if (response.bodyHtml.isNullOrBlank()) "The formatted body was empty." else null,
@@ -2129,6 +2246,7 @@ class MailboxViewModel @JvmOverloads constructor(
         } catch (error: kotlinx.coroutines.CancellationException) {
             throw error
         } catch (error: Exception) {
+            android.util.Log.w("GrapMailReader", "Formatted body fetch failed: ${error.javaClass.simpleName}")
             BodyRender(allowImages = allowImages, error = error.message ?: "The formatted view could not be loaded.")
         }
     }
@@ -2137,32 +2255,97 @@ class MailboxViewModel @JvmOverloads constructor(
      * Open a thread. The list payload has no bodies by design, so the bodies are
      * read here and memoised — a row re-rendering must not re-read a payload.
      */
-    fun openThread(threadId: String) {
+    fun openThread(threadId: String, focusedId: String? = null) {
         if (readerTarget == null && threadLoadedFor == threadId) return
         loadReader(threadId, isThread = true) {
-            val t = token()
-            if (t == null) {
+            val context = getApplication<Application>()
+            val session = SessionStore.snapshot(context) ?: run {
                 _thread.value = ThreadState(error = "Sign in again.")
                 return@loadReader
             }
-            runCatching { Api.mailThread(t, threadId) }
+            val cached = MailStore.thread(threadId)
+            val focused = focusedId?.let { MailStore.body(it) ?: MailStore.notificationMessage(context, it, session.id) }
+            val initial = (cached?.messages.orEmpty() + listOfNotNull(focused))
+                .distinctBy { it.id }.sortedBy { it.createdAt.orEmpty() }
+            if (initial.isNotEmpty() && SessionStore.isCurrent(context, session.id)) {
+                _thread.value = ThreadState(messages = initial, loading = true)
+            }
+            runCatching { Api.mailThread(session.token, threadId) }
                 .onSuccess { r ->
-                    // Remembered on success, because this field IS the memo: without
-                    // it the guard above never fires and every return from a thread
-                    // to the list costs the whole conversation payload again -- which
-                    // is the over-fetch the field's own comment promises not to do,
-                    // and iOS does not. A failure deliberately does not record it, so
-                    // re-opening retries instead of caching an empty conversation.
-                    val messages = MailStore.putBodies(r.messages)
+                    if (!SessionStore.isCurrent(context, session.id)) return@loadReader
+                    val page = MailStore.putThread(
+                        threadId, r.messages, r.nextCursor, r.hasMore, context, session.id,
+                    )
                     kotlinx.coroutines.currentCoroutineContext().ensureActive()
+                    if (!SessionStore.isCurrent(context, session.id)) return@loadReader
                     threadLoadedFor = threadId
-                    _thread.update { it.copy(messages = messages, loading = false) }
+                    val exact = if (focusedId != null && focused == null && page.messages.none { it.id == focusedId }) {
+                        runCatching { Api.mailMessage(session.token, focusedId).message }
+                            .onFailure { if (it is kotlinx.coroutines.CancellationException) throw it }
+                            .getOrNull()?.takeIf { it.threadId == threadId }
+                    } else focused
+                    if (!SessionStore.isCurrent(context, session.id)) return@loadReader
+                    _thread.update { it.copy(
+                        messages = (page.messages + listOfNotNull(exact))
+                            .distinctBy { message -> message.id }.sortedBy { message -> message.createdAt.orEmpty() },
+                        nextCursor = page.nextCursor,
+                        hasMore = page.hasMore,
+                        loading = false,
+                    ) }
                 }
                 .onFailure { e ->
                     if (e is kotlinx.coroutines.CancellationException) throw e
-                    _thread.update { it.copy(loading = false,
-                        error = e.message ?: "This conversation could not be opened.") }
+                    if (!SessionStore.isCurrent(context, session.id)) return@loadReader
+                    if (cached != null) threadLoadedFor = threadId
+                    _thread.value = if (initial.isNotEmpty()) ThreadState(
+                        messages = initial, nextCursor = cached?.nextCursor, hasMore = cached?.hasMore ?: false,
+                    ) else ThreadState(error = e.message ?: "This conversation could not be opened.")
                 }
+        }
+    }
+
+    fun loadEarlierThread(threadId: String) {
+        val current = _thread.value
+        val cursor = current.nextCursor ?: return
+        if (!current.hasMore || current.loadingEarlier) return
+        earlierThreadJob?.cancel()
+        val target = threadId to true
+        _thread.update { it.copy(loadingEarlier = true, error = null) }
+        earlierThreadJob = viewModelScope.launch {
+            val context = getApplication<Application>()
+            val session = SessionStore.snapshot(context) ?: run {
+                if (readerTarget == target) _thread.update { it.copy(loadingEarlier = false) }
+                return@launch
+            }
+            try {
+                val response = Api.mailThread(session.token, threadId, cursor)
+                if (!SessionStore.isCurrent(context, session.id) ||
+                    readerTarget != target || _thread.value.nextCursor != cursor
+                ) return@launch
+                val combined = (response.messages + _thread.value.messages).distinctBy { it.id }
+                val page = MailStore.putThread(
+                    threadId, combined, response.nextCursor, response.hasMore, context, session.id,
+                )
+                if (!SessionStore.isCurrent(context, session.id) ||
+                    readerTarget != target || _thread.value.nextCursor != cursor
+                ) return@launch
+                _thread.update { it.copy(
+                    messages = page.messages,
+                    nextCursor = page.nextCursor,
+                    hasMore = page.hasMore,
+                    loadingEarlier = false,
+                ) }
+                earlierThreadJob = null
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                if (!SessionStore.isCurrent(context, session.id) || readerTarget != target) return@launch
+                _thread.update { it.copy(
+                    loadingEarlier = false,
+                    error = e.message ?: "Earlier messages could not be loaded.",
+                ) }
+                earlierThreadJob = null
+            }
         }
     }
 
@@ -2220,19 +2403,25 @@ class MailboxViewModel @JvmOverloads constructor(
      */
     fun markUnread(id: String, onOutcome: (String?) -> Unit) {
         viewModelScope.launch {
-            val t = token()
-            if (t == null) {
+            val app = getApplication<Application>()
+            val session = SessionStore.snapshot(app)
+            if (session == null) {
                 onOutcome("You are signed out, so this could not be saved.")
                 return@launch
             }
-            runCatching { Api.mailAction(t, id, MailAction.Unread, null) }
+            runCatching { Api.mailAction(session.token, id, MailAction.Unread, null) }
                 .onSuccess {
-                    applyLocally(id, MailAction.Unread)
+                    if (!SessionStore.isCurrent(app, session.id)) return@launch
+                    applyLocally(id, MailAction.Unread, session.id)
+                    if (!SessionStore.isCurrent(app, session.id)) return@launch
                     reproject()
+                    refreshCounts(session, force = true)
                     GMHaptics.marking()
                     onOutcome(null)
                 }
                 .onFailure {
+                    if (it is kotlinx.coroutines.CancellationException) throw it
+                    if (!SessionStore.isCurrent(app, session.id)) return@launch
                     GMHaptics.failure()
                     onOutcome((it as? ApiException)?.message
                         ?: "That action didn't go through.")
@@ -2262,10 +2451,11 @@ class MailboxViewModel @JvmOverloads constructor(
             _thread.update { state ->
                 state.copy(messages = state.messages.map { if (it.id == id) viewed else it })
             }
-            MailStore.putBody(viewed)
+            MailStore.putBody(viewed, context, session.id)
             if (viewed.isRead) {
-                MailStore.patchFlags(id, read = true)
+                MailStore.patchFlags(id, read = true, sessionContext = context, sessionId = session.id)
                 reproject()
+                if (!message.isRead) refreshCounts(session, force = true)
             }
             null
         } catch (error: kotlinx.coroutines.CancellationException) {
@@ -2278,20 +2468,23 @@ class MailboxViewModel @JvmOverloads constructor(
     fun openMessage(id: String) {
         if (readerTarget == null && threadLoadedFor == id) return
         loadReader(id, isThread = false) {
-            val t = token()
-            if (t == null) {
+            val context = getApplication<Application>()
+            val session = SessionStore.snapshot(context)
+            if (session == null) {
                 _thread.value = ThreadState(error = "Sign in again.")
                 return@loadReader
             }
-            val cached = MailStore.body(id)
+            val cached = MailStore.body(id) ?: MailStore.notificationMessage(context, id, session.id)
             if (cached != null) {
                 kotlinx.coroutines.currentCoroutineContext().ensureActive()
+                if (!SessionStore.isCurrent(context, session.id)) return@loadReader
                 threadLoadedFor = id
                 _thread.update { it.copy(messages = listOf(cached), loading = false) }
                 return@loadReader
             }
-            runCatching { Api.mailMessage(t, id) }
+            runCatching { Api.mailMessage(session.token, id) }
                 .onSuccess { r ->
+                    if (!SessionStore.isCurrent(context, session.id)) return@loadReader
                     // Recorded only when a body actually arrived: caching the id for
                     // an empty response would make the guard above skip the retry and
                     // leave the screen showing nothing for a message that exists.
@@ -2299,16 +2492,18 @@ class MailboxViewModel @JvmOverloads constructor(
                     if (message == null) {
                         _thread.value = ThreadState(error = "This message could not be opened.")
                     } else {
-                        MailStore.putBody(message)
+                        MailStore.putBody(message, context, session.id)
                         kotlinx.coroutines.currentCoroutineContext().ensureActive()
+                        if (!SessionStore.isCurrent(context, session.id)) return@loadReader
                         threadLoadedFor = id
                         _thread.update { s -> s.copy(messages = listOf(message), loading = false) }
-                        MailStore.patchFlags(message.id, read = true)
+                        MailStore.patchFlags(message.id, read = true, sessionContext = context, sessionId = session.id)
                     }
                     reproject()
                 }
                 .onFailure { e ->
                     if (e is kotlinx.coroutines.CancellationException) throw e
+                    if (!SessionStore.isCurrent(context, session.id)) return@loadReader
                     _thread.update { it.copy(loading = false,
                         error = e.message ?: "This message could not be opened.") }
                 }

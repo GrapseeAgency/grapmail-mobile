@@ -88,10 +88,14 @@ struct UnreadPill: View {
 /// The initial comes from the display name when there is one and from the address
 /// when there is not — never from the address's first character, which would
 /// render every `@grapsee.com` sender under the same letter.
-struct SenderAvatar: View {
+struct SenderAvatar: View, Equatable {
     let display: String
     let address: String
     var size: CGFloat = 40
+
+    static func == (lhs: SenderAvatar, rhs: SenderAvatar) -> Bool {
+        lhs.display == rhs.display && lhs.address == rhs.address && lhs.size == rhs.size
+    }
 
     private var initial: String {
         let source = display.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -125,20 +129,34 @@ enum MailTime {
      * order.
      */
     static func short(_ iso: String?, now: Date = Date()) -> String? {
-        guard let date = parse(iso) else { return nil }
+        guard let raw = iso, !raw.isEmpty else { return nil }
+        let nowMinute = Int(now.timeIntervalSince1970 / 60)
+        let key = "\(TimeZone.current.identifier)\u{0}\(raw)\u{0}\(nowMinute)" as NSString
+        if let cached = formattedTimes.object(forKey: key) {
+            return cached as String
+        }
+        guard let date = parse(raw) else { return nil }
         let cal = Calendar.current
+        let result: String
         if cal.isDate(date, inSameDayAs: now) {
-            return fmt("h:mm a", date)
-        }
-        if let yesterday = cal.date(byAdding: .day, value: -1, to: now),
+            result = fmt("h:mm a", date)
+        } else if let yesterday = cal.date(byAdding: .day, value: -1, to: now),
            cal.isDate(date, inSameDayAs: yesterday) {
-            return "Yesterday"
+            result = "Yesterday"
+        } else if cal.component(.year, from: date) == cal.component(.year, from: now) {
+            result = fmt("MMM d", date)
+        } else {
+            result = fmt("MMM d, yyyy", date)
         }
-        if cal.component(.year, from: date) == cal.component(.year, from: now) {
-            return fmt("MMM d", date)
-        }
-        return fmt("MMM d, yyyy", date)
+        formattedTimes.setObject(result as NSString, forKey: key)
+        return result
     }
+
+    private static let formattedTimes: NSCache<NSString, NSString> = {
+        let cache = NSCache<NSString, NSString>()
+        cache.countLimit = 2_048
+        return cache
+    }()
 
     /// The full date a message body needs. Falls back to the raw string rather
     /// than a fabricated date: showing "Jan 1, 1970" for an unparseable instant
@@ -167,7 +185,8 @@ enum MailTime {
 
     private static func parse(_ iso: String?) -> Date? {
         guard let iso, !iso.isEmpty else { return nil }
-        let key = iso as NSString
+        // Zone-less timestamps are parsed in the current local zone.
+        let key = "\(TimeZone.current.identifier)\u{0}\(iso)" as NSString
         if let cached = parsedDates.object(forKey: key) { return cached as Date }
         for parser in parsers {
             if let date = parser.date(from: iso) {
@@ -203,13 +222,27 @@ enum MailTime {
 /// The unread dot, the star and the attachment glyph all come from `publicRow`;
 /// none is inferred. `isE2eEncrypted` is shown too, because a lock is the only
 /// honest signal that the body will not open here.
-struct MessageRow: View {
+struct MessageRow: View, Equatable {
     let message: MailMessage
     let selecting: Bool
     let selected: Bool
     let onSelect: () -> Void
     let onOpen: () -> Void
     let onStar: () -> Void
+
+    static func == (lhs: MessageRow, rhs: MessageRow) -> Bool {
+        lhs.message.id == rhs.message.id &&
+        lhs.message.isRead == rhs.message.isRead &&
+        lhs.message.isStarred == rhs.message.isStarred &&
+        lhs.message.hasAttachments == rhs.message.hasAttachments &&
+        lhs.message.isE2eEncrypted == rhs.message.isE2eEncrypted &&
+        lhs.message.from?.display == rhs.message.from?.display &&
+        lhs.message.from?.address == rhs.message.from?.address &&
+        lhs.message.subject == rhs.message.subject &&
+        lhs.message.snippet == rhs.message.snippet &&
+        lhs.message.createdAt == rhs.message.createdAt &&
+        lhs.selecting == rhs.selecting && lhs.selected == rhs.selected
+    }
 
     private var unread: Bool { !message.isRead }
 
@@ -220,12 +253,10 @@ struct MessageRow: View {
                     .foregroundColor(selected ? GM.primarySolid : GM.textTertiary)
                     .font(.system(size: 20))
                     .padding(.top, 10)
-            } else {
-                Circle()
-                    .fill(unread ? GM.primarySolid : Color.clear)
-                    .frame(width: 8, height: 8)
-                    .padding(.top, 17)
             }
+            // The unread dot lives in the time column now (the reference draws
+            // it beside the clock), so this slot is only ever a picking
+            // affordance.
 
             SenderAvatar(display: message.from?.display ?? "",
                          address: message.from?.address ?? "")
@@ -240,10 +271,6 @@ struct MessageRow: View {
                         .foregroundColor(GM.textPrimary)
                         .lineLimit(1)
                     Spacer(minLength: 8)
-                    if let time = MailTime.short(message.createdAt) {
-                        Text(time).font(.system(size: 12)).foregroundColor(GM.textTertiary)
-                            .lineLimit(1)
-                    }
                 }
                 Text(message.subjectOrNone)
                     .font(.system(size: 14, weight: unread ? .medium : .regular))
@@ -259,21 +286,36 @@ struct MessageRow: View {
                 }
             }
 
-            VStack(spacing: 6) {
-                if message.hasAttachments {
-                    Image(systemName: "paperclip").font(.system(size: 13))
-                        .foregroundColor(GM.textTertiary)
+            VStack(alignment: .trailing, spacing: 6) {
+                // The clock and the unread dot, in the reference's own column:
+                // date at the top of the row, dot beside it, star underneath.
+                // A fixed minimum width keeps a long date from squeezing the
+                // sender line, and right alignment keeps the stars in one line.
+                HStack(spacing: 5) {
+                    if unread {
+                        Circle().fill(GM.primarySolid).frame(width: 8, height: 8)
+                    }
+                    if let time = MailTime.short(message.createdAt) {
+                        Text(time).font(.system(size: 12)).foregroundColor(GM.textTertiary)
+                            .lineLimit(1)
+                    }
                 }
-                Image(systemName: message.isStarred ? "star.fill" : "star")
-                    .font(.system(size: 16))
-                    // The star token, not `GM.warning`: this is the row the dark
-                    // home screenshot photographs, and `warning` carries a single
-                    // value with no dark counterpart, so the list and the thread of
-                    // the same starred message showed two different ambers.
-                    .foregroundColor(message.isStarred ? GM.star : GM.textTertiary)
-                    .onTapGesture(perform: onStar)
+                HStack(spacing: 5) {
+                    if message.hasAttachments {
+                        Image(systemName: "paperclip").font(.system(size: 12))
+                            .foregroundColor(GM.textTertiary)
+                    }
+                    Image(systemName: message.isStarred ? "star.fill" : "star")
+                        .font(.system(size: 16))
+                        // The star token, not `GM.warning`: this is the row the dark
+                        // home screenshot photographs, and `warning` carries a single
+                        // value with no dark counterpart, so the list and the thread of
+                        // the same starred message showed two different ambers.
+                        .foregroundColor(message.isStarred ? GM.star : GM.textTertiary)
+                        .onTapGesture(perform: onStar)
+                }
             }
-            .frame(width: 24)
+            .frame(minWidth: 44, alignment: .trailing)
         }
         .padding(.horizontal, 16).padding(.vertical, 12)
         .contentShape(Rectangle())
@@ -324,36 +366,44 @@ struct LabelChip: View {
     }
 }
 
-/// A box tab with the underline the reference shows on the active one.
 struct BoxTab: View {
     let title: String
+    let icon: String
+    let tint: Color
+    let badgeColor: Color
     let count: Int?
     let active: Bool
     let onClick: () -> Void
 
     var body: some View {
         Button(action: onClick) {
-            VStack(spacing: 6) {
-                HStack(spacing: 6) {
-                    Text(title)
-                        .font(.system(size: 14, weight: active ? .semibold : .regular))
-                        .foregroundColor(active ? GM.primarySolid : GM.textSecondary)
-                        // One line at the label's natural width: a horizontal
-                        // ScrollView compresses Text otherwise, and the old
-                        // fixed row wrapped every box name mid-word.
-                        .fixedSize()
-                    CountBadge(count: count)
+            HStack(spacing: 6) {
+                Image(systemName: icon)
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundColor(tint)
+                    .accessibilityHidden(true)
+                Text(title)
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundColor(GM.textPrimary)
+                if let count, count > 0 {
+                    Text(count > 99 ? "99+" : String(count))
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(badgeColor, in: Capsule())
                 }
-                Rectangle()
-                    .fill(active ? GM.primarySolid : Color.clear)
-                    .frame(height: 2)
             }
-            // The whole tab at natural size: inside the scrollable row the
-            // fill-first underline would otherwise collapse to nothing.
             .fixedSize(horizontal: true, vertical: false)
-            .padding(.horizontal, 14).padding(.vertical, 10)
+            .padding(.horizontal, 10)
+            .frame(height: 44)
+            .background(active ? tint.opacity(0.14) : GM.card, in: Capsule())
+            .overlay(Capsule().strokeBorder(active ? tint : GM.border).allowsHitTesting(false))
+            .contentShape(Capsule())
         }
         .buttonStyle(.plain)
+        .accessibilityAddTraits(active ? .isSelected : [])
+        .accessibilityIdentifier("mail-box-tab-\(title)")
     }
 }
 
@@ -362,25 +412,28 @@ struct BoxTab: View {
 /// scrolls.
 struct MailFab: View {
     let onClick: () -> Void
+    var expanded = true
 
     var body: some View {
         Button(action: onClick) {
-            // The extended pill the reference draws: glyph + word, not a bare
-            // circle. The word names the affordance a 56pt dot never said out
-            // loud.
             HStack(spacing: 10) {
                 Image(systemName: "pencil")
                     .font(.system(size: 17, weight: .semibold))
-                Text("Compose")
-                    .font(.system(size: 16, weight: .semibold))
+                    .frame(width: 20)
+                if expanded {
+                    Text("Compose")
+                        .font(.system(size: 16, weight: .semibold))
+                        .fixedSize(horizontal: true, vertical: false)
+                }
             }
             .foregroundColor(.white)
-            .padding(.horizontal, 20)
-            .padding(.vertical, 15)
-            .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(GM.primarySolid))
+            .padding(.horizontal, expanded ? 20 : 14)
+            .frame(height: 48)
+            .background(RoundedRectangle(cornerRadius: 24, style: .continuous).fill(GM.primarySolid))
             .shadow(color: Color.black.opacity(0.18), radius: 10, x: 0, y: 4)
         }
         .buttonStyle(.plain)
+        .accessibilityLabel("Compose")
         .accessibilityIdentifier("mail-compose")
     }
 }
@@ -476,6 +529,7 @@ struct MailStateBlock<Content: View>: View {
     let failed: Bool
     let noMailbox: Bool
     let empty: Bool
+    var filtered: Bool = false
     let boxTitle: String
     let onRetry: () -> Void
     @ViewBuilder let content: Content
@@ -496,9 +550,12 @@ struct MailStateBlock<Content: View>: View {
                     title: "Couldn't load \(boxTitle)",
                     detail: "Your mailbox could not be reached. Nothing has been deleted.",
                     action: ("Try again", onRetry))
+            } else if empty && boxTitle == "Inbox" && !filtered {
+                CenteredState(title: "Welcome home to GrapMail",
+                              detail: "Your inbox is fresh, quiet, and completely protected.")
             } else {
-                CenteredState(title: "\(boxTitle) is empty",
-                              detail: "No messages here yet.")
+                CenteredState(title: filtered ? "No matching messages" : "\(boxTitle) is empty",
+                              detail: filtered ? "Try changing your search or filters." : "No messages here yet.")
             }
         }
     }

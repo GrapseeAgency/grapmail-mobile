@@ -1,0 +1,266 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<meta name="theme-color" content="#030c20">
+<title>GrapMail • The Screener Gate — Scene 02</title>
+<style>
+:root{color-scheme:dark;--ease:cubic-bezier(.18,.82,.2,1);--night:#020b1b;--ice:#e7faff;--blue:#248cff}
+*,*::before,*::after{box-sizing:border-box}
+html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#030c20}
+body{display:grid;place-items:center;font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:var(--ice);user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent}
+body::before{position:fixed;inset:-20%;content:"";pointer-events:none;background:radial-gradient(ellipse at 50% 49%,#12376e 0,#071a3c 27%,#020b1c 61%,#010613 100%);animation:sky 9s ease-in-out infinite alternate}
+body::after{content:"";position:fixed;inset:0;pointer-events:none;background:linear-gradient(138deg,transparent 43%,#0852a71a 50%,transparent 57%),radial-gradient(ellipse at 52% 62%,#1c6cf90b,transparent 63%);opacity:.8}
+@keyframes sky{0%{transform:scale(1) rotate(-1deg)}100%{transform:scale(1.08) rotate(1deg)}}
+.viewport{position:relative;width:100%;max-width:440px;height:100%;max-height:560px;aspect-ratio:440/560;margin:0 auto;isolation:isolate;overflow:visible}
+#stage{width:440px;height:560px;position:absolute;left:0;top:0;transform-origin:0 0;will-change:transform;overflow:visible;isolation:isolate}
+#particleField{position:absolute;inset:0;width:440px;height:560px;pointer-events:none;z-index:0;opacity:.92}
+.scene{position:absolute;inset:0;width:440px;height:560px;overflow:visible;z-index:1;pointer-events:none}
+#portalGroup{transform-origin:220px 250px;filter:drop-shadow(0 0 17px #1273fd45);opacity:.15;transform:translateY(16px) scale(.82);transition:opacity 1.1s var(--ease),transform 1.1s var(--ease)}
+.started #portalGroup{opacity:1;transform:translateY(0) scale(1)}
+#innerGate{transform-origin:220px 252px;animation:gateBreath 5s ease-in-out infinite alternate}
+@keyframes gateBreath{from{transform:scale(.982)}to{transform:scale(1.018)}}
+#ringOrbit{transform-origin:220px 262px;animation:ringRotate 19s linear infinite}
+#ringOrbit2{transform-origin:220px 262px;animation:ringRotate 27s linear infinite reverse}
+@keyframes ringRotate{to{transform:rotate(360deg)}}
+#gateTrace{stroke-dasharray:36 680;animation:dash 6s linear infinite}
+@keyframes dash{to{stroke-dashoffset:-716}}
+#shieldRim{stroke-dasharray:610;stroke-dashoffset:610;transition:stroke-dashoffset 1.2s cubic-bezier(.22,1,.22,1),filter .25s ease}
+.started #shieldRim{stroke-dashoffset:0}
+#shieldCheck{stroke-dasharray:80;stroke-dashoffset:80;transition:stroke-dashoffset .55s ease-out;filter:drop-shadow(0 0 6px #aff5ff)}
+.accepted #shieldCheck{stroke-dashoffset:0}
+#shieldBody{transition:filter .3s ease,opacity .4s ease}
+.impact #shieldBody{filter:drop-shadow(0 0 28px #68edff)}
+.reject #shieldBody{filter:drop-shadow(0 0 23px #92baff)}
+#baseGlow{transform-origin:220px 442px;animation:ground 4s ease-in-out infinite}
+@keyframes ground{0%,100%{opacity:.55;transform:scale(.89)}50%{opacity:.92;transform:scale(1.14)}}
+#mailbox{transform-origin:220px 390px;transform:translateY(45px) scale(.9);opacity:.25;transition:transform 1s var(--ease),opacity .9s}
+.started #mailbox{transform:translateY(0) scale(1);opacity:1}
+#frontGlint{opacity:.45;animation:glimmer 4.5s ease-in-out infinite}
+@keyframes glimmer{0%,100%{opacity:.25}50%{opacity:.9}}
+#screenerEtching{opacity:0;transition:opacity .55s ease}
+.started #screenerEtching{opacity:.87}
+#lockHalo{transform-origin:220px 245px;opacity:.1;transform:scale(.75);transition:opacity .45s ease,transform .55s var(--ease)}
+.impact #lockHalo,.accepted #lockHalo{opacity:1;transform:scale(1.03)}
+#deflectRing{opacity:0;transform-origin:220px 236px;transform:scale(.55)}
+.reject #deflectRing{animation:repel .9s ease-out 1}
+@keyframes repel{0%{opacity:.85;transform:scale(.55)}100%{opacity:0;transform:scale(1.46)}}
+.floating-sigil{position:absolute;z-index:3;pointer-events:none;transform-style:preserve-3d;animation:float 5s ease-in-out infinite}
+@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
+.sigil-left{left:45px;top:107px;width:53px;height:60px;animation-delay:-.6s;opacity:0;transition:opacity .8s}
+.sigil-right{right:41px;top:139px;width:46px;height:49px;animation-delay:-2s;opacity:0;transition:opacity .8s}
+.started .floating-sigil{opacity:.95}
+.sigil-svg{width:100%;height:100%;filter:drop-shadow(0 2px 15px #39b5ff78)}
+/* Source and envelope cards are genuine positioned DOM layers, not flattened imagery. */
+.mail-card{position:absolute;width:130px;height:91px;border-radius:17px;z-index:5;overflow:hidden;transform-style:preserve-3d;pointer-events:none;opacity:0;transform:translate3d(-105px,35px,0) rotate(-23deg) scale(.65);background:linear-gradient(155deg,#b4efff2b 0,#205aa979 35%,#081d41e8 100%);border:1px solid #b4ebff86;box-shadow:inset 0 1px 0 #ffffff8a,inset 0 -12px 25px #0a4db150,0 12px 29px #000c2f99,0 0 23px #3d9eff33;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);transition:transform .78s cubic-bezier(.23,.86,.19,1),opacity .45s,filter .45s}
+.mail-card::before{content:"";position:absolute;left:-50%;top:-75%;width:100%;height:240%;transform:rotate(28deg);background:linear-gradient(90deg,transparent, #ffffff30,transparent)}
+.mail-card .strip{height:3px;background:linear-gradient(90deg,transparent,#6be8ff,#aefaff,transparent);opacity:.85}
+.mail-card .inner{padding:11px 10px 9px;display:flex;align-items:center;gap:9px}
+.avatar{width:31px;height:31px;border-radius:10px;display:grid;place-items:center;flex:none;font-weight:800;font-size:15px;background:linear-gradient(135deg,#93f0ff,#2386ff);color:#073260;box-shadow:0 3px 13px #69e6ff44}
+.avatar.alt{background:linear-gradient(135deg,#d3bbff,#7579ff);color:#27174e}
+.cardcopy{min-width:0}
+.cardcopy b{display:block;font-size:11px;letter-spacing:.1px;white-space:nowrap;text-overflow:ellipsis;overflow:hidden;color:#f2fbff}
+.cardcopy span{display:block;font-size:8.6px;margin-top:3px;color:#b4d3f9;white-space:nowrap}
+.mail-card .line{height:3px;border-radius:9px;background:#a8d9ff43;position:absolute;left:51px;right:15px;bottom:15px}
+.mail-card .line.small{bottom:9px;right:41px;opacity:.7}
+#trusted{left:34px;top:190px}
+#unknown{left:286px;top:190px;transform:translate3d(100px,30px,0) rotate(23deg) scale(.64)}
+/* Film states: both cards stay within the visual artifact. */
+.film-approach #trusted{opacity:1;transform:translate3d(0,0,0) rotate(-11deg) scale(1)}
+.film-approach #unknown{opacity:1;transform:translate3d(0,0,0) rotate(10deg) scale(1)}
+.film-trusted #trusted{opacity:0;transform:translate3d(128px,97px,0) rotate(0) scale(.25);filter:brightness(1.8)}
+.film-trusted #unknown{opacity:1;transform:translate3d(0,0,0) rotate(10deg) scale(1)}
+.film-unknown #unknown{opacity:1;transform:translate3d(-82px,43px,0) rotate(-5deg) scale(.94);filter:brightness(1.25)}
+.film-review #unknown{opacity:1;transform:translate3d(-64px,28px,0) rotate(0) scale(.87)}
+.film-decline #unknown{opacity:0;transform:translate3d(194px,-86px,0) rotate(34deg) scale(.44);filter:brightness(1.8)}
+.film-allow #unknown{opacity:0;transform:translate3d(-63px,118px,0) rotate(0) scale(.18);filter:brightness(2)}
+/* The queue isn't a conventional onboarding page; it is a little frosted surface inside the artwork. */
+#choice{position:absolute;z-index:7;left:77px;top:418px;width:286px;border:1px solid #93cfff82;background:linear-gradient(125deg,#23569cd9,#0b244fd9 52%,#081b3eee);box-shadow:0 14px 45px #000c2dab,0 0 34px #317dec4b,inset 0 1px 0 #d1f7ff70;backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);border-radius:22px;padding:12px 14px 13px;opacity:0;transform:translateY(42px) scale(.9);pointer-events:none;transition:opacity .42s ease,transform .56s cubic-bezier(.2,.87,.17,1)}
+.film-review #choice{opacity:1;transform:translateY(0) scale(1);pointer-events:auto}
+.choice-top{display:flex;gap:10px;align-items:center;margin-bottom:11px}
+.queue-symbol{height:33px;width:33px;border-radius:11px;display:grid;place-items:center;background:linear-gradient(135deg,#7482e7b0,#365acc50);border:1px solid #cae9ff85;font-weight:750;color:#f2f7ff;flex:none}
+.queue-title{font-size:12px;font-weight:720;color:#f4faff;letter-spacing:.05px}
+.queue-caption{font-size:10px;color:#acc8ee;margin-top:3px;white-space:nowrap}
+.choice-buttons{display:flex;gap:8px}
+.choice-buttons button{height:36px;flex:1;cursor:pointer;border-radius:11px;font-size:11px;font-weight:700;outline:none;transition:transform .16s ease,background .16s ease;touch-action:manipulation}
+.choice-buttons button:active{transform:scale(.94)}
+.choice-buttons button:focus-visible{outline:2px solid #fff;outline-offset:2px}
+#decline{border:1px solid #93b8ed6c;color:#d2e6ff;background:#09234b}
+#allow{border:1px solid #81f5e3bf;color:#032a4b;background:linear-gradient(135deg,#b4ffed,#42d9fd)}
+.event{position:absolute;z-index:8;left:50%;top:88px;transform:translate(-50%,12px);font-weight:720;letter-spacing:2.3px;text-transform:uppercase;font-size:10px;line-height:1.4;color:#c5f7ff;white-space:nowrap;opacity:0;text-shadow:0 0 14px #2b9effae;transition:opacity .35s ease,transform .45s var(--ease);pointer-events:none}
+.event.show{opacity:1;transform:translate(-50%,0)}
+#pointer{position:absolute;z-index:9;left:212px;top:501px;width:23px;height:23px;opacity:0;pointer-events:none;transform:translate(110px,25px) scale(.75);transition:opacity .22s,transform .45s var(--ease);filter:drop-shadow(0 0 8px #bdeeff88)}
+#pointer.show{opacity:1;transform:translate(0,0) scale(1)}
+#pointer svg{width:100%;height:100%}
+#touchwave{position:absolute;z-index:8;width:50px;height:50px;left:190px;top:480px;border-radius:50%;border:2px solid #a8f9ff;opacity:0;pointer-events:none}
+#touchwave.pop{animation:touchwave .65s ease-out 1}
+@keyframes touchwave{0%{opacity:.85;transform:scale(.25)}100%{opacity:0;transform:scale(1.3)}}
+.sr-only{position:absolute!important;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+@media(hover:hover){.choice-buttons button:hover{filter:brightness(1.14)}}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition-duration:.01ms!important;scroll-behavior:auto!important}#portalGroup,#mailbox{opacity:1!important;transform:none!important}#shieldRim{stroke-dashoffset:0!important}#screenerEtching{opacity:1!important}.floating-sigil{opacity:1!important}}
+</style>
+</head>
+<body>
+<main class="viewport" id="viewport" aria-label="GrapMail Screener gate, an animated interactive product illustration">
+ <div id="stage" class="film" role="group" aria-label="Scene 2: A trusted email enters the mailbox, while an unknown sender is held at a protective gate for approval.">
+  <canvas width="880" height="1120" id="particleField" aria-hidden="true"></canvas>
+  <svg class="scene" viewBox="0 0 440 560" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+    <defs>
+      <radialGradient id="ambient"><stop stop-color="#267fff" stop-opacity=".24"/><stop offset=".5" stop-color="#0950cb" stop-opacity=".07"/><stop offset="1" stop-color="#03204b" stop-opacity="0"/></radialGradient>
+      <radialGradient id="halo"><stop stop-color="#bcfaff" stop-opacity=".6"/><stop offset=".25" stop-color="#8deaff" stop-opacity=".24"/><stop offset="1" stop-color="#2c7fff" stop-opacity="0"/></radialGradient>
+      <radialGradient id="baseLight"><stop stop-color="#42baff" stop-opacity=".78"/><stop offset=".35" stop-color="#156eff" stop-opacity=".28"/><stop offset="1" stop-color="#1466ff" stop-opacity="0"/></radialGradient>
+      <linearGradient id="prismBorder" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#e9ffff"/><stop offset=".18" stop-color="#86eeff"/><stop offset=".47" stop-color="#2e85f9"/><stop offset=".7" stop-color="#beadff"/><stop offset="1" stop-color="#e4ffff"/></linearGradient>
+      <linearGradient id="gateGlass" x1=".12" y1="0" x2=".9" y2="1"><stop stop-color="#9af7ff" stop-opacity=".29"/><stop offset=".25" stop-color="#5ab8ff" stop-opacity=".13"/><stop offset=".66" stop-color="#2672fc" stop-opacity=".1"/><stop offset="1" stop-color="#e5d5ff" stop-opacity=".23"/></linearGradient>
+      <linearGradient id="shieldShine" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#fff" stop-opacity=".48"/><stop offset=".36" stop-color="#fff" stop-opacity="0"/><stop offset="1" stop-color="#b6ddff" stop-opacity=".1"/></linearGradient>
+      <linearGradient id="ringStroke" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2475ff" stop-opacity="0"/><stop offset=".24" stop-color="#97f3ff" stop-opacity=".84"/><stop offset=".52" stop-color="#3e86ff" stop-opacity=".2"/><stop offset=".85" stop-color="#70cfff" stop-opacity=".6"/><stop offset="1" stop-color="#2475ff" stop-opacity="0"/></linearGradient>
+      <linearGradient id="envelopeBack" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2c95ff"/><stop offset=".53" stop-color="#0a50bc"/><stop offset="1" stop-color="#072d78"/></linearGradient>
+      <linearGradient id="envelopeFront" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#44b9ff"/><stop offset=".27" stop-color="#1982f8"/><stop offset=".71" stop-color="#0d5acb"/><stop offset="1" stop-color="#083989"/></linearGradient>
+      <linearGradient id="foldLeft" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#5cceff"/><stop offset=".43" stop-color="#1872dc"/><stop offset="1" stop-color="#062e7e"/></linearGradient>
+      <linearGradient id="foldRight" x1="1" y1="0" x2="0" y2="1"><stop stop-color="#87e6ff"/><stop offset=".36" stop-color="#187ef2"/><stop offset="1" stop-color="#073b95"/></linearGradient>
+      <linearGradient id="foldBottom" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#3bb4ff"/><stop offset=".45" stop-color="#126ce3"/><stop offset="1" stop-color="#043181"/></linearGradient>
+      <linearGradient id="mailScreen" x1="0" y1="0" x2=".8" y2="1"><stop stop-color="#16356e"/><stop offset=".5" stop-color="#0a285d"/><stop offset="1" stop-color="#041938"/></linearGradient>
+      <linearGradient id="glint" x1="0" y1="0" x2="1" y2="0"><stop stop-color="#a0faff" stop-opacity="0"/><stop offset=".45" stop-color="#efffff" stop-opacity=".93"/><stop offset="1" stop-color="#62bdff" stop-opacity="0"/></linearGradient>
+      <filter id="blur14" x="-100%" y="-100%" width="300%" height="300%"><feGaussianBlur stdDeviation="14"/></filter>
+      <filter id="blur6" x="-100%" y="-100%" width="300%" height="300%"><feGaussianBlur stdDeviation="6"/></filter>
+      <filter id="softGlow" x="-80%" y="-80%" width="260%" height="260%"><feGaussianBlur stdDeviation="2.4"/></filter>
+      <path id="shieldShape" d="M220 128 C248 149 272 153 287 160 L287 230 C287 281 266 310 220 336 C174 310 153 281 153 230 L153 160 C171 151 192 148 220 128 Z"/>
+    </defs>
+    <ellipse cx="220" cy="281" rx="200" ry="239" fill="url(#ambient)"/>
+    <g opacity=".52">
+      <path d="M6 157 C74 74 162 81 222 96 C316 119 370 76 437 29" fill="none" stroke="#156ce2" stroke-width=".7" opacity=".34"/>
+      <path d="M16 466 C123 508 287 514 434 445" fill="none" stroke="#2587ff" stroke-width=".8" opacity=".26"/>
+    </g>
+    <g id="ringOrbit" opacity=".7"><ellipse cx="220" cy="262" rx="178" ry="80" transform="rotate(-26 220 262)" fill="none" stroke="url(#ringStroke)" stroke-width="1.3"/></g>
+    <g id="ringOrbit2" opacity=".38"><ellipse cx="220" cy="262" rx="143" ry="138" transform="rotate(29 220 262)" fill="none" stroke="url(#ringStroke)" stroke-width="1" stroke-dasharray="1 13"/></g>
+    <g id="portalGroup">
+      <ellipse cx="220" cy="253" rx="116" ry="148" fill="none" stroke="#3b8dff" stroke-width="18" opacity=".16" filter="url(#blur14)"/>
+      <ellipse cx="220" cy="253" rx="113" ry="143" fill="none" stroke="url(#ringStroke)" stroke-width="1.2"/>
+      <ellipse cx="220" cy="253" rx="107" ry="135" fill="none" stroke="#78caff" stroke-width=".5" opacity=".5"/>
+      <ellipse cx="220" cy="257" rx="89" ry="112" fill="url(#ambient)" opacity=".5"/>
+      <g id="innerGate">
+       <use href="#shieldShape" fill="#338bff" opacity=".27" filter="url(#blur14)"/>
+       <use href="#shieldShape" id="shieldBody" fill="url(#gateGlass)" stroke="#3182ff" stroke-width="4" opacity=".8"/>
+       <use href="#shieldShape" fill="url(#shieldShine)" opacity=".55"/>
+       <use href="#shieldShape" id="shieldRim" fill="none" stroke="url(#prismBorder)" stroke-width="2.5"/>
+       <path d="M220 142 C242 159 257 164 273 168" fill="none" stroke="#dfffff" stroke-width="1.4" opacity=".55" stroke-linecap="round"/>
+       <path d="M220 316 C254 295 270 273 274 246" fill="none" stroke="#57adff" stroke-width="1.2" opacity=".65" stroke-linecap="round"/>
+       <g opacity=".86"><circle cx="220" cy="240" r="43" fill="none" stroke="#83dfff" stroke-width="1.2" stroke-dasharray="2 6" opacity=".65"/>
+       <circle cx="220" cy="240" r="30" fill="url(#halo)" opacity=".7"/></g>
+       <g id="lockHalo"><ellipse cx="220" cy="241" rx="49" ry="49" fill="url(#halo)"/></g>
+       <path d="M203 239 L216 251 L240 223" id="shieldCheck" stroke="#eaffff" stroke-width="6" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+       <g id="screenerEtching" fill="none" stroke="#b7eeff" stroke-width="1.4" opacity=".8">
+         <path d="M208 222 v-3 a12 12 0 0 1 24 0 v3"/>
+         <rect x="203" y="223" width="34" height="28" rx="7" fill="#257eea" fill-opacity=".17"/>
+         <circle cx="220" cy="236" r="2.1" fill="#d7fbff" stroke="none"/><path d="M220 238v5"/>
+       </g>
+      </g>
+      <ellipse id="deflectRing" cx="220" cy="236" rx="70" ry="91" fill="none" stroke="#cbceff" stroke-width="3"/>
+      <path id="gateTrace" d="M220 128 C248 149 272 153 287 160 L287 230 C287 281 266 310 220 336 C174 310 153 281 153 230 L153 160 C171 151 192 148 220 128 Z" stroke="#c3ffff" stroke-width="3.5" fill="none" stroke-linecap="round" filter="url(#softGlow)"/>
+    </g>
+    <g id="mailbox">
+      <ellipse id="baseGlow" cx="221" cy="446" rx="139" ry="29" fill="url(#baseLight)"/>
+      <ellipse cx="220" cy="447" rx="99" ry="7" fill="#23adff" opacity=".47" filter="url(#blur6)"/>
+      <path d="M89 376 L196 313 Q220 300 244 313 L351 376 V425 Q351 451 324 451 H116 Q89 451 89 425 Z" fill="url(#envelopeBack)" stroke="#61c6ff" stroke-width="1.6"/>
+      <path d="M120 363 L220 321 L319 363 L319 395 L120 395Z" fill="url(#mailScreen)" stroke="#83d8ff" stroke-opacity=".56" stroke-width="1.1"/>
+      <rect x="137" y="337" width="167" height="6" rx="3" fill="#bfebff" opacity=".18"/>
+      <rect x="137" y="351" width="129" height="4" rx="2" fill="#bfebff" opacity=".17"/>
+      <path d="M89 376 L215 414 Q220 417 225 414 L351 376 L351 425 Q351 450 326 450H114 Q89 450 89 425Z" fill="url(#envelopeFront)" stroke="#72dfff" stroke-width="1.45"/>
+      <path d="M89 377 L219 417 L89 437Z" fill="url(#foldLeft)"/>
+      <path d="M351 377 L220 417 L351 437Z" fill="url(#foldRight)"/>
+      <path d="M90 437 L212 411 Q220 409 228 411 L350 437 Q344 450 326 450H114Q96 450 90 437Z" fill="url(#foldBottom)"/>
+      <path d="M92 378 L214 414 Q220 417 226 414 L349 378" fill="none" stroke="#9fefff" stroke-width="1.3" opacity=".7"/>
+      <path id="frontGlint" d="M111 445 Q219 430 333 445" fill="none" stroke="url(#glint)" stroke-width="1.3"/>
+      <ellipse cx="220" cy="454" rx="91" ry="2.2" fill="#95ebff" opacity=".64" filter="url(#blur6)"/>
+    </g>
+    <circle cx="83" cy="307" r="4" fill="#b8f8ff" opacity=".86" filter="url(#blur6)"/><circle cx="83" cy="307" r="2" fill="#b8f8ff" opacity=".85"/>
+    <circle cx="374" cy="339" r="3.5" fill="#b8f8ff" opacity=".65" filter="url(#blur6)"/><circle cx="374" cy="339" r="1.5" fill="#b8f8ff"/>
+  </svg>
+  <div class="floating-sigil sigil-left" aria-hidden="true"><svg class="sigil-svg" viewBox="0 0 60 65"><defs><linearGradient id="sg1" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#76c9ff" stop-opacity=".75"/><stop offset="1" stop-color="#134b9c" stop-opacity=".3"/></linearGradient></defs><rect x="2" y="2" width="56" height="61" rx="18" fill="url(#sg1)" stroke="#a8edff" stroke-width="1.3"/><path d="M30 14L43 19V31Q43 42 30 49Q17 42 17 31V19Z" stroke="#e5faff" stroke-width="2.6" fill="none"/><path d="M23 31L28 36L37 26" stroke="#fff" stroke-width="2.7" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+  <div class="floating-sigil sigil-right" aria-hidden="true"><svg class="sigil-svg" viewBox="0 0 50 53"><rect x="2" y="2" width="46" height="49" rx="16" fill="#164d98b3" stroke="#8bd7ff" stroke-width="1.4"/><path d="M29 11L19 29H27L23 42L36 24H29Z" fill="#d2f8ff"/></svg></div>
+  <div id="trusted" class="mail-card" aria-hidden="true"><div class="strip"></div><div class="inner"><div class="avatar">L</div><div class="cardcopy"><b>Lina Carter</b><span>Trusted contact</span></div></div><div class="line"></div><div class="line small"></div></div>
+  <div id="unknown" class="mail-card" aria-hidden="true"><div class="strip"></div><div class="inner"><div class="avatar alt">?</div><div class="cardcopy"><b>New sender</b><span>First message</span></div></div><div class="line"></div><div class="line small"></div></div>
+  <div class="event" id="event" aria-live="polite">SCREENER ACTIVE</div>
+  <div id="choice" role="group" aria-label="Demonstration: what should happen to a new sender?" aria-hidden="true"><div class="choice-top"><span class="queue-symbol">?</span><div><div class="queue-title">An unknown sender</div><div class="queue-caption">Waiting in your Screener</div></div></div><div class="choice-buttons"><button id="decline" type="button" tabindex="-1">Decline</button><button id="allow" type="button" tabindex="-1">Accept sender</button></div></div>
+  <div id="touchwave" aria-hidden="true"></div>
+  <div id="pointer" aria-hidden="true"><svg viewBox="0 0 26 28"><path d="M4 2V22L10 17L15 26L20 23L15 15L24 14Z" fill="#f4ffff" stroke="#0b2e63" stroke-width="1.5" stroke-linejoin="round"/></svg></div>
+ </div>
+</main>
+<p class="sr-only">This is a fictional illustration of GrapMail's Screener. During the demonstration a trusted email enters your mailbox while an unfamiliar sender is held for your choice. When Accept sender and Decline appear, you can choose either action; otherwise the demonstration decides automatically and loops.</p>
+<script>
+(()=>{
+'use strict';
+const stage=document.getElementById('stage'),viewport=document.getElementById('viewport');
+const choice=document.getElementById('choice'),eventNode=document.getElementById('event');
+const decline=document.getElementById('decline'),allow=document.getElementById('allow');
+const pointer=document.getElementById('pointer'),touchwave=document.getElementById('touchwave');
+const canvas=document.getElementById('particleField'),cx=canvas.getContext('2d',{alpha:true});
+const reduce=window.matchMedia('(prefers-reduced-motion: reduce)');
+const fit=()=>{let size=viewport.getBoundingClientRect();let w=(size.width&&size.width>0)?size.width:440;stage.style.transform=`scale(${w/440})`};
+fit();window.addEventListener('resize',fit,{passive:true});
+let timers=[],current='intro',run=0,decisionMade=false;
+let flowParticles=[],shockwaves=[];
+function lightTrail(x1,y1,x2,y2,color){
+ const now=performance.now();
+ for(let i=0;i<29;i++)flowParticles.push({x1,y1,x2,y2,color,start:now+i*18+Math.random()*50,speed:480+Math.random()*270,w:.65+Math.random()*2,drift:(Math.random()-.5)*30});
+}
+function shock(x,y,color){shockwaves.push({x,y,color,t:performance.now()});}
+function gateImpact(){
+ const rim=document.getElementById('shieldBody');
+ if(!reduce.matches && rim.animate)rim.animate([{opacity:.8,filter:'drop-shadow(0 0 6px #a5edff)'},{opacity:1,filter:'drop-shadow(0 0 27px #a5edff)'},{opacity:.8,filter:'drop-shadow(0 0 3px #65a7ff)'}],{duration:730,easing:'ease-out'});
+}
+
+const later=(fn,ms)=>{const t=setTimeout(fn,ms);timers.push(t);return t};
+const clear=()=>{timers.forEach(clearTimeout);timers=[]};
+function say(s,delay=0){later(()=>{eventNode.classList.remove('show');later(()=>{eventNode.textContent=s;eventNode.classList.add('show')},90)},delay)}
+function setFilm(next){current=next;stage.classList.remove('film-approach','film-trusted','film-unknown','film-review','film-decline','film-allow');if(next!=='intro')stage.classList.add('film-'+next)}
+function choose(which,manual=false){if(decisionMade || current!=='review')return;decisionMade=true;
+ choice.setAttribute('aria-hidden','true');decline.tabIndex=-1;allow.tabIndex=-1;
+ if(!manual){pointer.classList.add('show');later(()=>{touchwave.classList.remove('pop');void touchwave.offsetWidth;touchwave.classList.add('pop')},280);later(()=>pointer.classList.remove('show'),780)}
+ later(()=>{stage.classList.add(which==='allow'?'accepted':'reject');setFilm(which);say(which==='allow'?'SENDER WELCOMED':'PEACE RESTORED');gateImpact();if(which==='allow')lightTrail(284,226,221,380,'126,244,255');else {shock(270,249,'187,186,255');lightTrail(267,243,393,118,'178,186,255')}},manual?40:420);
+ later(()=>{stage.classList.remove('reject','impact');},1100);
+ later(()=>{eventNode.classList.remove('show')},2400);
+ later(()=>{startFilm()},3100);
+}
+function startFilm(){clear();run++;const thisRun=run;decisionMade=false;stage.className=stage.classList.contains('started')?'film started':'film';current='intro';pointer.classList.remove('show');touchwave.classList.remove('pop');eventNode.classList.remove('show');choice.setAttribute('aria-hidden','true');decline.tabIndex=-1;allow.tabIndex=-1;
+ if(reduce.matches){stage.classList.add('started');setFilm('review');eventNode.textContent='YOUR INBOX. YOUR RULES.';eventNode.classList.add('show');choice.setAttribute('aria-hidden','false');decline.tabIndex=0;allow.tabIndex=0;return}
+ later(()=>{stage.classList.add('started');say('SCREENER ACTIVE')},180);
+ later(()=>{setFilm('approach');},1050);
+ later(()=>{stage.classList.add('accepted','impact');setFilm('trusted');say('TRUSTED CONTACT');lightTrail(118,225,218,376,'91,232,255');gateImpact()},2570);
+ later(()=>{stage.classList.remove('impact','accepted');setFilm('unknown');say('NEW SENDER DETECTED')},3660);
+ later(()=>{stage.classList.add('reject');say('HELD FOR YOUR APPROVAL');shock(269,242,'141,216,255');gateImpact()},4320);
+ later(()=>{stage.classList.remove('reject');setFilm('review');choice.setAttribute('aria-hidden','false');decline.tabIndex=0;allow.tabIndex=0;},5150);
+ later(()=>{if(!decisionMade&&current==='review')choose('decline',false)},7850);
+}
+allow.addEventListener('click',()=>choose('allow',true));decline.addEventListener('click',()=>choose('decline',true));
+window.addEventListener('keydown',e=>{if(e.key==='r'&&e.target.tagName!=='BUTTON')startFilm()});
+reduce.addEventListener('change',startFilm);
+// Pure canvas depth: no libraries / assets / networking. Screen-sized operations remain inexpensive.
+let particles=[];let seed=91;const rand=()=>{seed=(seed*1664525+1013904223)>>>0;return seed/4294967296};
+for(let i=0;i<75;i++)particles.push({x:rand()*440,y:rand()*560,r:.35+rand()*1.4,o:.12+rand()*.3,v:.08+rand()*.24,phase:rand()*6.283});
+let last=0;function render(t){if(!document.hidden && t-last>28){last=t;cx.clearRect(0,0,880,1120);cx.save();cx.scale(2,2);const q=t*.001;
+const g=cx.createRadialGradient(220,251,21,220,260,225);g.addColorStop(0,'rgba(23,91,201,.1)');g.addColorStop(.57,'rgba(10,48,105,.08)');g.addColorStop(1,'rgba(1,10,30,0)');cx.fillStyle=g;cx.fillRect(0,0,440,560);
+for(const p of particles){let yy=(p.y-q*p.v*11+1120)%560;let a=p.o*(.75+.25*Math.sin(q*1.2+p.phase));cx.beginPath();cx.arc(p.x+Math.sin(q*.4+p.phase)*2.5,yy,p.r,0,Math.PI*2);cx.fillStyle=`rgba(163,226,255,${a})`;cx.fill()}
+// low-key streaks and caustics follow the main object
+cx.globalCompositeOperation='screen';const light=cx.createRadialGradient(220,439,4,220,439,144);light.addColorStop(0,'rgba(60,165,255,.13)');light.addColorStop(1,'rgba(8,68,213,0)');cx.fillStyle=light;cx.fillRect(60,300,330,200);
+// A stream of individual luminous fragments sweeps along the letter's route.
+flowParticles=flowParticles.filter(p=>t-p.start<p.speed);
+for(const p of flowParticles){const progress=(t-p.start)/p.speed;if(progress<0||progress>1)continue;
+const u=1-progress,cx1=(p.x1+p.x2)*.5,cy1=Math.min(p.y1,p.y2)-65;
+const x=u*u*p.x1+2*u*progress*cx1+progress*progress*p.x2;
+const y=u*u*p.y1+2*u*progress*cy1+progress*progress*p.y2+p.drift*Math.sin(progress*Math.PI);
+const opacity=Math.sin(progress*Math.PI)*.88;
+cx.beginPath();cx.arc(x,y,p.w*(.4+.6*opacity),0,Math.PI*2);cx.fillStyle=`rgba(${p.color},${opacity})`;cx.shadowBlur=8;cx.shadowColor=`rgba(${p.color},.7)`;cx.fill();
+}cx.shadowBlur=0;
+shockwaves=shockwaves.filter(p=>t-p.t<900);
+for(const w of shockwaves){const progress=(t-w.t)/900;
+cx.beginPath();cx.ellipse(w.x,w.y,14+progress*96,16+progress*88,0,0,Math.PI*2);
+cx.lineWidth=1.9*(1-progress);cx.strokeStyle=`rgba(${w.color},${(1-progress)*.72})`;cx.stroke()}
+cx.restore();}
+requestAnimationFrame(render)}requestAnimationFrame(render);
+startFilm();
+window.GrapMailScene2={replay:startFilm,accept:()=>choose('allow',true),decline:()=>choose('decline',true),get state(){return current},get event(){return eventNode.textContent}};
+})();
+</script>
+</body>
+</html>

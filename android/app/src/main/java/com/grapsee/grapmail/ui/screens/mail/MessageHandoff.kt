@@ -88,7 +88,7 @@ private const val PRINT_LINE_HEIGHT = 17f
  * part is HTML says it was printed as plain text — the same admission the screen
  * makes, one step further out.
  */
-fun messageShareText(message: MailMessageFullDto): String = buildString {
+fun messageShareText(message: MailMessageFullDto, formattedText: String? = null): String = buildString {
     appendLine(message.subject?.takeIf { it.isNotBlank() } ?: "(no subject)")
     val from = message.from?.display?.takeIf { it.isNotBlank() }
         ?: message.from?.address?.takeIf { it.isNotBlank() }
@@ -98,26 +98,12 @@ fun messageShareText(message: MailMessageFullDto): String = buildString {
     appendLine("Date: ${message.createdAt ?: "Not recorded"}")
     appendLine()
     val text = message.bodyText?.takeIf { it.isNotBlank() }
+        ?: formattedText?.takeIf { it.isNotBlank() }
     when {
         text != null -> append(text)
-        !message.bodyHtml.isNullOrBlank() -> {
-            append(stripForShare(message.bodyHtml!!))
-            append("\n\n(Printed as plain text: GrapMail does not render the sender's HTML.)")
-        }
         else -> append("This message has no text body.")
     }
 }
-
-/** Display-stripped HTML, for the document only. Not a sanitiser — see [stripForShare]'s caller. */
-private fun stripForShare(html: String): String =
-    html.replace(Regex("(?is)<(script|style)[^>]*>.*?</\\1>"), "")
-        .replace(Regex("(?is)<br\\s*/?>"), "\n")
-        .replace(Regex("(?is)</p>"), "\n\n")
-        .replace(Regex("(?is)<[^>]+>"), "")
-        .replace("&nbsp;", " ").replace("&amp;", "&").replace("&lt;", "<")
-        .replace("&gt;", ">").replace("&quot;", "\"")
-        .replace(Regex("\n{3,}"), "\n\n")
-        .trim()
 
 /**
  * The `src` addresses an HTML part points at, http(s) only.
@@ -299,6 +285,7 @@ private fun fetchRemoteImage(url: String): RemoteImageOutcome {
 fun printMessageText(
     context: Context,
     message: MailMessageFullDto,
+    formattedText: String? = null,
     onOutcome: (String?) -> Unit,
 ) {
     val manager = context.getSystemService(Context.PRINT_SERVICE) as? PrintManager
@@ -313,7 +300,7 @@ fun printMessageText(
     // last-used attributes: `print()` takes the attributes to *request*, and the
     // panel lets the person change them, so the layout pass is where the real
     // numbers arrive.
-    val adapter = TextPrintAdapter(messageShareText(message), docName)
+    val adapter = TextPrintAdapter(messageShareText(message, formattedText), docName)
     val handed = runCatching {
         manager.print(docName, adapter, PrintAttributes.Builder().build())
     }.isSuccess

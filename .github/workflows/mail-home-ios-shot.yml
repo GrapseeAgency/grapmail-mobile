@@ -1,0 +1,120 @@
+name: Mailbox home screenshot (iOS)
+
+# Build the app, launch the test-only snapshot host on the mailbox home and
+# photograph it in dark and light. The host draws the live chrome — top bar,
+# search pill, the one rounded card, the floating bottom bar, the compose pill —
+# so these frames are the evidence that the iOS home carries the reference's
+# shape, not only Android's.
+on:
+  workflow_dispatch:
+  push:
+    branches: ["welcome-living-mailbox"]
+    paths:
+      - ".github/workflows/mail-home-ios-shot.yml"
+      - "ios/GrapMail/MailboxView.swift"
+      - "ios/GrapMail/MailComponents.swift"
+      - "ios/GrapMail/MailChrome.swift"
+      - "ios/GrapMail/MailSnapshot.swift"
+      - "ios/GrapMail/MailSheets.swift"
+      - "ios/GrapMail/OnboardingViews.swift"
+      - "ios/GrapMail/Assets.xcassets/**"
+
+concurrency:
+  group: mail-home-ios-shot-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  screenshot:
+    name: Shoot the mailbox home (iPhone simulator)
+    runs-on: macos-15
+    timeout-minutes: 40
+    env:
+      SCHEME: GrapMail
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        working-directory: ios
+        run: xcodegen generate
+
+      - name: Build for the simulator
+        working-directory: ios
+        run: |
+          set -o pipefail
+          xcodebuild build \
+            -project GrapMail.xcodeproj \
+            -scheme "$SCHEME" \
+            -configuration Debug \
+            -destination "generic/platform=iOS Simulator" \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO
+
+      - name: Resolve a simulator
+        id: sim
+        run: |
+          LINE=$(xcrun simctl list devices available | grep -m1 -E "iPhone 16 Pro \(|iPhone 16 \(|iPhone 15 \(" || true)
+          if [ -z "$LINE" ]; then
+            echo "::error::no iPhone simulator is available on this runner"
+            xcrun simctl list devices available >&2
+            exit 1
+          fi
+          UDID=$(echo "$LINE" | grep -oE "[0-9A-F-]{36}" | head -1)
+          echo "udid=$UDID" >> "$GITHUB_OUTPUT"
+          echo "Using simulator $LINE"
+
+      - name: Boot, install, launch the mailbox frame, photograph
+        run: |
+          set -euo pipefail
+          UDID="${{ steps.sim.outputs.udid }}"
+          APP="ios/build/Build/Products/Debug-iphonesimulator/GrapMail.app"
+          OUT="mail-home-shots-ios"
+          mkdir -p "$OUT"
+
+          xcrun simctl boot "$UDID" || true
+          xcrun simctl bootstatus "$UDID" -b
+          xcrun simctl install "$UDID" "$APP"
+
+          shoot() {
+            local name="$1" appearance="$2"
+            xcrun simctl terminate "$UDID" com.grapsee.grapmail 2>/dev/null || true
+            xcrun simctl ui "$UDID" appearance "$appearance"
+            xcrun simctl launch "$UDID" com.grapsee.grapmail -gmSnapshot mail-home
+            # The snapshot seeds its rows in an effect, so wait for a painted
+            # frame rather than a fixed sleep: screenshot until two consecutive
+            # captures are byte-identical (settled) or the budget runs out.
+            local prev=""
+            for i in $(seq 1 20); do
+              sleep 1
+              xcrun simctl io "$UDID" screenshot "$OUT/$name.png" >/dev/null 2>&1
+              local now
+              now=$(shasum "$OUT/$name.png" | cut -d' ' -f1)
+              if [ -n "$prev" ] && [ "$prev" = "$now" ] && [ "$i" -ge 3 ]; then
+                echo "$name settled after ${i}s"
+                break
+              fi
+              prev="$now"
+            done
+            test -s "$OUT/$name.png" || { echo "::error::$name was not captured"; exit 1; }
+          }
+
+          shoot mail-home-dark dark
+          shoot mail-home-light light
+
+          # The two palettes must not photograph as the same frame.
+          if cmp -s "$OUT/mail-home-dark.png" "$OUT/mail-home-light.png"; then
+            echo "::error::dark and light captured the same pixels"
+            exit 1
+          fi
+          echo "PASS: dark and light are different frames"
+          ls -la "$OUT"
+
+      - name: Upload the evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mail-home-shots-ios
+          path: mail-home-shots-ios/
+          if-no-files-found: warn
