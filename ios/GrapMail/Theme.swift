@@ -10,15 +10,20 @@ enum GM {
         })
     }
 
-    // Surfaces
-    static let bg            = color(light: 0xFBFCFE, dark: 0x070F18)
-    static let bgTinted      = color(light: 0xF7F9FC, dark: 0x081019)
-    static let card          = color(light: 0xFFFFFF, dark: 0x0C182A)
-    static let inputFill     = color(light: 0xFFFFFF, dark: 0x0D1521)
-    static let softFill      = color(light: 0xEFF5FD, dark: 0x12233C)
-    static let infoFill      = color(light: 0xE3ECFB, dark: 0x12233C)
-    static let border        = color(light: 0xE1E7F2, dark: 0x1B2A44)
-    static let stepInactive  = color(light: 0xDCE6F5, dark: 0x1B2A44)
+    // Surfaces. Dark values repainted 2026-11-14 to the founder's mailbox
+    // reference: a neutral near-black canvas with clearly lighter cards, so the
+    // rounded card group the design centres on is actually visible — the old
+    // navy pair (#070F18 / #0C182A) differed by so little the card's rounding
+    // could not read at all. Brand blues and accents are untouched; only the
+    // neutral surfaces and their greys moved, from blue-tinted to warm-neutral.
+    static let bg            = color(light: 0xFBFCFE, dark: 0x0A0A0C)
+    static let bgTinted      = color(light: 0xF7F9FC, dark: 0x0D0D0F)
+    static let card          = color(light: 0xFFFFFF, dark: 0x141416)
+    static let inputFill     = color(light: 0xFFFFFF, dark: 0x1A1A1E)
+    static let softFill      = color(light: 0xEFF5FD, dark: 0x232327)
+    static let infoFill      = color(light: 0xE3ECFB, dark: 0x232327)
+    static let border        = color(light: 0xE1E7F2, dark: 0x2C2C31)
+    static let stepInactive  = color(light: 0xDCE6F5, dark: 0x2C2C31)
     static let buttonDisabled = color(light: 0xC4DBFD, dark: 0x1E3A66)
 
     // Brand
@@ -27,9 +32,9 @@ enum GM {
     static let primarySolid  = color(light: 0x1A6DF0, dark: 0x1F6DFD)
 
     // Text
-    static let textPrimary   = color(light: 0x0F172A, dark: 0xF1F5F9)
-    static let textSecondary = color(light: 0x5B6B84, dark: 0x8FA3C0)
-    static let textTertiary  = color(light: 0x94A3B8, dark: 0x5E7290)
+    static let textPrimary   = color(light: 0x0F172A, dark: 0xEAEAEA)
+    static let textSecondary = color(light: 0x5B6B84, dark: 0x9E9EA5)
+    static let textTertiary  = color(light: 0x94A3B8, dark: 0x67676D)
 
     // Status
     static let success       = color(light: 0x10B981, dark: 0x34D399)
@@ -42,8 +47,8 @@ enum GM {
     static let successInk    = color(light: 0x0B8F64, dark: 0x34D399)
     static let warnChipBg    = color(light: 0xFDF0DE, dark: 0x2B1F0B)
     static let warnInk       = color(light: 0xC2620A, dark: 0xF5A623)
-    static let cardAlt       = color(light: 0xF5F9FE, dark: 0x0B1626)
-    static let otpFill       = color(light: 0xFFFFFF, dark: 0x0A1220)
+    static let cardAlt       = color(light: 0xF5F9FE, dark: 0x1C1C20)
+    static let otpFill       = color(light: 0xFFFFFF, dark: 0x141418)
     /// Mailbox swipe backgrounds. Same two directions, same two meanings, and the
     /// same values as Android's `swipeArchive`/`swipeTrash` in `Color.kt` — the
     /// swipe is the one gesture photographed from two angles in the walk, so a

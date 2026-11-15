@@ -227,6 +227,7 @@ fun LabelCreateScreen(vm: MailboxViewModel, onDone: () -> Unit,
             Text("Name", fontSize = 13.sp, color = palette.textSecondary)
             Spacer(Modifier.height(8.dp))
             BasicTextField(
+                cursorBrush = androidx.compose.ui.graphics.SolidColor(LocalPalette.current.cursor),
                 value = name, onValueChange = { name = it }, maxLines = 1,
                 textStyle = TextStyle(fontSize = 16.sp, color = palette.textPrimary),
                 modifier = Modifier.fillMaxWidth().testTag("label-name")
@@ -334,6 +335,7 @@ fun ContactsScreen(vm: MailboxViewModel, onBack: () -> Unit, onOpen: (String) ->
                 Icon(Icons.Rounded.Contacts, null, tint = palette.textTertiary, modifier = Modifier.size(16.dp))
                 Spacer(Modifier.width(10.dp))
                 BasicTextField(
+                    cursorBrush = androidx.compose.ui.graphics.SolidColor(LocalPalette.current.cursor),
                     value = query, onValueChange = { query = it }, maxLines = 1,
                     textStyle = TextStyle(fontSize = 14.sp, color = palette.textPrimary),
                     modifier = Modifier.weight(1f).testTag("contacts-search"),

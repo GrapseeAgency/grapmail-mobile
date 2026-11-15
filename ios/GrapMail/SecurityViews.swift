@@ -329,7 +329,7 @@ struct ConfirmPasswordView: View {
                                 onVerified()
                             } catch {
                                 busy = false
-                                self.error = error.localizedDescription
+                                self.error = apiMessage(error, fallback: "Could not complete the security request. Try again.")
                             }
                         }
                     }
@@ -375,7 +375,7 @@ struct VerifyPhoneView: View {
                 expiresAt = Date(timeIntervalSince1970: Double(millis) / 1000)
             }
         } catch {
-            self.error = error.localizedDescription
+            self.error = apiMessage(error, fallback: "Could not complete the security request. Try again.")
         }
     }
 
@@ -482,7 +482,7 @@ struct VerifyPhoneView: View {
                                 self.error = apiError.localizedDescription
                             } catch {
                                 busy = false
-                                self.error = error.localizedDescription
+                                self.error = apiMessage(error, fallback: "Could not complete the security request. Try again.")
                             }
                         }
                     }
@@ -583,7 +583,7 @@ struct DisableTwoFactorView: View {
                                 onDisabled()
                             } catch {
                                 busy = false
-                                self.error = error.localizedDescription
+                                self.error = apiMessage(error, fallback: "Could not complete the security request. Try again.")
                             }
                         }
                     }
@@ -674,7 +674,7 @@ struct GenerateBackupCodesView: View {
                                 onGenerated(resp.newBackupCodes ?? [])
                             } catch {
                                 busy = false
-                                self.error = error.localizedDescription
+                                self.error = apiMessage(error, fallback: "Could not complete the security request. Try again.")
                             }
                         }
                     }
@@ -923,7 +923,7 @@ struct ChangePasswordView: View {
                                 onChanged()
                             } catch {
                                 busy = false
-                                self.error = error.localizedDescription
+                                self.error = apiMessage(error, fallback: "Could not complete the security request. Try again.")
                             }
                         }
                     }
@@ -1044,7 +1044,7 @@ struct SignOutAllDevicesView: View {
                                 onDone()
                             } catch {
                                 busy = false
-                                self.error = error.localizedDescription
+                                self.error = apiMessage(error, fallback: "Could not complete the security request. Try again.")
                             }
                         }
                     }
@@ -1172,7 +1172,7 @@ struct ManageSessionsView: View {
                     flaggedDeviceId = activity.suspiciousEvent?.deviceId ?? ""
                 }
             } catch {
-                self.error = error.localizedDescription
+                self.error = apiMessage(error, fallback: "Could not complete the security request. Try again.")
             }
             loading = false
         }
@@ -1252,7 +1252,7 @@ struct RevokeSessionView: View {
                 onRevoked(device)
             } catch {
                 busy = false
-                self.error = error.localizedDescription
+                self.error = apiMessage(error, fallback: "Could not complete the security request. Try again.")
             }
         }
     }
@@ -1314,7 +1314,7 @@ struct ConfirmSessionRevocationView: View {
                                 onRevoked(device)
                             } catch {
                                 busy = false
-                                self.error = error.localizedDescription
+                                self.error = apiMessage(error, fallback: "Could not complete the security request. Try again.")
                             }
                         }
                     }
@@ -1466,7 +1466,7 @@ struct SecurityActivityView: View {
                 events = resp.events
                 suspicious = resp.suspicious
             } catch {
-                self.error = error.localizedDescription
+                self.error = apiMessage(error, fallback: "Could not complete the security request. Try again.")
             }
             loading = false
         }
@@ -1530,7 +1530,7 @@ struct SuspiciousSignInAlertView: View {
                             _ = try await ApiClient.acknowledgeActivity(token: token)
                             onThisWasMe()
                         } catch {
-                            ackError = error.localizedDescription
+                            ackError = apiMessage(error, fallback: "Could not complete the security request. Try again.")
                         }
                     }
                 })
@@ -1618,7 +1618,7 @@ struct SecureMyAccountView: View {
                 _ = try await ApiClient.revokeSession(token: token, id: session.id)
                 await load()
             } catch {
-                revokeError = error.localizedDescription
+                revokeError = apiMessage(error, fallback: "Could not complete the security request. Try again.")
             }
             revokeBusy = false
         }

@@ -13,14 +13,7 @@ struct WelcomeView: View {
         GeometryReader { viewport in
             ScrollView {
                 VStack(spacing: 0) {
-                    Spacer(minLength: 40)
-                    Wordmark()
-                    Text("Your world. Your inbox.")
-                        .font(.system(size: 13))
-                        .foregroundColor(GM.textSecondary)
-                        .padding(.top, 6)
-
-                    Spacer(minLength: 10)
+                    Spacer(minLength: 64)
 
                     VStack(spacing: 0) {
                         Text("Welcome to")
@@ -36,17 +29,18 @@ struct WelcomeView: View {
                         .multilineTextAlignment(.center)
                         .padding(.top, 12)
 
-                    // The clean envelope artwork — ill_hero carried the
-                    // headline and subcopy baked in, duplicating the text.
-                    // Now drawn: no raster, no baked words, no second dark
-                    // crop.
-                    Image("GrapMailLogo")
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: 220)
-                        .padding(.top, 18)
+                    // The living-mailbox animation, authored at 400 x 440 and
+                    // bounded to 360pt so it sits inside the text column on wide
+                    // phones. It is a picture: no touch, no navigation, no data.
+                    GeometryReader { _ in
+                        WelcomeHeroView()
+                    }
+                    .aspectRatio(400.0 / 440.0, contentMode: .fit)
+                    .frame(maxWidth: 360)
+                    .padding(.top, 16)
+                    .accessibilityHidden(true)
 
-                    Spacer(minLength: 10)
+                    Spacer(minLength: 24)
 
                     GradientButton(title: "Create Account", trailing: AnyView(
                         Image(systemName: "arrow.right")
@@ -58,7 +52,7 @@ struct WelcomeView: View {
                             .font(.system(size: 15, weight: .semibold))
                             .foregroundColor(GM.textPrimary)
                     ), action: onSignIn)
-                    .padding(.top, 12)
+                    .padding(.top, 20)
 
                     (Text("By continuing, you agree to our ")
                         .foregroundColor(GM.textTertiary)

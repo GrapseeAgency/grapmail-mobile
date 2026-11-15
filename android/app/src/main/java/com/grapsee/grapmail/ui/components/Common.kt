@@ -224,7 +224,7 @@ fun AppTextField(
                 errorContainerColor = palette.inputFill,
                 focusedTextColor = palette.textPrimary,
                 unfocusedTextColor = palette.textPrimary,
-                cursorColor = palette.primarySolid,
+                cursorColor = palette.cursor,
             ),
         )
         if (error != null) {

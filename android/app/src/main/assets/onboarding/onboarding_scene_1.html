@@ -1,0 +1,297 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#030b1d">
+<title>GrapMail • Sanctuary Reveal</title>
+<style>
+:root{color-scheme:dark;--night:#030b1d;--ice:#d9f5ff;--blue:#1685ff}
+*{box-sizing:border-box}
+html,body{width:100%;height:100%;margin:0;overflow:hidden}
+body{background:radial-gradient(ellipse 78% 55% at 50% 47%,#0b2754 0%,#061732 30%,#030d22 66%,#020817 100%);display:grid;place-items:center;font-family:Inter,system-ui,-apple-system,'Segoe UI',sans-serif;-webkit-tap-highlight-color:transparent;user-select:none}
+body::before{content:"";position:fixed;inset:-20%;pointer-events:none;background:radial-gradient(ellipse at 25% 35%,#095aff18 0,transparent 37%),radial-gradient(ellipse at 77% 67%,#0095e918 0,transparent 34%);animation:atmos 12s ease-in-out infinite alternate}
+body::after{content:"";position:fixed;inset:0;pointer-events:none;opacity:.24;background-image:linear-gradient(125deg,transparent 45%,#0734651b 46%,transparent 48%);mix-blend-mode:screen}
+@keyframes atmos{from{transform:translate(-2%,1%) scale(1)}to{transform:translate(3%,-2%) scale(1.06)}}
+.wrap{width:100%;max-width:440px;height:100%;max-height:560px;aspect-ratio:440/560;margin:0 auto;position:relative;touch-action:manipulation;isolation:isolate;outline:none;cursor:pointer}
+.wrap svg{display:block;width:100%;height:100%;overflow:visible}
+.wrap:focus-visible{outline:2px solid #59c7ff;border-radius:14px}
+#field{position:absolute;inset:0;width:100%;height:100%;z-index:0;pointer-events:none}
+.art{position:relative;z-index:1;width:100%;height:100%;transform-style:preserve-3d;will-change:transform;--tiltx:0deg;--tilty:0deg;transform:perspective(900px) rotateX(var(--tiltx)) rotateY(var(--tilty));transition:transform .55s cubic-bezier(.2,.8,.2,1)}
+@media(hover:none){.art{transform:none}}
+/* Film timing: 10.4 seconds. One evolving object rather than many unrelated effects. */
+.art .world{transform-origin:220px 300px;animation:breath 10.4s cubic-bezier(.44,.05,.22,1) infinite}
+@keyframes breath{0%,100%{transform:translateY(4px) rotate(-1deg)}15%{transform:translateY(0) rotate(0)}40%,63%{transform:translateY(-8px) rotate(.45deg)}84%{transform:translateY(4px) rotate(-.4deg)}}
+.art .ambient-orbit{transform-origin:220px 288px;animation:orbitspin 17s linear infinite;opacity:.65}
+.art .orbital-upper{transform-origin:220px 292px;animation:orbitspin 22s linear infinite reverse}
+@keyframes orbitspin{to{transform:rotate(360deg)}}
+.art .open-flap{transform-origin:220px 310px;animation:flap 10.4s cubic-bezier(.16,.9,.22,1) infinite;will-change:transform,opacity}
+@keyframes flap{0%,9%{transform:scaleY(1);opacity:1}19%,73%{transform:scaleY(-1);opacity:.95}86%,100%{transform:scaleY(1);opacity:1}}
+.art .flap-crease{transform-origin:220px 310px;animation:crease 10.4s ease-in-out infinite}
+@keyframes crease{0%,9%,86%,100%{opacity:1}18%,72%{opacity:0}}
+.art .letter{transform-origin:220px 315px;animation:letterflight 10.4s cubic-bezier(.19,1,.22,1) infinite;will-change:transform,opacity}
+@keyframes letterflight{0%,11%{transform:translateY(79px) scale(.79) rotate(-3deg);opacity:.5}23%{transform:translateY(-9px) scale(1.02) rotate(1deg);opacity:1}32%{transform:translateY(-39px) scale(1.08) rotate(-1deg);opacity:1}44%,61%{transform:translateY(-44px) scale(1.08) rotate(0deg);opacity:1}69%{transform:translateY(-32px) scale(1.06)}82%{transform:translateY(70px) scale(.8) rotate(1deg);opacity:.8}88%,100%{transform:translateY(79px) scale(.79) rotate(-3deg);opacity:.5}}
+.art .letter-light{transform-origin:220px 272px;animation:paperLight 10.4s ease-in-out infinite}
+@keyframes paperLight{0%,14%,82%,100%{opacity:0;transform:scale(.72)}29%,59%{opacity:.85;transform:scale(1.18)}73%{opacity:.2;transform:scale(1.03)}}
+.art .halo{transform-origin:220px 256px;animation:haloOpen 10.4s cubic-bezier(.18,.8,.25,1) infinite}
+@keyframes haloOpen{0%,16%,80%,100%{opacity:0;transform:scale(.68) rotate(-18deg)}28%{opacity:.75;transform:scale(.98) rotate(0deg)}42%,64%{opacity:1;transform:scale(1.06) rotate(5deg)}72%{opacity:.6;transform:scale(1.12) rotate(8deg)}}
+.art .halo2{transform-origin:220px 257px;animation:halo2 10.4s ease-in-out infinite}
+@keyframes halo2{0%,17%,80%,100%{opacity:0;transform:scale(.5) rotate(25deg)}33%,62%{opacity:.7;transform:scale(1) rotate(-8deg)}74%{opacity:.1;transform:scale(1.15) rotate(-14deg)}}
+.art .seal{transform-origin:220px 220px;animation:sealAppear 10.4s cubic-bezier(.2,.9,.2,1) infinite}
+@keyframes sealAppear{0%,25%,78%,100%{opacity:0;transform:scale(.3) rotate(-35deg)}35%{opacity:.96;transform:scale(1.08) rotate(8deg)}45%,60%{opacity:1;transform:scale(1) rotate(0deg)}70%{opacity:.55;transform:scale(.85) rotate(0)}}
+.art .seal-check{stroke-dasharray:80;stroke-dashoffset:80;animation:drawcheck 10.4s ease-out infinite}
+@keyframes drawcheck{0%,31%{stroke-dashoffset:80}43%,73%{stroke-dashoffset:0}80%,100%{stroke-dashoffset:80}}
+.art .sweep{transform-origin:220px 284px;animation:sweep 10.4s cubic-bezier(.18,.8,.2,1) infinite}
+@keyframes sweep{0%,20%,82%,100%{opacity:0;transform:rotate(-30deg) scale(.65)}32%{opacity:.65;transform:rotate(2deg) scale(1)}54%,65%{opacity:.22;transform:rotate(45deg) scale(1.22)}77%{opacity:0;transform:rotate(85deg) scale(1.28)}}
+.art .glints{animation:glints 10.4s ease-in-out infinite}
+@keyframes glints{0%,20%,78%,100%{opacity:.08}34%,55%{opacity:1}67%{opacity:.5}}
+.art .star1{transform-origin:0 0;animation:twinkle1 3.6s ease-in-out infinite}
+.art .star2{transform-origin:0 0;animation:twinkle1 4.5s 1s ease-in-out infinite}
+@keyframes twinkle1{0%,100%{opacity:.3;transform:scale(.7)}50%{opacity:1;transform:scale(1.18)}}
+.art .base-light{transform-origin:220px 448px;animation:baseglow 10.4s ease-in-out infinite}
+@keyframes baseglow{0%,100%{opacity:.34;transform:scale(.8)}26%,66%{opacity:1;transform:scale(1.12)}}
+.art .shield-trace{animation:trace 10.4s ease-out infinite;stroke-dasharray:240;stroke-dashoffset:240}
+@keyframes trace{0%,30%{stroke-dashoffset:240}45%,72%{stroke-dashoffset:0}81%,100%{stroke-dashoffset:240}}
+.art .front-highlight{animation:shine 10.4s ease-in-out infinite}
+@keyframes shine{0%,10%,88%,100%{opacity:.35}26%,70%{opacity:.9}}
+.art .ripple{transform-origin:220px 280px;animation:ripple 10.4s ease-out infinite}
+@keyframes ripple{0%,24%,100%{opacity:0;transform:scale(.4)}34%{opacity:.55;transform:scale(1)}46%,81%{opacity:0;transform:scale(1.4)}}
+.art .line-run{animation:runline 10.4s linear infinite;stroke-dasharray:44 620}
+@keyframes runline{to{stroke-dashoffset:-664}}
+.art .core-shimmer{animation:coreShimmer 10.4s ease-in-out infinite}
+@keyframes coreShimmer{0%,10%,92%,100%{opacity:.15}30%,75%{opacity:.9}}
+.art .backdrop-glow{animation:backGlow 10.4s ease-in-out infinite}
+@keyframes backGlow{0%,100%{opacity:.3}25%,70%{opacity:.9}}
+/* Airy spectral arcs and their gleaming edges. These create physical depth without distracting UI. */
+.art .portal-core{transform-origin:220px 258px;animation:portal 10.4s cubic-bezier(.18,.75,.25,1) infinite}
+@keyframes portal{0%,15%,88%,100%{opacity:.05;transform:scale(.74) rotate(-12deg)}32%{opacity:.8;transform:scale(1.02) rotate(0deg)}47%,65%{opacity:1;transform:scale(1.07) rotate(5deg)}76%{opacity:.2;transform:scale(1.14) rotate(10deg)}}
+.art .prism-1{transform-origin:220px 258px;animation:prismSpin 16s linear infinite}
+.art .prism-2{transform-origin:220px 258px;animation:prismSpin 24s linear infinite reverse}
+@keyframes prismSpin{to{transform:rotate(360deg)}}
+.art .crystal-dust{animation:dustReveal 10.4s ease-in-out infinite}
+@keyframes dustReveal{0%,19%,82%,100%{opacity:0}34%,62%{opacity:.9}75%{opacity:.2}}
+.art .aurora-beams{animation:beamshow 10.4s ease-in-out infinite}
+@keyframes beamshow{0%,14%,88%,100%{opacity:0}31%{opacity:.5}49%,62%{opacity:.82}74%{opacity:.12}}
+.art .caustics{animation:caustics 10.4s ease-in-out infinite}
+@keyframes caustics{0%,20%,86%,100%{opacity:.05}36%,63%{opacity:.9}74%{opacity:.24}}
+.art .specular-wave{transform-origin:220px 257px;animation:specular 10.4s ease-in-out infinite}
+@keyframes specular{0%,24%,88%,100%{opacity:0;transform:translate(-50px,70px) rotate(-20deg)}40%{opacity:.45;transform:translate(0px,0px) rotate(0deg)}61%{opacity:.15;transform:translate(45px,-32px) rotate(12deg)}76%{opacity:0;transform:translate(76px,-50px) rotate(15deg)}}
+/* Optional visual feedback: artwork restarts its one complete cinematic sequence on tap. */
+.wrap.paused *{animation-play-state:paused!important}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}.art .letter{transform:translateY(-39px) scale(1.05)!important;opacity:1!important}.art .open-flap{transform:scaleY(-1)!important}.art .halo,.art .halo2,.art .seal{opacity:1!important;transform:none!important}.art .seal-check,.art .shield-trace{stroke-dashoffset:0!important}.art .letter-light{opacity:.6!important}}
+</style>
+</head>
+<body>
+<main class="wrap" tabindex="0" role="img" aria-label="Cinematic animated GrapMail sanctuary envelope. A sculpted sapphire-blue envelope opens, a white glass letter floats upward and a protective shield of light forms around it. Tap to replay.">
+<canvas id="field" aria-hidden="true"></canvas>
+<div class="art" id="art">
+<svg viewBox="0 0 440 560" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+<defs>
+ <radialGradient id="aura"><stop stop-color="#1575ef" stop-opacity=".34"/><stop offset=".45" stop-color="#0a48bf" stop-opacity=".14"/><stop offset="1" stop-color="#04112d" stop-opacity="0"/></radialGradient>
+ <radialGradient id="warm"><stop stop-color="#e6faff" stop-opacity=".55"/><stop offset=".22" stop-color="#78c9ff" stop-opacity=".22"/><stop offset=".7" stop-color="#1d78ff" stop-opacity=".07"/><stop offset="1" stop-color="#1d78ff" stop-opacity="0"/></radialGradient>
+ <radialGradient id="ground"><stop stop-color="#24b4ff" stop-opacity=".72"/><stop offset=".32" stop-color="#1269fa" stop-opacity=".32"/><stop offset="1" stop-color="#1273ff" stop-opacity="0"/></radialGradient>
+ <linearGradient id="bodyFace" x1=".08" y1=".08" x2=".86" y2="1"><stop stop-color="#60dcff"/><stop offset=".17" stop-color="#197dff"/><stop offset=".58" stop-color="#0651c5"/><stop offset="1" stop-color="#052b81"/></linearGradient>
+ <linearGradient id="metalBorder" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#f6feff"/><stop offset=".2" stop-color="#54d8ff"/><stop offset=".48" stop-color="#1d80ff"/><stop offset=".78" stop-color="#1461d5"/><stop offset="1" stop-color="#9eefff"/></linearGradient>
+ <linearGradient id="backPocket" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#143c8e"/><stop offset=".4" stop-color="#0b66da"/><stop offset="1" stop-color="#032458"/></linearGradient>
+ <linearGradient id="leftFold" x1="0" y1="0" x2=".9" y2="1"><stop stop-color="#87e6ff"/><stop offset=".15" stop-color="#188dff"/><stop offset=".7" stop-color="#095bc8"/><stop offset="1" stop-color="#092b7d"/></linearGradient>
+ <linearGradient id="rightFold" x1="1" y1="0" x2="0" y2="1"><stop stop-color="#6bdfff"/><stop offset=".15" stop-color="#126be7"/><stop offset=".73" stop-color="#0742a1"/><stop offset="1" stop-color="#03255d"/></linearGradient>
+ <linearGradient id="lowerFold" x1="0" y1="0" x2=".78" y2="1"><stop stop-color="#2aa7ff"/><stop offset=".36" stop-color="#0d72ec"/><stop offset=".66" stop-color="#0755cb"/><stop offset="1" stop-color="#04317d"/></linearGradient>
+ <linearGradient id="flapFront" x1=".1" y1="0" x2=".78" y2="1"><stop stop-color="#87e9ff"/><stop offset=".18" stop-color="#328cfa"/><stop offset=".68" stop-color="#0d56c7"/><stop offset="1" stop-color="#093b8f"/></linearGradient>
+ <linearGradient id="paper" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#ffffff"/><stop offset=".29" stop-color="#ecfaff"/><stop offset=".72" stop-color="#b8dfff"/><stop offset="1" stop-color="#84bafa"/></linearGradient>
+ <linearGradient id="paperRim" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#fff"/><stop offset=".5" stop-color="#90caff"/><stop offset="1" stop-color="#3b8aff"/></linearGradient>
+ <linearGradient id="gold" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#fff"/><stop offset=".4" stop-color="#e2fbff"/><stop offset=".8" stop-color="#8aceff"/><stop offset="1" stop-color="#e8f5ff"/></linearGradient>
+ <linearGradient id="rimIridescent" x1="0" y1="0" x2="1" y2=".9"><stop stop-color="#80caff"/><stop offset=".26" stop-color="#c8eaff"/><stop offset=".53" stop-color="#2e89ff"/><stop offset=".78" stop-color="#d4bbff"/><stop offset="1" stop-color="#57ebff"/></linearGradient>
+ <linearGradient id="flightBeam" x1="0" y1="0" x2="1" y2="0"><stop stop-color="#40b9ff" stop-opacity="0"/><stop offset=".4" stop-color="#d6ffff" stop-opacity=".95"/><stop offset="1" stop-color="#2f92ff" stop-opacity="0"/></linearGradient>
+ <linearGradient id="glassShine" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#fff" stop-opacity=".55"/><stop offset=".28" stop-color="#fff" stop-opacity=".11"/><stop offset=".56" stop-color="#fff" stop-opacity="0"/></linearGradient>
+ <radialGradient id="portalFill"><stop stop-color="#80c9ff" stop-opacity=".11"/><stop offset=".63" stop-color="#84bfff" stop-opacity=".035"/><stop offset=".81" stop-color="#4b99ff" stop-opacity=".018"/><stop offset=".96" stop-color="#8cc7ff" stop-opacity=".07"/><stop offset="1" stop-color="#a5e6ff" stop-opacity=".23"/></radialGradient>
+ <linearGradient id="prism" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#efffff" stop-opacity=".95"/><stop offset=".18" stop-color="#96e3ff" stop-opacity=".26"/><stop offset=".35" stop-color="#2979fd" stop-opacity=".1"/><stop offset=".68" stop-color="#caabff" stop-opacity=".7"/><stop offset=".82" stop-color="#8fdaff" stop-opacity=".2"/><stop offset="1" stop-color="#88e9ff" stop-opacity=".88"/></linearGradient>
+ <radialGradient id="auroraBeam"><stop stop-color="#a9eaff" stop-opacity=".5"/><stop offset=".4" stop-color="#4589ff" stop-opacity=".12"/><stop offset="1" stop-color="#3b70ff" stop-opacity="0"/></radialGradient>
+ <linearGradient id="edgeA" x1="0" y1="0" x2="1" y2="0"><stop stop-color="#3e7df8" stop-opacity="0"/><stop offset=".48" stop-color="#b8f7ff" stop-opacity=".9"/><stop offset="1" stop-color="#3e7df8" stop-opacity="0"/></linearGradient>
+ <filter id="blur12" x="-100%" y="-100%" width="300%" height="300%"><feGaussianBlur stdDeviation="12"/></filter>
+ <filter id="blur22" x="-100%" y="-100%" width="300%" height="300%"><feGaussianBlur stdDeviation="22"/></filter>
+ <filter id="blur5" x="-100%" y="-100%" width="300%" height="300%"><feGaussianBlur stdDeviation="5"/></filter>
+ <filter id="drop" x="-70%" y="-90%" width="240%" height="280%"><feDropShadow dx="0" dy="14" stdDeviation="16" flood-color="#00112d" flood-opacity=".85"/></filter>
+ <filter id="edgeglow" x="-100%" y="-100%" width="300%" height="300%"><feGaussianBlur stdDeviation="3"/></filter>
+ <clipPath id="clipEnv"><rect x="56" y="308" width="328" height="146" rx="24"/></clipPath>
+</defs>
+<!-- Deep space diffusion. Never a conventional UI panel. -->
+<ellipse class="backdrop-glow" cx="220" cy="270" rx="205" ry="231" fill="url(#aura)"/>
+<ellipse class="backdrop-glow" cx="220" cy="272" rx="146" ry="150" fill="url(#warm)" opacity=".4"/>
+<path d="M 90 83 Q 220 8 352 84" fill="none" stroke="#85beff" stroke-opacity=".13" stroke-width="1"/>
+<path d="M 73 86 Q 220 -5 368 88" fill="none" stroke="#76c7ff" stroke-opacity=".08" stroke-width="1"/>
+<!-- Light sculpture: an opalescent glass portal hovering behind the envelope. -->
+<g class="aurora-beams">
+ <path d="M190 80 Q220 30 250 80 L329 381 Q220 468 112 378Z" fill="url(#auroraBeam)" opacity=".28"/>
+ <ellipse cx="220" cy="268" rx="168" ry="192" fill="url(#portalFill)" filter="url(#blur22)"/>
+</g>
+<g class="portal-core">
+ <circle cx="220" cy="257" r="154" fill="url(#portalFill)" stroke="url(#prism)" stroke-opacity=".34" stroke-width="1.25"/>
+ <circle cx="220" cy="257" r="147" stroke="#bce7ff" stroke-opacity=".13" stroke-width=".7"/>
+ <path d="M90 177 Q119 107 218 104 Q292 101 338 168" fill="none" stroke="url(#prism)" stroke-opacity=".85" stroke-width="2.5" stroke-linecap="round"/>
+ <path d="M342 332 Q288 412 202 411 Q117 408 90 339" fill="none" stroke="url(#prism)" stroke-opacity=".45" stroke-width="1.4" stroke-linecap="round"/>
+ <g class="prism-1"><circle cx="220" cy="257" r="159" fill="none" stroke="url(#prism)" stroke-width="1.5" stroke-dasharray="57 940" stroke-linecap="round"/></g>
+ <g class="prism-2"><circle cx="220" cy="257" r="141" fill="none" stroke="#72cbff" stroke-opacity=".58" stroke-width="1" stroke-dasharray="3 36 12 490"/></g>
+</g>
+<!-- Holographic moving orbits and light ripples -->
+<g class="ambient-orbit">
+<ellipse cx="220" cy="294" rx="202" ry="81" transform="rotate(-24 220 294)" fill="none" stroke="#1c7bff" stroke-width="1.15" stroke-opacity=".46"/>
+<ellipse cx="220" cy="294" rx="202" ry="81" transform="rotate(-24 220 294)" fill="none" stroke="#9eeeff" stroke-width="1.6" stroke-dasharray="1 630" stroke-linecap="round" opacity=".95"/>
+</g>
+<g class="orbital-upper">
+<ellipse cx="220" cy="292" rx="173" ry="65" transform="rotate(19 220 292)" fill="none" stroke="#75c5ff" stroke-width=".85" stroke-opacity=".18" stroke-dasharray="3 9"/>
+</g>
+<g class="ripple"><circle cx="220" cy="271" r="125" fill="none" stroke="#91dfff" stroke-opacity=".7" stroke-width="1.5"/><circle cx="220" cy="271" r="144" fill="none" stroke="#007cff" stroke-opacity=".35"/></g>
+<!-- Glancing light as the letter clears the envelope. -->
+<g class="specular-wave">
+ <path d="M 42 287 Q 217 159 393 238" fill="none" stroke="url(#prism)" stroke-width="1.5"/>
+ <path d="M 72 306 Q 220 182 372 281" fill="none" stroke="#8fe0ff" stroke-opacity=".25" stroke-width="7" filter="url(#blur5)"/>
+</g>
+<g class="crystal-dust" fill="none" stroke="url(#prism)" stroke-linejoin="round">
+ <path d="M84 202 l6 -12 6 12 -6 10Z" stroke-width="1.15"/>
+ <path d="M352 190 l4 -9 5 9 -5 9Z" stroke-width="1"/>
+ <path d="M338 326 l5 -9 5 9 -5 10Z" stroke-width="1.2"/>
+ <path d="M112 350 l3 -6 4 6 -4 8Z" stroke-width="1"/>
+ <path d="M283 117 l3 -5 3 5 -3 6Z" stroke-width=".9"/>
+</g>
+<!-- Floor light + soft physical shadow -->
+<g class="base-light">
+<ellipse cx="220" cy="463" rx="162" ry="23" fill="url(#ground)" filter="url(#blur12)"/>
+<ellipse cx="220" cy="463" rx="123" ry="2.8" fill="#28acff" filter="url(#blur5)"/>
+<ellipse cx="220" cy="457" rx="102" ry="3" fill="#74e5ff" opacity=".7"/>
+</g>
+<g class="world">
+<!-- protection aura starts behind envelope but above world background -->
+<g class="halo2">
+<circle cx="220" cy="253" r="138" stroke="#8fbcff" stroke-opacity=".11" stroke-width="13" fill="none" filter="url(#blur5)"/>
+<circle cx="220" cy="253" r="136" stroke="url(#rimIridescent)" stroke-width=".8" stroke-opacity=".48" fill="none"/>
+<ellipse cx="220" cy="253" rx="143" ry="67" transform="rotate(-29 220 253)" stroke="#5ac6ff" stroke-opacity=".36" fill="none"/>
+</g>
+<g class="halo">
+<circle cx="220" cy="252" r="104" fill="url(#warm)" opacity=".5"/>
+<circle cx="220" cy="252" r="108" stroke="#8cd8ff" stroke-width=".7" stroke-opacity=".8" fill="none" stroke-dasharray="4 13"/>
+<circle cx="220" cy="252" r="117" stroke="#208aff" stroke-width="2.5" stroke-opacity=".24" fill="none" filter="url(#edgeglow)"/>
+<path d="M220 115 C 287 150 326 155 324 232 C321 293 286 332 220 363 C154 332 119 293 116 232 C114 155 153 150 220 115Z" fill="#49b5ff" fill-opacity=".018" stroke="#a6e6ff" stroke-opacity=".22" stroke-width="1.15"/>
+<path class="shield-trace" d="M220 135 Q290 170 307 175 L307 244 Q304 294 220 342 Q136 294 133 244 L133 175 Q158 162 220 135" fill="none" stroke="#bfeeff" stroke-width="1.6" stroke-linecap="round" stroke-opacity=".75"/>
+</g>
+<!-- rear envelope, sculpted edge -->
+<g filter="url(#drop)">
+ <path d="M60 315 L203 220 Q220 208 237 220 L380 315 L380 419 Q380 450 351 452 L88 452 Q59 450 59 419Z" fill="url(#backPocket)" stroke="url(#metalBorder)" stroke-width="2"/>
+ <path d="M63 316 L220 407 L376 316" fill="none" stroke="#86e1ff" stroke-opacity=".38" stroke-width="1.5"/>
+</g>
+<!-- Fold opens first, behind paper -->
+<g class="open-flap">
+<path d="M59 310 L220 403 L381 310Z" fill="url(#flapFront)" stroke="url(#metalBorder)" stroke-width="1.6"/>
+<path d="M65 313 L220 399 L375 313" fill="none" stroke="#cbfbff" stroke-opacity=".55" stroke-width="1"/>
+</g>
+<!-- inner light beam behind letter -->
+<g class="letter-light">
+ <ellipse cx="220" cy="271" rx="93" ry="165" fill="url(#warm)" filter="url(#blur22)"/>
+ <path d="M220 439 L165 130 L275 130 Z" fill="#98eaff" opacity=".17" filter="url(#blur22)"/>
+ <path d="M220 435 L197 114 L240 114 Z" fill="#c0faff" opacity=".19" filter="url(#blur12)"/>
+</g>
+<!-- Floatable glass-white letter. All text replaced by crafted symbols. -->
+<g class="letter" filter="url(#drop)">
+  <rect x="138" y="182" width="164" height="180" rx="15" fill="#73bfff" opacity=".32" filter="url(#blur12)"/>
+  <rect x="137" y="179" width="166" height="183" rx="14" fill="url(#paper)" stroke="url(#paperRim)" stroke-width="2.2"/>
+  <rect x="145" y="187" width="150" height="166" rx="9" fill="none" stroke="#fff" stroke-opacity=".75" stroke-width="1"/>
+  <path d="M151 191 H289 L268 206 H158Z" fill="#fff" opacity=".32"/>
+  <path d="M161 320 H280" stroke="#72ace5" stroke-opacity=".45" stroke-width="2" stroke-linecap="round"/>
+  <path d="M173 333 H265" stroke="#72ace5" stroke-opacity=".29" stroke-width="2" stroke-linecap="round"/>
+  <path d="M183 345 H252" stroke="#72ace5" stroke-opacity=".2" stroke-width="1.5" stroke-linecap="round"/>
+  <!-- embossed seal -->
+  <circle cx="220" cy="253" r="35" fill="#d5ecff" fill-opacity=".45" stroke="#fff" stroke-opacity=".86" stroke-width="1.2"/>
+  <circle cx="220" cy="253" r="29" fill="none" stroke="#6bafff" stroke-opacity=".5" stroke-width=".9"/>
+  <path d="M220 233 L238 241 V256 Q238 272 220 280 Q202 272 202 256 V241 Z" fill="#5d9cea" fill-opacity=".14" stroke="#499bef" stroke-width="2.4" stroke-linejoin="round"/>
+  <path d="M211 254 L218 261 L230 248" stroke="#418fe8" stroke-width="3.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M145 194 L156 185" stroke="#fff" stroke-opacity=".84" stroke-width="2"/>
+  <path d="M289 348 L297 338" stroke="#6fbaff" stroke-opacity=".8" stroke-width="2"/>
+  <path d="M146 201 V330" stroke="#fff" stroke-opacity=".18" stroke-width="2"/>
+  <rect x="137" y="179" width="166" height="183" rx="14" fill="url(#glassShine)"/>
+</g>
+<!-- Atmospheric protective sigil appears above letter, during open state -->
+<g class="seal">
+ <circle cx="220" cy="111" r="43" fill="#66b8ff" opacity=".23" filter="url(#blur12)"/>
+ <circle cx="220" cy="111" r="38" fill="#08274c" fill-opacity=".42" stroke="url(#rimIridescent)" stroke-width="1.5"/>
+ <circle cx="220" cy="111" r="31" fill="none" stroke="#7acaff" stroke-opacity=".37" stroke-width="1" stroke-dasharray="3 5"/>
+ <path d="M220 89 L238 97 V111 Q237 126 220 134 Q203 126 202 111 V97Z" fill="#4dbaff" fill-opacity=".14" stroke="#e1fbff" stroke-width="2" stroke-linejoin="round"/>
+ <path class="seal-check" d="M209 111 L218 120 L231 105" fill="none" stroke="#eaffff" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/>
+</g>
+<!-- Glass side wings: move with envelope body and stay in front of letter -->
+<g class="core-shimmer">
+ <path d="M56 321 L70 309 L220 398 L370 309 L384 321 L220 415Z" fill="#8ecfff" fill-opacity=".13" filter="url(#blur5)"/>
+</g>
+<!-- Front folded envelope -->
+<g>
+ <path d="M59 310 L218 408 L59 439 Q56 430 56 416 L56 332 Q56 318 59 310Z" fill="url(#leftFold)" stroke="#8cddff" stroke-opacity=".6" stroke-width="1.4"/>
+ <path d="M381 310 L222 408 L381 439 Q384 430 384 416 L384 332 Q384 318 381 310Z" fill="url(#rightFold)" stroke="#72d7ff" stroke-opacity=".6" stroke-width="1.4"/>
+ <path d="M62 437 L211 395 Q220 392 229 395 L378 437 Q371 454 351 454 H89 Q69 454 62 437Z" fill="url(#lowerFold)" stroke="url(#metalBorder)" stroke-width="1.8"/>
+ <path d="M60 313 L208 402 Q220 411 232 402 L380 313" fill="none" stroke="#a5f0ff" stroke-opacity=".78" stroke-width="1.7"/>
+ <path d="M62 436 L212 396 Q220 392 228 396 L378 436" fill="none" stroke="#abedff" stroke-opacity=".43" stroke-width="1.1"/>
+ <path class="front-highlight" d="M66 328 Q68 324 75 328 L182 397" fill="none" stroke="#e5ffff" stroke-opacity=".33" stroke-width="2.2" stroke-linecap="round"/>
+ <path d="M60 413 Q62 448 91 449 L349 449 Q377 448 379 418" fill="none" stroke="#69d2ff" stroke-opacity=".3" stroke-width="1.5"/>
+ <path d="M78 450 H350" fill="none" stroke="url(#edgeA)" stroke-width="1"/>
+</g>
+<!-- Etched illumination and translucent caustics on sculpted folds. -->
+<g class="caustics" clip-path="url(#clipEnv)">
+ <path d="M25 315 L180 418 L180 432 L40 357Z" fill="#ffffff" fill-opacity=".05"/>
+ <path d="M404 323 L270 407 L279 432 L415 355Z" fill="#9bdfff" fill-opacity=".075"/>
+ <path d="M-10 452 Q130 405 262 454" stroke="#b5f7ff" stroke-opacity=".14" stroke-width="20" fill="none" filter="url(#blur12)"/>
+ <path d="M80 438 H365" stroke="url(#prism)" stroke-opacity=".23" stroke-width="1.8"/>
+</g>
+<!-- Travelling reflections and pinpoint stars -->
+<g class="sweep"><ellipse cx="220" cy="280" rx="168" ry="56" transform="rotate(-22 220 280)" fill="none" stroke="url(#flightBeam)" stroke-width="3" opacity=".5" filter="url(#edgeglow)"/></g>
+<g class="glints">
+ <g transform="translate(100 303)" class="star1"><path d="M0 -13 V13 M-13 0 H13" stroke="#eafaff" stroke-width="1.3" stroke-linecap="round"/><circle r="2" fill="#fff"/></g>
+ <g transform="translate(342 363)" class="star2"><path d="M0 -10 V10 M-10 0 H10" stroke="#d6faff" stroke-width="1.2" stroke-linecap="round"/><circle r="1.5" fill="#fff"/></g>
+ <circle cx="345" cy="235" r="3" fill="#f3ffff" filter="url(#edgeglow)"/>
+</g>
+</g><!--world-->
+</svg>
+</div>
+</main>
+<script>
+(()=>{
+ const root=document.querySelector('.wrap');
+ const art=document.querySelector('#art');
+ const canvas=document.querySelector('#field');
+ const ctx=canvas.getContext('2d',{alpha:true});
+ const reduced=matchMedia('(prefers-reduced-motion: reduce)');
+ const points=Array.from({length:43},(_,i)=>({
+  x:((Math.sin(i*29.73+7.1)*43758.5453)%1+1)%1,
+  y:((Math.sin(i*11.27+9.3)*12734.771)%1+1)%1,
+  phase:i*1.37, size:i%7===0?1.25:.65,
+  speed:.12+.065*(i%4)
+ }));
+ let w=440,h=560,last=0,playing=!reduced.matches;
+ function resize(){
+  const r=root.getBoundingClientRect();w=(r.width&&r.width>0)?r.width:440;h=(r.height&&r.height>0)?r.height:560;
+  const scale=Math.min(2,devicePixelRatio||1);
+  canvas.width=Math.round(w*scale);canvas.height=Math.round(h*scale);
+  ctx.setTransform(scale,0,0,scale,0,0);
+ }
+ new ResizeObserver(resize).observe(root); resize();
+ function paint(t){
+  ctx.clearRect(0,0,w,h);
+  if(!reduced.matches){
+    for(const p of points){
+      const yy=(p.y+(t*.000012*p.speed))%1;
+      const a=.14+Math.pow(.5+.5*Math.sin(t*.0011+p.phase),2)*.41;
+      ctx.beginPath();ctx.fillStyle=`rgba(157,215,255,${a.toFixed(3)})`;
+      ctx.arc(p.x*w,yy*h,p.size*w/440,0,6.283);ctx.fill();
+    }
+  }else{for(const p of points){ctx.beginPath();ctx.fillStyle='rgba(157,215,255,.22)';ctx.arc(p.x*w,p.y*h,p.size*w/440,0,6.283);ctx.fill()}}
+  last=t;if(playing)requestAnimationFrame(paint);
+ }
+ if(playing)requestAnimationFrame(paint);else paint(0);
+ const restart=()=>{if(reduced.matches)return;art.style.animation='none';const anims=art.querySelectorAll('*');for(const el of anims){el.style.animation='none'}void art.offsetWidth;art.style.removeProperty('animation');for(const el of anims){el.style.removeProperty('animation')}};
+ root.addEventListener('click',restart);
+ root.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();restart()}});
+ if(matchMedia('(hover:hover) and (pointer:fine)').matches){
+ root.addEventListener('pointermove',e=>{const r=root.getBoundingClientRect();const x=(e.clientX-r.left)/r.width-.5,y=(e.clientY-r.top)/r.height-.5;art.style.setProperty('--tiltx',`${(-y*3.8).toFixed(2)}deg`);art.style.setProperty('--tilty',`${(x*4.6).toFixed(2)}deg`)});
+ root.addEventListener('pointerleave',()=>{art.style.setProperty('--tiltx','0deg');art.style.setProperty('--tilty','0deg')});
+ }
+ reduced.addEventListener('change',e=>{playing=!e.matches;if(playing)requestAnimationFrame(paint);else paint(last)})
+})();
+</script>
+</body>
+</html>

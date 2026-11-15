@@ -322,7 +322,7 @@ fun CodeCells(
                         keyboardType = if (alphanumeric) KeyboardType.Ascii else KeyboardType.NumberPassword,
                         capitalization = if (alphanumeric) KeyboardCapitalization.Characters else KeyboardCapitalization.None,
                     ),
-                    cursorBrush = SolidColor(palette.primarySolid),
+                    cursorBrush = SolidColor(palette.cursor),
                     singleLine = true,
                 )
             }

@@ -17,6 +17,7 @@ import okhttp3.MultipartBody
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
+import okhttp3.RequestBody.Companion.asRequestBody
 import okhttp3.Response
 import java.io.IOException
 import java.net.URLEncoder
@@ -184,7 +185,50 @@ import kotlin.coroutines.resumeWithException
         }
 }
 
-class ApiException(val status: Int, val code: String?, message: String) : Exception(message)
+class ApiException(val status: Int, val code: String?, message: String) :
+    Exception(apiErrorMessage(status, code)) {
+    init {
+        android.util.Log.w("GrapMailApi", "HTTP $status; reason returned=${message.isNotBlank()}")
+    }
+}
+
+private fun apiErrorMessage(status: Int, code: String?): String = when (code) {
+    "TOO_MANY_ATTEMPTS" -> "Too many failed attempts. Try again in about 15 minutes."
+    "RATE_LIMITED" -> "Too many requests. Try again in a few minutes."
+    "WRONG_PASSWORD" -> "Check your password and try again."
+    "INVALID_CREDENTIALS" -> "Check your email address and password."
+    "WEAK_PASSWORD" -> "Use at least 8 characters with a letter, a number and a symbol."
+    "INVALID_RESET_CHALLENGE" -> "Request a new password reset code and try again."
+    "TWO_FACTOR_REJECTED" -> "Check your verification code and try again."
+    "INVALID_PHONE" -> "Check the phone number and country code."
+    "PHONE_IN_USE" -> "That phone number is already linked to another account."
+    "PHONE_NOT_VERIFIED" -> "Verify your phone number to continue."
+    "PHONE_PROOF_REQUIRED" -> "Verify your phone number to continue."
+    "NO_RECOVERY_CHANNEL" -> "There is no verified recovery method for this account."
+    "SMS_DELIVERY_UNAVAILABLE" -> "The code could not be sent. Try again in a moment."
+    "BAD_ADDRESS" -> "Check the email address and try again."
+    "ADDRESS_REJECTED" -> "That email address is unavailable."
+    "ALIAS_REJECTED" -> "That email address is unavailable."
+    "NO_RECIPIENT" -> "Add at least one recipient."
+    "TOO_MANY_RECIPIENTS" -> "Remove some recipients and try again."
+    "EMPTY_BODY" -> "Write a message before sending."
+    "QUOTA_EXCEEDED" -> "Your mailbox is full. Free up some storage and try again."
+    "BODY_TOO_LARGE" -> "Shorten your message or remove large attachments."
+    "TOO_LARGE" -> "Choose a smaller file and try again."
+    "CANNOT_REVOKE_CURRENT" -> "Sign out to end this session."
+    "TWOFA_REQUIRED_FOR_BACKUP_CODES" -> "Turn on two-step verification to use backup codes."
+    "NO_MAILBOX" -> "Your GrapMail inbox is not ready yet."
+    else -> when (status) {
+        401 -> "Check your sign-in details or sign in again."
+        403 -> "This action is unavailable for your account."
+        404 -> "This item is no longer available."
+        409 -> "Refresh and try again."
+        413 -> "Choose a smaller file and try again."
+        429 -> "Too many requests. Try again in a few minutes."
+        in 500..599 -> "GrapMail is temporarily unavailable. Try again in a moment."
+        else -> "Please try again."
+    }
+}
 
 // ── Recovery & security ─────────────────────────────────────────────────────
 
@@ -699,14 +743,16 @@ object Api {
         continuation.invokeOnCancellation { call.cancel() }
         call.enqueue(object : Callback {
             override fun onFailure(call: Call, e: IOException) {
-                continuation.resumeWithException(e)
+                android.util.Log.w("GrapMailApi", "Network request failed: ${e.javaClass.simpleName}")
+                continuation.resumeWithException(IOException("Check your connection and try again.", e))
             }
 
             override fun onResponse(call: Call, response: Response) {
                 val result = try {
                     response.use(readBody)
                 } catch (e: Exception) {
-                    continuation.resumeWithException(e)
+                    android.util.Log.w("GrapMailApi", "Response read failed: ${e.javaClass.simpleName}")
+                    continuation.resumeWithException(IOException("Could not read the response. Try again.", e))
                     return
                 }
                 continuation.resume(result)
@@ -736,6 +782,17 @@ object Api {
         throw ApiException(status, code, message)
     }
 
+    private inline fun <reified T> decodeResponse(body: String): T =
+        decodeResponse(kotlinx.serialization.serializer<T>(), body)
+
+    @OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
+    private fun <T> decodeResponse(strategy: kotlinx.serialization.DeserializationStrategy<T>, body: String): T = try {
+        json.decodeFromString(strategy, body)
+    } catch (e: kotlinx.serialization.SerializationException) {
+        android.util.Log.w("GrapMailApi", "Could not decode ${strategy.descriptor.serialName}")
+        throw IOException("Could not read the response. Try again.", e)
+    }
+
     private fun kotlinx.serialization.json.JsonElement.jsonObjectOrNull() =
         this as? kotlinx.serialization.json.JsonObject
 
@@ -748,7 +805,7 @@ object Api {
             .get().build()
         val (status, body) = execute(req)
         if (status >= 400) fail(status, body)
-        return json.decodeFromString<CheckResponse>(body)
+        return decodeResponse<CheckResponse>(body)
     }
 
     suspend fun createAccount(req: CreateRequest): CreateResponse {
@@ -759,7 +816,7 @@ object Api {
             .build()
         val (status, body) = execute(request)
         if (status >= 400) fail(status, body)
-        return json.decodeFromString<CreateResponse>(body)
+        return decodeResponse<CreateResponse>(body)
     }
 
     suspend fun signIn(identifier: String, password: String): SignInResponse {
@@ -771,11 +828,11 @@ object Api {
         val (status, body) = execute(request)
         // Only this precise 403 shape is a challenge. Throttles and other 403s still fail.
         if (status == 403) {
-            val challenge = runCatching { json.decodeFromString<SignInResponse>(body) }.getOrNull()
+            val challenge = runCatching { decodeResponse<SignInResponse>(body) }.getOrNull()
             if (challenge?.emailOtpRequired == true) return challenge
         }
         if (status >= 400) fail(status, body)
-        return json.decodeFromString<SignInResponse>(body)
+        return decodeResponse<SignInResponse>(body)
     }
 
     suspend fun verifyEmailOtp(email: String, otp: String): SignInResponse {
@@ -785,7 +842,7 @@ object Api {
         }
         return read(Request.Builder().url("$AUTH/verify-otp")
             .header("x-device-id", DeviceId.value).post(postBody(payload.toString())).build()) {
-            json.decodeFromString<SignInResponse>(it)
+            decodeResponse<SignInResponse>(it)
         }
     }
 
@@ -795,7 +852,7 @@ object Api {
         }
         return read(Request.Builder().url("$AUTH/resend-otp")
             .header("x-device-id", DeviceId.value).post(postBody(payload.toString())).build()) {
-            json.decodeFromString<ActionResponse>(it)
+            decodeResponse<ActionResponse>(it)
         }
     }
 
@@ -819,7 +876,7 @@ object Api {
             .build()
         val (status, body) = execute(request, refreshClient)
         if (status >= 400) fail(status, body)
-        return json.decodeFromString<SignInResponse>(body)
+        return decodeResponse<SignInResponse>(body)
     }
 
     suspend fun twoFactorCode(challengeId: String, code: String): TwoFactorResponse =
@@ -842,7 +899,7 @@ object Api {
             .build()
         val (status, body) = execute(request)
         if (status >= 400) fail(status, body)
-        return json.decodeFromString<ForgotPasswordResponse>(body)
+        return decodeResponse<ForgotPasswordResponse>(body)
     }
 
     /** Step 2: the code and the new password are checked together, by design. */
@@ -861,7 +918,7 @@ object Api {
             .build()
         val (status, body) = execute(request)
         if (status >= 400) fail(status, body)
-        return json.decodeFromString<ResetPasswordResponse>(body)
+        return decodeResponse<ResetPasswordResponse>(body)
     }
 
     /** Phone -> partially hidden GrapMail address. Never returns the full one. */
@@ -873,7 +930,7 @@ object Api {
             .build()
         val (status, body) = execute(request)
         if (status >= 400) fail(status, body)
-        return json.decodeFromString<FindAddressResponse>(body)
+        return decodeResponse<FindAddressResponse>(body)
     }
 
     suspend fun startPhoneVerification(phone: String): PhoneStartResponse {
@@ -884,7 +941,7 @@ object Api {
             .build()
         val (status, body) = execute(request)
         if (status >= 400) fail(status, body)
-        return json.decodeFromString<PhoneStartResponse>(body)
+        return decodeResponse<PhoneStartResponse>(body)
     }
 
     suspend fun verifyPhone(challengeId: String, code: String, token: String? = null): PhoneVerifyResponse {
@@ -906,7 +963,7 @@ object Api {
             .build()
         val (status, body) = execute(request)
         if (status >= 400) fail(status, body)
-        return json.decodeFromString<PhoneVerifyResponse>(body)
+        return decodeResponse<PhoneVerifyResponse>(body)
     }
 
     /**
@@ -923,7 +980,7 @@ object Api {
             .build()
         val (status, body) = execute(request)
         if (status >= 400) fail(status, body)
-        return json.decodeFromString<LinkPhoneResponse>(body)
+        return decodeResponse<LinkPhoneResponse>(body)
     }
 
     private suspend fun twoFactor(payload: TwoFactorRequest): TwoFactorResponse {
@@ -934,7 +991,7 @@ object Api {
             .build()
         val (status, body) = execute(request)
         if (status >= 400) fail(status, body)
-        return json.decodeFromString<TwoFactorResponse>(body)
+        return decodeResponse<TwoFactorResponse>(body)
     }
 
     // ── Security sector ─────────────────────────────────────────────────────
@@ -951,7 +1008,7 @@ object Api {
     }
 
     suspend fun profile(token: String): ProfileResponse = read(authed("$AUTH/account/profile", token).get().build()) {
-        json.decodeFromString<ProfileResponse>(it)
+        decodeResponse<ProfileResponse>(it)
     }
 
     /**
@@ -968,12 +1025,12 @@ object Api {
         val req = authed("$AUTH/account/profile", token)
             .method("PATCH", postBody(jsonSparse.encodeToString(ProfilePatch.serializer(), patch)))
             .build()
-        return read(req) { json.decodeFromString<ProfileResponse>(it) }
+        return read(req) { decodeResponse<ProfileResponse>(it) }
     }
 
     /**
      * The profile photo, as multipart — the same field name (`file`) and the
-     * same 256 KB ceiling the route enforces (`auth-account-profile.ts:256`).
+     * same 10 MB ceiling the route enforces (`auth-account-profile.ts`).
      * The answer's `avatarUrl` carries a cache nonce; storing it is what makes a
      * replaced photo show immediately instead of after a kill and relaunch.
      */
@@ -982,13 +1039,13 @@ object Api {
             .addFormDataPart("file", filename, bytes.toRequestBody(mime.toMediaType()))
             .build()
         return read(authed("$AUTH/account/avatar", token).post(body).build()) {
-            json.decodeFromString<AvatarResponse>(it)
+            decodeResponse<AvatarResponse>(it)
         }
     }
 
     suspend fun deleteAvatar(token: String): AvatarResponse {
         val req = authed("$AUTH/account/avatar", token).delete().build()
-        return read(req) { json.decodeFromString<AvatarResponse>(it) }
+        return read(req) { decodeResponse<AvatarResponse>(it) }
     }
 
     /**
@@ -1012,28 +1069,28 @@ object Api {
                 TwoFactorEnableRequest("on", proof ?: "", phoneProof ?: ""),
             )))
             .build()
-        return read(req) { json.decodeFromString<ProfileResponse>(it) }
+        return read(req) { decodeResponse<ProfileResponse>(it) }
     }
 
     suspend fun disableTwoFactor(token: String, password: String): ProfileResponse {
         val req = authed("$AUTH/account/profile", token)
             .patch(postBody(json.encodeToString(TwoFactorDisableRequest.serializer(), TwoFactorDisableRequest("off", password))))
             .build()
-        return read(req) { json.decodeFromString<ProfileResponse>(it) }
+        return read(req) { decodeResponse<ProfileResponse>(it) }
     }
 
     suspend fun changePassword(token: String, currentPassword: String, newPassword: String): ProfileResponse {
         val req = authed("$AUTH/account/profile", token)
             .patch(postBody(json.encodeToString(PasswordChangeRequest.serializer(), PasswordChangeRequest(currentPassword, newPassword))))
             .build()
-        return read(req) { json.decodeFromString<ProfileResponse>(it) }
+        return read(req) { decodeResponse<ProfileResponse>(it) }
     }
 
     suspend fun generateBackupCodes(token: String): ProfileResponse {
         val req = authed("$AUTH/account/profile", token)
             .patch(postBody(json.encodeToString(BackupCodesRequest.serializer(), BackupCodesRequest(true))))
             .build()
-        return read(req) { json.decodeFromString<ProfileResponse>(it) }
+        return read(req) { decodeResponse<ProfileResponse>(it) }
     }
 
     /** Signs every OTHER device out. The token passed here stays valid. */
@@ -1041,27 +1098,27 @@ object Api {
         val req = authed("$AUTH/account/profile", token)
             .patch(postBody(json.encodeToString(SignOutEverywhereRequest.serializer(), SignOutEverywhereRequest(true))))
             .build()
-        return read(req) { json.decodeFromString<ProfileResponse>(it) }
+        return read(req) { decodeResponse<ProfileResponse>(it) }
     }
 
     suspend fun verifyPassword(token: String, password: String): ProfileResponse {
         val req = authed("$AUTH/account/verify-password", token)
             .post(postBody(json.encodeToString(VerifyPasswordRequest.serializer(), VerifyPasswordRequest(password))))
             .build()
-        return read(req) { json.decodeFromString<ProfileResponse>(it) }
+        return read(req) { decodeResponse<ProfileResponse>(it) }
     }
 
     suspend fun sessions(token: String): SessionsResponse = read(authed("$AUTH/account/sessions", token).get().build()) {
-        json.decodeFromString<SessionsResponse>(it)
+        decodeResponse<SessionsResponse>(it)
     }
 
     suspend fun revokeSession(token: String, id: String): ProfileResponse {
         val url = "$AUTH/account/sessions?id=" + URLEncoder.encode(id, "UTF-8")
-        return read(authed(url, token).delete().build()) { json.decodeFromString<ProfileResponse>(it) }
+        return read(authed(url, token).delete().build()) { decodeResponse<ProfileResponse>(it) }
     }
 
     suspend fun activity(token: String): ActivityResponse = read(authed("$AUTH/account/activity", token).get().build()) {
-        json.decodeFromString<ActivityResponse>(it)
+        decodeResponse<ActivityResponse>(it)
     }
 
     /** "This sign-in was me": recorded, not deleted, so the alert can clear honestly. */
@@ -1069,7 +1126,7 @@ object Api {
         val req = authed("$AUTH/account/activity", token)
             .post(postBody("{}"))
             .build()
-        return read(req) { json.decodeFromString<ProfileResponse>(it) }
+        return read(req) { decodeResponse<ProfileResponse>(it) }
     }
 
     // ── Mailbox sector ───────────────────────────────────────────────────────
@@ -1091,15 +1148,25 @@ object Api {
     private fun enc(v: String) = URLEncoder.encode(v, "UTF-8")
 
     suspend fun mailMe(token: String): MailMeResponse =
-        read(authed("$MAIL/me", token).get().build()) { json.decodeFromString(it) }
+        read(authed("$MAIL/me", token).get().build()) { decodeResponse(it) }
 
     /**
      * `GET /stats`. Only five boxes are reported; a null on this type means the
      * server did not answer, and the caller must draw no badge rather than a
      * zero — see `MailStatsResponse`.
      */
+    private val parkedAccountClient by lazy {
+        OkHttpClient.Builder().callTimeout(3, TimeUnit.SECONDS).build()
+    }
+
+    suspend fun parkedAccountUnread(token: String): Int? {
+        val request = authed("$MAIL/stats", token).header("User-Agent", userAgent).get().build()
+        val (status, body) = execute(request, parkedAccountClient)
+        return if (status == 200) decodeResponse<MailStatsResponse>(body).inbox?.unread else null
+    }
+
     suspend fun mailStats(token: String): MailStatsResponse =
-        read(authed("$MAIL/stats", token).get().build()) { json.decodeFromString(it) }
+        read(authed("$MAIL/stats", token).get().build()) { decodeResponse(it) }
 
     /**
      * `GET /inbox`. `box` is the API value from [MailBox]; `q` is only sent when
@@ -1117,7 +1184,7 @@ object Api {
             if (term != null) append("&q=").append(enc(term))
         }
         val resp: MailInboxResponse =
-            read(authed(url, token).get().build()) { json.decodeFromString(it) }
+            read(authed(url, token).get().build()) { decodeResponse(it) }
         // Checked HERE, at the transport, rather than at each caller: three places
         // read this response — the list, the pull-to-refresh, and the screener's
         // pending count — and a listing the server said it did not produce must not
@@ -1136,24 +1203,33 @@ object Api {
      * the second write is redundant and races the first.
      */
     suspend fun mailMessage(token: String, id: String): MailMessageResponse =
-        read(authed("$MAIL/message/${enc(id)}", token).get().build()) { json.decodeFromString(it) }
+        read(authed("$MAIL/message/${enc(id)}?native=1", token).get().build()) { decodeResponse(it) }
 
-    suspend fun mailThread(token: String, threadId: String): MailThreadResponse =
-        read(authed("$MAIL/thread/${enc(threadId)}", token).get().build()) { json.decodeFromString(it) }
+    suspend fun notificationMessage(token: String, id: String): MailMessageFullDto? =
+        read<MailMessageResponse>(authed("$MAIL/message/${enc(id)}/notification-preview", token).get().build()) {
+            decodeResponse(it)
+        }.message
+
+    suspend fun mailThread(token: String, threadId: String, before: String? = null): MailThreadResponse {
+        val url = "$MAIL/thread/${enc(threadId)}?native=1" + (before?.let { "&before=${enc(it)}" } ?: "")
+        return read(authed(url, token).get().build()) { decodeResponse(it) }
+    }
 
     /**
      * `GET /message/:id/body` — the reader's render body. The web app
-     * sanitizes the message's HTML part with its own `sanitizeEmailHtml`
-     * profile before answering, so this response is the only HTML a renderer
+     * filters the message's HTML and applies the requested design profile before answering, so this response is the only HTML a renderer
      * here may load; `allowImages` is the reader's images-gate opt-in, sent as
-     * `?images=1` only when the person asked for this message's remote images.
+     * `remoteImages=true` only when the person asked for this message's remote images.
      * An error is thrown like every other call — the model decides what the
      * reader falls back to (the stripped-text branch it always had).
      */
     suspend fun mailBody(token: String, id: String, allowImages: Boolean): MailBodyResponse =
         read(
-            authed("$MAIL/message/${enc(id)}/body" + if (allowImages) "?images=1" else "", token).get().build(),
-        ) { json.decodeFromString(it) }
+            authed(
+                "$MAIL/message/${enc(id)}/html?preserveDesign=true" + if (allowImages) "&remoteImages=true" else "",
+                token,
+            ).get().build(),
+        ) { decodeResponse(it) }
 
     /**
      * `PATCH /message/:id/:action` — the action is in the **path**, never the
@@ -1170,7 +1246,7 @@ object Api {
         val req = authed("$MAIL/message/${enc(id)}/${action.apiValue}", token)
             .method("PATCH", body.toRequestBody(JSON_MEDIA))
             .build()
-        return read(req) { json.decodeFromString(it) }
+        return read(req) { decodeResponse(it) }
     }
 
     /** Permanent destruction. Valid only from Trash — see [MailAction]. */
@@ -1200,7 +1276,7 @@ object Api {
      * it to 'queued' at its `scheduledFor` instant.
      */
     suspend fun mailScheduledList(token: String): MailScheduledResponse =
-        read(authed("$MAIL/scheduled", token).get().build()) { json.decodeFromString(it) }
+        read(authed("$MAIL/scheduled", token).get().build()) { decodeResponse(it) }
 
     /**
      * `DELETE /scheduled/:id` — take one future send back. The server clears
@@ -1214,17 +1290,17 @@ object Api {
     suspend fun mailSend(token: String, req: MailSendRequest): MailSendResponse {
         val r = authed("$MAIL/send", token).post(postBody(
             json.encodeToString(MailSendRequest.serializer(), req))).build()
-        return read(r) { json.decodeFromString(it) }
+        return read(r) { decodeResponse(it) }
     }
 
     suspend fun mailDraft(token: String, req: MailDraftRequest): MailDraftResponse {
         val r = authed("$MAIL/draft", token).post(postBody(
             json.encodeToString(MailDraftRequest.serializer(), req))).build()
-        return read(r) { json.decodeFromString(it) }
+        return read(r) { decodeResponse(it) }
     }
 
     suspend fun mailLabels(token: String): MailLabelsResponse =
-        read(authed("$MAIL/labels", token).get().build()) { json.decodeFromString(it) }
+        read(authed("$MAIL/labels", token).get().build()) { decodeResponse(it) }
 
     /**
      * Every (message, label) pair the account has, in one call.
@@ -1237,7 +1313,7 @@ object Api {
      * costs one request instead of one each (`grapmail-labels.ts:21-27,166-176`).
      */
     suspend fun mailLabelAssignments(token: String): MailAssignmentsResponse =
-        read(authed("$MAIL/labels/assignments", token).get().build()) { json.decodeFromString(it) }
+        read(authed("$MAIL/labels/assignments", token).get().build()) { decodeResponse(it) }
 
     /**
      * Create a label. The body key is **`colour`**, not `color`
@@ -1248,7 +1324,7 @@ object Api {
         val r = authed("$MAIL/labels", token).post(postBody(
             json.encodeToString(MailLabelCreateRequest.serializer(),
                 MailLabelCreateRequest(name, colour)))).build()
-        return read(r) { json.decodeFromString(it) }
+        return read(r) { decodeResponse(it) }
     }
 
     /**
@@ -1305,7 +1381,7 @@ object Api {
     }
 
     suspend fun mailAliases(token: String): MailAliasesResponse =
-        read(authed("$MAIL/aliases", token).get().build()) { json.decodeFromString(it) }
+        read(authed("$MAIL/aliases", token).get().build()) { decodeResponse(it) }
 
     /**
      * `POST /aliases` — mint a second address that delivers here
@@ -1323,7 +1399,7 @@ object Api {
         val req = authed("$MAIL/aliases", token)
             .post(postBody(json.encodeToString(MailAliasLabelRequest.serializer(), MailAliasLabelRequest(label))))
             .build()
-        return read(req) { json.decodeFromString(it) }
+        return read(req) { decodeResponse(it) }
     }
 
     /**
@@ -1333,7 +1409,7 @@ object Api {
      */
     suspend fun mailDeleteAlias(token: String, address: String): MailAliasDeleteResponse {
         val req = authed("$MAIL/aliases/${enc(address)}", token).delete().build()
-        return read(req) { json.decodeFromString(it) }
+        return read(req) { decodeResponse(it) }
     }
 
     /**
@@ -1343,7 +1419,7 @@ object Api {
      */
     suspend fun mailDeleteAttachment(token: String, id: String): MailAttachmentDeleteResponse {
         val req = authed("$MAIL/attachments/${enc(id)}", token).delete().build()
-        return read(req) { json.decodeFromString(it) }
+        return read(req) { decodeResponse(it) }
     }
 
     // ── End-to-end encryption ────────────────────────────────────────────────
@@ -1360,7 +1436,7 @@ object Api {
     // field for one either.
 
     suspend fun mailE2eKeys(token: String): MailE2eKeysResponse =
-        read(authed("$MAIL/e2e/keys", token).get().build()) { json.decodeFromString(it) }
+        read(authed("$MAIL/e2e/keys", token).get().build()) { decodeResponse(it) }
 
     suspend fun mailE2ePublish(
         token: String, encryptionPublicKey: String, signingPublicKey: String?,
@@ -1370,12 +1446,12 @@ object Api {
                 MailE2ePublishRequest.serializer(),
                 MailE2ePublishRequest(encryptionPublicKey, signingPublicKey))))
             .build()
-        return read(req) { json.decodeFromString(it) }
+        return read(req) { decodeResponse(it) }
     }
 
     suspend fun mailE2eUnpublish(token: String): MailE2eUnpublishResponse {
         val req = authed("$MAIL/e2e/keys", token).delete().build()
-        return read(req) { json.decodeFromString(it) }
+        return read(req) { decodeResponse(it) }
     }
 
     /**
@@ -1389,7 +1465,7 @@ object Api {
             .post(postBody(json.encodeToString(
                 MailE2eAddressesRequest.serializer(), MailE2eAddressesRequest(addresses))))
             .build()
-        return read(req) { json.decodeFromString(it) }
+        return read(req) { decodeResponse(it) }
     }
 
     suspend fun mailE2eLookup(token: String, addresses: List<String>): MailE2eLookupResponse {
@@ -1397,7 +1473,7 @@ object Api {
             .post(postBody(json.encodeToString(
                 MailE2eAddressesRequest.serializer(), MailE2eAddressesRequest(addresses))))
             .build()
-        return read(req) { json.decodeFromString(it) }
+        return read(req) { decodeResponse(it) }
     }
 
     /**
@@ -1413,6 +1489,21 @@ object Api {
             if (resp.code >= 400) fail(resp.code, resp.body?.string() ?: "")
             resp.body?.bytes() ?: ByteArray(0)
         }
+
+    /** Stream an attachment to disk without retaining its entire body in memory. */
+    suspend fun mailAttachmentFile(token: String, id: String, destination: java.io.File) {
+        executeResponse(authed("$MAIL/attachments/${enc(id)}", token).get().build()) { resp ->
+            if (resp.code >= 400) fail(resp.code, resp.body?.string() ?: "")
+            try {
+                destination.outputStream().buffered().use { output ->
+                    resp.body?.byteStream()?.use { input -> input.copyTo(output) }
+                }
+            } catch (error: Exception) {
+                destination.delete()
+                throw error
+            }
+        }
+    }
 
     /**
      * `POST /attachments` — multipart, with the field names the route reads:
@@ -1431,8 +1522,19 @@ object Api {
             .build()
         val req = authed("$MAIL/attachments", token).post(body).build()
         return read(req) {
-            json.decodeFromString(MailAttachmentResponseJson.serializer(), it).attachment
+            decodeResponse(MailAttachmentResponseJson.serializer(), it).attachment
         }
+    }
+
+    suspend fun mailAttachmentUploadFile(
+        token: String, file: java.io.File, filename: String, mimeType: String,
+    ): MailAttachmentDto {
+        val body = MultipartBody.Builder().setType(MultipartBody.FORM)
+            .addFormDataPart("file", filename, file.asRequestBody(mimeType.toMediaType()))
+            .addFormDataPart("messageId", "")
+            .build()
+        val req = authed("$MAIL/attachments", token).post(body).build()
+        return read(req) { decodeResponse(MailAttachmentResponseJson.serializer(), it).attachment }
     }
     /**
      * The screener queue's own settings. Note `?box=screener` is the queue
@@ -1440,14 +1542,14 @@ object Api {
      * switch, so the list comes from [mailInbox] like every other box.
      */
     suspend fun mailScreener(token: String): MailScreenerResponse =
-        read(authed("$MAIL/screener", token).get().build()) { json.decodeFromString(it) }
+        read(authed("$MAIL/screener", token).get().build()) { decodeResponse(it) }
 
     suspend fun mailScreenerSet(token: String, enabled: Boolean): MailScreenerResponse {
         val r = authed("$MAIL/screener/enabled", token)
             .method("PUT", postBody(json.encodeToString(
                 MailScreenerEnableRequest.serializer(), MailScreenerEnableRequest(enabled))))
             .build()
-        return read(r) { json.decodeFromString(it) }
+        return read(r) { decodeResponse(it) }
     }
 
     /**
@@ -1471,7 +1573,7 @@ object Api {
         val r = authed("$MAIL/screener/decision", token)
             .method("PUT", postBody(json.encodeToString(MailScreenerDecisionRequest.serializer(), body)))
             .build()
-        return read(r) { json.decodeFromString(it) }
+        return read(r) { decodeResponse(it) }
     }
 
     /**
@@ -1488,7 +1590,7 @@ object Api {
         token: String, sender: String, scope: MailSenderScope,
     ): MailScreenerDecisionResponse {
         val url = "$MAIL/screener/decision?scope=${enc(scope.apiValue)}&sender=${enc(sender)}"
-        return read(authed(url, token).delete().build()) { json.decodeFromString(it) }
+        return read(authed(url, token).delete().build()) { decodeResponse(it) }
     }
 }
 
@@ -1553,6 +1655,7 @@ data class MailDraftRequest(
     val cc: List<String> = emptyList(),
     val subject: String = "",
     val bodyText: String = "",
+    val bodyHtml: String? = null,
     val inReplyTo: String? = null,
     /**
      * The draft row this save updates, when there is one. Absent on a first

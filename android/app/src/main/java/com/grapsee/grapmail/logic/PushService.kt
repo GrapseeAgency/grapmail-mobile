@@ -3,7 +3,9 @@ package com.grapsee.grapmail.logic
 import android.content.Context
 import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.OutOfQuotaPolicy
 import androidx.work.WorkManager
+import androidx.work.workDataOf
 import com.google.firebase.FirebaseApp
 import com.google.firebase.messaging.FirebaseMessaging
 import com.google.firebase.messaging.FirebaseMessagingService
@@ -47,19 +49,19 @@ class PushService : FirebaseMessagingService() {
 
     override fun onMessageReceived(message: RemoteMessage) {
         val context = applicationContext
-        // The signal says only that the backend sent it. The counted summary —
-        // the same comparison the poll makes — is produced by the read below
-        // and replaces the placeholder under the same notification id.
-        PushSync.scope.launch {
-            Notifications.pushSignal(context, SessionStore.address(context))
-        }
-        // The same refresh the poll does: the worker reads /stats, compares
-        // with what this device last saw and announces a real difference.
-        // Nothing here trusts the push as mailbox data.
+        val id = message.data["messageId"]?.takeIf { it.isNotBlank() && it.length <= 300 }
+        val mailbox = message.data["mailbox"]
+        val request = OneTimeWorkRequestBuilder<MailPollWorker>()
+            .setInputData(workDataOf("messageId" to id, "mailbox" to mailbox,
+                "threadId" to message.data["threadId"], "sender" to message.data["sender"],
+                "subject" to message.data["subject"], "encrypted" to message.data["encrypted"]))
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S &&
+            message.priority == RemoteMessage.PRIORITY_HIGH
+        ) request.setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
         WorkManager.getInstance(context).enqueueUniqueWork(
-            MailPollWorker.PUSH_NAME,
+            id?.let { "${MailPollWorker.PUSH_NAME}:$it" } ?: MailPollWorker.PUSH_NAME,
             ExistingWorkPolicy.KEEP,
-            OneTimeWorkRequestBuilder<MailPollWorker>().build(),
+            request.build(),
         )
     }
 }
@@ -94,10 +96,23 @@ object PushSync {
      */
     suspend fun register(context: Context) {
         if (!configured(context)) return
-        val bearer = SessionStore.token(context) ?: return
+        if (!Notifications.allowed(context)) return
         val deviceToken = runCatching { FirebaseMessaging.getInstance().token.await() }.getOrNull() ?: return
-        runCatching { Api.registerPush(bearer, deviceToken) }
-            .onSuccess { prefs(context).edit().putString(KEY_TOKEN, deviceToken).apply() }
+        prefs(context).edit().putString(KEY_TOKEN, deviceToken).apply()
+        val sessions = SessionStore.snapshotAll(context)
+        for (stored in sessions) {
+            val session = com.grapsee.grapmail.data.SessionRefresh.forAccount(context, stored.id) ?: continue
+            try {
+                Api.registerPush(session.token, deviceToken)
+                if (SessionStore.snapshotAll(context).none { it.id == session.id }) {
+                    Api.unregisterPush(session.token, deviceToken)
+                }
+            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                android.util.Log.w("GrapMailNotify", "Device registration failed for a saved account")
+            }
+        }
     }
 
     /**
@@ -110,7 +125,6 @@ object PushSync {
     suspend fun unregister(context: Context, session: SessionSnapshot) {
         if (!SessionStore.isCurrent(context, session.id)) return
         val deviceToken = prefs(context).getString(KEY_TOKEN, null) ?: return
-        prefs(context).edit().remove(KEY_TOKEN).apply()
         if (!configured(context)) return
         try {
             Api.unregisterPush(session.token, deviceToken)

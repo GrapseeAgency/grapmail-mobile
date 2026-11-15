@@ -1,5 +1,11 @@
 package com.grapsee.grapmail.ui.screens.mail
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -10,11 +16,13 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -22,11 +30,17 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.Send
+import androidx.compose.material.icons.outlined.Mail
+import androidx.compose.material.icons.outlined.StarBorder
+import androidx.compose.material.icons.rounded.Email
 import androidx.compose.material.icons.rounded.AllInbox
+import androidx.compose.material.icons.rounded.Archive
 import androidx.compose.material.icons.rounded.AttachFile
 import androidx.compose.material.icons.rounded.Contacts
 import androidx.compose.material.icons.rounded.Delete
@@ -38,12 +52,15 @@ import androidx.compose.material.icons.rounded.Label
 import androidx.compose.material.icons.rounded.MailOutline
 import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.Menu
+import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
+import androidx.compose.material.icons.rounded.KeyboardArrowUp
 import androidx.compose.material.icons.rounded.Person
-import androidx.compose.material.icons.rounded.MoreHoriz
 import androidx.compose.material.icons.rounded.Report
 import androidx.compose.material.icons.rounded.Schedule
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Send
+import androidx.compose.material.icons.automirrored.rounded.Logout
+import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Shield
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.Star
@@ -55,11 +72,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.SheetState
-import androidx.compose.material3.SwipeToDismissBox
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.SwipeToDismissBoxValue
-import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.Text
@@ -81,17 +95,31 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.ExperimentalComposeUiApi
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.testTagsAsResourceId
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Popup
+import androidx.compose.ui.window.PopupProperties
 import com.grapsee.grapmail.data.MailAction
 import com.grapsee.grapmail.data.MailBox
 import com.grapsee.grapmail.data.MailFilter
@@ -146,12 +174,36 @@ fun MailboxScreen(
     onSubscriptions: () -> Unit,
     onScheduled: () -> Unit,
     onSignOut: () -> Unit,
+    onAddAccount: () -> Unit,
+    onAccountSwitched: () -> Unit = {},
 ) {
     val palette = LocalPalette.current
     val state by vm.state.collectAsStateWithLifecycle()
     val drawer = rememberDrawerState(DrawerValue.Closed)
     val scope = rememberCoroutineScope()
     val listState = key(state.box) { rememberLazyListState() }
+    var controlsVisible by remember(listState, state.query, state.filter) { mutableStateOf(true) }
+    val scrollThreshold = with(LocalDensity.current) { 8.dp.toPx() }
+    val controlsScroll = remember(listState, state.query, state.filter, scrollThreshold) {
+        object : NestedScrollConnection {
+            private var travel = 0f
+
+            override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset {
+                if (source != NestedScrollSource.UserInput) return Offset.Zero
+                if (!listState.canScrollBackward) {
+                    controlsVisible = true
+                    travel = 0f
+                } else if (consumed.y != 0f) {
+                    travel = if (travel * consumed.y > 0f) travel + consumed.y else consumed.y
+                    if (kotlin.math.abs(travel) >= scrollThreshold) {
+                        controlsVisible = travel > 0f
+                        travel = 0f
+                    }
+                }
+                return Offset.Zero
+            }
+        }
+    }
 
     var showSortSheet by remember { mutableStateOf(false) }
     var showAdvSheet by remember { mutableStateOf(false) }
@@ -160,6 +212,15 @@ fun MailboxScreen(
     var showSnoozeSheet by remember { mutableStateOf(false) }
     var showPermanentConfirm by remember { mutableStateOf(false) }
     var showSenderSheet by remember { mutableStateOf(false) }
+    var searchDraft by remember(state.box) { mutableStateOf(state.query) }
+
+    LaunchedEffect(searchDraft) {
+        kotlinx.coroutines.delay(350)
+        if (searchDraft != state.query) vm.query(searchDraft)
+    }
+    LaunchedEffect(state.query) {
+        if (searchDraft != state.query) searchDraft = state.query
+    }
     // The last decision receipt, kept here rather than in the view model: it is
     // one line of text about one interaction, and the sheet that shows it is the
     // only thing that can dismiss it. The view model's own `error` stays on the
@@ -175,8 +236,8 @@ fun MailboxScreen(
             info.totalItemsCount > 0 && lastVisible >= info.totalItemsCount - 4
         }
     }
-    LaunchedEffect(listState, nearEnd, state.pages) {
-        if (nearEnd && state.hasRows && state.canLoadMore && state.appendError == null) vm.loadMore()
+    LaunchedEffect(listState, nearEnd, state.pages, state.canLoadMore, state.appendError) {
+        if (nearEnd && state.hasRows && state.canLoadMore && state.appendError == null) vm.loadMoreWhenReady()
     }
 
     // The screen's first ask: the box that has never been fetched. Nothing here
@@ -185,6 +246,19 @@ fun MailboxScreen(
     LaunchedEffect(vm) {
         vm.ensureLoaded()
         vm.loadAccount()
+    }
+
+    var wasOffline by remember { mutableStateOf(false) }
+    LaunchedEffect(state.online) {
+        if (state.online == false) wasOffline = true
+        if (state.online == true && wasOffline) {
+            wasOffline = false
+            if (!state.loading && !state.loadingMore && !state.busy && !state.selecting &&
+                state.pages <= 1 && (state.fatal != null || state.staleError != null)
+            ) {
+                vm.load(forceCounts = false)
+            }
+        }
     }
 
     val owner = LocalLifecycleOwner.current
@@ -220,6 +294,7 @@ fun MailboxScreen(
                 onLabels = { scope.launch { drawer.close() }; onLabels() },
                 onScreener = { scope.launch { drawer.close() }; onScreener() },
                 onSubscriptions = { scope.launch { drawer.close() }; onSubscriptions() },
+                onFiles = { scope.launch { drawer.close() }; onFiles() },
                 onScheduled = { scope.launch { drawer.close() }; onScheduled() },
                 onSortFilter = { scope.launch { drawer.close() }; showSortSheet = true },
                 onAdvanced = { scope.launch { drawer.close() }; showAdvSheet = true },
@@ -271,10 +346,13 @@ fun MailboxScreen(
                         onProfile = onProfile,
                         onSettings = onSettings,
                         onSignOut = onSignOut,
+                        loadUnreads = { vm.accountUnreads(it) },
+                        onSwitchAccount = { vm.switchAccount(it, onAccountSwitched) },
+                        onAddAccount = onAddAccount,
                     ) {
                         SearchField(
-                            query = state.query,
-                            onQuery = vm::query,
+                            query = searchDraft,
+                            onQuery = { searchDraft = it },
                             onFilter = { showSortSheet = true },
                             filterActive = state.filter != MailFilter.All || state.sort != MailSort.Newest,
                             onAdvanced = { showAdvSheet = true },
@@ -290,6 +368,7 @@ fun MailboxScreen(
                         fontSize = 13.sp,
                         fontWeight = FontWeight.Medium,
                     )
+                    BoxTabRow(state.box, drawerCounts(state), vm::open)
                 }
 
                 // The device's own path to the network, read before asking
@@ -362,19 +441,29 @@ fun MailboxScreen(
                 PullToRefreshBox(
                     isRefreshing = refreshing,
                     onRefresh = { refreshing = true; vm.load() },
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.weight(1f).mailListSurface().nestedScroll(controlsScroll),
                 ) {
                     MailStateBlock(
                         loading = state.loading,
                         failed = state.fatal != null,
                         noMailbox = state.noMailbox,
                         empty = !state.hasRows && !state.canLoadMore && !state.loadingMore,
+                        filtered = state.query.trim().length >= 3 || state.filter != MailFilter.All ||
+                            state.advFrom.isNotBlank() || state.advTo.isNotBlank() ||
+                            state.advSubject.isNotBlank() || state.advFiles ||
+                            state.advAfter.isNotBlank() || state.advBefore.isNotBlank(),
                         boxTitle = state.box.title,
                         onRetry = { vm.load() },
                     ) {
+                        val visibleBox = state.box
+                        val selectedIds = state.selection
+                        val selectingRows = selectedIds.isNotEmpty()
+                        val inTrashOrSpam = visibleBox == MailBox.Trash || visibleBox == MailBox.Spam
+                        val inArchive = visibleBox == MailBox.Archive
                         LazyColumn(
                             state = listState,
                             modifier = Modifier.fillMaxSize().testTag("mail-list"),
+                            contentPadding = PaddingValues(top = 6.dp, bottom = MailBottomClearance),
                         ) {
                             // `key` and `contentType` are arguments of `items`, not
                             // of `LazyColumn` — the spec writes them as if they sat on
@@ -395,20 +484,26 @@ fun MailboxScreen(
                             // holds — but per-row `derivedStateOf` would need the
                             // selection set out of that object, which is a view-model
                             // change this sector's evidence does not ask for.
-                            items(state.rows, key = { it.id }, contentType = { "row" }) { row ->
-                                // Which swipes mean something depends on where the
-                                // message already is. Archiving something that is in
-                                // Archive, or trashing something already in Trash,
-                                // is a gesture that fires a request to change a state
-                                // it cannot change — so those directions are simply
-                                // not offered there, and the row does not move.
-                                val inTrashOrSpam = state.box == com.grapsee.grapmail.data.MailBox.Trash ||
-                                    state.box == com.grapsee.grapmail.data.MailBox.Spam
-                                val inArchive = state.box == com.grapsee.grapmail.data.MailBox.Archive
+                            // The box's own name is drawn above the card by the
+                            // header, not as a scrolling row here: a title that
+                            // scrolls away leaves the card unlabelled.
+                            itemsIndexed(state.rows, key = { _, r -> r.id }, contentType = { _, _ -> "row" }) { index, row ->
                                 SwipeableMessageRow(
-                                    leadingTo = if (inTrashOrSpam) "Back to Inbox"
-                                        else if (inArchive) null else "Archive",
-                                    trailingTo = if (inTrashOrSpam) null else "Trash",
+                                    modifier = Modifier.animateItem(fadeInSpec = null, fadeOutSpec = null)
+                                        .drawWithContent {
+                                            drawContent()
+                                            if (index < state.rows.lastIndex) {
+                                                val y = size.height - 0.5f
+                                                drawLine(palette.border, Offset(0f, y), Offset(size.width, y))
+                                            }
+                                        },
+                                    restoresToInbox = inTrashOrSpam,
+                                    leadingTo = when {
+                                        selectedIds.isNotEmpty() || inArchive -> null
+                                        inTrashOrSpam -> "Back to Inbox"
+                                        else -> "Archive"
+                                    },
+                                    trailingTo = if (inTrashOrSpam || selectedIds.isNotEmpty()) null else "Trash",
                                     onLeading = {
                                         vm.actOn(row.id, if (inTrashOrSpam)
                                             com.grapsee.grapmail.data.MailAction.Restore
@@ -420,7 +515,7 @@ fun MailboxScreen(
                                 ) {
                                     MessageRow(
                                         message = row,
-                                        selected = state.selection.contains(row.id),
+                                        selected = row.id in selectedIds,
                                         onSelect = { vm.toggleSelect(row.id) },
                                         onOpen = {
                                             // Drafts are the person's own
@@ -431,7 +526,7 @@ fun MailboxScreen(
                                             // message you cannot edit or
                                             // send, which is a draft that
                                             // does not draft.
-                                            if (state.box == MailBox.Drafts) {
+                                            if (visibleBox == MailBox.Drafts) {
                                                 onOpenDraft(row.id)
                                             } else {
                                                 val tid = row.threadId
@@ -443,11 +538,9 @@ fun MailboxScreen(
                                                 if (row.isStarred) com.grapsee.grapmail.data.MailAction.Unstar
                                                 else com.grapsee.grapmail.data.MailAction.Star)
                                         },
-                                        selecting = state.selecting,
+                                        selecting = selectingRows,
                                     )
                                 }
-                                Box(Modifier.fillMaxWidth().padding(horizontal = 16.dp)
-                                    .height(1.dp).background(palette.border))
                             }
                             if (state.loadingMore || state.canLoadMore) {
                                 item {
@@ -469,18 +562,17 @@ fun MailboxScreen(
                         }
                     }
                 }
-
-                MailBottomBar(selected = 0, unread = state.unreadCount,
-                    onContacts = onContacts, onFiles = onFiles,
-                    onMore = { scope.launch { drawer.open() } })
             }
 
-            // The FAB sits above the list but inside the content, so it survives
-            // the drawer opening and closing.
-            Box(Modifier.fillMaxSize().padding(end = 20.dp, bottom = 96.dp),
-                contentAlignment = Alignment.BottomEnd) {
-                MailFab(onCompose, modifier = Modifier.testTag("mail-compose"))
-            }
+            MailBottomControls(
+                modifier = Modifier.align(Alignment.BottomCenter),
+                isVisible = { controlsVisible || !listState.canScrollBackward },
+                inboxSelected = state.box == MailBox.Inbox,
+                unread = state.unreadCount,
+                onMail = { vm.open(MailBox.Inbox) },
+                onCompose = onCompose,
+                onContacts = onContacts,
+            )
         }
     }
 
@@ -510,6 +602,7 @@ fun MailboxScreen(
                 read = state.assignmentsRead,
                 note = state.labelNote,
                 selectedCount = state.selection.size,
+                busy = state.busy,
             ) { vm.toggleLabel(it) }
         }
     }
@@ -598,13 +691,16 @@ internal fun drawerBoxes(s: MailboxViewModel.MailboxUiState): List<MailBox> =
 // ── chrome ───────────────────────────────────────────────────────────────────
 
 @Composable
-private fun MailTopBar(
+internal fun MailTopBar(
     onMenu: () -> Unit,
     onProfile: () -> Unit,
     accountName: String,
     accountAddress: String?,
     onSettings: () -> Unit,
     onSignOut: () -> Unit,
+    loadUnreads: suspend (List<com.grapsee.grapmail.data.SessionSnapshot>) -> Map<String, Int?>,
+    onSwitchAccount: (String) -> Unit,
+    onAddAccount: () -> Unit,
     search: @Composable () -> Unit,
 ) {
     val palette = LocalPalette.current
@@ -625,37 +721,240 @@ private fun MailTopBar(
                 if (accountName.isBlank() && accountAddress.isNullOrBlank()) {
                     Icon(Icons.Rounded.Person, null, tint = palette.textSecondary)
                 } else {
-                    SenderAvatar(accountName, accountAddress, size = 32.dp)
+                    SenderAvatar(accountName, accountAddress, size = 36.dp)
                 }
             }
-            DropdownMenu(expanded = accountOpen, onDismissRequest = { accountOpen = false }) {
-                if (!accountAddress.isNullOrBlank()) {
-                    Text(accountAddress, modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
-                }
-                DropdownMenuItem(text = { Text("Profile") }, onClick = {
-                    accountOpen = false
-                    onProfile()
-                })
-                DropdownMenuItem(text = { Text("Settings") }, onClick = {
-                    accountOpen = false
-                    onSettings()
-                })
-                DropdownMenuItem(text = { Text("Sign out") }, onClick = {
-                    accountOpen = false
-                    onSignOut()
-                })
+            if (accountOpen) {
+                AccountSwitcherPopup(
+                    loadUnreads = loadUnreads,
+                    activeAddress = accountAddress,
+                    onDismiss = { accountOpen = false },
+                    onSwitch = {
+                        accountOpen = false
+                        onSwitchAccount(it)
+                    },
+                    onAddAccount = {
+                        accountOpen = false
+                        onAddAccount()
+                    },
+                    onProfile = {
+                        accountOpen = false
+                        onProfile()
+                    },
+                    onSettings = {
+                        accountOpen = false
+                        onSettings()
+                    },
+                    onSignOut = {
+                        accountOpen = false
+                        onSignOut()
+                    },
+                )
             }
         }
     }
 }
 
+/**
+ * The account switcher, as the reference draws it: a dark rounded card
+ * anchored to the avatar — header with the active account, one row per stored
+ * account (the active one carries a check, the others their unread pill),
+ * "Add another account", Profile and Settings, and Sign out in red. Every row
+ * is real navigation; nothing here is a picture of a control.
+ */
 @Composable
-private fun SearchField(query: String, onQuery: (String) -> Unit, onFilter: () -> Unit, filterActive: Boolean,
+private fun AccountSwitcherPopup(
+    loadUnreads: suspend (List<com.grapsee.grapmail.data.SessionSnapshot>) -> Map<String, Int?>,
+    activeAddress: String?,
+    onDismiss: () -> Unit,
+    onSwitch: (String) -> Unit,
+    onAddAccount: () -> Unit,
+    onProfile: () -> Unit,
+    onSettings: () -> Unit,
+    onSignOut: () -> Unit,
+) {
+    val palette = LocalPalette.current
+    val context = androidx.compose.ui.platform.LocalContext.current
+    // Sessions and the other accounts' unread counts load on entry, in the
+    // background with a hard ceiling — a dead or slow session shows no pill
+    // instead of holding the menu open.
+    var accounts by remember { mutableStateOf(emptyList<com.grapsee.grapmail.data.SessionSnapshot>()) }
+    var unreads by remember { mutableStateOf(emptyMap<String, Int?>()) }
+    LaunchedEffect(Unit) {
+        val loaded = com.grapsee.grapmail.data.SessionStore.snapshotAll(context)
+        accounts = loaded
+        unreads = loadUnreads(loaded.filterNot { it.address.equals(activeAddress, ignoreCase = true) })
+    }
+    val displayedAddress = activeAddress ?: accounts.firstOrNull()?.address
+    Popup(
+        popupPositionProvider = remember {
+            object : androidx.compose.ui.window.PopupPositionProvider {
+                override fun calculatePosition(anchorBounds: androidx.compose.ui.unit.IntRect,
+                    windowSize: androidx.compose.ui.unit.IntSize, layoutDirection: androidx.compose.ui.unit.LayoutDirection,
+                    popupContentSize: androidx.compose.ui.unit.IntSize): androidx.compose.ui.unit.IntOffset {
+                    val right = (anchorBounds.right - popupContentSize.width).coerceIn(0,
+                        (windowSize.width - popupContentSize.width).coerceAtLeast(0))
+                    val top = (anchorBounds.bottom + 6).coerceAtMost(
+                        (windowSize.height - popupContentSize.height).coerceAtLeast(0))
+                    return androidx.compose.ui.unit.IntOffset(right, top)
+                }
+            }
+        },
+        onDismissRequest = onDismiss,
+        properties = androidx.compose.ui.window.PopupProperties(focusable = true),
+    ) {
+        Column(horizontalAlignment = Alignment.End) {
+            androidx.compose.foundation.Canvas(Modifier.padding(end = 17.dp).width(16.dp).height(8.dp)) {
+                val pointer = androidx.compose.ui.graphics.Path().apply {
+                    moveTo(0f, size.height)
+                    lineTo(size.width / 2f, 0f)
+                    lineTo(size.width, size.height)
+                    close()
+                }
+                drawPath(pointer, palette.cardAlt)
+                drawLine(palette.border, Offset(0f, size.height), Offset(size.width / 2, 0f), 1.dp.toPx())
+                drawLine(palette.border, Offset(size.width / 2, 0f), Offset(size.width, size.height), 1.dp.toPx())
+            }
+            Column(
+                Modifier
+                    .width(330.dp)
+                    .heightIn(max = 510.dp)
+                    .shadow(12.dp, RoundedCornerShape(26.dp), clip = false)
+                    .clip(RoundedCornerShape(26.dp))
+                    .background(Brush.verticalGradient(listOf(palette.cardAlt, palette.card)))
+                    .border(1.dp, Brush.verticalGradient(listOf(palette.textSecondary.copy(alpha = 0.55f), palette.border)),
+                        RoundedCornerShape(26.dp))
+                    .verticalScroll(rememberScrollState())
+                    .padding(10.dp),
+            ) {
+                // Header: the active account.
+                Row(
+                    Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp))
+                        .clickable(onClickLabel = "Close account switcher", onClick = onDismiss)
+                        .padding(horizontal = 12.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    SenderAvatar(
+                        displayedAddress.orEmpty(),
+                        displayedAddress,
+                        size = 38.dp,
+                    )
+                    Spacer(Modifier.width(12.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text(
+                            displayedAddress ?: "GrapMail",
+                            fontSize = 14.sp, fontWeight = FontWeight.SemiBold,
+                            color = palette.textPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                        )
+                        Text("GrapMail Account", fontSize = 11.sp, color = palette.textSecondary)
+                    }
+                    Icon(Icons.Rounded.KeyboardArrowUp, null, tint = palette.textSecondary, modifier = Modifier.size(18.dp))
+                }
+                Box(Modifier.fillMaxWidth().height(1.dp).background(palette.border))
+
+                accounts.forEach { account ->
+                    val active = account.address.equals(displayedAddress, ignoreCase = true)
+                    Row(
+                        Modifier.fillMaxWidth()
+                            .clip(RoundedCornerShape(17.dp))
+                            .background(if (active) palette.successChipBg else Color.Transparent)
+                            .then(if (active) Modifier.border(1.dp, palette.successInk, RoundedCornerShape(17.dp)) else Modifier)
+                            .clickable { if (active) onDismiss() else onSwitch(account.address) }
+                            .padding(horizontal = 16.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        SenderAvatar(account.address, account.address, size = 32.dp)
+                        Spacer(Modifier.width(12.dp))
+                        Text(
+                            account.address,
+                            fontSize = 14.sp,
+                            fontWeight = if (active) FontWeight.SemiBold else FontWeight.Normal,
+                            color = palette.textPrimary,
+                            maxLines = 1, overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f),
+                        )
+                        if (active) {
+                            Icon(Icons.Rounded.Check, "Active account", tint = palette.successInk, modifier = Modifier.size(18.dp))
+                        } else {
+                            val unread = unreads[account.address]
+                            if (unread != null && unread > 0) {
+                                Text(
+                                    if (unread >= 100) "99+" else unread.toString(),
+                                    fontSize = 11.sp, fontWeight = FontWeight.SemiBold,
+                                    color = palette.textPrimary,
+                                    modifier = Modifier.clip(RoundedCornerShape(50))
+                                        .background(palette.softFill)
+                                        .padding(horizontal = 7.dp, vertical = 2.dp),
+                                )
+                            }
+                        }
+                    }
+                }
+
+                Row(
+                    Modifier.fillMaxWidth().clickable { onAddAccount() }
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Box(
+                        Modifier.size(32.dp).clip(CircleShape)
+                            .background(palette.primarySolid.copy(alpha = 0.14f)),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(Icons.Rounded.Add, null, tint = palette.primarySolid, modifier = Modifier.size(18.dp))
+                    }
+                    Spacer(Modifier.width(12.dp))
+                    Text("Add another account", fontSize = 14.sp, fontWeight = FontWeight.Medium,
+                        color = palette.textPrimary)
+                }
+                Box(Modifier.fillMaxWidth().height(1.dp).background(palette.border))
+
+                SwitcherActionRow(Icons.Rounded.Person, "Profile") { onProfile() }
+                SwitcherActionRow(Icons.Rounded.Settings, "Settings") { onSettings() }
+                Row(
+                    Modifier.fillMaxWidth()
+                        .clip(RoundedCornerShape(18.dp))
+                        .background(palette.error.copy(alpha = 0.11f))
+                        .clickable { onSignOut() }
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(Icons.AutoMirrored.Rounded.Logout, null, tint = palette.error, modifier = Modifier.size(20.dp))
+                    Spacer(Modifier.width(12.dp))
+                    Text("Sign out", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = palette.error)
+                }
+            }
+        }
+
+    }
+}
+
+@Composable
+private fun SwitcherActionRow(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, onClick: () -> Unit) {
+    val palette = LocalPalette.current
+    Row(
+        Modifier.fillMaxWidth().clickable(onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(icon, null, tint = palette.textPrimary, modifier = Modifier.size(20.dp))
+        Spacer(Modifier.width(12.dp))
+        Text(label, fontSize = 14.sp, color = palette.textPrimary, modifier = Modifier.weight(1f))
+        Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, null, tint = palette.textSecondary,
+            modifier = Modifier.size(18.dp))
+    }
+}
+
+@Composable
+internal fun SearchField(query: String, onQuery: (String) -> Unit, onFilter: () -> Unit, filterActive: Boolean,
                         onAdvanced: () -> Unit, advActive: Boolean) {
     val palette = LocalPalette.current
     Row(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(palette.card)
-            .border(1.dp, palette.border, RoundedCornerShape(14.dp)).padding(horizontal = 14.dp, vertical = 11.dp),
+        // The reference's search pill: a tinted, borderless, fully-rounded
+        // capsule — not a bordered card. The tint is the palette's own soft
+        // fill so it reads as a control, not a surface, in both themes.
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(26.dp)).background(palette.softFill)
+            .padding(horizontal = 16.dp, vertical = 13.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         // A real value field: the reference's placeholder is not a hint that the
@@ -664,6 +963,7 @@ private fun SearchField(query: String, onQuery: (String) -> Unit, onFilter: () -
         // (`grapmail-search.ts:110-118`) -- because a placeholder promising
         // "people or files" would advertise a search the route does not run.
         androidx.compose.foundation.text.BasicTextField(
+            cursorBrush = androidx.compose.ui.graphics.SolidColor(LocalPalette.current.cursor),
             value = query,
             onValueChange = onQuery,
             maxLines = 1,
@@ -673,7 +973,7 @@ private fun SearchField(query: String, onQuery: (String) -> Unit, onFilter: () -
             decorationBox = { inner ->
                 Box {
                     if (query.isEmpty()) {
-                        Text("Search mail", fontSize = 14.sp, color = palette.textTertiary)
+                        Text("Search in mail", fontSize = 14.sp, color = palette.textTertiary)
                     }
                     inner()
                 }
@@ -700,174 +1000,153 @@ private fun LabelStrip(s: MailboxViewModel.MailboxUiState) {
     }
 }
 
-/**
- * The box tabs. Tappable, and they go to the same place the drawer rows do.
- *
- * These were inert once — the row drew the active underline and the drawer's
- * counts, so it read as the box switcher the reference shows, and a tap did
- * nothing. A control that only looks like a control is worse than no control:
- * the drawer works, so a person concludes the tab row is broken rather than
- * decorative. It now opens the box through the same `vm.open`, which means the
- * same fetch policy (a box already read is not re-read) and the same
- * selection-clearing as the drawer path.
- */
 @Composable
-private fun BoxTabRow(s: MailboxViewModel.MailboxUiState, onSelect: (MailBox) -> Unit) {
-    val counts = drawerCounts(s)
-    // Scrollable tabs, the Material answer to a tab bar wider than the
-    // screen. The fixed Row this replaces measured every label against an
-    // equal slice of width: on the 1080px phone "Inbox" wrapped to
-    // "In/bo/x" and Starred/Archive broke mid-word, and on the narrow
-    // walk device four of the five boxes fell off the row entirely --
-    // doors that exist must stay reachable at every width.
-    Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp)
-            .horizontalScroll(rememberScrollState())
-            .testTag("mail-box-tabs"),
-        horizontalArrangement = Arrangement.spacedBy(2.dp)) {
-        MailBox.tabOrder.forEach { box ->
-            BoxTab(box.title, counts[box], box == s.box, onClick = { onSelect(box) })
-        }
-    }
-}
-
-/**
- * A message row that files on swipe.
- *
- * Two directions, and each is optional: a null label means that direction is not
- * offered at all, so the row refuses to move rather than firing a request that
- * cannot change anything. That is how one component serves Trash — where the
- * useful swipe is back out to the inbox, and trashing an already-trashed message
- * is a no-op dressed as an action — and the inbox, where both mean something.
- *
- * Nothing here destroys mail. A swipe can archive, trash or restore, and all three
- * undo; permanent deletion stays behind its confirmation sheet, reachable only
- * from Trash. So both colours mean "moved", never "gone".
- *
- * The action fires on the settled value rather than during the drag, and the row
- * snaps back afterwards: a swipe released short of the threshold animates home and
- * must file nothing, and a row left dismissed off-screen would show a gap in a list
- * whose length has not changed yet.
- *
- * One mechanic genuinely differs from iOS, and it is worth naming rather than
- * describing the two as identical: SwiftUI can refuse a full fling
- * (`allowsFullSwipe: false`) so the row stays open until the revealed button is
- * tapped, and Material3 has no equivalent — past the halfway threshold a fling
- * files the message. Both directions here archive, trash or restore, all of which
- * undo, so the difference is in how much a stray flick costs: nothing irreversible
- * is reachable either way.
- */
-@Composable
-private fun SwipeableMessageRow(
-    leadingTo: String?,
-    trailingTo: String?,
-    onLeading: () -> Unit,
-    onTrailing: () -> Unit,
-    content: @Composable () -> Unit,
-) {
-    val palette = LocalPalette.current
-    val state = rememberSwipeToDismissBoxState()
-    val direction by remember(state) { derivedStateOf { state.dismissDirection } }
-
-    LaunchedEffect(state.currentValue) {
-        when (state.currentValue) {
-            SwipeToDismissBoxValue.StartToEnd -> if (leadingTo != null) onLeading()
-            SwipeToDismissBoxValue.EndToStart -> if (trailingTo != null) onTrailing()
-            SwipeToDismissBoxValue.Settled -> return@LaunchedEffect
-        }
-        state.snapTo(SwipeToDismissBoxValue.Settled)
-    }
-
-    SwipeToDismissBox(
-        state = state,
-        enableDismissFromStartToEnd = leadingTo != null,
-        enableDismissFromEndToStart = trailingTo != null,
-        backgroundContent = {
-            val toLeading = direction == SwipeToDismissBoxValue.StartToEnd
-            val swiping = direction != SwipeToDismissBoxValue.Settled
-            val label = if (toLeading) leadingTo else trailingTo
-            Row(
-                Modifier.fillMaxSize()
-                    .background(when {
-                        !swiping -> Color.Transparent
-                        toLeading -> palette.swipeArchive
-                        else -> palette.swipeTrash
-                    })
-                    .padding(horizontal = 24.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = if (toLeading) Arrangement.Start else Arrangement.End,
-            ) {
-                // Nothing at all while the row is at rest: a coloured band behind an
-                // untouched row would read as a state the message is not in.
-                if (swiping && label != null) {
-                    Text(label, fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
-                        color = Color.White)
-                }
-            }
-        },
-    ) { Box(Modifier.fillMaxWidth().background(palette.bg)) { content() } }
-}
-
-/**
- * The bottom bar. Four tabs, not five: the reference draws a Calendar tab and
- * there is no calendar backend anywhere in the API, so drawing it would be a
- * control that goes nowhere — the one thing this sector was told not to ship.
- */
-@Composable
-private fun MailBottomBar(
-    selected: Int,
-    unread: Int?,
-    onContacts: () -> Unit,
-    onFiles: () -> Unit,
-    onMore: () -> Unit,
-) {
+internal fun BoxTabRow(activeBox: MailBox, counts: Map<MailBox, Int?>, onSelect: (MailBox) -> Unit) {
     val palette = LocalPalette.current
     Row(
-        Modifier.fillMaxWidth().background(palette.card).border(1.dp, palette.border)
-            .padding(vertical = 8.dp).testTag("mail-tabs"),
-        horizontalArrangement = Arrangement.SpaceAround,
+        Modifier.fillMaxWidth()
+            .horizontalScroll(rememberScrollState())
+            .padding(start = 16.dp, end = 16.dp, bottom = 10.dp)
+            .testTag("mail-box-tabs"),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        // No handler for Mail: it is the screen this bar is standing on.
-        TabItem(Icons.Rounded.Inbox, "Mail", selected == 0, unread)
-        TabItem(Icons.Rounded.Contacts, "Contacts", selected == 1) { onContacts() }
-        TabItem(Icons.Rounded.Description, "Files", selected == 2) { onFiles() }
-        TabItem(Icons.Rounded.MoreHoriz, "More", selected == 3) { onMore() }
+        BoxTab(MailBox.All.title, Icons.Outlined.Mail, palette.primarySolid, palette.tabBadgeAll,
+            counts[MailBox.All], activeBox == MailBox.All) { onSelect(MailBox.All) }
+        BoxTab(MailBox.Starred.title, Icons.Outlined.StarBorder, palette.star, palette.tabBadgeStarred,
+            counts[MailBox.Starred], activeBox == MailBox.Starred) { onSelect(MailBox.Starred) }
+        BoxTab(MailBox.Sent.title, Icons.AutoMirrored.Rounded.Send, palette.tabTintSent, palette.tabBadgeSent,
+            counts[MailBox.Sent], activeBox == MailBox.Sent) { onSelect(MailBox.Sent) }
+    }
+}
+
+internal val MailBottomClearance = 76.dp
+
+@Composable
+internal fun Modifier.mailListSurface(): Modifier {
+    val palette = LocalPalette.current
+    val shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
+    return padding(horizontal = 12.dp)
+        .clip(shape)
+        .background(palette.cardAlt)
+        .border(1.dp, palette.border, shape)
+}
+
+@Composable
+internal fun MailBottomControls(
+    inboxSelected: Boolean,
+    unread: Int?,
+    onMail: () -> Unit,
+    onCompose: () -> Unit,
+    onContacts: () -> Unit,
+    modifier: Modifier = Modifier,
+    visible: Boolean = true,
+) = MailBottomControls(
+    inboxSelected = inboxSelected,
+    unread = unread,
+    onMail = onMail,
+    onCompose = onCompose,
+    onContacts = onContacts,
+    modifier = modifier,
+    isVisible = { visible },
+)
+
+@Composable
+internal fun MailBottomControls(
+    inboxSelected: Boolean,
+    unread: Int?,
+    onMail: () -> Unit,
+    onCompose: () -> Unit,
+    onContacts: () -> Unit,
+    modifier: Modifier = Modifier,
+    isVisible: () -> Boolean,
+) {
+    val show = isVisible()
+    val fabBottom by animateDpAsState(
+        targetValue = if (show) 96.dp else 20.dp,
+        animationSpec = androidx.compose.animation.core.spring(
+            dampingRatio = androidx.compose.animation.core.Spring.DampingRatioLowBouncy,
+            stiffness = androidx.compose.animation.core.Spring.StiffnessMediumLow
+        ),
+        label = "compose bottom"
+    )
+    Box(modifier.fillMaxWidth(), contentAlignment = Alignment.BottomCenter) {
+        AnimatedVisibility(
+            visible = show,
+            enter = fadeIn(androidx.compose.animation.core.spring(stiffness = androidx.compose.animation.core.Spring.StiffnessMediumLow)) +
+                slideInVertically(androidx.compose.animation.core.spring(stiffness = androidx.compose.animation.core.Spring.StiffnessMediumLow)) { it / 2 },
+            exit = fadeOut(androidx.compose.animation.core.spring(stiffness = androidx.compose.animation.core.Spring.StiffnessMediumLow)) +
+                slideOutVertically(androidx.compose.animation.core.spring(stiffness = androidx.compose.animation.core.Spring.StiffnessMediumLow)) { it / 2 },
+        ) {
+            MailBottomBar(inboxSelected, unread, onMail, onContacts)
+        }
+        MailFab(
+            onCompose,
+            Modifier.align(Alignment.BottomEnd)
+                .padding(end = 20.dp, bottom = fabBottom).testTag("mail-compose"),
+            expanded = show
+        )
     }
 }
 
 @Composable
-private fun TabItem(icon: ImageVector, label: String, active: Boolean, badge: Int? = null,
-                    onClick: (() -> Unit)? = null) {
+internal fun MailBottomBar(
+    inboxSelected: Boolean,
+    unread: Int?,
+    onMail: () -> Unit,
+    onContacts: () -> Unit,
+    overList: Boolean = true,
+) {
     val palette = LocalPalette.current
-    Column(
-        // A tab that names the screen you are already on is not a destination, so
-        // it takes no click and no `clickable` at all — no ripple, no accessibility
-        // action, nothing for a tap to fall through to. A Button wired to an empty
-        // lambda is precisely the control-that-goes-nowhere this sector was told
-        // not to ship, and it is invisible to a screenshot: the frame looks right.
-        Modifier.then(if (onClick == null) Modifier else Modifier.clickable(onClick = onClick))
-            .padding(horizontal = 14.dp, vertical = 4.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Box(contentAlignment = Alignment.TopEnd) {
-            Icon(icon, null, tint = if (active) palette.primarySolid else palette.textTertiary,
-                modifier = Modifier.size(22.dp))
-            if (badge != null && badge > 0) {
-                // The count pill the reference draws, not a bare dot: a number
-                // the server answered, capped the way Gmail caps it.
-                Text(
-                    if (badge >= 100) "99+" else badge.toString(),
-                    fontSize = 10.sp, fontWeight = FontWeight.SemiBold,
-                    color = palette.onPrimary,
-                    modifier = Modifier.clip(RoundedCornerShape(50))
-                        .background(palette.primarySolid)
-                        .padding(horizontal = 5.dp, vertical = 2.dp),
-                )
-            }
+    Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.BottomCenter) {
+        if (overList) {
+            Box(
+                Modifier.fillMaxWidth().padding(horizontal = 13.dp).height(MailBottomClearance)
+                    .background(Brush.verticalGradient(listOf(Color.Transparent, palette.cardAlt))),
+            )
         }
-        Spacer(Modifier.height(3.dp))
-        Text(label, fontSize = 11.sp,
-            fontWeight = if (active) FontWeight.Medium else FontWeight.Normal,
-            color = if (active) palette.primarySolid else palette.textTertiary)
+        Row(
+            Modifier.padding(bottom = 12.dp)
+                .clip(RoundedCornerShape(16.dp))
+                .background(palette.card)
+                .testTag("mail-tabs"),
+        ) {
+            MailBarItem(Icons.Rounded.Email, "Mail", "mail-tab-Mail", active = inboxSelected,
+                unread = unread, onClick = onMail.takeUnless { inboxSelected && overList })
+            MailBarItem(Icons.Rounded.Contacts, "Contacts", "mail-tab-Contacts", onClick = onContacts)
+        }
+    }
+}
+
+@Composable
+private fun MailBarItem(
+    icon: ImageVector,
+    label: String,
+    tag: String,
+    active: Boolean = false,
+    unread: Int? = null,
+    onClick: (() -> Unit)? = null,
+) {
+    val palette = LocalPalette.current
+    val action = if (onClick == null) Modifier.semantics { selected = active }
+        else Modifier.clickable(role = Role.Button, onClick = onClick)
+    Box(Modifier.size(width = 84.dp, height = 46.dp).testTag(tag).then(action),
+        contentAlignment = Alignment.Center) {
+        val badgeCount = unread?.takeIf { it > 0 }
+        val description = badgeCount?.let { "$label, $it unread" } ?: label
+        Icon(icon, description, tint = if (active) palette.textPrimary else palette.textSecondary,
+            modifier = Modifier.size(24.dp))
+        badgeCount?.let {
+            Text(
+                if (it > 99) "99+" else it.toString(),
+                modifier = Modifier.align(Alignment.TopCenter)
+                    .padding(start = 28.dp, top = 2.dp)
+                    .clearAndSetSemantics {}
+                    .background(palette.unreadBadge, CircleShape)
+                    .padding(horizontal = 5.dp, vertical = 1.dp),
+                fontSize = 10.sp, lineHeight = 13.sp, color = Color.White, fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+            )
+        }
     }
 }
 
@@ -891,6 +1170,7 @@ internal fun MailDrawer(
     onScreener: () -> Unit,
     onSubscriptions: () -> Unit,
     onScheduled: () -> Unit,
+    onFiles: () -> Unit,
     onSortFilter: () -> Unit,
     onAdvanced: () -> Unit,
     onSettings: () -> Unit,
@@ -932,6 +1212,7 @@ internal fun MailDrawer(
         DrawerRow("Scheduled", Icons.Rounded.Schedule, null, selected = false) {
             onScheduled()
         }
+        DrawerRow("Files", Icons.Rounded.Description, null, selected = false) { onFiles() }
 
         // The search pill carries only the field now — the two glyphs that
         // cluttered it moved here, where every other tool lives. The pill is
@@ -1038,7 +1319,13 @@ internal fun MailSheet(onDismiss: () -> Unit, content: @Composable () -> Unit) {
     // seemed nicer": an app behaviour changed on a misreading is a change nobody
     // can defend later.
     val sheetState: SheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
-    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+        containerColor = LocalPalette.current.card,
+        contentColor = LocalPalette.current.textPrimary,
+    ) {
         // The root sets `testTagsAsResourceId` for the app's own tree, but a
         // ModalBottomSheet composes into its OWN window, and the property does not
         // cross that boundary — so every `gm-sheets-*` tag inside a sheet is
@@ -1214,6 +1501,7 @@ private fun AdvField(label: String, placeholder: String, value: String, onValue:
     Column(Modifier.fillMaxWidth().padding(vertical = 5.dp)) {
         Text(label, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = palette.textTertiary)
         androidx.compose.foundation.text.BasicTextField(
+            cursorBrush = androidx.compose.ui.graphics.SolidColor(LocalPalette.current.cursor),
             value = value,
             onValueChange = onValue,
             maxLines = 1,
@@ -1259,6 +1547,7 @@ internal fun AssignLabelContent(
     read: com.grapsee.grapmail.data.AssignmentsRead,
     note: String?,
     selectedCount: Int,
+    busy: Boolean,
     onPick: (String) -> Unit,
 ) {
     val palette = LocalPalette.current
@@ -1308,6 +1597,7 @@ internal fun AssignLabelContent(
             l.name,
             active = m == com.grapsee.grapmail.data.LabelMark.On,
             mixed = m == com.grapsee.grapmail.data.LabelMark.Mixed,
+            enabled = !busy,
         ) { onPick(l.id) }
     }
     note?.let {
@@ -1449,11 +1739,14 @@ private fun SheetOption(
      *  state this can describe — a filing target is either where the message is or
      *  it is not — so no other caller passes it. */
     mixed: Boolean = false,
+    enabled: Boolean = true,
     onClick: () -> Unit,
 ) {
     val palette = LocalPalette.current
     Row(
-        Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 20.dp, vertical = 13.dp),
+        Modifier.fillMaxWidth().clickable(enabled = enabled, onClick = onClick)
+            .padding(horizontal = 20.dp, vertical = 13.dp)
+            .alpha(if (enabled) 1f else 0.55f),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(label, fontSize = 15.sp, color = palette.textPrimary, modifier = Modifier.weight(1f))

@@ -1,16 +1,15 @@
 package com.grapsee.grapmail.ui.screens
 
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -20,32 +19,35 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.grapsee.grapmail.ui.components.GrapMailLogo
 import com.grapsee.grapmail.ui.components.GradientButton
 import com.grapsee.grapmail.ui.components.OutlineButton
+import com.grapsee.grapmail.ui.components.WelcomeHero
 import com.grapsee.grapmail.ui.theme.H1
 import com.grapsee.grapmail.ui.theme.LocalPalette
 
 /**
- * Welcome — founder design verbatim: logo + "Your world. Your inbox.",
- * "Welcome to / GrapMail" two-line headline, the 3D-envelope hero,
- * Create Account / Sign In with trailing arrows, legal line with the
- * Terms and Privacy names in brand blue.
+ * Welcome — the founder's 2026-11 frame: "Welcome to / GrapMail", the tiny
+ * promise line, the living-mailbox animation, then Create Account / Sign In
+ * with trailing arrows and the legal line in brand blue.
+ *
+ * The animation is the bundled `GrapMail_Autoplay_Mailbox.html` (see
+ * [WelcomeHero]): a 400 x 440 artwork that plays a full product tour by itself.
+ * It is handed exactly that aspect ratio and bounded to the column width, and
+ * the screen paints the backdrop behind it, so no second background shows.
+ *
+ * Scrollable first: on short phones and in landscape the hero plus the CTA pair
+ * and legal line must stay reachable; fixed spacers replace weighted spacers,
+ * which collapse to zero and clip content off-screen.
  */
 @Composable
 fun WelcomeScreen(onCreateAccount: () -> Unit, onSignIn: () -> Unit) {
     val palette = LocalPalette.current
-    // Scrollable first: on short phones and landscape the CTA pair and the
-    // legal line must stay reachable; fixed spacers replace the old weighted
-    // spacers, which collapse to zero and clip content off-screen.
     Column(
         Modifier
             .fillMaxSize()
@@ -54,11 +56,6 @@ fun WelcomeScreen(onCreateAccount: () -> Unit, onSignIn: () -> Unit) {
             .padding(horizontal = 24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Spacer(Modifier.height(48.dp))
-        GrapMailLogo(40.dp, wordmark = true)
-        Spacer(Modifier.height(6.dp))
-        Text("Your world. Your inbox.", fontSize = 13.sp, color = palette.textSecondary)
-
         Spacer(Modifier.height(56.dp))
 
         Text("Welcome to", style = H1, color = palette.textPrimary, textAlign = TextAlign.Center)
@@ -72,24 +69,25 @@ fun WelcomeScreen(onCreateAccount: () -> Unit, onSignIn: () -> Unit) {
             textAlign = TextAlign.Center,
         )
 
-        Spacer(Modifier.height(18.dp))
-        // The founder's real logo, uncropped — ContentScale.Fit inside a
-        // bounded box so the Create Account button never leaves a short screen.
-        androidx.compose.foundation.Image(
-            painter = androidx.compose.ui.res.painterResource(
-                com.grapsee.grapmail.R.drawable.grapmail_logo),
-            contentDescription = null,
-            modifier = Modifier.width(150.dp),
-            contentScale = androidx.compose.ui.layout.ContentScale.Fit,
+        // The hero is authored at 400 x 440. Bounded to 360dp so it sits inside
+        // the text column on wide phones/tablets, then centred by the parent.
+        Spacer(Modifier.height(16.dp))
+        WelcomeHero(
+            Modifier
+                .widthIn(max = 360.dp)
+                .fillMaxWidth()
+                .aspectRatio(400f / 440f)
         )
 
-        Spacer(Modifier.height(48.dp))
+        Spacer(Modifier.height(24.dp))
 
         GradientButton("Create Account", onCreateAccount, trailing = {
             Spacer(Modifier.size(10.dp))
             Icon(Icons.Rounded.ArrowForward, contentDescription = null, modifier = Modifier.size(18.dp))
         })
-        Spacer(Modifier.height(12.dp))
+        // The founder asked for air between the primary and the secondary CTA:
+        // 20dp, not the 12dp pair spacing used inside forms.
+        Spacer(Modifier.height(20.dp))
         OutlineButton("Sign In", onSignIn, trailing = {
             Spacer(Modifier.size(10.dp))
             Icon(Icons.Rounded.ArrowForward, contentDescription = null, modifier = Modifier.size(18.dp), tint = palette.textPrimary)

@@ -1,0 +1,119 @@
+name: Welcome hero screenshot (iOS)
+
+# The iOS twin of welcome-shot.yml: build the app, launch it on a fresh
+# simulator (no session, so the welcome screen is the first thing shown), and
+# photograph it in dark and light. No UI-test walk — this job exists to answer
+# "does the bundled animation sit in the right place on iOS", and a build plus a
+# launch is the whole question.
+#
+# The push trigger is the feature branch because a brand-new workflow cannot be
+# dispatched before it exists on the default branch. workflow_dispatch keeps the
+# manual re-shoot available once merged.
+on:
+  workflow_dispatch:
+  push:
+    branches: ["welcome-living-mailbox"]
+    paths:
+      - ".github/workflows/welcome-ios-shot.yml"
+      - "ios/GrapMail/GrapMail_Autoplay_Mailbox.html"
+      - "ios/GrapMail/WelcomeHeroView.swift"
+      - "ios/GrapMail/AuthScreens.swift"
+
+concurrency:
+  group: welcome-ios-shot-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  screenshot:
+    name: Shoot the welcome hero (iPhone simulator)
+    runs-on: macos-15
+    timeout-minutes: 40
+    env:
+      SCHEME: GrapMail
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        working-directory: ios
+        run: xcodegen generate
+
+      - name: Build for the simulator
+        working-directory: ios
+        run: |
+          set -o pipefail
+          xcodebuild build \
+            -project GrapMail.xcodeproj \
+            -scheme "$SCHEME" \
+            -configuration Debug \
+            -destination "generic/platform=iOS Simulator" \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO
+
+      - name: Resolve a simulator
+        id: sim
+        run: |
+          LINE=$(xcrun simctl list devices available | grep -m1 -E "iPhone 16 Pro \(|iPhone 16 \(|iPhone 15 \(" || true)
+          if [ -z "$LINE" ]; then
+            echo "::error::no iPhone simulator is available on this runner"
+            xcrun simctl list devices available >&2
+            exit 1
+          fi
+          UDID=$(echo "$LINE" | grep -oE "[0-9A-F-]{36}" | head -1)
+          echo "udid=$UDID" >> "$GITHUB_OUTPUT"
+          echo "Using simulator $LINE"
+
+      - name: Boot, install, launch, photograph
+        run: |
+          set -euo pipefail
+          UDID="${{ steps.sim.outputs.udid }}"
+          APP="ios/build/Build/Products/Debug-iphonesimulator/GrapMail.app"
+          OUT="welcome-shots-ios"
+          mkdir -p "$OUT"
+
+          xcrun simctl boot "$UDID" || true
+          xcrun simctl bootstatus "$UDID" -b
+          # The animation only exists if the file actually shipped in the app
+          # bundle; assert that before the screenshot can be mistaken for proof.
+          test -f "$APP/GrapMail_Autoplay_Mailbox.html" || {
+            echo "::error::GrapMail_Autoplay_Mailbox.html is not in the app bundle"
+            find "$APP" -maxdepth 1 -type f | sort
+            exit 1
+          }
+          xcrun simctl install "$UDID" "$APP"
+
+          # Dark first — the founder's frame.
+          xcrun simctl ui "$UDID" appearance dark
+          xcrun simctl launch "$UDID" com.grapsee.grapmail
+          sleep 6
+          xcrun simctl io "$UDID" screenshot "$OUT/welcome-dark-1.png"
+          sleep 4
+          xcrun simctl io "$UDID" screenshot "$OUT/welcome-dark-2.png"
+          sleep 4
+          xcrun simctl io "$UDID" screenshot "$OUT/welcome-dark-3.png"
+
+          # Then light.
+          xcrun simctl ui "$UDID" appearance light
+          sleep 3
+          xcrun simctl io "$UDID" screenshot "$OUT/welcome-light.png"
+
+          # Prove the tour is alive: two dark frames three seconds apart must
+          # differ. `sips` writes a tiny PPM-free comparison via `cmp` here —
+          # different compressed bytes is enough to show the hero is not frozen.
+          if cmp -s "$OUT/welcome-dark-1.png" "$OUT/welcome-dark-2.png"; then
+            echo "::error::the hero did not change between two frames — the tour is frozen"
+            exit 1
+          fi
+          echo "PASS: the hero moved between frames"
+
+          ls -la "$OUT"
+
+      - name: Upload the evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: welcome-hero-shots-ios
+          path: welcome-shots-ios/
+          if-no-files-found: warn

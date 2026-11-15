@@ -315,7 +315,7 @@ fun MailPrefsScreen(vm: ProfileViewModel, onBack: () -> Unit) {
                 BasicTextField(signature, { signature = it },
                     textStyle = TextStyle(fontSize = 15.sp, color = palette.textPrimary,
                         lineHeight = 22.sp),
-                    cursorBrush = SolidColor(palette.primarySolid),
+                    cursorBrush = androidx.compose.ui.graphics.SolidColor(LocalPalette.current.cursor),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
                     decorationBox = { inner ->
                         if (signature.isEmpty()) Text("— none —", fontSize = 15.sp,
@@ -354,7 +354,7 @@ fun MailPrefsScreen(vm: ProfileViewModel, onBack: () -> Unit) {
                         { v -> overrides = overrides + (address to v) },
                         textStyle = TextStyle(fontSize = 14.sp, color = palette.textPrimary,
                             lineHeight = 20.sp),
-                        cursorBrush = SolidColor(palette.primarySolid),
+                        cursorBrush = androidx.compose.ui.graphics.SolidColor(LocalPalette.current.cursor),
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
                         decorationBox = { inner ->
                             if (overrides[address].isNullOrEmpty()) Text("Uses the main signature",
@@ -842,48 +842,44 @@ fun ProfileEditScreen(vm: ProfileViewModel, onBack: () -> Unit) {
         contract = ActivityResultContracts.GetContent(),
     ) { uri: Uri? ->
         if (uri != null) photoScope.launch {
-            // Read the bytes, honour the server's own ceiling, and hand them to
-            // the upload route. A refusal says why in the same words the API
-            // uses — the screen never uploads something it already knows will
-            // be rejected.
             val ctx = vm.getApplication<android.app.Application>()
-            val (bytes, mime) = withContext(Dispatchers.IO) {
-                val resolver = ctx.contentResolver
-                val bytes = runCatching {
-                    resolver.openInputStream(uri)?.use { stream ->
-                        val buffer = ByteArray(256 * 1024 + 1)
-                        var count = 0
-                        while (count < buffer.size) {
-                            val read = stream.read(buffer, count, buffer.size - count)
-                            if (read <= 0) break
-                            count += read
+            val bytes = withContext(Dispatchers.IO) {
+                runCatching {
+                    val resolver = ctx.contentResolver
+                    val bitmap = if (android.os.Build.VERSION.SDK_INT >= 28) {
+                        android.graphics.ImageDecoder.decodeBitmap(android.graphics.ImageDecoder.createSource(resolver, uri)) { decoder, info, _ ->
+                            val width = info.size.width
+                            val height = info.size.height
+                            val scale = minOf(1f, 1024f / maxOf(width, height))
+                            decoder.setTargetSize((width * scale).toInt().coerceAtLeast(1), (height * scale).toInt().coerceAtLeast(1))
+                            decoder.allocator = android.graphics.ImageDecoder.ALLOCATOR_SOFTWARE
                         }
-                        buffer.copyOf(count)
+                    } else {
+                        val options = android.graphics.BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                        resolver.openInputStream(uri)?.use { android.graphics.BitmapFactory.decodeStream(it, null, options) }
+                        if (options.outWidth <= 0 || options.outHeight <= 0) return@runCatching null
+                        var sample = 1
+                        while (maxOf(options.outWidth, options.outHeight) / sample > 1024) sample *= 2
+                        options.inJustDecodeBounds = false
+                        options.inSampleSize = sample
+                        resolver.openInputStream(uri)?.use { android.graphics.BitmapFactory.decodeStream(it, null, options) }
+                            ?: return@runCatching null
+                    }
+                    java.io.ByteArrayOutputStream().use { output ->
+                        try {
+                            if (bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, output)) output.toByteArray()
+                            else null
+                        } finally {
+                            bitmap.recycle()
+                        }
                     }
                 }.getOrNull()
-                val mime = bytes?.takeIf { it.isNotEmpty() && it.size <= 256 * 1024 }?.let {
-                    val options = android.graphics.BitmapFactory.Options().apply { inJustDecodeBounds = true }
-                    android.graphics.BitmapFactory.decodeByteArray(it, 0, it.size, options)
-                    options.outMimeType
-                }
-                bytes to mime
             }
-            when {
-                bytes == null || bytes.isEmpty() -> photoError = "That file could not be read."
-                bytes.size > 256 * 1024 ->
-                    photoError = "That photo is too large. A profile photo can be up to 256 KB."
-                mime == null || mime !in setOf("image/png", "image/jpeg", "image/webp", "image/gif") ->
-                    photoError = "Choose a PNG, JPEG, WebP or GIF image."
-                else -> {
-                    val ext = when (mime) {
-                        "image/png" -> "png"
-                        "image/webp" -> "webp"
-                        "image/gif" -> "gif"
-                        else -> "jpg"
-                    }
-                    vm.uploadAvatar(bytes, "profile.$ext", mime)
-                    photoError = null
-                }
+            if (bytes == null || bytes.isEmpty()) {
+                photoError = "Couldn’t open that photo. Choose another image."
+            } else {
+                photoError = null
+                vm.uploadAvatar(bytes, "profile.png", "image/png")
             }
         }
     }

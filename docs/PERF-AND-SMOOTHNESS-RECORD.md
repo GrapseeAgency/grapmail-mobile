@@ -53,7 +53,7 @@ Founder-side build (their stated job):
 ```bash
 cd android
 export CI_KEYSTORE_FILE=/home/arafat/grapmail-release.jks
-export CI_KEYSTORE_PASSWORD=$(grep -i storePass /home/arafat/grapmail-release-credentials.txt | awk '{print $2}')
+export CI_KEYSTORE_PASSWORD=$(grep -i password /home/arafat/grapmail-release-credentials.txt | awk '{print $2}')
 export CI_KEYSTORE_ALIAS=grapmail
 ./gradlew assembleRelease   # app/build/outputs/apk/release/app-release.apk
 ```

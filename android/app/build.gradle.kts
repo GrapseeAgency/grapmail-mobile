@@ -78,8 +78,8 @@ android {
         // v0.6.0 / versionCode 9: the first release that can be signed with the
         // founder's distribution key (android.yml resolves CI_KEYSTORE_* secrets
         // and refuses to label a test-signed file as founder-signed).
-        versionCode = 10
-        versionName = "0.6.1"
+        versionCode = 1
+        versionName = "0.0.1"
         // Real account API — same contract the website uses.
         buildConfigField("String", "API_BASE", "\"https://grapsee.com/api\"")
     }
@@ -119,6 +119,12 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.6")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.6")
     implementation("androidx.navigation:navigation-compose:2.8.2")
+    // Delivers the baseline profile (`src/main/baseline-prof.txt`) to ART at
+    // install time, so the mailbox's hot paths — row render, scroll, thread
+    // open — are precompiled AOT instead of JIT-compiled mid-scroll on the
+    // first runs. This is the difference between emulator-smooth and
+    // real-device smooth, and it only costs the app its install size.
+    implementation("androidx.profileinstaller:profileinstaller:1.4.1")
 
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-graphics")

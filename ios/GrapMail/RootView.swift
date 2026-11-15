@@ -53,8 +53,9 @@ struct RootView: View {
         case secActivity, secAlert, secSecure
         case created(address: String, name: String)
         case createdAlt(address: String, name: String)
+        case onboarding(address: String, name: String)
         case home
-        case mailThread(id: String, isThread: Bool)
+        case mailThread(id: String, isThread: Bool, focus: String? = nil, more: Bool = false)
         // Compose carries an optional reply target and mode: empty reply opens
         // blank, "reply|all|forward" opens prepared from the full server row.
         case mailCompose(reply: String, mode: String, recipient: String = "")
@@ -113,6 +114,7 @@ struct RootView: View {
     /// screen. The hook outranks the restore because no real launch carries it.
     @State private var path: [Route] = []
     @State private var restoredSession = false
+    @State private var renewingSession = false
     /// The ten codes live in SecurityFlow.backupCodes, not a view @State, so
     /// SessionStore.clear() → SecurityFlow.reset() wipes them on sign-out. A
     /// plaintext recovery code left in the root view's memory after the account
@@ -171,22 +173,41 @@ struct RootView: View {
             .toolbar(.hidden, for: .navigationBar)
             .navigationBarBackButtonHidden(true)
             // The gateway's access token lives one hour; the refresh token is
-            // good for thirty days. A stored pair whose access token aged out
-            // is renewed silently here, so launching the morning after a
-            // sign-in does not present the sign-in screen to someone who is
-            // still signed in. The snapshot host never refreshes: the walk
-            // owns its own session.
+            // good for thirty days. A stored pair opens the locally-restored
+            // mailbox immediately; renewal must not sit between app launch and
+            // the first rendered frame. The mailbox can paint its actor cache
+            // while the single-flight renewal runs, and a genuinely dead token
+            // still reaches the `.gmSessionExpired` handler below on the first
+            // refused authenticated request.
             .task {
                 guard !restoredSession, SecuritySnapshot.requested() == nil else { return }
                 let generation = SessionStore.generation
                 let session = await SessionStore.launchSession()
                 guard !Task.isCancelled, generation == SessionStore.generation else { return }
-                var signedIn = session.unexpired
-                if session.stored && !signedIn { signedIn = await ApiClient.renewPair() != nil }
-                guard !Task.isCancelled, generation == SessionStore.generation else { return }
                 restoredSession = true
-                if signedIn, path.isEmpty { path = [.home] }
-                if shortcuts.pendingCompose { openComposeShortcut() }
+                if path.isEmpty {
+                    if session.stored { path = [.home] }
+                    else if !SessionStore.accounts().isEmpty { showRemainingAccount(or: []) }
+                }
+                if session.stored && !session.unexpired {
+                    renewingSession = true
+                    let renewal = await ApiClient.renewPairStatus()
+                    renewingSession = false
+                    guard !Task.isCancelled, generation == SessionStore.generation else { return }
+                    if shortcuts.pendingCompose, renewal == .renewed { openComposeShortcut() }
+                    if shortcuts.pendingCompose, renewal == .rejected, path.last != .signIn {
+                        path = [.signIn]
+                    }
+                    // A transient unavailable result keeps Home and the shortcut
+                    // pending. The normal authenticated retry/expiry path decides
+                    // later; a network outage is not evidence of bad credentials.
+                } else if shortcuts.pendingCompose {
+                    openComposeShortcut()
+                }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .gmSessionChanged)) { _ in
+                guard shortcuts.pendingCompose, restoredSession, SessionStore.hasValidSession else { return }
+                openComposeShortcut()
             }
             // A dead token is discovered by the server, not by us: the first
             // authenticated call that comes back 401 clears the Keychain and
@@ -196,13 +217,7 @@ struct RootView: View {
             // sign-in) never reach here — only a rejected bearer does.
             .onReceive(NotificationCenter.default.publisher(for: .gmSessionExpired)) { _ in
                 restoredSession = true
-                signedInModels.reset()
-                guard path.last != .signIn else { return }
-                // A dead token strands the unlocked private halves in this
-                // stack otherwise: the model outlives path rewrites, so the
-                // expiry route clears it exactly like a deliberate sign-out.
-                e2e.clearForSignOut()
-                path = [.signIn]
+                showRemainingAccount(or: [.signIn])
             }
             // A long-press on the icon that says "Compose mail" has to land in
             // the composer. The delegate parks the request until a stack exists
@@ -210,8 +225,11 @@ struct RootView: View {
             // request replayed on the next launch would open a composer nobody
             // asked for. Signed out, the honest route to writing a mail is
             // sign-in, not a composer whose every send would fail.
+            .onChange(of: shortcuts.pendingMail) { _ in openNotificationMail() }
+            .onChange(of: restoredSession) { _ in openNotificationMail() }
+            .onChange(of: renewingSession) { _ in openNotificationMail() }
             .onChange(of: shortcuts.pendingCompose) { pending in
-                guard pending, restoredSession else { return }
+                guard pending, restoredSession, !renewingSession else { return }
                 openComposeShortcut()
             }
             // The background poll is scheduled whenever this app goes away:
@@ -221,6 +239,18 @@ struct RootView: View {
                 MailPoll.scheduleNext()
             }
         }
+    }
+
+    private func openNotificationMail() {
+        guard restoredSession, !renewingSession, let target = shortcuts.pendingMail else { return }
+        shortcuts.pendingMail = nil
+        if target.account.caseInsensitiveCompare(SessionStore.address ?? "") != .orderedSame {
+            guard SessionStore.switchTo(target.account) else { return }
+            enterMailbox()
+        }
+        guard SessionStore.token != nil else { return }
+        path = [.home, .mailThread(id: target.threadId ?? target.messageId, isThread: target.threadId != nil, focus: target.messageId, more: target.more)]
+        if target.reply { path.append(.mailCompose(reply: target.messageId, mode: "reply")) }
     }
 
     private func openComposeShortcut() {
@@ -316,10 +346,7 @@ struct RootView: View {
                 case .signIn:
                     SignInView(
                         model: recovery,
-                        onSignedIn: { _ in
-                            path.removeAll()
-                            path.append(.home)
-                        },
+                        onSignedIn: { _ in enterMailbox() },
                         onBack: { path.removeLast() },
                         onSignUp: { path.append(.stepName) },
                         onForgotPassword: { path.append(.forgotPassword) },
@@ -328,15 +355,12 @@ struct RootView: View {
                     )
                 case .emailVerification:
                     EmailVerificationView(model: recovery,
-                                          onSignedIn: { _ in path = [.home] },
+                                          onSignedIn: { _ in enterMailbox() },
                                           onBack: { backToSignIn() })
                 case .twoFactor:
                     TwoFactorView(
                         model: recovery,
-                        onSignedIn: { _ in
-                            path.removeAll()
-                            path.append(.home)
-                        },
+                        onSignedIn: { _ in enterMailbox() },
                         onBack: { path.removeLast() },
                         onBackToSignIn: { backToSignIn() },
                         onUseBackupCode: { path.append(.backupCode) }
@@ -344,10 +368,7 @@ struct RootView: View {
                 case .backupCode:
                     BackupCodeView(
                         model: recovery,
-                        onSignedIn: { _ in
-                            path.removeAll()
-                            path.append(.home)
-                        },
+                        onSignedIn: { _ in enterMailbox() },
                         onBack: { path.removeLast() },
                         onTryAnotherMethod: { path.removeLast() },
                         onBackToSignIn: { backToSignIn() }
@@ -611,14 +632,14 @@ struct RootView: View {
                 case .humanVerify:
                     HumanVerifyView(model: model, onBack: { path.removeLast() }) {
                         let s = model.state
-                        path.append(.created(
+                        path.append(.onboarding(
                             address: s.createdAddress ?? "",
                             name: s.createdName ?? s.firstName
                         ))
                     }
                 case let .created(address, name):
                     AccountCreatedView(address: address, name: name) {
-                        path.append(.createdAlt(address: address, name: name))
+                        path.append(.onboarding(address: address, name: name))
                     }
                 case let .createdAlt(address, name):
                     AccountCreatedAltView(
@@ -629,6 +650,12 @@ struct RootView: View {
                             path.append(.home)
                         },
                         onContinueOnboarding: {
+                            path.append(.onboarding(address: address, name: name))
+                        }
+                    )
+                case let .onboarding(address, name):
+                    OnboardingView(
+                        onFinish: {
                             path.removeAll()
                             path.append(.home)
                         }
@@ -636,6 +663,27 @@ struct RootView: View {
             default:
                 mailDestination(route)
         }
+    }
+
+    private func enterMailbox() {
+        e2e.clearForSignOut()
+        signedInModels.reset()
+        path = [.home]
+    }
+
+    private func showRemainingAccount(or fallback: [Route]) {
+        if let next = SessionStore.accounts().first, SessionStore.switchTo(next.address) {
+            enterMailbox()
+        } else {
+            e2e.clearForSignOut()
+            signedInModels.reset()
+            path = fallback
+        }
+    }
+
+    private func signOutOfMailbox() {
+        SessionStore.clear()
+        showRemainingAccount(or: [])
     }
 
     /// The signed-in world: mailbox, account record, encryption,
@@ -664,14 +712,14 @@ struct RootView: View {
                         onHelp: openSupport,
                         onContacts: { path.append(.mailContacts) },
                         onFiles: { path.append(.mailFiles) },
-                        onSignOut: {
-                            e2e.clearForSignOut()
-                            SessionStore.clear()
-                            signedInModels.reset()
-                            path.removeAll()
+                        onSignOut: signOutOfMailbox,
+                        onAddAccount: { path.append(.signIn) },
+                        onSwitchAccount: { address in
+                            if SessionStore.switchTo(address) { enterMailbox() }
                         }
                     )
-                case let .mailThread(id, isThread):
+                    .id(SessionStore.generation)
+                case let .mailThread(id, isThread, focus, more):
                     ThreadView(
                         vm: mail, e2e: e2e, id: id, isThread: isThread,
                         onBack: { path.removeLast() },
@@ -690,7 +738,9 @@ struct RootView: View {
                         onStepNext: { step in
                             path.removeLast()
                             path.append(.mailThread(id: step.id, isThread: step.isThread))
-                        }
+                        },
+                        onContacts: { path.append(.mailContacts) },
+                        initialMessageId: focus, openMessageActions: more
                     )
                 case let .mailCompose(reply, mode, recipient):
                     ComposeView(vm: mail, account: account, e2e: e2e, replyId: reply, mode: mode,
@@ -740,12 +790,7 @@ struct RootView: View {
                         onPrivacy: { path.append(.accountPrivacy) },
                         onEncryption: { path.append(.e2eStatus) },
                         onHelp: { path.append(.mailSupport) },
-                        onSignOut: {
-                            e2e.clearForSignOut()
-                            SessionStore.clear()
-                            signedInModels.reset()
-                            path.removeAll()
-                        }
+                        onSignOut: signOutOfMailbox
                     )
                 case .mailNotes:
                     NotesView(vm: account, onBack: { path.removeLast() })

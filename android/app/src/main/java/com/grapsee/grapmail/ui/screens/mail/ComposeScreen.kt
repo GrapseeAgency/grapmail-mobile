@@ -99,6 +99,7 @@ fun ComposeScreen(
     val context = LocalContext.current
     val scope = androidx.compose.runtime.rememberCoroutineScope()
     val state by vm.compose.collectAsStateWithLifecycle()
+    val waitingForDraft = mode == "draft" && !state.accepted && state.draftId != replyId
     val profileState by profile.state.collectAsStateWithLifecycle()
     val e2eState by e2e.state.collectAsStateWithLifecycle()
     val attached = remember { mutableStateListOf<MailAttachmentDto>() }
@@ -113,7 +114,7 @@ fun ComposeScreen(
     }
     val close = {
         if (!state.sending && !uploading && !preparingSend) {
-            if (!state.accepted && (attached.isNotEmpty() ||
+            if (!waitingForDraft && !state.accepted && (attached.isNotEmpty() ||
                     listOf(state.to, state.cc, state.subject, state.body).any { it.isNotBlank() })
             ) {
                 saveDraft(onBack)
@@ -125,6 +126,7 @@ fun ComposeScreen(
     BackHandler(onBack = close)
     var showCc by remember { mutableStateOf(false) }
     var showEmoji by remember { mutableStateOf(false) }
+    var showFormatting by remember { mutableStateOf(false) }
     // The encryption choice. It can only be ON when this device holds an
     // unlocked key -- a toggle that sealed with a locked key would fail on
     // send, and a failure at send time is the worst place to learn the key
@@ -241,7 +243,7 @@ fun ComposeScreen(
             }
         }
     }
-    val sendEnabled = !state.sending && !state.accepted && !preparingSend && !uploading && !state.pendingSend
+    val sendEnabled = !waitingForDraft && !state.sending && !state.accepted && !preparingSend && !uploading && !state.pendingSend
     Column(Modifier.fillMaxSize().background(palette.bg).statusBarsPadding().imePadding()) {
         // The undo-send window: the message is held on this device for five
         // seconds, and this bar is its whole story — nothing has been sent,
@@ -284,6 +286,21 @@ Spacer(Modifier.width(10.dp))
                 modifier = Modifier.size(22.dp).clip(CircleShape)
                     .clickable(enabled = sendEnabled, onClick = sendMessage)
                     .padding(2.dp).testTag("mail-send"))
+        }
+
+        if (waitingForDraft) {
+            Column(Modifier.fillMaxWidth().padding(20.dp)) {
+                val error = state.error
+                if (error == null) {
+                    Text("Opening draft…", color = palette.textSecondary)
+                } else {
+                    Text(error, color = palette.textPrimary)
+                    androidx.compose.material3.TextButton(onClick = { vm.prepareReply(replyId, mode, signature) }) {
+                        Text("Try again")
+                    }
+                }
+            }
+            return@Column
         }
 
         // Fields on top, the body filling everything between them and the
@@ -365,8 +382,7 @@ Spacer(Modifier.width(10.dp))
                     Text("Unlock your key to encrypt — it locks when the app closes.",
                         fontSize = 12.sp, color = palette.textTertiary)
                 } else if (encryptOn) {
-                    Text("Only the recipients' published keys can open this. The server will " +
-                        "store a notice, not your text.",
+                    Text("Only the recipients can open this message. Encrypted messages are sent as plain text.",
                         fontSize = 12.sp, color = palette.textTertiary)
                 }
                 Spacer(Modifier.height(4.dp))
@@ -377,8 +393,23 @@ Spacer(Modifier.width(10.dp))
             // fragile in frame 76's photograph (the bar floated mid-screen).
             // The Box takes the leftover height, unconditionally; the text
             // paints inside it at the same insets as before.
+            androidx.compose.material3.TextButton(onClick = {
+                if (showFormatting || state.bodyHtml != null) {
+                    showFormatting = false
+                    vm.composeUpdate { it.copy(bodyHtml = null) }
+                } else showFormatting = true
+            }) {
+                Text(if (showFormatting || state.bodyHtml != null) "Switch to plain text" else "Format message")
+            }
             Box(Modifier.weight(1f).heightIn(min = 240.dp)) {
-                BasicTextField(
+                if (showFormatting || state.bodyHtml != null) {
+                    ComposeFormattingEditor(
+                        state.body, state.bodyHtml,
+                        onChange = { text, html -> vm.composeUpdate { it.copy(body = text, bodyHtml = html) } },
+                        modifier = Modifier.fillMaxSize().testTag("mail-body-field"),
+                    )
+                } else BasicTextField(
+                    cursorBrush = androidx.compose.ui.graphics.SolidColor(LocalPalette.current.cursor),
                     value = state.body,
                     onValueChange = { vm.composeUpdate { s -> s.copy(body = it) } },
                     // The tag names the signed state because the walk needs a
@@ -445,7 +476,10 @@ Spacer(Modifier.width(10.dp))
             // smaller and duller than anything the buttons produce. It yields
             // to the receipt entirely when one exists — the send verdict is
             // the sentence this area exists for.
-            if (state.resultStatus == null) {
+            if (state.resultStatus == null && state.error != null) {
+                Text(state.error.orEmpty(), color = palette.error, fontSize = 12.sp)
+            }
+            if (state.resultStatus == null && state.error == null) {
                 val autosaveNote = state.autosaveNote
                 when {
                     state.autosaving -> {
@@ -468,15 +502,15 @@ Spacer(Modifier.width(10.dp))
                     modifier = Modifier.size(20.dp).clickable { pickFile.launch(arrayOf("*/*")) })
                 Icon(Icons.Rounded.Image, "Attach an image", tint = palette.textSecondary,
                     modifier = Modifier.size(20.dp).clickable { pickImage.launch("image/*") })
-                Icon(Icons.Rounded.Link, "Insert a link", tint = palette.textSecondary,
+                if (!showFormatting && state.bodyHtml == null) Icon(Icons.Rounded.Link, "Insert a link", tint = palette.textSecondary,
                     modifier = Modifier.size(20.dp).clickable {
                         vm.composeUpdate { s -> s.copy(body = if (s.body.isBlank()) "https://" else "${s.body}\n\nhttps://") }
                     })
-                Icon(Icons.Rounded.EmojiEmotions, "Insert an emoji", tint = palette.textSecondary,
+                if (!showFormatting && state.bodyHtml == null) Icon(Icons.Rounded.EmojiEmotions, "Insert an emoji", tint = palette.textSecondary,
                     modifier = Modifier.size(20.dp).clickable { showEmoji = !showEmoji })
             }
 
-            if (showEmoji) {
+            if (showEmoji && !showFormatting && state.bodyHtml == null) {
                 // Inserting a character, not opening a panel that goes nowhere.
                 Row(Modifier.fillMaxWidth().padding(bottom = 10.dp),
                     horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -526,6 +560,7 @@ private fun FieldRow(
     ) {
         Text(label, fontSize = 14.sp, color = palette.textSecondary, modifier = Modifier.width(56.dp))
         BasicTextField(
+            cursorBrush = androidx.compose.ui.graphics.SolidColor(LocalPalette.current.cursor),
             value = value,
             onValueChange = onValue,
             maxLines = 3,
@@ -569,7 +604,7 @@ internal fun SendReceipt(status: String, detail: String?, error: String?) {
         // beneath a line saying "Saved to Drafts". iOS already handles `draft`:
         // this is parity, and the headline stays the server's own word.
         "draft" -> "Saved to Drafts" to palette.successInk
-        else -> "Server reported: $status" to palette.warnInk
+        else -> "Delivery could not be confirmed" to palette.warnInk
     }
     Column(
         Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(palette.softFill)
@@ -607,42 +642,51 @@ private suspend fun uploadOne(
     report: (String) -> Unit,
 ) {
     val maxBytes = 25 * 1024 * 1024
-    val (name, mime, bytes) = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-        val resolver = context.contentResolver
-        val name = queryName(context, uri) ?: uri.lastPathSegment ?: "attachment"
-        val mime = runCatching { resolver.getType(uri) }.getOrNull() ?: "application/octet-stream"
-        val bytes = runCatching {
-            resolver.openInputStream(uri)?.use { stream ->
-                val output = java.io.ByteArrayOutputStream()
-                val buffer = ByteArray(32 * 1024)
-                var remaining = maxBytes + 1
-                while (remaining > 0) {
-                    kotlinx.coroutines.currentCoroutineContext().ensureActive()
-                    val count = stream.read(buffer, 0, minOf(buffer.size, remaining))
-                    if (count < 0) break
-                    output.write(buffer, 0, count)
-                    remaining -= count
-                }
-                output.toByteArray()
-            }
-        }.getOrElse { error ->
-            if (error is kotlinx.coroutines.CancellationException) throw error
-            null
-        }
-        Triple(name, mime, bytes)
-    }
-    if (bytes == null) { report("That file could not be read."); return }
-    if (bytes.size > maxBytes) { report("That file exceeds the 25 MB attachment limit."); return }
-    if (bytes.isEmpty()) { report("That file is empty."); return }
-    report("Uploading ${name}…")
+    val session = com.grapsee.grapmail.data.SessionStore.snapshot(context)
+        ?: run { report("Sign in again to attach a file."); return }
+    val temporary = java.io.File(context.cacheDir, "upload-${java.util.UUID.randomUUID()}")
     try {
-        val attachment = vm.uploadAttachment(bytes, name, mime)
+        val (name, mime, size) = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            val resolver = context.contentResolver
+            val name = queryName(context, uri) ?: uri.lastPathSegment ?: "attachment"
+            val mime = runCatching { resolver.getType(uri) }.getOrNull() ?: "application/octet-stream"
+            val size = runCatching {
+                val stream = resolver.openInputStream(uri) ?: return@runCatching null
+                stream.use { input ->
+                    temporary.outputStream().buffered().use { output ->
+                        val buffer = ByteArray(32 * 1024)
+                        var remaining = maxBytes + 1
+                        while (remaining > 0) {
+                            kotlinx.coroutines.currentCoroutineContext().ensureActive()
+                            val count = input.read(buffer, 0, minOf(buffer.size, remaining))
+                            if (count < 0) break
+                            output.write(buffer, 0, count)
+                            remaining -= count
+                        }
+                        maxBytes + 1 - remaining
+                    }
+                }
+            }.getOrElse { error ->
+                if (error is kotlinx.coroutines.CancellationException) throw error
+                null
+            }
+            Triple(name, mime, size)
+        }
+        if (size == null) { report("That file could not be read."); return }
+        if (size > maxBytes) { report("That file exceeds the 25 MB attachment limit."); return }
+        if (size == 0) { report("That file is empty."); return }
+        report("Uploading ${name}…")
+        val attachment = vm.uploadAttachment(temporary, name, mime, session.id)
         into.add(attachment)
         report("Attached ${attachment.name ?: name}.")
     } catch (error: kotlinx.coroutines.CancellationException) {
         throw error
     } catch (error: Exception) {
         report(error.message ?: "This file could not be attached.")
+    } finally {
+        kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable + kotlinx.coroutines.Dispatchers.IO) {
+            temporary.delete()
+        }
     }
 }
 

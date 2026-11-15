@@ -1,10 +1,12 @@
 package com.grapsee.grapmail.ui.components
 
+import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -45,6 +47,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -305,21 +312,35 @@ fun SenderAvatar(display: String, address: String?, size: Dp = 40.dp, modifier: 
  * list is sorted by time, so an invented timestamp would also invent the order.
  */
 fun mailTime(iso: String?, now: Date = Date()): String? {
+    if (iso.isNullOrBlank()) return null
+    val tz = TimeZone.getDefault()
+    val nowMillis = now.time
+    val cacheKey = tz.id + '\u0000' + iso + '\u0000' + (nowMillis / 60_000)
+    formattedMailTimes.get(cacheKey)?.let { return it }
+
     val millis = parseMailIso(iso) ?: return null
     val then = Calendar.getInstance().apply { timeInMillis = millis }
     val today = Calendar.getInstance().apply { time = now }
     val sameYear = then.get(Calendar.YEAR) == today.get(Calendar.YEAR)
     val sameDay = sameYear && then.get(Calendar.DAY_OF_YEAR) == today.get(Calendar.DAY_OF_YEAR)
-    if (sameDay) return mailDateFormatter("h:mm a").format(Date(millis))
-    val yesterday = (today.clone() as Calendar).apply { add(Calendar.DAY_OF_YEAR, -1) }
-    if (then.get(Calendar.YEAR) == yesterday.get(Calendar.YEAR) &&
-        then.get(Calendar.DAY_OF_YEAR) == yesterday.get(Calendar.DAY_OF_YEAR))
-        return "Yesterday"
-    if (then.get(Calendar.YEAR) == today.get(Calendar.YEAR))
-        return mailDateFormatter("MMM d").format(Date(millis))
-    return mailDateFormatter("MMM d, yyyy").format(Date(millis))
+    val formatted = if (sameDay) {
+        mailDateFormatter("h:mm a").format(Date(millis))
+    } else {
+        val yesterday = (today.clone() as Calendar).apply { add(Calendar.DAY_OF_YEAR, -1) }
+        if (then.get(Calendar.YEAR) == yesterday.get(Calendar.YEAR) &&
+            then.get(Calendar.DAY_OF_YEAR) == yesterday.get(Calendar.DAY_OF_YEAR)) {
+            "Yesterday"
+        } else if (then.get(Calendar.YEAR) == today.get(Calendar.YEAR)) {
+            mailDateFormatter("MMM d").format(Date(millis))
+        } else {
+            mailDateFormatter("MMM d, yyyy").format(Date(millis))
+        }
+    }
+    formattedMailTimes.put(cacheKey, formatted)
+    return formatted
 }
 
+private val formattedMailTimes = android.util.LruCache<String, String>(2_048)
 private val mailDateFormatters = ThreadLocal.withInitial { mutableMapOf<String, SimpleDateFormat>() }
 
 private fun mailDateFormatter(pattern: String): SimpleDateFormat =
@@ -333,14 +354,22 @@ private val mailDatePatterns = listOf(
     "yyyy-MM-dd'T'HH:mm:ss.SSSXXX", "yyyy-MM-dd'T'HH:mm:ssXXX",
     "yyyy-MM-dd'T'HH:mm:ss'Z'", "yyyy-MM-dd'T'HH:mm:ssZ", "yyyy-MM-dd HH:mm:ss",
 )
+private val parsedMailDates = android.util.LruCache<String, Long>(1_024)
 
 /** ISO-8601 with or without fractional seconds and zone; null if unparseable. */
 private fun parseMailIso(iso: String?): Long? {
     if (iso.isNullOrBlank()) return null
+    // Zone-less server dates use the current local zone, so changing zones must
+    // not reuse a value parsed under the previous one.
+    val cacheKey = TimeZone.getDefault().id + '\u0000' + iso
+    parsedMailDates.get(cacheKey)?.let { return it }
     for (p in mailDatePatterns) {
         runCatching {
             mailDateFormatter(p).parse(iso)?.time
-        }.getOrNull()?.let { return it }
+        }.getOrNull()?.let {
+            parsedMailDates.put(cacheKey, it)
+            return it
+        }
     }
     return null
 }
@@ -389,8 +418,9 @@ fun MessageRow(
             .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.Top,
     ) {
-        // Selection checkbox or the unread dot — the same slot, because a row is
-        // either being read or being picked.
+        // Selection checkbox or nothing — the unread dot moved to the time
+        // column, where the reference puts it (beside the clock), so this slot
+        // is only ever a picking affordance.
         if (selecting) {
             Box(Modifier.size(22.dp).clip(RoundedCornerShape(6.dp))
                 .border(1.5.dp, if (selected) palette.primarySolid else palette.border, RoundedCornerShape(6.dp))
@@ -400,10 +430,7 @@ fun MessageRow(
             }
             Spacer(Modifier.width(10.dp))
         } else {
-            Box(Modifier.padding(top = 15.dp).size(8.dp), contentAlignment = Alignment.Center) {
-                if (!message.isRead) Box(Modifier.size(8.dp).clip(CircleShape).background(palette.primarySolid))
-            }
-            Spacer(Modifier.width(8.dp))
+            Spacer(Modifier.width(4.dp))
         }
 
         SenderAvatar(message.from?.display ?: "", message.from?.address)
@@ -421,10 +448,10 @@ fun MessageRow(
                     modifier = Modifier.weight(1f),
                 )
                 Spacer(Modifier.width(8.dp))
-                val time = mailTime(message.createdAt)
-                if (time != null) {
-                    Text(time, fontSize = 12.sp, color = palette.textTertiary, maxLines = 1)
-                }
+                // The clock and the unread dot live in the right-hand column
+                // now, the reference's own position: date at the top of the
+                // row, dot beside it, star underneath. One fixed-width column
+                // also means a long date can no longer squeeze the sender line.
             }
             Text(
                 message.subjectOrNone,
@@ -453,22 +480,35 @@ fun MessageRow(
         }
 
         Spacer(Modifier.width(8.dp))
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            if (message.hasAttachments) {
-                Icon(Icons.Rounded.AttachFile, "Has attachments", tint = palette.textTertiary,
-                    modifier = Modifier.size(16.dp))
-                Spacer(Modifier.height(6.dp))
+        Column(horizontalAlignment = Alignment.End) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (!message.isRead) {
+                    Box(Modifier.size(8.dp).clip(CircleShape).background(palette.primarySolid))
+                    Spacer(Modifier.width(5.dp))
+                }
+                val time = mailTime(message.createdAt)
+                if (time != null) {
+                    Text(time, fontSize = 12.sp, color = palette.textTertiary, maxLines = 1)
+                }
             }
-            Icon(
-                if (message.isStarred) Icons.Rounded.Star else Icons.Rounded.StarBorder,
-                if (message.isStarred) "Starred" else "Star",
-                // The token, not a literal. This row is what the dark screenshot of
-                // the home photographs, and a hardcoded light amber renders a
-                // different star from the thread's for the very same message.
-                tint = if (message.isStarred) palette.star else palette.textTertiary,
-                modifier = Modifier.size(20.dp).clip(CircleShape)
-                    .clickable { onStar() }.padding(2.dp),
-            )
+            Spacer(Modifier.height(6.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (message.hasAttachments) {
+                    Icon(Icons.Rounded.AttachFile, "Has attachments", tint = palette.textTertiary,
+                        modifier = Modifier.size(15.dp))
+                    Spacer(Modifier.width(5.dp))
+                }
+                Icon(
+                    if (message.isStarred) Icons.Rounded.Star else Icons.Rounded.StarBorder,
+                    if (message.isStarred) "Starred" else "Star",
+                    // The token, not a literal. This row is what the dark screenshot of
+                    // the home photographs, and a hardcoded light amber renders a
+                    // different star from the thread's for the very same message.
+                    tint = if (message.isStarred) palette.star else palette.textTertiary,
+                    modifier = Modifier.size(20.dp).clip(CircleShape)
+                        .clickable { onStar() }.padding(2.dp),
+                )
+            }
         }
     }
 }
@@ -538,26 +578,40 @@ fun LabelChip(
     }
 }
 
-/** A box tab with the underline the reference shows on the active one. */
 @Composable
-fun BoxTab(title: String, count: Int?, active: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
+fun BoxTab(
+    title: String,
+    icon: ImageVector,
+    tint: Color,
+    badgeColor: Color,
+    count: Int?,
+    active: Boolean,
+    onClick: () -> Unit,
+) {
     val palette = LocalPalette.current
-    Column(modifier.clickable(onClick = onClick).padding(horizontal = 14.dp, vertical = 10.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(title, fontSize = 14.sp,
-                fontWeight = if (active) FontWeight.SemiBold else FontWeight.Normal,
-                // One line, always: inside a scrollable tab row a wrapping
-                // label is the bug, not the fallback.
+    Row(
+        Modifier.testTag("mail-box-tab-$title")
+            .clip(CircleShape)
+            .background(if (active) tint.copy(alpha = 0.14f) else palette.card)
+            .border(1.dp, if (active) tint else palette.border, CircleShape)
+            .selectable(selected = active, role = Role.Tab, onClick = onClick)
+            .height(44.dp)
+            .padding(horizontal = 10.dp),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(icon, null, tint = tint, modifier = Modifier.size(17.dp))
+        Text(title, color = palette.textPrimary, fontSize = 13.sp,
+            fontWeight = FontWeight.Medium, softWrap = false, maxLines = 1)
+        if (count != null && count > 0) {
+            Text(
+                if (count > 99) "99+" else count.toString(),
+                color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.SemiBold,
                 softWrap = false, maxLines = 1,
-                color = if (active) palette.primarySolid else palette.textSecondary)
-            if (count != null) {
-                Spacer(Modifier.width(6.dp))
-                CountBadge(count)
-            }
+                modifier = Modifier.background(badgeColor, CircleShape)
+                    .padding(horizontal = 6.dp, vertical = 2.dp),
+            )
         }
-        Spacer(Modifier.height(6.dp))
-        Box(Modifier.fillMaxWidth().height(2.dp)
-            .background(if (active) palette.primarySolid else Color.Transparent))
     }
 }
 
@@ -570,21 +624,24 @@ fun BoxTab(title: String, count: Int?, active: Boolean, onClick: () -> Unit, mod
  * a walk that breaks whenever the list scrolls, so it names itself.
  */
 @Composable
-fun MailFab(onClick: () -> Unit, modifier: Modifier = Modifier) {
+fun MailFab(onClick: () -> Unit, modifier: Modifier = Modifier, expanded: Boolean = true) {
     val palette = LocalPalette.current
-    // The extended pill, as the reference draws it: glyph + word, not a bare
-    // circle. The word names the affordance a 56dp dot never said out loud.
     Row(
         modifier
-            .clip(RoundedCornerShape(16.dp))
+            .clip(RoundedCornerShape(24.dp))
             .background(palette.primarySolid)
-            .clickable(onClick = onClick)
-            .padding(horizontal = 20.dp, vertical = 16.dp),
+            .clickable(role = Role.Button, onClick = onClick)
+            .semantics { contentDescription = "Compose" }
+            .animateContentSize(alignment = Alignment.CenterEnd)
+            .height(48.dp)
+            .padding(horizontal = if (expanded) 20.dp else 14.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(Icons.Rounded.Edit, "Compose", tint = palette.onPrimary, modifier = Modifier.size(20.dp))
-        Spacer(Modifier.width(10.dp))
-        Text("Compose", fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = palette.onPrimary)
+        Icon(Icons.Rounded.Edit, null, tint = palette.onPrimary, modifier = Modifier.size(20.dp))
+        if (expanded) {
+            Spacer(Modifier.width(10.dp))
+            Text("Compose", fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = palette.onPrimary)
+        }
     }
 }
 
@@ -675,6 +732,7 @@ fun MailStateBlock(
     failed: Boolean,
     noMailbox: Boolean,
     empty: Boolean,
+    filtered: Boolean = false,
     boxTitle: String,
     onRetry: () -> Unit,
     content: @Composable () -> Unit,
@@ -698,9 +756,15 @@ fun MailStateBlock(
             palette, action = "Try again" to onRetry,
         )
 
+        empty && boxTitle == "Inbox" && !filtered -> CenteredState(
+            "Welcome home to GrapMail",
+            "Your inbox is fresh, quiet, and completely protected.",
+            palette,
+        )
+
         else -> CenteredState(
-            "$boxTitle is empty",
-            "No messages here yet.",
+            if (filtered) "No matching messages" else "$boxTitle is empty",
+            if (filtered) "Try changing your search or filters." else "No messages here yet.",
             palette,
         )
     }

@@ -1,0 +1,83 @@
+name: Welcome hero screenshot
+
+# The welcome screen is the one screen every install sees first, and its hero is
+# a WebView — the one part of the UI a Compose preview cannot photograph. This
+# walk exists so a change to the bundled animation or its frame is answered with
+# a picture from a real Android emulator instead of an opinion.
+#
+# It asserts the things that actually go wrong with an embedded artwork:
+#   * exactly ONE hero (two would paint two backdrops or two tours),
+#   * the frame keeps the artwork's authored 400x440 ratio,
+#   * it sits between the promise line and Create Account, horizontally centred,
+#   * it is not blank, and two frames three seconds apart differ (the tour runs).
+#
+# Pushing the feature branch triggers it because workflow_dispatch cannot reach
+# a workflow that does not exist on the default branch yet. Once merged, the
+# manual dispatch entry is the normal way to re-shoot the screen.
+on:
+  workflow_dispatch:
+  push:
+    branches: ["welcome-living-mailbox"]
+    paths:
+      - ".github/workflows/welcome-shot.yml"
+      - "android/app/src/main/assets/GrapMail_Autoplay_Mailbox.html"
+      - "android/app/src/main/java/com/grapsee/grapmail/ui/components/WelcomeHero.kt"
+      - "scripts/welcome-shot.sh"
+      - "android/app/src/main/java/com/grapsee/grapmail/ui/screens/WelcomeScreen.kt"
+
+concurrency:
+  group: welcome-shot-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  screenshot:
+    name: Shoot the welcome hero (Pixel 6, Android 14)
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Build the debug APK
+        working-directory: android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon
+
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' \
+            | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Install, open, and photograph the welcome screen
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          arch: x86_64
+          target: google_apis
+          profile: pixel_6
+          emulator-boot-timeout: 900
+          # Deliberately NOT disabled: animator_duration_scale=0 is what Android
+          # WebView reports as prefers-reduced-motion, and the point of this walk
+          # is the animated frame, not a still.
+          disable-animations: false
+          emulator-options: -no-window -no-audio -no-boot-anim -gpu swiftshader_indirect -no-snapshot
+          # The walk itself lives in scripts/welcome-shot.sh: this action runs
+          # its `script` input one line at a time, which breaks loops and
+          # heredocs written inline. The file is bash and can be run by hand.
+          script: bash scripts/welcome-shot.sh
+
+      - name: Upload the evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: welcome-hero-shots
+          path: welcome-shots/
+          if-no-files-found: warn

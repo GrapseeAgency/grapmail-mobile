@@ -95,6 +95,18 @@ fun MailSnapshotScreen(name: String) {
     // and the walk waits for that settled state before it photographs.
     LaunchedEffect(name) {
         when (name) {
+            // The real home, not a frame of its rows: its chrome, its one
+            // rounded card and its real LazyColumn are the things under test,
+            // and a stand-in list would photograph a shape the screen does not
+            // draw. `snapshotMode` keeps every boot read from overwriting the
+            // seed; the rows and account are literals below.
+            "mail-home" -> {
+                seedRows(vm)
+                vm.seedForSnapshot {
+                    it.copy(accountName = "Amira Rahman",
+                        accountAddress = "amira@grapmail.com")
+                }
+            }
             // The id goes with the body: the thread screen asks the model for its
             // conversation on appear, and the model has to know this one is already
             // here rather than fetching over it and landing on an error state.
@@ -210,8 +222,7 @@ fun MailSnapshotScreen(name: String) {
             // name for it would be a second copy of a screen rather than a second
             // piece of data — and it was one, launched by nothing, until the name-set
             // pin in `scripts/mail-honesty.py` made an unlaunched case illegal.
-            "mail-home" -> listFrame(rows, MailBox.Inbox, loading = false,
-                failed = false, noMailbox = false)
+            "mail-home" -> liveHomeFrame(vm)
             // No `mail-drawer`, `mail-search` or `mail-sort-filter` case, and no
             // `drawerFrame`/`searchFrame` to draw them: frames 62, 67 and 69 are
             // photographed from the LIVE screen on both platforms (the walk opens the
@@ -248,6 +259,7 @@ fun MailSnapshotScreen(name: String) {
                     read = com.grapsee.grapmail.data.AssignmentsRead.Read,
                     note = null,
                     selectedCount = 3,
+                    busy = false,
                 ) { }
             }
             "mail-snooze-sheet" -> sheetHost { SnoozeContent { } }
@@ -281,19 +293,19 @@ fun MailSnapshotScreen(name: String) {
             "mail-label-create" -> LabelCreateScreen(vm, onDone = {})
             "mail-thread" -> ThreadScreen(vm, e2eVm, threadId = "t-m1", isThread = true,
                 onBack = {}, onReply = { _, _ -> },
-                onStepPrev = { }, onStepNext = { })
+                onStepPrev = {}, onStepNext = {}, onContacts = {})
             // The live reader again, over a message whose only part is HTML: the
-            // frame photographs the images gate, the stepper's honest range and
-            // the reader's own read-state control, none of which a CI mailbox
+            // frame photographs the images gate, the formatted preview and the reader's
+            // own read-state control, none of which a CI mailbox
             // can produce. The closures do nothing, as everywhere in this host —
             // a walk that tapped them would be asking a sender's server for
             // bytes on a reserved address, which proves nothing about the gate.
             "mail-thread-images" -> ThreadScreen(vm, e2eVm, threadId = "t-n2", isThread = true,
                 onBack = {}, onReply = { _, _ -> },
-                onStepPrev = { }, onStepNext = { })
+                onStepPrev = {}, onStepNext = {}, onContacts = {})
             "mail-thread-encrypted" -> ThreadScreen(vm, e2eVm, threadId = "t-m9", isThread = true,
                 onBack = {}, onReply = { _, _ -> },
-                onStepPrev = {}, onStepNext = {})
+                onStepPrev = {}, onStepNext = {}, onContacts = {})
             "mail-compose" -> ComposeScreen(vm = vm, profile = profileVm, e2e = e2eVm, onBack = {})
             "mail-send-receipt" -> sheetHost {
                 // The live `SendReceipt` composable, with the strings a server
@@ -659,26 +671,26 @@ private fun seedHtmlThread(vm: MailboxViewModel) {
             subject = "This week in letterforms",
             isRead = true,
             createdAt = "2026-10-28T08:00:00Z",
-            bodyHtml = "<html><body><p>The kerning quarrels, mostly, and one " +
-                "risograph plate that printed better than the mockup.</p>" +
-                "<img src=\"https://images.newsletter.example/plate-1.png\">" +
-                "<img src=\"https://images.newsletter.example/pixel.gif?m=n2\"></body></html>",
+            hasHtml = true,
         ),
     ))
-    // The formatted body is planted beside the row: the images-off variant the
-    // body endpoint would return — sanitized markup with the remote sources
-    // already moved to `data-grapmail-blocked-src` (one real image, one
-    // tracking pixel, both blocked, both rendered as alt-text chips by the
-    // island). No sanitizer runs here: the string is a developer-authored
-    // sample of the endpoint's output, not a processing of the seed's raw
-    // HTML, which stays in the row for the images-gate count.
+    // A branded newsletter and two blocked images as returned by the body endpoint.
     vm.seedBodyForSnapshot("n2", MailboxViewModel.BodyRender(
-        html = "<p>The kerning quarrels, mostly, and one risograph plate that " +
-            "printed better than the mockup.</p>" +
-            "<img alt=\"Risograph plate 1\" " +
-            "data-grapmail-blocked-src=\"https://images.newsletter.example/plate-1.png\">" +
-            "<img alt=\"Open-rate pixel\" " +
-            "data-grapmail-blocked-src=\"https://images.newsletter.example/pixel.gif?m=n2\">",
+        html = """
+            <table width="600" cellpadding="0" cellspacing="0" style="width:100%;border-collapse:separate;background-color:#f5f1ed;border-radius:18px">
+              <tr><td style="padding:24px;background-color:#202936;border-radius:18px;color:#ffffff;font-family:Arial,sans-serif">
+                <p style="margin:0;color:#f9c9b0;font-size:12px;font-weight:700;letter-spacing:2px">THE WEEKLY DRAFT</p>
+                <h1 style="margin:12px 0;font-size:34px;line-height:1.1">This week in letterforms.</h1>
+                <p style="margin:0;color:#e2e8f0;font-size:15px;line-height:1.6">A new set of experiments in type, texture, and print.</p>
+              </td></tr>
+              <tr><td style="padding:24px;color:#202936;font-family:Arial,sans-serif">
+                <h2 style="margin:0 0 8px;font-size:20px">From the studio</h2>
+                <p style="margin:0 0 18px;font-size:15px;line-height:1.6">The kerning quarrels, mostly, and one risograph plate that printed better than the mockup.</p>
+                <a href="https://newsletter.example/design" target="_blank" rel="noopener noreferrer nofollow" style="display:inline-block;padding:10px 16px;border-radius:8px;background-color:#202936;color:#ffffff;text-decoration:none;font-weight:600">Explore the design ↗</a>
+              </td></tr>
+            </table>
+            <p><img alt="Risograph plate 1" data-blocked-src="https://images.newsletter.example/plate-1.png"><img alt="Open-rate pixel" data-blocked-src="https://images.newsletter.example/pixel.gif?m=n2"></p>
+            """.trimIndent(),
         blockedImages = 2,
     ))
 }
@@ -720,6 +732,33 @@ private fun seedThread(vm: MailboxViewModel, id: String, encrypted: Boolean) {
 
 // ── frames ───────────────────────────────────────────────────────────────────
 
+/// The live mailbox home over the seeded state: the screen a person opens, with
+/// every door wired to nothing. Rendering it here is what lets the frame
+/// photograph — and measure — the actual LazyColumn and the actual card rather
+/// than a look-alike list. It was added after the rounded card landed, when the
+/// old host photograph turned out to be a picture of a different list.
+@Composable
+private fun liveHomeFrame(vm: MailboxViewModel) {
+    MailboxScreen(
+        vm = vm,
+        onOpenThread = { _, _ -> },
+        onCompose = {},
+        onOpenDraft = {},
+        onProfile = {},
+        onSettings = {},
+        onSecurity = {},
+        onHelp = {},
+        onLabels = {},
+        onContacts = {},
+        onFiles = {},
+        onScreener = {},
+        onSubscriptions = {},
+        onScheduled = {},
+        onSignOut = {},
+        onAddAccount = {},
+    )
+}
+
 /// The list states, drawn by the same [MailStateBlock] the live screen uses. The
 /// difference between empty, failed and no-mailbox is the thing being
 /// photographed, so it must not be re-implemented here.
@@ -732,32 +771,56 @@ private fun listFrame(
     noMailbox: Boolean,
 ) {
     val palette = LocalPalette.current
-    // The frame takes its values as arguments instead of seeding the view model:
-    // writing a flow during composition is a side effect in the wrong place, and
-    // this screen is the one place that already knows exactly what it wants to
-    // draw. The components are the live ones, so the photograph is of them.
-    Column(Modifier.fillMaxSize()) {
-        Box(Modifier.fillMaxWidth().weight(1f)) {
-            MailStateBlock(
-                loading = loading,
-                failed = failed,
-                noMailbox = noMailbox,
-                empty = shown.isEmpty(),
-                boxTitle = box.title,
-                onRetry = {},
+    // The frame draws the live home chrome — top bar, search pill, the one
+    // rounded card, the floating bottom bar, the compose pill — because the
+    // shape of the card IS the screen now. Photographing only the rows left the
+    // container, the thing the design is made of, out of every picture. The
+    // components are the live ones: only the data is literal.
+    Box(Modifier.fillMaxSize().background(palette.bg)) {
+        Column(Modifier.fillMaxSize()) {
+            MailTopBar(
+                onMenu = {}, onProfile = {}, accountName = "Amira Rahman",
+                accountAddress = "amira@grapmail.com", onSettings = {}, onSignOut = {},
+                loadUnreads = { emptyMap() },
+                onSwitchAccount = {}, onAddAccount = {},
             ) {
-                Column(Modifier.verticalScroll(rememberScrollState())) {
-                    shown.forEach { row ->
-                        MessageRow(
-                            message = row, selected = false,
-                            onSelect = {}, onOpen = {}, onStar = {}, selecting = false,
-                        )
-                        Box(Modifier.fillMaxWidth().padding(horizontal = 16.dp)
-                            .height(1.dp).background(palette.border))
+                SearchField(query = "", onQuery = {}, onFilter = {}, filterActive = false,
+                    onAdvanced = {}, advActive = false)
+            }
+            Text(
+                box.title,
+                modifier = Modifier.padding(start = 16.dp, bottom = 8.dp),
+                color = palette.textSecondary,
+                fontSize = 13.sp,
+                fontWeight = androidx.compose.ui.text.font.FontWeight.Medium,
+            )
+            BoxTabRow(box, mapOf(MailBox.All to 12, MailBox.Starred to 3, MailBox.Sent to 24), onSelect = {})
+            Box(
+                Modifier.fillMaxWidth().weight(1f)
+                    .mailListSurface(),
+            ) {
+                MailStateBlock(
+                    loading = loading,
+                    failed = failed,
+                    noMailbox = noMailbox,
+                    empty = shown.isEmpty(),
+                    boxTitle = box.title,
+                    onRetry = {},
+                ) {
+                    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())
+                        .padding(bottom = MailBottomClearance)) {
+                        shown.forEach { row ->
+                            MessageRow(
+                                message = row, selected = false,
+                                onSelect = {}, onOpen = {}, onStar = {}, selecting = false,
+                            )
+                        }
                     }
                 }
             }
         }
+        MailBottomControls(inboxSelected = box == MailBox.Inbox, unread = 7, onMail = {}, onCompose = {},
+            onContacts = {}, modifier = Modifier.align(Alignment.BottomCenter))
     }
 }
 
