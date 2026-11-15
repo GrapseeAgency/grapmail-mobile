@@ -293,19 +293,19 @@ fun MailSnapshotScreen(name: String) {
             "mail-label-create" -> LabelCreateScreen(vm, onDone = {})
             "mail-thread" -> ThreadScreen(vm, e2eVm, threadId = "t-m1", isThread = true,
                 onBack = {}, onReply = { _, _ -> },
-                onStepPrev = { }, onStepNext = { })
+                onStepPrev = {}, onStepNext = {}, onContacts = {})
             // The live reader again, over a message whose only part is HTML: the
-            // frame photographs the images gate, the stepper's honest range and
-            // the reader's own read-state control, none of which a CI mailbox
+            // frame photographs the images gate, the formatted preview and the reader's
+            // own read-state control, none of which a CI mailbox
             // can produce. The closures do nothing, as everywhere in this host —
             // a walk that tapped them would be asking a sender's server for
             // bytes on a reserved address, which proves nothing about the gate.
             "mail-thread-images" -> ThreadScreen(vm, e2eVm, threadId = "t-n2", isThread = true,
                 onBack = {}, onReply = { _, _ -> },
-                onStepPrev = { }, onStepNext = { })
+                onStepPrev = {}, onStepNext = {}, onContacts = {})
             "mail-thread-encrypted" -> ThreadScreen(vm, e2eVm, threadId = "t-m9", isThread = true,
                 onBack = {}, onReply = { _, _ -> },
-                onStepPrev = {}, onStepNext = {})
+                onStepPrev = {}, onStepNext = {}, onContacts = {})
             "mail-compose" -> ComposeScreen(vm = vm, profile = profileVm, e2e = e2eVm, onBack = {})
             "mail-send-receipt" -> sheetHost {
                 // The live `SendReceipt` composable, with the strings a server
@@ -674,20 +674,23 @@ private fun seedHtmlThread(vm: MailboxViewModel) {
             hasHtml = true,
         ),
     ))
-    // The formatted body is planted beside the row: the images-off variant the
-    // body endpoint would return — sanitized markup with the remote sources
-    // already moved to `data-grapmail-blocked-src` (one real image, one
-    // tracking pixel, both blocked, both rendered as alt-text chips by the
-    // island). No sanitizer runs here: the string is a developer-authored
-    // sample of the endpoint's output, not a processing of the seed's raw
-    // HTML, which stays in the row for the images-gate count.
+    // A branded newsletter and two blocked images as returned by the body endpoint.
     vm.seedBodyForSnapshot("n2", MailboxViewModel.BodyRender(
-        html = "<p>The kerning quarrels, mostly, and one risograph plate that " +
-            "printed better than the mockup.</p>" +
-            "<img alt=\"Risograph plate 1\" " +
-            "data-grapmail-blocked-src=\"https://images.newsletter.example/plate-1.png\">" +
-            "<img alt=\"Open-rate pixel\" " +
-            "data-grapmail-blocked-src=\"https://images.newsletter.example/pixel.gif?m=n2\">",
+        html = """
+            <table width="600" cellpadding="0" cellspacing="0" style="width:100%;border-collapse:separate;background-color:#f5f1ed;border-radius:18px">
+              <tr><td style="padding:24px;background-color:#202936;border-radius:18px;color:#ffffff;font-family:Arial,sans-serif">
+                <p style="margin:0;color:#f9c9b0;font-size:12px;font-weight:700;letter-spacing:2px">THE WEEKLY DRAFT</p>
+                <h1 style="margin:12px 0;font-size:34px;line-height:1.1">This week in letterforms.</h1>
+                <p style="margin:0;color:#e2e8f0;font-size:15px;line-height:1.6">A new set of experiments in type, texture, and print.</p>
+              </td></tr>
+              <tr><td style="padding:24px;color:#202936;font-family:Arial,sans-serif">
+                <h2 style="margin:0 0 8px;font-size:20px">From the studio</h2>
+                <p style="margin:0 0 18px;font-size:15px;line-height:1.6">The kerning quarrels, mostly, and one risograph plate that printed better than the mockup.</p>
+                <a href="https://newsletter.example/design" target="_blank" rel="noopener noreferrer nofollow" style="display:inline-block;padding:10px 16px;border-radius:8px;background-color:#202936;color:#ffffff;text-decoration:none;font-weight:600">Explore the design ↗</a>
+              </td></tr>
+            </table>
+            <p><img alt="Risograph plate 1" data-blocked-src="https://images.newsletter.example/plate-1.png"><img alt="Open-rate pixel" data-blocked-src="https://images.newsletter.example/pixel.gif?m=n2"></p>
+            """.trimIndent(),
         blockedImages = 2,
     ))
 }

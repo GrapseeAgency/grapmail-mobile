@@ -547,7 +547,7 @@ fun MailboxScreen(
 
             MailBottomControls(
                 modifier = Modifier.align(Alignment.BottomCenter),
-                visible = controlsVisible || !listState.canScrollBackward,
+                isVisible = { controlsVisible || !listState.canScrollBackward },
                 inboxSelected = state.box == MailBox.Inbox,
                 unread = state.unreadCount,
                 onMail = { vm.open(MailBox.Inbox) },
@@ -899,29 +899,70 @@ internal fun MailBottomControls(
     onContacts: () -> Unit,
     modifier: Modifier = Modifier,
     visible: Boolean = true,
+) = MailBottomControls(
+    inboxSelected = inboxSelected,
+    unread = unread,
+    onMail = onMail,
+    onCompose = onCompose,
+    onContacts = onContacts,
+    modifier = modifier,
+    isVisible = { visible },
+)
+
+@Composable
+internal fun MailBottomControls(
+    inboxSelected: Boolean,
+    unread: Int?,
+    onMail: () -> Unit,
+    onCompose: () -> Unit,
+    onContacts: () -> Unit,
+    modifier: Modifier = Modifier,
+    isVisible: () -> Boolean,
 ) {
-    val fabBottom by animateDpAsState(if (visible) 96.dp else 20.dp, label = "compose bottom")
+    val show = isVisible()
+    val fabBottom by animateDpAsState(
+        targetValue = if (show) 96.dp else 20.dp,
+        animationSpec = androidx.compose.animation.core.spring(
+            dampingRatio = androidx.compose.animation.core.Spring.DampingRatioLowBouncy,
+            stiffness = androidx.compose.animation.core.Spring.StiffnessMediumLow
+        ),
+        label = "compose bottom"
+    )
     Box(modifier.fillMaxWidth(), contentAlignment = Alignment.BottomCenter) {
         AnimatedVisibility(
-            visible = visible,
-            enter = fadeIn() + slideInVertically { it / 2 },
-            exit = fadeOut() + slideOutVertically { it / 2 },
+            visible = show,
+            enter = fadeIn(androidx.compose.animation.core.spring(stiffness = androidx.compose.animation.core.Spring.StiffnessMediumLow)) +
+                slideInVertically(androidx.compose.animation.core.spring(stiffness = androidx.compose.animation.core.Spring.StiffnessMediumLow)) { it / 2 },
+            exit = fadeOut(androidx.compose.animation.core.spring(stiffness = androidx.compose.animation.core.Spring.StiffnessMediumLow)) +
+                slideOutVertically(androidx.compose.animation.core.spring(stiffness = androidx.compose.animation.core.Spring.StiffnessMediumLow)) { it / 2 },
         ) {
             MailBottomBar(inboxSelected, unread, onMail, onContacts)
         }
-        MailFab(onCompose, Modifier.align(Alignment.BottomEnd)
-            .padding(end = 20.dp, bottom = fabBottom).testTag("mail-compose"), expanded = visible)
+        MailFab(
+            onCompose,
+            Modifier.align(Alignment.BottomEnd)
+                .padding(end = 20.dp, bottom = fabBottom).testTag("mail-compose"),
+            expanded = show
+        )
     }
 }
 
 @Composable
-private fun MailBottomBar(inboxSelected: Boolean, unread: Int?, onMail: () -> Unit, onContacts: () -> Unit) {
+internal fun MailBottomBar(
+    inboxSelected: Boolean,
+    unread: Int?,
+    onMail: () -> Unit,
+    onContacts: () -> Unit,
+    overList: Boolean = true,
+) {
     val palette = LocalPalette.current
     Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.BottomCenter) {
-        Box(
-            Modifier.fillMaxWidth().padding(horizontal = 13.dp).height(MailBottomClearance)
-                .background(Brush.verticalGradient(listOf(Color.Transparent, palette.cardAlt))),
-        )
+        if (overList) {
+            Box(
+                Modifier.fillMaxWidth().padding(horizontal = 13.dp).height(MailBottomClearance)
+                    .background(Brush.verticalGradient(listOf(Color.Transparent, palette.cardAlt))),
+            )
+        }
         Row(
             Modifier.padding(bottom = 12.dp)
                 .clip(RoundedCornerShape(16.dp))
@@ -929,7 +970,7 @@ private fun MailBottomBar(inboxSelected: Boolean, unread: Int?, onMail: () -> Un
                 .testTag("mail-tabs"),
         ) {
             MailBarItem(Icons.Rounded.Email, "Mail", "mail-tab-Mail", active = inboxSelected,
-                unread = unread, onClick = onMail.takeUnless { inboxSelected })
+                unread = unread, onClick = onMail.takeUnless { inboxSelected && overList })
             MailBarItem(Icons.Rounded.Contacts, "Contacts", "mail-tab-Contacts", onClick = onContacts)
         }
     }

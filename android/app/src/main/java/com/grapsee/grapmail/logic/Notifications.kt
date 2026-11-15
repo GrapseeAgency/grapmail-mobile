@@ -8,11 +8,17 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.Color
+import android.graphics.Paint
+import android.graphics.Typeface
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import com.grapsee.grapmail.MainActivity
 import com.grapsee.grapmail.R
+import com.grapsee.grapmail.data.MailMessageDto
 
 /**
  * The mail channel and the two producers it carries.
@@ -97,17 +103,23 @@ object Notifications {
      * permission, or a system that would not take it — which the caller reports
      * as "nothing announced", never as a success.
      */
-    fun newMail(context: Context, grew: Int, total: Int): Boolean {
+    fun newMail(context: Context, grew: Int, total: Int, message: MailMessageDto? = null): Boolean {
         if (!allowed(context)) return false
         ensureChannel(context)
+        val sender = message?.from?.display?.trim()?.takeIf { it.isNotEmpty() }
+        val summary = "$total unread in the inbox"
+        val subject = message?.subject?.takeIf { it.isNotBlank() } ?: "(no subject)"
         val content = NotificationCompat.Builder(context, CHANNEL_NEW_MAIL)
             // The small icon is a monochrome alpha silhouette — the platform tints it;
             // the full-color mark only ever appears on the launcher and the splash.
             .setSmallIcon(R.mipmap.ic_launcher_monochrome)
-            .setContentTitle("$grew new message" + (if (grew == 1) "" else "s"))
-            .setContentText("$total unread in the inbox")
-            .setStyle(androidx.core.app.NotificationCompat.InboxStyle()
-                .setSummaryText("$total unread in the inbox"))
+            .setContentTitle(sender ?: "$grew new message" + (if (grew == 1) "" else "s"))
+            .setContentText(if (sender != null) subject else summary)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(if (sender != null) subject else summary))
+            .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
+            .apply {
+                if (sender != null) setLargeIcon(senderAvatar(sender, message?.from?.address ?: sender))
+            }
             .setContentIntent(pendingOpen(context))
             .setAutoCancel(true)
             .build()
@@ -147,6 +159,21 @@ object Notifications {
         } catch (e: SecurityException) {
             false
         }
+    }
+
+    private fun senderAvatar(sender: String, identity: String): Bitmap {
+        val bitmap = Bitmap.createBitmap(128, 128, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(bitmap)
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+        paint.color = Color.HSVToColor(floatArrayOf(Math.floorMod(identity.lowercase().hashCode(), 360).toFloat(), 0.65f, 0.63f))
+        canvas.drawCircle(64f, 64f, 64f, paint)
+        paint.color = Color.WHITE
+        paint.textSize = 56f
+        paint.textAlign = Paint.Align.CENTER
+        paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        val initial = String(Character.toChars(sender.codePointAt(0))).uppercase()
+        canvas.drawText(initial, 64f, 64f - (paint.ascent() + paint.descent()) / 2f, paint)
+        return bitmap
     }
 
     private fun pendingOpen(context: Context) = PendingIntent.getActivity(

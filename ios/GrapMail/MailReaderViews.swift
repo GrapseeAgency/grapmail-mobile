@@ -1,20 +1,8 @@
 import SwiftUI
+import Combine
 import UIKit
 import UniformTypeIdentifiers
 
-/// One conversation. The same layout carries the encrypted branch, because an
-/// undecryptable body is one state of a message, not a different screen.
-///
-/// ── WHY `bodyHtml` IS NOT RENDERED ─────────────────────────────────────────
-/// The route hands back the HTML exactly as the sender wrote it. Rendering it in
-/// a WebView would give a remote message control of the app: it could load
-/// remote images (a tracking pixel that tells the sender the mail was read),
-/// restyle itself to look like a system warning, or run script. There is no
-/// sanitiser in this app's dependencies, and the correct one is not a regex.
-///
-/// So the body comes from `bodyText`. When a message has only an HTML part the
-/// tags are stripped for display and the screen says so — a visible, honest
-/// downgrade rather than a silent one.
 struct ThreadView: View {
     @ObservedObject var vm: MailboxModel
     /// The encryption sector's state, for the decrypt path on an encrypted
@@ -35,12 +23,22 @@ struct ThreadView: View {
     /// reader does not know the order, and it must not guess the route.
     let onStepPrev: (MailStep) -> Void
     let onStepNext: (MailStep) -> Void
+    let onContacts: () -> Void
+    @Environment(\.scenePhase) private var scenePhase
     /// Per-attachment, not global: a download result belongs to the row that
     /// asked for it, and a shared variable would let a later failure overwrite an
     /// earlier success on screen.
     @State private var notices: [String: String] = [:]
-    @State private var busy: String?
+    @State private var downloading: Set<String> = []
+    @State private var isVisible = false
     @State private var expandedMessageId: String?
+    @State private var pendingAction = false
+    @State private var filed: [String: MailAction] = [:]
+    @State private var feedback: [String: (text: String, error: Bool)] = [:]
+
+    private var activeMessage: MailMessageFull? {
+        vm.thread.messages.first { $0.id == expandedMessageId } ?? vm.thread.messages.last
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -51,113 +49,192 @@ struct ThreadView: View {
                 failedBody(error)
             } else {
                 ScrollView {
-                    LazyVStack(spacing: 0) {
+                    LazyVStack(spacing: 8) {
+                        subjectHeader
                         if isThread && (vm.thread.hasMore || vm.thread.loadingEarlier) {
                             ReaderOutlineButton(
-                                vm.thread.loadingEarlier
-                                    ? "Loading earlier messages…"
-                                    : "Load earlier messages",
+                                vm.thread.loadingEarlier ? "Loading earlier messages…" : "Load earlier messages",
                                 identifier: "mail-thread-load-earlier",
                                 action: { vm.loadEarlierThread(id) }
                             )
                             .disabled(vm.thread.loadingEarlier)
-                            .padding(.horizontal, 16).padding(.vertical, 10)
                         }
-                        ForEach(Array(vm.thread.messages.enumerated()), id: \.element.id) { index, m in
+                        ForEach(vm.thread.messages) { message in
                             ThreadMessageCard(
                                 vm: vm,
-                                message: m,
+                                message: message,
                                 e2e: e2e,
-                                expanded: expandedMessageId == m.id,
-                                onExpand: { expandedMessageId = m.id },
-                                busy: busy == m.id,
+                                expanded: activeMessage?.id == message.id,
+                                onExpand: { expandedMessageId = message.id },
+                                downloading: downloading,
                                 notices: notices,
-                                onReply: { mode in onReply(m.id, mode) },
-                                onStar: {
-                                    busy = m.id
-                                    vm.actOn(m.id, m.isStarred ? .unstar : .star)
-                                    busy = nil
-                                },
-                                onDownload: { a in
-                                    busy = a.id
-                                    vm.downloadAttachment(a) { outcome in
-                                        busy = nil
-                                        notices[a.id] = outcome
+                                onReply: { mode in onReply(message.id, mode) },
+                                onDownload: { attachment in
+                                    downloading.insert(attachment.id)
+                                    vm.downloadAttachment(attachment) { outcome in
+                                        downloading.remove(attachment.id)
+                                        notices[attachment.id] = outcome
                                     }
                                 }
                             )
-                            if index < vm.thread.messages.count - 1 {
-                                Rectangle().fill(GM.border).frame(height: 1)
-                            }
                         }
                     }
+                    .padding(.horizontal, 12)
+                    .padding(.top, 8)
+                    .padding(.bottom, 16)
+                }
+                if let activeMessage {
+                    if let outcome = feedback[activeMessage.id] {
+                        Text(outcome.text)
+                            .font(.system(size: 12))
+                            .foregroundColor(outcome.error ? GM.error : GM.textSecondary)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.horizontal, 18)
+                            .padding(.vertical, 4)
+                    }
+                    replyBar(for: activeMessage)
+                    MailBottomBar(inboxSelected: true, unread: vm.state.unreadCount,
+                                  onMail: onBack, onContacts: onContacts, overList: false)
                 }
             }
         }
-        .background(GM.bg)
+        .background(GM.bg.ignoresSafeArea())
         .task(id: MailStep(id: id, isThread: isThread)) {
             expandedMessageId = nil
             isThread ? vm.openThread(id) : vm.openMessage(id)
         }
-        .task(id: vm.thread.messages.last?.id) {
-            if expandedMessageId == nil { expandedMessageId = vm.thread.messages.last?.id }
+        .onAppear { isVisible = true }
+        .onReceive(NotificationCenter.default.publisher(for: MailPoll.didReadStats)) { notification in
+            guard isVisible, scenePhase == .active, let result = notification.object as? MailPoll.PollResult else { return }
+            vm.acceptPoll(result, atTop: false)
         }
-        .onDisappear { vm.leaveReader(id, isThread: isThread) }
+        .onDisappear {
+            isVisible = false
+            vm.leaveReader(id, isThread: isThread)
+        }
         .accessibilityIdentifier("mail-thread")
     }
 
     private var header: some View {
-        HStack(spacing: 12) {
-            Button(action: onBack) {
-                Image(systemName: "chevron.backward")
-                    .font(.system(size: 17, weight: .semibold))
-                    .foregroundColor(GM.textPrimary)
+        HStack(spacing: 0) {
+            ReaderIconButton("Back", icon: "chevron.backward", action: onBack)
+            Spacer(minLength: 0)
+            if let message = activeMessage {
+                if ![.archive, .spam, .trash].contains(vm.state.box) {
+                    ReaderIconButton("Archive message", icon: "archivebox") {
+                        file(message, action: .archive, success: "Message archived.")
+                    }
+                    .disabled(pendingAction || filed[message.id] != nil)
+                }
+                if vm.state.box != .trash {
+                    ReaderIconButton("Move message to Trash", icon: "trash") {
+                        file(message, action: .trash, success: "Message moved to Trash.")
+                    }
+                    .disabled(pendingAction || filed[message.id] == .trash)
+                }
+                if message.isRead {
+                    ReaderIconButton("Mark unread", icon: "envelope.badge") {
+                        pendingAction = true
+                        vm.markUnread(message.id) { error in
+                            pendingAction = false
+                            feedback[message.id] = (error ?? "Marked unread.", error != nil)
+                        }
+                    }
+                    .disabled(pendingAction)
+                    .accessibilityIdentifier("mail-mark-unread")
+                }
             }
-            .accessibilityLabel("Back")
-            Text(vm.thread.messages.count > 1
-                 ? "\(vm.thread.messages.count) messages" : "Message")
-                .font(.system(size: 16, weight: .semibold))
-                .foregroundColor(GM.textPrimary)
-            Spacer()
-            // Step through the mail the list already showed, without walking
-            // back to it. The label counts LOADED rows, not the box's total:
-            // a chevron that ran off the end of what is actually here would
-            // be a button that goes nowhere.
             let near = vm.neighbours(of: id)
-            let at = vm.loadedPosition(of: id)
-            let total = vm.loadedRowCount()
-            if at > 0 && total > 1 {
-                Text("\(at) of \(total) loaded")
-                    .font(.system(size: 12))
-                    .foregroundColor(GM.textTertiary)
-                Button {
-                    if let prior = near.prev { onStepPrev(prior) }
+            if near.prev != nil || near.next != nil {
+                Menu {
+                    let at = vm.loadedPosition(of: id)
+                    let total = vm.loadedRowCount()
+                    if at > 0 && total > 1 { Text("\(at) of \(total) loaded") }
+                    Button("Previous message") { if let step = near.prev { onStepPrev(step) } }
+                        .disabled(near.prev == nil)
+                        .accessibilityIdentifier("mail-thread-prev")
+                    Button("Next message") { if let step = near.next { onStepNext(step) } }
+                        .disabled(near.next == nil)
+                        .accessibilityIdentifier("mail-thread-next")
                 } label: {
-                    Image(systemName: "chevron.backward")
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundColor(near.prev == nil ? GM.textTertiary : GM.textPrimary)
+                    Image(systemName: "ellipsis")
+                        .font(.system(size: 19, weight: .medium))
+                        .foregroundColor(GM.textPrimary)
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
                 }
-                .disabled(near.prev == nil)
-                .accessibilityLabel("Previous message")
-                .accessibilityIdentifier("mail-thread-prev")
-                Button {
-                    if let next = near.next { onStepNext(next) }
-                } label: {
-                    Image(systemName: "chevron.forward")
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundColor(near.next == nil ? GM.textTertiary : GM.textPrimary)
-                }
-                .disabled(near.next == nil)
-                .accessibilityLabel("Next message")
-                .accessibilityIdentifier("mail-thread-next")
-            }
-            if vm.thread.messages.first?.isStarred == true {
-                Image(systemName: "star.fill")
-                    .font(.system(size: 18))
-                    .foregroundColor(GM.star)
+                .accessibilityLabel("Navigate messages")
             }
         }
-        .padding(.horizontal, 12).padding(.vertical, 10)
+        .padding(.horizontal, 6)
+        .padding(.vertical, 2)
+    }
+
+    private var subjectHeader: some View {
+        HStack(spacing: 8) {
+            VStack(alignment: .leading, spacing: 8) {
+                Text(vm.thread.messages.first?.subjectOrNone ?? "(no subject)")
+                    .font(.system(size: 24, weight: .semibold))
+                    .foregroundColor(GM.textPrimary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityAddTraits(.isHeader)
+                Text(vm.state.box.title)
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundColor(GM.primarySolid)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .background(GM.softFill, in: Capsule())
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            if let message = activeMessage {
+                ReaderIconButton(message.isStarred ? "Unstar message" : "Star message",
+                                 icon: message.isStarred ? "star.fill" : "star",
+                                 tint: message.isStarred ? GM.star : GM.textSecondary) {
+                    vm.actOn(message.id, message.isStarred ? .unstar : .star)
+                }
+            }
+        }
+        .padding(.leading, 6)
+        .padding(.trailing, 2)
+        .padding(.bottom, 6)
+    }
+
+    private func replyBar(for message: MailMessageFull) -> some View {
+        HStack(spacing: 8) {
+            replyButton("Reply", icon: "arrowshape.turn.up.left") { onReply(message.id, "reply") }
+            replyButton("Forward", icon: "arrowshape.turn.up.right") { onReply(message.id, "forward") }
+            ReaderIconButton("Reply all", icon: "arrowshape.turn.up.left.2", tint: GM.primarySolid) {
+                onReply(message.id, "all")
+            }
+            .frame(width: 46, height: 46)
+            .background(GM.softFill, in: Circle())
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .background(GM.bg)
+        .overlay(alignment: .top) { Rectangle().fill(GM.border).frame(height: 1) }
+    }
+
+    private func replyButton(_ label: String, icon: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Label(label, systemImage: icon)
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundColor(GM.primarySolid)
+                .lineLimit(1)
+                .frame(maxWidth: .infinity, minHeight: 48)
+                .background(GM.softFill, in: Capsule())
+                .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func file(_ message: MailMessageFull, action: MailAction, success: String) {
+        pendingAction = true
+        vm.actOn(message.id, action) { error in
+            pendingAction = false
+            if error == nil { filed[message.id] = action }
+            feedback[message.id] = (error ?? success, error != nil)
+        }
     }
 
     private func failedBody(_ error: String) -> some View {
@@ -175,16 +252,43 @@ struct ThreadView: View {
     }
 }
 
+private struct ReaderIconButton: View {
+    let label: String
+    let icon: String
+    let tint: Color
+    let action: () -> Void
+
+    @Environment(\.isEnabled) private var enabled
+
+    init(_ label: String, icon: String, tint: Color = GM.textPrimary, action: @escaping () -> Void) {
+        self.label = label
+        self.icon = icon
+        self.tint = tint
+        self.action = action
+    }
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: icon)
+                .font(.system(size: 18, weight: .medium))
+                .foregroundColor(enabled ? tint : GM.textTertiary.opacity(0.55))
+                .frame(width: 44, height: 44)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(label)
+    }
+}
+
 private struct ThreadMessageCard: View {
     let vm: MailboxModel
     let message: MailMessageFull
     let e2e: E2eModel
     let expanded: Bool
     let onExpand: () -> Void
-    let busy: Bool
+    let downloading: Set<String>
     let notices: [String: String]
     let onReply: (String) -> Void
-    let onStar: () -> Void
     let onDownload: (MailAttachment) -> Void
 
     /// The unsubscribe confirmation. Owned by the CARD, not the screen: the offer is
@@ -193,11 +297,15 @@ private struct ThreadMessageCard: View {
     /// "cannot find 'showUnsub' in scope" -- four errors, and the CI run named them.)
     @State private var showUnsub = false
     @State private var unsubNote: String?
-    /// The reader's own outcomes, kept beside the controls that produced them.
-    /// Accepted and refused are different sentences, so they are different
-    /// states -- an absent error is not evidence of a write.
-    @State private var unreadDone = false
-    @State private var unreadNote: String?
+    @State private var showDetails = false
+    @State private var renderAttempt = 0
+    @State private var renderLoading = false
+
+    private struct RenderRequest: Equatable {
+        let allowImages: Bool
+        let attempt: Int
+    }
+
     /// One note line for the affordances that leave the app: sharing and
     /// printing both ask the system for something, and a refusal has to be said
     /// here rather than left as a button that appeared to do nothing.
@@ -229,138 +337,29 @@ private struct ThreadMessageCard: View {
     // should not be built on an API that cannot say whether it reached it.
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 10) {
-                SenderAvatar(display: message.from?.display ?? "",
-                             address: message.from?.address ?? "", size: 38)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(message.from?.display ?? message.from?.address ?? "Unknown sender")
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundColor(GM.textPrimary)
-                        .lineLimit(1)
-                    if !message.to.isEmpty {
-                        Text("To " + message.to.joined(separator: ", "))
-                            .font(.system(size: 12)).foregroundColor(GM.textTertiary)
-                            .lineLimit(2)
-                    }
-                }
-                Spacer()
-                Button(action: onStar) {
-                    Image(systemName: message.isStarred ? "star.fill" : "star")
-                        .font(.system(size: 17))
-                        .foregroundColor(message.isStarred ? GM.star : GM.textTertiary)
-                }
-                .buttonStyle(.plain)
-            }
-
-            Text(message.subjectOrNone)
-                .font(.system(size: 17, weight: .semibold))
-                .foregroundColor(GM.textPrimary)
-
-            if showsBody {
+        VStack(alignment: .leading, spacing: 14) {
+            if expanded {
+                senderHeader
+                if showDetails { recipientDetails }
                 bodyView
                 attachmentRows
                 if let detailsError {
                     Text(detailsError).font(.system(size: 12)).foregroundColor(GM.textSecondary)
                     Button("Retry") { detailsAttempt += 1 }
                 }
-            } else {
-                Button("Show message", action: onExpand)
-                    .font(.system(size: 13, weight: .medium))
-            }
-
-            if !message.cc.isEmpty {
-                Text("Cc \(message.cc.joined(separator: ", "))")
-                    .font(.system(size: 12)).foregroundColor(GM.textSecondary)
-            }
-            if expanded {
-                // The date is shown only when one could be read. `MailTime.full`
-                // answers nil for an instant the app cannot parse, and an opened
-                // message must not print a substitute date.
-                if let when = MailTime.full(message.createdAt) {
-                    Text(when)
-                        .font(.system(size: 12)).foregroundColor(GM.textTertiary)
-                }
-                if let unsub = unsubscribeTarget(message.unsubscribe) {
-                    Spacer(minLength: 10)
-                    Button {
-                        showUnsub = true
-                    } label: {
-                        Text("Unsubscribe from this sender")
-                            .font(.system(size: 15))
-                            .foregroundColor(GM.textPrimary)
-                            .frame(maxWidth: .infinity, minHeight: 44)
-                            .background(RoundedRectangle(cornerRadius: GMShape.button, style: .continuous)
-                                .stroke(GM.border, lineWidth: 1))
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityIdentifier("mail-unsubscribe")
-                    if let unsubNote {
-                        Text(unsubNote)
-                            .font(.system(size: 12)).foregroundColor(GM.error)
-                    }
-                }
-                // Three doors, same words as Android's thread: reply answers
-                // the sender, reply-all answers everyone the message was
-                // addressed to, forward sends the row on to new people. All
-                // three build from the full message, not the snippet.
-                HStack(spacing: 10) {
-                    GradientButton(title: "Reply", action: { onReply("reply") })
-                    GradientButton(title: "Reply all", action: { onReply("all") })
-                    GradientButton(title: "Forward", action: { onReply("forward") })
-                }
-                // Opening a message marks it read — the thread route does that
-                // on the server. Without a way back out of that state from
-                // here, reading one thing commits the person to having read it,
-                // and the only undo lives in the list's selection toolbar they
-                // have now left. Same route that toolbar uses, offered where the
-                // read actually happened, and only while the message is actually
-                // read: a "mark unread" button on mail that is already unread is
-                // a control wired to nothing.
-                HStack(spacing: 10) {
-                    if message.isRead {
-                        ReaderOutlineButton("Mark unread",
-                                            identifier: "mail-mark-unread") {
-                            vm.markUnread(message.id) { outcome in
-                                // Accepted and refused are different sentences,
-                                // so they are different states. Nothing here
-                                // reads as success because no error arrived.
-                                unreadDone = outcome == nil
-                                unreadNote = outcome
-                            }
-                        }
-                    }
-                    // The text the server actually holds, handed to the system
-                    // chooser. Nothing is invented for the share card, and the
-                    // HTML part is never the shared item — a receiving app would
-                    // then be doing the rendering this app refused to do.
-                    ReaderOutlineButton("Share", identifier: "mail-share") {
-                        showShare = true
-                    }
-                    // The system's own print panel is the feedback when this
-                    // succeeds, so only a refusal needs a line here — and a
-                    // refusal is a real state, not an error to swallow.
-                    ReaderOutlineButton("Print", identifier: "mail-print") {
-                        printMessageText(message, formattedText: formattedBody?.bodyText) {
-                            outcome in handoffNote = outcome
-                        }
-                    }
-                }
-                if unreadDone {
-                    // The button above has already gone: the thread's own copy
-                    // of the message is flagged unread, so the control for the
-                    // state that ended is not left offering it again.
-                    Text("Marked unread.")
-                        .font(.system(size: 12)).foregroundColor(GM.textSecondary)
-                }
-                if let unreadNote {
-                    Text(unreadNote)
-                        .font(.system(size: 12)).foregroundColor(GM.error)
+                if let unsubNote {
+                    Text(unsubNote).font(.system(size: 12)).foregroundColor(GM.textSecondary)
                 }
                 if let handoffNote {
-                    Text(handoffNote)
-                        .font(.system(size: 12)).foregroundColor(GM.error)
+                    Text(handoffNote).font(.system(size: 12)).foregroundColor(GM.error)
                 }
+            } else {
+                Button(action: onExpand) {
+                    senderHeader
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityHint("Opens this message")
             }
         }
         // `.sheet` hangs off the card's outermost view, not off the `if expanded`
@@ -430,21 +429,129 @@ private struct ThreadMessageCard: View {
             MessageActivityView(text: messageShareText(
                 message, formattedText: formattedBody?.bodyText))
         }
-        .padding(16)
+        .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
+        .background(GM.card, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .strokeBorder(GM.border)
+                .allowsHitTesting(false)
+        }
         .task(id: showsBody ? detailsAttempt : nil) {
             guard showsBody else { return }
             let error = await vm.viewMessage(message.id)
             if !Task.isCancelled { detailsError = error }
         }
-        .task(id: needsFormattedBody ? shownImages : nil) {
-            formattedBody = nil
-            guard needsFormattedBody else { return }
+        .task(id: needsFormattedBody ? RenderRequest(allowImages: shownImages, attempt: renderAttempt) : nil) {
+            guard needsFormattedBody else {
+                formattedBody = nil
+                renderLoading = false
+                return
+            }
+            renderLoading = true
             let allowImages = shownImages
             guard let render = try? await vm.loadBody(message.id, allowImages: allowImages),
                   !Task.isCancelled else { return }
-            formattedBody = render
+            if render.error == nil || formattedBody?.html == nil {
+                formattedBody = render
+            }
+            renderLoading = false
         }
+    }
+
+    private var senderHeader: some View {
+        let sender = message.from?.display.nilIfBlank() ?? "Unknown sender"
+        return HStack(spacing: 12) {
+            SenderAvatar(display: sender, address: message.from?.address ?? "", size: 44)
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 6) {
+                    Text(sender)
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundColor(GM.textPrimary)
+                        .lineLimit(1)
+                    if let date = MailTime.short(message.createdAt) {
+                        Text(date)
+                            .font(.system(size: 11))
+                            .foregroundColor(GM.textSecondary)
+                            .lineLimit(1)
+                            .fixedSize()
+                    }
+                }
+                if expanded {
+                    Button {
+                        showDetails.toggle()
+                    } label: {
+                        HStack(spacing: 4) {
+                            Text(message.to.first.map { "To " + $0 } ?? "Message details")
+                                .lineLimit(1)
+                            Image(systemName: showDetails ? "chevron.up" : "chevron.down")
+                                .font(.system(size: 9, weight: .semibold))
+                        }
+                        .font(.system(size: 12))
+                        .foregroundColor(GM.textSecondary)
+                        .padding(.vertical, 5)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityHint("Shows sender, recipients and date")
+                } else {
+                    Text(message.isE2eEncrypted || message.e2eEnvelope != nil
+                         ? "Encrypted message" : (message.bodyText?.nilIfBlank() ?? "Show message"))
+                        .font(.system(size: 13))
+                        .foregroundColor(GM.textSecondary)
+                        .lineLimit(2)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            if expanded {
+                if unsubscribeTarget(message.unsubscribe) != nil {
+                    Button("Unsubscribe") { showUnsub = true }
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundColor(GM.primarySolid)
+                        .lineLimit(1)
+                        .fixedSize(horizontal: true, vertical: false)
+                        .frame(minHeight: 44)
+                        .buttonStyle(.plain)
+                        .accessibilityIdentifier("mail-unsubscribe")
+                }
+                Menu {
+                    Button("Reply") { onReply("reply") }
+                    Button("Share") { showShare = true }
+                        .accessibilityIdentifier("mail-share")
+                    Button("Print") {
+                        printMessageText(message, formattedText: formattedBody?.bodyText) { handoffNote = $0 }
+                    }
+                    .accessibilityIdentifier("mail-print")
+                } label: {
+                    Image(systemName: "ellipsis")
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundColor(GM.textSecondary)
+                        .frame(width: 34, height: 44)
+                        .contentShape(Rectangle())
+                }
+                .accessibilityLabel("Message actions")
+            } else {
+                Image(systemName: "chevron.down")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(GM.textSecondary)
+                    .accessibilityHidden(true)
+            }
+        }
+    }
+
+    private var recipientDetails: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            if let address = message.from?.address { Text("From \(address)") }
+            if !message.to.isEmpty { Text("To \(message.to.joined(separator: ", "))") }
+            if !message.cc.isEmpty { Text("Cc \(message.cc.joined(separator: ", "))") }
+            if let date = MailTime.full(message.createdAt) { Text(date) }
+        }
+        .font(.system(size: 12))
+        .foregroundColor(GM.textSecondary)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(12)
+        .background(GM.bgTinted, in: RoundedRectangle(cornerRadius: 12))
     }
 
     @ViewBuilder private var bodyView: some View {
@@ -454,8 +561,8 @@ private struct ThreadMessageCard: View {
         if message.isE2eEncrypted || message.e2eEnvelope != nil {
             E2eEncryptedBlock(message: message, e2e: e2e)
         } else {
-            bodyText
             imagesGate
+            bodyText
         }
     }
 
@@ -465,7 +572,9 @@ private struct ThreadMessageCard: View {
         } else if let text = message.bodyText?.nilIfBlank() {
             Text(text)
                 .font(.system(size: 15))
-                .foregroundColor(GM.textSecondary)
+                .foregroundColor(GM.textPrimary)
+                .lineSpacing(4)
+                .textSelection(.enabled)
                 .fixedSize(horizontal: false, vertical: true)
                 .frame(maxWidth: .infinity, alignment: .leading)
         } else {
@@ -474,73 +583,68 @@ private struct ThreadMessageCard: View {
         }
     }
 
-    /// HTML-first, matching the web's SafeEmailBody: when the message carries
-    /// an HTML part, the reader renders the SERVER-sanitized body the endpoint
-    /// answered with, never this row's raw markup — there is no sanitiser in
-    /// this app's dependencies, and the raw string is never a render input.
-    /// While the fetch is in flight, and if it fails, the stripped-text branch
-    /// the card always had is the visible fallback, said per message rather
-    /// than hidden.
     @ViewBuilder private var htmlBody: some View {
-        let render = formattedBody.flatMap { $0.allowImages == shownImages ? $0 : nil }
-        if let clean = render?.html?.nilIfBlank() {
+        if let render = formattedBody, let clean = render.html?.nilIfBlank() {
             MailHtmlBodyView(
                 html: clean,
-                allowImages: shownImages,
+                allowImages: render.allowImages,
                 onOpenLink: { urlString in
-                    if let url = URL(string: urlString) {
-                        UIApplication.shared.open(url)
-                    }
+                    guard let url = URL(string: urlString),
+                          let scheme = url.scheme?.lowercased(),
+                          ["https", "http", "mailto"].contains(scheme) else { return }
+                    UIApplication.shared.open(url)
                 },
                 contentHeight: $htmlBodyHeight
             )
             .frame(height: htmlBodyHeight)
             .frame(maxWidth: .infinity, alignment: .leading)
-        } else if let failure = render?.error {
-            // The formatted view is unavailable: say what failed and fall back
-            // to the plain rendering — the honest downgrade, still stated.
-            VStack(alignment: .leading, spacing: 6) {
-                Text(failure)
-                    .font(.system(size: 12)).foregroundColor(GM.textTertiary)
-                    .fixedSize(horizontal: false, vertical: true)
-                if let text = message.bodyText?.nilIfBlank() {
-                    Text(text)
-                        .font(.system(size: 15)).foregroundColor(GM.textSecondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-            }
+            .accessibilityIdentifier("mail-body")
         } else {
-            Text("Loading formatted message…")
-                .font(.system(size: 13)).foregroundColor(GM.textTertiary)
+            if let failure = formattedBody?.error {
+                HStack {
+                    Text("Formatting unavailable. \(failure)").font(.system(size: 12)).foregroundColor(GM.textSecondary)
+                    Spacer()
+                    Button("Retry") { renderAttempt += 1 }
+                        .disabled(renderLoading)
+                }
+            } else {
+                ProgressView().frame(maxWidth: .infinity)
+                    .accessibilityLabel("Loading formatted message")
+            }
+            if let text = formattedBody?.bodyText?.nilIfBlank() ?? message.bodyText?.nilIfBlank() {
+                Text(text)
+                    .font(.system(size: 15))
+                    .foregroundColor(GM.textPrimary)
+                    .lineSpacing(4)
+                    .textSelection(.enabled)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
     }
 
-    /// An HTML part can point at images that live on the SENDER's server.
-    /// Fetching one is a request that carries this device's address to them and
-    /// tells them the mail was opened, so nothing here is fetched until the
-    /// person asks, for this message alone. The count is what the part
-    /// references, not what arrives: an image the sender withdrew is still
-    /// named here and fails on its own line below, which is the honest order of
-    /// the two facts.
     @ViewBuilder private var imagesGate: some View {
-        let blocked = formattedBody?.blockedImages ?? 0
-        if blocked > 0 {
-            VStack(alignment: .leading, spacing: 8) {
-                if shownImages {
-                    Text("These images load from the sender's server.")
-                        .font(.system(size: 12)).foregroundColor(GM.textTertiary)
-                } else {
-                    Text("\(blocked) image\(blocked == 1 ? "" : "s") in this "
-                         + "message load from the sender's server, not from GrapMail. "
-                         + "Loading them tells the sender this message was opened.")
-                        .font(.system(size: 12)).foregroundColor(GM.textSecondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                    ReaderOutlineButton("Show images", identifier: "mail-show-images") {
-                        shownImages = true
-                    }
+        if let render = formattedBody, render.blockedImages > 0, !render.allowImages {
+            HStack(spacing: 8) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(shownImages && !renderLoading ? "Images couldn’t load."
+                         : "\(render.blockedImages) remote image\(render.blockedImages == 1 ? "" : "s") hidden")
+                        .font(.system(size: 12, weight: .semibold)).foregroundColor(GM.textPrimary)
+                    Text("Loading them tells the sender this message was opened.")
+                        .font(.system(size: 11)).foregroundColor(GM.textSecondary)
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.vertical, 8)
+                Button(shownImages && renderLoading ? "Loading…" : "Show images") {
+                    if shownImages { renderAttempt += 1 } else { shownImages = true }
+                }
+                .font(.system(size: 12, weight: .medium))
+                .foregroundColor(GM.primarySolid)
+                .frame(minHeight: 44)
+                .disabled(shownImages && renderLoading)
+                .accessibilityIdentifier("mail-show-images")
             }
-            .padding(.top, 4)
+            .padding(.horizontal, 12)
+            .background(GM.bgTinted, in: RoundedRectangle(cornerRadius: 12))
         }
     }
 
@@ -557,7 +661,7 @@ private struct ThreadMessageCard: View {
                             .foregroundColor(GM.textTertiary)
                     }
                     Spacer()
-                    if busy {
+                    if downloading.contains(a.id) {
                         Text("Saving…").font(.system(size: 12)).foregroundColor(GM.textTertiary)
                     } else {
                         Button("Save") { onDownload(a) }

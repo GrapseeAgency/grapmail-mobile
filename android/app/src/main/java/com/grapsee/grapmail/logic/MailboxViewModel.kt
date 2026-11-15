@@ -1040,12 +1040,18 @@ class MailboxViewModel @JvmOverloads constructor(
 
     private val pendingRowActions = mutableSetOf<String>()
 
-    fun actOn(id: String, action: MailAction) {
-        if (_state.value.busy) return
+    fun actOn(id: String, action: MailAction, onOutcome: ((String?) -> Unit)? = null) {
         viewModelScope.launch {
             val app = getApplication<Application>()
-            val session = SessionStore.snapshot(app) ?: return@launch
-            if (_state.value.busy || !pendingRowActions.add(id)) return@launch
+            val session = SessionStore.snapshot(app)
+            if (session == null) {
+                onOutcome?.invoke("You are signed out, so this could not be saved.")
+                return@launch
+            }
+            if (_state.value.busy || !pendingRowActions.add(id)) {
+                onOutcome?.invoke("A message action is already in progress.")
+                return@launch
+            }
             try {
                 // ── Optimistic first paint ──────────────────────────────────────
                 // The row answers the gesture before the network does: the flag
@@ -1127,6 +1133,7 @@ class MailboxViewModel @JvmOverloads constructor(
                     if (action == MailAction.Star || action == MailAction.Unstar ||
                         action == MailAction.Read || action == MailAction.Unread
                     ) reproject() else scheduleReconciliation()
+                    onOutcome?.invoke(null)
                 } catch (e: kotlinx.coroutines.CancellationException) {
                     throw e
                 } catch (e: Exception) {
@@ -1138,10 +1145,9 @@ class MailboxViewModel @JvmOverloads constructor(
                     loadedBoxes.remove(_state.value.box)
                     MailStore.invalidate(_state.value.box)
                     load(forceCounts = false)
-                    _state.update { s ->
-                        s.copy(actionError = (e as? ApiException)?.message
-                            ?: "That action didn't go through.")
-                    }
+                    val error = (e as? ApiException)?.message ?: "That action didn't go through."
+                    _state.update { it.copy(actionError = error) }
+                    onOutcome?.invoke(error)
                 }
             } finally {
                 pendingRowActions.remove(id)
@@ -2198,18 +2204,6 @@ class MailboxViewModel @JvmOverloads constructor(
                 return@loadReader
             }
             val cached = MailStore.thread(threadId)
-            if (cached != null) {
-                kotlinx.coroutines.currentCoroutineContext().ensureActive()
-                if (!SessionStore.isCurrent(context, session.id)) return@loadReader
-                threadLoadedFor = threadId
-                _thread.update { it.copy(
-                    messages = cached.messages,
-                    nextCursor = cached.nextCursor,
-                    hasMore = cached.hasMore,
-                    loading = false,
-                ) }
-                return@loadReader
-            }
             runCatching { Api.mailThread(session.token, threadId) }
                 .onSuccess { r ->
                     if (!SessionStore.isCurrent(context, session.id)) return@loadReader
@@ -2229,8 +2223,10 @@ class MailboxViewModel @JvmOverloads constructor(
                 .onFailure { e ->
                     if (e is kotlinx.coroutines.CancellationException) throw e
                     if (!SessionStore.isCurrent(context, session.id)) return@loadReader
-                    _thread.update { it.copy(loading = false,
-                        error = e.message ?: "This conversation could not be opened.") }
+                    if (cached != null) threadLoadedFor = threadId
+                    _thread.value = if (cached != null) ThreadState(
+                        messages = cached.messages, nextCursor = cached.nextCursor, hasMore = cached.hasMore,
+                    ) else ThreadState(error = e.message ?: "This conversation could not be opened.")
                 }
         }
     }

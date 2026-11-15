@@ -6,6 +6,7 @@ import androidx.work.WorkerParameters
 import com.grapsee.grapmail.data.Api
 import com.grapsee.grapmail.data.SessionStore
 import com.grapsee.grapmail.data.MailStatsResponse
+import com.grapsee.grapmail.data.MailBox
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.sync.Mutex
@@ -110,23 +111,38 @@ class MailPollWorker(
         val sawKey = "lastUnread"
         val hadPrevious = prefs.getString("sessionId", null) == session.id && prefs.contains(sawKey)
         val previous = prefs.getInt(sawKey, 0)
-        prefs.edit().putString("sessionId", session.id).putInt(sawKey, unread).apply()
+        val priorHead = prefs.getString("inboxHead", null).takeIf { hadPrevious }
+        val recent = if (Notifications.allowed(applicationContext)) {
+            runCatching { Api.mailInbox(token, MailBox.Inbox, pageSize = 12).messages.filter { it.id.isNotBlank() } }
+                .onFailure { if (it is kotlinx.coroutines.CancellationException) throw it }
+                .getOrNull()
+        } else null
+        if (!SessionStore.isCurrent(applicationContext, session.id)) return Result.success()
+        val update = prefs.edit().putString("sessionId", session.id).putInt(sawKey, unread)
+        if (recent != null) update.putString("inboxHead", recent.firstOrNull()?.id.orEmpty())
+        else update.remove("inboxHead")
+        update.apply()
         if (!hadPrevious) {
             report("silent first-read unread=$unread")
             return Result.success()
         }
+        val arrived = when {
+            priorHead == "" -> recent.orEmpty()
+            priorHead != null && recent?.any { it.id == priorHead } == true ->
+                recent.takeWhile { it.id != priorHead }
+            else -> emptyList()
+        }.filter { !it.isRead && it.direction != "outbound" }
         if (unread <= previous) {
             report("silent no-rise $previous->$unread")
             return Result.success()
         }
-        // The post itself can be refused by the permission; either way the read
-        // happened and the new baseline is stored, so the next run does not
-        // re-announce the same arrivals.
+        val grew = maxOf(unread - previous, arrived.size)
         val posted = Notifications.newMail(
-            applicationContext, grew = unread - previous, total = unread,
+            applicationContext, grew = grew, total = unread,
+            message = arrived.singleOrNull()?.takeIf { grew == 1 },
         )
-        report(if (posted) "announced +${unread - previous} of $unread"
-        else "silent post-refused-by-permission +${unread - previous} of $unread")
+        report(if (posted) "announced +$grew of $unread"
+        else "silent post-refused-by-permission +$grew of $unread")
         return Result.success()
     }
 }

@@ -438,9 +438,8 @@ pin("iOS gates each swipe direction on the box",
 # ── 4. only server-sanitized HTML reaches a renderer ────────────────────────
 # The reader renders the HTML part through one island per platform
 # (`MailHtmlBody.kt` / `MailHtmlBody.swift`). The ONLY string that may reach a
-# WebView is the body endpoint's response — the same DOMPurify email profile
-# the web's SafeEmailBody renders with, applied server-side before the HTML
-# leaves the app's origin. The raw `bodyHtml` the message row carries is never
+# WebView is the body endpoint's response, sanitized server-side before the
+# HTML leaves the app's origin. The raw `bodyHtml` the message row carries is never
 # a render input, page script is off at the engine level on both platforms,
 # and a failed fetch falls back to the stripped-text branch the reader always
 # had — never to raw HTML. A WebView anywhere else in mail code is still the
@@ -466,8 +465,13 @@ pin("iOS's island is fed only from the fetched body",
     "message.bodyHtml" not in sw_island)
 pin("Android's model loads the body endpoint", "Api.mailBody(" in KT_VM)
 pin("iOS's model loads the body endpoint", "ApiClient.mailBody(" in ios("MailboxModel.swift"))
+pin("both readers request the design profile and isolate the document",
+    "?preserveDesign=true" in code_only(KT_API)
+    and "?preserveDesign=true" in code_only(SW_API)
+    and all("default-src 'none'" in island and "form-action 'none'" in island
+            for island in (kt_island, sw_island)))
 pin("body prefetch never opens the read-marking message route",
-    '"$MAIL/message/${enc(id)}/html"' in code_only(KT_API)
+    '"$MAIL/message/${enc(id)}/html?preserveDesign=true"' in code_only(KT_API)
     and '"/message/\\(id.percentEncodedPath())/html\\(query)"' in code_only(SW_API))
 pin("native thread pages never carry raw sender HTML",
     "?native=1" in code_only(KT_API)
@@ -483,7 +487,7 @@ pin("long threads page without hiding earlier mail",
     and '"Load earlier messages"' in code_only(ios("MailReaderViews.swift")))
 pin("the islands take the images opt-in from the gate",
     "allowImages = formatted.allowImages" in code_only(android("ui/screens/mail/ThreadScreen.kt"))
-    and "allowImages: shownImages" in ios("MailReaderViews.swift")
+    and "allowImages: render.allowImages" in code_only(ios("MailReaderViews.swift"))
     and "vm.loadBody(message.id, shownImages)" in code_only(android("ui/screens/mail/ThreadScreen.kt")))
 
 # The thread view shows stripped text and says so, rather than silently
@@ -2897,8 +2901,8 @@ pin("the unread control appears only while the message is read",
 # stale-read banner, which is not on screen here — so a refused write would have
 # looked exactly like an accepted one.
 pin("accepted and refused are two different sentences in the reader",
-    'Text("Marked unread."' in code_only(KT_THREAD)
-    and 'Text("Marked unread.")' in code_only(SW_READ)
+    'error ?: "Marked unread."' in code_only(KT_THREAD)
+    and 'error ?? "Marked unread."' in code_only(SW_READ)
     and "You are signed out, so this could not be saved." in code_only(KT_VM)
     and "You are signed out, so this could not be saved." in code_only(SW_MODEL))
 
@@ -2910,14 +2914,15 @@ pin("accepted and refused are two different sentences in the reader",
 # reveals, and asks.
 pin("remote images are named and gated, per message",
     "formatted?.blockedImages ?: 0" in code_only(KT_THREAD)
-    and "formattedBody?.blockedImages ?? 0" in code_only(SW_READ)
+    and "render.blockedImages > 0, !render.allowImages" in code_only(SW_READ)
     and "tells the sender this message was opened" in code_only(KT_THREAD)
     and "tells the sender this message was opened" in code_only(SW_READ))
 
 pin("Both readers load bodies only for open conversation cards",
     "val needsFormattedBody = showsBody &&" in code_only(KT_THREAD)
     and "showsBody && !message.isE2eEncrypted" in code_only(SW_READ)
-    and ".task(id: needsFormattedBody ? shownImages : nil)" in code_only(SW_READ))
+    and ".task(id: needsFormattedBody ? RenderRequest(allowImages: shownImages, attempt: renderAttempt) : nil)"
+        in code_only(SW_READ))
 
 # The opt-in starts closed and belongs to one message. A shared flag would carry
 # a consent given for one sender's mail to the next one's, and Android's card is
@@ -2928,7 +2933,7 @@ pin("the opt-in starts closed and is keyed to its own message",
 
 # Nothing reaches the sender's server until the person asks — and the engine
 # agrees with the reader now: the sanctioned HTML carries no remote `src` until
-# the opt-in re-fetches the body with `?images=1`, and the island's own
+# the opt-in re-fetches the body with `remoteImages=true`, and the island's own
 # settings refuse remote image loads while the gate is closed. The images-gate
 # fetch is keyed on the opt-in itself, so a closed gate cannot produce a body
 # variant with live images in it. The standalone loader the print/share handoff
@@ -2936,7 +2941,8 @@ pin("the opt-in starts closed and is keyed to its own message",
 pin("no image is fetched before the person asks",
     "blockNetworkImage = !allowImages" in code_only(android("ui/screens/mail/MailHtmlBody.kt"))
     and "vm.loadBody(message.id, shownImages)" in code_only(KT_THREAD)
-    and ".task(id: needsFormattedBody ? shownImages : nil)" in code_only(SW_READ)
+    and ".task(id: needsFormattedBody ? RenderRequest(allowImages: shownImages, attempt: renderAttempt) : nil)"
+        in code_only(SW_READ)
     and "vm.loadBody(message.id, allowImages: allowImages)" in code_only(SW_READ))
 
 # The extraction rule, not the markup: only an absolute http(s) `img src` is
@@ -3030,18 +3036,15 @@ for ident in ("mail-thread-prev", "mail-thread-next", "mail-mark-unread",
         and (f'accessibilityIdentifier("{ident}")' in code_only(SW_READ)
              or f'identifier: "{ident}"' in code_only(SW_READ)))
 
-# The greedy-width defect 74-mail-thread photographed: `OutlineButton` fills its
-# width, a Row measures each unweighted child against the space LEFT, and two of
-# the reader's three reply doors were drawn at zero width while iOS showed all
-# three. The fix is content-sized buttons; a pin keeps it from being "tidied"
-# back, because the regression is invisible to every other gate in CI.
+# The pinned Android footer must fit both main actions alongside Reply all.
+# A fill-width action used to crowd the other controls completely off screen.
 kt_reader_code = code_only(KT_THREAD)
-pin("the reader's action rows size their buttons to their content",
-    all(f'OutlineButton("{label}"' in kt_reader_code for label in
-        ("Reply", "Reply all", "Forward", "Mark unread", "Share", "Print"))
-    and kt_reader_code.count("fill = false") >= 8
-    and '"Load earlier messages"' in kt_reader_code
-    and "trailing = { Icon(Icons.Rounded.Reply" not in kt_reader_code)
+pin("the reader reserves space for all three reply actions",
+    all(re.search(rf'ReaderReplyButton\("{label}"[^\n]*Modifier.weight\(1f\)', kt_reader_code)
+        for label in ("Reply", "Forward"))
+    and 'ReplyAll, "Reply all"' in kt_reader_code
+    and 'ReaderIconButton("Reply all"' in code_only(SW_READ)
+    and '"Load earlier messages"' in kt_reader_code)
 
 # The frame that proves all of this composes: an HTML-only message opened in the
 # middle of a seeded list, named the same on both platforms and launched by both

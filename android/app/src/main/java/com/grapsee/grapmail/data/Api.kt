@@ -1146,17 +1146,16 @@ object Api {
 
     /**
      * `GET /message/:id/body` — the reader's render body. The web app
-     * sanitizes the message's HTML part with its own `sanitizeEmailHtml`
-     * profile before answering, so this response is the only HTML a renderer
+     * filters the message's HTML and applies the requested design profile before answering, so this response is the only HTML a renderer
      * here may load; `allowImages` is the reader's images-gate opt-in, sent as
-     * `?images=1` only when the person asked for this message's remote images.
+     * `remoteImages=true` only when the person asked for this message's remote images.
      * An error is thrown like every other call — the model decides what the
      * reader falls back to (the stripped-text branch it always had).
      */
     suspend fun mailBody(token: String, id: String, allowImages: Boolean): MailBodyResponse =
         read(
             authed(
-                "$MAIL/message/${enc(id)}/html" + if (allowImages) "?remoteImages=true" else "",
+                "$MAIL/message/${enc(id)}/html?preserveDesign=true" + if (allowImages) "&remoteImages=true" else "",
                 token,
             ).get().build(),
         ) { json.decodeFromString(it) }

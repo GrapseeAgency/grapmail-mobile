@@ -360,31 +360,34 @@ struct MailBottomControls: View {
                 .padding(.bottom, visible ? 96 : 20)
         }
         .frame(maxWidth: .infinity, alignment: .bottomTrailing)
-        .animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: visible)
+        .animation(reduceMotion ? nil : .spring(response: 0.35, dampingFraction: 0.82), value: visible)
     }
 }
 
-private struct MailBottomBar: View {
+struct MailBottomBar: View {
     let inboxSelected: Bool
     let unread: Int?
     let onMail: () -> Void
     let onContacts: () -> Void
+    var overList = true
 
     var body: some View {
         HStack(spacing: 0) {
             item(icon: "envelope.fill", label: "Mail", active: inboxSelected,
-                 unread: unread, action: inboxSelected ? nil : onMail)
+                 unread: unread, action: inboxSelected && overList ? nil : onMail)
             item(icon: "person.crop.rectangle", label: "Contacts", action: onContacts)
         }
         .background(GM.card, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
         .padding(.bottom, 12)
         .frame(maxWidth: .infinity, alignment: .center)
         .background(alignment: .bottom) {
-            LinearGradient(colors: [.clear, GM.cardAlt], startPoint: .top, endPoint: .bottom)
-                .frame(height: MailBottomControls.clearance)
-                .padding(.horizontal, 13)
-                .allowsHitTesting(false)
-                .accessibilityHidden(true)
+            if overList {
+                LinearGradient(colors: [.clear, GM.cardAlt], startPoint: .top, endPoint: .bottom)
+                    .frame(height: MailBottomControls.clearance)
+                    .padding(.horizontal, 13)
+                    .allowsHitTesting(false)
+                    .accessibilityHidden(true)
+            }
         }
         .accessibilityIdentifier("mail-tabs")
     }

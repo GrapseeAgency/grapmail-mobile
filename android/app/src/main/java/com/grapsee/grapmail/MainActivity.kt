@@ -1095,6 +1095,7 @@ fun GrapMailNav(
                 threadId = id,
                 isThread = isThread,
                 onBack = { nav.popBackStack() },
+                onContacts = { nav.navigate(Routes.MAIL_CONTACTS) },
                 onReply = { m, mode -> nav.navigate(Routes.mailCompose(m.id, mode)) },
                 // Stepping replaces the reader rather than pushing another
                 // copy of it: five nexts must not bury the list under five

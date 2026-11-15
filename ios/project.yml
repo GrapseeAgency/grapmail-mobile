@@ -60,6 +60,7 @@ targets:
       path: GrapMail/GrapMail.entitlements
       properties:
         aps-environment: $(APS_ENVIRONMENT)
+        com.apple.developer.usernotifications.communication: true
     # XcodeGen writes the native launch configuration and other Info.plist entries.
     info:
       path: GrapMail/Info.plist
@@ -69,6 +70,8 @@ targets:
           UIImageName: LaunchBrand
           UIImageRespectsSafeAreaInsets: true
         # Must exactly match MailPoll.refreshIdentifier's registration/submission.
+        NSUserActivityTypes:
+          - INSendMessageIntent
         BGTaskSchedulerPermittedIdentifiers:
           - com.grapsee.grapmail.inbox-refresh
         # Polling remains the delivery path until a backend APNs provider exists.

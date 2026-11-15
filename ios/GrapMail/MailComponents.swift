@@ -125,20 +125,34 @@ enum MailTime {
      * order.
      */
     static func short(_ iso: String?, now: Date = Date()) -> String? {
-        guard let date = parse(iso) else { return nil }
+        guard let raw = iso, !raw.isEmpty else { return nil }
+        let nowMinute = Int(now.timeIntervalSince1970 / 60)
+        let key = "\(TimeZone.current.identifier)\u{0}\(raw)\u{0}\(nowMinute)" as NSString
+        if let cached = formattedTimes.object(forKey: key) {
+            return cached as String
+        }
+        guard let date = parse(raw) else { return nil }
         let cal = Calendar.current
+        let result: String
         if cal.isDate(date, inSameDayAs: now) {
-            return fmt("h:mm a", date)
-        }
-        if let yesterday = cal.date(byAdding: .day, value: -1, to: now),
+            result = fmt("h:mm a", date)
+        } else if let yesterday = cal.date(byAdding: .day, value: -1, to: now),
            cal.isDate(date, inSameDayAs: yesterday) {
-            return "Yesterday"
+            result = "Yesterday"
+        } else if cal.component(.year, from: date) == cal.component(.year, from: now) {
+            result = fmt("MMM d", date)
+        } else {
+            result = fmt("MMM d, yyyy", date)
         }
-        if cal.component(.year, from: date) == cal.component(.year, from: now) {
-            return fmt("MMM d", date)
-        }
-        return fmt("MMM d, yyyy", date)
+        formattedTimes.setObject(result as NSString, forKey: key)
+        return result
     }
+
+    private static let formattedTimes: NSCache<NSString, NSString> = {
+        let cache = NSCache<NSString, NSString>()
+        cache.countLimit = 2_048
+        return cache
+    }()
 
     /// The full date a message body needs. Falls back to the raw string rather
     /// than a fabricated date: showing "Jan 1, 1970" for an unparseable instant

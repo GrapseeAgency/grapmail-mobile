@@ -14,7 +14,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.toArgb
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.grapsee.grapmail.ui.theme.LocalPalette
@@ -25,8 +24,7 @@ import com.grapsee.grapmail.ui.theme.LocalPalette
  *
  * ── WHAT MAY REACH THIS VIEW ────────────────────────────────────────────────
  * Only the string the body endpoint answered with (`MailBodyResponse.bodyHtml`):
- * the server sanitized the sender's HTML part with the web's
- * `sanitizeEmailHtml` profile before it left the app's origin, so by the time
+ * the server sanitized the sender's HTML and filtered its inline styles, so by the time
  * markup gets here there is no script, no iframe, no form, no event handler
  * and no live remote image in it. The raw `message.bodyHtml` the row carries
  * is never passed here — there is no sanitiser in this app's dependencies, and
@@ -47,7 +45,7 @@ import com.grapsee.grapmail.ui.theme.LocalPalette
 
 /** The single holder that remembers what a WebView instance was last fed. */
 private class HtmlFeedState {
-    var html: String? = null
+    var document: String? = null
     var allowImages: Boolean? = null
     var measurement: Runnable? = null
 }
@@ -60,25 +58,41 @@ private fun hex(c: androidx.compose.ui.graphics.Color): String =
  * for the palette colours interpolated into it — this is the island's own
  * typography, not something a sender styled.
  */
-private fun mailDocument(html: String, text: String, muted: String, border: String, link: String, chip: String): String =
-    "<!DOCTYPE html><html><head><meta charset=\"utf-8\"/>" +
+private fun mailDocument(
+    html: String,
+    allowImages: Boolean,
+    text: String,
+    muted: String,
+    border: String,
+    link: String,
+    chip: String,
+): String {
+    val imageSources = if (allowImages) "https: http:" else "'none'"
+    val authoredColors = html.contains(" style=\"") || html.contains(" bgcolor=\"")
+    val canvas = if (authoredColors) "#FFFFFF" else "transparent"
+    val foreground = if (authoredColors) "#1F2937" else text
+    val linkColor = if (authoredColors) "#174EA6" else link
+    return "<!DOCTYPE html><html><head><meta charset=\"utf-8\"/>" +
         "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"/>" +
+        "<meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'none'; " +
+        "img-src $imageSources; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'\">" +
         "<style>" +
-        "html,body{margin:0;padding:0;background:transparent;}" +
-        "body{font-family:Roboto,'Segoe UI',sans-serif;font-size:15px;line-height:1.55;color:" + text + ";" +
+        "html,body{margin:0;padding:0;background:$canvas;}" +
+        "body{font-family:Roboto,'Segoe UI',sans-serif;font-size:15px;line-height:1.55;color:" + foreground + ";" +
         "-webkit-text-size-adjust:100%;word-wrap:break-word;overflow-wrap:break-word;padding:0 2px;}" +
-        "a{color:" + link + ";}" +
-        "img{max-width:100%;height:auto;}" +
-        "table{max-width:100%;border-collapse:collapse;}" +
-        "td,th{word-wrap:break-word;}" +
-        "pre,code{font-family:monospace;font-size:13px;white-space:pre-wrap;}" +
+        "a{color:$linkColor;}" +
+        "img{max-width:100%!important;height:auto;}" +
+        "table,div{max-width:100%!important;}" +
+        "table,div,td,th{min-width:0!important;overflow-wrap:anywhere;}" +
+        "pre,code{font-family:monospace;font-size:13px;white-space:pre-wrap;overflow-wrap:anywhere;}" +
         "blockquote{margin:8px 0;padding:2px 12px;border-left:3px solid " + border + ";color:" + muted + ";}" +
         // A blocked remote image has no `src` at all — Chromium draws its alt
         // text as an inline broken image, and this turns that into a
         // deliberate-looking chip instead of a broken-image glyph.
-        "img[data-grapmail-blocked-src]{display:inline-block;min-height:16px;padding:4px 10px;" +
+        "img[data-blocked-src],img[data-grapmail-blocked-src],img[data-cid-src]{display:inline-block;min-height:16px;padding:4px 10px;" +
         "border:1px dashed " + border + ";border-radius:8px;background:" + chip + ";color:" + muted + ";font-size:12px;}" +
         "</style></head><body>" + html + "</body></html>"
+}
 
 @SuppressLint("SetJavaScriptEnabled") // the setting is set to FALSE; the lint name is the inverse of the call
 @Composable
@@ -89,7 +103,10 @@ internal fun HtmlMailBody(
     modifier: Modifier = Modifier,
 ) {
     val palette = LocalPalette.current
-    val density = LocalDensity.current
+    val document = remember(html, allowImages, palette) {
+        mailDocument(html, allowImages, hex(palette.textPrimary), hex(palette.textSecondary),
+            hex(palette.border), hex(palette.primarySolid), hex(palette.bgTinted))
+    }
     // CSS height of the loaded document, in dp. Measured on finish and once
     // again after a beat, because images landing late grow the document
     // without a second finish event.
@@ -105,9 +122,7 @@ internal fun HtmlMailBody(
     AndroidView(
         modifier = modifier
             .fillMaxWidth()
-            .height(with(density) {
-                (if (contentHeightDp > 0f) contentHeightDp else 180f).dp
-            }),
+            .height((if (contentHeightDp > 0f) contentHeightDp else 180f).dp),
         factory = { context ->
             WebView(context).apply {
                 setBackgroundColor(android.graphics.Color.TRANSPARENT)
@@ -118,7 +133,7 @@ internal fun HtmlMailBody(
                 settings.blockNetworkImage = !allowImages
                 settings.mixedContentMode = WebSettings.MIXED_CONTENT_NEVER_ALLOW
                 settings.cacheMode = WebSettings.LOAD_NO_CACHE
-                settings.loadsImagesAutomatically = allowImages
+                settings.loadsImagesAutomatically = true
                 settings.mediaPlaybackRequiresUserGesture = true
                 settings.builtInZoomControls = true
                 settings.displayZoomControls = false
@@ -159,26 +174,12 @@ internal fun HtmlMailBody(
         update = { webView ->
             // Re-feed only on a real change: update runs on every recomposition,
             // and loadHTML-style reloads would restart rendering mid-scroll.
-            if (feed.html != html || feed.allowImages != allowImages) {
+            if (feed.document != document || feed.allowImages != allowImages) {
                 feed.measurement?.let { webView.removeCallbacks(it) }
-                feed.html = html
+                feed.document = document
                 feed.allowImages = allowImages
                 webView.settings.blockNetworkImage = !allowImages
-                webView.settings.loadsImagesAutomatically = allowImages
-                webView.loadDataWithBaseURL(
-                    null,
-                    mailDocument(
-                        html,
-                        hex(palette.textPrimary),
-                        hex(palette.textSecondary),
-                        hex(palette.border),
-                        hex(palette.primarySolid),
-                        hex(palette.bgTinted),
-                    ),
-                    "text/html",
-                    "utf-8",
-                    null,
-                )
+                webView.loadDataWithBaseURL(null, document, "text/html", "utf-8", null)
             }
         },
         onRelease = { webView ->

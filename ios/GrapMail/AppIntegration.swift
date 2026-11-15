@@ -1,5 +1,6 @@
 import BackgroundTasks
 import Foundation
+import Intents
 import Network
 import SwiftUI
 import UIKit
@@ -135,6 +136,7 @@ final class ShortcutRouter: ObservableObject {
 enum MailPoll {
     static let refreshIdentifier = "com.grapsee.grapmail.inbox-refresh"
     private static let lastSeenKey = "grapmail.poll.lastUnread"
+    private static let newestMessageKey = "grapmail.poll.inboxHead"
     static let channelName = "New mail"
     @MainActor private static var activeGeneration: UUID?
 
@@ -171,30 +173,92 @@ enum MailPoll {
         let defaults = UserDefaults.standard
         let didSee = defaults.object(forKey: lastSeenKey) != nil
         let previous = defaults.integer(forKey: lastSeenKey)
+        let priorHead = defaults.string(forKey: newestMessageKey)
+        let center = UNUserNotificationCenter.current()
+        let settings = await center.notificationSettings()
+        guard !Task.isCancelled, generation == SessionStore.generation else { return false }
+        let canNotify = settings.authorizationStatus == .authorized || settings.authorizationStatus == .provisional
+        let recent: [MailMessage]?
+        if canNotify {
+            recent = (try? await ApiClient.mailInbox(token: token, box: .inbox, pageSize: 12))?
+                .messages.filter { !$0.id.isEmpty }
+        } else {
+            recent = nil
+        }
+        guard !Task.isCancelled, generation == SessionStore.generation else { return false }
         defaults.set(count, forKey: lastSeenKey)
+        if let recent { defaults.set(recent.first?.id ?? "", forKey: newestMessageKey) }
+        else { defaults.removeObject(forKey: newestMessageKey) }
         guard didSee, count > previous else { return false }
-        await announce(grew: count - previous, total: count, generation: generation)
-        return true
+        guard canNotify else { return false }
+
+        let arrivals: [MailMessage]
+        if let priorHead, let recent, priorHead.isEmpty || recent.contains(where: { $0.id == priorHead }) {
+            arrivals = recent.prefix(while: { $0.id != priorHead }).filter { !$0.isRead && $0.direction != "outbound" }
+        } else {
+            arrivals = []
+        }
+        let grew = max(count - previous, arrivals.count)
+        guard grew > 0 else { return false }
+        return await announce(grew: grew, total: count, message: grew == 1 ? arrivals.first : nil, generation: generation)
     }
 
     @MainActor
-    private static func announce(grew: Int, total: Int, generation: UUID) async {
-        let center = UNUserNotificationCenter.current()
-        let settings = await center.notificationSettings()
-        guard !Task.isCancelled, generation == SessionStore.generation,
-              settings.authorizationStatus == .authorized
-              || settings.authorizationStatus == .provisional else { return }
+    private static func announce(grew: Int, total: Int, message: MailMessage?, generation: UUID) async -> Bool {
         let content = UNMutableNotificationContent()
-        // Both numbers, because one is not enough to be true: "3 new" says what
-        // arrived since the last read, and "12 unread in the inbox" says what
-        // the server counted now. Neither says the mail was delivered, and
-        // neither says it was read.
         content.title = "\(grew) new message\(grew == 1 ? "" : "s")"
         content.body = "\(total) unread in the inbox"
         content.sound = .default
-        let request = UNNotificationRequest(identifier: UUID().uuidString,
-                                            content: content, trigger: nil)
-        try? await center.add(request)
+
+        var notification: UNNotificationContent = content
+        if let message, let sender = message.from?.display.nilIfBlank() {
+            content.title = sender
+            content.body = message.subject?.nilIfBlank() ?? "(no subject)"
+            content.threadIdentifier = message.threadId ?? message.id
+            if let address = message.from?.address?.nilIfBlank(),
+               let avatar = senderAvatar(sender, address: address) {
+                let person = INPerson(
+                    personHandle: INPersonHandle(value: address, type: .emailAddress),
+                    nameComponents: nil, displayName: sender, image: avatar,
+                    contactIdentifier: nil, customIdentifier: address
+                )
+                let intent = INSendMessageIntent(
+                    recipients: nil, outgoingMessageType: .outgoingMessageText,
+                    content: content.body, speakableGroupName: nil, conversationIdentifier: content.threadIdentifier,
+                    serviceName: nil, sender: person, attachments: nil
+                )
+                let interaction = INInteraction(intent: intent, response: nil)
+                interaction.direction = .incoming
+                try? await interaction.donate()
+                if let updated = try? content.updating(from: intent) { notification = updated }
+            }
+        }
+        guard !Task.isCancelled, generation == SessionStore.generation else { return false }
+        do {
+            try await UNUserNotificationCenter.current().add(
+                UNNotificationRequest(identifier: UUID().uuidString, content: notification, trigger: nil)
+            )
+            return true
+        } catch {
+            return false
+        }
+    }
+
+    @MainActor
+    private static func senderAvatar(_ sender: String, address: String) -> INImage? {
+        let size: CGFloat = 128
+        let image = UIGraphicsImageRenderer(size: CGSize(width: size, height: size)).image { _ in
+            UIColor(MailUI.tint(address: address, display: sender)).setFill()
+            UIBezierPath(ovalIn: CGRect(x: 0, y: 0, width: size, height: size)).fill()
+            let initial = String(sender.prefix(1)).uppercased() as NSString
+            let attributes: [NSAttributedString.Key: Any] = [
+                .font: UIFont.boldSystemFont(ofSize: 54), .foregroundColor: UIColor.white,
+            ]
+            let bounds = initial.size(withAttributes: attributes)
+            initial.draw(at: CGPoint(x: (size - bounds.width) / 2, y: (size - bounds.height) / 2),
+                         withAttributes: attributes)
+        }
+        return image.pngData().map { INImage(imageData: $0) }
     }
 
     /// Ask for the notification permission from the settings screen, on a tap.
@@ -208,6 +272,7 @@ enum MailPoll {
     static func clear() {
         BGTaskScheduler.shared.cancel(taskRequestWithIdentifier: refreshIdentifier)
         UserDefaults.standard.removeObject(forKey: lastSeenKey)
+        UserDefaults.standard.removeObject(forKey: newestMessageKey)
     }
 
     static func scheduleNext() {

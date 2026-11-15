@@ -436,8 +436,20 @@ struct MailboxView: View {
                     let offset = min(limit, max(0, geometry.contentOffset.y + inset.top))
                     return Int(offset / 8)
                 } action: { previous, current in
-                    if current == 0 { controlsVisible = true }
-                    else if isUserScrolling { controlsVisible = current < previous }
+                    if current == 0 {
+                        if !controlsVisible {
+                            withAnimation(.spring(response: 0.35, dampingFraction: 0.82)) {
+                                controlsVisible = true
+                            }
+                        }
+                    } else if isUserScrolling {
+                        let shouldShow = current < previous
+                        if shouldShow != controlsVisible {
+                            withAnimation(.spring(response: 0.35, dampingFraction: 0.82)) {
+                                controlsVisible = shouldShow
+                            }
+                        }
+                    }
                 }
         } else {
             list
@@ -461,7 +473,12 @@ struct MailboxView: View {
         let distance = translation.height - lastScrollTranslation
         guard abs(distance) >= 8 else { return }
         lastScrollTranslation = translation.height
-        controlsVisible = distance > 0
+        let shouldShow = distance > 0
+        if shouldShow != controlsVisible {
+            withAnimation(.spring(response: 0.35, dampingFraction: 0.82)) {
+                controlsVisible = shouldShow
+            }
+        }
     }
 
     @ViewBuilder private func sheetContent(_ which: MailSheet) -> some View {
