@@ -1,7 +1,0 @@
-<!-- Debug-only overlay: the local verification builds point API_BASE at the
-     host loopback (http://10.0.2.2:<port>), which Android 9+ blocks unless the
-     debug variant opts into cleartext. The release manifest never carries this
-     — the shipped app talks HTTPS only. -->
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
-    <application android:usesCleartextTraffic="true" />
-</manifest>
