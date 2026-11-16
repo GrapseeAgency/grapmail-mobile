@@ -22,7 +22,7 @@ settings:
     # tag (v0.3.0's first run refused a disagreeing build), and an iOS build of
     # the same commit self-reporting 0.0.0.1 is the same disagreement kept
     # quiet only because no iOS badging check exists yet.
-    MARKETING_VERSION: "0.0.1"
+    MARKETING_VERSION: "0.6.3"
     CURRENT_PROJECT_VERSION: "12"
     # Empty on purpose for local development: a simulator build needs no team.
     # CI's release job injects the team per invocation with
