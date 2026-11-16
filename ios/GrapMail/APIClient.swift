@@ -982,6 +982,15 @@ private struct VerifyPasswordRequest: Codable { var password: String }
 
 struct ApiClient {
     static let base = "https://grapsee.com/api"
+
+    /// The avatar bytes must be read and written straight at the API host.
+    /// The Next.js origin proxy used by every other call converts a binary
+    /// `image/png` response into a JSON `UPSTREAM_NON_JSON` envelope, so the
+    /// app decoded that as "no photo" and drew the initial after a successful
+    /// upload. Measured live: through the proxy the avatar GET returned JSON
+    /// with the PNG in a `body` string; the same token and path against this
+    /// host returned real PNG bytes. Native apps have no browser CORS limit.
+    static let avatarBase = "https://api.iqracsc.com/auth"
     // Internal, not private: the mailbox sector lives in MailAPI.swift and
     // encodes through the same encoder and bearer path rather than standing up
     // a second one that could drift from the 401 handling below.
@@ -1488,8 +1497,11 @@ struct ApiClient {
     private struct AvatarRevision: Decodable { let revision: String }
 
     static func watchAvatar(token: String, revision: String) async throws -> String {
-        let result: AvatarRevision = try await request("/grapsee/auth/account/avatar?watch=\(revision)", bearer: token)
-        return result.revision
+        let (data, http) = try await avatarBinary(
+            path: "/account/avatar?watch=\(revision)", method: "GET", bearer: token,
+            body: nil, contentType: nil)
+        guard (200..<300).contains(http.statusCode) else { throw requestFailure(data: data, http: http) }
+        return try decoder.decode(AvatarRevision.self, from: data).revision
     }
 
     // ── Account-record sector (the eight profile screens) ──────────────────
@@ -1565,16 +1577,16 @@ struct ApiClient {
         text("Content-Type: \(mime)\r\n\r\n")
         body.append(bytes)
         text("\r\n--\(boundary)--\r\n")
-        let (data, http) = try await accountBinary(
-            path: "/grapsee/auth/account/avatar", method: "POST", bearer: token,
+        let (data, http) = try await avatarBinary(
+            path: "/account/avatar", method: "POST", bearer: token,
             body: body, contentType: "multipart/form-data; boundary=\(boundary)")
         guard (200..<300).contains(http.statusCode) else { throw requestFailure(data: data, http: http) }
         return try decoder.decode(AvatarResponse.self, from: data)
     }
 
     static func deleteAvatar(token: String) async throws -> AvatarResponse {
-        let (data, http) = try await accountBinary(
-            path: "/grapsee/auth/account/avatar", method: "DELETE", bearer: token,
+        let (data, http) = try await avatarBinary(
+            path: "/account/avatar", method: "DELETE", bearer: token,
             body: nil, contentType: nil)
         guard (200..<300).contains(http.statusCode) else { throw requestFailure(data: data, http: http) }
         return try decoder.decode(AvatarResponse.self, from: data)
@@ -1588,8 +1600,8 @@ struct ApiClient {
     /// the caller distinguishes them by the code, which only the route chose.
     static func avatarBytes(token: String, revision: String? = nil) async throws -> Data? {
         let query = revision.map { "revision=\($0)" } ?? "v=\(UUID().uuidString)"
-        let (data, http) = try await accountBinary(
-            path: "/grapsee/auth/account/avatar?\(query)", method: "GET", bearer: token,
+        let (data, http) = try await avatarBinary(
+            path: "/account/avatar?\(query)", method: "GET", bearer: token,
             body: nil, contentType: nil)
         if http.statusCode == 200,
            http.value(forHTTPHeaderField: "Content-Type")?.lowercased().hasPrefix("image/") == true,
@@ -1639,6 +1651,19 @@ struct ApiClient {
     /// see `mailBinary`). This one DOES signal a 401: these paths live on the
     /// account store, whose bearer the app's session is, so an expired one must
     /// take the app to sign-in exactly like every other JSON account call.
+    private static func avatarBinary(
+        path: String, method: String, bearer: String,
+        body: Data?, contentType: String?,
+    ) async throws -> (Data, HTTPURLResponse) {
+        guard let url = URL(string: avatarBase + path) else {
+            throw ApiError.http(status: -1, code: nil, message: "Bad avatar URL")
+        }
+        var req = mailRequest(url: url, method: method, bearer: bearer)
+        if let contentType { req.setValue(contentType, forHTTPHeaderField: "Content-Type") }
+        req.httpBody = body
+        return try await authenticatedResponse(for: req, bearer: bearer)
+    }
+
     private static func accountBinary(
         path: String, method: String, bearer: String,
         body: Data?, contentType: String?,

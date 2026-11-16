@@ -627,6 +627,19 @@ object Api {
     val BASE: String = com.grapsee.grapmail.BuildConfig.API_BASE
 
     /**
+     * The avatar bytes have to come straight from the API host. The Next.js
+     * origin proxy that every other call goes through turns a binary image
+     * response into a JSON envelope (`UPSTREAM_NON_JSON`), so the app decoded
+     * that as "no photo" and drew the initial instead — even on a successful
+     * upload. Measured live: through grapsee.com/api the avatar GET answered
+     * JSON with the PNG embedded in a `body` string; against this host the same
+     * token and path answered a real `image/png`. The same applies to the
+     * multipart upload. Native clients are not subject to browser CORS, so the
+     * direct host is safe and is the only path that carries the bytes.
+     */
+    private const val AVATAR_AUTH = "https://api.iqracsc.com/auth"
+
+    /**
      * The application context, handed over once at process start.
      *
      * Only the token refresh needs it: the authenticator below runs on an
@@ -1043,13 +1056,13 @@ object Api {
         val body = MultipartBody.Builder().setType(MultipartBody.FORM)
             .addFormDataPart("file", filename, bytes.toRequestBody(mime.toMediaType()))
             .build()
-        return read(authed("$AUTH/account/avatar", token).post(body).build()) {
+        return read(authed("$AVATAR_AUTH/account/avatar", token).post(body).build()) {
             decodeResponse<AvatarResponse>(it)
         }
     }
 
     suspend fun deleteAvatar(token: String): AvatarResponse {
-        val req = authed("$AUTH/account/avatar", token).delete().build()
+        val req = authed("$AVATAR_AUTH/account/avatar", token).delete().build()
         return read(req) { decodeResponse<AvatarResponse>(it) }
     }
 
@@ -1059,7 +1072,7 @@ object Api {
      * else throws like every other read, because a 500 must not look like no photo.
      */
     suspend fun avatarBytes(token: String, revision: String? = null): ByteArray? {
-        val url = "$AUTH/account/avatar" + if (revision != null) "?revision=${enc(revision)}" else ""
+        val url = "$AVATAR_AUTH/account/avatar" + if (revision != null) "?revision=${enc(revision)}" else ""
         val req = authed(url, token).header("Cache-Control", "no-cache").get().build()
         val bytes = executeResponse(req) { response ->
             if (response.code == 404) return@executeResponse null
@@ -1085,7 +1098,7 @@ object Api {
     private val avatarWatchClient by lazy { client.newBuilder().dispatcher(Dispatcher()).build() }
 
     suspend fun watchAvatar(token: String, revision: String): String {
-        val request = authed("$AUTH/account/avatar?watch=$revision", token).get().build()
+        val request = authed("$AVATAR_AUTH/account/avatar?watch=$revision", token).get().build()
         val (status, body) = execute(request, avatarWatchClient)
         if (status >= 400) fail(status, body)
         return decodeResponse<AvatarRevision>(body).revision

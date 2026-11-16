@@ -2093,15 +2093,24 @@ pin("the manifest declares the file-provider scope the attachment picker takes",
 pin("the manifest says plainly that nothing tracks",
     re.search(r"<key>NSPrivacyTracking</key>\s*<false/>", MANIFEST) is not None
     and re.search(r"<key>NSPrivacyTrackingDomains</key>\s*<array/>", MANIFEST) is not None)
-# The tracking answer rests on one fact: the code talks to one host. The hosts
-# are read out of the CODE (comments excluded — a comment about a third-party
-# URL is documentation, and an earlier version of this pin proved that by
-# failing on one): iOS's `base` literal and Android's `API_BASE` build field.
+# The tracking answer rests on one fact: the code talks only to GrapMail's own
+# API. There are two hosts, not one: the app's origin proxy for JSON calls, and
+# the API host itself for avatar bytes (the proxy wraps a binary image in a JSON
+# envelope, which used to leave every avatar showing initials after a successful
+# upload). Both are GrapMail infrastructure, neither is a tracker. The hosts are
+# read out of the CODE (comments excluded — a comment about a third-party URL
+# is documentation, and an earlier version of this pin proved that by failing
+# on one): the iOS literals and Android's API_BASE build field plus its avatar
+# constant.
 _API_URLS = (re.findall(r"https?://([A-Za-z0-9.-]+)", code_only(SW_APIC))
              + re.findall(r'https?://([A-Za-z0-9.-]+)',
-                          (ROOT / "android/app/build.gradle.kts").read_text(encoding="utf-8")))
-pin("both clients address exactly one host and it is the app's own API",
-    set(_API_URLS) == {"grapsee.com"})
+                          (ROOT / "android/app/build.gradle.kts").read_text(encoding="utf-8"))
+             + re.findall(r'https?://([A-Za-z0-9.-]+)', code_only(KT_API)))
+pin("both clients address only their own API hosts",
+    set(_API_URLS) == {"grapsee.com", "api.iqracsc.com"})
+pin("the second host exists only to carry avatar bytes",
+    "AVATAR_AUTH" in code_only(KT_API) and "avatarBase" in code_only(SW_APIC)
+    and "account/avatar" in code_only(KT_API) and "account/avatar" in code_only(SW_APIC))
 
 # The data-flow document is the source of the store forms' answers; it must
 # keep naming the endpoints from the clients' own code, the on-device stores,
