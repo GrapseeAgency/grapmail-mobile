@@ -169,10 +169,19 @@ fun OnboardingHero(
                     .bufferedReader()
                     .use { it.readText() }
                     .let { src ->
+                        // Host-mode background removal: the scenes are authored
+                        // as full-viewport animations with their own navy field,
+                        // which paints a hard-edged plate inside the app. Strip
+                        // only those background layers; every illustration rule
+                        // (SVG, canvas, gradients on the artwork itself) stays.
+                        val stripped = if (src.contains("</head>"))
+                            src.replaceFirst("</head>", HOST_BG + "</head>")
+                        else src
                         // Before </body> so the body exists when the fit runs;
                         // appended if a scene ever ships without the tag.
-                        if (src.contains("</body>")) src.replaceFirst("</body>", HOST_FIT + "</body>")
-                        else src + HOST_FIT
+                        if (stripped.contains("</body>"))
+                            stripped.replaceFirst("</body>", HOST_FIT + "</body>")
+                        else stripped + HOST_FIT
                     }
 
                 WebView(ctx).apply {
@@ -271,6 +280,26 @@ fun OnboardingHero(
 }
 
 /**
+ * Host-mode background removal.
+ *
+ * Each scene is authored as a standalone full-viewport animation and therefore
+ * paints its own navy field (`html`/`body` background, fixed `body` atmosphere
+ * layers, and scene 4's `#universe`/`.background` sky). Inside the app that
+ * field ends at the WebView's edge and reads as a hard-edged plate around the
+ * illustration. The host page paints one continuous dark surface behind all
+ * five scenes, so those background layers are removed here. Every illustration
+ * rule is left alone: SVG geometry, canvas particles, gradients and glows on
+ * the artwork itself all still render exactly as authored.
+ */
+private const val HOST_BG = """
+<style id="native-host-bg">
+html, body { background: transparent !important; }
+body::before, body::after, body:before, body:after { display: none !important; }
+#universe, .background { display: none !important; }
+</style>
+"""
+
+/**
  * The viewport anchor, appended to the document body.
  *
  * A WebView parses the document before Compose has laid it out, so the initial
@@ -347,12 +376,18 @@ fun OnboardingScreen(
             BoxWithConstraints(
                 Modifier.fillMaxSize().background(SceneBg).testTag("onboarding"),
             ) {
-                // The artwork is authored 440 x 560. It gets that ratio at full
-                // width, but never more than a little over half the screen, so
-                // the words and the CTA always have room on a short phone.
-                val heroHeight = minOf(maxWidth * (560f / 440f), maxHeight * 0.54f)
+                // The artwork is authored in a 440 x 560 box. Keep that exact
+                // ratio — taking the full width but capping only the height used
+                // to squash the box, which clipped the bottom of scene 2's
+                // screener card. Cap the width instead, centre the result, and
+                // the whole scene fits with room for the copy and the CTA.
+                val heroWidth = minOf(maxWidth, maxHeight * 0.54f * (440f / 560f))
+                val heroHeight = heroWidth * (560f / 440f)
 
-                Column(Modifier.fillMaxSize()) {
+                Column(
+                    Modifier.fillMaxSize(),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
                     OnboardingTopBar(
                         canSkip = sceneIndex > 0,
                         onSkip = { onFinish() },
@@ -366,7 +401,7 @@ fun OnboardingScreen(
                             scene = scene,
                             onOpenMailbox = onFinish,
                             modifier = Modifier
-                                .fillMaxWidth()
+                                .width(heroWidth)
                                 .height(heroHeight)
                                 .testTag("onboarding-hero"),
                         )
@@ -396,6 +431,7 @@ fun OnboardingScreen(
                             letterSpacing = (-0.4).sp,
                             color = SceneInk,
                             textAlign = TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth(),
                         )
                         Spacer(Modifier.height(10.dp))
                         Text(
@@ -404,13 +440,16 @@ fun OnboardingScreen(
                             lineHeight = 22.sp,
                             color = SceneSub,
                             textAlign = TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth(),
                         )
                     }
 
                     PageDots(
                         count = ONBOARDING_SCENES.size,
                         index = sceneIndex,
-                        modifier = Modifier.padding(bottom = 20.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 20.dp),
                     )
 
                     GradientButton(
@@ -475,7 +514,7 @@ private fun OnboardingTopBar(canSkip: Boolean, onSkip: () -> Unit) {
 private fun PageDots(count: Int, index: Int, modifier: Modifier = Modifier) {
     Row(
         modifier,
-        horizontalArrangement = Arrangement.spacedBy(7.dp),
+        horizontalArrangement = Arrangement.spacedBy(7.dp, Alignment.CenterHorizontally),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         repeat(count) { i ->

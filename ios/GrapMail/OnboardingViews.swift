@@ -126,6 +126,21 @@ struct OnboardingHeroView: UIViewRepresentable {
         }
     }
 
+    /// The scenes are authored as standalone full-viewport animations and paint
+    /// their own navy field (html/body background, fixed `body` atmosphere
+    /// layers, scene 4's `#universe` / `.background` sky). In the app that field
+    /// ends at the web view's edge and reads as a hard-edged plate. The host
+    /// paints one continuous dark surface behind all five scenes, so only those
+    /// background layers are removed — every illustration rule (SVG geometry,
+    /// canvas particles, gradients on the artwork itself) is left untouched.
+    static let hostBackgroundScript = """
+    <style id="native-host-bg">
+    html, body { background: transparent !important; }
+    body::before, body::after, body:before, body:after { display: none !important; }
+    #universe, .background { display: none !important; }
+    </style>
+    """
+
     static let fitScript = """
     (function () {
       var html = document.documentElement;
@@ -166,11 +181,14 @@ struct OnboardingHeroView: UIViewRepresentable {
             else {
                 return
             }
-            let html: String
-            if let bodyEnd = source.range(of: "</body>") {
-                html = source.replacingCharacters(in: bodyEnd, with: "<script>\(OnboardingHeroView.fitScript)</script></body>")
+            var html: String = source
+            if let headEnd = html.range(of: "</head>") {
+                html = html.replacingCharacters(in: headEnd, with: OnboardingHeroView.hostBackgroundScript + "</head>")
+            }
+            if let bodyEnd = html.range(of: "</body>") {
+                html = html.replacingCharacters(in: bodyEnd, with: "<script>\(OnboardingHeroView.fitScript)</script></body>")
             } else {
-                html = source + "<script>\(OnboardingHeroView.fitScript)</script>"
+                html += "<script>\(OnboardingHeroView.fitScript)</script>"
             }
             webView.loadHTMLString(html, baseURL: url.deletingLastPathComponent())
         }
@@ -246,10 +264,12 @@ struct OnboardingView: View {
 
     var body: some View {
         GeometryReader { viewport in
-            // The artwork is authored 440 x 560. It gets that ratio at full
-            // width, but never more than a little over half the screen, so the
-            // words and the CTA always have room on a short phone.
-            let heroHeight = min(viewport.size.width * 560.0 / 440.0, viewport.size.height * 0.54)
+            // The artwork is authored in a 440 x 560 box. Keep that exact ratio
+            // — taking the full width but capping only the height squashes the
+            // box and clips the bottom of scene 2's screener card. Cap the width
+            // instead; the VStack centres the result.
+            let heroWidth = min(viewport.size.width, viewport.size.height * 0.54 * 440.0 / 560.0)
+            let heroHeight = heroWidth * 560.0 / 440.0
 
             VStack(spacing: 0) {
                 topBar
@@ -258,7 +278,7 @@ struct OnboardingView: View {
                     filename: currentScene.filename,
                     onOpenMailbox: onFinish
                 )
-                .frame(width: viewport.size.width, height: heroHeight)
+                .frame(width: heroWidth, height: heroHeight)
                 .accessibilityLabel("Animated scene: \(currentScene.title)")
 
                 copyBlock
