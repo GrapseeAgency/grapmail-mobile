@@ -11,6 +11,7 @@ import android.util.AtomicFile
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.security.MessageDigest
+import java.util.concurrent.ConcurrentHashMap
 import org.json.JSONObject
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -20,20 +21,44 @@ object AvatarPhoto {
     const val maxBytes = 10 * 1024 * 1024
     private const val maxUploadBytes = 1024 * 1024
     private val cacheLock = kotlinx.coroutines.sync.Mutex()
+    private val memory = ConcurrentHashMap<String, ByteArray>()
 
-    private fun cacheFile(context: Context, session: SessionSnapshot): AtomicFile? {
+    private fun cacheKey(session: SessionSnapshot): String? {
         val parts = session.token.split('.', limit = 4)
         if (parts.size != 3 || parts[1].length > 16_384) return null
         // The account claim only namespaces the private cache. The API still authorizes all reads and writes.
         val payload = JSONObject(Base64.decode(parts[1], Base64.URL_SAFE).decodeToString())
-        val account = payload.getString("sub")
-        val key = MessageDigest.getInstance("SHA-256").digest("$account:${session.id}".toByteArray())
-            .joinToString("") { "%02x".format(it.toInt() and 0xff) }
-        return AtomicFile(File(context.cacheDir, "account-photos/$key"))
+        val account = payload.getString(\"sub\")
+        return MessageDigest.getInstance(\"SHA-256\").digest(\"$account:${session.id}\".toByteArray())
+            .joinToString(\"\") { \"%02x\".format(it.toInt() and 0xff) }
     }
 
-    suspend fun readCached(context: Context, session: SessionSnapshot): ByteArray? =
-        cacheLock.withLock {
+    private fun cacheFile(context: Context, session: SessionSnapshot): AtomicFile? {
+        val key = cacheKey(session) ?: return null
+        return AtomicFile(File(context.cacheDir, \"account-photos/$key\"))
+    }
+
+    // The photo lives in memory for as long as the process does, so every
+    // surface (mailbox chip, profile screen, switcher) shows it instantly,
+    // even before the disk cache is written or a server read completes.
+    fun remember(session: SessionSnapshot, bytes: ByteArray) {
+        if (bytes.isEmpty() || bytes.size > maxBytes) return
+        cacheKey(session)?.let { memory[it] = bytes }
+    }
+
+    // Only an explicit removal may clear the store. Reads that miss, stale
+    // profile payloads, or a slow network must never delete the photo.
+    suspend fun forget(context: Context, session: SessionSnapshot) {
+        val key = cacheKey(session) ?: return
+        memory.remove(key)
+        withContext(Dispatchers.IO) {
+            runCatching { AtomicFile(File(context.cacheDir, \"account-photos/$key\")).delete() }
+        }
+    }
+
+    suspend fun readCached(context: Context, session: SessionSnapshot): ByteArray? {
+        cacheKey(session)?.let { key -> memory[key]?.takeIf(::isImage)?.let { return it } }
+        return cacheLock.withLock {
             withContext(Dispatchers.IO) {
                 runCatching {
                     cacheFile(context, session)?.openRead()?.use {
@@ -43,23 +68,28 @@ object AvatarPhoto {
                 }.getOrNull()
             }
         }
+    }
 
     suspend fun cache(context: Context, session: SessionSnapshot, bytes: ByteArray?) {
+        // A null payload never deletes anything here: a read that missed is
+        // not proof the photo is gone, and competing answers (stale profile
+        // JSON, a failed watch poll) used to wipe the user's photo. Removal
+        // is handled by forget() alone.
+        if (bytes == null) return
+        if (bytes.isEmpty() || bytes.size > maxBytes) return
+        val key = cacheKey(session) ?: return
+        memory[key] = bytes
         cacheLock.withLock {
             withContext(Dispatchers.IO) {
                 runCatching {
                     val file = cacheFile(context, session) ?: return@runCatching
-                    if (bytes == null) {
-                        file.delete()
-                    } else if (bytes.isNotEmpty() && bytes.size <= maxBytes) {
-                        val stream = file.startWrite()
-                        try {
-                            stream.write(bytes)
-                            file.finishWrite(stream)
-                        } catch (error: Exception) {
-                            file.failWrite(stream)
-                            throw error
-                        }
+                    val stream = file.startWrite()
+                    try {
+                        stream.write(bytes)
+                        file.finishWrite(stream)
+                    } catch (error: Exception) {
+                        file.failWrite(stream)
+                        throw error
                     }
                 }
             }
@@ -69,8 +99,8 @@ object AvatarPhoto {
     fun inline(value: String?): ByteArray? {
         if (value == null || value.length > maxBytes * 4 / 3 + 100) return null
         val type = value.substringBefore(',')
-        if (type !in setOf("data:image/png;base64", "data:image/jpeg;base64",
-                "data:image/webp;base64", "data:image/gif;base64")) return null
+        if (type !in setOf(\"data:image/png;base64\", \"data:image/jpeg;base64\",
+                \"data:image/webp;base64\", \"data:image/gif;base64\")) return null
         return runCatching { Base64.decode(value.substringAfter(','), Base64.DEFAULT) }
             .getOrNull()?.takeIf(::isImage)
     }

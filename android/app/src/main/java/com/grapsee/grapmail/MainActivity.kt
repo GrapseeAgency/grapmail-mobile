@@ -1181,8 +1181,8 @@ fun GrapMailNav(
                 val photo = signup.photoBytes
                 if (session != null && session.address.equals(signup.createdAddress, ignoreCase = true) && photo != null) {
                     vm.update { copy(photoUri = null, photoBytes = null, photoSaved = false) }
+                    profile.showSignupAvatar(photo, session)
                     if (signup.photoSaved) {
-                        profile.showSignupAvatar(photo, session)
                         profile.load()
                     } else {
                         profile.uploadAvatar(photo, "profile.png", "image/png")

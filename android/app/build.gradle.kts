@@ -82,8 +82,8 @@ android {
         // is 0.6.2 / 11; shipping this as 1 would be refused as a downgrade even
         // with the correct signature, which is another way to keep running the
         // old app while believing the new one was installed.
-        versionCode = 12
-        versionName = "0.6.3"
+        versionCode = 13
+        versionName = "0.6.4"
         // Real account API — same contract the website uses.
         buildConfigField("String", "API_BASE", "\"https://grapsee.com/api\"")
     }

@@ -877,11 +877,11 @@ fun ProfileEditScreen(vm: ProfileViewModel, onBack: () -> Unit) {
                 }
                 Spacer(Modifier.width(14.dp))
                 Column {
-                    Text(if (p.avatarUrl.isNullOrBlank()) "Add a photo" else "Change photo",
+                    Text(if (p.avatarUrl.isNullOrBlank() && state.avatar == null) "Add a photo" else "Change photo",
                         fontSize = 14.sp, fontWeight = FontWeight.SemiBold,
                         color = palette.primarySolid,
                         modifier = Modifier.clickable { picker.launch("image/*") })
-                    if (!p.avatarUrl.isNullOrBlank()) {
+                    if (!p.avatarUrl.isNullOrBlank() || state.avatar != null) {
                         Text("Remove", fontSize = 13.sp, color = palette.error,
                             modifier = Modifier.padding(top = 4.dp).clickable { vm.removeAvatar() })
                     }

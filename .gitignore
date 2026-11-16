@@ -29,3 +29,4 @@ Thumbs.db
 !design/
 screenshots-*/
 __pycache__/
+.agent-build/
