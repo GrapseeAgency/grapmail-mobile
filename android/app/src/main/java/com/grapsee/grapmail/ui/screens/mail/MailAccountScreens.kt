@@ -843,38 +843,7 @@ fun ProfileEditScreen(vm: ProfileViewModel, onBack: () -> Unit) {
     ) { uri: Uri? ->
         if (uri != null) photoScope.launch {
             val ctx = vm.getApplication<android.app.Application>()
-            val bytes = withContext(Dispatchers.IO) {
-                runCatching {
-                    val resolver = ctx.contentResolver
-                    val bitmap = if (android.os.Build.VERSION.SDK_INT >= 28) {
-                        android.graphics.ImageDecoder.decodeBitmap(android.graphics.ImageDecoder.createSource(resolver, uri)) { decoder, info, _ ->
-                            val width = info.size.width
-                            val height = info.size.height
-                            val scale = minOf(1f, 1024f / maxOf(width, height))
-                            decoder.setTargetSize((width * scale).toInt().coerceAtLeast(1), (height * scale).toInt().coerceAtLeast(1))
-                            decoder.allocator = android.graphics.ImageDecoder.ALLOCATOR_SOFTWARE
-                        }
-                    } else {
-                        val options = android.graphics.BitmapFactory.Options().apply { inJustDecodeBounds = true }
-                        resolver.openInputStream(uri)?.use { android.graphics.BitmapFactory.decodeStream(it, null, options) }
-                        if (options.outWidth <= 0 || options.outHeight <= 0) return@runCatching null
-                        var sample = 1
-                        while (maxOf(options.outWidth, options.outHeight) / sample > 1024) sample *= 2
-                        options.inJustDecodeBounds = false
-                        options.inSampleSize = sample
-                        resolver.openInputStream(uri)?.use { android.graphics.BitmapFactory.decodeStream(it, null, options) }
-                            ?: return@runCatching null
-                    }
-                    java.io.ByteArrayOutputStream().use { output ->
-                        try {
-                            if (bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, output)) output.toByteArray()
-                            else null
-                        } finally {
-                            bitmap.recycle()
-                        }
-                    }
-                }.getOrNull()
-            }
+            val bytes = com.grapsee.grapmail.data.AvatarPhoto.encode(ctx, uri)
             if (bytes == null || bytes.isEmpty()) {
                 photoError = "Couldn’t open that photo. Choose another image."
             } else {
@@ -904,26 +873,7 @@ fun ProfileEditScreen(vm: ProfileViewModel, onBack: () -> Unit) {
                 modifier = Modifier.padding(vertical = 10.dp)) {
                 Box(Modifier.size(64.dp).clip(CircleShape).background(palette.softFill),
                     contentAlignment = Alignment.Center) {
-                    val bytes = state.avatar
-                    if (bytes != null && state.avatarTried) {
-                        // Decode where it is drawn: a corrupt or unsupported
-                        // bitmap falls back to the initial, not to a crash — the
-                        // bytes came from the server, and refusing to render them
-                        // is a display question, not a data question.
-                        val img = remember(bytes) {
-                            runCatching {
-                                android.graphics.BitmapFactory
-                                    .decodeByteArray(bytes, 0, bytes.size)
-                                    ?.asImageBitmap()
-                            }.getOrNull()
-                        }
-                        if (img != null) {
-                            Image(img, null, Modifier.fillMaxSize().clip(CircleShape))
-                        } else Text(p.name.take(1).uppercase(), fontSize = 22.sp,
-                            fontWeight = FontWeight.SemiBold, color = palette.primarySolid)
-                    } else Text(p.name.take(1).uppercase().ifBlank { "?" },
-                        fontSize = 22.sp, fontWeight = FontWeight.SemiBold,
-                        color = palette.primarySolid)
+                    AccountPhoto(state.avatar, p.name, p.address, 64.dp)
                 }
                 Spacer(Modifier.width(14.dp))
                 Column {

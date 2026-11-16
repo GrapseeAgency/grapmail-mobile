@@ -90,10 +90,9 @@ struct BasicInfoView: View {
     var onSignIn: (() -> Void)? = nil
     let onNext: () -> Void
 
-    // The real photo picker (the design ships the control; the old build
-    // had a dead label). Held locally — the account API takes no photo.
     @State private var photoItem: PhotosPickerItem?
-    @State private var photoPreview: UIImage?
+    @State private var photoError = false
+    private var photoPreview: UIImage? { model.state.photo.flatMap(UIImage.init(data:)) }
 
     private let months = ["January", "February", "March", "April", "May", "June",
                           "July", "August", "September", "October", "November", "December"]
@@ -199,12 +198,17 @@ struct BasicInfoView: View {
             .buttonStyle(.plain)
             .task(id: photoItem) {
                 guard let item = photoItem else { return }
-                guard let data = try? await item.loadTransferable(type: Data.self) else { return }
-                let thumbnail = await AvatarThumbnail.decode(data)
+                defer { if photoItem == item { photoItem = nil } }
+                let chosen = try? await item.loadTransferable(type: SelectedAvatar.self)
                 guard !Task.isCancelled else { return }
-                photoPreview = thumbnail.map { UIImage(cgImage: $0) }
+                photoError = chosen == nil
+                if let chosen { model.update { $0.photo = chosen.png } }
             }
             .padding(.top, 8)
+            if photoError {
+                Text("Couldn’t open that photo. Choose another image.")
+                    .font(.system(size: 12)).foregroundStyle(GM.error)
+            }
         }
     }
 
@@ -286,7 +290,7 @@ struct BasicInfoView: View {
     private var basicInfoBottom: some View {
                 GradientButton(
                     title: "Next",
-                    enabled: birthday.iso != nil && birthday.error == nil,
+                    enabled: birthday.iso != nil && birthday.error == nil && photoItem == nil,
                     trailing: AnyView(
                         Image(systemName: "arrow.right")
                             .font(.system(size: 15, weight: .semibold))
@@ -295,7 +299,7 @@ struct BasicInfoView: View {
                 ) {
                     let b = birthday
                     model.update { $0.birthdayIso = b.iso }
-                    if b.iso != nil && b.error == nil { onNext() }
+                    if b.iso != nil && b.error == nil && photoItem == nil { onNext() }
                 }
     }
 

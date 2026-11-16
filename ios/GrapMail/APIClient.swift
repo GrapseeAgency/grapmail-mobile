@@ -168,6 +168,7 @@ struct CreateRequest: Codable {
     var grapmailHandle: String?
     var password: String
     var acceptedTerms: Bool?
+    var avatarPhoto: String? = nil
     /// The gateway splits the agency dashboard's CLIENT accounts from GrapMail's
     /// USER accounts; only USER accounts get a handle and a mailbox.
     var accountType: String = "USER"
@@ -175,6 +176,7 @@ struct CreateRequest: Codable {
 
 struct CreateResponse: Codable {
     var success: Bool = false
+    var avatarSaved: Bool = false
     var account: AccountDto?
     var mailboxDomain: String?
     /// The gateway answers with the address it provisioned, under its own name.
@@ -189,12 +191,13 @@ struct CreateResponse: Codable {
     var code: String?
 
     private enum CodingKeys: String, CodingKey {
-        case success, account, mailboxDomain, grapmail, grapmailStatus, requireOtp,
+        case success, avatarSaved, account, mailboxDomain, grapmail, grapmailStatus, requireOtp,
              message, phoneVerified, error, code
     }
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         success = c.lenient(.success, false)
+        avatarSaved = c.lenient(.avatarSaved, false)
         account = c.lenientOpt(.account)
         mailboxDomain = c.lenientOpt(.mailboxDomain)
         grapmail = c.lenientOpt(.grapmail)
@@ -1482,6 +1485,13 @@ struct ApiClient {
         try await request("/grapsee/auth/account/profile", bearer: token)
     }
 
+    private struct AvatarRevision: Decodable { let revision: String }
+
+    static func watchAvatar(token: String, revision: String) async throws -> String {
+        let result: AvatarRevision = try await request("/grapsee/auth/account/avatar?watch=\(revision)", bearer: token)
+        return result.revision
+    }
+
     // ── Account-record sector (the eight profile screens) ──────────────────
 
     /// One partial profile write — the eight account screens' only writer.
@@ -1576,12 +1586,34 @@ struct ApiClient {
     /// `NO_AVATAR` is thrown, NOT returned as empty: "there is no photo" and
     /// "nobody answered the photo" are different sentences for the screen, and
     /// the caller distinguishes them by the code, which only the route chose.
-    static func avatarBytes(token: String) async throws -> Data {
+    static func avatarBytes(token: String, revision: String? = nil) async throws -> Data? {
+        let query = revision.map { "revision=\($0)" } ?? "v=\(UUID().uuidString)"
         let (data, http) = try await accountBinary(
-            path: "/grapsee/auth/account/avatar", method: "GET", bearer: token,
+            path: "/grapsee/auth/account/avatar?\(query)", method: "GET", bearer: token,
             body: nil, contentType: nil)
-        guard (200..<300).contains(http.statusCode) else { throw requestFailure(data: data, http: http) }
-        return data
+        if http.statusCode == 200,
+           http.value(forHTTPHeaderField: "Content-Type")?.lowercased().hasPrefix("image/") == true,
+           data.count <= 10 * 1024 * 1024, await AvatarThumbnail.decode(data) != nil {
+            return data
+        }
+        if revision == nil && (http.statusCode == 404 || http.statusCode == 200) {
+            guard let record = try await profile(token: token).profile else {
+                throw CocoaError(.fileReadUnknown)
+            }
+            guard let url = record.avatarUrl?.nilIfBlank() else { return nil }
+            if let bytes = AvatarThumbnail.inline(url),
+               await AvatarThumbnail.decode(bytes) != nil { return bytes }
+            throw CocoaError(.fileReadCorruptFile)
+        }
+        throw requestFailure(data: data, http: http)
+    }
+
+    static func saveAvatar(token: String, bytes: Data, filename: String, mime: String) async throws -> (AvatarResponse, Data) {
+        let response = try await uploadAvatar(token: token, bytes: bytes, filename: filename, mime: mime)
+        guard response.success, let saved = try await avatarBytes(token: token), saved == bytes else {
+            throw CocoaError(.fileReadCorruptFile)
+        }
+        return (response, saved)
     }
 
     /// The same envelope the JSON `request` builds its errors from, shared by

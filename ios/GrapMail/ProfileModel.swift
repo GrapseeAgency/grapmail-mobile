@@ -1,5 +1,50 @@
 import Foundation
 import Combine
+import CryptoKit
+
+enum AccountPhotoCache {
+    private static let queue = DispatchQueue(label: "com.grapsee.grapmail.account-photo", qos: .userInitiated)
+    private static let maxBytes = 10 * 1024 * 1024
+
+    private static func location(token: String) -> URL? {
+        let parts = token.split(separator: ".")
+        guard parts.count == 3, parts[1].count <= 16_384 else { return nil }
+        var payload = parts[1].replacingOccurrences(of: "-", with: "+").replacingOccurrences(of: "_", with: "/")
+        payload += String(repeating: "=", count: (4 - payload.count % 4) % 4)
+        guard let bytes = Data(base64Encoded: payload),
+              let claims = (try? JSONSerialization.jsonObject(with: bytes)) as? [String: Any],
+              let account = claims["sub"] as? String, let session = claims["jti"] as? String,
+              let root = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first else { return nil }
+        // The locally stored token namespaces the cache. Authorization stays server-side.
+        let key = SHA256.hash(data: Data("\(account):\(session)".utf8))
+            .map { String(format: "%02x", $0) }.joined()
+        return root.appendingPathComponent("grapmail-account-photos", isDirectory: true).appendingPathComponent(key)
+    }
+
+    static func read(token: String) async -> Data? {
+        guard let file = location(token: token) else { return nil }
+        return await withCheckedContinuation { continuation in
+            queue.async {
+                guard let size = try? file.resourceValues(forKeys: [.fileSizeKey]).fileSize,
+                      (1...maxBytes).contains(size) else {
+                    continuation.resume(returning: nil)
+                    return
+                }
+                continuation.resume(returning: try? Data(contentsOf: file))
+            }
+        }
+    }
+
+    static func store(_ bytes: Data?, token: String) {
+        guard let file = location(token: token) else { return }
+        queue.async {
+            guard let bytes else { try? FileManager.default.removeItem(at: file); return }
+            guard !bytes.isEmpty, bytes.count <= maxBytes else { return }
+            try? FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try? bytes.write(to: file, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
+        }
+    }
+}
 
 /// The account record and its writers — the eight screens the web client
 /// splits across `/mail/account/*`, `/mail/settings`, `/mail/notes` and
@@ -61,11 +106,80 @@ final class ProfileModel: ObservableObject {
         state.avatarTried = true
     }
 
+    func showSignupAvatar(_ bytes: Data) {
+        if state.profile == nil, state.avatar == nil { state.avatar = bytes }
+        if let token { AccountPhotoCache.store(bytes, token: token) }
+    }
+
     private var token: String? { SessionStore.token }
 
     private var profileLoad: Task<Void, Never>?
     private var avatarLoad: Task<Void, Never>?
     private var profileLoadedAt: TimeInterval?
+    private var avatarWriteGeneration = 0
+
+    func watchAvatar() async {
+        guard !snapshotSeeded else { return }
+        let generation = SessionStore.generation
+        var revision = ""
+        while !Task.isCancelled, generation == SessionStore.generation, let token {
+            let writeGeneration = avatarWriteGeneration
+            do {
+                let latest = try await ApiClient.watchAvatar(token: token, revision: revision)
+                guard !Task.isCancelled, generation == SessionStore.generation else { return }
+                if latest != revision {
+                    while state.busy || profileLoad != nil {
+                        try await Task.sleep(nanoseconds: 100_000_000)
+                    }
+                    guard !Task.isCancelled, generation == SessionStore.generation else { return }
+                    guard writeGeneration == avatarWriteGeneration else { continue }
+                    let currentUrl = state.profile?.avatarUrl?.nilIfBlank()
+                    let inAppPhoto = currentUrl == nil || currentUrl?.hasPrefix("/api/grapsee/auth/account/avatar?v=") == true
+                    if state.profile != nil, inAppPhoto {
+                        let url = latest == "none" ? nil : "/api/grapsee/auth/account/avatar?v=\(latest)"
+                        if url != currentUrl || !state.avatarTried {
+                            let bytes: Data?
+                            if url == nil {
+                                bytes = nil
+                            } else {
+                                guard let photo = try await ApiClient.avatarBytes(token: token, revision: latest) else {
+                                    throw CocoaError(.fileReadUnknown)
+                                }
+                                bytes = photo
+                            }
+                            guard !Task.isCancelled, generation == SessionStore.generation else { return }
+                            guard writeGeneration == avatarWriteGeneration, !state.busy, profileLoad == nil,
+                                  state.profile?.avatarUrl?.nilIfBlank() == currentUrl else { continue }
+                            avatarLoad?.cancel()
+                            avatarLoad = nil
+                            var updated = state
+                            updated.profile?.avatarUrl = url
+                            updated.avatar = bytes
+                            updated.avatarTried = true
+                            state = updated
+                            AccountPhotoCache.store(bytes, token: token)
+                        }
+                        revision = latest
+                        continue
+                    }
+                    load(force: true)
+                    await profileLoad?.value
+                    await avatarLoad?.value
+                    if state.staleError == nil, state.fatal == nil, let profile = state.profile,
+                       profile.avatarUrl?.nilIfBlank() == nil || state.avatarTried {
+                        revision = latest
+                    } else {
+                        try await Task.sleep(nanoseconds: 3_000_000_000)
+                    }
+                }
+            } catch {
+                if let apiError = error as? ApiError,
+                   case let .http(_, code, _) = apiError, code == "AVATAR_CHANGED" { continue }
+                if Task.isCancelled { return }
+                try? await Task.sleep(nanoseconds: 3_000_000_000)
+            }
+        }
+    }
 
     func load(force: Bool = false) {
         guard !snapshotSeeded, profileLoad == nil, !state.busy, let token else { return }
@@ -76,12 +190,26 @@ final class ProfileModel: ObservableObject {
             guard let self, !Task.isCancelled else { return }
             defer { if !Task.isCancelled { self.profileLoad = nil } }
             do {
+                if self.state.profile == nil, self.state.avatar == nil,
+                   let cached = await AccountPhotoCache.read(token: token),
+                   await AvatarThumbnail.decode(cached) != nil {
+                    guard !Task.isCancelled, generation == SessionStore.generation else { return }
+                    if self.state.profile == nil, self.state.avatar == nil, !self.state.busy {
+                        self.state.avatar = cached
+                    }
+                }
+                guard !Task.isCancelled, generation == SessionStore.generation else { return }
                 let resp = try await ApiClient.profile(token: token)
                 guard !Task.isCancelled, generation == SessionStore.generation else { return }
                 var updated = self.state
                 if let fresh = resp.profile {
-                    if fresh.avatarUrl != updated.profile?.avatarUrl {
+                    if fresh.avatarUrl?.nilIfBlank() == nil {
                         updated.avatar = nil
+                        AccountPhotoCache.store(nil, token: token)
+                    }
+                    if fresh.avatarUrl != updated.profile?.avatarUrl {
+                        self.avatarLoad?.cancel()
+                        self.avatarLoad = nil
                         updated.avatarTried = false
                     }
                     updated.profile = fresh
@@ -91,6 +219,7 @@ final class ProfileModel: ObservableObject {
                 updated.fatal = updated.profile == nil ? "The account record is unavailable." : nil
                 updated.staleError = nil
                 self.state = updated
+                if self.avatarLoad == nil { self.loadAvatar() }
             } catch {
                 guard !Task.isCancelled, generation == SessionStore.generation else { return }
                 let message = self.reason(error)
@@ -104,29 +233,33 @@ final class ProfileModel: ObservableObject {
     }
 
     func loadAvatar() {
-        guard !snapshotSeeded, !state.avatarTried, !state.busy, let token,
+        guard !snapshotSeeded, !state.avatarTried, !state.busy, avatarLoad == nil, let token,
               let url = state.profile?.avatarUrl?.nilIfBlank() else { return }
-        avatarLoad?.cancel()
         let generation = SessionStore.generation
         avatarLoad = Task { [weak self] in
             guard let self else { return }
             defer { if !Task.isCancelled { self.avatarLoad = nil } }
             do {
-                let bytes = try await ApiClient.avatarBytes(token: token)
+                let inline = AvatarThumbnail.inline(url)
+                let bytes: Data?
+                if let inline, await AvatarThumbnail.decode(inline) != nil { bytes = inline }
+                else { bytes = try await ApiClient.avatarBytes(token: token) }
                 guard !Task.isCancelled, generation == SessionStore.generation,
                       self.state.profile?.avatarUrl == url else { return }
                 var updated = self.state
                 updated.avatar = bytes
                 updated.avatarTried = true
                 self.state = updated
+                AccountPhotoCache.store(bytes, token: token)
             } catch let error as ApiError {
                 guard !Task.isCancelled, generation == SessionStore.generation,
                       self.state.profile?.avatarUrl == url else { return }
-                if case let .http(status, _, _) = error, status == 404 {
+                if case let .http(_, code, _) = error, code == "NO_AVATAR" {
                     var updated = self.state
                     updated.avatar = nil
                     updated.avatarTried = true
                     self.state = updated
+                    AccountPhotoCache.store(nil, token: token)
                 }
             } catch {}
         }
@@ -134,6 +267,7 @@ final class ProfileModel: ObservableObject {
 
     private func beginWrite() -> String? {
         guard !state.busy, let token else { return nil }
+        avatarWriteGeneration += 1
         profileLoad?.cancel()
         profileLoad = nil
         avatarLoad?.cancel()
@@ -266,25 +400,28 @@ final class ProfileModel: ObservableObject {
     /// Replace or clear the photo. On success the server's nonce-bearing URL
     /// replaces the stale one immediately; on failure the old bytes stay — a
     /// refused upload must not blank the photo that is still on the record.
-    func uploadAvatar(bytes: Data, filename: String, mime: String) {
+    func uploadAvatar(bytes: Data, filename: String, mime: String, onSaved: @escaping () -> Void = {}) {
         guard let token = beginWrite() else { return }
         let generation = SessionStore.generation
         Task {
             do {
-                let resp = try await ApiClient.uploadAvatar(
+                let (resp, saved) = try await ApiClient.saveAvatar(
                     token: token, bytes: bytes, filename: filename, mime: mime)
                 guard generation == SessionStore.generation else { return }
                 state.busy = false
-                state.avatar = bytes
+                state.avatar = saved
+                AccountPhotoCache.store(saved, token: token)
                 state.avatarTried = true
                 if let url = resp.avatarUrl { state.profile?.avatarUrl = url }
                 let text = resp.message?.trimmingCharacters(in: .whitespacesAndNewlines)
                 state.note = (text?.isEmpty == false) ? text! : "Profile photo updated."
                 state.noteIsBad = false
+                onSaved()
+                load(force: true)
             } catch {
                 guard generation == SessionStore.generation else { return }
                 state.busy = false
-                state.note = "Couldn’t update your profile photo. Try again."
+                state.note = "Couldn’t confirm your profile photo. Try again."
                 state.noteIsBad = true
             }
         }
@@ -297,8 +434,10 @@ final class ProfileModel: ObservableObject {
             do {
                 let resp = try await ApiClient.deleteAvatar(token: token)
                 guard generation == SessionStore.generation else { return }
+                guard resp.success else { throw CocoaError(.fileWriteUnknown) }
                 state.busy = false
                 state.avatar = nil
+                AccountPhotoCache.store(nil, token: token)
                 state.avatarTried = true
                 state.profile?.avatarUrl = nil
                 let text = resp.message?.trimmingCharacters(in: .whitespacesAndNewlines)

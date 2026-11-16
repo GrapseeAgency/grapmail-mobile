@@ -5,6 +5,16 @@ import ImageIO
 import UniformTypeIdentifiers
 
 enum AvatarThumbnail {
+    static func inline(_ value: String?) -> Data? {
+        guard let value, value.utf8.count <= 14 * 1024 * 1024,
+              let comma = value.firstIndex(of: ","),
+              ["data:image/png;base64", "data:image/jpeg;base64", "data:image/webp;base64",
+               "data:image/gif;base64"].contains(String(value[..<comma])),
+              let data = Data(base64Encoded: String(value[value.index(after: comma)...])),
+              !data.isEmpty, data.count <= 10 * 1024 * 1024 else { return nil }
+        return data
+    }
+
     static func decode(_ data: Data, maxSize: Int = 256) async -> CGImage? {
         await decode(maxSize: maxSize) { CGImageSourceCreateWithData(data as CFData, nil) }
     }
@@ -31,16 +41,25 @@ enum AvatarThumbnail {
     }
 }
 
-private struct SelectedAvatar: Transferable {
+struct SelectedAvatar: Transferable {
     let png: Data
 
     static var transferRepresentation: some TransferRepresentation {
         FileRepresentation(importedContentType: .image) { received in
-            guard let image = await AvatarThumbnail.decode(received.file, maxSize: 1024),
-                  let png = UIImage(cgImage: image).pngData() else {
-                throw CocoaError(.fileReadCorruptFile)
+            // The avatar route (and the register route) accept photos up to
+            // 10 MB, not 1 MB. Keep the full-resolution image where it fits;
+            // only a PNG above the ceiling is scaled down, and only enough to
+            // fit it. The result is always PNG, so the data URI the signup
+            // sends and the multipart part the profile screen sends both name
+            // the bytes' real format.
+            for limit in [8192, 4096, 2048, 1024, 512] {
+                guard let image = await AvatarThumbnail.decode(received.file, maxSize: limit),
+                      let png = UIImage(cgImage: image).pngData() else {
+                    throw CocoaError(.fileReadCorruptFile)
+                }
+                if !png.isEmpty, png.count <= 10 * 1024 * 1024 { return Self(png: png) }
             }
-            return Self(png: png)
+            throw CocoaError(.fileReadTooLarge)
         }
     }
 }

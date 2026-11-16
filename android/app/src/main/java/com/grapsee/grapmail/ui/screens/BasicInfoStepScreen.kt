@@ -1,5 +1,7 @@
 package com.grapsee.grapmail.ui.screens
 
+import kotlinx.coroutines.launch
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -75,33 +77,28 @@ fun BasicInfoStepScreen(vm: SignUpViewModel, onBack: () -> Unit, onSignIn: () ->
     var photoUri by androidx.compose.runtime.saveable.rememberSaveable {
         androidx.compose.runtime.mutableStateOf(state.photoUri)
     }
+    var photoError by remember { mutableStateOf(false) }
+    var photoLoading by remember { mutableStateOf(false) }
+    val photoScope = androidx.compose.runtime.rememberCoroutineScope()
     val picker = androidx.activity.compose.rememberLauncherForActivityResult(
         androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia(),
     ) { uri ->
-        photoUri = uri?.toString()
-        vm.update { copy(photoUri = photoUri) }
+        if (uri != null) photoScope.launch {
+            photoLoading = true
+            val bytes = com.grapsee.grapmail.data.AvatarPhoto.encode(context, uri)
+            photoLoading = false
+            photoError = bytes == null
+            if (bytes != null) {
+                photoUri = uri.toString()
+                vm.update { copy(photoUri = photoUri, photoBytes = bytes) }
+            }
+        }
     }
-    // Decode off the composition thread: a full-size photo must not stall
-    // a frame.
     var bitmap by remember { mutableStateOf<androidx.compose.ui.graphics.ImageBitmap?>(null) }
-    LaunchedEffect(photoUri, context) {
-        bitmap = photoUri?.let {
-            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-                runCatching {
-                    val uri = android.net.Uri.parse(it)
-                    val resolver = context.contentResolver
-                    val options = android.graphics.BitmapFactory.Options().apply { inJustDecodeBounds = true }
-                    resolver.openInputStream(uri)?.use { stream ->
-                        android.graphics.BitmapFactory.decodeStream(stream, null, options)
-                    }
-                    var sample = 1
-                    while (maxOf(options.outWidth, options.outHeight) / sample > 512) sample *= 2
-                    options.inSampleSize = sample
-                    options.inJustDecodeBounds = false
-                    resolver.openInputStream(uri)?.use { stream ->
-                        android.graphics.BitmapFactory.decodeStream(stream, null, options)?.asImageBitmap()
-                    }
-                }.getOrNull()
+    LaunchedEffect(state.photoBytes) {
+        bitmap = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            state.photoBytes?.let {
+                android.graphics.BitmapFactory.decodeByteArray(it, 0, it.size)?.asImageBitmap()
             }
         }
     }
@@ -117,9 +114,9 @@ fun BasicInfoStepScreen(vm: SignUpViewModel, onBack: () -> Unit, onSignIn: () ->
                 "Next",
                 onClick = {
                     vm.update { copy(birthdayIso = iso) }
-                    if (iso != null && birthError == null) onNext()
+                    if (iso != null && birthError == null && !photoLoading) onNext()
                 },
-                enabled = iso != null && birthError == null,
+                enabled = iso != null && birthError == null && !photoLoading,
                 trailing = {
                     Spacer(Modifier.size(10.dp))
                     Icon(Icons.AutoMirrored.Rounded.ArrowForward, contentDescription = null, modifier = Modifier.size(18.dp))
@@ -127,6 +124,7 @@ fun BasicInfoStepScreen(vm: SignUpViewModel, onBack: () -> Unit, onSignIn: () ->
             )
         },
     ) {
+        if (photoError) Text("Couldn’t open that photo. Choose another image.", color = palette.error)
         // ── Profile Photo card ──────────────────────────────────────────────
         Row(
             Modifier

@@ -3,6 +3,7 @@ import SwiftUI
 struct AccountSwitcher: View {
     let activeAddress: String?
     let accountName: String?
+    let accountPhoto: Data?
     let onClose: () -> Void
     let onSwitch: (String) -> Void
     let onAdd: () -> Void
@@ -12,6 +13,7 @@ struct AccountSwitcher: View {
 
     @State private var accounts: [SessionStore.Account] = []
     @State private var unreads: [String: Int] = [:]
+    @State private var savedPhotos: [String: Data] = [:]
     @State private var accountsExpanded = true
 
     private var displayedAddress: String? { activeAddress ?? accounts.first?.address }
@@ -23,7 +25,7 @@ struct AccountSwitcher: View {
                     withAnimation(.easeInOut(duration: 0.18)) { accountsExpanded.toggle() }
                 } label: {
                     HStack(spacing: 12) {
-                        SenderAvatar(display: accountName ?? "", address: displayedAddress ?? "", size: 42)
+                        AccountAvatar(photo: accountPhoto, name: accountName ?? "", address: displayedAddress ?? "", size: 42)
                         VStack(alignment: .leading, spacing: 3) {
                             Text(displayedAddress ?? "GrapMail").font(.system(size: 15, weight: .semibold))
                                 .foregroundStyle(GM.textPrimary).lineLimit(1).truncationMode(.middle)
@@ -85,7 +87,7 @@ struct AccountSwitcher: View {
             if active { onClose() } else { onSwitch(account.address) }
         } label: {
             HStack(spacing: 11) {
-                SenderAvatar(display: account.name, address: account.address, size: 32)
+                AccountAvatar(photo: active ? accountPhoto : savedPhotos[account.id], name: account.name, address: account.address, size: 32)
                 Text(account.address).font(.system(size: 14, weight: active ? .semibold : .medium))
                     .lineLimit(1).truncationMode(.middle)
                 Spacer(minLength: 2)
@@ -127,6 +129,33 @@ struct AccountSwitcher: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .task(id: active) {
+            if !active { await watchPhoto(account) }
+        }
+    }
+
+    private func watchPhoto(_ account: SessionStore.Account) async {
+        if let cached = await AccountPhotoCache.read(token: account.token), !Task.isCancelled {
+            savedPhotos[account.id] = cached
+        }
+        var revision = ""
+        while !Task.isCancelled, let token = await ApiClient.pushBearer(for: account.address) {
+            do {
+                let latest = try await ApiClient.watchAvatar(token: token, revision: revision)
+                if latest != revision {
+                    let photo = latest == "none" ? nil : try await ApiClient.avatarBytes(token: token, revision: latest)
+                    guard !Task.isCancelled else { return }
+                    savedPhotos[account.id] = photo
+                    AccountPhotoCache.store(photo, token: token)
+                    revision = latest
+                }
+            } catch {
+                if let apiError = error as? ApiError,
+                   case let .http(_, code, _) = apiError, code == "AVATAR_CHANGED" { continue }
+                if Task.isCancelled { return }
+                try? await Task.sleep(nanoseconds: 3_000_000_000)
+            }
+        }
     }
 }
 

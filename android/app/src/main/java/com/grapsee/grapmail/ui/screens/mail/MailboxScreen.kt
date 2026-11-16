@@ -102,6 +102,7 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.selected
@@ -176,6 +177,7 @@ fun MailboxScreen(
     onSignOut: () -> Unit,
     onAddAccount: () -> Unit,
     onAccountSwitched: () -> Unit = {},
+    accountPhoto: ByteArray? = null,
 ) {
     val palette = LocalPalette.current
     val state by vm.state.collectAsStateWithLifecycle()
@@ -343,6 +345,7 @@ fun MailboxScreen(
                         onMenu = { scope.launch { drawer.open() } },
                         accountName = state.accountName.orEmpty(),
                         accountAddress = state.accountAddress,
+                        accountPhoto = accountPhoto,
                         onProfile = onProfile,
                         onSettings = onSettings,
                         onSignOut = onSignOut,
@@ -701,6 +704,7 @@ internal fun MailTopBar(
     loadUnreads: suspend (List<com.grapsee.grapmail.data.SessionSnapshot>) -> Map<String, Int?>,
     onSwitchAccount: (String) -> Unit,
     onAddAccount: () -> Unit,
+    accountPhoto: ByteArray? = null,
     search: @Composable () -> Unit,
 ) {
     val palette = LocalPalette.current
@@ -718,16 +722,17 @@ internal fun MailTopBar(
                 onClick = { accountOpen = true },
                 modifier = Modifier.semantics { contentDescription = "Account" },
             ) {
-                if (accountName.isBlank() && accountAddress.isNullOrBlank()) {
+                if (accountPhoto == null && accountName.isBlank() && accountAddress.isNullOrBlank()) {
                     Icon(Icons.Rounded.Person, null, tint = palette.textSecondary)
                 } else {
-                    SenderAvatar(accountName, accountAddress, size = 36.dp)
+                    AccountPhoto(accountPhoto, accountName, accountAddress, 36.dp)
                 }
             }
             if (accountOpen) {
                 AccountSwitcherPopup(
                     loadUnreads = loadUnreads,
                     activeAddress = accountAddress,
+                    accountPhoto = accountPhoto,
                     onDismiss = { accountOpen = false },
                     onSwitch = {
                         accountOpen = false
@@ -766,6 +771,7 @@ internal fun MailTopBar(
 private fun AccountSwitcherPopup(
     loadUnreads: suspend (List<com.grapsee.grapmail.data.SessionSnapshot>) -> Map<String, Int?>,
     activeAddress: String?,
+    accountPhoto: ByteArray?,
     onDismiss: () -> Unit,
     onSwitch: (String) -> Unit,
     onAddAccount: () -> Unit,
@@ -780,12 +786,40 @@ private fun AccountSwitcherPopup(
     // instead of holding the menu open.
     var accounts by remember { mutableStateOf(emptyList<com.grapsee.grapmail.data.SessionSnapshot>()) }
     var unreads by remember { mutableStateOf(emptyMap<String, Int?>()) }
+    var savedPhotos by remember { mutableStateOf(emptyMap<String, ByteArray?>()) }
     LaunchedEffect(Unit) {
         val loaded = com.grapsee.grapmail.data.SessionStore.snapshotAll(context)
         accounts = loaded
         unreads = loadUnreads(loaded.filterNot { it.address.equals(activeAddress, ignoreCase = true) })
     }
     val displayedAddress = activeAddress ?: accounts.firstOrNull()?.address
+    LaunchedEffect(accounts, displayedAddress) {
+        accounts.filterNot { it.address.equals(displayedAddress, ignoreCase = true) }.forEach { account ->
+            launch {
+                com.grapsee.grapmail.data.AvatarPhoto.readCached(context, account)?.let {
+                    savedPhotos = savedPhotos + (account.id to it)
+                }
+                var revision = ""
+                while (true) {
+                    val session = com.grapsee.grapmail.data.SessionRefresh.forAccount(context, account.id) ?: break
+                    try {
+                        val latest = com.grapsee.grapmail.data.Api.watchAvatar(session.token, revision)
+                        if (latest != revision) {
+                            val photo = if (latest == "none") null else
+                                com.grapsee.grapmail.data.Api.avatarBytes(session.token, revision = latest)
+                            savedPhotos = savedPhotos + (account.id to photo)
+                            com.grapsee.grapmail.data.AvatarPhoto.cache(context, session, photo)
+                            revision = latest
+                        }
+                    } catch (error: Exception) {
+                        if (error is kotlinx.coroutines.CancellationException) throw error
+                        if (error is com.grapsee.grapmail.data.ApiException && error.code == "AVATAR_CHANGED") continue
+                        kotlinx.coroutines.delay(3_000)
+                    }
+                }
+            }
+        }
+    }
     Popup(
         popupPositionProvider = remember {
             object : androidx.compose.ui.window.PopupPositionProvider {
@@ -834,11 +868,7 @@ private fun AccountSwitcherPopup(
                         .padding(horizontal = 12.dp, vertical = 12.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    SenderAvatar(
-                        displayedAddress.orEmpty(),
-                        displayedAddress,
-                        size = 38.dp,
-                    )
+                    AccountPhoto(accountPhoto, displayedAddress.orEmpty(), displayedAddress, 38.dp)
                     Spacer(Modifier.width(12.dp))
                     Column(Modifier.weight(1f)) {
                         Text(
@@ -863,7 +893,8 @@ private fun AccountSwitcherPopup(
                             .padding(horizontal = 16.dp, vertical = 12.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        SenderAvatar(account.address, account.address, size = 32.dp)
+                        AccountPhoto(if (active) accountPhoto else savedPhotos[account.id],
+                            account.address, account.address, 32.dp)
                         Spacer(Modifier.width(12.dp))
                         Text(
                             account.address,
@@ -942,6 +973,23 @@ private fun SwitcherActionRow(icon: androidx.compose.ui.graphics.vector.ImageVec
         Text(label, fontSize = 14.sp, color = palette.textPrimary, modifier = Modifier.weight(1f))
         Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, null, tint = palette.textSecondary,
             modifier = Modifier.size(18.dp))
+    }
+}
+
+@Composable
+internal fun AccountPhoto(bytes: ByteArray?, name: String, address: String?, size: androidx.compose.ui.unit.Dp) {
+    val thumbnail = remember(bytes) {
+        bytes?.let { com.grapsee.grapmail.data.AvatarPhoto.thumbnail(it)?.asImageBitmap() }
+    }
+    if (thumbnail != null) {
+        androidx.compose.foundation.Image(
+            bitmap = thumbnail,
+            contentDescription = null,
+            modifier = Modifier.size(size).clip(CircleShape),
+            contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+        )
+    } else {
+        SenderAvatar(name, address, size = size)
     }
 }
 

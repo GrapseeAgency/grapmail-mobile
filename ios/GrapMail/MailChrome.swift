@@ -271,6 +271,7 @@ struct MailHomeTopBar<Search: View>: View {
     let onSignOut: () -> Void
     var onAddAccount: () -> Void = {}
     var onSwitchAccount: (String) -> Void = { _ in }
+    var accountPhoto: Data? = nil
     @State private var accountOpen = false
     @ViewBuilder let search: () -> Search
 
@@ -290,9 +291,9 @@ struct MailHomeTopBar<Search: View>: View {
 
                 Button { accountOpen.toggle() } label: {
                     Group {
-                        if accountName?.nilIfBlank() != nil || accountAddress?.nilIfBlank() != nil {
-                            SenderAvatar(display: accountName ?? "",
-                                         address: accountAddress ?? "", size: 36)
+                        if accountPhoto != nil || accountName?.nilIfBlank() != nil || accountAddress?.nilIfBlank() != nil {
+                            AccountAvatar(photo: accountPhoto, name: accountName ?? "",
+                                          address: accountAddress ?? "", size: 36)
                         } else {
                             Image(systemName: "person.crop.circle")
                                 .font(.system(size: 30))
@@ -305,7 +306,7 @@ struct MailHomeTopBar<Search: View>: View {
                 .accessibilityLabel("Account")
                 .popover(isPresented: $accountOpen, attachmentAnchor: .rect(.bounds), arrowEdge: .top) {
                     AccountSwitcher(
-                        activeAddress: accountAddress, accountName: accountName,
+                        activeAddress: accountAddress, accountName: accountName, accountPhoto: accountPhoto,
                         onClose: { accountOpen = false },
                         onSwitch: { accountOpen = false; onSwitchAccount($0) },
                         onAdd: { accountOpen = false; onAddAccount() },
@@ -325,6 +326,31 @@ struct MailHomeTopBar<Search: View>: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, 16)
                 .padding(.bottom, 8)
+        }
+    }
+}
+
+struct AccountAvatar: View {
+    let photo: Data?
+    let name: String
+    let address: String
+    let size: CGFloat
+    @State private var image: CGImage?
+
+    var body: some View {
+        Group {
+            if let image {
+                Image(uiImage: UIImage(cgImage: image))
+                    .resizable().scaledToFill().frame(width: size, height: size).clipShape(Circle())
+            } else {
+                SenderAvatar(display: name, address: address, size: size)
+            }
+        }
+        .accessibilityHidden(true)
+        .task(id: photo) {
+            image = nil
+            guard let photo, let decoded = await AvatarThumbnail.decode(photo), !Task.isCancelled else { return }
+            image = decoded
         }
     }
 }

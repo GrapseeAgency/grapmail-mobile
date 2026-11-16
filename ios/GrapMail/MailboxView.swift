@@ -43,6 +43,7 @@ struct MailboxView: View {
     let onSignOut: () -> Void
     var onAddAccount: () -> Void = {}
     var onSwitchAccount: (String) -> Void = { _ in }
+    var accountPhoto: Data? = nil
 
     @Environment(\.scenePhase) private var scenePhase
     @State private var isAtTop = true
@@ -200,6 +201,7 @@ struct MailboxView: View {
                 onSignOut: onSignOut,
                 onAddAccount: onAddAccount,
                 onSwitchAccount: onSwitchAccount,
+                accountPhoto: accountPhoto,
                 search: { searchField }
             )
         }

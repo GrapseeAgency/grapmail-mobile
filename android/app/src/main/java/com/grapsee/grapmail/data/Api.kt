@@ -53,6 +53,7 @@ import kotlin.coroutines.resumeWithException
     val grapmailHandle: String? = null,
     val password: String,
     val acceptedTerms: Boolean? = null,
+    val avatarPhoto: String? = null,
     /** The gateway distinguishes the agency dashboard's CLIENT accounts from
      *  GrapMail's USER accounts, and only USER accounts get a handle and a
      *  mailbox. This app only ever creates USER accounts.
@@ -70,6 +71,7 @@ import kotlin.coroutines.resumeWithException
 
 @Serializable data class CreateResponse(
     val success: Boolean = false,
+    val avatarSaved: Boolean = false,
     val account: AccountDto? = null,
     val mailboxDomain: String? = null,
     /** The gateway answers with the address it provisioned, under its own name. */
@@ -750,6 +752,9 @@ object Api {
             override fun onResponse(call: Call, response: Response) {
                 val result = try {
                     response.use(readBody)
+                } catch (error: ApiException) {
+                    continuation.resumeWithException(error)
+                    return
                 } catch (e: Exception) {
                     android.util.Log.w("GrapMailApi", "Response read failed: ${e.javaClass.simpleName}")
                     continuation.resumeWithException(IOException("Could not read the response. Try again.", e))
@@ -1053,14 +1058,46 @@ object Api {
      * the profile screen draws as the empty state, not as a failure; anything
      * else throws like every other read, because a 500 must not look like no photo.
      */
-    suspend fun avatarBytes(token: String): ByteArray? =
-        executeResponse(authed("$AUTH/account/avatar", token).get().build()) { resp ->
-            when {
-                resp.code == 404 -> null
-                resp.code >= 400 -> fail(resp.code, resp.body?.string() ?: "")
-                else -> resp.body?.bytes()
+    suspend fun avatarBytes(token: String, revision: String? = null): ByteArray? {
+        val url = "$AUTH/account/avatar" + if (revision != null) "?revision=${enc(revision)}" else ""
+        val req = authed(url, token).header("Cache-Control", "no-cache").get().build()
+        val bytes = executeResponse(req) { response ->
+            if (response.code == 404) return@executeResponse null
+            if (!response.isSuccessful) fail(response.code, response.body?.string() ?: "")
+            val body = response.body ?: return@executeResponse null
+            if (body.contentType()?.type != "image" || body.contentLength() > AvatarPhoto.maxBytes) {
+                return@executeResponse null
             }
+            val source = body.source()
+            if (source.request(AvatarPhoto.maxBytes.toLong() + 1)) return@executeResponse null
+            source.readByteArray().takeIf(AvatarPhoto::isImage)
         }
+        if (bytes != null) return bytes
+        if (revision != null) throw java.io.IOException("Photo revision could not be read")
+        val record = profile(token).profile ?: throw java.io.IOException("Account photo could not be read")
+        val avatarUrl = record.avatarUrl?.takeUnless { it.isBlank() } ?: return null
+        return AvatarPhoto.inline(avatarUrl) ?: throw java.io.IOException("Account photo could not be read")
+    }
+
+    @Serializable
+    private data class AvatarRevision(val revision: String)
+
+    private val avatarWatchClient by lazy { client.newBuilder().dispatcher(Dispatcher()).build() }
+
+    suspend fun watchAvatar(token: String, revision: String): String {
+        val request = authed("$AUTH/account/avatar?watch=$revision", token).get().build()
+        val (status, body) = execute(request, avatarWatchClient)
+        if (status >= 400) fail(status, body)
+        return decodeResponse<AvatarRevision>(body).revision
+    }
+
+    suspend fun saveAvatar(token: String, bytes: ByteArray, filename: String, mime: String): Pair<AvatarResponse, ByteArray> {
+        val response = uploadAvatar(token, bytes, filename, mime)
+        if (!response.success) throw java.io.IOException("Photo upload was not accepted")
+        val saved = avatarBytes(token)
+        if (saved == null || !saved.contentEquals(bytes)) throw java.io.IOException("Saved photo could not be confirmed")
+        return response to saved
+    }
 
     suspend fun enableTwoFactor(token: String, proof: String?, phoneProof: String?): ProfileResponse {
         val req = authed("$AUTH/account/profile", token)

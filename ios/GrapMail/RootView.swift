@@ -9,10 +9,20 @@ import Combine
 private final class SignedInModels: ObservableObject {
     private(set) var mail = MailboxModel()
     @Published private(set) var account = ProfileModel()
+    private var accountChanges: AnyCancellable?
+
+    init() { observeAccount() }
+
+    private func observeAccount() {
+        accountChanges = account.objectWillChange.sink { [weak self] in
+            self?.objectWillChange.send()
+        }
+    }
 
     func reset() {
         mail = MailboxModel()
         account = ProfileModel()
+        observeAccount()
     }
 }
 
@@ -21,6 +31,7 @@ private final class SignedInModels: ObservableObject {
 /// and the whole recovery/security arc beside it.
 @MainActor
 struct RootView: View {
+    @Environment(\.scenePhase) private var scenePhase
     @StateObject private var model = SignUpModel()
     @StateObject private var recovery = RecoveryModel()
     /// The home-screen shortcut's parked request. Observed, not owned: it is
@@ -172,6 +183,9 @@ struct RootView: View {
             // and a photograph set that contradicts itself screen by screen.
             .toolbar(.hidden, for: .navigationBar)
             .navigationBarBackButtonHidden(true)
+            .task(id: scenePhase == .active && path.contains(.home) ? SessionStore.generation : nil) {
+                if scenePhase == .active, path.contains(.home) { await account.watchAvatar() }
+            }
             // The gateway's access token lives one hour; the refresh token is
             // good for thirty days. A stored pair opens the locally-restored
             // mailbox immediately; renewal must not sit between app launch and
@@ -730,8 +744,32 @@ struct RootView: View {
                         onAddAccount: { path.append(.signIn) },
                         onSwitchAccount: { address in
                             if SessionStore.switchTo(address) { enterMailbox() }
-                        }
+                        },
+                        accountPhoto: account.state.avatar
                     )
+                    .task(id: SessionStore.generation) {
+                        if let address = model.state.createdAddress,
+                           address.caseInsensitiveCompare(SessionStore.address ?? "") == .orderedSame,
+                           let photo = model.state.photo {
+                            let saved = model.state.photoSaved
+                            model.update {
+                                $0.photo = nil
+                                $0.photoSaved = false
+                            }
+                            if saved {
+                                account.showSignupAvatar(photo)
+                                account.load()
+                            } else {
+                                account.uploadAvatar(bytes: photo, filename: "profile.png", mime: "image/png")
+                            }
+                        } else { account.load() }
+                    }
+                    .task(id: account.state.busy ? nil : account.state.profile?.avatarUrl) {
+                        if !account.state.busy { account.loadAvatar() }
+                    }
+                    .onChange(of: scenePhase) { phase in
+                        if phase == .active { account.load(force: true) }
+                    }
                     .id(SessionStore.generation)
                 case let .mailThread(id, isThread, focus, more):
                     ThreadView(

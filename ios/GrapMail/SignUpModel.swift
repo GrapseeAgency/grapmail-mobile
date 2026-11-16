@@ -19,6 +19,8 @@ final class SignUpModel: ObservableObject {
         var bYear = ""
         var birthdayIso: String?
         var gender: String?
+        var photo: Data?
+        var photoSaved = false
         var chosenHandle = ""
         var customHandle = ""
         var customOpen = false
@@ -125,14 +127,20 @@ final class SignUpModel: ObservableObject {
                         gender: s.gender,
                         grapmailHandle: s.chosenHandle.isEmpty ? nil : s.chosenHandle,
                         password: s.password,
-                        acceptedTerms: true
+                        acceptedTerms: true,
+                        avatarPhoto: s.photo.map { "data:image/png;base64," + $0.base64EncodedString() }
                     )
                 )
                 // The gateway answers `grapmail` (and no account object); the
                 // old local route answered `account.address`.
                 let fullName = "\(s.firstName) \(s.lastName)".trimmingCharacters(in: .whitespaces)
                 let address = resp.grapmail ?? resp.account?.address ?? "\(s.chosenHandle)@grapsee.com"
-                update { $0.creating = false; $0.createdAddress = address; $0.createdName = resp.account?.name ?? fullName }
+                update {
+                    $0.creating = false
+                    $0.createdAddress = address
+                    $0.createdName = resp.account?.name ?? fullName
+                    $0.photoSaved = resp.avatarSaved
+                }
                 // Auto sign-in — the same call the website makes the moment the
                 // account exists. The freshly-created credential can take a
                 // beat to become usable, so retry a few times before giving up

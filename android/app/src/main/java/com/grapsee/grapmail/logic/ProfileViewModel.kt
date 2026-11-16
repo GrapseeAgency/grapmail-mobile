@@ -5,16 +5,20 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.grapsee.grapmail.data.Api
 import com.grapsee.grapmail.data.ApiException
+import com.grapsee.grapmail.data.AvatarPhoto
 import com.grapsee.grapmail.data.ProfileConnectionDto
 import com.grapsee.grapmail.data.ProfileDto
 import com.grapsee.grapmail.data.ProfilePatch
 import com.grapsee.grapmail.data.ProfileSettingsPatch
 import com.grapsee.grapmail.data.SessionStore
+import com.grapsee.grapmail.data.SessionSnapshot
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.repeatOnLifecycle
 
 /**
  * The account record and its writers — the eight screens the web client splits
@@ -89,10 +93,84 @@ class ProfileViewModel @JvmOverloads constructor(
         _state.update { it.copy(profile = profile, loading = false, avatar = avatarBytes, avatarTried = true) }
     }
 
+    fun showSignupAvatar(bytes: ByteArray, session: SessionSnapshot) {
+        _state.update { if (it.profile == null && it.avatar == null) it.copy(avatar = bytes) else it }
+        viewModelScope.launch { AvatarPhoto.cache(getApplication(), session, bytes) }
+    }
+
     private var profileLoad: kotlinx.coroutines.Job? = null
     private var avatarLoad: kotlinx.coroutines.Job? = null
 
     private var profileLoadedAt: Long? = null
+    private var avatarWatch: kotlinx.coroutines.Job? = null
+    private var avatarWriteGeneration = 0L
+
+    fun startWatchingAvatar(lifecycle: Lifecycle) {
+        if (snapshotMode || avatarWatch?.isActive == true) return
+        avatarWatch = viewModelScope.launch {
+            lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) { watchAvatar() }
+        }
+    }
+
+    private suspend fun watchAvatar() {
+        var revision = ""
+        while (true) {
+            val session = SessionStore.snapshot(getApplication()) ?: break
+            val writeGeneration = avatarWriteGeneration
+            try {
+                val latest = Api.watchAvatar(session.token, revision)
+                if (latest != revision) {
+                    while (state.value.busy || profileLoad?.isActive == true) {
+                        kotlinx.coroutines.delay(100)
+                    }
+                    if (writeGeneration != avatarWriteGeneration) continue
+                    val current = state.value.profile
+                    val currentUrl = current?.avatarUrl
+                    val inAppPhoto = currentUrl.isNullOrBlank() ||
+                        currentUrl.startsWith("/api/grapsee/auth/account/avatar?v=")
+                    if (current != null && inAppPhoto) {
+                        val url = if (latest == "none") null else "/api/grapsee/auth/account/avatar?v=$latest"
+                        if (url != currentUrl || !state.value.avatarTried) {
+                            val bytes = if (url == null) {
+                                null
+                            } else {
+                                Api.avatarBytes(session.token, revision = latest)
+                                    ?: throw java.io.IOException("Photo revision could not be read")
+                            }
+                            if (SessionStore.snapshot(getApplication())?.id != session.id) return
+                            if (writeGeneration != avatarWriteGeneration || state.value.busy ||
+                                profileLoad?.isActive == true || state.value.profile?.avatarUrl != currentUrl
+                            ) continue
+                            avatarLoad?.cancel()
+                            avatarLoad = null
+                            _state.update {
+                                it.copy(profile = it.profile?.copy(avatarUrl = url), avatar = bytes, avatarTried = true)
+                            }
+                            AvatarPhoto.cache(getApplication(), session, bytes)
+                        }
+                        revision = latest
+                        continue
+                    }
+                    load(force = true)
+                    profileLoad?.join()
+                    avatarLoad?.join()
+                    val refreshed = state.value
+                    if (refreshed.staleError == null && refreshed.fatal == null &&
+                        refreshed.profile != null &&
+                        (refreshed.profile.avatarUrl.isNullOrBlank() || refreshed.avatarTried)
+                    ) {
+                        revision = latest
+                    } else {
+                        kotlinx.coroutines.delay(3_000)
+                    }
+                }
+            } catch (error: Exception) {
+                if (error is kotlinx.coroutines.CancellationException) throw error
+                if (error is ApiException && error.code == "AVATAR_CHANGED") continue
+                kotlinx.coroutines.delay(3_000)
+            }
+        }
+    }
 
     fun load(force: Boolean = false) {
         if (snapshotMode || profileLoad?.isActive == true || state.value.busy) return
@@ -100,22 +178,36 @@ class ProfileViewModel @JvmOverloads constructor(
             profileLoadedAt?.let { android.os.SystemClock.elapsedRealtime() - it < 30_000 } == true
         ) return
         profileLoad = viewModelScope.launch {
-            val t = token() ?: return@launch
+            val session = SessionStore.snapshot(getApplication()) ?: return@launch
             _state.update { it.copy(loading = it.profile == null) }
-            runCatching { Api.profile(t) }
+            if (state.value.profile == null && state.value.avatar == null) {
+                val cached = AvatarPhoto.readCached(getApplication(), session)
+                if (cached != null) _state.update {
+                    if (it.profile == null && it.avatar == null && !it.busy) it.copy(avatar = cached) else it
+                }
+            }
+            runCatching { Api.profile(session.token) }
                 .onSuccess { resp ->
                     val fresh = resp.profile
                     if (fresh != null) profileLoadedAt = android.os.SystemClock.elapsedRealtime()
+                    if (fresh != null && fresh.avatarUrl != state.value.profile?.avatarUrl) {
+                        avatarLoad?.cancel()
+                        avatarLoad = null
+                    }
                     _state.update {
                         val avatarChanged = fresh != null && fresh.avatarUrl != it.profile?.avatarUrl
                         it.copy(
                             profile = fresh ?: it.profile, loading = false,
-                            avatar = if (avatarChanged) null else it.avatar,
+                            avatar = if (fresh != null && fresh.avatarUrl.isNullOrBlank()) null else it.avatar,
                             avatarTried = !avatarChanged && it.avatarTried,
                             fatal = if (fresh == null && it.profile == null) "The account record is unavailable." else null,
                             staleError = null,
                         )
                     }
+                    if (fresh != null && fresh.avatarUrl.isNullOrBlank()) {
+                        AvatarPhoto.cache(getApplication(), session, null)
+                    }
+                    loadAvatar()
                 }
                 .onFailure { e ->
                     if (e is kotlinx.coroutines.CancellationException) throw e
@@ -140,13 +232,19 @@ class ProfileViewModel @JvmOverloads constructor(
      */
     fun loadAvatar() {
         val url = state.value.profile?.avatarUrl ?: return
-        if (snapshotMode || state.value.avatarTried || state.value.busy) return
-        avatarLoad?.cancel()
+        if (snapshotMode || state.value.avatarTried || state.value.busy || avatarLoad?.isActive == true) return
         avatarLoad = viewModelScope.launch {
-            val t = token() ?: return@launch
-            runCatching { Api.avatarBytes(t) }
+            val session = SessionStore.snapshot(getApplication()) ?: return@launch
+            runCatching {
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                    AvatarPhoto.inline(url) ?: Api.avatarBytes(session.token)
+                }
+            }
                 .onSuccess { bytes ->
-                    if (state.value.profile?.avatarUrl == url) _state.update { it.copy(avatar = bytes, avatarTried = true) }
+                    if (state.value.profile?.avatarUrl == url) {
+                        _state.update { it.copy(avatar = bytes, avatarTried = true) }
+                        AvatarPhoto.cache(getApplication(), session, bytes)
+                    }
                 }
                 .onFailure { e ->
                     if (e is kotlinx.coroutines.CancellationException) throw e
@@ -158,12 +256,14 @@ class ProfileViewModel @JvmOverloads constructor(
                             avatarTried = none || it.avatarTried,
                         )
                     }
+                    if (none) AvatarPhoto.cache(getApplication(), session, null)
                 }
         }
     }
 
     private fun beginWrite(): Boolean {
         if (state.value.busy) return false
+        avatarWriteGeneration++
         profileLoad?.cancel()
         profileLoad = null
         avatarLoad?.cancel()
@@ -256,22 +356,25 @@ class ProfileViewModel @JvmOverloads constructor(
      * replaces the stale one immediately; on failure the old bytes stay — a
      * refused upload must not blank the photo that is still on the record.
      */
-    fun uploadAvatar(bytes: ByteArray, filename: String, mime: String) {
+    fun uploadAvatar(bytes: ByteArray, filename: String, mime: String, onSaved: () -> Unit = {}) {
         if (!beginWrite()) return
         viewModelScope.launch {
-            val t = token() ?: run { writeTokenMissing(); return@launch }
-            runCatching { Api.uploadAvatar(t, bytes, filename, mime) }
-                .onSuccess { resp ->
+            val session = SessionStore.snapshot(getApplication()) ?: run { writeTokenMissing(); return@launch }
+            runCatching { Api.saveAvatar(session.token, bytes, filename, mime) }
+                .onSuccess { (resp, saved) ->
                     _state.update {
-                        it.copy(busy = false, avatar = bytes, avatarTried = true,
+                        it.copy(busy = false, avatar = saved, avatarTried = true,
                             profile = it.profile?.copy(avatarUrl = resp.avatarUrl ?: it.profile.avatarUrl),
                             note = resp.message?.takeIf { m -> m.isNotBlank() } ?: "Profile photo updated.",
                             noteIsBad = false)
                     }
+                    AvatarPhoto.cache(getApplication(), session, saved)
+                    onSaved()
+                    load(force = true)
                 }
                 .onFailure { e ->
                     if (e is kotlinx.coroutines.CancellationException) throw e
-                    _state.update { it.copy(busy = false, note = "Couldn’t update your profile photo. Try again.", noteIsBad = true) }
+                    _state.update { it.copy(busy = false, note = "Couldn’t confirm your profile photo. Try again.", noteIsBad = true) }
                 }
         }
     }
@@ -279,8 +382,10 @@ class ProfileViewModel @JvmOverloads constructor(
     fun removeAvatar() {
         if (!beginWrite()) return
         viewModelScope.launch {
-            val t = token() ?: run { writeTokenMissing(); return@launch }
-            runCatching { Api.deleteAvatar(t) }
+            val session = SessionStore.snapshot(getApplication()) ?: run { writeTokenMissing(); return@launch }
+            runCatching {
+                Api.deleteAvatar(session.token).also { check(it.success) }
+            }
                 .onSuccess { resp ->
                     _state.update {
                         it.copy(busy = false, avatar = null, avatarTried = true,
@@ -288,6 +393,7 @@ class ProfileViewModel @JvmOverloads constructor(
                             note = resp.message?.takeIf { m -> m.isNotBlank() } ?: "Profile photo removed.",
                             noteIsBad = false)
                     }
+                    AvatarPhoto.cache(getApplication(), session, null)
                 }
                 .onFailure { e ->
                     if (e is kotlinx.coroutines.CancellationException) throw e

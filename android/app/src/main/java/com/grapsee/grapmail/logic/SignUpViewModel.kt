@@ -39,6 +39,8 @@ class SignUpViewModel : ViewModel() {
         val birthdayIso: String? = null,
         val gender: String? = null,
         val photoUri: String? = null,
+        val photoBytes: ByteArray? = null,
+        val photoSaved: Boolean = false,
         val chosenHandle: String = "",
         val customHandle: String = "",
         val customOpen: Boolean = false,
@@ -155,6 +157,9 @@ class SignUpViewModel : ViewModel() {
                         grapmailHandle = s.chosenHandle.ifBlank { null },
                         password = s.password,
                         acceptedTerms = true,
+                        avatarPhoto = s.photoBytes?.let {
+                            "data:image/png;base64," + android.util.Base64.encodeToString(it, android.util.Base64.NO_WRAP)
+                        },
                         accountType = "USER",
                     )
                 )
@@ -162,7 +167,10 @@ class SignUpViewModel : ViewModel() {
                 // object); the old local route answered `account.address`.
                 val fullName = "${s.firstName.trim()} ${s.lastName.trim()}".trim()
                 val address = resp.addressOrNull ?: "${s.chosenHandle}@grapsee.com"
-                update { copy(creating = false, createdAddress = address, createdName = resp.account?.name ?: fullName) }
+                update {
+                    copy(creating = false, createdAddress = address, createdName = resp.account?.name ?: fullName,
+                        photoSaved = resp.avatarSaved)
+                }
                 onCreated(address, resp.account?.name ?: fullName)
             } catch (e: ApiException) {
                 update { copy(creating = false) }

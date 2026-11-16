@@ -33,6 +33,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.collectAsState
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.NavHost
@@ -714,6 +718,7 @@ fun GrapMailNav(
     val onHome = backStack?.destination?.route == Routes.HOME ||
         (backStack == null && dest == Routes.HOME)
     val hostActivity = nav.context as? android.app.Activity
+    val activityLifecycle = LocalLifecycleOwner.current.lifecycle
     BackHandler(enabled = onHome) { hostActivity?.moveTaskToBack(true) }
 
     NavHost(
@@ -1167,8 +1172,34 @@ fun GrapMailNav(
             )
         }
         composable(Routes.HOME) { entry ->
+            val profile = viewModel<com.grapsee.grapmail.logic.ProfileViewModel>(entry)
+            val personal by profile.state.collectAsStateWithLifecycle()
+            LaunchedEffect(profile) {
+                profile.startWatchingAvatar(activityLifecycle)
+                val session = SessionStore.snapshot(nav.context.applicationContext)
+                val signup = vm.state.value
+                val photo = signup.photoBytes
+                if (session != null && session.address.equals(signup.createdAddress, ignoreCase = true) && photo != null) {
+                    vm.update { copy(photoUri = null, photoBytes = null, photoSaved = false) }
+                    if (signup.photoSaved) {
+                        profile.showSignupAvatar(photo, session)
+                        profile.load()
+                    } else {
+                        profile.uploadAvatar(photo, "profile.png", "image/png")
+                    }
+                } else {
+                    profile.load()
+                }
+            }
+            LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
+                profile.load(force = true)
+            }
+            LaunchedEffect(personal.profile?.avatarUrl, personal.busy) {
+                if (!personal.busy) profile.loadAvatar()
+            }
             MailboxScreen(
                 vm = viewModel<MailboxViewModel>(entry),
+                accountPhoto = personal.avatar,
                 onOpenThread = { id, isThread ->
                     nav.navigate(Routes.mailThread(id, isThread))
                 },

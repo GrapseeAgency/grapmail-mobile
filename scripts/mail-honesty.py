@@ -1529,15 +1529,23 @@ pin("iOS adopts the upload's nonce-bearing avatar URL",
     re.search(r"state\.profile\?\.avatarUrl = url", code_only(SW_PVM)) is not None)
 # A bounded PNG is uploaded even when the original photo is larger or a different format.
 pin("both photo pickers resize and normalize uploads",
-    "1024f / maxOf(width, height)" in code_only(KT_ACCT)
-    and "Bitmap.CompressFormat.PNG" in code_only(KT_ACCT)
-    and "AvatarThumbnail.decode(received.file, maxSize: 1024)" in code_only(SW_ACCT)
+    "1024f / maxOf(width, height)" in code_only(android("data/AvatarPhoto.kt"))
+    and "Bitmap.CompressFormat.PNG" in code_only(android("data/AvatarPhoto.kt"))
+    and "AvatarPhoto.encode(ctx, uri)" in code_only(KT_ACCT)
+    and "for limit in [8192, 4096, 2048, 1024, 512]" in code_only(SW_ACCT)
+    and "png.count <= 10 * 1024 * 1024" in code_only(SW_ACCT)
+    and "AvatarThumbnail.decode(received.file, maxSize: limit)" in code_only(SW_ACCT)
     and ".pngData()" in code_only(SW_ACCT))
 
-pin("opening a profile-backed screen does not fetch the avatar",
-    "loadAvatar()" not in body_of(KT_PVM, "fun load(force")
-    and "loadAvatar()" not in body_of(SW_PVM, "func load(force")
-    and "vm.loadAvatar()" in KT_ACCT and "vm.loadAvatar()" in SW_ACCT)
+KT_HOME = body_of(KT_MAIN, "composable(Routes.HOME)")
+pin("Android mailbox observes the account photo and starts live sync",
+    "profile.startWatchingAvatar(activityLifecycle)" in KT_HOME
+    and "accountPhoto = personal.avatar" in KT_HOME
+    and "profile.showSignupAvatar(photo, session)" in KT_HOME)
+pin("iOS mailbox observes the account photo and starts live sync",
+    "await account.watchAvatar()" in code_only(SW_ROOT)
+    and "accountPhoto: account.state.avatar" in code_only(SW_ROOT)
+    and "account.showSignupAvatar(photo)" in code_only(SW_ROOT))
 pin("iOS waits for loaded account data before showing editable fields",
     ".task(id: s != nil)" in SW_ACCT and ".task(id: p != nil)" in SW_ACCT
     and SW_ACCT.count("else if fieldsReady {") >= 2)
@@ -2110,15 +2118,14 @@ pin("the data-flow doc states the deletion gap in the screens' own words",
 pin("the data-flow doc names every on-device store the code writes",
     all(s in DFLOW for s in ("Keychain", "UserDefaults", "Keystore",
                              "grapmail-e2e-protected-key/1", "MailStore")))
-pin("the release job builds and proves the AAB beside the APK",
-    "./gradlew assembleRelease bundleRelease" in WF_TEXT and "app-release.aab" in WF_TEXT)
-pin("the release page carries only the two installable files — no screenshot gallery",
-    # The founder's rule, pinned at the workflow: the release `files:` list is
-    # exactly the APK and the AAB. Screenshots stay CI artifacts on the run.
-    # Add `*.png` back to that list and this breaks.
-    ".png" not in body_of(WF_TEXT, "files: |")
-    and "app-release.apk" in body_of(WF_TEXT, "files: |")
-    and "app-release.aab" in body_of(WF_TEXT, "files: |"))
+pin("the Android release job builds and verifies the signed release APK",
+    "./gradlew assembleRelease --no-daemon" in WF_TEXT
+    and 'APK=android/app/build/outputs/apk/release/app-release.apk' in WF_TEXT
+    and '"$APKSIGNER" verify --print-certs "$APK"' in WF_TEXT)
+pin("the Android release page carries exactly the staged APK",
+    re.findall(r"^\s*files:\s*(.*)$", WF_TEXT, re.MULTILINE)
+    == ["download/GrapMail-${{ github.ref_name }}.apk"]
+    and "cp android/app/build/outputs/apk/release/app-release.apk download/GrapMail-${{ github.ref_name }}.apk" in WF_TEXT)
 
 # The manifest is a plist Apple parses at upload time — a structure error or a
 # reason code off Apple's list is an email from App Review two weeks after the
