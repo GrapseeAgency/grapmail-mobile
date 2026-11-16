@@ -110,6 +110,11 @@ struct AccountSwitcher: View {
         }
         .buttonStyle(.plain)
         .accessibilityAddTraits(active ? .isSelected : [])
+        // The active account is watched by RootView. Every other saved account
+        // needs its own watcher for a photo changed from web or another device.
+        .task(id: active) {
+            if !active { await watchPhoto(account) }
+        }
     }
 
     private func action(_ title: String, icon: String, chevron: Bool = false, destructive: Bool = false,
@@ -129,9 +134,6 @@ struct AccountSwitcher: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .task(id: active) {
-            if !active { await watchPhoto(account) }
-        }
     }
 
     private func watchPhoto(_ account: SessionStore.Account) async {
