@@ -17,6 +17,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.isActive
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.repeatOnLifecycle
 
@@ -109,7 +110,10 @@ class ProfileViewModel @JvmOverloads constructor(
     fun startWatchingAvatar(lifecycle: Lifecycle) {
         if (snapshotMode || avatarWatch?.isActive == true) return
         avatarWatch = viewModelScope.launch {
-            lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) { watchAvatar() }
+            lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                val session = SessionStore.snapshot(getApplication()) ?: return@repeatOnLifecycle
+                watchAvatar(session)
+            }
         }
     }
 

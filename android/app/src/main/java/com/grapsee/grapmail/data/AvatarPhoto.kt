@@ -28,14 +28,14 @@ object AvatarPhoto {
         if (parts.size != 3 || parts[1].length > 16_384) return null
         // The account claim only namespaces the private cache. The API still authorizes all reads and writes.
         val payload = JSONObject(Base64.decode(parts[1], Base64.URL_SAFE).decodeToString())
-        val account = payload.getString(\"sub\")
-        return MessageDigest.getInstance(\"SHA-256\").digest(\"$account:${session.id}\".toByteArray())
-            .joinToString(\"\") { \"%02x\".format(it.toInt() and 0xff) }
+        val account = payload.getString("sub")
+        return MessageDigest.getInstance("SHA-256").digest("$account:${session.id}".toByteArray())
+            .joinToString("") { "%02x".format(it.toInt() and 0xff) }
     }
 
     private fun cacheFile(context: Context, session: SessionSnapshot): AtomicFile? {
         val key = cacheKey(session) ?: return null
-        return AtomicFile(File(context.cacheDir, \"account-photos/$key\"))
+        return AtomicFile(File(context.cacheDir, "account-photos/$key"))
     }
 
     // The photo lives in memory for as long as the process does, so every
@@ -52,7 +52,7 @@ object AvatarPhoto {
         val key = cacheKey(session) ?: return
         memory.remove(key)
         withContext(Dispatchers.IO) {
-            runCatching { AtomicFile(File(context.cacheDir, \"account-photos/$key\")).delete() }
+            runCatching { AtomicFile(File(context.cacheDir, "account-photos/$key")).delete() }
         }
     }
 
@@ -99,8 +99,8 @@ object AvatarPhoto {
     fun inline(value: String?): ByteArray? {
         if (value == null || value.length > maxBytes * 4 / 3 + 100) return null
         val type = value.substringBefore(',')
-        if (type !in setOf(\"data:image/png;base64\", \"data:image/jpeg;base64\",
-                \"data:image/webp;base64\", \"data:image/gif;base64\")) return null
+        if (type !in setOf("data:image/png;base64", "data:image/jpeg;base64",
+                "data:image/webp;base64", "data:image/gif;base64")) return null
         return runCatching { Base64.decode(value.substringAfter(','), Base64.DEFAULT) }
             .getOrNull()?.takeIf(::isImage)
     }
