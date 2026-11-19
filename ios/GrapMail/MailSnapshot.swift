@@ -583,7 +583,7 @@ struct MailSnapshotView: View {
             case "mail-settings":
                 return AnyView(
                 secondary(MailSettingsView(vm: model, onBack: {},
-                                           onSecurity: {}, onScreener: {}, onLabels: {},
+                                           onSecurity: {}, onScreener: {}, onScheduled: {}, onLabels: {},
                                            onNotes: {}, onTasks: {}, onPrefs: {},
                                            onAddresses: {}, onConnections: {},
                                            onSubscriptions: {},

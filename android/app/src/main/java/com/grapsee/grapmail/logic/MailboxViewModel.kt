@@ -1504,6 +1504,10 @@ class MailboxViewModel @JvmOverloads constructor(
          *  and the composer draws it as one small tertiary line. */
         val autosaving: Boolean = false,
         val autosaveNote: String? = null,
+        /** True once the person has edited this compose. The signature seed
+         *  and a loaded draft fill fields without an edit, so a composer
+         *  nobody touched neither autosaves nor saves on close. */
+        val userEdited: Boolean = false,
     ) {
         val accepted: Boolean get() = resultStatus == "sent" || resultStatus == "queued" || resultStatus == "delivered"
     }
@@ -1512,8 +1516,17 @@ class MailboxViewModel @JvmOverloads constructor(
     val compose: StateFlow<ComposeState> = _compose.asStateFlow()
 
     fun composeUpdate(transform: (ComposeState) -> ComposeState) {
-        _compose.update(transform)
+        // A person's own change: the compose is now theirs, so the autosave
+        // may carry it.
+        _compose.update { s -> transform(s).copy(userEdited = true) }
         scheduleAutosave()
+    }
+
+    /** A programmatic fill — the signature seed, nothing the person did.
+     *  It arms no autosave: a composer nobody edited is not written to
+     *  Drafts (see [ComposeState.userEdited]). */
+    fun composeSeed(transform: (ComposeState) -> ComposeState) {
+        _compose.update(transform)
     }
 
     // ── autosave ─────────────────────────────────────────────────────────────
@@ -1531,7 +1544,9 @@ class MailboxViewModel @JvmOverloads constructor(
     /**
      * The rules the debounce obeys, each one a refusal rather than a feature:
      * an EMPTY compose saves nothing (a person opening the composer and
-     * leaving must not find an empty draft row named after nothing); a send or
+     * leaving must not find an empty draft row named after nothing); a composer
+     * nobody edited saves nothing either — the seeded signature is a fill, not
+     * an edit; a send or
      * a manual save in flight is not interrupted; and the autosave never
      * writes the receipt — its outcome is the composer's own quiet line, not
      * the "Saved to Drafts" banner the manual save earns.
@@ -1539,6 +1554,7 @@ class MailboxViewModel @JvmOverloads constructor(
     private fun scheduleAutosave() {
         val s = _compose.value
         if (s.sending || s.accepted) return
+        if (!s.userEdited) return
         if (autosaveInFlight) {
             autosaveNeedsFollowUp = true
             return
@@ -1923,12 +1939,14 @@ class MailboxViewModel @JvmOverloads constructor(
                 val generation = held.generation
                 val accepted = r.status in listOf("sent", "queued", "delivered")
                 if (!accepted) android.util.Log.w("GrapMailApi", "Send was not accepted; delivery error present=${r.deliveryError != null}")
-                if (generation == composeGeneration) _compose.update { it.copy(sending = false,
-                    result = null, resultStatus = r.status,
-                    error = if (accepted) null else "Could not send this message. Try again.") }
+                // One write, framed by the server: its message (or error /
+                // deliveryError) verbatim. The local sentence survives only
+                // as the last resort of a refusal — a delivered send with no
+                // server text shows none.
                 if (generation == composeGeneration) _compose.update { it.copy(sending = false,
                     result = r.message ?: r.error, resultStatus = r.status,
-                    error = r.deliveryError ?: r.error) }
+                    error = r.deliveryError ?: r.error
+                        ?: if (accepted) null else "Could not send this message. Try again.") }
                 if (accepted) {
                     // A delivered send is the app having proven itself — the
                     // review ask counts it and fires the store's flow when the
@@ -2039,11 +2057,9 @@ class MailboxViewModel @JvmOverloads constructor(
      * because a downloaded email attachment has no business being readable by
      * every other app on the device.
      *
-     * Opening it is deliberately not attempted here: that needs a FileProvider
-     * authority and a MIME-typed intent, and a half-wired "open" that throws on
-     * some devices is worse than a saved file with a clear message about where it
-     * went. Recorded as the sector's one unfinished affordance rather than left
-     * implicit.
+     * Opening is not attempted here on purpose: this function only saves. The
+     * open path lives in `openAttachment()` below — FileProvider URI, MIME-typed
+     * ACTION_VIEW — so the handoff is written out rather than left implicit.
      */
     fun downloadAttachment(a: MailAttachmentDto, then: (String) -> Unit) {
         viewModelScope.launch {
@@ -2124,6 +2140,43 @@ class MailboxViewModel @JvmOverloads constructor(
                 "This attachment could not be handed to another app."
             }
             then(outcome)
+        }
+    }
+
+    /**
+     * Local copy of an image attachment for the thumbnail loader (fixpack A2).
+     *
+     * Same rules as `downloadAttachment`: the app-owned cache, a session check
+     * on both sides of the request, and a file that is deleted rather than kept
+     * when the account changes mid-flight. One difference — a thumbnail that
+     * cannot load returns null so the screen can fall back to the type icon,
+     * instead of a message about a file the person never asked to save.
+     *
+     * The cached name is derived from the attachment id, so a second visit is a
+     * file-length check rather than a download.
+     */
+    suspend fun attachmentPreviewFile(a: MailAttachmentDto): java.io.File? {
+        val app = getApplication<android.app.Application>()
+        val session = SessionStore.snapshot(app) ?: return null
+        return kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            val root = java.io.File(app.cacheDir, "attachment-previews").apply { mkdirs() }
+            val file = java.io.File(
+                root,
+                a.id.replace(Regex("[^A-Za-z0-9._-]"), "_").take(96) + ".img",
+            )
+            if (file.length() > 0L) return@withContext file
+            runCatching { Api.mailAttachmentFile(session.token, a.id, file) }
+                .mapCatching {
+                    if (!SessionStore.isCurrent(app, session.id)) {
+                        file.delete(); null
+                    } else if (file.length() > 0L) file
+                    else { file.delete(); null }
+                }
+                .getOrElse { error ->
+                    if (error is kotlinx.coroutines.CancellationException) throw error
+                    file.delete()
+                    null
+                }
         }
     }
 

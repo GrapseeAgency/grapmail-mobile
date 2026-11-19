@@ -956,7 +956,7 @@ struct ComposeView: View {
                     prepared = true
                     vm.prepareReply(id: replyId, mode: mode, signature: signature)
                 } else if !signature.isEmpty {
-                    vm.composeUpdate { s in
+                    vm.composeSeed { s in
                         if s.body.isEmpty { s.body = "\n\n-- \n" + signature }
                     }
                     prepared = true
@@ -972,7 +972,9 @@ struct ComposeView: View {
             Button {
                 guard !vm.compose.sending, !preparingSend, !uploading else { return }
                 let draft = vm.compose
-                if !waitingForDraft && !draft.accepted && (!attached.isEmpty || [draft.to, draft.cc, draft.subject, draft.body].contains(where: { $0.nilIfBlank() != nil })) {
+                // The body alone does not qualify: the seeded signature is
+                // not the person's content. An edit, a recipient, or a subject is.
+                if !waitingForDraft && !draft.accepted && (!attached.isEmpty || draft.userEdited || [draft.to, draft.cc, draft.subject].contains(where: { $0.nilIfBlank() != nil })) {
                     saveDraft(onSaved: onBack)
                 } else {
                     onBack()

@@ -658,7 +658,7 @@ fun GrapMailNav(
             // The freshly-created credential can take a beat to become usable,
             // so retry with a short backoff before giving up. iOS does the same
             // (SignUpModel): without it the wizard strands a new user on the
-            // sign-in screen instead of the human-verify -> created flow the
+            // sign-in screen instead of the created -> onboarding flow the
             // design shows, and the CI walk loses those screens.
             for (attempt in 0 until 4) {
                 if (attempt > 0) { kotlinx.coroutines.delay(1_200) }
@@ -1089,7 +1089,10 @@ fun GrapMailNav(
                 onSignIn = { nav.navigate(Routes.SIGN_IN) },
                 onNext = {
                     vm.update { copy(step = 5) }
-                    nav.navigate(Routes.STEP_TERMS)
+                    // Human verification moved BEFORE the Terms/create step
+                    // (2026-11-18): the register call consumes the server-issued
+                    // verificationId, so the challenge must be solved first.
+                    nav.navigate(Routes.HUMAN_VERIFY)
                 },
             )
         }
@@ -1101,7 +1104,14 @@ fun GrapMailNav(
                 onCreated = { address, name ->
                     autoSignIn(address, name) { signedIn ->
                         if (signedIn) {
-                            nav.navigate(Routes.HUMAN_VERIFY) { popUpTo(Routes.STEP_NAME) { inclusive = true } }
+                            // Account created and signed in — the wizard finishes
+                            // here now that verification runs before registration
+                            // (2026-11-18 reorder).
+                            if (com.grapsee.grapmail.ui.screens.OnboardingGate.isDone(nav.context)) {
+                                nav.navigate(Routes.HOME) { popUpTo(Routes.WELCOME) { inclusive = true } }
+                            } else {
+                                nav.navigate(Routes.onboarding(address, name)) { popUpTo(Routes.STEP_NAME) { inclusive = true } }
+                            }
                         } else {
                             // Account exists, session does not. Land on sign-in with
                             // the address filled in rather than in a flow that has no
@@ -1118,17 +1128,11 @@ fun GrapMailNav(
                 vm = vm,
                 onBack = { nav.popBackStack() },
                 onDone = {
-                    val s = vm.state.value
-                    val address = s.createdAddress ?: ""
-                    val name = s.createdName ?: s.firstName
-                    // The walkthrough belongs to the first account this device
-                    // ever created. A second account is somebody who has seen
-                    // it; showing it again is an interruption, not a welcome.
-                    if (com.grapsee.grapmail.ui.screens.OnboardingGate.isDone(nav.context)) {
-                        nav.navigate(Routes.HOME) { popUpTo(Routes.WELCOME) { inclusive = true } }
-                    } else {
-                        nav.navigate(Routes.onboarding(address, name)) { popUpTo(Routes.HUMAN_VERIFY) { inclusive = true } }
-                    }
+                    // Server-confirmed verdict only (Continue gates on it). Go
+                    // to the Terms/create step — the register call there spends
+                    // the verificationId; the wizard finishes from that step
+                    // (2026-11-18 reorder).
+                    nav.navigate(Routes.STEP_TERMS) { popUpTo(Routes.HUMAN_VERIFY) { inclusive = true } }
                 },
             )
         }

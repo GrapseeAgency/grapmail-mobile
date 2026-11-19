@@ -35,6 +35,10 @@ final class SignUpModel: ObservableObject {
         var createdAddress: String?
         var createdName: String?
         var humanVerified = false
+        // Human-verification gate (2026-11-17): server-confirmed only.
+        var humanVerifying = false
+        var humanVerifyError: String?
+        var humanVerificationId: String?
     }
 
     @Published private(set) var state = UiState()
@@ -128,7 +132,8 @@ final class SignUpModel: ObservableObject {
                         grapmailHandle: s.chosenHandle.isEmpty ? nil : s.chosenHandle,
                         password: s.password,
                         acceptedTerms: true,
-                        avatarPhoto: s.photo.map { "data:image/png;base64," + $0.base64EncodedString() }
+                        avatarPhoto: s.photo.map { "data:image/png;base64," + $0.base64EncodedString() },
+                        humanVerificationId: s.humanVerificationId
                     )
                 )
                 // The gateway answers `grapmail` (and no account object); the
@@ -146,7 +151,7 @@ final class SignUpModel: ObservableObject {
                 // beat to become usable, so retry a few times before giving up
                 // and letting RootView fall back to the sign-in screen: without
                 // a session the wizard strands the new user on sign-in instead
-                // of the human-verify → created flow the design shows.
+                // of the created → onboarding flow the design shows.
                 for attempt in 0..<4 {
                     if attempt > 0 {
                         try? await Task.sleep(nanoseconds: 1_200_000_000)
@@ -165,6 +170,13 @@ final class SignUpModel: ObservableObject {
                 onCreated(address, resp.account?.name ?? fullName)
             } catch let ApiError.http(_, code, message) {
                 update { $0.creating = false }
+                // A spent or expired verification must not outlive its receipt:
+                // the stale verdict would keep passing the Continue gate and the
+                // bridge's idempotency guard for a check the server has already
+                // refused — the retry the copy below asks for could never happen.
+                if code == "HUMAN_VERIFICATION_REQUIRED" {
+                    update { $0.humanVerified = false; $0.humanVerificationId = nil; $0.humanVerifyError = nil }
+                }
                 switch code {
                 case "HANDLE_TAKEN": onError("That GrapMail address is already taken. Try another one.")
                 // The server names which rule failed and the message is already in
@@ -172,6 +184,7 @@ final class SignUpModel: ObservableObject {
                 // symbol now that the whole policy is enforced.
                 case "WEAK_PASSWORD": onError(message.isEmpty ? "Use at least 8 characters with a letter, a number and a symbol." : message)
                 case "INVALID_NAME": onError("Enter your full name (at least 2 characters).")
+                case "HUMAN_VERIFICATION_REQUIRED": onError("Your verification expired or was already used — complete the check again.")
                 default: onError(message.isEmpty ? "Could not create the account. Please try again." : message)
                 }
             } catch {
@@ -182,4 +195,28 @@ final class SignUpModel: ObservableObject {
     }
 
     func markHumanVerified() { update { $0.humanVerified = true } }
+
+    /// Human verification (2026-11-17 overhaul): exchange the reCAPTCHA token
+    /// from the checkpoint page's JS bridge for a server verdict. Continue
+    /// stays disabled until {success:true}. Idempotent: duplicates ignored.
+    func submitHumanVerification(token: String) {
+        guard !token.isEmpty, !state.humanVerified, !state.humanVerifying else { return }
+        Task {
+            update { $0.humanVerifying = true; $0.humanVerifyError = nil }
+            do {
+                let resp = try await ApiClient.verifyHuman(token: token)
+                if resp.success {
+                    update {
+                        $0.humanVerifying = false
+                        $0.humanVerified = true
+                        $0.humanVerificationId = resp.verificationId
+                    }
+                } else {
+                    update { $0.humanVerifying = false; $0.humanVerifyError = "Verification failed — please try again." }
+                }
+            } catch {
+                update { $0.humanVerifying = false; $0.humanVerifyError = "Network error — please try again." }
+            }
+        }
+    }
 }

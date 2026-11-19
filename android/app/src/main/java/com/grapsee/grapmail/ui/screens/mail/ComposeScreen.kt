@@ -114,8 +114,11 @@ fun ComposeScreen(
     }
     val close = {
         if (!state.sending && !uploading && !preparingSend) {
+            // The body alone does not qualify: the seeded signature is not
+            // the person's content. An edit, a recipient, or a subject is.
             if (!waitingForDraft && !state.accepted && (attached.isNotEmpty() ||
-                    listOf(state.to, state.cc, state.subject, state.body).any { it.isNotBlank() })
+                    state.userEdited ||
+                    listOf(state.to, state.cc, state.subject).any { it.isNotBlank() })
             ) {
                 saveDraft(onBack)
             } else {
@@ -162,7 +165,7 @@ fun ComposeScreen(
             prepared = true
             vm.prepareReply(replyId, mode, signature)
         } else if (signature.isNotBlank()) {
-            vm.composeUpdate { s ->
+            vm.composeSeed { s ->
                 if (s.body.isBlank()) s.copy(body = "\n\n-- \n$signature") else s
             }
             prepared = true

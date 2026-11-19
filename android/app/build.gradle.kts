@@ -146,6 +146,11 @@ dependencies {
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
+    // Attachment thumbnails (fixpack A2). Coil 3.0.x is the line built
+    // against Kotlin 2.0.x, which this project compiles with (Kotlin 2.0.20).
+    // Do not jump to 3.1+ without bumping Kotlin: 3.1.0 needs Kotlin 2.1.10.
+    implementation("io.coil-kt.coil3:coil-compose:3.0.4")
+    implementation("io.coil-kt.coil3:coil-network-okhttp:3.0.4")
 
     implementation("androidx.datastore:datastore-preferences:1.1.1")
     implementation(platform("com.google.firebase:firebase-bom:33.7.0"))

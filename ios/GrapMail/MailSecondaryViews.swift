@@ -627,6 +627,7 @@ struct MailSettingsView: View {
     let onBack: () -> Void
     let onSecurity: () -> Void
     let onScreener: () -> Void
+    let onScheduled: () -> Void
     let onLabels: () -> Void
     // The account-record band — the same rows Android's MailSettingsScreen
     // gained; each one opens a screen over the one profile document.
@@ -741,6 +742,8 @@ struct MailSettingsView: View {
                                value: "Password, two-step, sessions", onClick: onSecurity)
                     SettingRow(icon: "lock", title: "Screener",
                                value: "Approval for unknown senders", onClick: onScreener)
+                    SettingRow(icon: "clock", title: "Scheduled",
+                               value: "Sends queued on the server", onClick: onScheduled)
                     SettingRow(icon: "tag", title: "Labels",
                                value: "Filters for the inbox", onClick: onLabels)
                     SettingRow(icon: "envelope", title: "Mail settings",

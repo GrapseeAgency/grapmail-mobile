@@ -146,6 +146,28 @@ final class ScreenshotWalkUITests: XCTestCase {
         snap("05-step4-password-light")
         tap(app.buttons["Next"].firstMatch, "Next (step 4)")
 
+        // Human verification (verify-before-register): the challenge now runs
+        // BEFORE any account exists — the backend consumes the verification id
+        // at Create Account — and this build has no skip path: Continue unlocks
+        // only once the server verdict lands.
+        let humanVerify = app.staticTexts["Just one more step!"].firstMatch
+        XCTAssertTrue(humanVerify.waitForExistence(timeout: 25),
+                      "after the password step: human verification did not appear")
+        sleep(8)   // the checkpoint WebView loads the widget
+        snap("07-human-verify-light")
+        // Continue stays disabled until the verdict (dev walk environments use
+        // the v2 test keys, which always pass). Poll the enable state instead
+        // of tapping blind: a disabled tap is a no-op that would stall here.
+        let verifyContinue = app.buttons["Continue"].firstMatch
+        var checkpointPassed = false
+        for _ in 1...12 {
+            if verifyContinue.exists && verifyContinue.isEnabled { checkpointPassed = true; break }
+            sleep(2)
+        }
+        XCTAssertTrue(checkpointPassed,
+                      "checkpoint verdict never arrived — widget unsolved (test keys not configured / no hand to solve it) or the verdict call failed")
+        tap(verifyContinue, "Continue (post-verification)")
+
         // Step 5 — terms: the gate is REAL scroll detection. The document is
         // a fixed 300pt card with its OWN inner ScrollView. Swiping the text
         // element or dragging a coordinate inside the card scrolls the OUTER
@@ -183,18 +205,15 @@ final class ScreenshotWalkUITests: XCTestCase {
         snap("06-step5-terms-light")
         create.tap()
 
-        // After Create Account the app either auto-signs-in (human verify ->
-        // created -> home) or, if the immediate session didn't take, routes to
-        // sign-in with the address prefilled (RootView's documented fallback).
+        // After Create Account the app auto-signs-in to the created screens, or,
+        // if the immediate session didn't take, routes to sign-in with the
+        // address prefilled (RootView's documented fallback).
         // Reach the signed-in home either way so the security leg always runs.
-        let humanVerify = app.staticTexts["Just one more step!"].firstMatch
         let signinScreen = app.staticTexts["Welcome back 👋"].firstMatch
-        XCTAssertTrue(humanVerify.waitForExistence(timeout: 25) || signinScreen.exists,
-                      "after Create Account: neither human verify nor sign-in appeared")
-        if humanVerify.exists {
-            snap("07-human-verify-light")
-            tap(app.staticTexts["Skip for now"].firstMatch, "Skip for now", timeout: 8)
-            require(app.staticTexts["You're all set!"].firstMatch, "Account created (A)", timeout: 15)
+        let createdA = app.staticTexts["You're all set!"].firstMatch
+        XCTAssertTrue(createdA.waitForExistence(timeout: 25) || signinScreen.exists,
+                      "after Create Account: neither created nor sign-in appeared")
+        if createdA.exists {
             snap("08-created-a-light")
             tap(app.buttons["Continue to Onboarding"].firstMatch, "Continue to Onboarding")
             sleep(2)

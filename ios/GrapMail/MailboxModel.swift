@@ -177,6 +177,10 @@ final class MailboxModel: ObservableObject {
         /// and the composer draws it as one small tertiary line.
         var autosaving = false
         var autosaveNote: String?
+        /// True once the person has edited this compose. The signature seed
+        /// and a loaded draft fill fields without an edit, so a composer
+        /// nobody touched neither autosaves nor saves on close.
+        var userEdited = false
         var accepted: Bool { resultStatus == "sent" || resultStatus == "queued" || resultStatus == "delivered" }
     }
 
@@ -1819,8 +1823,18 @@ final class MailboxModel: ObservableObject {
     // ── compose ──────────────────────────────────────────────────────────────
 
     func composeUpdate(_ transform: (inout ComposeState) -> Void) {
+        // A person's own change: the compose is now theirs, so the autosave
+        // may carry it.
         transform(&compose)
+        compose.userEdited = true
         scheduleAutosave()
+    }
+
+    /// A programmatic fill — the signature seed, nothing the person did.
+    /// It arms no autosave: a composer nobody edited is not written to
+    /// Drafts (see `ComposeState.userEdited`).
+    func composeSeed(_ transform: (inout ComposeState) -> Void) {
+        transform(&compose)
     }
 
     // ── autosave ─────────────────────────────────────────────────────────────
@@ -1836,13 +1850,16 @@ final class MailboxModel: ObservableObject {
 
     /// The rules the debounce obeys, each one a refusal rather than a feature:
     /// an EMPTY compose saves nothing (a person opening the composer and
-    /// leaving must not find an empty draft row named after nothing); a send
+    /// leaving must not find an empty draft row named after nothing); a composer
+    /// nobody edited saves nothing either — the seeded signature is a fill, not
+    /// an edit; a send
     /// or a manual save in flight is not interrupted; and the autosave never
     /// writes the receipt — its outcome is the composer's own quiet line, not
     /// the "Saved to Drafts" banner the manual save earns.
     private func scheduleAutosave() {
         let s = compose
         if s.sending || s.accepted { return }
+        if !s.userEdited { return }
         if autosaveInFlight {
             autosaveNeedsFollowUp = true
             return
@@ -2170,9 +2187,12 @@ final class MailboxModel: ObservableObject {
                 if self.composeGeneration == generation {
                     var updated = self.compose
                     updated.sending = false
-                    updated.result = nil
+                    // The receipt shows the server's own words: its message
+                    // (or error / deliveryError) verbatim, the local sentence
+                    // kept only as the last resort of a refusal.
+                    updated.result = r.message ?? r.error
                     updated.resultStatus = r.status
-                    updated.error = sent ? nil : "Could not send this message. Try again."
+                    updated.error = r.deliveryError ?? r.error ?? (sent ? nil : "Could not send this message. Try again.")
                     if sent { updated.draftId = "" }
                     self.compose = updated
                 }

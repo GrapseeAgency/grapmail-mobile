@@ -54,6 +54,9 @@ import kotlin.coroutines.resumeWithException
     val password: String,
     val acceptedTerms: Boolean? = null,
     val avatarPhoto: String? = null,
+    /** Consumed exactly once by the register gate (POST /auth/register);
+     *  without it the server answers 403 and no mailbox is created. */
+    val humanVerificationId: String? = null,
     /** The gateway distinguishes the agency dashboard's CLIENT accounts from
      *  GrapMail's USER accounts, and only USER accounts get a handle and a
      *  mailbox. This app only ever creates USER accounts.
@@ -96,6 +99,16 @@ import kotlin.coroutines.resumeWithException
     val address: String? = null,
     val suggestion: String? = null,
     val reason: String? = null,
+)
+
+@Serializable
+data class VerifyHumanRequest(val token: String)
+
+@Serializable
+data class VerifyHumanResponse(
+    val success: Boolean = false,
+    val verificationId: String? = null,
+    val error: String? = null,
 )
 
 @Serializable data class SignInRequest(val identifier: String, val password: String)
@@ -220,6 +233,7 @@ private fun apiErrorMessage(status: Int, code: String?): String = when (code) {
     "CANNOT_REVOKE_CURRENT" -> "Sign out to end this session."
     "TWOFA_REQUIRED_FOR_BACKUP_CODES" -> "Turn on two-step verification to use backup codes."
     "NO_MAILBOX" -> "Your GrapMail inbox is not ready yet."
+    "HUMAN_VERIFICATION_REQUIRED" -> "Your verification expired or was already used — complete the check again."
     else -> when (status) {
         401 -> "Check your sign-in details or sign in again."
         403 -> "This action is unavailable for your account."
@@ -835,6 +849,21 @@ object Api {
         val (status, body) = execute(request)
         if (status >= 400) fail(status, body)
         return decodeResponse<CreateResponse>(body)
+    }
+
+    /**
+     * Exchanges a solved reCAPTCHA token for a single-use verification record.
+     * The server owns the verdict (siteverify) — nothing here trusts the device.
+     */
+    suspend fun verifyHuman(token: String): VerifyHumanResponse {
+        val request = Request.Builder()
+            .url("$AUTH/verify-human")
+            .header("x-device-id", DeviceId.value)
+            .post(postBody(json.encodeToString(VerifyHumanRequest.serializer(), VerifyHumanRequest(token))))
+            .build()
+        val (status, body) = execute(request)
+        if (status >= 400) fail(status, body)
+        return decodeResponse<VerifyHumanResponse>(body)
     }
 
     suspend fun signIn(identifier: String, password: String): SignInResponse {

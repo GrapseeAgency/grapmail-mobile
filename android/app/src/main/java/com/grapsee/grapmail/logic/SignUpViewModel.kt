@@ -57,6 +57,10 @@ class SignUpViewModel : ViewModel() {
         val createdAddress: String? = null,
         val createdName: String? = null,
         val humanVerified: Boolean = false,
+        // Human-verification gate (2026-11-17): server-confirmed only.
+        val humanVerifying: Boolean = false,
+        val humanVerifyError: String? = null,
+        val humanVerificationId: String? = null,
     )
 
     private val _state = MutableStateFlow(UiState())
@@ -161,6 +165,7 @@ class SignUpViewModel : ViewModel() {
                             "data:image/png;base64," + android.util.Base64.encodeToString(it, android.util.Base64.NO_WRAP)
                         },
                         accountType = "USER",
+                        humanVerificationId = s.humanVerificationId,
                     )
                 )
                 // The gateway envelope answers `grapmail` (and no account
@@ -174,6 +179,13 @@ class SignUpViewModel : ViewModel() {
                 onCreated(address, resp.account?.name ?: fullName)
             } catch (e: ApiException) {
                 update { copy(creating = false) }
+                // A spent or expired verification must not outlive its receipt:
+                // the stale verdict would keep passing the Continue gate and the
+                // bridge's idempotency guard for a check the server has already
+                // refused — the retry the copy below asks for could never happen.
+                if (e.code == "HUMAN_VERIFICATION_REQUIRED") {
+                    update { copy(humanVerified = false, humanVerificationId = null, humanVerifyError = null) }
+                }
                 onError(
                     when (e.code) {
                         "HANDLE_TAKEN" -> "That GrapMail address is already taken. Try another one."
@@ -183,6 +195,7 @@ class SignUpViewModel : ViewModel() {
                         // length message that is wrong for a missing letter or symbol.
                         "WEAK_PASSWORD" -> e.message ?: "Use at least 8 characters with a letter, a number and a symbol."
                         "INVALID_NAME" -> "Enter your full name (at least 2 characters)."
+                        "HUMAN_VERIFICATION_REQUIRED" -> "Your verification expired or was already used — complete the check again."
                         else -> e.message ?: "Could not create the account. Please try again."
                     }
                 )
@@ -194,4 +207,36 @@ class SignUpViewModel : ViewModel() {
     }
 
     fun markHumanVerified() { update { copy(humanVerified = true) } }
+
+    /**
+     * Human verification (2026-11-17 overhaul): exchange the reCAPTCHA token
+     * received from the checkpoint page's JS bridge for a server verdict.
+     * Until {success:true} comes back, the screen keeps Continue off.
+     * Idempotent: duplicate bridge deliveries are ignored.
+     */
+    fun submitHumanVerification(token: String) {
+        if (token.isBlank()) return
+        if (_state.value.humanVerified || _state.value.humanVerifying) return
+        viewModelScope.launch {
+            update { copy(humanVerifying = true, humanVerifyError = null) }
+            try {
+                val resp = Api.verifyHuman(token)
+                if (resp.success) {
+                    update {
+                        copy(
+                            humanVerifying = false,
+                            humanVerified = true,
+                            humanVerificationId = resp.verificationId,
+                        )
+                    }
+                } else {
+                    update { copy(humanVerifying = false, humanVerifyError = "Verification failed — please try again.") }
+                }
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                update { copy(humanVerifying = false, humanVerifyError = "Network error — please try again.") }
+            }
+        }
+    }
 }

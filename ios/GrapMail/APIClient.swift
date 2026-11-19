@@ -94,6 +94,7 @@ enum ApiError: Error, LocalizedError {
             case "CANNOT_REVOKE_CURRENT": return "Sign out to end this session."
             case "TWOFA_REQUIRED_FOR_BACKUP_CODES": return "Turn on two-step verification to use backup codes."
             case "NO_MAILBOX": return "Your GrapMail inbox is not ready yet."
+            case "HUMAN_VERIFICATION_REQUIRED": return "Your verification expired or was already used — complete the check again."
             default: break
             }
             switch status {
@@ -169,6 +170,9 @@ struct CreateRequest: Codable {
     var password: String
     var acceptedTerms: Bool?
     var avatarPhoto: String? = nil
+    /// Consumed exactly once by the register gate; without it the server
+    /// answers 403 human-verification-required and creates no mailbox.
+    var humanVerificationId: String? = nil
     /// The gateway splits the agency dashboard's CLIENT accounts from GrapMail's
     /// USER accounts; only USER accounts get a handle and a mailbox.
     var accountType: String = "USER"
@@ -208,6 +212,11 @@ struct CreateResponse: Codable {
         error = c.lenientOpt(.error)
         code = c.lenientOpt(.code)
     }
+}
+
+struct VerifyHumanResponse: Codable {
+    let success: Bool
+    let verificationId: String?
 }
 
 struct CheckResponse: Codable {
@@ -1351,6 +1360,15 @@ struct ApiClient {
     static func createAccount(_ payload: CreateRequest) async throws -> CreateResponse {
         let body = try encoder.encode(payload)
         return try await request("/grapsee/auth/register", method: "POST", body: body)
+    }
+
+    static func verifyHuman(token: String) async throws -> VerifyHumanResponse {
+        struct Body: Codable { let token: String }
+        return try await request(
+            "/grapsee/auth/verify-human",
+            method: "POST",
+            body: encoder.encode(Body(token: token))
+        )
     }
 
     static func signIn(identifier: String, password: String) async throws -> SignInResponse {

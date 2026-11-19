@@ -438,8 +438,12 @@ fun FilesScreen(vm: MailboxViewModel, onBack: () -> Unit, onOpen: (String) -> Un
                                 .padding(horizontal = 16.dp, vertical = 12.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            Box(Modifier.size(38.dp).clip(RoundedCornerShape(10.dp))
-                                .background(palette.softFill), contentAlignment = Alignment.Center) {
+                            AttachmentThumb(
+                                vm = vm,
+                                attachment = entry.attachment,
+                                modifier = Modifier.size(38.dp).clip(RoundedCornerShape(10.dp))
+                                    .background(palette.softFill),
+                            ) {
                                 Icon(Icons.Rounded.AttachFile, null, tint = palette.primarySolid,
                                     modifier = Modifier.size(18.dp))
                             }
@@ -469,10 +473,10 @@ fun FilesScreen(vm: MailboxViewModel, onBack: () -> Unit, onOpen: (String) -> Un
 /**
  * 79 — an attachment's own screen.
  *
- * It reports size, type and where it came from, and saves the bytes. It does not
- * claim to preview formats the app cannot decode: an image is offered as a
- * download, not a thumbnail, because there is no image loader in this build and
- * pretending otherwise would show a broken box.
+ * It reports size, type and where it came from, and saves the bytes. Images are
+ * drawn as a thumbnail through the same authenticated fetch the download button
+ * uses (fixpack A2, Coil); every other format keeps the type icon rather than a
+ * box that would decode to nothing.
  */
 @Composable
 fun AttachmentPreviewScreen(vm: MailboxViewModel, attachmentId: String, onBack: () -> Unit) {
@@ -511,8 +515,12 @@ fun AttachmentPreviewScreen(vm: MailboxViewModel, attachmentId: String, onBack: 
                 return@Column
             }
             Spacer(Modifier.height(16.dp))
-            Box(Modifier.size(84.dp).clip(RoundedCornerShape(18.dp)).background(palette.softFill),
-                contentAlignment = Alignment.Center) {
+            AttachmentThumb(
+                vm = vm,
+                attachment = a,
+                modifier = Modifier.size(84.dp).clip(RoundedCornerShape(18.dp))
+                    .background(palette.softFill),
+            ) {
                 Icon(Icons.Rounded.AttachFile, null, tint = palette.primarySolid, modifier = Modifier.size(34.dp))
             }
             Spacer(Modifier.height(16.dp))

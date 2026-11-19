@@ -73,7 +73,7 @@ struct RootView: View {
         case mailLabels, mailLabelCreate(id: String)
         case mailContacts, mailContactDetail(address: String)
         case mailFiles, mailAttachment(id: String)
-        case mailSettings, mailScreener
+        case mailSettings, mailScreener, mailScheduled
         // ── account-record band ──────────────────────────────────────────────
         // The web client's `/mail/notes`, `/mail/tasks`, `/mail/settings`,
         // `/mail/account/{profile,privacy,addresses,connections,support}` —
@@ -634,35 +634,34 @@ struct RootView: View {
                 case .stepPassword:
                     PasswordStepView(model: model, onBack: { path.removeLast() }, onSignIn: { path.append(.signIn) }) {
                         model.update { $0.step = 5 }
-                        path.append(.stepTerms)
+                        // Human verification moved BEFORE the Terms/create step
+                        // (2026-11-18): the register call consumes the server-issued
+                        // verificationId, so the challenge must be solved first.
+                        path.append(.humanVerify)
                     }
                 case .stepTerms:
                     TermsStepView(model: model, onBack: { path.removeLast() }, onSignIn: { path.append(.signIn) }) { address, name in
-                        path.removeAll(where: { $0 == .stepName || $0 == .stepInfo || $0 == .stepAddress || $0 == .stepPassword || $0 == .stepTerms })
-                        // The account exists at this point, but the auto
-                        // sign-in may not have: without a token the next screens
-                        // answer "sign in again". Send the person to sign-in with
+                        path.removeAll(where: { $0 == .stepName || $0 == .stepInfo || $0 == .stepAddress || $0 == .stepPassword || $0 == .stepTerms || $0 == .humanVerify })
+                        // The account now exists and the register call consumed the
+                        // verificationId (verification ran before this step,
+                        // 2026-11-18 reorder): finish the wizard. If the auto
+                        // sign-in did not land, send the person to sign-in with
                         // the address filled in instead of into a dead flow.
                         if SessionStore.hasValidSession {
-                            path.append(.humanVerify)
+                            guard !OnboardingGate.isDone else { return enterMailbox() }
+                            path.append(.onboarding(address: address, name: name))
                         } else {
                             recovery.prefillIdentifier = address
                             path.append(.signIn)
                         }
-                        _ = (address, name)
                     }
                 case .humanVerify:
                     HumanVerifyView(model: model, onBack: { path.removeLast() }) {
-                        let s = model.state
-                        // The walkthrough belongs to the first account this
-                        // device ever created. A second account is somebody who
-                        // has already met the product; replaying it is an
-                        // interruption, not a welcome.
-                        guard !OnboardingGate.isDone else { return enterMailbox() }
-                        path.append(.onboarding(
-                            address: s.createdAddress ?? "",
-                            name: s.createdName ?? s.firstName
-                        ))
+                        // Server-confirmed verdict only (Continue gates on it). Go
+                        // to the Terms/create step — the register call there spends
+                        // the verificationId; the wizard finishes from that step
+                        // (2026-11-18 reorder).
+                        path.append(.stepTerms)
                     }
                 case let .created(address, name):
                     AccountCreatedView(address: address, name: name) {
@@ -831,6 +830,7 @@ struct RootView: View {
                         onBack: { path.removeLast() },
                         onSecurity: { path.append(.security) },
                         onScreener: { path.append(.mailScreener) },
+                        onScheduled: { path.append(.mailScheduled) },
                         onLabels: { path.append(.mailLabels) },
                         onNotes: { path.append(.mailNotes) },
                         onTasks: { path.append(.mailTasks) },
@@ -900,6 +900,11 @@ struct RootView: View {
                 case .e2eStatus, .e2eSetup, .e2eUnlock, .e2eDetails,
                      .e2ePublish, .e2eChangePassphrase, .e2eRemove, .e2eRecipients:
                     e2eDestination(route)
+                case .mailScheduled:
+                    ScheduledView(
+                        apiToken: SessionStore.token ?? "",
+                        onBack: { path.removeLast() }
+                    )
                 case .mailScreener:
                     ScreenerView(
                         vm: mail,
