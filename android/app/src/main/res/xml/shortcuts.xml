@@ -27,4 +27,26 @@
             android:targetClass="com.grapsee.grapmail.MainActivity" />
         <categories android:name="android.shortcut.conversation" />
     </shortcut>
+    <shortcut
+        android:shortcutId="scheduled"
+        android:enabled="true"
+        android:icon="@mipmap/ic_launcher"
+        android:shortcutShortLabel="@string/shortcut_scheduled_short"
+        android:shortcutLongLabel="@string/shortcut_scheduled_long">
+        <intent
+            android:action="com.grapsee.grapmail.SCHEDULED"
+            android:targetPackage="com.grapsee.grapmail"
+            android:targetClass="com.grapsee.grapmail.MainActivity" />
+    </shortcut>
+    <shortcut
+        android:shortcutId="subscriptions"
+        android:enabled="true"
+        android:icon="@mipmap/ic_launcher"
+        android:shortcutShortLabel="@string/shortcut_subscriptions_short"
+        android:shortcutLongLabel="@string/shortcut_subscriptions_long">
+        <intent
+            android:action="com.grapsee.grapmail.SUBSCRIPTIONS"
+            android:targetPackage="com.grapsee.grapmail"
+            android:targetClass="com.grapsee.grapmail.MainActivity" />
+    </shortcut>
 </shortcuts>

@@ -1,0 +1,37 @@
+
+============================================================
+CITATION VERIFICATION: research_report_20261119_grapmail-native-verification.md
+============================================================
+
+Found 19 citations
+
+  [1] URL accessible ✓
+  [2] URL accessible ✓
+  [3] URL accessible ✓
+  [4] URL accessible ✓
+  [5] URL accessible ✓
+  [6] URL accessible ✓
+  [7] URL accessible ✓
+  [8] URL accessible ✓
+  [9] URL accessible ✓
+  [10] URL accessible ✓
+  [11] URL accessible ✓
+  [12] URL accessible ✓
+  [13] URL accessible ✓
+  [14] URL accessible ✓
+  [15] URL accessible ✓
+  [16] URL accessible ✓
+  [17] URL accessible ✓
+  [18] URL accessible ✓
+  [19] URL accessible ✓
+
+============================================================
+VERIFICATION SUMMARY
+============================================================
+
+DOI Verified: 0/19
+URL Verified: 19/19
+Suspicious: 0/19
+Unverified: 0/19
+
+CITATION VERIFICATION PASSED

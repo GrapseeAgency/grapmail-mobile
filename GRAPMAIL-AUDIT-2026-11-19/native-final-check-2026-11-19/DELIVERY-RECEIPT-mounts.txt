@@ -1,0 +1,20 @@
+MOUNT DELIVERY RECEIPT — 2026-11-19 (delivery T18, verification T19–T20) — 2026-11-19_11:21 UTC
+Bundle: GrapMail native final check — native-final-check-2026-11-19
+
+Targets:
+ 1) /mnt/local/grapmail-mobile/GRAPMAIL-AUDIT-2026-11-19   [F:\Grapsee All Time\grapmail-mobile]
+ 2) /mnt/local/Grapsee_All_Time/GRAPMAIL-AUDIT-2026-11-19  [F:\Grapsee All Time]
+
+Contents delivered: report/ (md + html), receipts/ (E1–E6 + guardrail receipts + scope note), tools/ (native-guardrails.sh, deliver-to-mounts.sh), ci/ (native-guardrails.yml), gates/ (validation / citation / html outputs), GUARDRAILS.md, README.md, NATIVE-FINAL-CHECK-2026-11-19.md (also at audit root); headline report also at <audit>/report/.
+
+Verification (file-by-file copy-back + exact size + full byte compare; the mount client's close-time EIO noise is tolerated on the read leg — every counted file was read in full and byte-matched):
+ mount grapmail-mobile: ok=27 fail=0
+ mount Grapsee_All_Time: ok=27 fail=0
+ total: ok=54 fail=0 (per mount: 24 bundle files + 2 headline report files + 1 root doc)
+
+Repo state check:
+ grapmail-mobile HEAD @ 0fb5998e (unchanged audited commit — guardrail PASS receipt remains valid)
+ Grapsee_All_Time workspace repo @ f9c43384 (mobile guardrail not applicable — see receipts/NOTE-guardrail-recheck.txt)
+
+Artifact store copy: /mnt/cos/artifacts/native-final-check-2026-11-19 (authoritative)
+STATUS: DELIVERED-AND-VERIFIED

@@ -1,0 +1,11 @@
+--- /mnt/work/audit3/msnapshot-orig.tmp	2026-11-19 03:45:55.193431000 +0000
++++ /mnt/work/audit3/edit/MailSnapshot.swift	2026-11-19 03:34:53.153431000 +0000
+@@ -583,7 +583,7 @@
+             case "mail-settings":
+                 return AnyView(
+                 secondary(MailSettingsView(vm: model, onBack: {},
+-                                           onSecurity: {}, onScreener: {}, onLabels: {},
++                                           onSecurity: {}, onScreener: {}, onScheduled: {}, onLabels: {},
+                                            onNotes: {}, onTasks: {}, onPrefs: {},
+                                            onAddresses: {}, onConnections: {},
+                                            onSubscriptions: {},

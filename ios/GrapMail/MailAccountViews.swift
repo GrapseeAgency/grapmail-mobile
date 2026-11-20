@@ -490,6 +490,8 @@ struct MailPrefsView: View {
             .buttonStyle(.plain)
             .accessibilityIdentifier("gm-save-signatures")
 
+            MailFeatureSettingsSection()
+
             AccountSectionLabel(text: "List density")
             AccountRadioRow(title: "Comfortable — the roomier list",
                             selected: s?.density != "compact") {

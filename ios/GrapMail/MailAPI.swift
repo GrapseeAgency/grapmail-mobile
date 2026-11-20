@@ -1792,6 +1792,48 @@ extension ApiClient {
             + "&sender=\(sender.percentEncodedQuery())"
         return try await request(url, method: "DELETE", bearer: token)
     }
+
+    /// One-click unsubscribe (RFC 8058), executed by the account's own server
+    /// rather than this process. The list advertises a `List-Unsubscribe-Post`
+    /// request; the route at `POST /grapmail/unsubscribe` on grapsee.com
+    /// performs it behind the same live-session check every other call passes.
+    /// Nothing opens a browser, and nothing here can see the list's answer —
+    /// the caller's copy reports only what was witnessed.
+    static func mailUnsubscribeOneClick(
+        token: String, address: String, url: String,
+    ) async throws -> MailUnsubscribeOneClickResponse {
+        try await request(
+            "/grapmail/unsubscribe", method: "POST",
+            body: try encoder.encode(MailUnsubscribeOneClickRequest(
+                address: address, url: url, oneClick: true)),
+            bearer: token)
+    }
+}
+
+// ── the one-click unsubscribe wire ───────────────────────────────────────────
+
+/// `POST /grapmail/unsubscribe` — the body the web route destructures
+/// (`src/app/api/grapmail/unsubscribe/route.ts`: `address`, `url`, `oneClick`).
+/// Field names are the route's keys, not the app's vocabulary.
+struct MailUnsubscribeOneClickRequest: Encodable {
+    var address: String
+    var url: String
+    var oneClick: Bool
+}
+
+/// The route answers `{ success: true }` when the list accepted the request;
+/// refusals arrive as non-2xx and surface through the shared failure path.
+/// `error` covers a 200 that still carried one.
+struct MailUnsubscribeOneClickResponse: Decodable {
+    var success = false
+    var error: String?
+
+    private enum CodingKeys: String, CodingKey { case success, error }
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        success = c.lenient(.success, false)
+        error = c.lenientOpt(.error)
+    }
 }
 
 // ── small helpers used across the sector ─────────────────────────────────────

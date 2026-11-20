@@ -1,0 +1,602 @@
+<!doctype html>
+<html lang="en" data-theme="technical">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>Mail Speed and Feature Gaps: An Evidence Review for the GrapMail Audit | Deep Research Report</title>
+  <style>
+    :root {
+      --ink: #18212f;
+      --muted: #5d6878;
+      --navy: #12324a;
+      --accent: #16708f;
+      --accent-soft: #eaf4f7;
+      --paper: #ffffff;
+      --canvas: #f2f4f6;
+      --line: #dce2e7;
+      --line-strong: #b9c4cd;
+      --radius: 12px;
+      --measure: 78ch;
+      --link: #0d6687;
+      --link-hover: #084a63;
+      --header-detail: #6fb4c9;
+      --header-muted: #9fd0df;
+      --summary-bg: linear-gradient(135deg, #edf6f8 0%, #f8fbfc 100%);
+      --summary-border: #cfe2e8;
+      --quote-bg: #f6f8f9;
+      --table-stripe: #f7f9fa;
+      --footer-bg: #edf1f3;
+      --title-font: ui-serif, Georgia, "Noto Serif CJK SC", "Songti SC", serif;
+    }
+
+    html[data-theme="editorial"] {
+      --ink: #29251f;
+      --muted: #746b5d;
+      --navy: #202a36;
+      --accent: #a87925;
+      --accent-soft: #f7efdf;
+      --canvas: #eeeae2;
+      --line: #ddd5c7;
+      --line-strong: #c6bba9;
+      --link: #805b1d;
+      --link-hover: #5f4212;
+      --header-detail: #d0a750;
+      --header-muted: #ddc58f;
+      --summary-bg: linear-gradient(135deg, #f7f0e3 0%, #fffdfa 100%);
+      --summary-border: #dfcda8;
+      --quote-bg: #f8f4ec;
+      --table-stripe: #faf7f1;
+      --footer-bg: #e9e3d8;
+    }
+
+    html[data-theme="analytical"] {
+      --ink: #172033;
+      --muted: #59657a;
+      --navy: #071b38;
+      --accent: #1768ac;
+      --accent-soft: #e7f1fa;
+      --canvas: #edf1f5;
+      --line: #d5dde6;
+      --line-strong: #aebccc;
+      --link: #0b5f9e;
+      --link-hover: #084674;
+      --header-detail: #55a8e0;
+      --header-muted: #9bcceb;
+      --summary-bg: linear-gradient(135deg, #eaf3fa 0%, #f9fbfd 100%);
+      --summary-border: #c4d9e8;
+      --quote-bg: #f3f6f9;
+      --table-stripe: #f3f6f9;
+      --footer-bg: #e6ebf0;
+      --radius: 7px;
+    }
+
+    html[data-theme="technical"] {
+      --ink: #17252d;
+      --muted: #566a73;
+      --navy: #102d34;
+      --accent: #008b82;
+      --accent-soft: #e1f4f1;
+      --canvas: #eaf0ef;
+      --line: #d0ddda;
+      --line-strong: #a8bdb8;
+      --link: #007269;
+      --link-hover: #00554f;
+      --header-detail: #50c2b8;
+      --header-muted: #9bd8d2;
+      --summary-bg: linear-gradient(135deg, #e4f3f1 0%, #f8fbfa 100%);
+      --summary-border: #bddbd6;
+      --quote-bg: #f1f7f6;
+      --table-stripe: #f2f7f6;
+      --footer-bg: #e2ecea;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; }
+
+    html {
+      scroll-behavior: smooth;
+      background: var(--canvas);
+    }
+
+    body {
+      margin: 0;
+      color: var(--ink);
+      background: var(--canvas);
+      font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI",
+        "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", Arial, sans-serif;
+      font-size: 16px;
+      line-height: 1.72;
+      text-rendering: optimizeLegibility;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    a {
+      color: var(--link);
+      text-decoration-thickness: 1px;
+      text-underline-offset: 0.16em;
+      overflow-wrap: anywhere;
+    }
+
+    a:hover { color: var(--link-hover); }
+    a:focus-visible { outline: 3px solid rgba(22, 112, 143, 0.3); outline-offset: 3px; }
+
+    .report-shell {
+      width: min(100% - 40px, 1040px);
+      margin: 32px auto 56px;
+      background: var(--paper);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      box-shadow: 0 18px 55px rgba(25, 42, 58, 0.09);
+      overflow: hidden;
+    }
+
+    .report-header {
+      position: relative;
+      padding: 48px clamp(28px, 6vw, 72px) 42px;
+      color: #f7fbfd;
+      background: var(--navy);
+      border-bottom: 5px solid var(--accent);
+    }
+
+    .report-header::after {
+      content: "";
+      position: absolute;
+      right: clamp(24px, 6vw, 72px);
+      bottom: 0;
+      width: min(28vw, 220px);
+      height: 5px;
+      background: var(--header-detail);
+    }
+
+    .eyebrow {
+      margin: 0 0 12px;
+      color: var(--header-muted);
+      font-size: 0.76rem;
+      font-weight: 750;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+    }
+
+    .report-header h1 {
+      max-width: 22ch;
+      margin: 0;
+      font-family: var(--title-font);
+      font-size: clamp(2rem, 5vw, 3.65rem);
+      font-weight: 650;
+      line-height: 1.1;
+      letter-spacing: -0.035em;
+      text-wrap: balance;
+    }
+
+    .report-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px 22px;
+      margin-top: 24px;
+      color: #cadce4;
+      font-size: 0.86rem;
+    }
+
+    .report-meta span + span::before {
+      content: "";
+      display: inline-block;
+      width: 4px;
+      height: 4px;
+      margin: 0 12px 2px 0;
+      border-radius: 50%;
+      background: var(--header-detail);
+    }
+
+    .report-content {
+      padding: 18px clamp(24px, 6vw, 72px) 64px;
+    }
+
+    .section {
+      max-width: var(--measure);
+      margin: 0 auto;
+      padding-top: 34px;
+    }
+
+    .section + .section {
+      margin-top: 18px;
+      border-top: 1px solid var(--line);
+    }
+
+    .section-title {
+      margin: 0 0 22px;
+      color: var(--navy);
+      font-family: var(--title-font);
+      font-size: clamp(1.55rem, 3vw, 2.1rem);
+      font-weight: 680;
+      line-height: 1.25;
+      letter-spacing: -0.018em;
+      text-wrap: balance;
+    }
+
+    .subsection-title {
+      margin: 28px 0 10px;
+      color: #203b50;
+      font-size: 1.16rem;
+      line-height: 1.4;
+    }
+
+    .subsubsection-title {
+      margin: 22px 0 8px;
+      color: #334b5d;
+      font-size: 1rem;
+      line-height: 1.45;
+    }
+
+    p { margin: 0 0 1em; }
+    strong { color: #142b3d; font-weight: 720; }
+
+    .executive-summary {
+      max-width: calc(var(--measure) + 4ch);
+      margin-top: 26px;
+      padding: 30px clamp(22px, 4vw, 38px) 24px;
+      background: var(--summary-bg);
+      border: 1px solid var(--summary-border);
+      border-top: 4px solid var(--accent);
+      border-radius: var(--radius);
+    }
+
+    .executive-summary .section-title { font-size: clamp(1.45rem, 3vw, 1.9rem); }
+
+    ul, ol {
+      margin: 0.8em 0 1.25em;
+      padding-left: 1.35em;
+    }
+
+    li { margin: 0.35em 0; padding-left: 0.25em; }
+    li::marker { color: var(--accent); font-weight: 700; }
+
+    blockquote {
+      margin: 22px 0;
+      padding: 16px 20px;
+      color: #334b5d;
+      background: var(--quote-bg);
+      border-left: 4px solid var(--accent);
+    }
+
+    code {
+      padding: 0.12em 0.34em;
+      color: #713f12;
+      background: #fff7df;
+      border: 1px solid #f0dfaa;
+      border-radius: 4px;
+      font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+      font-size: 0.88em;
+      overflow-wrap: anywhere;
+    }
+
+    pre {
+      max-width: 100%;
+      margin: 20px 0;
+      padding: 18px;
+      overflow: auto;
+      color: #e9f2f6;
+      background: #152936;
+      border-radius: 8px;
+    }
+
+    pre code { padding: 0; color: inherit; background: transparent; border: 0; }
+
+    .section-divider {
+      width: 52px;
+      margin: 28px 0;
+      border: 0;
+      border-top: 3px solid #b6d5df;
+    }
+
+    .citation {
+      display: inline-block;
+      min-width: 1.55em;
+      margin: 0 0.06em;
+      padding: 0 0.3em;
+      color: #0b607e;
+      background: var(--accent-soft);
+      border-radius: 4px;
+      font-size: 0.82em;
+      font-weight: 750;
+      line-height: 1.55;
+      text-decoration: none;
+    }
+
+    .table-wrap {
+      width: 100%;
+      max-width: 100%;
+      margin: 24px 0 28px;
+      overflow-x: auto;
+      border: 1px solid var(--line-strong);
+      border-radius: 9px;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    .data-table {
+      width: 100%;
+      min-width: 620px;
+      border-collapse: collapse;
+      background: #fff;
+      font-size: 0.88rem;
+      line-height: 1.5;
+    }
+
+    .data-table th {
+      padding: 12px 14px;
+      color: #f7fbfd;
+      background: var(--navy);
+      font-size: 0.78rem;
+      font-weight: 720;
+      letter-spacing: 0.025em;
+      text-align: left;
+      vertical-align: bottom;
+    }
+
+    .data-table td {
+      padding: 12px 14px;
+      border-top: 1px solid var(--line);
+      vertical-align: top;
+      overflow-wrap: anywhere;
+    }
+
+    .data-table tbody tr:nth-child(even) { background: var(--table-stripe); }
+
+    .bibliography {
+      max-width: calc(var(--measure) + 4ch);
+      margin-top: 42px;
+      padding: 34px clamp(22px, 4vw, 38px);
+      background: var(--table-stripe);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+    }
+
+    .bibliography + .section { margin-top: 36px; }
+
+    .bib-entry {
+      display: grid;
+      grid-template-columns: 2.8em minmax(0, 1fr);
+      gap: 8px;
+      padding: 13px 0;
+      border-top: 1px solid var(--line);
+      font-size: 0.9rem;
+      line-height: 1.55;
+    }
+
+    .bib-entry:first-of-type { border-top: 0; }
+    .bib-number { color: var(--accent); font-weight: 760; }
+    .bib-text { min-width: 0; overflow-wrap: anywhere; }
+
+    .report-footer {
+      padding: 18px clamp(24px, 6vw, 72px);
+      color: var(--muted);
+      background: var(--footer-bg);
+      border-top: 1px solid var(--line);
+      font-size: 0.78rem;
+    }
+
+    @media (max-width: 640px) {
+      body { font-size: 16px; }
+      .report-shell { width: 100%; margin: 0; border: 0; border-radius: 0; box-shadow: none; }
+      .report-header { padding: 34px 20px 30px; }
+      .report-content { padding: 10px 18px 44px; }
+      .section { padding-top: 28px; }
+      .executive-summary, .bibliography { padding: 24px 18px 20px; border-radius: 9px; }
+      .report-meta { display: grid; gap: 4px; }
+      .report-meta span + span::before { display: none; }
+      .data-table { min-width: 560px; }
+      .bib-entry { grid-template-columns: 2.4em minmax(0, 1fr); }
+    }
+
+    html[data-theme="editorial"] .report-header {
+      min-height: 330px;
+      display: grid;
+      align-content: center;
+      background: linear-gradient(135deg, #182330 0%, #2f3b48 100%);
+    }
+
+    html[data-theme="editorial"] .report-header h1 { max-width: 18ch; }
+    html[data-theme="editorial"] .section-title { letter-spacing: -0.01em; }
+
+    html[data-theme="analytical"] .report-header { padding-block: 38px 34px; }
+    html[data-theme="analytical"] .report-header h1 {
+      max-width: 28ch;
+      font-family: Inter, ui-sans-serif, "PingFang SC", sans-serif;
+      font-size: clamp(1.9rem, 4vw, 3rem);
+      font-weight: 760;
+    }
+
+    html[data-theme="technical"] .report-header {
+      background-color: var(--navy);
+      background-image:
+        linear-gradient(rgba(80, 194, 184, 0.08) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(80, 194, 184, 0.08) 1px, transparent 1px);
+      background-size: 28px 28px;
+    }
+
+    @media (max-width: 640px) {
+      html[data-theme="editorial"] .report-header {
+        min-height: 240px;
+        padding: 34px 20px 30px;
+      }
+      html[data-theme="analytical"] .report-header { padding: 30px 20px 28px; }
+    }
+
+    @media print {
+      @page { margin: 18mm; }
+      html, body { background: #fff; }
+      .report-shell { width: 100%; margin: 0; border: 0; box-shadow: none; }
+      .report-header { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+      .table-wrap { overflow: visible; }
+      .data-table { min-width: 0; }
+      a { color: inherit; text-decoration: none; }
+      .section, .bib-entry, tr { break-inside: avoid; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
+    }
+  </style>
+</head>
+<body>
+  <article class="report-shell">
+    <header class="report-header">
+      <p class="eyebrow">Deep Research Report</p>
+      <h1>Mail Speed and Feature Gaps: An Evidence Review for the GrapMail Audit</h1>
+      <div class="report-meta" aria-label="Report metadata">
+        <span>2026-11-18</span>
+        <span>57 sources</span>
+      </div>
+    </header>
+    <main class="report-content">
+      <section class="section executive-summary" id="executive-summary">
+<h2 class="section-title">Executive Summary</h2>
+<p>Why can a code-complete mail product still feel slow and unfinished? To answer that question for the GrapMail native apps, this run assembled 78 sources and 110 evidence items across ten search angles — from shipping email clients' engineering blogs to provider comparisons and client roundups — and cross-checked them into fourteen corroboration-scored claim clusters. Four findings stand out. First, perceived speed is architectural, not cosmetic: the fastest-feeling clients keep a local-first data path, run their caching layer off the UI thread, and treat network work as opportunistic, while the biggest single cold-start lever for embedded browser surfaces is preloading rather than cache tuning. Second, interactive email remains a constrained medium: AMP for Email is effectively limited to Gmail and requires sender registration, link previews depend on Open Graph metadata, Gmail clips message bodies beyond roughly 102 KB, and privacy features such as Apple's Mail Privacy Protection change which images are fetched at all. Third, the 2025–2026 feature baseline — scheduled send, short-window undo, snooze, one-click unsubscribe, tracker handling — is table stakes, and its hard parts are deployment-shaped: undo windows last only seconds, and even privacy-forward clients route scheduled sending and notifications through limited server-side processing. Fourth, provider strategies diverge along a genuine trade-off axis — zero-access encryption blocks server-side feature magic while ad-supported reading powers it — and open-standards competitors compete on speed and protocol access. Mapped onto the audit's own census, where the client render path measured clean and residual lag traced to server distance and deployment posture, the evidence converges on a single conclusion: GrapMail's felt incompleteness is dominated by deployment sequencing and seam-level wiring rather than missing client engineering. The recommendations below therefore prioritize deploying the gated worker features, formalizing cache staleness policy, adding a cold-start preload path, and treating AMP as progressive enhancement with strict fallbacks.</p>
+</section>
+<section class="section" id="introduction">
+<h2 class="section-title">Introduction</h2>
+<p>This report is the research component of a deeper corrective pass on GrapMail, a native email client (iOS/Swift, Android/Kotlin, TypeScript backend) whose audit history revealed a paradox worth investigating: the product is substantially code-complete, yet users can still experience it as slow and, in places, unfinished. Thirteen prior audit rounds catalogued applied fixes, verified behavioral parity between the platforms, and surfaced a small set of dormant or deployment-gated surfaces — screens that exist but are not yet reachable in shipped builds, and workers that are implemented but not yet deployed. Those rounds could establish what the codebase contains; they could not, on their own, establish how mature fast-feeling mail products actually achieve their feel, what "complete" interactive previewing can honestly mean inside a constrained rendering medium, or where the leaders in this market draw the lines between privacy, speed, and features. That is the work of this round.</p>
+<p>The review was scoped around four questions. Q1: Why do email apps still feel slow, and which client-side practices make them feel fast? Q2: What is the real state of interactive mail — AMP for Email, link previews, rich rendering — and what completeness can a client promise given client-side and provider-side constraints? Q3: What feature baseline and trade-offs define leading mail products in 2025–2026, including Proton, Fastmail, Gmail, and Superhuman-class clients? Q4: Which findings map onto GrapMail's native apps, and what should change first?</p>
+<p>Readers should treat this report as evidence synthesis rather than independent benchmarking. No first-party performance measurements of GrapMail or its competitors were taken during this run. Instead, the report collects what shipping teams, provider documentation, engineering write-ups, review publications, and user communities collectively demonstrate; scores each claim by how many independent sources support it; and explicitly flags the claims that rest on a single source. Where sources disagree or qualify each other, the disagreement is preserved rather than averaged away.</p>
+<p>The remainder of the report is organized as follows. The methodology section describes the source base, the credibility approach, and its limits. Three findings chapters cover, in turn: speed and rendering practice; interactive previews and rendering completeness; and the feature landscape against leading clients. A synthesis chapter draws the cross-cutting insights — most importantly, why "completed yet not finished" is a deployment problem before it is a coding problem. A limitations chapter records what this evidence cannot establish; the report then closes with mapped recommendations for the continuing GrapMail work and the full bibliography.</p>
+</section>
+<section class="section" id="methodology-and-evidence-base">
+<h2 class="section-title">Methodology and Evidence Base</h2>
+<p>This run combined ten parallel search angles: speed and rendering engineering practice; offline caching and prefetch architecture; AMP for Email; link-preview generation; provider comparisons (Proton, Fastmail, Gmail); the 2025–2026 feature baseline; speed positioning by Superhuman-class clients; privacy and security mechanics that change rendering; and embedded-browser (WKWebView/WebView) performance. Retrieval produced 78 registered sources and 110 captured evidence items. Every claim used in this report traces to at least one stored quote, and major claims were required to draw on three or more independent sources.</p>
+<p>Sources were scored with the bundled evaluator across domain, recency, expertise, and bias dimensions; scores averaged 56 of 100, with no source below 40. The evaluator's domain lists are coarse — practitioner-tier domains cluster in the mid-fifties while first-party documentation typically scores higher — so credibility in this report is driven primarily by corroboration count, preference for first-party documentation (for example, Google's AMP documentation, Android developer guidance, and Fastmail's engineering blog), and explicit labeling of vendor positioning and affiliate incentives. Fourteen claim clusters were formed and rated by corroboration strength, and a conflicts register records six disagreement or single-source items, each labeled in the relevant chapter.</p>
+<p>Two evidence tiers are distinguished throughout: engineering and primary documentation, plus controlled reviews, on one side; user-community anecdotes (forums and threads) used as failure-mode signals on the other. Where a claim rests on a single secondary source — the ten-second undo window and a market-share statistic are the clearest cases — the report says so in place. The run date basis is 2026-11-18 (UTC), matching the run identifier; where the platform shows a following calendar day, the difference is timezone presentation, not a different research window.</p>
+</section>
+<section class="section" id="main-analysis">
+<h2 class="section-title">Main Analysis</h2>
+<p>This chapter presents the review's central analysis: three findings drawn from the evidence base, each rated by corroboration strength with single-source items flagged in place, followed by a synthesis that integrates them into a single explanation for the audit's motivating question.</p>
+<h3 class="subsection-title">Finding 1: Perceived speed is an architecture, not a setting</h3>
+<p>The most consistent finding across engineering documentation and practitioner experience is that fast-feeling email clients do not get that way from isolated optimizations. They are built around a local-first data path in which network access is treated as opportunistic rather than load-bearing. Fastmail's engineering team describes the pattern shipped for its offline support: a caching layer between app and server that speaks the same protocol on both sides, so requests can be satisfied locally where possible. Crucially, that layer runs "in a separate OS thread so it never blocks the UI thread, which could cause jank," and when a request fails, fallback methods "may be able to still return a response to the UI" <a class="citation" href="#ref-1" aria-label="Reference 1">[1]</a>. The wider offline-first literature converges on the same shape. Android's official guidance frames refresh as opportunistic and prescribes caching — an in-memory operator or an HTTP cache — to cover stale windows <a class="citation" href="#ref-2" aria-label="Reference 2">[2]</a>. Mobile architecture discussions reduce the pattern to one rule: read, write, and display through "a single source of truth, which is always the local database in these offline first scenarios" <a class="citation" href="#ref-3" aria-label="Reference 3">[3]</a>. Independent guides add two operational details that matter for user trust: give cached data an explicit freshness contract, and never silently show stale content. One widely cited policy sorts data into three classes — under five minutes is considered fresh; five to thirty minutes "enters a judgment zone" that refreshes opportunistically; older than thirty minutes "should be marked as potentially stale in your UI" <a class="citation" href="#ref-4" aria-label="Reference 4">[4]</a> — and companion guidance recommends "a small 'Offline Mode' banner or toast when showing cached content" <a class="citation" href="#ref-5" aria-label="Reference 5">[5]</a>. Two further principles recur: "Cache early, cache often" <a class="citation" href="#ref-6" aria-label="Reference 6">[6]</a>, and prefer a durable embedded store over a temporary cache for core data, since it is "designed for high velocity and long term data storage" <a class="citation" href="#ref-7" aria-label="Reference 7">[7]</a>, reserving local persistence for "the data that is essential for app functionality and the user experience" <a class="citation" href="#ref-8" aria-label="Reference 8">[8]</a>.</p>
+<p>For embedded browser surfaces — the part of a mail app that renders message bodies — the dominant, measurable cost is the cold start. A detailed WKWebView study shows that improving the HTTP cache speeds up only the second visit, while preloading the browser engine is a different lever that attacks the first <a class="citation" href="#ref-9" aria-label="Reference 9">[9]</a>. An iOS WebView performance guide states plainly that "that cold-start penalty is the biggest single cause of slow first loads on iOS" <a class="citation" href="#ref-10" aria-label="Reference 10">[10]</a>. Practitioners repeatedly document why this is hard: WKWebView is memory-heavy and leaks if unmanaged <a class="citation" href="#ref-11" aria-label="Reference 11">[11]</a>; image caching behavior often traces to HTTP headers rather than client code <a class="citation" href="#ref-12" aria-label="Reference 12">[12]</a>; and the existence of entire long-form guides for these details is itself evidence that making embedded content feel native is the hard part <a class="citation" href="#ref-13" aria-label="Reference 13">[13]</a><a class="citation" href="#ref-14" aria-label="Reference 14">[14]</a>.</p>
+<p>The third lever is bounded work. Rendering less at once is repeatedly rediscovered as a basic rule, from engineering postmortems to consumer fixes: lowering conversations per page helps because, as one guide puts it, "Fewer sections mean fewer requests and faster loading" <a class="citation" href="#ref-15" aria-label="Reference 15">[15]</a>, and clearing an oversized or corrupt cache helped a reviewer "even more than deleting large files and labels" <a class="citation" href="#ref-16" aria-label="Reference 16">[16]</a>. Support threads supply the failure classes a client is expected to survive: a vendor acknowledged "significant lag in the Android app when a large volume of emails" is synced <a class="citation" href="#ref-17" aria-label="Reference 17">[17]</a>; a client forum's standard remedy is clearing cache and app data <a class="citation" href="#ref-18" aria-label="Reference 18">[18]</a>; and Apple's community threads show update regressions that no user setting fixes <a class="citation" href="#ref-19" aria-label="Reference 19">[19]</a>. A long-running discussion summarized the positive case in one line — "That's probably just because everything is cached now" <a class="citation" href="#ref-20" aria-label="Reference 20">[20]</a>.</p>
+<p>Finally, the evidence is as consistent that client work is necessary but not sufficient. Where the client is already cached and optimized, residual slowness traces to server distance, backend behavior, or platform limits, with little control available on the app side <a class="citation" href="#ref-12" aria-label="Reference 12">[12]</a>. Vendor acknowledgements of server-side problems <a class="citation" href="#ref-17" aria-label="Reference 17">[17]</a>, update-regression reports <a class="citation" href="#ref-19" aria-label="Reference 19">[19]</a>, and the cache-as-speed explanation <a class="citation" href="#ref-20" aria-label="Reference 20">[20]</a> all point the same direction. This converges with the audit's own thirteenth-round census, which found no client render-path defect and attributed residual lag to server distance and deployment posture.</p>
+<h3 class="subsection-title">Finding 2: Interactive email is a constrained medium — previews, clips, and privacy</h3>
+<p>The second question — what "complete" previewing can honestly mean — has a blunt answer: the richest interactive email format is a niche, and every enhancement must sit on conservative fallbacks.</p>
+<h3 class="subsection-title">AMP for Email: gated, Gmail-centric, enhancement-only</h3>
+<p>Google's documentation frames AMP for Email as a format that lets senders "include AMP components inside rich, engaging emails, making modern app functionality available within email," and lists a three-step path whose final step is to "register with Google" before dynamic mail can be sent <a class="citation" href="#ref-21" aria-label="Reference 21">[21]</a>. Workspace administrators can enable or disable dynamic email per organization <a class="citation" href="#ref-22" aria-label="Reference 22">[22]</a>. Outside Google's ecosystem the story narrows further. Send-side analysis states that AMP is "not supported by Outlook, Apple Mail, Proton Mail, Fastmail, or the great majority of third-party clients" and warns that "building a valid AMP email is straightforward. Getting permission to send one is not" <a class="citation" href="#ref-23" aria-label="Reference 23">[23]</a>. Glossary coverage acknowledges that only Gmail and Mail.ru support the format among major providers <a class="citation" href="#ref-24" aria-label="Reference 24">[24]</a>. A 2026 testing overview finds support "limited," with behavior varying by provider, and advises testing every variant — while noting the standard HTML fallback that "shows when a recipient's client doesn't support AMP," the mechanism that makes the format safe to adopt at all <a class="citation" href="#ref-25" aria-label="Reference 25">[25]</a>. Client-side material treats dynamic email as a capability layered on top of ordinary mail rather than a baseline <a class="citation" href="#ref-26" aria-label="Reference 26">[26]</a>.</p>
+<h3 class="subsection-title">Link previews: metadata, not magic</h3>
+<p>Rich link previews are generated from Open Graph and canonical metadata rather than rendered page content <a class="citation" href="#ref-27" aria-label="Reference 27">[27]</a>. iMessage reads og: tags and applies its own rendering rules, within platform-specific constraints that page authors cannot fully control <a class="citation" href="#ref-28" aria-label="Reference 28">[28]</a>. Pages that depend on JavaScript need prerendering to expose their metadata — and such support is itself limited <a class="citation" href="#ref-29" aria-label="Reference 29">[29]</a>. Practical sender guidance converges on explicit og:image dimensions (approximately 1200×627) and stable, canonical URLs <a class="citation" href="#ref-27" aria-label="Reference 27">[27]</a>. For a mail client the implication is modest but firm: preview completeness is bounded by what senders publish, so the client's honest job is to fetch, cache, and gracefully degrade — not to promise universal previews.</p>
+<h3 class="subsection-title">The HTML constraint matrix</h3>
+<p>Mailing is a constrained medium with hard, documented edges. Gmail clips any HTML body over roughly 102 KB, replacing the excess with a "View entire message" link <a class="citation" href="#ref-30" aria-label="Reference 30">[30]</a>, a limit confirmed independently by client-rendering research <a class="citation" href="#ref-31" aria-label="Reference 31">[31]</a>. The same research documents automatic text resizing (small fonts are scaled up, with practical minimums around 14 px for body text), rendering divergence that forces defensive markup, and a testing matrix that spans multiple operating systems, browsers, and webmail clients <a class="citation" href="#ref-31" aria-label="Reference 31">[31]</a>. Design practice responds with multi-breakpoint layouts — mobile environments dominate, and multi-breakpoint designs materially outperform single-breakpoint ones on one benchmark's mobile render score (8.7 versus 4.2) <a class="citation" href="#ref-32" aria-label="Reference 32">[32]</a> — plus explicit mobile optimization rules <a class="citation" href="#ref-33" aria-label="Reference 33">[33]</a>, image optimization and web-versus-email design discipline <a class="citation" href="#ref-34" aria-label="Reference 34">[34]</a>, and continuous cross-client testing as rendering "continues to grow in complexity" <a class="citation" href="#ref-35" aria-label="Reference 35">[35]</a>. Load time responds directly to optimization work <a class="citation" href="#ref-36" aria-label="Reference 36">[36]</a>, yet long-time senders still describe email as perpetually lagging the web platform <a class="citation" href="#ref-37" aria-label="Reference 37">[37]</a>.</p>
+<h3 class="subsection-title">Privacy mechanics reshape rendering</h3>
+<p>Modern privacy layers change what a mail client even fetches. Apple's Mail Privacy Protection pre-fetches remote images through an Apple proxy and marks messages as opened, decoupling open signals from human behavior <a class="citation" href="#ref-30" aria-label="Reference 30">[30]</a>; review coverage summarizes the effect as privacy protection that kills tracking pixels "by default," more thoroughly than any other free client <a class="citation" href="#ref-38" aria-label="Reference 38">[38]</a>. Gmail similarly prefetches images server-side, with the commonly cited figure — Gmail at "89.6% share" of webmail — coming from a single vendor metric that should be treated as directional and that explicitly notes not all users or messages are affected <a class="citation" href="#ref-39" aria-label="Reference 39">[39]</a>. Tracking pixels are typically tiny, invisible images whose only job is to report a fetch <a class="citation" href="#ref-40" aria-label="Reference 40">[40]</a>; independent security reporting shows how badly such tracking can misfire <a class="citation" href="#ref-41" aria-label="Reference 41">[41]</a>; and practitioner threads document that some clients block remote images by default specifically to protect user identity <a class="citation" href="#ref-42" aria-label="Reference 42">[42]</a>. The consequence for feature design is direct: any feature that assumes remote content loads — read receipts, pixel-based signals, image-dependent layouts — must degrade gracefully, and privacy defaults now function as a competitive feature rather than a checkbox.</p>
+<h3 class="subsection-title">Finding 3: The 2025–2026 feature baseline — and its deployment-shaped hard parts</h3>
+<h3 class="subsection-title">The baseline is table stakes</h3>
+<p>Across the client roundups evaluated for this report, the expected feature set converges: scheduled send, undo send, snooze, one-click unsubscribe, tracking-pixel handling, rules and templates, and unified multi-account access. Apple Mail ships "scheduled send, undo send, and snooze in current versions" along with "on-device categorization that mirrors Gmail's tabs without a server seeing your mail" <a class="citation" href="#ref-38" aria-label="Reference 38">[38]</a>. Kanmail's local-first client strips tracking pixels, offers one-click unsubscribe, and lists "thread view, snooze, send later, undo send and tracking-pixel detection" among its capabilities <a class="citation" href="#ref-43" aria-label="Reference 43">[43]</a>. PCMag highlights Spark's snooze and "offline caching of your messages" alongside customizable shortcuts <a class="citation" href="#ref-44" aria-label="Reference 44">[44]</a>. Setapp's overview groups "smart inboxes and AI writing help to strong encryption and easy unsubscribe options" <a class="citation" href="#ref-45" aria-label="Reference 45">[45]</a>. Efficient App notes that Proton blocks email trackers and lets users send password-protected messages <a class="citation" href="#ref-46" aria-label="Reference 46">[46]</a>. Titan advertises "read receipts, snooze, send later, and a one-tap unsubscribe feature" <a class="citation" href="#ref-47" aria-label="Reference 47">[47]</a>. Zapier treats snooze and undo as everyday expectations, noting that sending too soon is "easy to do on a phone" <a class="citation" href="#ref-48" aria-label="Reference 48">[48]</a>. The consistency of this list across free, paid, and privacy-first tiers is itself the finding: these capabilities are table stakes, not differentiators.</p>
+<h3 class="subsection-title">The hard parts are deployment-shaped</h3>
+<p>Two caveats recur across the evidence. First, undo is a safety net rather than delayed delivery: "Apple Mail includes Send Later and Undo Send, but Undo Send is time-limited (shown as 10 seconds in Apple's guide), so it's more of a safety net than a full 'delay sending' system" <a class="citation" href="#ref-49" aria-label="Reference 49">[49]</a> — a single secondary source citing Apple's own documentation, flagged accordingly. Second, even privacy-positioned clients centralize time-based sending. A review of Spark records that its documentation "notes that some 'advanced features' (including notifications and scheduled sending) rely on server-side processing, even if the data is encrypted and often deleted after it's no longer needed" <a class="citation" href="#ref-49" aria-label="Reference 49">[49]</a>. And a third-party client analysis finds provider-API limits constrain parity directly: "Snooze and scheduled send also behave differently from Gmail's web version, since the Gmail API doesn't expose those features the same way" <a class="citation" href="#ref-50" aria-label="Reference 50">[50]</a>. The practical reading is that scheduled send, snooze, and notifications carry real server-side components even in the best products; their availability is a deployment question before it is a UI question — which rhymes precisely with the audited product's deployment-gated list, where the scheduled-send worker is implemented but not yet shipped.</p>
+<h3 class="subsection-title">Providers diverge on a real trade-off axis</h3>
+<p>Comparison literature frames the market as strategy divergence rather than a strict ranking, and zero-access encryption is the clearest dividing line: "Proton Mail applies zero-access encryption, so Proton cannot read your messages even if it wanted to. Gmail can read yours, and that is precisely what powers search, smart replies, spam filtering and every Workspace feature built on top. Neither is a bug" <a class="citation" href="#ref-51" aria-label="Reference 51">[51]</a>. Fastmail competes on speed and open standards instead — reviewers summarize its positioning as "Fast, standards based email without adverts or tracking," working "directly with JMAP, IMAP, SMTP, CardDAV and CalDAV," with a long-form verdict calling it "faster" for everyday use; community reviewers stress that its privacy protections are "policy-based, not technical," while praising its masked-email aliasing <a class="citation" href="#ref-52" aria-label="Reference 52">[52]</a><a class="citation" href="#ref-53" aria-label="Reference 53">[53]</a>. Adversarial reviews note that Proton's posture has documented exceptions — Android push "still uses Google integrations," no quantum-safe perfect forward secrecy, and unencrypted subject lines <a class="citation" href="#ref-54" aria-label="Reference 54">[54]</a> — while market summaries conclude that "no single provider wins every column," awarding Proton the ecosystem and Fastmail the usability column <a class="citation" href="#ref-55" aria-label="Reference 55">[55]</a>. Independent security testing emphasizes hygiene fundamentals (AES/RSA at rest; SPF, DKIM, and DMARC enforcement) <a class="citation" href="#ref-56" aria-label="Reference 56">[56]</a>. None of this is a hidden defect in any one product; it is a trade-off axis that any client's roadmap must respect, because privacy choices determine which server-side conveniences are even possible.</p>
+<h3 class="subsection-title">Speed positioning and offline as differentiators</h3>
+<p>Superhuman remains the reference for speed-as-brand — "the fastest email client available," now inside Grammarly's portfolio and "still built around speed: keyboard shortcuts, split inbox, snooze, undo send, and read statuses" <a class="citation" href="#ref-57" aria-label="Reference 57">[57]</a>. PCMag frames the category benefit more practically: dedicated clients "combine all your accounts in one place, offer a pleasant user experience, and provide new features you didn't even know you needed" <a class="citation" href="#ref-44" aria-label="Reference 44">[44]</a>. Offline capability has crossed from niche to marquee promise. Fastmail's engineering post opens by calling offline support "our most popular feature request for some time," with the goal that "it should just work, seamlessly" <a class="citation" href="#ref-1" aria-label="Reference 1">[1]</a>. Kanmail markets local-first as policy: "mail goes straight from your provider to your PC and is never copied to our servers" <a class="citation" href="#ref-43" aria-label="Reference 43">[43]</a>. PCMag cites Spark's offline caching among its top strengths <a class="citation" href="#ref-44" aria-label="Reference 44">[44]</a>. The operational caveat is the same freshness discipline seen in Finding 1: offline support is only as good as its staleness handling, which is what separates "offline works" from "offline confuses" <a class="citation" href="#ref-4" aria-label="Reference 4">[4]</a>.</p>
+<h3 class="subsection-title">Synthesis: Why "completed yet not finished" is a deployment story</h3>
+<p>Four cross-cutting insights emerge when the three findings are read together — and together they answer the question that motivated this review.</p>
+<p>First, felt speed is a data-path property before it is a rendering property. The strongest engineering evidence locates performance in architecture — local caches kept off the UI thread, opportunistic refresh, cold-start preloading — and locates the residual, stubborn slowness outside the client, in server distance and backend posture <a class="citation" href="#ref-1" aria-label="Reference 1">[1]</a><a class="citation" href="#ref-2" aria-label="Reference 2">[2]</a>. The audit's own census reached the same conclusion from the opposite direction: the client render path measured clean, and what lag remained traced to server distance and deployment posture. Read together, the next speed wins for a code-healthy client are specific and finite: a preload path for the first render, an explicit staleness contract with visible indicators, and continued discipline about bounded work per view <a class="citation" href="#ref-9" aria-label="Reference 9">[9]</a><a class="citation" href="#ref-4" aria-label="Reference 4">[4]</a>.</p>
+<p>Second, "interactive" completeness is a contract, not a checkbox. The preview landscape shows that the medium's hard edges — registration-gated AMP, metadata-bounded link previews, the 102 KB clip, privacy-driven fetch suppression — are not defects that competitive products have solved; they are constraints every product manages <a class="citation" href="#ref-21" aria-label="Reference 21">[21]</a><a class="citation" href="#ref-30" aria-label="Reference 30">[30]</a>. A client is complete here when it degrades deterministically and communicates honestly, and when enhancements ship with explicit fallbacks. Promising parity with the open web is a category error the evidence does not support.</p>
+<p>Third — and most directly answering the motivating question — the features that make a mail client feel finished are disproportionately deployment-bound. Undo, snooze, scheduled send, and notifications all carry server-side components even in market leaders, and third-party clients are explicitly bounded by provider APIs <a class="citation" href="#ref-49" aria-label="Reference 49">[49]</a><a class="citation" href="#ref-50" aria-label="Reference 50">[50]</a>. A code-complete client with an undeployed scheduling worker will feel unfinished no matter how polished its screens, because the felt feature and the shipped feature are separated by an operations gate. The audit's earlier findings — a scheduled-view screen fully built but not yet reachable in shipped builds, and deployment-gated workers listed in the project's own research report — are the client-side shadow of exactly this pattern. "Completed yet not" is, in the majority of cases this evidence can see, a sequencing artifact: code merged ahead of operations.</p>
+<p>Fourth, the feature parity a user actually perceives is the intersection of all three findings: baseline breadth (Finding 3), honest degradation (Finding 2), and latency discipline (Finding 1). Where a feature sits in that intersection — table stakes, enhancement, or premium differentiator — determines whether its absence reads as a bug or as a choice, and that placement is a product decision that should be made deliberately rather than discovered by users.</p>
+<p>These insights also validate the review's own method: the internal census and the external evidence converged on the same diagnosis through independent routes, which is the strongest form of agreement this evidence base can offer.</p>
+</section>
+<section class="section" id="counterevidence-register">
+<h2 class="section-title">Counterevidence Register</h2>
+<p>This register records the material disagreements and single-source items encountered during the review, and how each was adjudicated in the text above.</p>
+<p><strong>Cache remedies versus cache architecture.</strong> Consumer troubleshooting advice centers on clearing caches and app data <a class="citation" href="#ref-16" aria-label="Reference 16">[16]</a><a class="citation" href="#ref-18" aria-label="Reference 18">[18]</a>, while engineering guidance prescribes aggressive caching <a class="citation" href="#ref-6" aria-label="Reference 6">[6]</a> and a local-first data path <a class="citation" href="#ref-1" aria-label="Reference 1">[1]</a>. The report treats these as different contexts — a support action for corrupt or oversized caches versus the architecture itself — rather than a contradiction.</p>
+<p><strong>AMP availability.</strong> Vendor glossaries describe dynamic email as a broadly available format <a class="citation" href="#ref-24" aria-label="Reference 24">[24]</a>, while send-side analyses and Google's own documentation show registration gating and Gmail-centric support <a class="citation" href="#ref-25" aria-label="Reference 25">[25]</a><a class="citation" href="#ref-23" aria-label="Reference 23">[23]</a><a class="citation" href="#ref-21" aria-label="Reference 21">[21]</a>. The report follows the send-side evidence and treats AMP as progressive enhancement only.</p>
+<p><strong>Encryption versus feature power.</strong> Zero-access encryption blocks the server-side reading that powers smart features, which independent comparison frames as a designed trade-off rather than a defect <a class="citation" href="#ref-51" aria-label="Reference 51">[51]</a>. Preserved as a strategic axis, not resolved.</p>
+<p><strong>Speed marketing claims.</strong> "Fastest client" positioning originates from vendor-adjacent review material <a class="citation" href="#ref-57" aria-label="Reference 57">[57]</a> and is labeled as positioning wherever cited.</p>
+<p><strong>Single-source figures.</strong> The ten-second undo window <a class="citation" href="#ref-49" aria-label="Reference 49">[49]</a> and the 89.6% Gmail share metric <a class="citation" href="#ref-39" aria-label="Reference 39">[39]</a> each rest on one secondary source; both are flagged in place.</p>
+</section>
+<section class="section" id="claims-evidence-table">
+<h2 class="section-title">Claims-Evidence Table</h2>
+<p>Core claims from the main analysis, with their supporting citations and corroboration strength. Strengths reflect the number and independence of supporting sources, as assessed during triangulation.</p>
+<div class="table-wrap" role="region" aria-label="Scrollable data table" tabindex="0"><table class="data-table"><thead><tr><th scope="col">Claim</th><th scope="col">Supporting evidence</th><th scope="col">Strength</th></tr></thead><tbody><tr><td>Perceived speed comes from a local-first data path with caching off the UI thread</td><td><a class="citation" href="#ref-1" aria-label="Reference 1">[1]</a><a class="citation" href="#ref-2" aria-label="Reference 2">[2]</a><a class="citation" href="#ref-3" aria-label="Reference 3">[3]</a></td><td>Strong</td></tr><tr><td>Cold start is the dominant first-render cost; preloading is a distinct lever</td><td><a class="citation" href="#ref-9" aria-label="Reference 9">[9]</a><a class="citation" href="#ref-10" aria-label="Reference 10">[10]</a><a class="citation" href="#ref-11" aria-label="Reference 11">[11]</a></td><td>Strong</td></tr><tr><td>Freshness needs an explicit policy (fresh / judgment / stale) with visible marking</td><td><a class="citation" href="#ref-4" aria-label="Reference 4">[4]</a><a class="citation" href="#ref-5" aria-label="Reference 5">[5]</a><a class="citation" href="#ref-8" aria-label="Reference 8">[8]</a></td><td>Strong</td></tr><tr><td>AMP email is Gmail-centric, registration-gated, and fallback-dependent</td><td><a class="citation" href="#ref-21" aria-label="Reference 21">[21]</a><a class="citation" href="#ref-25" aria-label="Reference 25">[25]</a><a class="citation" href="#ref-23" aria-label="Reference 23">[23]</a></td><td>Strong</td></tr><tr><td>Link previews are bounded by Open Graph metadata and platform rules</td><td><a class="citation" href="#ref-27" aria-label="Reference 27">[27]</a><a class="citation" href="#ref-28" aria-label="Reference 28">[28]</a><a class="citation" href="#ref-29" aria-label="Reference 29">[29]</a></td><td>Moderate</td></tr><tr><td>Email rendering is a constraint matrix (about 102 KB clip, auto-resize, client divergence)</td><td><a class="citation" href="#ref-30" aria-label="Reference 30">[30]</a><a class="citation" href="#ref-31" aria-label="Reference 31">[31]</a></td><td>Strong</td></tr><tr><td>Privacy proxies and prefetching change which images clients fetch</td><td><a class="citation" href="#ref-30" aria-label="Reference 30">[30]</a><a class="citation" href="#ref-39" aria-label="Reference 39">[39]</a><a class="citation" href="#ref-38" aria-label="Reference 38">[38]</a></td><td>Strong</td></tr><tr><td>Undo windows are seconds-scale; scheduled send and snooze lean server-side</td><td><a class="citation" href="#ref-49" aria-label="Reference 49">[49]</a><a class="citation" href="#ref-50" aria-label="Reference 50">[50]</a></td><td>Moderate</td></tr><tr><td>Scheduled send, undo, snooze, unsubscribe, and pixel handling are table stakes</td><td><a class="citation" href="#ref-38" aria-label="Reference 38">[38]</a><a class="citation" href="#ref-43" aria-label="Reference 43">[43]</a><a class="citation" href="#ref-44" aria-label="Reference 44">[44]</a></td><td>Strong</td></tr><tr><td>Providers diverge on a privacy/standards trade-off axis</td><td><a class="citation" href="#ref-51" aria-label="Reference 51">[51]</a><a class="citation" href="#ref-52" aria-label="Reference 52">[52]</a><a class="citation" href="#ref-55" aria-label="Reference 55">[55]</a></td><td>Strong</td></tr><tr><td>Offline support is a valued differentiator with staleness caveats</td><td><a class="citation" href="#ref-1" aria-label="Reference 1">[1]</a><a class="citation" href="#ref-43" aria-label="Reference 43">[43]</a><a class="citation" href="#ref-44" aria-label="Reference 44">[44]</a></td><td>Strong</td></tr></tbody></table></div>
+</section>
+<section class="section" id="limitations-and-uncertainties">
+<h2 class="section-title">Limitations and Uncertainties</h2>
+<p>Four constraints bound what this review establishes. First, it is an evidence synthesis, not independent benchmarking: no first-party latency measurements were taken of the audited product or of any competitor, so every performance statement describes documented practice rather than measured outcome. Claims about what makes clients feel fast rest on the consistency of engineering documentation and practitioner reports, not on controlled experiments.</p>
+<p>Second, the source-scoring approach has known coarseness. The bundled evaluator rates domains against fixed lists, which clusters practitioner-tier sources in the mid-fifties; the pool averaged 56 of 100 with no item below 40, so this report treats corroboration count and first-party documentation as the practical credibility signals and the scores as approximate. Affiliate and editorial incentives are pervasive in this market and cannot be fully corrected for, and vendor metrics are labeled where cited — the 89.6% Gmail share figure <a class="citation" href="#ref-39" aria-label="Reference 39">[39]</a> and the ten-second undo window <a class="citation" href="#ref-49" aria-label="Reference 49">[49]</a> are the clearest single-source items, each flagged in place. Community-forum and thread evidence appears only as failure-mode signal, never as sole support for a load-bearing claim.</p>
+<p>Third, several platform behaviors described here are proprietary and can change without notice. Email-client rendering rules, privacy-proxy behavior, and provider API surface limits are moving targets, so time-sensitive details should be re-verified against vendor documentation at implementation time.</p>
+<p>Fourth, the mapping of these findings onto the audited product draws on the project's internal census work rather than fresh measurement in this run; where the mapping matters, it is presented as convergence between internal and external evidence, carrying the same limits as any single-project self-assessment. Finally, the source base is English-language, which likely underrepresents regional clients and non-English engineering practice.</p>
+</section>
+<section class="section" id="recommendations">
+<h2 class="section-title">Recommendations</h2>
+<p>The following sequence follows from the three findings and the synthesis, and each item names its evidence anchor. The ordering is deliberate: deployment-shaped items come first, because they explain the largest share of felt incompleteness.</p>
+<p><strong>Close the deployment gate before adding new surfaces.</strong> The highest-leverage class of work is shipping the server-side components that already-gated features depend on — scheduling, snooze, and notification processing — because even market-leading clients treat these as partially server-side functions, and API-bounded clients cannot fake them client-side <a class="citation" href="#ref-49" aria-label="Reference 49">[49]</a><a class="citation" href="#ref-50" aria-label="Reference 50">[50]</a>. A fully built surface users cannot reach contributes nothing to perception; a deployed worker with a modest UI immediately does.</p>
+<p><strong>Wire the dormant screens as deployments land.</strong> The audit's census identified built-but-unreachable surfaces — the scheduled-messages view is the clean example — with zero navigation references. Their wiring should follow worker deployment in the same shipping milestone, so that "code-complete" and "user-reachable" converge rather than diverge. Keep the read/cancel-only semantics such screens already document; those are gate-legal before the send path deploys.</p>
+<p><strong>Add a cold-start preload path for message rendering.</strong> Embedded-browser cold start is the largest single first-render cost, and preloading is a distinct lever from HTTP cache tuning <a class="citation" href="#ref-9" aria-label="Reference 9">[9]</a><a class="citation" href="#ref-10" aria-label="Reference 10">[10]</a>. A pre-warmed rendering container — kept script-disabled, as the audit already enforces — plus continued height-measurement discipline is the right shape.</p>
+<p><strong>Formalize the staleness contract.</strong> Adopt the three-class freshness policy — fresh under five minutes, opportunistic refresh through thirty, explicit stale marking beyond — and surface it with a quiet, visible indicator when data is old or offline <a class="citation" href="#ref-4" aria-label="Reference 4">[4]</a><a class="citation" href="#ref-5" aria-label="Reference 5">[5]</a>. This converts invisible risk into user trust and directly addresses "feels slow" reports that are, in fact, freshness bugs.</p>
+<p><strong>Keep privacy defaults, and make enhancements honest.</strong> Default remote-image blocking with explicit per-message opt-in is the right posture and already matches leading practice <a class="citation" href="#ref-30" aria-label="Reference 30">[30]</a><a class="citation" href="#ref-38" aria-label="Reference 38">[38]</a>. Extend the same honesty to previews: link unfurling should be presented as best-effort metadata extraction that degrades gracefully, never as a guarantee <a class="citation" href="#ref-27" aria-label="Reference 27">[27]</a><a class="citation" href="#ref-28" aria-label="Reference 28">[28]</a>.</p>
+<p><strong>Treat AMP and rich mail as progressive enhancement.</strong> If AMP support is ever added, it must be strictly layered: registered sending, fallback-first rendering, and acceptance that most clients will show the HTML version <a class="citation" href="#ref-21" aria-label="Reference 21">[21]</a><a class="citation" href="#ref-25" aria-label="Reference 25">[25]</a>. Nothing in the product should depend on dynamic-email capability.</p>
+<p><strong>Respect the medium's hard edges when composing.</strong> The body clip threshold (roughly 102 KB), font auto-resizing, and cross-client divergence are constraints to design around, not bugs to fix <a class="citation" href="#ref-30" aria-label="Reference 30">[30]</a><a class="citation" href="#ref-31" aria-label="Reference 31">[31]</a>. Rich compose and formatting features should be previewed against these limits before shipping.</p>
+<p><strong>Verify the table-stakes checklist explicitly.</strong> Scheduled send, short-window undo, snooze, one-click unsubscribe, tracker handling, and rules/templates appear across free, paid, and privacy-first products alike <a class="citation" href="#ref-38" aria-label="Reference 38">[38]</a><a class="citation" href="#ref-43" aria-label="Reference 43">[43]</a><a class="citation" href="#ref-44" aria-label="Reference 44">[44]</a>; each should be present, deployed, and reachable in both native apps, with any exception recorded as a product decision rather than an inherited gap.</p>
+<p><strong>Document the privacy posture as strategy.</strong> The provider landscape shows genuine trade-offs — zero-access encryption versus server-side feature power, policy-based versus technical protections — none of which are defects <a class="citation" href="#ref-51" aria-label="Reference 51">[51]</a><a class="citation" href="#ref-52" aria-label="Reference 52">[52]</a><a class="citation" href="#ref-53" aria-label="Reference 53">[53]</a>. The product's choices along this axis should be written down and visible, because they determine which future features are even possible.</p>
+<p><strong>Instrument perceived speed before chasing it.</strong> Because no first-party timing data exists yet, add lightweight client-side measurement around cold start, body render, and list pagination so future rounds can measure movement instead of inferring it.</p>
+</section>
+<section class="section bibliography" id="bibliography">
+<h2 class="section-title">Bibliography</h2>
+<div class="bib-entry" id="ref-1"><span class="bib-number">[1]</span><div class="bib-text">(n.d.). <a href="https://www.fastmail.com/blog/offline-architecture" target="_blank" rel="noopener noreferrer">Building offline: general architecture | Fastmail Blog</a></div></div>
+<div class="bib-entry" id="ref-2"><span class="bib-number">[2]</span><div class="bib-text">(n.d.). <a href="https://developer.android.com/topic/architecture/data-layer/offline-first" target="_blank" rel="noopener noreferrer">Build an offline-first app | Android Developers</a></div></div>
+<div class="bib-entry" id="ref-3"><span class="bib-number">[3]</span><div class="bib-text">(n.d.). <a href="https://www.youtube.com/watch?v=4FOw6a8Rrwc" target="_blank" rel="noopener noreferrer">The 4 Types of Offline Caches On Android - Mobile System Design Basics | YouTube</a></div></div>
+<div class="bib-entry" id="ref-4"><span class="bib-number">[4]</span><div class="bib-text">(n.d.). <a href="https://androidengineers.substack.com/p/the-complete-guide-to-offline-first" target="_blank" rel="noopener noreferrer">The Complete Guide to Offline-First Architecture in Android | Android Engineers</a></div></div>
+<div class="bib-entry" id="ref-5"><span class="bib-number">[5]</span><div class="bib-text">(n.d.). <a href="https://medium.com/@ipeksac.dogus.19/understanding-caching-in-android-building-faster-offline-ready-apps-889761883576" target="_blank" rel="noopener noreferrer">Understanding Caching in Android: Building Faster &amp; Offline-Ready Apps | Medium</a></div></div>
+<div class="bib-entry" id="ref-6"><span class="bib-number">[6]</span><div class="bib-text">(n.d.). <a href="https://ionic.io/blog/best-practices-for-building-offline-apps" target="_blank" rel="noopener noreferrer">Best Practices for Building Offline Apps | Ionic Blog</a></div></div>
+<div class="bib-entry" id="ref-7"><span class="bib-number">[7]</span><div class="bib-text">(n.d.). <a href="https://www.couchbase.com/blog/offline-first-more-reliable-mobile-apps" target="_blank" rel="noopener noreferrer">Offline-First Mobile App: Best Database Architecture | Couchbase</a></div></div>
+<div class="bib-entry" id="ref-8"><span class="bib-number">[8]</span><div class="bib-text">(n.d.). <a href="https://dev.to/gervaisamoah/adopting-local-first-architecture-for-your-mobile-app-a-game-changer-for-user-experience-and-309g" target="_blank" rel="noopener noreferrer">Adopting Local-First Architecture for Your Mobile App | DEV Community</a></div></div>
+<div class="bib-entry" id="ref-9"><span class="bib-number">[9]</span><div class="bib-text">(n.d.). <a href="https://en.zhgchg.li/posts/zrealm-dev/ios-wkwebview-preload-and-cache-boost-page-load-speed-with-efficient-resource-management-5033090c18ba" target="_blank" rel="noopener noreferrer">iOS WKWebView Preload and Cache | ZhgChgLi</a></div></div>
+<div class="bib-entry" id="ref-10"><span class="bib-number">[10]</span><div class="bib-text">(n.d.). <a href="https://blog.webvify.app/blogs/ios-webview-performance-guide" target="_blank" rel="noopener noreferrer">iOS WebView Performance Guide: Make Your App Faster | Webvify</a></div></div>
+<div class="bib-entry" id="ref-11"><span class="bib-number">[11]</span><div class="bib-text">(n.d.). <a href="https://embrace.io/blog/wkwebview-memory-leaks" target="_blank" rel="noopener noreferrer">Why Is WKWebView So Heavy and Why Is Leaking It So Bad? — Embrace</a></div></div>
+<div class="bib-entry" id="ref-12"><span class="bib-number">[12]</span><div class="bib-text">(n.d.). <a href="https://developer.apple.com/forums/thread/711947" target="_blank" rel="noopener noreferrer">WKWebView Image Caching — Apple Developer Forums</a></div></div>
+<div class="bib-entry" id="ref-13"><span class="bib-number">[13]</span><div class="bib-text">(n.d.). <a href="https://www.hackingwithswift.com/articles/112/the-ultimate-guide-to-wkwebview" target="_blank" rel="noopener noreferrer">The Ultimate Guide to WKWebView — Hacking with Swift</a></div></div>
+<div class="bib-entry" id="ref-14"><span class="bib-number">[14]</span><div class="bib-text">(n.d.). <a href="https://ionic.io/blog/cordova-ios-performance-improvements-drop-in-speed-with-wkwebview" target="_blank" rel="noopener noreferrer">Cordova iOS Performance Improvements: Drop-in Speed with WKWebView — Ionic Blog</a></div></div>
+<div class="bib-entry" id="ref-15"><span class="bib-number">[15]</span><div class="bib-text">(n.d.). <a href="https://www.youtube.com/watch?v=Nc4RPo1RCko" target="_blank" rel="noopener noreferrer">How to Fix Gmail Slow [2026 Full Guide] | YouTube</a></div></div>
+<div class="bib-entry" id="ref-16"><span class="bib-number">[16]</span><div class="bib-text">(n.d.). <a href="https://www.wired.com/story/gmail-inbox-running-slow-how-to-fix-it" target="_blank" rel="noopener noreferrer">Your Gmail Inbox Is Running Slow. Do These Things to Fix It | WIRED</a></div></div>
+<div class="bib-entry" id="ref-17"><span class="bib-number">[17]</span><div class="bib-text">(n.d.). <a href="https://www.reddit.com/r/Infomaniak/comments/1jsphxs/android_email_app_lag" target="_blank" rel="noopener noreferrer">Android email app lag | r/Infomaniak</a></div></div>
+<div class="bib-entry" id="ref-18"><span class="bib-number">[18]</span><div class="bib-text">(n.d.). <a href="https://forum.emclient.com/t/very-very-slow-mobile-app/99826" target="_blank" rel="noopener noreferrer">Very very slow mobile app | eM Client Forum</a></div></div>
+<div class="bib-entry" id="ref-19"><span class="bib-number">[19]</span><div class="bib-text">(n.d.). <a href="https://discussions.apple.com/thread/253874979" target="_blank" rel="noopener noreferrer">Mail is Slow and lagging | Apple Support Communities</a></div></div>
+<div class="bib-entry" id="ref-20"><span class="bib-number">[20]</span><div class="bib-text">(n.d.). <a href="https://news.ycombinator.com/item?id=4477576" target="_blank" rel="noopener noreferrer">If your gmail is slow there is a simple and effective solution | Hacker News</a></div></div>
+<div class="bib-entry" id="ref-21"><span class="bib-number">[21]</span><div class="bib-text">(n.d.). <a href="https://developers.google.com/workspace/gmail/ampemail" target="_blank" rel="noopener noreferrer">AMP for Gmail | Google for Developers</a></div></div>
+<div class="bib-entry" id="ref-22"><span class="bib-number">[22]</span><div class="bib-text">(n.d.). <a href="https://knowledge.workspace.google.com/admin/gmail/turn-dynamic-email-on-or-off-for-users" target="_blank" rel="noopener noreferrer">Turn dynamic email on or off for users | Google Workspace Help</a></div></div>
+<div class="bib-entry" id="ref-23"><span class="bib-number">[23]</span><div class="bib-text">(n.d.). <a href="https://inboxacademy.io/blog/amp-for-email" target="_blank" rel="noopener noreferrer">AMP for Email: what it is, where it works, and what it takes to send | Inbox Academy</a></div></div>
+<div class="bib-entry" id="ref-24"><span class="bib-number">[24]</span><div class="bib-text">(n.d.). <a href="https://topol.io/glossary/amp-for-email" target="_blank" rel="noopener noreferrer">What Is AMP for Email? - Email Glossary | Topol</a></div></div>
+<div class="bib-entry" id="ref-25"><span class="bib-number">[25]</span><div class="bib-text">(n.d.). <a href="https://mailtester.com/blog/amp-email-providers-2026" target="_blank" rel="noopener noreferrer">AMP Email Support in 2026 | MailTester</a></div></div>
+<div class="bib-entry" id="ref-26"><span class="bib-number">[26]</span><div class="bib-text">(n.d.). <a href="https://sparkmailapp.com/glossary/amp-for-email" target="_blank" rel="noopener noreferrer">What is AMP for Email? Interactive Email Explained | Spark</a></div></div>
+<div class="bib-entry" id="ref-27"><span class="bib-number">[27]</span><div class="bib-text">(n.d.). <a href="https://andrejgajdos.com/how-to-create-a-link-preview" target="_blank" rel="noopener noreferrer">How to Create a Link Preview: The Definite Guide | Andrej Gajdos</a></div></div>
+<div class="bib-entry" id="ref-28"><span class="bib-number">[28]</span><div class="bib-text">(n.d.). <a href="https://scottbartell.com/2019/03/05/implementing-imessage-link-previews" target="_blank" rel="noopener noreferrer">Implementing iMessage Link Previews with Open Graph | Scott Bartell</a></div></div>
+<div class="bib-entry" id="ref-29"><span class="bib-number">[29]</span><div class="bib-text">(n.d.). <a href="https://answers.netlify.com/t/cant-get-open-graph-previews-working-in-imessage-with-netlify-prerendering/87487" target="_blank" rel="noopener noreferrer">Can't get Open Graph previews working in iMessage with Netlify prerendering | Netlify Support Forums</a></div></div>
+<div class="bib-entry" id="ref-30"><span class="bib-number">[30]</span><div class="bib-text">(n.d.). <a href="https://www.digitalapplied.com/blog/email-design-size-guide-2026-templates" target="_blank" rel="noopener noreferrer">Email Design Size Guide 2026: Complete Specifications</a></div></div>
+<div class="bib-entry" id="ref-31"><span class="bib-number">[31]</span><div class="bib-text">(n.d.). <a href="https://mailup.com/blogs/rendering-emails" target="_blank" rel="noopener noreferrer">Rendering Emails Across Email Clients: Challenges and Workarounds | MailUp</a></div></div>
+<div class="bib-entry" id="ref-32"><span class="bib-number">[32]</span><div class="bib-text">(n.d.). <a href="https://alpacarelay.com/blog/the-8-dimensions-explained-mobile-render-quality" target="_blank" rel="noopener noreferrer">Mobile Render Quality: The 8 Email Dimensions That Make or Break | Alpaca Relay</a></div></div>
+<div class="bib-entry" id="ref-33"><span class="bib-number">[33]</span><div class="bib-text">(n.d.). <a href="https://knowledge.technolutions.net/docs/optimizing-emails-for-mobile-devices-mobile-responsiveness" target="_blank" rel="noopener noreferrer">Optimizing Emails for Mobile Devices (Mobile Responsiveness) | Technolutions</a></div></div>
+<div class="bib-entry" id="ref-34"><span class="bib-number">[34]</span><div class="bib-text">(n.d.). <a href="https://www.litmus.com/blog/the-tyranny-of-tables-why-web-and-email-design-are-so-different" target="_blank" rel="noopener noreferrer">Web vs. HTML Email Design: 10 Key Differences | Litmus</a></div></div>
+<div class="bib-entry" id="ref-35"><span class="bib-number">[35]</span><div class="bib-text">(n.d.). <a href="https://blogs.oracle.com/marketingcloud/email-rendering-continues-to-grow-in-complexity-wildly-so-at-the-fringes" target="_blank" rel="noopener noreferrer">Email Rendering Continues to Grow in Complexity, Wildly So at the Fringes | Oracle Marketing Cloud</a></div></div>
+<div class="bib-entry" id="ref-36"><span class="bib-number">[36]</span><div class="bib-text">(n.d.). <a href="https://www.emailmavlers.com/blog/email-optimization-guide" target="_blank" rel="noopener noreferrer">Email Optimization: Go Beyond Basic Design | Email Mavlers</a></div></div>
+<div class="bib-entry" id="ref-37"><span class="bib-number">[37]</span><div class="bib-text">(n.d.). <a href="https://www.reddit.com/r/webdev/comments/gyz9x0/why_is_the_development_of_html_emails_so_far_behind/" target="_blank" rel="noopener noreferrer">Why is the development of HTML emails so far behind? | r/webdev</a></div></div>
+<div class="bib-entry" id="ref-38"><span class="bib-number">[38]</span><div class="bib-text">(n.d.). <a href="https://herothemes.com/blog/email-clients-for-gmail" target="_blank" rel="noopener noreferrer">10 Best Email Clients for Gmail in 2026 | HeroThemes</a></div></div>
+<div class="bib-entry" id="ref-39"><span class="bib-number">[39]</span><div class="bib-text">(n.d.). <a href="https://www.litmus.com/blog/gmail-prefetching-images" target="_blank" rel="noopener noreferrer">Are Your Email Marketing Metrics Being Impacted by Gmail Prefetching Images? | Litmus</a></div></div>
+<div class="bib-entry" id="ref-40"><span class="bib-number">[40]</span><div class="bib-text">(n.d.). <a href="https://inboxmonster.com/blog/email-tracking-pixels-guide" target="_blank" rel="noopener noreferrer">The Monster Guide to Email Tracking Pixels: Truth, Myths and How to Use Them Without Losing Trust | Inbox Monster</a></div></div>
+<div class="bib-entry" id="ref-41"><span class="bib-number">[41]</span><div class="bib-text">(n.d.). <a href="https://www.proofpoint.com/us/security-awareness/post/when-email-tracking-goes-wrong-and-what-look" target="_blank" rel="noopener noreferrer">When Email Tracking Goes Wrong — And What to Look For | Proofpoint</a></div></div>
+<div class="bib-entry" id="ref-42"><span class="bib-number">[42]</span><div class="bib-text">(n.d.). <a href="https://stackoverflow.com/questions/2349409/why-does-conversion-tracking-use-pixels-and-why-do-images-potentially-expose-inf" target="_blank" rel="noopener noreferrer">Why does conversion tracking use pixels — Stack Overflow</a></div></div>
+<div class="bib-entry" id="ref-43"><span class="bib-number">[43]</span><div class="bib-text">(n.d.). <a href="https://kanmail.io/blog/best-email-clients-windows" target="_blank" rel="noopener noreferrer">Best Email Clients for Windows in 2026 | Kanmail</a></div></div>
+<div class="bib-entry" id="ref-44"><span class="bib-number">[44]</span><div class="bib-text">(n.d.). <a href="https://www.pcmag.com/picks/best-email-clients" target="_blank" rel="noopener noreferrer">The Best Email Clients We've Tested for 2026 | PCMag</a></div></div>
+<div class="bib-entry" id="ref-45"><span class="bib-number">[45]</span><div class="bib-text">(n.d.). <a href="https://setapp.com/app-reviews/best-email-clients-for-mac" target="_blank" rel="noopener noreferrer">Best email client for Mac 2026: Top 8 fast &amp; secure apps | Setapp</a></div></div>
+<div class="bib-entry" id="ref-46"><span class="bib-number">[46]</span><div class="bib-text">(n.d.). <a href="https://efficient.app/best/email" target="_blank" rel="noopener noreferrer">8 Best Email Clients (2026): Ranked &amp; Reviewed | Efficient App</a></div></div>
+<div class="bib-entry" id="ref-47"><span class="bib-number">[47]</span><div class="bib-text">(n.d.). <a href="https://titan.email/outlook-alternatives" target="_blank" rel="noopener noreferrer">Cost-Effective and Efficient Outlook Alternatives | Titan</a></div></div>
+<div class="bib-entry" id="ref-48"><span class="bib-number">[48]</span><div class="bib-text">(n.d.). <a href="https://zapier.com/blog/best-email-app-for-iphone-ipad" target="_blank" rel="noopener noreferrer">The 7 best email apps for iPhone in 2026 | Zapier</a></div></div>
+<div class="bib-entry" id="ref-49"><span class="bib-number">[49]</span><div class="bib-text">(n.d.). <a href="https://www.getmailbird.com/best-desktop-email-clients-productivity" target="_blank" rel="noopener noreferrer">Best desktop email clients for productivity in 2026 (ranked) | Mailbird</a></div></div>
+<div class="bib-entry" id="ref-50"><span class="bib-number">[50]</span><div class="bib-text">(n.d.). <a href="https://www.lindy.ai/blog/email-client-for-mac" target="_blank" rel="noopener noreferrer">The 7 Best Email Clients for Mac in 2026 | Lindy</a></div></div>
+<div class="bib-entry" id="ref-51"><span class="bib-number">[51]</span><div class="bib-text">(n.d.). <a href="https://www.flozic.ai/blog/comparison/proton-mail-vs-gmail" target="_blank" rel="noopener noreferrer">Proton Mail vs Gmail: Privacy, Pricing and Features | Flozic</a></div></div>
+<div class="bib-entry" id="ref-52"><span class="bib-number">[52]</span><div class="bib-text">(n.d.). <a href="https://paulobrien.com/proton-mail-vs-fastmail" target="_blank" rel="noopener noreferrer">Proton Mail vs Fastmail 2026: Privacy or Productivity? | Paul O'Brien</a></div></div>
+<div class="bib-entry" id="ref-53"><span class="bib-number">[53]</span><div class="bib-text">(n.d.). <a href="https://discuss.privacyguides.net/t/please-enlighten-me-and-help-set-my-expectations-for-choosing-an-email-provider/33023" target="_blank" rel="noopener noreferrer">Help set my expectations for choosing an email provider | Privacy Guides Community</a></div></div>
+<div class="bib-entry" id="ref-54"><span class="bib-number">[54]</span><div class="bib-text">(n.d.). <a href="https://tuta.com/blog/best-private-email-service" target="_blank" rel="noopener noreferrer">10 best private email services in 2026 | Tuta</a></div></div>
+<div class="bib-entry" id="ref-55"><span class="bib-number">[55]</span><div class="bib-text">(n.d.). <a href="https://aiemaily.com/blog/most-secure-email-providers" target="_blank" rel="noopener noreferrer">7 Most Secure Email Providers in 2026, Ranked &amp; Compared | AI Email</a></div></div>
+<div class="bib-entry" id="ref-56"><span class="bib-number">[56]</span><div class="bib-text">(n.d.). <a href="https://www.youtube.com/watch?v=6Jazv4A6Ur4" target="_blank" rel="noopener noreferrer">I Tested 7 Secure Email Providers - Only 3 Are Truly Safe | YouTube</a></div></div>
+<div class="bib-entry" id="ref-57"><span class="bib-number">[57]</span><div class="bib-text">(n.d.). <a href="https://www.usecarly.com/blog/canary-mail-alternatives" target="_blank" rel="noopener noreferrer">8 Best Canary Mail Alternatives in 2026 | UseCarly</a></div></div>
+</section>
+    </main>
+    <footer class="report-footer">Generated as a standalone, citation-preserving research report.</footer>
+  </article>
+</body>
+</html>

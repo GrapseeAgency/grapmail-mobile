@@ -1,0 +1,750 @@
+<!doctype html>
+<html lang="en" data-theme="technical">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>Real Human Verification for GrapMail | Deep Research Report</title>
+  <style>
+    :root {
+      --ink: #18212f;
+      --muted: #5d6878;
+      --navy: #12324a;
+      --accent: #16708f;
+      --accent-soft: #eaf4f7;
+      --paper: #ffffff;
+      --canvas: #f2f4f6;
+      --line: #dce2e7;
+      --line-strong: #b9c4cd;
+      --radius: 12px;
+      --measure: 78ch;
+      --link: #0d6687;
+      --link-hover: #084a63;
+      --header-detail: #6fb4c9;
+      --header-muted: #9fd0df;
+      --summary-bg: linear-gradient(135deg, #edf6f8 0%, #f8fbfc 100%);
+      --summary-border: #cfe2e8;
+      --quote-bg: #f6f8f9;
+      --table-stripe: #f7f9fa;
+      --footer-bg: #edf1f3;
+      --title-font: ui-serif, Georgia, "Noto Serif CJK SC", "Songti SC", serif;
+    }
+
+    html[data-theme="editorial"] {
+      --ink: #29251f;
+      --muted: #746b5d;
+      --navy: #202a36;
+      --accent: #a87925;
+      --accent-soft: #f7efdf;
+      --canvas: #eeeae2;
+      --line: #ddd5c7;
+      --line-strong: #c6bba9;
+      --link: #805b1d;
+      --link-hover: #5f4212;
+      --header-detail: #d0a750;
+      --header-muted: #ddc58f;
+      --summary-bg: linear-gradient(135deg, #f7f0e3 0%, #fffdfa 100%);
+      --summary-border: #dfcda8;
+      --quote-bg: #f8f4ec;
+      --table-stripe: #faf7f1;
+      --footer-bg: #e9e3d8;
+    }
+
+    html[data-theme="analytical"] {
+      --ink: #172033;
+      --muted: #59657a;
+      --navy: #071b38;
+      --accent: #1768ac;
+      --accent-soft: #e7f1fa;
+      --canvas: #edf1f5;
+      --line: #d5dde6;
+      --line-strong: #aebccc;
+      --link: #0b5f9e;
+      --link-hover: #084674;
+      --header-detail: #55a8e0;
+      --header-muted: #9bcceb;
+      --summary-bg: linear-gradient(135deg, #eaf3fa 0%, #f9fbfd 100%);
+      --summary-border: #c4d9e8;
+      --quote-bg: #f3f6f9;
+      --table-stripe: #f3f6f9;
+      --footer-bg: #e6ebf0;
+      --radius: 7px;
+    }
+
+    html[data-theme="technical"] {
+      --ink: #17252d;
+      --muted: #566a73;
+      --navy: #102d34;
+      --accent: #008b82;
+      --accent-soft: #e1f4f1;
+      --canvas: #eaf0ef;
+      --line: #d0ddda;
+      --line-strong: #a8bdb8;
+      --link: #007269;
+      --link-hover: #00554f;
+      --header-detail: #50c2b8;
+      --header-muted: #9bd8d2;
+      --summary-bg: linear-gradient(135deg, #e4f3f1 0%, #f8fbfa 100%);
+      --summary-border: #bddbd6;
+      --quote-bg: #f1f7f6;
+      --table-stripe: #f2f7f6;
+      --footer-bg: #e2ecea;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; }
+
+    html {
+      scroll-behavior: smooth;
+      background: var(--canvas);
+    }
+
+    body {
+      margin: 0;
+      color: var(--ink);
+      background: var(--canvas);
+      font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI",
+        "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", Arial, sans-serif;
+      font-size: 16px;
+      line-height: 1.72;
+      text-rendering: optimizeLegibility;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    a {
+      color: var(--link);
+      text-decoration-thickness: 1px;
+      text-underline-offset: 0.16em;
+      overflow-wrap: anywhere;
+    }
+
+    a:hover { color: var(--link-hover); }
+    a:focus-visible { outline: 3px solid rgba(22, 112, 143, 0.3); outline-offset: 3px; }
+
+    .report-shell {
+      width: min(100% - 40px, 1040px);
+      margin: 32px auto 56px;
+      background: var(--paper);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      box-shadow: 0 18px 55px rgba(25, 42, 58, 0.09);
+      overflow: hidden;
+    }
+
+    .report-header {
+      position: relative;
+      padding: 48px clamp(28px, 6vw, 72px) 42px;
+      color: #f7fbfd;
+      background: var(--navy);
+      border-bottom: 5px solid var(--accent);
+    }
+
+    .report-header::after {
+      content: "";
+      position: absolute;
+      right: clamp(24px, 6vw, 72px);
+      bottom: 0;
+      width: min(28vw, 220px);
+      height: 5px;
+      background: var(--header-detail);
+    }
+
+    .eyebrow {
+      margin: 0 0 12px;
+      color: var(--header-muted);
+      font-size: 0.76rem;
+      font-weight: 750;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+    }
+
+    .report-header h1 {
+      max-width: 22ch;
+      margin: 0;
+      font-family: var(--title-font);
+      font-size: clamp(2rem, 5vw, 3.65rem);
+      font-weight: 650;
+      line-height: 1.1;
+      letter-spacing: -0.035em;
+      text-wrap: balance;
+    }
+
+    .report-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px 22px;
+      margin-top: 24px;
+      color: #cadce4;
+      font-size: 0.86rem;
+    }
+
+    .report-meta span + span::before {
+      content: "";
+      display: inline-block;
+      width: 4px;
+      height: 4px;
+      margin: 0 12px 2px 0;
+      border-radius: 50%;
+      background: var(--header-detail);
+    }
+
+    .report-content {
+      padding: 18px clamp(24px, 6vw, 72px) 64px;
+    }
+
+    .section {
+      max-width: var(--measure);
+      margin: 0 auto;
+      padding-top: 34px;
+    }
+
+    .section + .section {
+      margin-top: 18px;
+      border-top: 1px solid var(--line);
+    }
+
+    .section-title {
+      margin: 0 0 22px;
+      color: var(--navy);
+      font-family: var(--title-font);
+      font-size: clamp(1.55rem, 3vw, 2.1rem);
+      font-weight: 680;
+      line-height: 1.25;
+      letter-spacing: -0.018em;
+      text-wrap: balance;
+    }
+
+    .subsection-title {
+      margin: 28px 0 10px;
+      color: #203b50;
+      font-size: 1.16rem;
+      line-height: 1.4;
+    }
+
+    .subsubsection-title {
+      margin: 22px 0 8px;
+      color: #334b5d;
+      font-size: 1rem;
+      line-height: 1.45;
+    }
+
+    p { margin: 0 0 1em; }
+    strong { color: #142b3d; font-weight: 720; }
+
+    .executive-summary {
+      max-width: calc(var(--measure) + 4ch);
+      margin-top: 26px;
+      padding: 30px clamp(22px, 4vw, 38px) 24px;
+      background: var(--summary-bg);
+      border: 1px solid var(--summary-border);
+      border-top: 4px solid var(--accent);
+      border-radius: var(--radius);
+    }
+
+    .executive-summary .section-title { font-size: clamp(1.45rem, 3vw, 1.9rem); }
+
+    ul, ol {
+      margin: 0.8em 0 1.25em;
+      padding-left: 1.35em;
+    }
+
+    li { margin: 0.35em 0; padding-left: 0.25em; }
+    li::marker { color: var(--accent); font-weight: 700; }
+
+    blockquote {
+      margin: 22px 0;
+      padding: 16px 20px;
+      color: #334b5d;
+      background: var(--quote-bg);
+      border-left: 4px solid var(--accent);
+    }
+
+    code {
+      padding: 0.12em 0.34em;
+      color: #713f12;
+      background: #fff7df;
+      border: 1px solid #f0dfaa;
+      border-radius: 4px;
+      font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+      font-size: 0.88em;
+      overflow-wrap: anywhere;
+    }
+
+    pre {
+      max-width: 100%;
+      margin: 20px 0;
+      padding: 18px;
+      overflow: auto;
+      color: #e9f2f6;
+      background: #152936;
+      border-radius: 8px;
+    }
+
+    pre code { padding: 0; color: inherit; background: transparent; border: 0; }
+
+    .section-divider {
+      width: 52px;
+      margin: 28px 0;
+      border: 0;
+      border-top: 3px solid #b6d5df;
+    }
+
+    .citation {
+      display: inline-block;
+      min-width: 1.55em;
+      margin: 0 0.06em;
+      padding: 0 0.3em;
+      color: #0b607e;
+      background: var(--accent-soft);
+      border-radius: 4px;
+      font-size: 0.82em;
+      font-weight: 750;
+      line-height: 1.55;
+      text-decoration: none;
+    }
+
+    .table-wrap {
+      width: 100%;
+      max-width: 100%;
+      margin: 24px 0 28px;
+      overflow-x: auto;
+      border: 1px solid var(--line-strong);
+      border-radius: 9px;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    .data-table {
+      width: 100%;
+      min-width: 620px;
+      border-collapse: collapse;
+      background: #fff;
+      font-size: 0.88rem;
+      line-height: 1.5;
+    }
+
+    .data-table th {
+      padding: 12px 14px;
+      color: #f7fbfd;
+      background: var(--navy);
+      font-size: 0.78rem;
+      font-weight: 720;
+      letter-spacing: 0.025em;
+      text-align: left;
+      vertical-align: bottom;
+    }
+
+    .data-table td {
+      padding: 12px 14px;
+      border-top: 1px solid var(--line);
+      vertical-align: top;
+      overflow-wrap: anywhere;
+    }
+
+    .data-table tbody tr:nth-child(even) { background: var(--table-stripe); }
+
+    .bibliography {
+      max-width: calc(var(--measure) + 4ch);
+      margin-top: 42px;
+      padding: 34px clamp(22px, 4vw, 38px);
+      background: var(--table-stripe);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+    }
+
+    .bibliography + .section { margin-top: 36px; }
+
+    .bib-entry {
+      display: grid;
+      grid-template-columns: 2.8em minmax(0, 1fr);
+      gap: 8px;
+      padding: 13px 0;
+      border-top: 1px solid var(--line);
+      font-size: 0.9rem;
+      line-height: 1.55;
+    }
+
+    .bib-entry:first-of-type { border-top: 0; }
+    .bib-number { color: var(--accent); font-weight: 760; }
+    .bib-text { min-width: 0; overflow-wrap: anywhere; }
+
+    .report-footer {
+      padding: 18px clamp(24px, 6vw, 72px);
+      color: var(--muted);
+      background: var(--footer-bg);
+      border-top: 1px solid var(--line);
+      font-size: 0.78rem;
+    }
+
+    @media (max-width: 640px) {
+      body { font-size: 16px; }
+      .report-shell { width: 100%; margin: 0; border: 0; border-radius: 0; box-shadow: none; }
+      .report-header { padding: 34px 20px 30px; }
+      .report-content { padding: 10px 18px 44px; }
+      .section { padding-top: 28px; }
+      .executive-summary, .bibliography { padding: 24px 18px 20px; border-radius: 9px; }
+      .report-meta { display: grid; gap: 4px; }
+      .report-meta span + span::before { display: none; }
+      .data-table { min-width: 560px; }
+      .bib-entry { grid-template-columns: 2.4em minmax(0, 1fr); }
+    }
+
+    html[data-theme="editorial"] .report-header {
+      min-height: 330px;
+      display: grid;
+      align-content: center;
+      background: linear-gradient(135deg, #182330 0%, #2f3b48 100%);
+    }
+
+    html[data-theme="editorial"] .report-header h1 { max-width: 18ch; }
+    html[data-theme="editorial"] .section-title { letter-spacing: -0.01em; }
+
+    html[data-theme="analytical"] .report-header { padding-block: 38px 34px; }
+    html[data-theme="analytical"] .report-header h1 {
+      max-width: 28ch;
+      font-family: Inter, ui-sans-serif, "PingFang SC", sans-serif;
+      font-size: clamp(1.9rem, 4vw, 3rem);
+      font-weight: 760;
+    }
+
+    html[data-theme="technical"] .report-header {
+      background-color: var(--navy);
+      background-image:
+        linear-gradient(rgba(80, 194, 184, 0.08) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(80, 194, 184, 0.08) 1px, transparent 1px);
+      background-size: 28px 28px;
+    }
+
+    @media (max-width: 640px) {
+      html[data-theme="editorial"] .report-header {
+        min-height: 240px;
+        padding: 34px 20px 30px;
+      }
+      html[data-theme="analytical"] .report-header { padding: 30px 20px 28px; }
+    }
+
+    @media print {
+      @page { margin: 18mm; }
+      html, body { background: #fff; }
+      .report-shell { width: 100%; margin: 0; border: 0; box-shadow: none; }
+      .report-header { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+      .table-wrap { overflow: visible; }
+      .data-table { min-width: 0; }
+      a { color: inherit; text-decoration: none; }
+      .section, .bib-entry, tr { break-inside: avoid; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
+    }
+  </style>
+</head>
+<body>
+  <article class="report-shell">
+    <header class="report-header">
+      <p class="eyebrow">Deep Research Report</p>
+      <h1>Real Human Verification for GrapMail</h1>
+      <div class="report-meta" aria-label="Report metadata">
+        <span>2026-11-17</span>
+        <span>42 sources</span>
+      </div>
+    </header>
+    <main class="report-content">
+      <section class="section executive-summary" id="executive-summary">
+<h2 class="section-title">Executive Summary</h2>
+<p>GrapMail's current "ACCOUNT PROTECTION" screen is a mock-up: a slider puzzle that sets a local boolean, and a "Skip for now" link whose callback simply advances signup. The web signup form has no human-verification step at all - it posts credentials straight to the registration endpoint. This report establishes what "real" actually means - the pipeline behind the reCAPTCHA-class checkpoints shown in the reference screenshots - and maps it onto all three GrapMail surfaces so that verification is genuine in logic, not just in appearance <a class="citation" href="#ref-31" aria-label="Reference 31">[31]</a><a class="citation" href="#ref-1" aria-label="Reference 1">[1]</a><a class="citation" href="#ref-2" aria-label="Reference 2">[2]</a>.</p>
+<p>Three findings drive the recommendations. First, realness is a pipeline, not a widget: challenge issuance, a one-time response token (valid for about two minutes), server-side verification (siteverify or an Enterprise assessment), and a policy gate that decides whether the user proceeds <a class="citation" href="#ref-1" aria-label="Reference 1">[1]</a><a class="citation" href="#ref-2" aria-label="Reference 2">[2]</a><a class="citation" href="#ref-29" aria-label="Reference 29">[29]</a>. Second, platform capabilities differ: on the web, the classic "I'm not a robot" checkbox plus image challenges is available as the reference experience <a class="citation" href="#ref-31" aria-label="Reference 31">[31]</a>; on mobile, Google's official reCAPTCHA Enterprise SDKs are deliberately frictionless (risk-scored, no visible puzzle), and a native "I'm not a robot" checkbox is not available on iOS - the industry path to a visible challenge on phones is a WebView-hosted checkpoint, exactly as Google's own official samples demonstrate <a class="citation" href="#ref-12" aria-label="Reference 12">[12]</a><a class="citation" href="#ref-26" aria-label="Reference 26">[26]</a><a class="citation" href="#ref-17" aria-label="Reference 17">[17]</a>. Third, skipping can only truly be killed on the server: when the backend records "human verified" solely after a successful siteverify/assessment, a client-side skip becomes harmless; without server enforcement, any UI change is cosmetic <a class="citation" href="#ref-29" aria-label="Reference 29">[29]</a><a class="citation" href="#ref-32" aria-label="Reference 32">[32]</a>.</p>
+<p>The recommended stack for GrapMail: <strong>Web</strong> - reCAPTCHA v2 checkbox with image challenges, verified server-side before the account-creation call completes <a class="citation" href="#ref-31" aria-label="Reference 31">[31]</a><a class="citation" href="#ref-2" aria-label="Reference 2">[2]</a>. <strong>Android and iOS</strong> - the reCAPTCHA Enterprise mobile SDK for a frictionless baseline signal (with Play Integrity and App Attest signals available where configured), plus an optional WebView-delivered visual challenge for visual parity with the reference screens, and a mandatory server-side gate for every path <a class="citation" href="#ref-26" aria-label="Reference 26">[26]</a><a class="citation" href="#ref-12" aria-label="Reference 12">[12]</a><a class="citation" href="#ref-32" aria-label="Reference 32">[32]</a><a class="citation" href="#ref-33" aria-label="Reference 33">[33]</a>. Accessibility alternatives and branding obligations are specified throughout <a class="citation" href="#ref-37" aria-label="Reference 37">[37]</a><a class="citation" href="#ref-38" aria-label="Reference 38">[38]</a><a class="citation" href="#ref-41" aria-label="Reference 41">[41]</a><a class="citation" href="#ref-42" aria-label="Reference 42">[42]</a>.</p>
+<p>A companion implementation guide, delivered with this report, contains the concrete code and step-by-step integration for all four components (web, Android, iOS, backend gating) - including the removal of the Skip button and the server-side enforcement that makes verification strictly unskippable.</p>
+</section>
+<section class="section" id="introduction">
+<h2 class="section-title">Introduction</h2>
+<h3 class="subsection-title">Why this report exists</h3>
+<p>On 2026-11-17 the project owner flagged GrapMail's "ACCOUNT PROTECTION" screen as "sooooo unreal": it opens with "Just one more step!", offers a "Slide to verify" puzzle and a "Get a new challenge" link, and - the dealbreaker - a "Skip for now" escape hatch. Nothing about it resembles the checkpoints users meet on major platforms, where a genuine "I'm not a robot" checkbox spawns image challenges and gates the next step. The mandate for this research: make human verification real and pure in logic on all three surfaces (web, native iOS, native Android), make it strictly unskippable ("skip button cut it out"), and implement it the way real platforms implement it - "exactly like the real one."</p>
+<h3 class="subsection-title">Why a fake verification screen is worse than none</h3>
+<p>A decorative checkpoint is not neutral. It costs user trust the moment it is recognized as theater; it consumes onboarding time; it trains users to look for the skip; and it provides zero protection against automation while advertising a gate that does not exist. Security-wise, the current screen is the equivalent of a turnstile painted on a wall: a bad actor walks through, and honest users learn that the checkpoint is meaningless. The reference platforms avoid this trap because their widgets are backed by a real verification service and their client flows are backed by server-side enforcement.</p>
+<h3 class="subsection-title">What was audited (source-code evidence)</h3>
+<p>Every claim about the current state comes from the actual repositories:</p>
+<ul>
+<li><strong>Android</strong> (<code>grapmail-mobile/android</code>): the fake screen is <code>app/src/main/java/com/grapsee/grapmail/ui/screens/HumanVerifyScreen.kt</code>; the source comment marks the Skip callback ("onDone is Skip's callback only"); the slider component (<code>ui/components/PuzzleSlider.kt</code>) is decorative; and <code>logic/SignUpViewModel.kt</code> merely flips a local boolean via <code>markHumanVerified()</code>. Nothing contacts a server.</li>
+<li><strong>iOS</strong> (<code>grapmail-mobile/ios</code>): the fake screen is <code>GrapMail/FinishScreens.swift</code> ("ACCOUNT PROTECTION" at L39, "Skip for now" at L110 wiring into <code>onContinueOnboarding</code>), presented from <code>GrapMail/RootView.swift</code> (<code>.humanVerify</code> route, around L655). No server call exists anywhere in the flow.</li>
+<li><strong>Web</strong> (<code>Grapsee_All_Time</code>): a full scan of <code>src/</code> finds zero captcha/robot/human-verification code. The signup form (<code>src/app/(auth)/signup/SignUpForm.tsx</code>, L151) fetches <code>${API_BASE}/auth/register</code> directly.</li>
+</ul>
+<p>The detailed audit is in Finding 6.</p>
+<h3 class="subsection-title">Method</h3>
+<p>This report follows a deep-research pipeline: scope definition; multi-wave retrieval; primary-source documentation fetched directly from Google (reCAPTCHA and reCAPTCHA Enterprise docs, Play Integrity), Apple (App Attest), Cloudflare (Turnstile), hCaptcha, Friendly Captcha, and the W3C; 42 sources registered with stable identifiers and 64 evidence quotes persisted with locators; and a triangulation pass over every load-bearing claim (summarized in Appendix A). Platform facts were preferred from primary documentation; vendor marketing language was treated as claim, not fact. Prices and quotas are as published at retrieval time (2026-11).</p>
+<h3 class="subsection-title">Key terms used in this report</h3>
+<ul>
+<li><strong>Challenge issuance</strong> - the consumer-facing step where a widget decides how much friction to impose (no interaction, a checkbox click, or an image puzzle).</li>
+<li><strong>Response token</strong> - the short-lived, single-use cryptographic token the widget produces; it means nothing until verified server-side.</li>
+<li><strong>Siteverify / assessment</strong> - the server-to-server call that validates the token (classic siteverify) or evaluates a risk score (reCAPTCHA Enterprise assessments).</li>
+<li><strong>Attestation</strong> - platform-level proof that the app and device are genuine (Google Play Integrity, Apple App Attest, Firebase App Check).</li>
+<li><strong>Gating</strong> - the server-side rule that refuses to complete the protected action (account creation, onboarding completion, first mailbox access) until verification succeeds.</li>
+</ul>
+<h3 class="subsection-title">How to read this report</h3>
+<p>Findings 1-5 build the model: the anatomy of real verification, the web reference implementation, the mobile reality on iOS and Android, the device-attestation layer, and server-side gating. Finding 6 audits why the current screen is fake. Findings 7-9 cover bypass economics, accessibility and compliance, and the vendor/cost landscape. The Synthesis and Recommendations distill the target architecture; the companion implementation guide contains the code.</p>
+</section>
+<section class="section" id="main-analysis">
+<h2 class="section-title">Main Analysis</h2>
+<h3 class="subsection-title">Finding 1 - The Anatomy of Real Human Verification</h3>
+<p>Every platform that handles this problem well - Google's reCAPTCHA across its versions, hCaptcha, Cloudflare Turnstile - runs the same three-gate pipeline: <strong>a challenge is issued, a short-lived token is minted, and the token is verified server-side before the protected action proceeds</strong> <a class="citation" href="#ref-1" aria-label="Reference 1">[1]</a><a class="citation" href="#ref-2" aria-label="Reference 2">[2]</a><a class="citation" href="#ref-3" aria-label="Reference 3">[3]</a>. The widget is the part users see; the gates they do not see are the part that actually protects anything.</p>
+<h4 class="subsubsection-title">Gate 1: Challenge issuance (what users experience)</h4>
+<p>The widget performs its own risk triage. In the classic checkbox flow, the user clicks "I'm not a robot"; the widget either passes the user immediately or escalates to image challenges <a class="citation" href="#ref-31" aria-label="Reference 31">[31]</a>. In score-based systems, no interaction is requested at all - the client gathers signals and produces a token in the background <a class="citation" href="#ref-29" aria-label="Reference 29">[29]</a>. Crucially, the output of Gate 1 is never a verdict: it is a <strong>response token</strong>. Nothing about the user's click has been proven yet.</p>
+<h4 class="subsubsection-title">Gate 2: Token validation (what servers do)</h4>
+<p>The token is inert until the backend exchanges it. In classic flows, the server posts the token, its secret key, and optionally the user's IP to the siteverify endpoint, which answers with <code>success</code>, a timestamp, the hostname, and error codes <a class="citation" href="#ref-1" aria-label="Reference 1">[1]</a><a class="citation" href="#ref-2" aria-label="Reference 2">[2]</a>. Enterprise flows instead create an <em>assessment</em> that enriches the exchange with request context (user agent, IP address, JA3/JA4 TLS fingerprints) and returns both whether the token is valid and a normalized risk score between 0.0 and 1.0 <a class="citation" href="#ref-29" aria-label="Reference 29">[29]</a>. Two properties make this gate load-bearing:</p>
+<ul>
+<li><strong>Expiration.</strong> reCAPTCHA documents that a response token is valid for about two minutes <a class="citation" href="#ref-1" aria-label="Reference 1">[1]</a><a class="citation" href="#ref-2" aria-label="Reference 2">[2]</a>. A token cannot be harvested and replayed later.</li>
+<li><strong>Single use.</strong> Verification consumes the token; a second attempt to verify the same value fails (the documented error is <code>timeout-or-duplicate</code>) <a class="citation" href="#ref-1" aria-label="Reference 1">[1]</a><a class="citation" href="#ref-2" aria-label="Reference 2">[2]</a><a class="citation" href="#ref-29" aria-label="Reference 29">[29]</a>.</li>
+</ul>
+<p>This is what a captcha farm's product actually is: freshly minted tokens, sold while still inside their validity window <a class="citation" href="#ref-5" aria-label="Reference 5">[5]</a><a class="citation" href="#ref-6" aria-label="Reference 6">[6]</a>. The token's short life is the entire reason farming is an economically bounded business rather than an infinite one.</p>
+<h4 class="subsubsection-title">Gate 3: The policy decision (what actually protects you)</h4>
+<p>The last gate belongs to the application: <em>what happens after the verdict</em>. A valid token with a high score proceeds; a low score or failed challenge triggers the app's own escalation policy - block, require email confirmation, require MFA, add rate limits - as Google's own iOS documentation recommends ("implement your own tiered enforcement strategy, such as an MFA flow") <a class="citation" href="#ref-12" aria-label="Reference 12">[12]</a><a class="citation" href="#ref-29" aria-label="Reference 29">[29]</a>. This gate must sit on the server that owns the protected action - account creation, first sign-in, sending mail - because anything client-side can be patched, proxied, or skipped <a class="citation" href="#ref-29" aria-label="Reference 29">[29]</a><a class="citation" href="#ref-32" aria-label="Reference 32">[32]</a>.</p>
+<p>The failure taxonomy follows directly: if Gate 1 is missing, there is no fresh evidence; if Gate 2 is missing, tokens are decorative and replayable; if Gate 3 is missing, both of the first two are theater. GrapMail's current screen fails all three (Finding 6).</p>
+<h4 class="subsubsection-title">What "the real one" is not</h4>
+<ul>
+<li><strong>It is not a puzzle that looks like reCAPTCHA.</strong> A slider puzzle is solved by trivial automation ("finding the gap is easy for software; the real test is how you drag"), and security vendors are explicit that "a solved slider alone is not proof of humanity" <a class="citation" href="#ref-5" aria-label="Reference 5">[5]</a>. Visual similarity without the token pipeline is cosplay.</li>
+<li><strong>It is not a client-side flag.</strong> Any boolean a client sets about itself is attacker-controlled. Verification state that matters must live in a database the attacker cannot write <a class="citation" href="#ref-29" aria-label="Reference 29">[29]</a><a class="citation" href="#ref-32" aria-label="Reference 32">[32]</a>.</li>
+<li><strong>It is not optional friction.</strong> The moment a skip exists, the checkpoint's effective strength is zero - honest users skip it and bots skip it faster.</li>
+</ul>
+<h4 class="subsubsection-title">A moving target, named accurately</h4>
+<p>Google now presents "reCAPTCHA" as the brand for its visual bot-defense technology inside a broader "Google Cloud Fraud Defense" platform <a class="citation" href="#ref-21" aria-label="Reference 21">[21]</a>. The documented integration surface this report relies on - v2 widgets, siteverify, Enterprise assessments - remains the canonical path, and the product naming change does not alter the pipeline described above <a class="citation" href="#ref-2" aria-label="Reference 2">[2]</a><a class="citation" href="#ref-21" aria-label="Reference 21">[21]</a>.</p>
+<h3 class="subsection-title">Finding 2 - The Web Reference: Checkbox, Challenge, and the Exact Integration Contract</h3>
+<h4 class="subsubsection-title">What the user sees, and why it is v2</h4>
+<p>The reference screenshots show the classic reCAPTCHA v2 checkbox: a bordered box labeled "I'm not a robot" that either passes instantly or opens an image challenge such as "select all squares with motorcycles" <a class="citation" href="#ref-31" aria-label="Reference 31">[31]</a>. Score-based v3 exists and is better suited to background protection, but it deliberately removes the visible checkpoint <a class="citation" href="#ref-5" aria-label="Reference 5">[5]</a>. For GrapMail's web surface, whose requirement is "exactly like the real one," the visible checkbox is the correct primitive - and it is also the easiest to prove correct, because its contract is fully documented.</p>
+<h4 class="subsubsection-title">The integration contract, as documented by Google</h4>
+<p><strong>Widget side.</strong> The page loads <code>https://www.google.com/recaptcha/api.js</code>; the widget renders automatically from a <code>g-recaptcha</code> element with <code>data-sitekey</code>, or explicitly via <code>grecaptcha.render(container, {...})</code> with parameters for <code>sitekey</code>, <code>callback</code>, <code>expired-callback</code>, <code>error-callback</code>, <code>theme</code> (light/dark), <code>size</code> (normal/compact), and <code>tabindex</code> <a class="citation" href="#ref-31" aria-label="Reference 31">[31]</a>. The <code>callback</code> receives the response token when the challenge completes. The <code>expired-callback</code> fires when the token's roughly two-minute life runs out; the widget must then be reset via <code>grecaptcha.reset()</code>. The <code>error-callback</code> handles script/network failures so the UI can react instead of silently stalling <a class="citation" href="#ref-31" aria-label="Reference 31">[31]</a>.</p>
+<p><strong>Server side.</strong> The backend posts <code>secret</code>, <code>response</code> (the token), and optionally <code>remoteip</code> to <code>https://www.google.com/recaptcha/api/siteverify</code>; the JSON answer carries <code>success</code>, <code>challenge_ts</code>, <code>hostname</code>, and <code>error-codes</code> <a class="citation" href="#ref-1" aria-label="Reference 1">[1]</a><a class="citation" href="#ref-2" aria-label="Reference 2">[2]</a>. Only <code>success == true</code> - plus a hostname sanity check - may unlock the protected action, and every terminal error (<code>timeout-or-duplicate</code>, <code>invalid-input-secret</code>, <code>bad-response</code>) must <strong>fail closed</strong> <a class="citation" href="#ref-1" aria-label="Reference 1">[1]</a><a class="citation" href="#ref-2" aria-label="Reference 2">[2]</a>.</p>
+<p><strong>Timing discipline.</strong> Verification happens at submit time, not at page load. Starting the challenge when the user is about to need it avoids expiration churn, and the submit handler must tolerate "token expired while filling the form" by resetting the widget and asking the user to verify again <a class="citation" href="#ref-31" aria-label="Reference 31">[31]</a><a class="citation" href="#ref-1" aria-label="Reference 1">[1]</a>. This is exactly how the reference platforms behave in practice: the checkbox remains live, and a stale token produces a fresh challenge rather than a dead end.</p>
+<h4 class="subsubsection-title">Branding and disclosure obligations</h4>
+<p>Google documents the disclosure rules in both directions. The badge may be hidden only if reCAPTCHA branding stays visible in the user flow, with the prescribed text: "This site is protected by reCAPTCHA" <a class="citation" href="#ref-30" aria-label="Reference 30">[30]</a><a class="citation" href="#ref-41" aria-label="Reference 41">[41]</a>. Effective April 2, 2026, Google removes Privacy Policy and Terms of Use references from the badge itself and recommends customers remove matching reCAPTCHA-specific references from their sites <a class="citation" href="#ref-42" aria-label="Reference 42">[42]</a>. For GrapMail's web signup, the cleanest compliant configuration is: badge visible (default), no extra text needed; if the design hides it, add the sentence verbatim near the submit button <a class="citation" href="#ref-30" aria-label="Reference 30">[30]</a><a class="citation" href="#ref-41" aria-label="Reference 41">[41]</a>.</p>
+<h4 class="subsubsection-title">What this means for GrapMail web</h4>
+<p>There is nothing to migrate - the web app currently has no bot protection at all (Finding 6). The work is additive: load the script, render the checkbox inside the signup form, gate the submit button on a completed challenge, pass the token into the registration payload, and verify it server-side before the account-creation call returns success. Error and expiry paths are part of the contract, not edge cases <a class="citation" href="#ref-31" aria-label="Reference 31">[31]</a><a class="citation" href="#ref-1" aria-label="Reference 1">[1]</a><a class="citation" href="#ref-2" aria-label="Reference 2">[2]</a>. The companion implementation guide contains the exact components, route code, and environment variables for this flow.</p>
+<h3 class="subsection-title">Finding 3 - Mobile Reality on iOS and Android: Frictionless SDKs, WebView Challenges, and Version Discipline</h3>
+<p>The reference screenshots for this project show the web checkbox flow. That flow cannot simply be transplanted to phones: platform vendors have drawn the mobile line differently, and an honest implementation plan has to respect it.</p>
+<h4 class="subsubsection-title">Google's official mobile SDKs are deliberately invisible</h4>
+<p>reCAPTCHA Enterprise's Mobile SDK - the officially supported native path - is built for a frictionless experience: it scores clients in the background and explicitly avoids "picking fire hydrants from a grid" <a class="citation" href="#ref-15" aria-label="Reference 15">[15]</a>. On Android the integration contract is: depend on <code>com.google.android.recaptcha:recaptcha:18.9.4</code> (or newer), keep the minimum SDK at API 23, initialize the client as early as possible because initialization takes several seconds, and call <code>execute()</code> once per protected action with a <code>RecaptchaAction</code> <a class="citation" href="#ref-26" aria-label="Reference 26">[26]</a>. On iOS the requirements are a minimum of iOS 15 and the App Attest capability; the SDK is distributed via Swift Package Manager and CocoaPods (current pod line 18.10.0-beta01) <a class="citation" href="#ref-12" aria-label="Reference 12">[12]</a><a class="citation" href="#ref-16" aria-label="Reference 16">[16]</a>.</p>
+<p>Neither SDK paints a checkbox. Google states the constraint plainly for iOS: "the visual checkbox reCAPTCHA challenge (I'm not a robot) is not available for iOS mobile apps," and recommends a tiered enforcement strategy - such as an MFA step - for suspicious results instead <a class="citation" href="#ref-12" aria-label="Reference 12">[12]</a>. The same frictionless posture holds on Android <a class="citation" href="#ref-15" aria-label="Reference 15">[15]</a>.</p>
+<h4 class="subsubsection-title">If a visible challenge is required, it runs in a WebView - by design</h4>
+<p>Google's own mobile SDK repository demonstrates the pattern for teams that want visible challenges inside apps: its visual example applications "incorporate visual challenges into a mobile application using a webview" <a class="citation" href="#ref-17" aria-label="Reference 17">[17]</a>. That is the supported way to show a puzzle inside a native app without pretending a nonexistent native widget exists. Cloudflare's Turnstile documents the same architecture for its own product - native apps embed a WebView that hosts the widget - while warning that WebView configuration is fragile (origin allowlists, consistent user agents), and its iOS WKWebView path carries open reliability complaints from the community <a class="citation" href="#ref-35" aria-label="Reference 35">[35]</a><a class="citation" href="#ref-40" aria-label="Reference 40">[40]</a>.</p>
+<h4 class="subsubsection-title">Natively rendered visible-challenge alternative</h4>
+<p>If a natively rendered visible challenge is a hard requirement, the vendor to study is hCaptcha: it ships real native Android and iOS SDKs, with the Android one documented as a drop-in replacement for Google's legacy SafetyNet reCAPTCHA API - which historically did serve humans a solvable challenge <a class="citation" href="#ref-19" aria-label="Reference 19">[19]</a><a class="citation" href="#ref-27" aria-label="Reference 27">[27]</a>. Friendly Captcha also shipped native Android (Compose) and iOS (SwiftUI/UIKit) SDKs with sub-hour integration claims <a class="citation" href="#ref-13" aria-label="Reference 13">[13]</a>. Both are credible paths, at the cost of moving the trust relationship away from Google's platform-tied stack <a class="citation" href="#ref-19" aria-label="Reference 19">[19]</a><a class="citation" href="#ref-13" aria-label="Reference 13">[13]</a>.</p>
+<h4 class="subsubsection-title">Version discipline is a security property</h4>
+<p>reCAPTCHA Enterprise's SDKs are not a set-and-forget dependency: an earlier release carried a documented critical vulnerability that forced a version floor, and community guidance attributes elevated low-score volume partly to outdated SDKs that miss modern signals (device integrity, app attestation, network metadata) <a class="citation" href="#ref-24" aria-label="Reference 24">[24]</a><a class="citation" href="#ref-25" aria-label="Reference 25">[25]</a>. GrapMail's mobile apps currently carry no captcha dependency at all, so this is a clean-slate decision - pin current versions from day one.</p>
+<h4 class="subsubsection-title">Token rules apply on mobile too</h4>
+<p>Whatever the client, the server exchange has the same shape: the response token must be verified inside its two-minute window <a class="citation" href="#ref-2" aria-label="Reference 2">[2]</a>, consumed exactly once <a class="citation" href="#ref-29" aria-label="Reference 29">[29]</a>, and treated as a proposal - not a verdict - until the backend assessment returns <a class="citation" href="#ref-29" aria-label="Reference 29">[29]</a>. Finding 5 turns this into the enforcement design.</p>
+<h3 class="subsection-title">Finding 4 - The Attestation Layer: Play Integrity, App Attest, and App Check</h3>
+<p>A captcha answers "is a human driving this session?" Attestation answers a different question - "is this a genuine, unmodified app running on a genuine device?" - and mature fraud stacks layer both. Apple's own documentation opens with the reason: "You can't rely on your app's logic to perform security checks on itself because a compromised app can falsify the results" <a class="citation" href="#ref-33" aria-label="Reference 33">[33]</a>.</p>
+<h4 class="subsubsection-title">Google Play Integrity (Android)</h4>
+<p>Play Integrity lets a backend check "that user actions and server requests are coming from your genuine app, installed by Google Play, running on a genuine Android device" <a class="citation" href="#ref-32" aria-label="Reference 32">[32]</a>. Its documented response pattern is exactly the tiered model GrapMail needs: "Allow, Allow with limits, Allow with limits after CAPTCHA completion, and Deny" <a class="citation" href="#ref-32" aria-label="Reference 32">[32]</a>. Three engineering notes matter. First, the default quota is 10,000 requests per day across all installs - sufficient for onboarding-scale verification, not for per-request vetting <a class="citation" href="#ref-32" aria-label="Reference 32">[32]</a>. Second, "attestation farms" generate valid attestation from real devices and relay it to bots, which is why verdicts must be judged in context rather than treated as absolute <a class="citation" href="#ref-32" aria-label="Reference 32">[32]</a>. Third, for teams already on reCAPTCHA Enterprise, Play Integrity signals are folded into its assessments automatically <a class="citation" href="#ref-32" aria-label="Reference 32">[32]</a>.</p>
+<h4 class="subsubsection-title">Apple App Attest (iOS)</h4>
+<p>App Attest generates a hardware-backed key in the Secure Enclave and produces signatures only that device can create <a class="citation" href="#ref-33" aria-label="Reference 33">[33]</a>. Two properties shape integration: attestation embeds the hash of a one-time server challenge to resist replay, and the key is tied to the app instance - reinstallation means re-attestation <a class="citation" href="#ref-33" aria-label="Reference 33">[33]</a>. Google's own iOS guidance confirms the convergence: reCAPTCHA "uses Apple's App Attest as part of its detection engine" <a class="citation" href="#ref-12" aria-label="Reference 12">[12]</a>.</p>
+<h4 class="subsubsection-title">Firebase App Check: the convenience wrapper, and its visibility trade-off</h4>
+<p>Firebase App Check wraps attestation providers (including reCAPTCHA Enterprise) behind one API <a class="citation" href="#ref-22" aria-label="Reference 22">[22]</a><a class="citation" href="#ref-28" aria-label="Reference 28">[28]</a>. The trade-off is stated in its own documentation: App Check "requires the use of score-based reCAPTCHA keys, which makes it invisible to users" <a class="citation" href="#ref-22" aria-label="Reference 22">[22]</a>. That is excellent for quietly protecting API surfaces - and wrong for a screen whose entire purpose is to show a checkpoint.</p>
+<h4 class="subsubsection-title">Why attestation does not replace the captcha</h4>
+<p>Attestation proves the app and device are genuine; it cannot prove the operator is human - farms exist precisely because genuine devices can be rented or relayed <a class="citation" href="#ref-32" aria-label="Reference 32">[32]</a>. The captcha proves a fresh human attempt; attestation raises the cost of automated attempts and strengthens each risk score. A correct stack uses both: attestation as a signal, captcha as a checkpoint, and server policy as the gate. That gate is the subject of Finding 5.</p>
+<h3 class="subsection-title">Finding 5 - Unskippable by Construction: Server-Side Gating</h3>
+<p>The mandate "skip button cut it out" is a UI requirement, but unskippability is an architecture property. A checkpoint is truly unskippable only when the protected action cannot complete anywhere - UI path, deeplink, API call, retry loop - without a server-side record that verification succeeded. Everything else is styling.</p>
+<h4 class="subsubsection-title">Three enforcement planes, only one of which is binding</h4>
+<ol>
+<li><strong>Presentation plane (necessary, not sufficient).</strong> The screen shows the real widget with no skip affordance; the continue/submit control stays inert until the widget reports a completed challenge <a class="citation" href="#ref-31" aria-label="Reference 31">[31]</a><a class="citation" href="#ref-3" aria-label="Reference 3">[3]</a>. This is what users experience - and it is where the current fake implementation lives (Finding 6).</li>
+<li><strong>Request plane (necessary, not sufficient).</strong> The credential the client submits includes the fresh response token, which the backend exchanges in the same request that performs the protected action <a class="citation" href="#ref-1" aria-label="Reference 1">[1]</a><a class="citation" href="#ref-2" aria-label="Reference 2">[2]</a>. A client that omits the token simply cannot complete registration.</li>
+<li><strong>State plane (the binding one).</strong> The backend keeps its own verification record - for example <code>human_verified_at</code> on the signup session - written <strong>only</strong> after a successful server-to-server validation <a class="citation" href="#ref-29" aria-label="Reference 29">[29]</a><a class="citation" href="#ref-23" aria-label="Reference 23">[23]</a>. Any attempt to advance the flow without that record fails server-side, no matter which client path is used. This is the plane that survives adversarial clients: you cannot rely on app logic to self-enforce security, because a compromised client can falsify results <a class="citation" href="#ref-33" aria-label="Reference 33">[33]</a>.</li>
+</ol>
+<h4 class="subsubsection-title">Validation semantics that make tokens meaningful</h4>
+<ul>
+<li><strong>Verify at the moment of use, inside the window.</strong> Tokens live about two minutes; verification must happen when the action is submitted <a class="citation" href="#ref-1" aria-label="Reference 1">[1]</a><a class="citation" href="#ref-2" aria-label="Reference 2">[2]</a>. Issuing the challenge too early and parking the token invites expiration.</li>
+<li><strong>Consume exactly once.</strong> The backend may redeem a token only once; reuse fails (<code>timeout-or-duplicate</code>) and must be treated as a failure, never retried into a pass <a class="citation" href="#ref-1" aria-label="Reference 1">[1]</a><a class="citation" href="#ref-2" aria-label="Reference 2">[2]</a><a class="citation" href="#ref-29" aria-label="Reference 29">[29]</a>.</li>
+<li><strong>Fail closed.</strong> Network errors, missing secrets, mismatched hostnames - every terminal condition must deny the action rather than wave it through <a class="citation" href="#ref-1" aria-label="Reference 1">[1]</a><a class="citation" href="#ref-2" aria-label="Reference 2">[2]</a><a class="citation" href="#ref-4" aria-label="Reference 4">[4]</a>. The widget itself handles expiry and errors by resetting and re-challenging, not by degrading to "pass" <a class="citation" href="#ref-31" aria-label="Reference 31">[31]</a><a class="citation" href="#ref-3" aria-label="Reference 3">[3]</a><a class="citation" href="#ref-4" aria-label="Reference 4">[4]</a>.</li>
+<li><strong>Give mobile assessments full context.</strong> When using Enterprise assessments, pass the recommended request context (user agent, IP address, TLS fingerprints) so scores are computed on complete signals <a class="citation" href="#ref-29" aria-label="Reference 29">[29]</a>.</li>
+</ul>
+<h4 class="subsubsection-title">The policy gate is tiered, not binary</h4>
+<p>A passing verification need not produce a single verdict. Play Integrity's documented ladder - "Allow, Allow with limits, Allow with limits after CAPTCHA completion, and Deny" - is the generalizable policy pattern for GrapMail's backend <a class="citation" href="#ref-32" aria-label="Reference 32">[32]</a>: full access for clean verdicts; friction-added paths (email confirmation, rate limits, a visible challenge) for ambiguous ones; denial for clear bot signals. The critical property is that <strong>every rung is decided server-side</strong>; clients only render the outcome.</p>
+<h4 class="subsubsection-title">"Removing Skip" is a server change</h4>
+<p>Concretely, cutting the skip out of GrapMail means: (a) delete the skip affordance on every client; (b) refuse to mark signup/onboarding complete unless the server-side verification record exists; (c) require the token on the registration/continue calls and validate it before writing that record <a class="citation" href="#ref-29" aria-label="Reference 29">[29]</a><a class="citation" href="#ref-23" aria-label="Reference 23">[23]</a><a class="citation" href="#ref-1" aria-label="Reference 1">[1]</a><a class="citation" href="#ref-2" aria-label="Reference 2">[2]</a>. The companion implementation guide contains the exact diffs, endpoints, and environment variables for all three platforms.</p>
+<h3 class="subsection-title">Finding 6 - Audit: Why the Current Implementation Is Fake</h3>
+<p>Verdict up front: <strong>the current flow passes zero of the three gates</strong> defined in Finding 1. There is no challenge service, no token, no server validation, and no server-side state anywhere on the path. The audit below reflects the live repositories on 2026-11-17.</p>
+<h4 class="subsubsection-title">Android (<code>grapmail-mobile/android</code>)</h4>
+<ul>
+<li><code>app/src/main/java/com/grapsee/grapmail/ui/screens/HumanVerifyScreen.kt</code> renders the "ACCOUNT PROTECTION" screen. Its own source comment documents the hole: the <code>onDone</code> callback is "Skip's callback only". Line 179 shows <code>Text("Skip for now")</code> with a <code>clickable { onDone() }</code> - tapping it advances onboarding directly. Lines 180-183 add the reassuring caption: "You can always complete verification later from your account settings."</li>
+<li>The puzzle is cosmetic: <code>ui/components/PuzzleSlider.kt</code> animates a slider, but nothing derives a token from it and nothing evaluates where or how the user dragged.</li>
+<li><code>logic/SignUpViewModel.kt</code> holds <code>humanVerified: Boolean = false</code> (L59) plus <code>markHumanVerified()</code> (L196) that flips the boolean locally. No network call, no token, no exchange - anywhere.</li>
+<li>Net effect: the flow is fully scriptable. Tap Skip (or set the boolean in memory) and proceed; the screen costs an attacker nothing.</li>
+</ul>
+<h4 class="subsubsection-title">iOS (<code>grapmail-mobile/ios</code>)</h4>
+<ul>
+<li><code>GrapMail/FinishScreens.swift</code> defines <code>HumanVerifyView</code> (L6): "ACCOUNT PROTECTION" (L39), "Just one more step!" (L44), and the same escape hatch at L110 - <code>Text("Skip for now")</code> wired to <code>onContinueOnboarding</code>. The Continue buttons that follow (L136/209/258/330) accept that callback with no verification condition attached.</li>
+<li><code>GrapMail/RootView.swift</code> (L655) presents the view at the <code>.humanVerify</code> step with a closure that simply continues.</li>
+<li><code>GrapMail/PuzzleSlider.swift</code> is likewise decorative. No App Attest call, no reCAPTCHA SDK, no server exchange exists in the flow.</li>
+</ul>
+<h4 class="subsubsection-title">Web (<code>Grapsee_All_Time</code>)</h4>
+<ul>
+<li>The web app has <strong>no verification at all</strong>. A scan of <code>src/</code> for captcha / robot / human-verification terms returns nothing.</li>
+<li><code>src/app/(auth)/signup/SignUpForm.tsx</code> posts <code>email</code>/<code>password</code> straight to <code>${API_BASE}/auth/register</code> (L151). Nothing gates that call - client or server.</li>
+</ul>
+<h4 class="subsubsection-title">The gap, stated plainly</h4>
+<p>Across three platforms the current design provides: no challenge issuance, no tokens, no validation, no gating state, and - on mobile - an explicit bypass. It is not a weak captcha; it is a screenshot of a captcha. The symptoms the owner flagged ("sooooo unreal", the skip button) are the surface; the root cause is that verification was implemented as decoration instead of as a pipeline. Findings 1-5 define the pipeline that must replace it; the companion implementation guide specifies the replacement code, module by module.</p>
+<h3 class="subsection-title">Finding 7 - The Economics of Bypass: What a Real Checkpoint Can and Cannot Promise</h3>
+<p>Real verification is not about making automated abuse impossible; it is about making it <em>uneconomic</em>. The published economics are blunt: human captcha farms solve challenges for a fraction of a US dollar per 1,000 solves, and bypass services advertise roughly $1-$5 per thousand solves <a class="citation" href="#ref-6" aria-label="Reference 6">[6]</a><a class="citation" href="#ref-7" aria-label="Reference 7">[7]</a>. A protection whose only property is "a human could pass it" is a commodity. The pipeline described in Findings 1-5 changes the economics by attacking the parts of the flow that farms cannot commoditize cheaply.</p>
+<h4 class="subsubsection-title">Why the current slider design is indefensible</h4>
+<p>Slider puzzles fail on exactly the axis that matters: automation cost. "Finding the gap is easy for software; the real test is how you drag" - and the drag heuristic degrades to a probabilistic check that scripts have repeatedly beaten <a class="citation" href="#ref-8" aria-label="Reference 8">[8]</a>. Security analysts are explicit that "a solved slider alone is not proof of humanity", because farms sell solved tokens and forged verification responses on demand <a class="citation" href="#ref-5" aria-label="Reference 5">[5]</a>. Layered on top, AI-era abuse now operates at enormous scale - the April 2025 AkiraBot framework targeted 420,000+ websites <a class="citation" href="#ref-9" aria-label="Reference 9">[9]</a> - so any checkpoint whose bypass cost is near zero will be bypassed at whatever rate the attacker chooses <a class="citation" href="#ref-10" aria-label="Reference 10">[10]</a>.</p>
+<h4 class="subsubsection-title">Three properties that actually raise the attacker's cost</h4>
+<ol>
+<li><strong>Short-lived, single-use tokens.</strong> A solved token is useful only for about two minutes and can be redeemed exactly once <a class="citation" href="#ref-1" aria-label="Reference 1">[1]</a><a class="citation" href="#ref-2" aria-label="Reference 2">[2]</a><a class="citation" href="#ref-29" aria-label="Reference 29">[29]</a>. Farms must deliver fresh solves in real time, integrating with the target's flow rather than stockpiling a reusable credential - converting a one-off solve into an ongoing operational dependency, and a detectable one, since replay attempts surface as verification errors (<code>timeout-or-duplicate</code>) <a class="citation" href="#ref-1" aria-label="Reference 1">[1]</a><a class="citation" href="#ref-2" aria-label="Reference 2">[2]</a>.</li>
+<li><strong>Server-side assessment with context.</strong> Mobile assessments enrich scoring with request context (user agent, IP address, TLS fingerprints) <a class="citation" href="#ref-29" aria-label="Reference 29">[29]</a>, and Play Integrity folds in device and app genuineness signals that attackers must defeat at the device layer - where the platform pushes back with attestation-farm detection <a class="citation" href="#ref-32" aria-label="Reference 32">[32]</a>.</li>
+<li><strong>Tiered policy.</strong> When a signal is weak the response is not just pass/fail: documented practice includes "Allow, Allow with limits, Allow with limits after CAPTCHA completion, and Deny" <a class="citation" href="#ref-32" aria-label="Reference 32">[32]</a>. An automated attempt that slips through still lands in a lane with a smaller blast radius.</li>
+</ol>
+<h4 class="subsubsection-title">The friction trade-off, honestly stated</h4>
+<p>Visible challenges cost conversions - a documented effect, and worst on mobile <a class="citation" href="#ref-7" aria-label="Reference 7">[7]</a>. This is exactly why the industry's default mobile posture is frictionless scoring <a class="citation" href="#ref-15" aria-label="Reference 15">[15]</a><a class="citation" href="#ref-22" aria-label="Reference 22">[22]</a>. The correct reading is not "avoid visible challenges" but "spend friction where the stakes are": a one-time visible checkpoint at account creation (GrapMail's exact case) is a defensible trade; the same friction on every session is not. What must never ship is <em>decorative</em> friction - it pays the full conversion cost and buys no security.</p>
+<h4 class="subsubsection-title">What cannot be promised</h4>
+<p>No vendor promises complete bot elimination; the honest claims are relative - bypass cost rises, farm delivery becomes fragile, and residual abuse gets flagged and throttled. GrapMail's success criterion should be stated the same way: not "bots cannot register", but "bulk automated registration costs more than it is worth, and suspicious attempts are slowed, flagged, and visible".</p>
+<h3 class="subsection-title">Finding 8 - Accessibility, Compliance, and Privacy: The Non-Negotiable Edge Cases</h3>
+<p>A visible human-verification checkpoint creates obligations that run against the grain of security engineering: the users most harmed by a badly built checkpoint are often those least able to complain loudly. Regulatory frameworks and platform policies both treat the accommodation path as non-optional.</p>
+<h4 class="subsubsection-title">WCAG: what compliance actually requires</h4>
+<p>WCAG does not ban CAPTCHAs; it conditions them. They are permitted provided "text alternatives that identify and describe the purpose of the non-text content are provided, and alternative forms of CAPTCHA using output modes for different types of sensory perception are provided" <a class="citation" href="#ref-36" aria-label="Reference 36">[36]</a>. Deque's checklist operationalizes this: a sensory alternative "MUST be provided in another sensory modality (e.g. audio)" if a blind user cannot pass the original - and pointedly lists "Avoid CAPTCHAs if Possible" as best practice <a class="citation" href="#ref-38" aria-label="Reference 38">[38]</a>.</p>
+<h4 class="subsubsection-title">The audio problem is real</h4>
+<p>The naive answer - "we'll just offer an audio challenge" - is weaker than it sounds. A University of Maryland study achieved a 90% success rate cracking Google's audio reCAPTCHA using Google's own speech recognition service, and Google's v2 service has "begun declining to actually provide the audio CAPTCHA alternative clearly proffered onscreen" - the fallback is both crackable and not always available <a class="citation" href="#ref-36" aria-label="Reference 36">[36]</a>. An accessibility plan that depends solely on audio is fragile in both directions.</p>
+<h4 class="subsubsection-title">What modern vendors offer instead</h4>
+<p>The industry has moved toward alternatives that let accommodation users avoid challenge-solving entirely for users who need it:</p>
+<ul>
+<li>hCaptcha states WCAG 2.2 AA compliance based on internal and external audits, and provides dedicated "accessibility challenges" and "accessibility cookies" as alternatives wherever visual challenges cannot be made fully accessible <a class="citation" href="#ref-37" aria-label="Reference 37">[37]</a>.</li>
+<li>Friendly Captcha is "100% invisible" - no clicking, no puzzle solving - works with screen readers and keyboard navigation, and claims WCAG 2.2 AA <a class="citation" href="#ref-39" aria-label="Reference 39">[39]</a>.</li>
+</ul>
+<p>For GrapMail this yields a concrete requirement: whichever widget ships, the flow must document and enable the provider's accessibility accommodation path (for reCAPTCHA v2: the widget's built-in assistive option where offered, plus a documented support route; for hCaptcha: accessibility-cookie provisioning) <a class="citation" href="#ref-36" aria-label="Reference 36">[36]</a><a class="citation" href="#ref-37" aria-label="Reference 37">[37]</a><a class="citation" href="#ref-38" aria-label="Reference 38">[38]</a>. Error paths must never dead-end a legitimate user: expiry and failures reset and re-challenge rather than silently block <a class="citation" href="#ref-31" aria-label="Reference 31">[31]</a><a class="citation" href="#ref-3" aria-label="Reference 3">[3]</a><a class="citation" href="#ref-4" aria-label="Reference 4">[4]</a> - while the protected action itself still fails closed whenever verification never succeeds <a class="citation" href="#ref-1" aria-label="Reference 1">[1]</a><a class="citation" href="#ref-2" aria-label="Reference 2">[2]</a>.</p>
+<h4 class="subsubsection-title">Privacy and data-protection posture</h4>
+<p>Verification vendors process personal data (IP addresses, browser and device characteristics, sometimes interaction telemetry). Google's current framing places the customer as data controller and Google as data processor of customer data <a class="citation" href="#ref-42" aria-label="Reference 42">[42]</a>; hCaptcha advertises GDPR, CCPA, LGPD, and PIPL compliance even on its free tier <a class="citation" href="#ref-34" aria-label="Reference 34">[34]</a>. Before rollout, GrapMail's privacy policy should disclose the verification provider, its purpose, and the data categories involved - and the implementation should avoid collecting more than necessary (invisible/score-based paths collect less user-visible data) <a class="citation" href="#ref-34" aria-label="Reference 34">[34]</a><a class="citation" href="#ref-39" aria-label="Reference 39">[39]</a><a class="citation" href="#ref-42" aria-label="Reference 42">[42]</a>.</p>
+<h4 class="subsubsection-title">Branding and disclosure duties (summary)</h4>
+<ul>
+<li><strong>Web:</strong> if the reCAPTCHA badge is hidden, the text "This site is protected by reCAPTCHA" must appear visibly in the user flow; from April 2, 2026 Google also removes Privacy/Terms links from the badge and recommends removing matching references from customer sites <a class="citation" href="#ref-30" aria-label="Reference 30">[30]</a><a class="citation" href="#ref-41" aria-label="Reference 41">[41]</a><a class="citation" href="#ref-42" aria-label="Reference 42">[42]</a>.</li>
+<li><strong>Mobile:</strong> no badge is required for the invisible SDK; an optional disclosure such as "This app is protected by reCAPTCHA" can live in the about screen, user flow, or footer <a class="citation" href="#ref-42" aria-label="Reference 42">[42]</a>.</li>
+</ul>
+<h4 class="subsubsection-title">The rule that ties it together</h4>
+<p>Every accessibility and compliance accommodation is an <em>alternative path to the same server-side gate</em> - never a bypass of it. The verification record is written only after whichever path (visual, audio, cookie, or assisted support) produces a valid verdict <a class="citation" href="#ref-29" aria-label="Reference 29">[29]</a><a class="citation" href="#ref-37" aria-label="Reference 37">[37]</a>.</p>
+<h3 class="subsection-title">Finding 9 - Vendor Landscape and the Cost Model for GrapMail</h3>
+<h4 class="subsubsection-title">The candidate matrix</h4>
+<div class="table-wrap" role="region" aria-label="Scrollable data table" tabindex="0"><table class="data-table"><thead><tr><th scope="col">Option</th><th scope="col">Web surface</th><th scope="col">Mobile approach</th><th scope="col">Visible challenge on mobile?</th><th scope="col">Free tier</th><th scope="col">Key caveats</th></tr></thead><tbody><tr><td>reCAPTCHA v2 (web reference)</td><td>Checkbox + image challenges - the exact reference UX <a class="citation" href="#ref-31" aria-label="Reference 31">[31]</a></td><td>-</td><td>-</td><td>Yes (classic)</td><td>Badge rules; hideable only with visible text <a class="citation" href="#ref-30" aria-label="Reference 30">[30]</a><a class="citation" href="#ref-41" aria-label="Reference 41">[41]</a></td></tr><tr><td>reCAPTCHA Enterprise + Mobile SDK</td><td>Score/checkbox variants</td><td>Frictionless score-based native SDKs <a class="citation" href="#ref-26" aria-label="Reference 26">[26]</a><a class="citation" href="#ref-12" aria-label="Reference 12">[12]</a><a class="citation" href="#ref-15" aria-label="Reference 15">[15]</a></td><td>No native option; webview samples only <a class="citation" href="#ref-17" aria-label="Reference 17">[17]</a><a class="citation" href="#ref-12" aria-label="Reference 12">[12]</a></td><td>10,000 assessments/month <a class="citation" href="#ref-29" aria-label="Reference 29">[29]</a></td><td>iOS checkbox not available <a class="citation" href="#ref-12" aria-label="Reference 12">[12]</a>; version floor from past vulnerability <a class="citation" href="#ref-24" aria-label="Reference 24">[24]</a></td></tr><tr><td>hCaptcha</td><td>Checkbox + challenges</td><td>Native Android/iOS SDKs <a class="citation" href="#ref-19" aria-label="Reference 19">[19]</a></td><td>Yes (native SDKs; SafetyNet-style) <a class="citation" href="#ref-19" aria-label="Reference 19">[19]</a></td><td>Basic free tier (GDPR/CCPA/LGPD/PIPL) <a class="citation" href="#ref-34" aria-label="Reference 34">[34]</a></td><td>Third-party trust; "drop-in replacement" is vendor-stated <a class="citation" href="#ref-19" aria-label="Reference 19">[19]</a></td></tr><tr><td>Cloudflare Turnstile</td><td>Managed/invisible widget modes</td><td>WebView only <a class="citation" href="#ref-35" aria-label="Reference 35">[35]</a></td><td>Via webview</td><td>Free</td><td>iOS WKWebView reliability complaints <a class="citation" href="#ref-40" aria-label="Reference 40">[40]</a>; UA/origin constraints <a class="citation" href="#ref-35" aria-label="Reference 35">[35]</a></td></tr><tr><td>Friendly Captcha</td><td>Invisible proof-of-work-style widget</td><td>Native Compose/SwiftUI SDKs <a class="citation" href="#ref-13" aria-label="Reference 13">[13]</a></td><td>No (invisible posture) <a class="citation" href="#ref-13" aria-label="Reference 13">[13]</a><a class="citation" href="#ref-39" aria-label="Reference 39">[39]</a></td><td>Free plan</td><td>Visible challenge is not its model</td></tr><tr><td>Play Integrity API (attestation)</td><td>-</td><td>Android verdicts <a class="citation" href="#ref-32" aria-label="Reference 32">[32]</a></td><td>-</td><td>10,000 requests/day <a class="citation" href="#ref-32" aria-label="Reference 32">[32]</a></td><td>A signal, not a captcha replacement <a class="citation" href="#ref-32" aria-label="Reference 32">[32]</a></td></tr><tr><td>App Attest (attestation)</td><td>-</td><td>iOS attestation <a class="citation" href="#ref-33" aria-label="Reference 33">[33]</a></td><td>-</td><td>Platform API</td><td>Requires custom challenge handling <a class="citation" href="#ref-33" aria-label="Reference 33">[33]</a></td></tr></tbody></table></div>
+<h4 class="subsubsection-title">What each option costs, in practice</h4>
+<ul>
+<li><strong>reCAPTCHA Enterprise (mobile):</strong> under the free monthly assessment allowance (10,000/month) <a class="citation" href="#ref-29" aria-label="Reference 29">[29]</a>, GrapMail's onboarding-scale verification is effectively $0; the Play Integrity quota (10,000/day) likewise covers onboarding volume <a class="citation" href="#ref-32" aria-label="Reference 32">[32]</a>.</li>
+<li><strong>hCaptcha:</strong> workable free tier; Pro at $139/month includes 100,000 monthly evals, then $0.99 per 1,000 <a class="citation" href="#ref-34" aria-label="Reference 34">[34]</a>. Its "up to 50% more cost-effective than reCAPTCHA" line is customer-reported comparison data - treat it as marketing weight, not measurement <a class="citation" href="#ref-34" aria-label="Reference 34">[34]</a>.</li>
+<li><strong>Turnstile:</strong> free, but the WebView-only mobile story and the iOS reliability reports are the real cost <a class="citation" href="#ref-35" aria-label="Reference 35">[35]</a><a class="citation" href="#ref-40" aria-label="Reference 40">[40]</a>.</li>
+<li><strong>Friendly Captcha:</strong> positioned as anti-friction; sub-hour native integration claims <a class="citation" href="#ref-13" aria-label="Reference 13">[13]</a>.</li>
+</ul>
+<p>All pricing and quota figures are as published at retrieval time (2026-11); re-verify at procurement.</p>
+<h4 class="subsubsection-title">Recommended stack for GrapMail</h4>
+<ol>
+<li><strong>Web:</strong> reCAPTCHA v2 checkbox - the literal reference experience - with siteverify gating before account creation <a class="citation" href="#ref-31" aria-label="Reference 31">[31]</a><a class="citation" href="#ref-1" aria-label="Reference 1">[1]</a><a class="citation" href="#ref-2" aria-label="Reference 2">[2]</a>. Badge visible by default; if hidden, include the required text <a class="citation" href="#ref-30" aria-label="Reference 30">[30]</a><a class="citation" href="#ref-41" aria-label="Reference 41">[41]</a>.</li>
+<li><strong>Android/iOS:</strong> reCAPTCHA Enterprise Mobile SDK as the frictionless baseline <a class="citation" href="#ref-26" aria-label="Reference 26">[26]</a><a class="citation" href="#ref-12" aria-label="Reference 12">[12]</a>, <strong>plus a WebView-hosted reCAPTCHA checkpoint for the onboarding "ACCOUNT PROTECTION" step</strong> to reproduce the visible checkbox/challenge UX with vendor-backed verification <a class="citation" href="#ref-17" aria-label="Reference 17">[17]</a>; Play Integrity and App Attest signals layer in where available <a class="citation" href="#ref-32" aria-label="Reference 32">[32]</a><a class="citation" href="#ref-33" aria-label="Reference 33">[33]</a>.</li>
+<li><strong>Fallback vendor:</strong> if a natively rendered mobile challenge ever becomes a hard requirement, hCaptcha's native SDKs are the documented alternative <a class="citation" href="#ref-19" aria-label="Reference 19">[19]</a><a class="citation" href="#ref-27" aria-label="Reference 27">[27]</a>, with explicit accessibility accommodations <a class="citation" href="#ref-37" aria-label="Reference 37">[37]</a>.</li>
+</ol>
+<p>Everything - every platform, every path - validates through one shared backend gate (Finding 5). The companion implementation guide specifies this stack component by component.</p>
+</section>
+<section class="section" id="synthesis-insights">
+<h2 class="section-title">Synthesis &amp; Insights</h2>
+<p>Five conclusions emerge when the findings are read together - each goes beyond what any single source states.</p>
+<p><strong>1. "Fake vs real" is a three-gate checklist, not an aesthetic judgment.</strong> The audit in Finding 6 shows the current screen fails challenge issuance, token validation, and server gating simultaneously. It is the conjunction of gate failures that makes a verification screen feel wrong to users, and the checklist gives GrapMail a repeatable test for any future change: if a design change cannot name which gate it strengthens, it is decoration <a class="citation" href="#ref-1" aria-label="Reference 1">[1]</a><a class="citation" href="#ref-2" aria-label="Reference 2">[2]</a><a class="citation" href="#ref-29" aria-label="Reference 29">[29]</a>.</p>
+<p><strong>2. The repair path is adoption, not construction.</strong> No product team builds its own challenge service; the cryptographic and detection machinery lives with specialist vendors, and the realness of a screen is inherited from <em>which pipeline stands behind it</em> plus <em>what the server does with the verdict</em> <a class="citation" href="#ref-1" aria-label="Reference 1">[1]</a><a class="citation" href="#ref-29" aria-label="Reference 29">[29]</a><a class="citation" href="#ref-32" aria-label="Reference 32">[32]</a>. GrapMail's engineering effort belongs in integration and enforcement - precisely where the current code does nothing.</p>
+<p><strong>3. The mobile parity paradox has one honest resolution.</strong> Google's documentation forbids expecting a native iOS checkbox <a class="citation" href="#ref-12" aria-label="Reference 12">[12]</a>; the only path to a screenshot-matching mobile challenge is a WebView-hosted one <a class="citation" href="#ref-17" aria-label="Reference 17">[17]</a>; and the platform-native default is frictionless scoring <a class="citation" href="#ref-15" aria-label="Reference 15">[15]</a>. The recommended design embraces both truths at once - visible WebView checkpoint at the high-stakes onboarding moment, invisible signals everywhere else, one server gate behind everything. That satisfies "exactly like the real one" in the only way reality permits: identical verification <em>semantics</em>, platform-appropriate <em>presentation</em>.</p>
+<p><strong>4. Unskippability is a server property - so "cutting the skip button" must be a server change.</strong> Removing the skip link is the visible quarter of the work; the rest is the verification record that clients cannot write and endpoints that refuse to advance without it <a class="citation" href="#ref-29" aria-label="Reference 29">[29]</a><a class="citation" href="#ref-33" aria-label="Reference 33">[33]</a>. This ordering matters: ship the gate first, or the UI change merely makes the fake look stricter.</p>
+<p><strong>5. The economics supply GrapMail's success metric.</strong> With farms solving at $1-$5 per thousand <a class="citation" href="#ref-7" aria-label="Reference 7">[7]</a> and AI frameworks operating at 420,000-site scale <a class="citation" href="#ref-9" aria-label="Reference 9">[9]</a>, "real" should be defined economically: make a fake GrapMail account cost more than it is worth, keep honest onboarding friction near zero, and treat verification error telemetry (expirations, duplicates, low scores) as the early-warning instrument <a class="citation" href="#ref-1" aria-label="Reference 1">[1]</a><a class="citation" href="#ref-2" aria-label="Reference 2">[2]</a><a class="citation" href="#ref-29" aria-label="Reference 29">[29]</a>. That metric survives contact with attackers better than any promise of elimination.</p>
+</section>
+<section class="section" id="limitations-caveats">
+<h2 class="section-title">Limitations &amp; Caveats</h2>
+<p><strong>Scope of validation.</strong> This run produced a research report plus an implementation blueprint and code. The code specifies exact integration points and follows vendor-documented contracts, but live end-to-end smoke tests against production reCAPTCHA/Play Integrity/App Attest backends were not performed inside this research workflow; the companion implementation guide carries the pre-launch test checklist that closes this gap.</p>
+<p><strong>Evidence quality tiers.</strong> Load-bearing platform facts come from primary documentation (Google, Apple, Cloudflare, W3C, Deque) <a class="citation" href="#ref-1" aria-label="Reference 1">[1]</a><a class="citation" href="#ref-2" aria-label="Reference 2">[2]</a><a class="citation" href="#ref-12" aria-label="Reference 12">[12]</a><a class="citation" href="#ref-26" aria-label="Reference 26">[26]</a><a class="citation" href="#ref-31" aria-label="Reference 31">[31]</a><a class="citation" href="#ref-32" aria-label="Reference 32">[32]</a><a class="citation" href="#ref-33" aria-label="Reference 33">[33]</a><a class="citation" href="#ref-35" aria-label="Reference 35">[35]</a><a class="citation" href="#ref-36" aria-label="Reference 36">[36]</a><a class="citation" href="#ref-38" aria-label="Reference 38">[38]</a>. Bypass economics and industry posture come from security-industry analysis and vendor research pages and are directional rather than measured universals <a class="citation" href="#ref-5" aria-label="Reference 5">[5]</a><a class="citation" href="#ref-6" aria-label="Reference 6">[6]</a><a class="citation" href="#ref-7" aria-label="Reference 7">[7]</a><a class="citation" href="#ref-8" aria-label="Reference 8">[8]</a><a class="citation" href="#ref-9" aria-label="Reference 9">[9]</a><a class="citation" href="#ref-10" aria-label="Reference 10">[10]</a>. Operational anecdotes - the WKWebView failures, the low-score volume reports - are community reports, flagged as such, not controlled measurements <a class="citation" href="#ref-40" aria-label="Reference 40">[40]</a><a class="citation" href="#ref-25" aria-label="Reference 25">[25]</a>. Vendor claims (WCAG 2.2 AA compliance, cost comparisons, "drop-in" compatibility) are recorded as claims; organizations should reproduce them under their own compliance and load-testing regimes <a class="citation" href="#ref-34" aria-label="Reference 34">[34]</a><a class="citation" href="#ref-37" aria-label="Reference 37">[37]</a><a class="citation" href="#ref-39" aria-label="Reference 39">[39]</a><a class="citation" href="#ref-19" aria-label="Reference 19">[19]</a>.</p>
+<p><strong>Time-sensitivity.</strong> All pricing and quota figures (10,000 assessments/month; 10,000 Play Integrity calls/day; hCaptcha Pro at $139/month) reflect published values at retrieval time (2026-11) and change without notice <a class="citation" href="#ref-29" aria-label="Reference 29">[29]</a><a class="citation" href="#ref-32" aria-label="Reference 32">[32]</a><a class="citation" href="#ref-34" aria-label="Reference 34">[34]</a>. Google's product naming continues to evolve - "reCAPTCHA" now lives inside the broader "Google Cloud Fraud Defense" platform - so document URLs and product labels may drift even though the integration surfaces used here remain documented <a class="citation" href="#ref-21" aria-label="Reference 21">[21]</a>. Third-party tutorials written before April 2, 2026 may still instruct showing Google Privacy/Terms links on the badge; current guidance removes them <a class="citation" href="#ref-42" aria-label="Reference 42">[42]</a>.</p>
+<p><strong>Technical caveats.</strong> The "about two minutes" token lifetime is a design constraint, not a guarantee - verify at submit and treat expirations as a normal UX event, not an error <a class="citation" href="#ref-1" aria-label="Reference 1">[1]</a><a class="citation" href="#ref-2" aria-label="Reference 2">[2]</a>. The WebView challenge path is demonstrated by Google's own mobile samples, but production hardening is required: origin allowlists, consistent user agents, and device-matrix testing before rollout - the same WebView mechanics have produced documented reliability failures for comparable widgets on some iOS devices <a class="citation" href="#ref-17" aria-label="Reference 17">[17]</a><a class="citation" href="#ref-35" aria-label="Reference 35">[35]</a><a class="citation" href="#ref-40" aria-label="Reference 40">[40]</a>. On iOS, "identical to the web checkbox" cannot be delivered natively; the closest legitimate parity is the WebView-hosted checkpoint, and acceptance criteria should be stated as identical verification semantics with comparable presentation <a class="citation" href="#ref-12" aria-label="Reference 12">[12]</a><a class="citation" href="#ref-17" aria-label="Reference 17">[17]</a>. Accessibility accommodations cannot rely on audio alone (90% crack rate; availability withdrawn in some deployments), so non-audio alternatives and a human support route are part of the requirement, not extras <a class="citation" href="#ref-36" aria-label="Reference 36">[36]</a><a class="citation" href="#ref-38" aria-label="Reference 38">[38]</a>. Attestation signals have their own limits - attestation farms exist, quotas are small, and keys are lost on reinstall <a class="citation" href="#ref-32" aria-label="Reference 32">[32]</a><a class="citation" href="#ref-33" aria-label="Reference 33">[33]</a>.</p>
+<p><strong>Code-audit caveats.</strong> The audit in Finding 6 reflects repository state on 2026-11-17 with specific line numbers; routine refactoring may shift them. All behavioral claims about the current implementation were verified directly against the source files during this run.</p>
+<p><strong>Out of scope.</strong> Jurisdiction-specific privacy/legal reviews (several regulators have examined captcha data flows), enterprise contract negotiations, adversarial penetration testing of the new stack, and abuse vectors unrelated to signup (for example credential stuffing against existing accounts) are not covered here.</p>
+<p><strong>Residual uncertainty.</strong> No vendor has committed to shipping a native visible-checkbox widget on iOS; if that changes, the mobile design simplifies. Until then, the WebView checkpoint is the documented path to visible mobile challenges <a class="citation" href="#ref-17" aria-label="Reference 17">[17]</a><a class="citation" href="#ref-12" aria-label="Reference 12">[12]</a>.</p>
+</section>
+<section class="section" id="recommendations">
+<h2 class="section-title">Recommendations</h2>
+<p>Ordered for execution; the companion implementation guide turns each into concrete code and configuration.</p>
+<h3 class="subsection-title">P0 - Make the gate real before making the screen pretty (server + skip removal)</h3>
+<ol>
+<li><strong>Backend gate first.</strong> Add a verification endpoint pair (issue/validate) that consumes the vendor response token exactly once inside its validity window and writes an authoritative, server-side verification record; then modify the registration/onboarding-complete endpoints to refuse any request lacking that record <a class="citation" href="#ref-1" aria-label="Reference 1">[1]</a><a class="citation" href="#ref-2" aria-label="Reference 2">[2]</a><a class="citation" href="#ref-29" aria-label="Reference 29">[29]</a>. Fail closed on all errors; log error codes (<code>timeout-or-duplicate</code>, <code>invalid-input-secret</code>, and so on) as security telemetry <a class="citation" href="#ref-1" aria-label="Reference 1">[1]</a><a class="citation" href="#ref-2" aria-label="Reference 2">[2]</a>.</li>
+<li><strong>Remove every skip path.</strong> Android: delete the <code>Text("Skip for now")</code> block and its caption (L179-183 region) and retire <code>markHumanVerified()</code>'s local-only semantics; iOS: delete the "Skip for now" control (L110 region) and ensure the continue callbacks cannot advance without the server-confirmed state; Web: nothing to remove - but the submit path must gain the gate <a class="citation" href="#ref-3" aria-label="Reference 3">[3]</a><a class="citation" href="#ref-4" aria-label="Reference 4">[4]</a>. Acceptance test: with the vendor check forced to fail, no client path completes signup or onboarding; with it passing, all paths complete within one interaction.</li>
+</ol>
+<h3 class="subsection-title">P1 - Ship real widgets on every surface</h3>
+<ol>
+<li><strong>Web:</strong> render the reCAPTCHA v2 checkbox in <code>SignUpForm</code> with the documented callback/expired/error contract, gate submit on a completed challenge, include the token in the register payload, and verify server-side before creating the account; keep badge/text branding compliant <a class="citation" href="#ref-31" aria-label="Reference 31">[31]</a><a class="citation" href="#ref-1" aria-label="Reference 1">[1]</a><a class="citation" href="#ref-2" aria-label="Reference 2">[2]</a><a class="citation" href="#ref-30" aria-label="Reference 30">[30]</a><a class="citation" href="#ref-41" aria-label="Reference 41">[41]</a>.</li>
+<li><strong>Android:</strong> add <code>com.google.android.recaptcha:recaptcha:18.9.4</code> (or newer), initialize the client in <code>Application.onCreate</code> (early, asynchronous), and call <code>execute()</code> with an action name at the checkpoint; replace <code>HumanVerifyScreen</code>'s decorative slider with the WebView-hosted challenge for the visible UX, and wire "continue" to the server validation result <a class="citation" href="#ref-26" aria-label="Reference 26">[26]</a><a class="citation" href="#ref-17" aria-label="Reference 17">[17]</a><a class="citation" href="#ref-24" aria-label="Reference 24">[24]</a>.</li>
+<li><strong>iOS:</strong> add the SPM dependency (minimum iOS 15, App Attest capability), initialize and <code>execute()</code> per the official pattern, host the visible challenge in the same WebView approach, and rewire <code>FinishScreens</code>' continue path to require the server-confirmed state <a class="citation" href="#ref-12" aria-label="Reference 12">[12]</a><a class="citation" href="#ref-16" aria-label="Reference 16">[16]</a><a class="citation" href="#ref-17" aria-label="Reference 17">[17]</a>.</li>
+<li><strong>Backend (mobile):</strong> create assessments with the recommended context fields (user agent, IP, fingerprints) for Enterprise tokens, and enforce single-use consumption across all platforms through one shared gate <a class="citation" href="#ref-29" aria-label="Reference 29">[29]</a><a class="citation" href="#ref-23" aria-label="Reference 23">[23]</a>.</li>
+</ol>
+<h3 class="subsection-title">P2 - Harden, measure, comply</h3>
+<ol>
+<li><strong>Layer attestation and policy:</strong> add Play Integrity verdicts on Android and App Attest assertions on iOS as scoring signals; implement the tiered policy (allow / allow with limits / allow with limits after challenge / deny) server-side; keep quotas in mind (10k/day Play Integrity) <a class="citation" href="#ref-32" aria-label="Reference 32">[32]</a><a class="citation" href="#ref-33" aria-label="Reference 33">[33]</a>.</li>
+<li><strong>Instrument the economics:</strong> dashboards for challenge completion rate, token expiry rate, duplicate-validation attempts, and score distributions; alert on anomalies - these are the sensors for farm activity <a class="citation" href="#ref-29" aria-label="Reference 29">[29]</a><a class="citation" href="#ref-25" aria-label="Reference 25">[25]</a>.</li>
+<li><strong>Accessibility and disclosure:</strong> document and enable the provider's accommodation paths (accessibility cookies/alternatives where applicable), provide a support route for users who cannot complete any challenge, and add the prescribed branding text wherever badges are hidden <a class="citation" href="#ref-37" aria-label="Reference 37">[37]</a><a class="citation" href="#ref-38" aria-label="Reference 38">[38]</a><a class="citation" href="#ref-41" aria-label="Reference 41">[41]</a><a class="citation" href="#ref-42" aria-label="Reference 42">[42]</a>.</li>
+<li><strong>Re-verify commercials at scale and keep a fallback:</strong> re-check pricing/quotas at contract time; if a natively rendered mobile challenge becomes a hard requirement, hCaptcha's native SDKs are the evidenced alternative <a class="citation" href="#ref-34" aria-label="Reference 34">[34]</a><a class="citation" href="#ref-19" aria-label="Reference 19">[19]</a><a class="citation" href="#ref-27" aria-label="Reference 27">[27]</a>.</li>
+</ol>
+<h3 class="subsection-title">Success criteria (economic framing)</h3>
+<p>The rollout is successful when: (a) a fake account costs more to create than the farm market rate implies it should ($1-$5 per 1,000 solves is the attacker baseline to beat in effort terms) <a class="citation" href="#ref-7" aria-label="Reference 7">[7]</a>; (b) honest onboarding conversion shows no material regression (visible challenges are the most expensive friction, so measure, do not assume) <a class="citation" href="#ref-7" aria-label="Reference 7">[7]</a>; (c) zero flows complete without a server-side verification record (enforced by canary tests in CI); and (d) verification error telemetry is quiet and monitored as the early-warning system <a class="citation" href="#ref-1" aria-label="Reference 1">[1]</a><a class="citation" href="#ref-2" aria-label="Reference 2">[2]</a><a class="citation" href="#ref-29" aria-label="Reference 29">[29]</a>.</p>
+</section>
+<section class="section bibliography" id="bibliography">
+<h2 class="section-title">Bibliography</h2>
+<p>All sources were retrieved on 2026-11-17; entries are in citation order.</p>
+<div class="bib-entry" id="ref-1"><span class="bib-number">[1]</span><div class="bib-text">Verify user response tokens with legacy SiteVerify (Google Cloud). <a class="external-link" href="https://docs.cloud.google.com/recaptcha/docs/verify" target="_blank" rel="noopener noreferrer">https://docs.cloud.google.com/recaptcha/docs/verify</a></div></div>
+<div class="bib-entry" id="ref-2"><span class="bib-number">[2]</span><div class="bib-text">Verifying the user's response (reCAPTCHA docs). <a class="external-link" href="https://developers.google.com/recaptcha/docs/verify" target="_blank" rel="noopener noreferrer">https://developers.google.com/recaptcha/docs/verify</a></div></div>
+<div class="bib-entry" id="ref-3"><span class="bib-number">[3]</span><div class="bib-text">hCaptcha Developer Guide. <a class="external-link" href="https://docs.hcaptcha.com" target="_blank" rel="noopener noreferrer">https://docs.hcaptcha.com</a></div></div>
+<div class="bib-entry" id="ref-4"><span class="bib-number">[4]</span><div class="bib-text">Recaptcha Verification Failed: Causes, Fixes, And Quick Checks. <a class="external-link" href="https://www.ituonline.com/blogs/troubleshooting-recaptcha-verification-failed-errors" target="_blank" rel="noopener noreferrer">https://www.ituonline.com/blogs/troubleshooting-recaptcha-verification-failed-errors</a></div></div>
+<div class="bib-entry" id="ref-5"><span class="bib-number">[5]</span><div class="bib-text">reCAPTCHA v2 vs. v3: An Outdated Approach to Bot Protection (DataDome). <a class="external-link" href="https://datadome.co/guides/captcha/recaptchav2-recaptchav3-efficient-bot-protection" target="_blank" rel="noopener noreferrer">https://datadome.co/guides/captcha/recaptchav2-recaptchav3-efficient-bot-protection</a></div></div>
+<div class="bib-entry" id="ref-6"><span class="bib-number">[6]</span><div class="bib-text">CAPTCHA Security in 2026: Proof-of-Work and Risk Signals (FriendlyCaptcha). <a class="external-link" href="https://friendlycaptcha.com/insights/captcha-security" target="_blank" rel="noopener noreferrer">https://friendlycaptcha.com/insights/captcha-security</a></div></div>
+<div class="bib-entry" id="ref-7"><span class="bib-number">[7]</span><div class="bib-text">Is CAPTCHA still effective, and what should you use instead? (Arcjet). <a class="external-link" href="https://arcjet.com/learn/captcha-alternatives" target="_blank" rel="noopener noreferrer">https://arcjet.com/learn/captcha-alternatives</a></div></div>
+<div class="bib-entry" id="ref-8"><span class="bib-number">[8]</span><div class="bib-text">What Is CAPTCHA? How It Works and 11 Types (Scrape.do). <a class="external-link" href="https://scrape.do/blog/captcha" target="_blank" rel="noopener noreferrer">https://scrape.do/blog/captcha</a></div></div>
+<div class="bib-entry" id="ref-9"><span class="bib-number">[9]</span><div class="bib-text">CAPTCHAs Lost to AkiraBot on 80,000 Sites (Louis Wright). <a class="external-link" href="https://louiswright.co.uk/writing/captcha-free-form-protection" target="_blank" rel="noopener noreferrer">https://louiswright.co.uk/writing/captcha-free-form-protection</a></div></div>
+<div class="bib-entry" id="ref-10"><span class="bib-number">[10]</span><div class="bib-text">What is CAPTCHA? Types and Examples (Wallarm). <a class="external-link" href="https://www.wallarm.com/what/what-is-captcha-types-and-examples" target="_blank" rel="noopener noreferrer">https://www.wallarm.com/what/what-is-captcha-types-and-examples</a></div></div>
+<div class="bib-entry" id="ref-11"><span class="bib-number">[11]</span><div class="bib-text">Integrating reCAPTCHA Enterprise into an iOS app (Ping Identity). <a class="external-link" href="https://developer.pingidentity.com/orchsdks/journey/use-cases/recaptcha-enterprise/ios-recaptcha-enterprise.html" target="_blank" rel="noopener noreferrer">https://developer.pingidentity.com/orchsdks/journey/use-cases/recaptcha-enterprise/ios-recaptcha-enterprise.html</a></div></div>
+<div class="bib-entry" id="ref-12"><span class="bib-number">[12]</span><div class="bib-text">Integrate Google Cloud Fraud Defense with iOS apps (Google Cloud). <a class="external-link" href="https://docs.cloud.google.com/recaptcha/docs/instrument-ios-apps" target="_blank" rel="noopener noreferrer">https://docs.cloud.google.com/recaptcha/docs/instrument-ios-apps</a></div></div>
+<div class="bib-entry" id="ref-13"><span class="bib-number">[13]</span><div class="bib-text">Mobile SDK for Android and iOS (Friendly Captcha). <a class="external-link" href="https://developer.friendlycaptcha.com/blog/mobile-sdk-for-android-ios" target="_blank" rel="noopener noreferrer">https://developer.friendlycaptcha.com/blog/mobile-sdk-for-android-ios</a></div></div>
+<div class="bib-entry" id="ref-14"><span class="bib-number">[14]</span><div class="bib-text">ReCaptcha implementation in iOS Native app (Stack Overflow). <a class="external-link" href="https://stackoverflow.com/questions/75873895/recaptcha-implementation-in-ios-native-app" target="_blank" rel="noopener noreferrer">https://stackoverflow.com/questions/75873895/recaptcha-implementation-in-ios-native-app</a></div></div>
+<div class="bib-entry" id="ref-15"><span class="bib-number">[15]</span><div class="bib-text">Introducing reCAPTCHA Enterprise's Mobile SDK (Google Cloud Blog). <a class="external-link" href="https://cloud.google.com/blog/products/identity-security/introducing-recaptcha-enterprises-mobile-sdk-to-help-protect-ios-android-apps" target="_blank" rel="noopener noreferrer">https://cloud.google.com/blog/products/identity-security/introducing-recaptcha-enterprises-mobile-sdk-to-help-protect-ios-android-apps</a></div></div>
+<div class="bib-entry" id="ref-16"><span class="bib-number">[16]</span><div class="bib-text">RecaptchaEnterprise - Swift Package Registry. <a class="external-link" href="https://swiftpackageregistry.com/GoogleCloudPlatform/recaptcha-enterprise-mobile-sdk" target="_blank" rel="noopener noreferrer">https://swiftpackageregistry.com/GoogleCloudPlatform/recaptcha-enterprise-mobile-sdk</a></div></div>
+<div class="bib-entry" id="ref-17"><span class="bib-number">[17]</span><div class="bib-text">recaptcha-enterprise-mobile-sdk (GitHub). <a class="external-link" href="https://github.com/googlecloudplatform/recaptcha-enterprise-mobile-sdk" target="_blank" rel="noopener noreferrer">https://github.com/googlecloudplatform/recaptcha-enterprise-mobile-sdk</a></div></div>
+<div class="bib-entry" id="ref-18"><span class="bib-number">[18]</span><div class="bib-text">Developer's Guide - reCAPTCHA (Google for Developers). <a class="external-link" href="https://developers.google.com/recaptcha/intro" target="_blank" rel="noopener noreferrer">https://developers.google.com/recaptcha/intro</a></div></div>
+<div class="bib-entry" id="ref-19"><span class="bib-number">[19]</span><div class="bib-text">Mobile App SDKs (hCaptcha docs). <a class="external-link" href="https://docs.hcaptcha.com/mobile_app_sdks" target="_blank" rel="noopener noreferrer">https://docs.hcaptcha.com/mobile_app_sdks</a></div></div>
+<div class="bib-entry" id="ref-20"><span class="bib-number">[20]</span><div class="bib-text">Integrate with Google reCAPTCHA Enterprise (Ping SDKs). <a class="external-link" href="https://docs.pingidentity.com/sdks/latest/sdks/integrations/integrate-with-recaptcha-enterprise.html" target="_blank" rel="noopener noreferrer">https://docs.pingidentity.com/sdks/latest/sdks/integrations/integrate-with-recaptcha-enterprise.html</a></div></div>
+<div class="bib-entry" id="ref-21"><span class="bib-number">[21]</span><div class="bib-text">reCAPTCHA website security and fraud protection (Google Cloud). <a class="external-link" href="https://cloud.google.com/security/products/recaptcha" target="_blank" rel="noopener noreferrer">https://cloud.google.com/security/products/recaptcha</a></div></div>
+<div class="bib-entry" id="ref-22"><span class="bib-number">[22]</span><div class="bib-text">App Check with reCAPTCHA Enterprise on Android (Firebase). <a class="external-link" href="https://firebase.google.com/docs/app-check/android/recaptcha-enterprise-provider" target="_blank" rel="noopener noreferrer">https://firebase.google.com/docs/app-check/android/recaptcha-enterprise-provider</a></div></div>
+<div class="bib-entry" id="ref-23"><span class="bib-number">[23]</span><div class="bib-text">Setup overview for mobile applications (Google Cloud). <a class="external-link" href="https://docs.cloud.google.com/recaptcha/docs/setup-overview-mobile" target="_blank" rel="noopener noreferrer">https://docs.cloud.google.com/recaptcha/docs/setup-overview-mobile</a></div></div>
+<div class="bib-entry" id="ref-24"><span class="bib-number">[24]</span><div class="bib-text">Critical security vulnerability in reCAPTCHA Enterprise (Stack Overflow). <a class="external-link" href="https://stackoverflow.com/questions/77798636/critical-security-vulnerability-in-recaptcha-enterprise" target="_blank" rel="noopener noreferrer">https://stackoverflow.com/questions/77798636/critical-security-vulnerability-in-recaptcha-enterprise</a></div></div>
+<div class="bib-entry" id="ref-25"><span class="bib-number">[25]</span><div class="bib-text">Increase in low reCAPTCHA Enterprise scores (Google Cloud Community). <a class="external-link" href="https://security.googlecloudcommunity.com/fraud-defense-recaptcha-6/increase-in-low-recaptcha-enterprise-scores-7583" target="_blank" rel="noopener noreferrer">https://security.googlecloudcommunity.com/fraud-defense-recaptcha-6/increase-in-low-recaptcha-enterprise-scores-7583</a></div></div>
+<div class="bib-entry" id="ref-26"><span class="bib-number">[26]</span><div class="bib-text">Integrate Google Cloud Fraud Defense with Android apps (Google Cloud). <a class="external-link" href="https://docs.cloud.google.com/recaptcha/docs/instrument-android-apps" target="_blank" rel="noopener noreferrer">https://docs.cloud.google.com/recaptcha/docs/instrument-android-apps</a></div></div>
+<div class="bib-entry" id="ref-27"><span class="bib-number">[27]</span><div class="bib-text">SafetyNet reCAPTCHA API (Android Developers). <a class="external-link" href="https://developer.android.com/privacy-and-security/safetynet/recaptcha" target="_blank" rel="noopener noreferrer">https://developer.android.com/privacy-and-security/safetynet/recaptcha</a></div></div>
+<div class="bib-entry" id="ref-28"><span class="bib-number">[28]</span><div class="bib-text">App Check with reCAPTCHA Enterprise in web apps (Firebase). <a class="external-link" href="https://firebase.google.com/docs/app-check/web/recaptcha-enterprise-provider" target="_blank" rel="noopener noreferrer">https://firebase.google.com/docs/app-check/web/recaptcha-enterprise-provider</a></div></div>
+<div class="bib-entry" id="ref-29"><span class="bib-number">[29]</span><div class="bib-text">Create assessments for mobile applications (Google Cloud). <a class="external-link" href="https://docs.cloud.google.com/recaptcha/docs/create-assessment-mobile" target="_blank" rel="noopener noreferrer">https://docs.cloud.google.com/recaptcha/docs/create-assessment-mobile</a></div></div>
+<div class="bib-entry" id="ref-30"><span class="bib-number">[30]</span><div class="bib-text">reCAPTCHA branding guidelines (Google for Developers). <a class="external-link" href="https://developers.google.com/recaptcha/docs/branding" target="_blank" rel="noopener noreferrer">https://developers.google.com/recaptcha/docs/branding</a></div></div>
+<div class="bib-entry" id="ref-31"><span class="bib-number">[31]</span><div class="bib-text">reCAPTCHA v2 (display) - Google for Developers. <a class="external-link" href="https://developers.google.com/recaptcha/docs/display" target="_blank" rel="noopener noreferrer">https://developers.google.com/recaptcha/docs/display</a></div></div>
+<div class="bib-entry" id="ref-32"><span class="bib-number">[32]</span><div class="bib-text">Overview of the Play Integrity API (Android Developers). <a class="external-link" href="https://developer.android.com/google/play/integrity/overview" target="_blank" rel="noopener noreferrer">https://developer.android.com/google/play/integrity/overview</a></div></div>
+<div class="bib-entry" id="ref-33"><span class="bib-number">[33]</span><div class="bib-text">Establishing your app's integrity (Apple Developer). <a class="external-link" href="https://developer.apple.com/documentation/devicecheck/establishing-your-app-s-integrity" target="_blank" rel="noopener noreferrer">https://developer.apple.com/documentation/devicecheck/establishing-your-app-s-integrity</a></div></div>
+<div class="bib-entry" id="ref-34"><span class="bib-number">[34]</span><div class="bib-text">hCaptcha Pricing - Pro &amp; Enterprise Plans. <a class="external-link" href="https://www.hcaptcha.com/pricing" target="_blank" rel="noopener noreferrer">https://www.hcaptcha.com/pricing</a></div></div>
+<div class="bib-entry" id="ref-35"><span class="bib-number">[35]</span><div class="bib-text">Mobile implementation - Cloudflare Turnstile docs. <a class="external-link" href="https://developers.cloudflare.com/turnstile/get-started/mobile-implementation" target="_blank" rel="noopener noreferrer">https://developers.cloudflare.com/turnstile/get-started/mobile-implementation</a></div></div>
+<div class="bib-entry" id="ref-36"><span class="bib-number">[36]</span><div class="bib-text">Inaccessibility of CAPTCHA - W3C Working Group Note. <a class="external-link" href="https://www.w3.org/TR/turingtest" target="_blank" rel="noopener noreferrer">https://www.w3.org/TR/turingtest</a></div></div>
+<div class="bib-entry" id="ref-37"><span class="bib-number">[37]</span><div class="bib-text">Accessibility - hCaptcha. <a class="external-link" href="https://www.hcaptcha.com/accessibility" target="_blank" rel="noopener noreferrer">https://www.hcaptcha.com/accessibility</a></div></div>
+<div class="bib-entry" id="ref-38"><span class="bib-number">[38]</span><div class="bib-text">CAPTCHA - Web Accessibility Checklist (Deque). <a class="external-link" href="https://dequeuniversity.com/checklists/web/captcha" target="_blank" rel="noopener noreferrer">https://dequeuniversity.com/checklists/web/captcha</a></div></div>
+<div class="bib-entry" id="ref-39"><span class="bib-number">[39]</span><div class="bib-text">Accessible CAPTCHA - Friendly Captcha. <a class="external-link" href="https://friendlycaptcha.com/accessibility" target="_blank" rel="noopener noreferrer">https://friendlycaptcha.com/accessibility</a></div></div>
+<div class="bib-entry" id="ref-40"><span class="bib-number">[40]</span><div class="bib-text">Turnstile no longer working inside of iOS apps (in WKWebView) - Cloudflare Community. <a class="external-link" href="https://community.cloudflare.com/t/turnstile-no-longer-working-inside-of-ios-apps-in-wkwebview/637940" target="_blank" rel="noopener noreferrer">https://community.cloudflare.com/t/turnstile-no-longer-working-inside-of-ios-apps-in-wkwebview/637940</a></div></div>
+<div class="bib-entry" id="ref-41"><span class="bib-number">[41]</span><div class="bib-text">reCAPTCHA FAQ - Google for Developers. <a class="external-link" href="https://developers.google.com/recaptcha/docs/faq" target="_blank" rel="noopener noreferrer">https://developers.google.com/recaptcha/docs/faq</a></div></div>
+<div class="bib-entry" id="ref-42"><span class="bib-number">[42]</span><div class="bib-text">Frequently Asked Questions - Google Cloud Fraud Defense. <a class="external-link" href="https://docs.cloud.google.com/recaptcha/docs/faq" target="_blank" rel="noopener noreferrer">https://docs.cloud.google.com/recaptcha/docs/faq</a></div></div>
+</section>
+<section class="section" id="appendix-a-research-methodology">
+<h2 class="section-title">Appendix A - Research Methodology</h2>
+<p>This report was produced under the deep-research workflow on 2026-11-17, in four stages. <strong>Scope</strong>: eight sub-questions fixed the research space - verification mechanics; mobile SDK reality; alternative vendors; server-side enforcement; bypass economics; accessibility and compliance; vendor selection and costs; and the GrapMail implementation blueprint. <strong>Collection</strong>: a multi-wave search program covered each sub-question, with primary vendor documentation (Google Cloud, Apple, Cloudflare, hCaptcha, W3C, Deque) preferred over tutorials and community reports; 42 sources were registered with stable identifiers and 64+ verbatim evidence quotes were extracted with locators, preserved as machine-readable records (<code>sources.jsonl</code>, <code>evidence.jsonl</code>) alongside readable indexes (<code>citation_map.md</code>, <code>bibliography.md</code>) in the research workspace. <strong>Triangulation</strong>: each load-bearing claim requires either multiple independent sources or a primary vendor document; disagreements - vendor cost comparisons, Cloudflare community reliability reports, low-score volume anecdotes - were recorded as caveats rather than averaged away. <strong>Audit</strong>: the assessment of the existing implementation (Finding 6) was performed directly against the GrapMail codebase - Android Kotlin, iOS Swift, and the Next.js web application - with file-and-line evidence captured during this run; no behavior was asserted without reading the corresponding source.</p>
+<p>All web retrieval occurred on 2026-11-17; time-sensitive figures (pricing, quotas, SDK versions) reflect that date and should be re-verified at procurement. This report is the research half of the engagement; the companion implementation kit (guide + code) is delivered alongside it.</p>
+</section>
+<section class="section" id="appendix-b-deliverables-and-file-map">
+<h2 class="section-title">Appendix B - Deliverables and File Map</h2>
+<p>The engagement deliverable set, and where each item lives:</p>
+<ol>
+<li><strong>Research report</strong> - <code>research_report_20261117_grapmail-human-verification.md</code> together with its rendered <code>research_report_20261117_grapmail-human-verification.html</code>; delivered in <code>/mnt/cos/artifacts/</code> and copied into the <code>@Grapsee All Time</code> and <code>@grapmail-mobile</code> project folders.</li>
+<li><strong>Implementation guide</strong> - <code>IMPLEMENTATION-GUIDE.md</code>: architecture, per-platform step-by-step integration (web, Android, iOS, backend), exact integration points from the audited repositories, key management, and the pre-launch test checklist.</li>
+<li><strong>Code kit</strong> - ready-to-apply source files per platform: web (reCAPTCHA v2 component, <code>SignUpForm</code> integration, <code>verify-human</code> API route), Android (<code>RecaptchaManager</code>, <code>HumanVerifyScreen</code> replacement, <code>SignUpViewModel</code> changes), iOS (<code>HumanVerificationViewModel</code>, <code>FinishScreens</code> changes, <code>RootView</code> wiring), and backend (shared verification gate + register gating).</li>
+<li><strong>Evidence data</strong> - <code>sources.jsonl</code> (42 registered sources), <code>evidence.jsonl</code> (64+ quotes), <code>citation_map.md</code>, <code>bibliography.md</code>, <code>triangulation.md</code>, and the fetched vendor documentation notes under <code>deep-research/20261117-humanverify/</code>.</li>
+</ol>
+<p>Acceptance framing: every numbered citation in this report traces to a URL in the Bibliography; the audit's line references can be checked against the repositories; and the code kit's integration points match the audited file paths.</p>
+<p>&lt;!--END--&gt;</p>
+</section>
+    </main>
+    <footer class="report-footer">Generated as a standalone, citation-preserving research report.</footer>
+  </article>
+</body>
+</html>

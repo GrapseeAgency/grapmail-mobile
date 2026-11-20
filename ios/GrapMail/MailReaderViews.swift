@@ -106,6 +106,18 @@ struct ThreadView: View {
                             .padding(.horizontal, 18)
                             .padding(.vertical, 4)
                     }
+                    MailSmartPanelView(
+                        message: activeMessage,
+                        threadMessages: vm.thread.messages.map { m in
+                            ThreadMessageText(
+                                senderName: m.from?.name ?? m.from?.address ?? "",
+                                body: m.bodyText ?? "",
+                                fromMe: m.direction == "outbound")
+                        })
+                    SmartReplyStrip(body: activeMessage.bodyText ?? "") { suggestion in
+                        MailFeaturePrefs.shared.stageInsert(suggestion)
+                        onReply(activeMessage.id, "reply")
+                    }
                     replyBar(for: activeMessage)
                     MailBottomBar(inboxSelected: true, unread: vm.state.unreadCount,
                                   onMail: onBack, onContacts: onContacts, overList: false)
@@ -333,6 +345,10 @@ private struct ThreadMessageCard: View {
     /// The share sheet's own presentation state. The sheet is the system's, so
     /// this app only ever knows that it was asked for.
     @State private var showShare = false
+    /// The menu's spam and block calls answer on the card the same way the
+    /// handoff affordances do; a block files nothing, so without a line the
+    /// button would look like it did nothing.
+    @State private var decisionNote: String?
     /// The images the sender's HTML part points at, and whether this message has
     /// asked for them. Both belong to the message, and the card is rebuilt per
     /// message -- an opt-in given for one mail must not travel to the next.
@@ -373,6 +389,9 @@ private struct ThreadMessageCard: View {
                 if let handoffNote {
                     Text(handoffNote).font(.system(size: 12)).foregroundColor(GM.error)
                 }
+                if let decisionNote {
+                    Text(decisionNote).font(.system(size: 12)).foregroundColor(GM.textSecondary)
+                }
             } else {
                 Button(action: onExpand) {
                     senderHeader
@@ -400,6 +419,11 @@ private struct ThreadMessageCard: View {
                     sender: message.from?.address?.nilIfBlank()
                         ?? (message.from?.display ?? "").nilIfBlank(),
                     url: unsub,
+                    onOneClick: (message.unsubscribe?.oneClickAdvertised == true
+                                    && message.from?.address?.nilIfBlank() != nil)
+                        ? ({ showUnsub = false
+                             vm.unsubscribeOneClick(address: message.from?.address ?? "", url: unsub) { unsubNote = $0 } })
+                        : nil,
                     onOpen: {
                         showUnsub = false
                         // Only what this app witnessed is reported. Whether the
@@ -543,6 +567,19 @@ private struct ThreadMessageCard: View {
                         printMessageText(message, formattedText: formattedBody?.bodyText) { handoffNote = $0 }
                     }
                     .accessibilityIdentifier("mail-print")
+                    Button("Report spam") {
+                        vm.actOn(message.id, .spam) { decisionNote = $0 ?? "Moved to spam." }
+                    }
+                    .accessibilityIdentifier("mail-report-spam")
+                    Button("Block sender") {
+                        guard let sender = message.from?.address?.nilIfBlank()
+                                ?? (message.from?.display ?? "").nilIfBlank() else {
+                            decisionNote = "This message does not name a sender to block."
+                            return
+                        }
+                        vm.blockSender(sender) { decisionNote = $0 }
+                    }
+                    .accessibilityIdentifier("mail-block-sender")
                 } label: {
                     Image(systemName: "ellipsis")
                         .font(.system(size: 18, weight: .semibold))
@@ -963,6 +1000,26 @@ struct ComposeView: View {
                 }
             }
             contactCandidates = await vm.people()
+            if let staged = MailFeaturePrefs.shared.consumeStagedInsert() {
+                vm.composeSeed { s in
+                    if s.body.isEmpty {
+                        s.body = staged
+                    } else if !s.body.contains(staged) {
+                        s.body = staged + "\n\n" + s.body
+                    }
+                }
+            }
+            UserDefaults.standard.set(false, forKey: "gm.pendingFollowUp")
+        }
+        .onChange(of: vm.compose.accepted) { accepted in
+            guard accepted else { return }
+            if UserDefaults.standard.bool(forKey: "gm.pendingFollowUp"),
+               let threadId = vm.compose.inReplyTo {
+                UserDefaults.standard.set(false, forKey: "gm.pendingFollowUp")
+                MailFeaturePrefs.shared.markAwaitingReply(
+                    threadId: threadId,
+                    title: vm.compose.subject.isEmpty ? "(no subject)" : vm.compose.subject)
+            }
         }
         .accessibilityIdentifier("mail-compose-screen")
     }
@@ -1039,6 +1096,14 @@ struct ComposeView: View {
             field(label: "Bcc", key: \MailboxModel.ComposeState.bcc, placeholder: "Addresses", tag: "mail-bcc")
         }
         field(label: "Subject", key: \MailboxModel.ComposeState.subject, placeholder: "Add a subject", tag: "mail-subject")
+        // F10 templates, F11 rewrite, F12 reminder: the compose shelf, bound to the same state the fields edit.
+        MailComposeTools(
+            subject: Binding(
+                get: { vm.compose.subject },
+                set: { value in vm.composeUpdate { $0.subject = value } }),
+            body: Binding(
+                get: { vm.compose.body },
+                set: { value in vm.composeUpdate { $0.body = value } }))
         Divider().overlay(GM.border)
         // The encrypt row. The states are the web compose's own, and Android's:
         // a device with no key never sees the option; a locked key says what
@@ -1388,6 +1453,10 @@ struct ComposeView: View {
 struct UnsubscribeSheet: View {
     let sender: String?
     let url: String
+    /// Present only when the list advertised a one-click request AND the
+    /// message names a sender address to put in it. The button sends nothing
+    /// by itself — the closure does, through the account's own server.
+    var onOneClick: (() -> Void)? = nil
     let onOpen: () -> Void
     let onCancel: () -> Void
 
@@ -1410,6 +1479,16 @@ struct UnsubscribeSheet: View {
             Spacer(minLength: 10)
             GradientButton(title: "Open in my browser", action: onOpen)
                 .padding(.horizontal, 20)
+            if let onOneClick {
+                Text("This list also advertises a one-click request: nothing opens, and "
+                     + "GrapMail's server sends the exact POST the list asked for. Whether "
+                     + "the list acts on it is not visible from here.")
+                    .font(.system(size: 13)).foregroundColor(GM.textSecondary)
+                    .lineSpacing(5)
+                    .padding(.horizontal, 20).padding(.vertical, 6)
+                GradientButton(title: "Unsubscribe in one click", action: onOneClick)
+                    .padding(.horizontal, 20)
+            }
             Button(action: onCancel) {
                 Text("Cancel")
                     .font(.system(size: 15)).foregroundColor(GM.textTertiary)

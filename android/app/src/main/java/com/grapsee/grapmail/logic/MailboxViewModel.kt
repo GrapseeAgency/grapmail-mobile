@@ -2700,6 +2700,56 @@ class MailboxViewModel @JvmOverloads constructor(
         else -> e.message ?: "Couldn't reach your mailbox."
     }
 
+    /**
+     * Send the one-click unsubscribe the list advertised, through the app's own
+     * server. This is not a message action: nothing in the mailbox moves, and
+     * the only thing this can report is what it witnessed — the request was
+     * accepted for delivery. What the list does with it is not observable from
+     * here, so the note never says "unsubscribed".
+     */
+    fun unsubscribeOneClick(address: String, url: String, then: (String) -> Unit) {
+        viewModelScope.launch {
+            val t = token() ?: run {
+                then("Sign in again to unsubscribe.")
+                return@launch
+            }
+            runCatching { Api.mailUnsubscribeOneClick(t, address, url) }
+                .onSuccess { r ->
+                    then(
+                        if (r.success) "One-click request sent — the list's answer is not visible from here."
+                        else r.error ?: "The one-click request was not accepted."
+                    )
+                }
+                .onFailure { e ->
+                    if (e is kotlinx.coroutines.CancellationException) throw e
+                    then(mailReason(e))
+                }
+        }
+    }
+
+    /**
+     * Record a standing decision against one sender: future mail is refused at
+     * the door. The confirmation reuses the decision's own sentence so the two
+     * doors cannot drift, and nothing in front of the user moves — the same
+     * rule the screener queue keeps.
+     */
+    fun blockSender(sender: String, then: (String) -> Unit) {
+        viewModelScope.launch {
+            val t = token() ?: run {
+                then("Sign in again to decide on this sender.")
+                return@launch
+            }
+            runCatching { Api.mailScreenerDecision(t, sender, MailSenderScope.Address, MailDecision.Blocked) }
+                .onSuccess { r ->
+                    then(if (r.success) "Blocked. " + MailDecision.Blocked.note else r.error ?: "The server refused that decision.")
+                }
+                .onFailure { e ->
+                    if (e is kotlinx.coroutines.CancellationException) throw e
+                    then(mailReason(e))
+                }
+        }
+    }
+
     // ── snapshot host only ───────────────────────────────────────────────────
     //
     // The mailbox's state is written by its loaders and nothing else. These four

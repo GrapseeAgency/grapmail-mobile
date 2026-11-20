@@ -1,0 +1,31 @@
+FAIL: hybrid artifacts present:
+.local/skills/artifacts/artifacts/expo/files/app/(tabs)/_layout.tsx
+.local/skills/artifacts/artifacts/expo/files/app/(tabs)/index.tsx
+.local/skills/artifacts/artifacts/expo/files/app/+not-found.tsx
+.local/skills/artifacts/artifacts/expo/files/app/_layout.tsx
+.local/skills/artifacts/artifacts/expo/files/components/ErrorBoundary.tsx
+.local/skills/artifacts/artifacts/expo/files/components/ErrorFallback.tsx
+.local/skills/artifacts/artifacts/expo/files/components/KeyboardAwareScrollViewCompat.tsx
+.local/skills/artifacts/artifacts/expo/files/metro.config.js
+.local/skills/artifacts/artifacts/mockup-sandbox/files/src/App.tsx
+.local/skills/artifacts/artifacts/mockup-sandbox/files/src/components/ui/accordion.tsx
+.local/skills/artifacts/artifacts/mockup-sandbox/files/src/components/ui/alert-dialog.tsx
+.local/skills/artifacts/artifacts/mockup-sandbox/files/src/components/ui/alert.tsx
+.local/skills/artifacts/artifacts/mockup-sandbox/files/src/components/ui/aspect-ratio.tsx
+.local/skills/artifacts/artifacts/mockup-sandbox/files/src/components/ui/avatar.tsx
+.local/skills/artifacts/artifacts/mockup-sandbox/files/src/components/ui/badge.tsx
+.local/skills/artifacts/artifacts/mockup-sandbox/files/src/components/ui/breadcrumb.tsx
+.local/skills/artifacts/artifacts/mockup-sandbox/files/src/components/ui/button-group.tsx
+.local/skills/artifacts/artifacts/mockup-sandbox/files/src/components/ui/button.tsx
+.local/skills/artifacts/artifacts/mockup-sandbox/files/src/components/ui/calendar.tsx
+.local/skills/artifacts/artifacts/mockup-sandbox/files/src/components/ui/card.tsx
+PASS: no hybrid framework tokens in ios/ + android/ sources
+INFO: WebKit usage iOS=0 (budget 5) | WebView usage Android=0 (budget 5)
+FAIL: ios/project.yml missing
+FAIL: android Gradle Kotlin DSL missing
+FAIL: no Swift sources
+FAIL: no Kotlin sources
+WARN: Java sources present — still native, but review (Kotlin is the project standard)
+----
+RESULT: fails=5 warns=1
+NATIVE-GUARDRAIL: FAIL

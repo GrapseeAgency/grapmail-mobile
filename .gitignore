@@ -13,6 +13,11 @@ ios/DerivedData/
 ios/**/xcuserdata/
 *.xcresult
 
+# Release artifacts staged locally for the Releases page. The workflow stages
+# them on the runner; a committed copy is 16MB of binary that changes every
+# build and cannot be reviewed as a diff.
+download/
+
 # Screenshots from local runs (CI uploads them as artifacts)
 screenshots/
 welcome-shots/

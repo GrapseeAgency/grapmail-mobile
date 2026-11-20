@@ -1,0 +1,806 @@
+import XCTest
+import CoreGraphics
+import Foundation
+
+/// The live signup walk on a real iOS simulator — the same walk the Android
+/// CI runs. Creates a real account against the live API and screenshots
+/// every screen into the result bundle (kept via XCTAttachment).
+/// Assertions are HARD (continueAfterFailure = false): a screen that fails
+/// to render or a control that never appears fails the run — the v1 test
+/// soft-skipped every step and would pass green on a dead build.
+final class ScreenshotWalkUITests: XCTestCase {
+
+    override func setUp() {
+        continueAfterFailure = false
+    }
+
+    private var app: XCUIApplication!
+
+    private func snap(_ name: String) {
+        let attachment = XCTAttachment(screenshot: app.screenshot())
+        attachment.name = name
+        attachment.lifetime = .keepAlways
+        add(attachment)
+    }
+
+    /// Wait for an element and fail with its name if it never appears.
+    /// On failure, dump the visible static texts and fields first — CI logs
+    /// are the only place to see WHICH screen the walk actually reached
+    /// (the 'missing: field yourname' failure was undiagnosable from the
+    /// bare assertion alone).
+    @discardableResult
+    private func require(_ element: XCUIElement, _ what: String, timeout: TimeInterval = 6) -> XCUIElement {
+        if !element.waitForExistence(timeout: timeout) {
+            let texts = app.staticTexts.allElementsBoundByIndex.map { $0.label }
+            let fields = app.textFields.allElementsBoundByIndex.map { $0.label }
+            let secure = app.secureTextFields.allElementsBoundByIndex.count
+            let buttons = app.buttons.allElementsBoundByIndex.map { $0.label }
+            print("WALK-FAIL \(what) | texts: \(texts) | fields: \(fields) | secureCount: \(secure) | buttons: \(buttons)")
+            snap("fail-\(what.replacingOccurrences(of: " ", with: "-"))")
+        }
+        XCTAssertTrue(element.waitForExistence(timeout: 1), "missing: \(what)")
+        return element
+    }
+
+    private func tap(_ element: XCUIElement, _ what: String, timeout: TimeInterval = 6) {
+        require(element, what, timeout: timeout).tap()
+    }
+
+    private func typeIntoTextField(_ identifier: String, _ value: String) {
+        focusAndType(app.textFields[identifier].firstMatch, "field \(identifier)", value)
+        if app.keyboards.buttons["return"].exists { app.keyboards.buttons["return"].tap() }
+        // Terminal fields close the keyboard on return themselves; if it
+        // somehow stays up, resign focus on an inert tap before returning.
+        inertDismiss()
+    }
+
+    /// Tap a field until it actually has the keyboard, then type.
+    ///
+    /// `typeText` synthesises its key events into whatever holds focus, so on a
+    /// tap that landed a fraction before the keyboard attached it fails the run
+    /// with "Neither element nor any descendant has keyboard focus" — which is
+    /// what killed a whole green-capable run at its very first field. The
+    /// keyboard appearing IS the proof of focus, so wait for it and retry the
+    /// tap rather than typing blind and losing the run to a race.
+    private func focusAndType(_ field: XCUIElement, _ what: String, _ value: String) {
+        for attempt in 1...4 {
+            tap(field, what)
+            if waitForKeyboard(timeout: 3) {
+                field.typeText(value)
+                return
+            }
+            print("WALK-KEYBOARD \(what): no keyboard after tap \(attempt)")
+            usleep(300_000)
+        }
+        XCTFail("tapping \(what) never raised the keyboard")
+    }
+
+    private func waitForKeyboard(timeout: TimeInterval) -> Bool {
+        let deadline = Date().addingTimeInterval(timeout)
+        while Date() < deadline {
+            if app.keyboards.count > 0 { return true }
+            usleep(150_000)
+        }
+        return app.keyboards.count > 0
+    }
+
+    /// Best-effort keyboard resignation that never fails the walk. On the
+    /// wizard the inert 'CREATE ACCOUNT' eyebrow band closes the keyboard; on
+    /// the sign-in fallback that band does not exist, so tap the inert
+    /// top-center header band instead. No assertion: if the keyboard lingers,
+    /// the next control tap (a ScrollView element) auto-scrolls into view
+    /// above the keyboard anyway. Asserting here is what broke the walk
+    /// ('missing: inert header band') the moment it reached the sign-in screen.
+    private func inertDismiss() {
+        guard app.keyboards.count > 0 else { return }
+        let eyebrow = app.staticTexts["CREATE ACCOUNT"].firstMatch
+        if eyebrow.exists { eyebrow.tap() }
+        let deadline = Date().addingTimeInterval(1.5)
+        while app.keyboards.count > 0 && Date() < deadline {
+            app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.06)).tap()
+            usleep(200_000)
+        }
+    }
+
+    func testSignupWalkScreenshots() {
+        // One linear test on purpose: XCTest runs methods alphabetically, so
+        // separate walk / restore / sign-in methods would execute out of
+        // order (restore before signup). This mirrors the Android walk script.
+        app = XCUIApplication()
+        app.launch()
+
+        // Welcome
+        tap(app.buttons["Create Account"].firstMatch, "Create Account")
+        typeIntoTextField("Enter your first name", "Arafat")
+        typeIntoTextField("Enter your last name", "Hossain")
+        snap("02-step1-name-light")
+        tap(app.buttons["Next"].firstMatch, "Next (step 1)")
+
+        // Step 2 — basic info: menu pickers + gender chip
+        require(app.staticTexts["Basic Info"].firstMatch, "Step 2 header")
+        // All three picks are index 1 — the panel's first item — at one shared
+        // offset: January 1, 2013 is a valid 13-year-old date. pickInline
+        // asserts the row label changed: a missed geometry tap used to leave
+        // the birthday empty, Next silently disabled (GradientButton guards
+        // its action), and the walk died two steps later on 'yourname'.
+        pickInline("Month", "January")
+        pickInline("Day", "1")
+        pickInline("Year", "2013")
+        tap(app.buttons["Female"].firstMatch, "Female chip")
+        snap("03-step2-basicinfo-light")
+        tap(app.buttons["Next"].firstMatch, "Next (step 2)")
+
+        // Step 3 — address (custom unique handle)
+        require(app.staticTexts["Choose your GrapMail address"].firstMatch, "Step 3 header", timeout: 10)
+        typeIntoTextField("yourname", "e2eios" + String(Int(Date().timeIntervalSince1970) % 1000000))
+        sleep(3) // live availability check
+        snap("04-step3-address-light")
+        tap(app.buttons["Next"].firstMatch, "Next (step 3)", timeout: 10)
+
+        // Step 4 — password. SecureField has no onSubmit hook, so the
+        // keyboard can't be closed from the app side here; resign focus on
+        // the inert 'Password *' label before reaching for 'Next'.
+        typeIntoSecureField("Create a strong password", "Grapmail#e2e2026")
+        typeIntoSecureField("Re-enter your password", "Grapmail#e2e2026")
+        inertDismiss()
+        snap("05-step4-password-light")
+        tap(app.buttons["Next"].firstMatch, "Next (step 4)")
+
+        // Human verification (verify-before-register): the challenge now runs
+        // BEFORE any account exists — the backend consumes the verification id
+        // at Create Account — and this build has no skip path: Continue unlocks
+        // only once the server verdict lands.
+        let humanVerify = app.staticTexts["Just one more step!"].firstMatch
+        XCTAssertTrue(humanVerify.waitForExistence(timeout: 25),
+                      "after the password step: human verification did not appear")
+        sleep(8)   // the checkpoint WebView loads the widget
+        snap("07-human-verify-light")
+        // Continue stays disabled until the verdict (dev walk environments use
+        // the v2 test keys, which always pass). Poll the enable state instead
+        // of tapping blind: a disabled tap is a no-op that would stall here.
+        let verifyContinue = app.buttons["Continue"].firstMatch
+        var checkpointPassed = false
+        for _ in 1...12 {
+            if verifyContinue.exists && verifyContinue.isEnabled { checkpointPassed = true; break }
+            sleep(2)
+        }
+        XCTAssertTrue(checkpointPassed,
+                      "checkpoint verdict never arrived — widget unsolved (test keys not configured / no hand to solve it) or the verdict call failed")
+        tap(verifyContinue, "Continue (post-verification)")
+
+        // Step 5 — terms: the gate is REAL scroll detection. The document is
+        // a fixed 300pt card with its OWN inner ScrollView. Swiping the text
+        // element or dragging a coordinate inside the card scrolls the OUTER
+        // WizardScaffold page instead of the inner doc, so scrolledToEnd
+        // never fires and the agree checkbox stays disabled. The reliable
+        // primitive is XCUIElement.swipeUp() on the inner ScrollView itself —
+        // identified as the only scroll view about 300pt tall (the outer page
+        // fills the screen). Repeat until the gate opens.
+        let docHeader = app.staticTexts["GrapMail Terms of Service"].firstMatch
+        require(docHeader, "Terms document", timeout: 8)
+        let docScroll = app.scrollViews.allElementsBoundByIndex.first { $0.frame.height < 340 }
+        XCTAssertNotNil(docScroll, "terms document inner ScrollView not found")
+        let create = app.buttons["Create Account"].firstMatch
+        require(create, "Create Account (terms)", timeout: 6)
+        for _ in 1..<8 {
+            if create.isEnabled { break }
+            docScroll?.swipeUp(velocity: .slow)
+            usleep(500_000)
+        }
+        sleep(1)
+        // The agree line is a CONCATENATED Text ("I agree to the " +
+        // "Terms of Service" + " and " + "Privacy Policy"), which SwiftUI
+        // exposes as ONE static text whose label is the whole sentence - so
+        // an exact "I agree to the " query never matched (the 'missing: Agree
+        // card' failure). Match on the stable prefix.
+        let agree = app.staticTexts.matching(
+            NSPredicate(format: "label CONTAINS %@", "I agree to the")).firstMatch
+        tap(agree, "Agree card")
+        // The tap only toggles once scrolledToEnd enabled the checkbox; prove
+        // the gate opened by the Create Account button becoming enabled before
+        // tapping it, so a stuck scroll fails HERE with a clear reason rather
+        // than two steps later as 'missing: Human verification'.
+        XCTAssertTrue(create.waitForExistence(timeout: 4) && create.isEnabled,
+                      "Create Account still disabled — the agree gate never opened (scrolledToEnd false)")
+        snap("06-step5-terms-light")
+        create.tap()
+
+        // After Create Account the app auto-signs-in to the created screens, or,
+        // if the immediate session didn't take, routes to sign-in with the
+        // address prefilled (RootView's documented fallback).
+        // Reach the signed-in home either way so the security leg always runs.
+        let signinScreen = app.staticTexts["Welcome back 👋"].firstMatch
+        let createdA = app.staticTexts["You're all set!"].firstMatch
+        XCTAssertTrue(createdA.waitForExistence(timeout: 25) || signinScreen.exists,
+                      "after Create Account: neither created nor sign-in appeared")
+        if createdA.exists {
+            snap("08-created-a-light")
+            tap(app.buttons["Continue to Onboarding"].firstMatch, "Continue to Onboarding")
+            sleep(2)
+            snap("09-created-b-light")
+            tap(app.buttons["Go to Mailbox"].firstMatch, "Go to Mailbox")
+        } else {
+            // Sign-in fallback: the email is prefilled with the created address;
+            // type the password and sign in to reach the home directly.
+            typeIntoSecureField("Enter your password", "Grapmail#e2e2026")
+            inertDismiss()
+            tap(app.buttons["Sign In"].firstMatch, "Sign In (post-create)", timeout: 10)
+        }
+        // The signed-in home IS the mailbox. Every anchor below is an identifier
+        // the screen sets on itself rather than a sentence it happens to print —
+        // the placeholder home's literal "Signed in" was the kind of anchor a
+        // copy change breaks silently, and six of them went red at once in the
+        // plan for exactly that reason.
+        let mailHome = app.descendants(matching: .any)["mail-home"].firstMatch
+        /// Tap the element's own frame centre through a coordinate, the way the
+        /// Android walk taps uiautomator node bounds. The drawer's lower rows are
+        /// found, correctly placed and NOT clipped by anything visible, yet their
+        /// hit test is refused (`not hittable`) — a SwiftUI/AX layering artefact,
+        /// not an app bug. The coordinate path drives the same on-screen control,
+        /// and the frame is printed so the choice can be audited rather than
+        /// taken on trust.
+        func tapFrame(_ element: XCUIElement, _ what: String) {
+            XCTAssertTrue(element.waitForExistence(timeout: 20), "missing: \(what)")
+            let f = element.frame
+            print("WALK-TAP \(what) frame: \(f)")
+            let dx = (f.midX) / max(app.frame.width, 1)
+            let dy = (f.midY) / max(app.frame.height, 1)
+            app.coordinate(withNormalizedOffset: CGVector(dx: dx, dy: dy)).tap()
+        }
+        /// The mailbox home is on screen when either its container name or the
+        /// one control it always draws is reachable. The container is asked
+        /// first; the text field is the proof, because a container identifier on
+        /// a ZStack that also holds an overlay is exactly the case where
+        /// XCUITest cannot resolve the node. This box is slow enough that one
+        /// short wait would read as an absent screen, so both get their time.
+        func homeOnScreen(_ timeout: TimeInterval = 40) -> Bool {
+            app.textFields["mail-search"].waitForExistence(timeout: timeout / 2)
+                || mailHome.waitForExistence(timeout: timeout / 2)
+        }
+        // The runner's cold start is slow enough that one wait on the identifier
+        // would read as an absent screen: this box took 27 s to draw its first
+        // button in the previous run. Wait for the identifier, then for the one
+        // label the home always draws, and fail only if neither arrives — a real
+        // absence still fails, slowness does not.
+        XCTAssertTrue(homeOnScreen(), "missing: Mailbox home")
+        snap("60-mail-home")
+
+        // The observation that would have caught the auth seam weeks earlier:
+        // the signed-in home either rendered a mailbox or said it could not. Not
+        // an assertion — a server that briefly refuses is a state the walk must
+        // still photograph — but it stops being invisible in the run log.
+        let loadFailure = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "Couldn't load")).firstMatch
+        print("live-mail: home shows load failure = \(loadFailure.exists)")
+
+        // Mailbox leg — read-only. The drawer and the search field are reachable
+        // without filing, deleting or sending, so they are photographed from the
+        // live screen. Send, permanent delete and Report spam are not in this
+        // leg: one is irreversible, one destroys, one feeds the suppression list
+        // that would stop future CI mail. They live in the snapshot band.
+        tap(app.descendants(matching: .any)["mail-menu"].firstMatch, "Open folders (drawer)")
+        XCTAssertTrue(app.staticTexts["Pending approval"].waitForExistence(timeout: 20),
+                      "drawer did not open")
+        snap("62-mail-drawer")
+        // The drawer closes on a row tap; choosing the box already on screen is
+        // the one gesture that dismisses it without leaving the home.
+        tap(app.descendants(matching: .any)["mail-drawer-Inbox"].firstMatch, "Close drawer (Inbox)")
+        XCTAssertTrue(homeOnScreen(20), "home after drawer")
+
+        tap(app.textFields["mail-search"].firstMatch, "Search field", timeout: 20)
+        sleep(1)
+        snap("67-mail-search")
+        app.swipeDown() // the keyboard is not part of the frame being reviewed
+
+        tap(app.buttons["Sort and filter"].firstMatch, "Sort and filter (search row)")
+        XCTAssertTrue(app.staticTexts["Sort & filter"].waitForExistence(timeout: 8),
+                      "sort sheet did not open")
+        snap("69-mail-sort-filter")
+        // Close the sheet the way the app does. A swipe-down over a sheet can
+        // scroll the list behind it instead, leaving the walk waiting for a home
+        // that is still covered. Choosing an option is the screen's own dismissal
+        // path, it changes only client-side sort state, and 'Newest first' is the
+        // server's own order, so the box is left exactly as it was found.
+        let newest = app.buttons["Newest first"].firstMatch
+        if newest.waitForExistence(timeout: 10) {
+            newest.tap()
+        } else {
+            tap(app.staticTexts["Newest first"].firstMatch, "Newest first (sheet)", timeout: 10)
+        }
+        XCTAssertTrue(homeOnScreen(20), "home after sort sheet")
+
+        // Security sector — the reference screens photographed in the app's
+        // light theme. Read-only: the walk opens every hub row, snapshots it,
+        // and backs out. It never submits a password change, never revokes a
+        // session, never signs the fresh account out of everything — those
+        // flows have their own screens and their own confirmations, and this
+        // account has to survive to the session-restore leg below.
+        // Account security is reached through the mailbox drawer now. The row is
+        // a drawer row, so the drawer has to be open for it to exist — the same
+        // path a person takes.
+        tap(app.descendants(matching: .any)["mail-menu"].firstMatch, "Open folders (to security)")
+        XCTAssertTrue(app.staticTexts["Pending approval"].waitForExistence(timeout: 15),
+                      "drawer did not open (to security)")
+        // The plain element tap, once the row is inside the drawer's own bounds.
+        // It failed while the row was clipped by a scroller it did not belong to
+        // — and the coordinate tap that followed closed the drawer without
+        // navigating, which is the reason not to keep that workaround: a tap that
+        // lands next to a control is worse than a tap that throws.
+        tap(app.buttons["Security"].firstMatch, "Security (drawer)", timeout: 20)
+        require(app.staticTexts["Account Security"].firstMatch, "Security hub", timeout: 8)
+        snap("20-sec-hub-light")
+        openSecurityRow("Two-Step Verification", "21-sec-2fa-enable-light")
+        openSecurityRow("Phone Number", "22-sec-phone-light")
+        openSecurityRow("Change Password", "23-sec-change-password-light")
+        openSecurityRow("Backup Codes", "24-sec-backup-codes-light")
+        openSecurityRow("Active Sessions", "25-sec-sessions-light")
+        openSecurityRow("Recent Security Activity", "26-sec-activity-light")
+        openSecurityRow("Sign Out All Devices", "27-sec-signout-all-light")
+
+        // The enable flow's first gate is a real reference screen and it
+        // renders on navigation alone: tap the switch, tap Continue, photograph
+        // 'Confirm Your Password', back out twice. Nothing is typed, so no
+        // action proof is minted and the factor stays off — but the screen is
+        // no longer compile-only. (The per-session Revoke confirmation is NOT
+        // reachable here: a fresh account has exactly one session and it is the
+        // current device, which deliberately has no revoke affordance.)
+        // The hub re-fetches on every reappear (`.onAppear { reload += 1 }`), and
+        // while that is in flight the 2FA switch is disabled: the tap lands on
+        // nothing and the enable screen never arrives (this is exactly where the
+        // run died — 'missing: 2FA enable (gate leg)'). Wait for the switch to
+        // actually be enabled before tapping it.
+        let gateSwitch = app.switches["Two-Step Verification"].firstMatch
+        require(gateSwitch, "2FA switch (gate leg)", timeout: 12)
+        waitEnabled(gateSwitch, "2FA switch (gate leg)")
+        gateSwitch.tap()
+        require(app.staticTexts["Enable Two-Step Verification"].firstMatch, "2FA enable (gate leg)", timeout: 8)
+        tap(app.buttons["Continue"].firstMatch, "Continue (enable flow)")
+        require(app.staticTexts["Confirm Your Password"].firstMatch, "Confirm-password gate", timeout: 8)
+        snap("28-sec-confirm-password-light")
+        tap(app.buttons["back"].firstMatch, "back (gate → enable)")
+        tap(app.buttons["back"].firstMatch, "back (enable → hub)")
+        backFromSecurityScreens()
+
+        // Screens that exist only AFTER a write this walk must not perform:
+        // signing out everywhere ends the session the restore leg proves, and
+        // changing the password breaks the sign-in leg. So the app carries a
+        // test-only hook (-gmSnapshot <name>) that renders one of them with
+        // no-op closures, and each is photographed and left. An out-of-process
+        // UI test cannot read the app's source, so keep this list in sync with
+        // the switch in SecuritySnapshotView.
+        let postWriteScreens: [(shot: String, name: String)] = [
+            ("40-sec-two-factor-on", "two-factor-on"),
+            ("41-sec-two-factor-off-form", "two-factor-off-form"),
+            ("42-sec-two-factor-off-done", "two-factor-off-done"),
+            ("43-sec-backup-codes-form", "backup-codes-form"),
+            ("44-sec-backup-codes-saved", "backup-codes-saved"),
+            ("45-sec-change-password", "change-password"),
+            ("46-sec-password-changed", "password-changed"),
+            ("47-sec-sign-out-all-form", "sign-out-all-form"),
+            ("48-sec-sign-out-all-done", "sign-out-all-done"),
+            ("49-sec-session-revoked", "session-revoked"),
+            ("50-sec-session-revoked-suspicious", "session-revoked-suspicious"),
+            // The per-session revoke confirmations: a fresh account has exactly
+            // one session and it is this device, which has no revoke affordance
+            // by design, so navigation can never reach them either.
+            ("51-sec-revoke-session-form", "revoke-session-form"),
+            ("52-sec-revoke-session-confirm", "revoke-session-confirm"),
+            // The suspicious sign-in pair, photographed in the only state a
+            // clean CI account can honestly be in: no open alert. Their names
+            // say so, because the same screens with a real intruder on them
+            // need a server-seeded event no test can ask for.
+            ("53-sec-alert-no-open-alert", "suspicious-alert"),
+            ("54-sec-secure-no-open-alert", "secure-account"),
+            // Mailbox band. 60/62/67/69 are shot from the live screen above;
+            // 61 is the dark frame below. Everything here needs a message to
+            // exist, and the account CI creates may have no provisioned mailbox
+            // at all — so the populated, loading, empty, failed and no-mailbox
+            // frames come from the test-only host rather than from a guess about
+            // what the server will say.
+            ("63-mail-empty", "mail-empty"),
+            ("64-mail-loading", "mail-loading"),
+            ("65-mail-load-failed", "mail-load-failed"),
+            ("66-mail-no-mailbox", "mail-no-mailbox"),
+            ("68-mail-selection", "mail-selection"),
+            ("70-mail-move-sheet", "mail-move-sheet"),
+            ("71-mail-delete-sheet", "mail-delete-sheet"),
+            ("72-mail-labels", "mail-labels"),
+            ("73-mail-label-create", "mail-label-create"),
+            ("74-mail-thread", "mail-thread"),
+            ("75-mail-thread-encrypted", "mail-thread-encrypted"),
+            ("76-mail-compose", "mail-compose"),
+            ("77-mail-contacts", "mail-contacts"),
+            ("78-mail-files", "mail-files"),
+            ("79-mail-attachment-preview", "mail-attachment-preview"),
+            ("80-mail-settings", "mail-settings"),
+            ("81-mail-screener", "mail-screener"),
+            ("82-mail-send-receipt", "mail-send-receipt"),
+            ("83-mail-assign-label-sheet", "mail-assign-label-sheet"),
+            ("84-mail-snooze-sheet", "mail-snooze-sheet"),
+            ("85-mail-contact-detail", "mail-contact-detail"),
+            // The sender-decision sheet is reachable only with the screener queue
+            // open and messages selected, so a read-only walk on a fresh CI
+            // mailbox cannot reach it — the queue is empty there. Android's host
+            // draws the same frame from the same two addresses.
+            ("86-mail-sender-sheet", "mail-sender-sheet"),
+            // The unsubscribe confirmation hangs off a message carrying the sender's
+            // `List-Unsubscribe` header, which a fresh CI mailbox has none of, so the
+            // screen would otherwise ship with no artifact at all. Android's host
+            // draws the same sheet from the same invented address.
+            ("87-mail-unsubscribe", "mail-unsubscribe"),
+            // The account band (Phase 1). Eight screens over the one profile
+            // document, photographed from the snapshot host's seeded record:
+            // the CI account's real lists are empty, and an empty screen
+            // cannot prove the populated branch exists. Android's walk names
+            // the same eight frames.
+            ("90-account-profile", "account-profile"),
+            ("91-account-privacy", "account-privacy"),
+            ("92-mail-notes", "mail-notes"),
+            ("93-mail-tasks", "mail-tasks"),
+            ("94-account-connections", "account-connections"),
+            ("95-mail-prefs", "mail-settings-prefs"),
+            ("96-mail-addresses", "mail-addresses"),
+            ("97-mail-support", "mail-support"),
+            // Phase 2: the advanced-search sheet (its scope line is the thing
+            // under test) and the filing undo banner (reachable only after a
+            // filing a read-only walk must not perform).
+            ("98-mail-adv-search", "mail-adv-search"),
+            ("99-mail-undo", "mail-undo"),
+            // The encryption band (Phase 3). Nine frames over the seeded
+            // identity, published answer and lookup rows — the CI account has
+            // no key, so every populated branch here exists only because the
+            // host seeded it. Android's walk names the same nine frames and
+            // waits on the same sentences.
+            ("100-e2e-status-none", "e2e-status-none"),
+            ("101-e2e-status-unlocked", "e2e-status-unlocked"),
+            ("102-e2e-setup", "e2e-setup"),
+            ("103-e2e-unlock", "e2e-unlock"),
+            ("104-e2e-details", "e2e-details"),
+            ("105-e2e-publish", "e2e-publish"),
+            ("106-e2e-passphrase", "e2e-passphrase"),
+            ("107-e2e-remove", "e2e-remove"),
+            ("108-e2e-recipients", "e2e-recipients"),
+            // The subscriptions band: the two detected senders seeded through
+            // the real offer decoder, and the empty branch over an honest
+            // empty read. Android's walk names the same two frames.
+            ("109-mail-subs-list", "mail-subs-list"),
+            ("110-mail-subs-empty", "mail-subs-empty"),
+            // The per-app detail: the linked frame over a seeded connection,
+            // the unlinked frame over a name the record does not carry.
+            // Android names the same two frames and waits on the same text.
+            ("114-account-connection-detail", "account-connection-detail"),
+            ("115-account-connection-unknown", "account-connection-unknown"),
+            // The reader over an HTML-only message: the images gate, the
+            // stepper's honest range and the read-state control all exist only
+            // for mail a CI mailbox does not have. Android's host draws the same
+            // frame from the same seeded sender.
+            ("116-mail-thread-images", "mail-thread-images"),
+        ]
+        // These two fetch on appear, so the shutter has to wait for the loaded
+        // branch — otherwise the photograph catches "Checking your account…"
+        // and proves nothing. Each marker is a label that exists ONLY once the
+        // fetch has settled.
+        let settledLabels: [String: String] = [
+            "suspicious-alert": "Address",
+            "secure-account": "Suspicious Sign-In Details",
+            // The seeded mail screens read their sample content through an
+            // effect, so the shutter has to wait for it. Photographed a frame
+            // early, a populated screen looks exactly like its empty branch and
+            // the artifact would document the wrong state.
+            "mail-thread": "Q3 facilities invoice",
+            "mail-thread-encrypted": "End-to-end encrypted",
+            // The seeded newsletter's subject: it exists only once the HTML-only
+            // body has landed and stripped, which is the branch this frame is
+            // here to photograph. Android waits on the gate control's own tag
+            // for the same screen, because its harness can read identifiers and
+            // this one reads static text only.
+            "mail-thread-images": "This week in letterforms",
+            "mail-contacts": "amira@northwind.example",
+            "mail-contact-detail": "Messages seen",
+            "mail-files": "invoice-q3.pdf",
+            // The attachment's own NAME, as on Android. "Save to this device" is
+            // a button's title, and this check reads static text only — a marker
+            // can be wrong without the screen being wrong, and this one waited on
+            // text the view never draws.
+            "mail-attachment-preview": "invoice-q3.pdf",
+            "mail-settings": "GrapMail address",
+            "mail-screener": "Waiting in the queue",
+            // A seeded label's NAME, so it appears only once the labels arrive.
+            // "Manage labels" is a drawer row: the previous marker waited on text
+            // this screen never draws.
+            "mail-labels": "Bills",
+            "mail-selection": "Delete",
+            // The four sheets present with an animation. Photographed early the
+            // frame is a dimmed home behind a scrim, which looks like a sheet in
+            // a thumbnail and satisfies a gate that only counts files. Each
+            // marker here is the sheet's own title: text that exists only once its
+            // content has drawn. Android waits on the same four SHEETS but by their
+            // `gm-sheets-*` identifiers rather than these strings — the heading is
+            // re-wordable copy there, and an identifier is not — so the two runs
+            // prove the same thing by the mechanism each harness can hold on to.
+            "mail-move-sheet": "Move to",
+            "mail-delete-sheet": "Delete 3 messages permanently?",
+            "mail-assign-label-sheet": "Label",
+            "mail-snooze-sheet": "Snooze until",
+            "mail-unsubscribe": "Unsubscribe",
+            "mail-sender-sheet": "Decide the sender",
+            // The account band: markers are seeded values that exist only once
+            // the profile document has landed. Where the value lives in a text
+            // FIELD (the birthday, the signature) rather than static text —
+            // which this check cannot read — the marker is a neighbouring
+            // static label the populated branch alone draws.
+            "account-profile": "Rather not say",
+            "account-privacy": "2026-03-14",
+            "mail-notes": "Send the Q3 numbers before Friday",
+            "mail-tasks": "Book the studio visit",
+            "account-connections": "Northwind SSO",
+            "mail-settings-prefs": "Comfortable — the roomier list",
+            "mail-addresses": "business@grapmail.com",
+            "mail-support": "Why can I not create an account for someone under 13?",
+            "mail-adv-search": "Search filters",
+            "mail-undo": "Archived 2 messages",
+            // The encryption band: each marker is a sentence one specific
+            // seeded state draws. "Encryption is not set up on this device"
+            // exists only with no record; the unlocked headline only with a
+            // record and an open session; the fingerprint only once the
+            // seeded identity has landed. A wrong state photographs the
+            // wrong headline and the walk fails rather than lies.
+            "e2e-status-none": "Encryption is not set up on this device",
+            "e2e-status-unlocked": "Your key is unlocked for this session",
+            "e2e-setup": "There is no way to recover a forgotten passphrase.",
+            "e2e-unlock": "Your passphrase decrypts the key on this device. It is never sent anywhere.",
+            "e2e-details": "Signing key",
+            "e2e-publish": "Published fingerprint",
+            // The frame's own headline, not its lede: XCUITest refuses string
+            // identifiers over 128 characters, and the full re-lock sentence
+            // (139 chars) threw "Invalid query" here in CI. The headline is
+            // text this screen alone draws, so it proves the same thing.
+            "e2e-passphrase": "Change your passphrase",
+            "e2e-remove": "Remove from this device",
+            "e2e-recipients": "priya@havenworks.example",
+            // A seeded sender's NAME exists only once the cache page landed
+            // and detection grouped it; the empty sentence only once an
+            // honestly-empty read landed.
+            // The frequency label, not the sender NAME: the name row carries
+            // lineLimit(1), and a truncated element no longer answers to the
+            // seed string. The label has no line limit and draws only once the
+            // page landed and detection grouped it.
+            "mail-subs-list": "10 or fewer emails recently",
+            "mail-subs-empty": "No subscriptions detected.",
+            "account-connection-detail": "Your name, GrapMail address and profile photo",
+            // The subtitle: walk waits match exactly, and the card's answer
+            // wraps across literals and truncates at one line -- a fragment
+            // of it is a name no element ever answers to.
+            "account-connection-unknown": "Not connected to this account",
+        ]
+        for screen in postWriteScreens {
+            app.terminate()
+            app.launchArguments = ["-gmSnapshot", screen.name]
+            app.launch()
+            sleep(2) // the view's own layout settles
+            // The snapshot host must be the screen actually on screen. Checking
+            // only that the switch's "Unknown snapshot" label is ABSENT let
+            // eleven home-screen photographs pass as eleven confirmation
+            // screens: a stored session pushed .home over the stub, and nothing
+            // in the old assertion could tell. The marker is on the host itself.
+            let host = app.descendants(matching: .any)["gm-snapshot"].firstMatch
+            XCTAssertTrue(host.waitForExistence(timeout: 6),
+                          "snapshot '\(screen.name)' is not the visible screen")
+            // And the name has to be one the app knows: an unrecognised one
+            // falls through to the default label, which would hand the artifact
+            // a placeholder photographed as if it were the screen.
+            let unknown = app.staticTexts["Unknown snapshot: \(screen.name)"].firstMatch
+            XCTAssertFalse(unknown.exists, "app did not recognise snapshot '\(screen.name)'")
+            // The mail host names its own miss. Without this check a typo in a
+            // mail-* name would photograph the fallthrough label and still fill
+            // the artifact's expected set.
+            let unknownMail = app.staticTexts["Unknown mail snapshot: \(screen.name)"].firstMatch
+            XCTAssertFalse(unknownMail.exists, "app did not recognise mail snapshot '\(screen.name)'")
+            if let settled = settledLabels[screen.name] {
+                XCTAssertTrue(app.staticTexts[settled].waitForExistence(timeout: 12),
+                              "snapshot '\(screen.name)' never finished loading")
+            }
+            // The reader's three reply doors must ALL be on screen. iOS drew
+            // them correctly — the zero-width pair was Android's, where a
+            // filling button inside a shared Row leaves its siblings nothing.
+            // The check lives here as well because an assertion that exists on
+            // one platform only records that platform's good luck, and 74's
+            // photograph passed every gate while showing two missing actions.
+            //
+            // Queried as a BUTTON first, with the static text as the fallback:
+            // SwiftUI folds a plain button's label into the button element, so
+            // `staticTexts["Reply all"]` alone has no such child to find, and
+            // the first run failed on a screen that visibly shows the door. A
+            // check that can only fail is worse than no check — it teaches the
+            // next reader to delete the line.
+            if screen.name == "mail-thread" {
+                for door in ["Reply all", "Forward"] {
+                    let asButton = app.buttons[door].firstMatch
+                    let asText = app.staticTexts[door].firstMatch
+                    XCTAssertTrue(asButton.waitForExistence(timeout: 5) || asText.exists,
+                                  "the reader drew no '\(door)' button")
+                }
+            }
+            snap(screen.shot)
+        }
+
+        // Session restore: relaunch with the stored Keychain token must open
+        // signed-in, not at Welcome. Then sign out returns to Welcome. The
+        // snapshot argument has to be cleared first, or the restore opens a
+        // stub screen instead of the flow.
+        app.terminate()
+        app.launchArguments = []
+        app.launch()
+        XCTAssertTrue(app.descendants(matching: .any)["mail-home"].firstMatch
+                        .waitForExistence(timeout: 20)
+                      || app.textFields["mail-search"].waitForExistence(timeout: 20),
+                      "session restored on launch (the mailbox is the signed-in home)")
+        snap("10-session-restored")
+        // Sign out lives in the mailbox drawer. This is the leg that ends the
+        // session, which is why it runs after the restore proof above.
+        tap(app.descendants(matching: .any)["mail-menu"].firstMatch, "Open folders (to sign out)")
+        XCTAssertTrue(app.staticTexts["Pending approval"].waitForExistence(timeout: 15),
+                      "drawer did not open (to sign out)")
+        tap(app.buttons["Sign out"].firstMatch, "Sign out (drawer)", timeout: 20)
+        require(app.staticTexts["Welcome to"].firstMatch, "welcome after sign-out", timeout: 8)
+
+        // Sign-in screen
+        tap(app.buttons["Sign In"].firstMatch, "Sign In (welcome)")
+        require(app.staticTexts["Welcome back 👋"].firstMatch, "Sign-in header")
+        snap("11-signin-light")
+
+        // Recovery arc — navigation only, nothing submitted. 'Forgot password?'
+        // opens the reset form and that form's own link opens the address
+        // lookup; both are reference screens the walk had never photographed,
+        // and reaching them costs no code send and no state change.
+        tap(app.buttons["Forgot password?"].firstMatch, "Forgot password (sign-in)")
+        require(app.staticTexts["Reset your password"].firstMatch, "Recovery: reset form", timeout: 8)
+        snap("30-recovery-start-light")
+        tap(app.buttons["Find your GrapMail address"].firstMatch, "Find-address link (reset form)")
+        require(app.staticTexts["Find your GrapMail address"].firstMatch, "Recovery: find form", timeout: 8)
+        snap("31-recovery-find-address-light")
+
+        // Three mail screens in dark. The mailbox's own colours resolve through the
+        // trait environment, and the snapshot host takes `-gmDark` to pin the scheme
+        // for the frame — the earlier version of this comment claimed no launch
+        // argument was needed, which the line below it has contradicted ever since
+        // `XCUIDevice.forceDarkMode` turned out not to exist on this runner's SDK.
+        //
+        // The thread and the labels screen join the home because they carry the parts
+        // of the palette a list of rows does not: the body surface, the attachment row,
+        // the encrypted notice, the new unsubscribe button, and — on labels — the
+        // server's per-label colour, which now resolves through `labelSwatch` with a
+        // light and a dark value per key. Every other colour in the band goes through
+        // the same two token tables, which `scripts/mail-honesty.py` pins
+        // structurally, so the claim "dark is correct across the band" rests on that
+        // check plus these three photographs rather than on thirty relaunches.
+        // Each dark frame carries the same two proofs its light twin does: the host
+        // recognised the name (a typo would otherwise photograph the "Unknown mail
+        // snapshot" placeholder, which also bears the gm-snapshot marker), and the
+        // screen's own content has drawn -- a populated screen and its empty branch
+        // look identical until something that exists only in the loaded state is seen.
+        for (shot, screen, marker) in [
+            ("61-mail-home-dark", "mail-home", "Q3 facilities invoice"),
+            ("88-mail-thread-dark", "mail-thread", "Q3 facilities invoice"),
+            ("89-mail-labels-dark", "mail-labels", "Bills"),
+            // Phase 6: one dark frame per band added after the first three.
+            // Same rule as above — the host case stays the light one's name
+            // (a `-dark` case would be a second copy of a screen), and each
+            // frame carries BOTH proofs: the name check runs in the loop,
+            // and the marker below is settled content the seeded state
+            // draws only once its data has landed.
+            ("111-account-profile-dark", "account-profile", "Rather not say"),
+            ("112-e2e-status-unlocked-dark", "e2e-status-unlocked",
+             "Your key is unlocked for this session"),
+            ("113-mail-subs-list-dark", "mail-subs-list", "10 or fewer emails recently")] {
+            app.terminate()
+            app.launchArguments = ["-gmSnapshot", screen, "-gmDark"]
+            app.launch()
+            XCTAssertTrue(app.descendants(matching: .any)["gm-snapshot"].firstMatch
+                            .waitForExistence(timeout: 12),
+                          "snapshot '\(screen)' (dark) is not the visible screen")
+            XCTAssertFalse(app.staticTexts["Unknown mail snapshot: \(screen)"].firstMatch.exists,
+                           "app did not recognise mail snapshot '\(screen)' (dark)")
+            // Every one of the three waits on a piece of text that only exists once the
+            // screen's own content has drawn. The home first waited on the `mail-search`
+            // field, which is a marker of the LIVE mailbox header (`MailboxView.swift`)
+            // and is not in the snapshot host's `listFrame` at all: greeting plus rows.
+            // So that assertion could only ever time out, and it would have said "dark
+            // mode is broken" about a screen whose rows were never the question. A
+            // seeded row subject is the marker Android's dark home uses for the same
+            // reason, which keeps the two artifacts proving the same thing.
+            XCTAssertTrue(app.staticTexts[marker].firstMatch.waitForExistence(timeout: 12),
+                          "dark snapshot '\(screen)' never showed its content")
+            sleep(2) // the scheme change propagates through the environment
+            snap(shot)
+        }
+        app.terminate()
+    }
+
+    /// Open an inline picker and choose `option` (always the panel's first
+    /// item: January / 1 / 2013 = a valid 13-year-old date). Tap the option
+    /// ELEMENT, not a measured coordinate: the option lives in a clipped
+    /// animated ScrollView, and a coordinate tap taken from `opt.frame`
+    /// landed just outside the clip and never selected (the walk stalled at
+    /// step 2 with an empty birthday, disabling 'Next'). XCUITest's element
+    /// tap hits the option's real center and closes the panel.
+    ///
+    /// The pick is NOT verified by re-reading the row: selecting an option
+    /// changes the row's label away from `placeholder`, which makes the
+    /// `buttons[placeholder]` query resolve to zero, and reading `.label` on
+    /// it throws 'No matches found for ... IN identifiers' (that throw, not a
+    /// real UI bug, failed the walk). Instead the whole birthday is proven
+    /// valid downstream: 'Next (step 2)' only enables when it is, and the
+    /// Step 3 header the walk requires right after is the pass/fail gate.
+    private func pickInline(_ placeholder: String, _ option: String) {
+        app.swipeDown() // page to top — stable frames, no drift between taps
+        sleep(1)
+        let row = app.buttons[placeholder].firstMatch
+        tap(row, "picker \(placeholder)")
+        sleep(1) // panel expansion settles
+        let opt = app.buttons[option].firstMatch
+        // If the panel didn't open on the first row tap, tap once more.
+        if !opt.waitForExistence(timeout: 3) { tap(row, "re-open \(placeholder)") }
+        require(opt, "option \(option) in \(placeholder) panel", timeout: 4).tap()
+        sleep(1) // panel collapse settles before the next picker opens
+    }
+
+    /// Open one Account Security hub row, snapshot the screen it lands on,
+    /// and return to the hub. Plain rows are buttons whose label carries the
+    /// title; the Two-Step row is a switch (app.switches, identified by the
+    /// row title) — a tap there fires onToggle, which routes into the enable
+    /// flow exactly like the reference.
+    private func openSecurityRow(_ title: String, _ shotName: String) {
+        let row = app.buttons.matching(NSPredicate(
+            format: "label CONTAINS %@", title)).firstMatch
+        if row.waitForExistence(timeout: 4) {
+            row.tap()
+        } else {
+            // The Two-Step row's only interactive element is the switch, and the
+            // hub disables it while it re-fetches on reappear: a tap on a
+            // disabled switch lands on nothing and the walk photographs the hub
+            // twice. Wait for it to go live before tapping.
+            let toggle = app.switches[title].firstMatch
+            require(toggle, "switch \(title)", timeout: 8)
+            waitEnabled(toggle, "switch \(title)")
+            toggle.tap()
+        }
+        sleep(1) // the screen's own load (profile fetch) settles
+        snap(shotName)
+        tap(app.buttons["back"].firstMatch, "back from \(title)")
+        sleep(1)
+    }
+
+    /// Poll until the element reports enabled, then assert it got there. Fails
+    /// with the element's name, so a control stuck disabled is not mistaken for
+    /// a screen that failed to open. On giving up it prints the screen's texts:
+    /// "never enabled" has two causes — the load is still in flight, or it came
+    /// back and the hub is showing its error state — and only the first is a
+    /// timing problem.
+    private func waitEnabled(_ element: XCUIElement, _ what: String, attempts: Int = 30) {
+        var waited = 0
+        while !element.isEnabled && waited < attempts {
+            usleep(500_000)
+            waited += 1
+        }
+        if !element.isEnabled {
+            let texts = app.staticTexts.allElementsBoundByIndex.map { $0.label }
+            print("WALK-STUCK \(what) | texts: \(texts)")
+        }
+        XCTAssertTrue(element.isEnabled, "\(what) never became enabled — still loading")
+    }
+
+    /// The hub sits under a NavigationStack path the walk appended; back out
+    /// of it so the session-restore leg starts from the signed-in home.
+    private func backFromSecurityScreens() {
+        require(app.staticTexts["Account Security"].firstMatch, "Security hub (return)", timeout: 8)
+        tap(app.buttons["back"].firstMatch, "back (hub → home)")
+        XCTAssertTrue(app.descendants(matching: .any)["mail-home"].firstMatch
+                        .waitForExistence(timeout: 20)
+                      || app.textFields["mail-search"].waitForExistence(timeout: 20),
+                      "Mailbox home (return)")
+    }
+
+    private func typeIntoSecureField(_ identifier: String, _ value: String) {
+        focusAndType(app.secureTextFields[identifier].firstMatch, "secure field \(identifier)", value)
+    }
+}

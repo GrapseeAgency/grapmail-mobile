@@ -258,6 +258,12 @@ fun ThreadScreen(
                     }
                 }
             }
+            item(key = "smart-panel") {
+                com.grapsee.grapmail.ui.mailfeatures.MailSmartPanel(
+                    message = active,
+                    messages = thread.messages,
+                )
+            }
             if (isThread && (thread.hasMore || thread.loadingEarlier)) {
                 item(key = "load-earlier") {
                     Row(
@@ -299,6 +305,16 @@ fun ThreadScreen(
                 Text(text, fontSize = 12.sp, color = if (isError) palette.error else palette.textSecondary,
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 4.dp))
             }
+            com.grapsee.grapmail.ui.mailfeatures.SmartReplyStrip(
+                suggestions = com.grapsee.grapmail.features.SmartReplyEngine.suggest(
+                    subject = message.subject.orEmpty(),
+                    bodyText = message.bodyText.orEmpty(),
+                ),
+                onPick = { suggestion ->
+                    com.grapsee.grapmail.logic.MailFeaturePrefs.stageComposeInsert(suggestion)
+                    onReply(message, "reply")
+                },
+            )
             ReaderReplyBar { mode -> onReply(message, mode) }
             MailBottomBar(inboxSelected = true, unread = mailbox.unreadCount, onMail = onBack,
                 onContacts = onContacts, overList = false)
@@ -379,6 +395,10 @@ private fun ThreadMessageCard(
     // "nothing received it" has to be said here rather than left as a button
     // that appeared to do nothing.
     var shareNote by androidx.compose.runtime.remember(message.id) { mutableStateOf<String?>(null) }
+    // The menu's spam and block calls answer on the card the same way the
+    // handoff affordances do; without a line, a block would look like a
+    // button that did nothing.
+    var decisionNote by androidx.compose.runtime.remember(message.id) { mutableStateOf<String?>(null) }
     var showDetails by remember(message.id) { mutableStateOf(false) }
     var showActions by remember(message.id) { mutableStateOf(false) }
     LaunchedEffect(openActions, expanded) {
@@ -494,6 +514,27 @@ private fun ThreadMessageCard(
                             showActions = false
                             printMessageText(context, message, render?.bodyText) { outcome -> shareNote = outcome }
                         })
+
+                        DropdownMenuItem(text = { Text("Unsubscribe in one click") }, modifier = Modifier.testTag("mail-unsubscribe-oneclick"), onClick = {
+                            showActions = false
+                            val address = message.from?.address?.takeIf { it.isNotBlank() }
+                            if (message.unsubscribe?.oneClickAdvertised == true && address != null) {
+                                vm.unsubscribeOneClick(address, unsubUrl ?: "") { unsubNote = it }
+                            } else {
+                                unsubNote = "This message does not carry a one-click request."
+                            }
+                        })
+                        DropdownMenuItem(text = { Text("Report spam") }, modifier = Modifier.testTag("mail-report-spam"), onClick = {
+                            showActions = false
+                            vm.actOn(message.id, com.grapsee.grapmail.data.MailAction.Spam) { note -> decisionNote = note ?: "Moved to spam." }
+                        })
+                        DropdownMenuItem(text = { Text("Block sender") }, modifier = Modifier.testTag("mail-block-sender"), onClick = {
+                            showActions = false
+                            val address = message.from?.address?.takeIf { it.isNotBlank() }
+                            if (address == null) decisionNote = "This message does not name a sender to block."
+                            else vm.blockSender(address) { decisionNote = it }
+                        })
+
                     }
                 }
             }
@@ -605,7 +646,7 @@ private fun ThreadMessageCard(
             }
         }
 
-        listOfNotNull(unsubNote, shareNote).forEach {
+        listOfNotNull(unsubNote, shareNote, decisionNote).forEach {
             Text(it, fontSize = 12.sp, color = palette.textSecondary, modifier = Modifier.padding(top = 8.dp))
         }
     }

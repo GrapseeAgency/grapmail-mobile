@@ -173,5 +173,16 @@ dependencies {
     // process.
     implementation("androidx.work:work-runtime-ktx:2.9.1")
 
+    // The app lock's prompt: androidx.biometric is the platform's own face /
+    // fingerprint / credential sheet, and fragment-ktx brings the
+    // FragmentActivity that prompt needs.
+    implementation("androidx.biometric:biometric:1.1.0")
+    implementation("androidx.fragment:fragment-ktx:1.8.5")
+
+    // The home-screen unread widget: Glance draws it from the same Compose the
+    // app is written in; its receiver + provider XML live beside the app's
+    // other entry points (AndroidManifest.xml, res/xml).
+    implementation("androidx.glance:glance-appwidget:1.1.1")
+
     debugImplementation("androidx.compose.ui:ui-tooling")
 }

@@ -38,8 +38,11 @@ targets:
     sources:
       - GrapMail
       - NotificationShared
+      - WidgetShared
     dependencies:
       - target: GrapMailNotificationService
+        embed: true
+      - target: GrapMailWidget
         embed: true
       - package: Crypto
         product: Crypto
@@ -67,6 +70,10 @@ targets:
           - $(AppIdentifierPrefix)com.grapsee.grapmail
           - $(DEVELOPMENT_TEAM).com.grapsee.grapmail.notifications
         com.apple.developer.usernotifications.communication: true
+        # The crate the widget reads (WidgetShared.swift). Nothing else lives
+        # in it: the widget must never need a keychain, a session or a fetch.
+        com.apple.security.application-groups:
+          - group.com.grapsee.grapmail
     # XcodeGen writes the native launch configuration and other Info.plist entries.
     info:
       path: GrapMail/Info.plist
@@ -79,6 +86,18 @@ targets:
         # Must exactly match MailPoll.refreshIdentifier's registration/submission.
         NSUserActivityTypes:
           - INSendMessageIntent
+        # App lock (AppLock.swift) - the system needs a reason string before it
+        # will ever show the Face ID sheet.
+        NSFaceIDUsageDescription: "GrapMail uses Face ID to keep your mailbox private when the app is locked."
+        # The send-later Live Activity; the start request is refused at runtime
+        # without this key.
+        NSSupportsLiveActivities: true
+        # The widget and the Live Activity tap through to grapmail://scheduled
+        # - the Scheduled screen, which is where cancel actually lives.
+        CFBundleURLTypes:
+          - CFBundleURLName: com.grapsee.grapmail
+            CFBundleURLSchemes:
+              - grapmail
         BGTaskSchedulerPermittedIdentifiers:
           - com.grapsee.grapmail.inbox-refresh
         # Background fetch also covers devices where APNs delivery is unavailable.
@@ -114,6 +133,34 @@ targets:
         keychain-access-groups:
           - $(DEVELOPMENT_TEAM).com.grapsee.grapmail.notifications
         com.apple.developer.usernotifications.communication: true
+
+  # -- the widget extension -------------------------------------------------
+  # Home/Lock Screen widget + send-later Live Activity. A separate process on
+  # the shared App Group (WidgetShared.swift), with no network of its own: it
+  # draws the numbers the app last read and mirrors the server's schedule.
+  GrapMailWidget:
+    type: app-extension
+    platform: iOS
+    deploymentTarget: "16.1"
+    sources:
+      - GrapMailWidget
+      - WidgetShared
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.grapsee.grapmail.widget
+        SKIP_INSTALL: YES
+        APPLICATION_EXTENSION_API_ONLY: YES
+    info:
+      path: GrapMailWidget/Info.plist
+      properties:
+        CFBundleDisplayName: GrapMail
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+    entitlements:
+      path: GrapMailWidget/GrapMailWidget.entitlements
+      properties:
+        com.apple.security.application-groups:
+          - group.com.grapsee.grapmail
 
   GrapMailUITests:
     type: bundle.ui-testing

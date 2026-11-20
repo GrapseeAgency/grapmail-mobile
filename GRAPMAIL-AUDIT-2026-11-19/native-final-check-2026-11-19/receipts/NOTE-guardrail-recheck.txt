@@ -1,0 +1,11 @@
+NOTE on scope — guardrail-recheck-f9c43384.txt
+
+This receipts folder contains guardrail-recheck-f9c43384.txt, produced on 2026-11-19 when the native guardrail script was run against the Grapsee_All_Time workspace repository at commit f9c43384.
+
+That run FAILED as expected, because the native guardrail targets the mobile application repository (grapmail-mobile), not the workspace/backend repository: a workspace repo legitimately has no Kotlin sources, no iOS XcodeGen manifest, and contains other stacks.
+
+The authoritative native check remains:
+- Repository: grapmail-mobile @ 0fb5998e (unchanged; still the current HEAD as of 2026-11-19)
+- Receipt: guardrail-test-0fb5998e.txt -> RESULT: fails=0 warns=0 -> NATIVE-GUARDRAIL: PASS
+
+No action required; this note exists only to prevent misreading the workspace-repo recheck file.

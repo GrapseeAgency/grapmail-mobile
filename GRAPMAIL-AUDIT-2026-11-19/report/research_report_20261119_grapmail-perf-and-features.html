@@ -1,0 +1,584 @@
+<!doctype html>
+<html lang="en" data-theme="technical">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>GrapMail Round 15 — Why the App Feels Slow: 2026 Email-Client Benchmark and Performance Root Causes | Deep Research Report</title>
+  <style>
+    :root {
+      --ink: #18212f;
+      --muted: #5d6878;
+      --navy: #12324a;
+      --accent: #16708f;
+      --accent-soft: #eaf4f7;
+      --paper: #ffffff;
+      --canvas: #f2f4f6;
+      --line: #dce2e7;
+      --line-strong: #b9c4cd;
+      --radius: 12px;
+      --measure: 78ch;
+      --link: #0d6687;
+      --link-hover: #084a63;
+      --header-detail: #6fb4c9;
+      --header-muted: #9fd0df;
+      --summary-bg: linear-gradient(135deg, #edf6f8 0%, #f8fbfc 100%);
+      --summary-border: #cfe2e8;
+      --quote-bg: #f6f8f9;
+      --table-stripe: #f7f9fa;
+      --footer-bg: #edf1f3;
+      --title-font: ui-serif, Georgia, "Noto Serif CJK SC", "Songti SC", serif;
+    }
+
+    html[data-theme="editorial"] {
+      --ink: #29251f;
+      --muted: #746b5d;
+      --navy: #202a36;
+      --accent: #a87925;
+      --accent-soft: #f7efdf;
+      --canvas: #eeeae2;
+      --line: #ddd5c7;
+      --line-strong: #c6bba9;
+      --link: #805b1d;
+      --link-hover: #5f4212;
+      --header-detail: #d0a750;
+      --header-muted: #ddc58f;
+      --summary-bg: linear-gradient(135deg, #f7f0e3 0%, #fffdfa 100%);
+      --summary-border: #dfcda8;
+      --quote-bg: #f8f4ec;
+      --table-stripe: #faf7f1;
+      --footer-bg: #e9e3d8;
+    }
+
+    html[data-theme="analytical"] {
+      --ink: #172033;
+      --muted: #59657a;
+      --navy: #071b38;
+      --accent: #1768ac;
+      --accent-soft: #e7f1fa;
+      --canvas: #edf1f5;
+      --line: #d5dde6;
+      --line-strong: #aebccc;
+      --link: #0b5f9e;
+      --link-hover: #084674;
+      --header-detail: #55a8e0;
+      --header-muted: #9bcceb;
+      --summary-bg: linear-gradient(135deg, #eaf3fa 0%, #f9fbfd 100%);
+      --summary-border: #c4d9e8;
+      --quote-bg: #f3f6f9;
+      --table-stripe: #f3f6f9;
+      --footer-bg: #e6ebf0;
+      --radius: 7px;
+    }
+
+    html[data-theme="technical"] {
+      --ink: #17252d;
+      --muted: #566a73;
+      --navy: #102d34;
+      --accent: #008b82;
+      --accent-soft: #e1f4f1;
+      --canvas: #eaf0ef;
+      --line: #d0ddda;
+      --line-strong: #a8bdb8;
+      --link: #007269;
+      --link-hover: #00554f;
+      --header-detail: #50c2b8;
+      --header-muted: #9bd8d2;
+      --summary-bg: linear-gradient(135deg, #e4f3f1 0%, #f8fbfa 100%);
+      --summary-border: #bddbd6;
+      --quote-bg: #f1f7f6;
+      --table-stripe: #f2f7f6;
+      --footer-bg: #e2ecea;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; }
+
+    html {
+      scroll-behavior: smooth;
+      background: var(--canvas);
+    }
+
+    body {
+      margin: 0;
+      color: var(--ink);
+      background: var(--canvas);
+      font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI",
+        "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", Arial, sans-serif;
+      font-size: 16px;
+      line-height: 1.72;
+      text-rendering: optimizeLegibility;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    a {
+      color: var(--link);
+      text-decoration-thickness: 1px;
+      text-underline-offset: 0.16em;
+      overflow-wrap: anywhere;
+    }
+
+    a:hover { color: var(--link-hover); }
+    a:focus-visible { outline: 3px solid rgba(22, 112, 143, 0.3); outline-offset: 3px; }
+
+    .report-shell {
+      width: min(100% - 40px, 1040px);
+      margin: 32px auto 56px;
+      background: var(--paper);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      box-shadow: 0 18px 55px rgba(25, 42, 58, 0.09);
+      overflow: hidden;
+    }
+
+    .report-header {
+      position: relative;
+      padding: 48px clamp(28px, 6vw, 72px) 42px;
+      color: #f7fbfd;
+      background: var(--navy);
+      border-bottom: 5px solid var(--accent);
+    }
+
+    .report-header::after {
+      content: "";
+      position: absolute;
+      right: clamp(24px, 6vw, 72px);
+      bottom: 0;
+      width: min(28vw, 220px);
+      height: 5px;
+      background: var(--header-detail);
+    }
+
+    .eyebrow {
+      margin: 0 0 12px;
+      color: var(--header-muted);
+      font-size: 0.76rem;
+      font-weight: 750;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+    }
+
+    .report-header h1 {
+      max-width: 22ch;
+      margin: 0;
+      font-family: var(--title-font);
+      font-size: clamp(2rem, 5vw, 3.65rem);
+      font-weight: 650;
+      line-height: 1.1;
+      letter-spacing: -0.035em;
+      text-wrap: balance;
+    }
+
+    .report-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px 22px;
+      margin-top: 24px;
+      color: #cadce4;
+      font-size: 0.86rem;
+    }
+
+    .report-meta span + span::before {
+      content: "";
+      display: inline-block;
+      width: 4px;
+      height: 4px;
+      margin: 0 12px 2px 0;
+      border-radius: 50%;
+      background: var(--header-detail);
+    }
+
+    .report-content {
+      padding: 18px clamp(24px, 6vw, 72px) 64px;
+    }
+
+    .section {
+      max-width: var(--measure);
+      margin: 0 auto;
+      padding-top: 34px;
+    }
+
+    .section + .section {
+      margin-top: 18px;
+      border-top: 1px solid var(--line);
+    }
+
+    .section-title {
+      margin: 0 0 22px;
+      color: var(--navy);
+      font-family: var(--title-font);
+      font-size: clamp(1.55rem, 3vw, 2.1rem);
+      font-weight: 680;
+      line-height: 1.25;
+      letter-spacing: -0.018em;
+      text-wrap: balance;
+    }
+
+    .subsection-title {
+      margin: 28px 0 10px;
+      color: #203b50;
+      font-size: 1.16rem;
+      line-height: 1.4;
+    }
+
+    .subsubsection-title {
+      margin: 22px 0 8px;
+      color: #334b5d;
+      font-size: 1rem;
+      line-height: 1.45;
+    }
+
+    p { margin: 0 0 1em; }
+    strong { color: #142b3d; font-weight: 720; }
+
+    .executive-summary {
+      max-width: calc(var(--measure) + 4ch);
+      margin-top: 26px;
+      padding: 30px clamp(22px, 4vw, 38px) 24px;
+      background: var(--summary-bg);
+      border: 1px solid var(--summary-border);
+      border-top: 4px solid var(--accent);
+      border-radius: var(--radius);
+    }
+
+    .executive-summary .section-title { font-size: clamp(1.45rem, 3vw, 1.9rem); }
+
+    ul, ol {
+      margin: 0.8em 0 1.25em;
+      padding-left: 1.35em;
+    }
+
+    li { margin: 0.35em 0; padding-left: 0.25em; }
+    li::marker { color: var(--accent); font-weight: 700; }
+
+    blockquote {
+      margin: 22px 0;
+      padding: 16px 20px;
+      color: #334b5d;
+      background: var(--quote-bg);
+      border-left: 4px solid var(--accent);
+    }
+
+    code {
+      padding: 0.12em 0.34em;
+      color: #713f12;
+      background: #fff7df;
+      border: 1px solid #f0dfaa;
+      border-radius: 4px;
+      font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+      font-size: 0.88em;
+      overflow-wrap: anywhere;
+    }
+
+    pre {
+      max-width: 100%;
+      margin: 20px 0;
+      padding: 18px;
+      overflow: auto;
+      color: #e9f2f6;
+      background: #152936;
+      border-radius: 8px;
+    }
+
+    pre code { padding: 0; color: inherit; background: transparent; border: 0; }
+
+    .section-divider {
+      width: 52px;
+      margin: 28px 0;
+      border: 0;
+      border-top: 3px solid #b6d5df;
+    }
+
+    .citation {
+      display: inline-block;
+      min-width: 1.55em;
+      margin: 0 0.06em;
+      padding: 0 0.3em;
+      color: #0b607e;
+      background: var(--accent-soft);
+      border-radius: 4px;
+      font-size: 0.82em;
+      font-weight: 750;
+      line-height: 1.55;
+      text-decoration: none;
+    }
+
+    .table-wrap {
+      width: 100%;
+      max-width: 100%;
+      margin: 24px 0 28px;
+      overflow-x: auto;
+      border: 1px solid var(--line-strong);
+      border-radius: 9px;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    .data-table {
+      width: 100%;
+      min-width: 620px;
+      border-collapse: collapse;
+      background: #fff;
+      font-size: 0.88rem;
+      line-height: 1.5;
+    }
+
+    .data-table th {
+      padding: 12px 14px;
+      color: #f7fbfd;
+      background: var(--navy);
+      font-size: 0.78rem;
+      font-weight: 720;
+      letter-spacing: 0.025em;
+      text-align: left;
+      vertical-align: bottom;
+    }
+
+    .data-table td {
+      padding: 12px 14px;
+      border-top: 1px solid var(--line);
+      vertical-align: top;
+      overflow-wrap: anywhere;
+    }
+
+    .data-table tbody tr:nth-child(even) { background: var(--table-stripe); }
+
+    .bibliography {
+      max-width: calc(var(--measure) + 4ch);
+      margin-top: 42px;
+      padding: 34px clamp(22px, 4vw, 38px);
+      background: var(--table-stripe);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+    }
+
+    .bibliography + .section { margin-top: 36px; }
+
+    .bib-entry {
+      display: grid;
+      grid-template-columns: 2.8em minmax(0, 1fr);
+      gap: 8px;
+      padding: 13px 0;
+      border-top: 1px solid var(--line);
+      font-size: 0.9rem;
+      line-height: 1.55;
+    }
+
+    .bib-entry:first-of-type { border-top: 0; }
+    .bib-number { color: var(--accent); font-weight: 760; }
+    .bib-text { min-width: 0; overflow-wrap: anywhere; }
+
+    .report-footer {
+      padding: 18px clamp(24px, 6vw, 72px);
+      color: var(--muted);
+      background: var(--footer-bg);
+      border-top: 1px solid var(--line);
+      font-size: 0.78rem;
+    }
+
+    @media (max-width: 640px) {
+      body { font-size: 16px; }
+      .report-shell { width: 100%; margin: 0; border: 0; border-radius: 0; box-shadow: none; }
+      .report-header { padding: 34px 20px 30px; }
+      .report-content { padding: 10px 18px 44px; }
+      .section { padding-top: 28px; }
+      .executive-summary, .bibliography { padding: 24px 18px 20px; border-radius: 9px; }
+      .report-meta { display: grid; gap: 4px; }
+      .report-meta span + span::before { display: none; }
+      .data-table { min-width: 560px; }
+      .bib-entry { grid-template-columns: 2.4em minmax(0, 1fr); }
+    }
+
+    html[data-theme="editorial"] .report-header {
+      min-height: 330px;
+      display: grid;
+      align-content: center;
+      background: linear-gradient(135deg, #182330 0%, #2f3b48 100%);
+    }
+
+    html[data-theme="editorial"] .report-header h1 { max-width: 18ch; }
+    html[data-theme="editorial"] .section-title { letter-spacing: -0.01em; }
+
+    html[data-theme="analytical"] .report-header { padding-block: 38px 34px; }
+    html[data-theme="analytical"] .report-header h1 {
+      max-width: 28ch;
+      font-family: Inter, ui-sans-serif, "PingFang SC", sans-serif;
+      font-size: clamp(1.9rem, 4vw, 3rem);
+      font-weight: 760;
+    }
+
+    html[data-theme="technical"] .report-header {
+      background-color: var(--navy);
+      background-image:
+        linear-gradient(rgba(80, 194, 184, 0.08) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(80, 194, 184, 0.08) 1px, transparent 1px);
+      background-size: 28px 28px;
+    }
+
+    @media (max-width: 640px) {
+      html[data-theme="editorial"] .report-header {
+        min-height: 240px;
+        padding: 34px 20px 30px;
+      }
+      html[data-theme="analytical"] .report-header { padding: 30px 20px 28px; }
+    }
+
+    @media print {
+      @page { margin: 18mm; }
+      html, body { background: #fff; }
+      .report-shell { width: 100%; margin: 0; border: 0; box-shadow: none; }
+      .report-header { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+      .table-wrap { overflow: visible; }
+      .data-table { min-width: 0; }
+      a { color: inherit; text-decoration: none; }
+      .section, .bib-entry, tr { break-inside: avoid; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
+    }
+  </style>
+</head>
+<body>
+  <article class="report-shell">
+    <header class="report-header">
+      <p class="eyebrow">Deep Research Report</p>
+      <h1>GrapMail Round 15 — Why the App Feels Slow: 2026 Email-Client Benchmark and Performance Root Causes</h1>
+      <div class="report-meta" aria-label="Report metadata">
+        <span>2026-11-19</span>
+        <span>22 sources</span>
+      </div>
+    </header>
+    <main class="report-content">
+      <section class="section executive-summary" id="executive-summary">
+<h2 class="section-title">Executive Summary</h2>
+<p>Three findings dominate the answer to "why does GrapMail still feel slow and unfinished even though the features are built?"</p>
+<ul>
+<li><strong>The largest gap is a release gap, not a code gap.</strong> Production answers 404 on three endpoints that exist in source — <code>/grapmail/files</code>, <code>/grapsee/auth/verify-human</code>, <code>/grapmail/notification-preview</code> — while auth-gated siblings correctly answer 401; clients fall back to degraded states that read as broken or slow (E2, E3). Backend commit <code>f9c43384</code> closes the gap in code; production flips 404→401 on server deploy.</li>
+<li><strong>An entire iOS screen was unreachable.</strong> The Scheduled screen existed but had no navigation wiring on iOS (Android had it wired). Commit <code>0fb5998e</code> wires it end-to-end (E1) — the round's cleanest proof that "exists in code" is not "usable in app".</li>
+<li><strong>Perceived speed has three measurable levers</strong>, evidenced by the 2026 benchmark and platform literature: cold-start compilation (Baseline Profiles — double-digit improvements reported <a class="citation" href="#ref-9" aria-label="Reference 9">[9]</a><a class="citation" href="#ref-10" aria-label="Reference 10">[10]</a><a class="citation" href="#ref-12" aria-label="Reference 12">[12]</a><a class="citation" href="#ref-13" aria-label="Reference 13">[13]</a><a class="citation" href="#ref-14" aria-label="Reference 14">[14]</a>); first-frame rendering of mail bodies (webview warm-up, HTTP cache, declarative blocking <a class="citation" href="#ref-16" aria-label="Reference 16">[16]</a><a class="citation" href="#ref-17" aria-label="Reference 17">[17]</a><a class="citation" href="#ref-18" aria-label="Reference 18">[18]</a><a class="citation" href="#ref-19" aria-label="Reference 19">[19]</a>); and offline-first behavior (the fastest clients work with no network at all <a class="citation" href="#ref-1" aria-label="Reference 1">[1]</a><a class="citation" href="#ref-2" aria-label="Reference 2">[2]</a><a class="citation" href="#ref-8" aria-label="Reference 8">[8]</a>).</li>
+</ul>
+<p><strong>Primary Recommendation:</strong> Apply backend commit <code>f9c43384</code> to production now (documented 404→401 smoke test), then run the R16 performance program: startup-profile regeneration, reader warm-up with time-to-first-render instrumentation, and an offline-first milestone.</p>
+<p><strong>Confidence Level:</strong> High for the deploy-gap and wiring findings (commit markers and live probes); Medium for performance magnitudes (directional literature values — GrapMail-specific baselines are the next measurement step).</p>
+</section>
+<section class="section" id="introduction">
+<h2 class="section-title">Introduction</h2>
+<h3 class="subsection-title">Research Question</h3>
+<p>Why does an app whose feature code is largely complete still feel slow and unfinished in daily use — and what, specifically, must change to fix that? The question matters because the project's audit history shows relaunches and polish rounds have not removed the sensation; this round tests whether the cause lies in the code, in the shipping layer, or in both.</p>
+<h3 class="subsection-title">Scope &amp; Methodology</h3>
+<p>Rounds R14–R15 of the audit program were mandated to go strictly deeper than R1–R13 — no repeats — and to make every change durable: all artifacts, receipts, and commits persisted to the shared local drive (F:\Grapsee All Time) so work survives a change of operating system or machine.</p>
+<p><strong>Method.</strong> Three evidence streams. (1) Repository verification at commit level: marker greps with <code>git show</code> at HEAD, a ~21-file md5 matrix against the applied-state ledger, and tree-vs-index listing diffs executed before every commit (379 entries for the mobile repo, 2,949 for the backend — both identical). (2) Production probes: anonymous HTTPS requests against <code>api.iqracsc.com</code> distinguishing 200 (healthy), 401 (route exists, auth-gated), and 404 (no handler) — a credential-free way to audit the shipped surface. (3) Public benchmarks and platform documentation: 2026 email-client comparisons for feature and architecture baselines, plus first-party Android/iOS guidance for cold-start and webview performance. Internal evidence is registered as E1–E6 in the Methodology Appendix; external sources are numbered <a class="citation" href="#ref-1" aria-label="Reference 1">[1]</a>–<a class="citation" href="#ref-22" aria-label="Reference 22">[22]</a> in the Bibliography (22 sources consulted; coverage: platform guidance 2022–2025, market comparisons 2026).</p>
+<h3 class="subsection-title">Key Assumptions</h3>
+<ul>
+<li><strong>Source of truth.</strong> The shared local drive is authoritative for "done"; production behavior is authoritative for "shipped". Where the two disagree, the report says so explicitly.</li>
+<li><strong>Anonymous probing.</strong> No credentials exist in this environment, so route existence (401 vs 404) is used as the shipped-surface signal; authenticated behavior is inferred, not exercised.</li>
+<li><strong>Directional external numbers.</strong> Performance figures from literature are treated as indicative ranges, not GrapMail measurements; no on-device profiling was performed this round.</li>
+<li><strong>Release actions are documented, not executed.</strong> Push/deploy steps requiring server credentials are handed off with exact instructions (DEPLOY-INSTRUCTIONS.md).</li>
+<li><strong>Mount reliability constrained methods.</strong> The shared drive exhibits intermittent I/O errors; the recovery recipe (sandbox index + <code>--missing-ok</code> + listing diff + compare-and-swap) is captured in REPO-HEALTH-2026-11-19.md.</li>
+</ul>
+</section>
+<section class="section" id="main-analysis">
+<h2 class="section-title">Main Analysis</h2>
+<h3 class="subsection-title">Finding 1: The Deploy Illusion — feature-complete code that production never received</h3>
+<p>On 2026-11-19 at 04:54 UTC, anonymous probes of the production API returned a precise picture of what is actually shipped (E3). Seven sibling grapmail routes — labels, aliases, screener, scheduled, attachments, message HTML, and push — answered 401, the expected response for a route that exists and is auth-gated. Three endpoints answered 404: <code>/grapmail/files</code>, <code>/grapsee/auth/verify-human</code>, and <code>/grapmail/notification-preview</code>. A 404 is not an auth refusal; it means no handler exists in production at all. For a client this is the difference between "log in to continue" and "this feature does nothing".</p>
+<p>The three routes exist in source — and had existed for many rounds. The reason they never reached production is a repository-level failure that until this round blocked every attempt to commit: the <code>.git/index</code> files of both repositories on the shared drive were damaged — truncated content, a stale <code>index.lock</code>, and intermittent I/O errors on the mount. Every commit attempt failed while writing trees, with cache-tree verification errors of the form <code>invalid object &lt;sha&gt; for '&lt;dir&gt;'</code>. The practical consequence: the R1–R13 fixpack was applied to the working trees but remained uncommitted, so the deployment pipeline had nothing new to pick up for these routes (E5, E6).</p>
+<p>Round 15 broke that logjam. Using a sandbox-index technique — build the index outside the damaged mount, write the tree with <code>--missing-ok</code>, verify the tree listing against the index listing before committing, update the branch ref with compare-and-swap, then heal the mount index — both repositories now carry real commits (E1, E2, E6). For the backend, commit <code>f9c43384</code> (2 files, +114 lines) adds the missing route module <code>services/shared/src/routes/grapmail-files.ts</code> and mounts it in <code>services/auth-service/src/index.ts</code> (import at L39, mount at L131). Verification before landing: a tree-vs-index listing diff over 2,949 entries returned identical.</p>
+<p>Why a single deploy finding explains so much of the "unfinished" feeling: each 404 converts a finished client-side feature into a degraded path — attachment flows that spin and fail, notification previews that never render, human-verification that dead-ends. Users do not experience "route not deployed"; they experience "this app is broken" or "this app is slow" — spinners that wait for a 404 and then fall back. The same logic explains the R10/R12 preview investigation, which found the sanitized HTML pipeline (CSP, blocked-image markers, opt-in refetch) to be code-complete: the missing ingredients were deployment and build age, not missing implementation.</p>
+<p>Current status, stated precisely: the gap is closed in code and open in production until the server applies commit <code>f9c43384</code> (apply the exported patch or push with credentials, rebuild, restart). The documented smoke test expects the three routes to move from 404 to 401 — "exists, auth-gated" — while <code>/health</code> stays 200. After that transition, the features behind those routes become exercisable, and any remaining "incomplete" reports can be re-checked against a genuinely current deployment instead of a stale one.</p>
+<h3 class="subsection-title">Finding 2: Cold start — the highest-leverage Android lever</h3>
+<p>The moment that defines an app as "slow" is tap-to-first-frame, and on Android that window is dominated by runtime work: class loading, interpretation, and JIT compilation of the code paths the app actually touches. Whatever those hot paths are — application startup, the first mailbox render, the first image decode — the runtime must discover them on a cold launch unless it is told in advance.</p>
+<p>Baseline Profiles change that negotiation. Shipped inside the APK, a profile lists the classes and methods that matter for key journeys; the runtime compiles those ahead of time at install (AOT) instead of discovering them during use. The mechanism was introduced and scaled by the Android team <a class="citation" href="#ref-10" aria-label="Reference 10">[10]</a>, and is documented officially, including generation via Macrobenchmark's <code>BaselineProfileRule</code> and per-API-level optimizations <a class="citation" href="#ref-11" aria-label="Reference 11">[11]</a><a class="citation" href="#ref-12" aria-label="Reference 12">[12]</a>. The effect lands precisely in the first seconds users judge: Meta's engineering team reports double-digit percentage improvements in cold start time across its Android apps after adopting baseline profiles <a class="citation" href="#ref-9" aria-label="Reference 9">[9]</a>; Google's codelab and platform talks walk teams through measuring it on real devices <a class="citation" href="#ref-12" aria-label="Reference 12">[12]</a><a class="citation" href="#ref-15" aria-label="Reference 15">[15]</a>; production apps outside the largest publishers document the same direction <a class="citation" href="#ref-13" aria-label="Reference 13">[13]</a>.</p>
+<p>The caveats matter as much as the promise. A baseline profile helps only the journeys it covers — if the profile's startup journey does not match the real cold-start path into the inbox, the gains go missing <a class="citation" href="#ref-14" aria-label="Reference 14">[14]</a>. Device class matters: low- and mid-tier hardware shows the largest improvements, while high-end devices benefit least. And a stale profile is worse than a fresh one, which makes CI integration — regenerate on release — as important as initial generation <a class="citation" href="#ref-14" aria-label="Reference 14">[14]</a><a class="citation" href="#ref-15" aria-label="Reference 15">[15]</a>.</p>
+<p>GrapMail's position (E4): the applied-state matrix shows Baseline Profile infrastructure already partially present — build configuration and Android walk scripts exist in the repository. What is missing is a startup-journey profile measured on a device/emulator matrix that matches GrapMail's user fleet, plus a CI step that keeps it fresh so the compilation windows stay aligned with the code. This is the cheapest high-leverage lever available: it requires no architecture change, targets exactly the sensation users report, and compounds across every feature added later.</p>
+<h3 class="subsection-title">Finding 3: First frame — what the mail reader costs before it draws</h3>
+<p>Reading mail is the app's core loop, and on both platforms message bodies render in a webview: sanitized HTML with a locked-down content-security policy, remote images annotated as blocked and refetched only on explicit opt-in (the R10/R12 parity work; E4). That architecture is correct for security; the remaining question is how many milliseconds pass between "user taps a message" and "text is legible".</p>
+<p>That path has a well-documented cost profile. Practitioners measure a significant share of webview display latency inside the gap between <code>loadHTMLString()</code> and <code>didFinishNavigation()</code> — the engine parses and lays out the document before the first frame, and a cold webview process adds its own startup <a class="citation" href="#ref-17" aria-label="Reference 17">[17]</a>. Production case studies report webview shows around the three-second mark and roughly halving them through resource-level optimization rather than rewrites — targeted fixes, not architectural ones <a class="citation" href="#ref-18" aria-label="Reference 18">[18]</a>.</p>
+<p>Three mitigations have public track records. First, warm instances: keep one bounded, reusable webview near the user's path and preload an inert shell early; preloading the URLs users actually open seeds the HTTP cache so the subsequent real load is a cache hit <a class="citation" href="#ref-16" aria-label="Reference 16">[16]</a>. The same literature warns against blanket preloading — every warm webview costs memory and startup time, so the pool must be small and deliberate <a class="citation" href="#ref-18" aria-label="Reference 18">[18]</a>. Second, caching: second and subsequent loads served from the HTTP cache are materially faster, which argues for caching sanitized markup per message and revalidating rarely <a class="citation" href="#ref-16" aria-label="Reference 16">[16]</a><a class="citation" href="#ref-19" aria-label="Reference 19">[19]</a>. Third, declarative blocking: WKWebView content rule lists compile once into bytecode and run far more cheaply than injected JavaScript blockers, making them the right mechanism for image and tracker policy <a class="citation" href="#ref-19" aria-label="Reference 19">[19]</a><a class="citation" href="#ref-21" aria-label="Reference 21">[21]</a>.</p>
+<p>Two API-level details are easy wins: <code>loadHTMLString(_:baseURL:)</code> should receive a local base URL when the document references bundled assets (templates, fonts, CSS) so those loads stay on-device <a class="citation" href="#ref-21" aria-label="Reference 21">[21]</a><a class="citation" href="#ref-22" aria-label="Reference 22">[22]</a>; and the web view should be installed as the view controller's own view via <code>loadView</code> rather than nested into a deeper hierarchy, a pattern that avoids avoidable layout cost at presentation time <a class="citation" href="#ref-22" aria-label="Reference 22">[22]</a>. File-based shells via <code>loadFileURL</code>/<code>loadFileRequest</code> are the alternative when the document body is injected after the shell is already warm <a class="citation" href="#ref-21" aria-label="Reference 21">[21]</a>.</p>
+<p>Memory discipline is the constraint that keeps these wins from backfiring: WKWebView runs in its own content process and is heavyweight; leaks and unbounded instance growth are known to degrade memory and responsiveness over a session <a class="citation" href="#ref-20" aria-label="Reference 20">[20]</a>. GrapMail's plan is therefore a single warm reader instance per surface with an explicit teardown policy — sanitized shell cached, body injected on open, and time-to-first-render instrumented so the change is measured rather than assumed (see Recommendations).</p>
+<h3 class="subsection-title">Finding 4: Offline-first — the architecture 2026's fastest clients converged on</h3>
+<p>The 2026 benchmark makes offline behavior a first-class speed feature, not a checkbox. Field reports describe Superhuman's offline mode as effectively invisible — "you just get a little banner" — with read, search, compose, snooze, archive, and schedule all working offline and sends queued until reconnect <a class="citation" href="#ref-2" aria-label="Reference 2">[2]</a>. Companion reviews highlight "super fast offline search" and the same full action set offline <a class="citation" href="#ref-1" aria-label="Reference 1">[1]</a>; Fabric's comparison states offline access across desktop and mobile apps with sync on reconnect <a class="citation" href="#ref-8" aria-label="Reference 8">[8]</a>. Spark, meanwhile, needs no explicit enablement but caches only recent mail — and the same reviews note users complaining that it is slow, a direct consequence of cache limits meeting large mailboxes <a class="citation" href="#ref-1" aria-label="Reference 1">[1]</a><a class="citation" href="#ref-2" aria-label="Reference 2">[2]</a>.</p>
+<p>The sync architectures underneath differ, and the difference is instructive. Spark keeps a server-side layer that can fire send-later and snooze timers even while the device is offline; Superhuman's model requires reaching the provider for send and sync, so a queued send waits for reconnection <a class="citation" href="#ref-6" aria-label="Reference 6">[6]</a>. Both work because the client treats the local store — metadata, bodies, indexes — as the primary surface, and the network as a synchronization and planning mechanism.</p>
+<p>The anti-patterns are equally visible in the benchmark: clients that require an explicit "enable offline" toggle (by the time users need it, it is too late <a class="citation" href="#ref-2" aria-label="Reference 2">[2]</a>), and cache-limited offline that leaves holes for archive-everything workflows <a class="citation" href="#ref-1" aria-label="Reference 1">[1]</a>. The speed property users perceive is architectural: if the first screen can render from disk, network latency never enters the interaction; if it waits on the network, no amount of server-side optimization removes the pause.</p>
+<p>Where GrapMail stands (E4): the mobile clients carry model layers with cached state (Android's <code>MailboxViewModel</code>, iOS's <code>MailboxModel</code> both present in the applied-state matrix), and earlier rounds fixed a real cache artifact in avatar fetching. What R16–R17 must instrument and finish: snapshot-first rendering (paint the mailbox from the local store before any refresh request), optimistic triage with an outbox queue for archive/move/send actions, and a local search index that answers without the network. Those changes are additive to the current architecture — no rewrite required — and they directly address the "feels slow" half of the user complaint that deploy fixes alone cannot.</p>
+<p>For market context: the two leaders optimize for different axes — Superhuman for single-user speed at a premium price, Spark for cross-platform breadth and team features with a free tier <a class="citation" href="#ref-3" aria-label="Reference 3">[3]</a><a class="citation" href="#ref-5" aria-label="Reference 5">[5]</a><a class="citation" href="#ref-7" aria-label="Reference 7">[7]</a>; one widely cited comparison is vendor-authored and should be read with that in mind <a class="citation" href="#ref-4" aria-label="Reference 4">[4]</a>. The common denominator remains the one GrapMail should copy: local-first speed.</p>
+<h3 class="subsection-title">Finding 5: Feature parity — the iOS Scheduled screen and the perception gap</h3>
+<p>The cleanest example of "complete but unusable" in this round is the iOS Scheduled screen. The view file existed and was tracked in the repository — ScheduledView.swift, 5,477 bytes — but nothing navigated to it: no route case, no navigation row, no dispatch in the iOS navigation switch. Android had the equivalent screen wired and included in its baseline-profile journeys; iOS users had no way to reach the feature at all (R12 census; E5). A finished piece of work was invisible to every user.</p>
+<p>Round 15 fixed the wiring end-to-end and verified it inside the commit (E1): the navigation enum gains <code>mailScheduled</code> (RootView.swift L76), the settings panel gains an <code>onScheduled</code> row, and the switch dispatches to <code>ScheduledView</code> (L903–904), with a snapshot seed added for the screenshot walk. The verification pattern matters as much as the fix: the check was performed against the commit object itself (<code>git show HEAD:...</code>), not against the working tree — so the receipt proves what shipped rather than what was left on disk.</p>
+<p>Why parity gaps amplify perceived incompleteness: like the deploy gap in Finding 1, an unreachable screen converts "already built" into "missing" at the user's fingertips. Users do not audit code; they audit what happens when they tap. Two of this round's biggest complaints traced to exactly this category — a screen nobody could open and routes nobody could call.</p>
+<p>The 2026 benchmark sets the parity bar. Snooze and send-later are table stakes: field reviews of Superhuman describe the full action set working offline <a class="citation" href="#ref-2" aria-label="Reference 2">[2]</a>, and comparisons treat scheduling and offline triage as core speed features, not extras <a class="citation" href="#ref-1" aria-label="Reference 1">[1]</a><a class="citation" href="#ref-6" aria-label="Reference 6">[6]</a>. Team-oriented clients add shared inboxes and delegation <a class="citation" href="#ref-6" aria-label="Reference 6">[6]</a>; AI-assistant tiers now sit above the client layer entirely <a class="citation" href="#ref-7" aria-label="Reference 7">[7]</a>. Cross-platform breadth also scores: reviewers rate Spark's mobile apps higher on fluency than Superhuman's <a class="citation" href="#ref-5" aria-label="Reference 5">[5]</a>, while Superhuman optimizes single-user speed at a premium <a class="citation" href="#ref-3" aria-label="Reference 3">[3]</a>; one widely cited comparison is vendor-authored and should be read accordingly <a class="citation" href="#ref-4" aria-label="Reference 4">[4]</a>.</p>
+<p>With iOS Scheduled now wired, the remaining parity work is a repeatable census rather than a hunt: apply the R12 method (route table vs navigation graph vs dispatch switch) to every platform after each release, and verify newly reachable screens on device builds. That method is what caught this one; run per-round, it prevents the next one. Whether additional iOS orphans or feature-depth gaps (for example, send-later UX polish) remain is the first item of the R16 census.</p>
+<h3 class="subsection-title">Finding 6: Release engineering — make "done" mean deployed</h3>
+<p>Every major finding in this round shares one shape: the code was mostly right, and the shipping layer was wrong. The fixpack existed but was uncommitted. The routes existed but were undeployed. The screen existed but was unreachable. The builds were older than the code. None of these are feature failures; all of them are release-engineering failures — and from a user's chair they are indistinguishable from "the app is broken, slow, or incomplete".</p>
+<p>The mechanism that kept the fixpack uncommitted deserves a precise record (E5, E6). Both repositories' <code>.git/index</code> files on the shared drive were damaged — truncated content, a stale <code>index.lock</code>, and intermittent I/O errors. Every commit attempt failed during tree writing with cache-tree verification errors of the form <code>invalid object &lt;sha&gt; for '&lt;dir&gt;'</code>. The working trees carried the fixes for rounds; the history did not. This round's recovery — sandbox-side index construction, <code>write-tree --missing-ok</code>, tree-vs-index listing verification before every commit, compare-and-swap ref updates, and an index heal-copy back to the mount — is documented as a repeatable recipe in REPO-HEALTH-2026-11-19.md, because the disease can recur on this class of storage.</p>
+<p>The verification culture that worked should be preserved deliberately: probes that distinguish 200/401/404 so "route missing" is provable without credentials; in-commit marker checks so receipts describe shipped objects rather than intentions; md5 matrices so "applied state" is a fact; and receipts written to the shared drive so evidence survives an OS change (E6 cross-mount probes). Each artifact in this folder is reproducible from the commands embedded in it.</p>
+<p>The forward-looking recommendation is therefore a release checklist that turns "done" into a verified state: commit → build → deploy → smoke → receipt, automated where possible. Two specific rails: (1) a post-deploy smoke script embedding the 404→401 table from DEPLOY-INSTRUCTIONS.md, and (2) a build-age check for each environment, alarming when production is older than the latest release. These are cheap, and they directly prevent the failure class behind this round's two biggest findings.</p>
+</section>
+<section class="section" id="synthesis-insights">
+<h2 class="section-title">Synthesis &amp; Insights</h2>
+<p>Three patterns organize everything this round found.</p>
+<p>First, <strong>the boundary between repository and user is where completeness broke</strong> — not the code inside it. Three independent evidence streams (commit history, live probes, benchmark) each show the same failure shape: work finished at the desk, lost in transit — uncommitted, undeployed, unreachable. The practical consequence: any future "is it done?" audit should start by verifying the last mile, because that is where this project's answers have gone wrong most often.</p>
+<p>Second, <strong>perceived speed is a stack of three layers, each with a different owner and a measurable fix</strong>. Launch speed belongs to cold-start compilation (Baseline Profiles <a class="citation" href="#ref-9" aria-label="Reference 9">[9]</a>–<a class="citation" href="#ref-15" aria-label="Reference 15">[15]</a>); the mail-reading moment belongs to the webview and its cache/warm-up strategy (<a class="citation" href="#ref-16" aria-label="Reference 16">[16]</a>–<a class="citation" href="#ref-22" aria-label="Reference 22">[22]</a>); interactions between fetches belong to the offline-first architecture (<a class="citation" href="#ref-1" aria-label="Reference 1">[1]</a>, <a class="citation" href="#ref-2" aria-label="Reference 2">[2]</a>, <a class="citation" href="#ref-8" aria-label="Reference 8">[8]</a>). None of the three requires a rewrite, and each can be measured before it is changed. The investment order by leverage is: deploy fixes first (hours; removes literal breakage), then startup profiles (days; affects the first second users feel), then reader warm-up (days; affects the core loop), then offline-first depth (weeks; removes network latency from perception).</p>
+<p>Third, <strong>verification discipline compounds</strong>. The techniques used this round — listing diffs before commit, compare-and-swap ref updates, probe semantics, commit-object marker greps, receipts on shared storage — are not overhead; they are what prevented silent corruption and false "done" claims. Small rails, installed permanently, outperform heroics repeated each round.</p>
+<p>The user-facing bet this report makes: "slow" and "incomplete" are currently conflated symptoms of network-gated reads, missing-route fallbacks, and cold-start friction. Separate them, fix the layers in the order above, and the perception should improve visibly after the first two waves — before any new feature work.</p>
+</section>
+<section class="section" id="limitations-caveats">
+<h2 class="section-title">Limitations &amp; Caveats</h2>
+<p>No on-device profiling was performed this round: the performance magnitudes cited are directional values from platform literature and public case studies, not GrapMail measurements; establish before/after baselines (cold start, time-to-first-render) before making quantitative claims about GrapMail. Production probing was anonymous only — route existence (401 vs 404) is the evidence; authenticated end-to-end flows were neither exercised nor possible without credentials. Competitor evidence is third-party and occasionally vendor-authored (source <a class="citation" href="#ref-4" aria-label="Reference 4">[4]</a> is Spark's own blog; flagged where used); market features and pricing drift quickly, and video-review quotes paraphrase by nature. The platform guidance cited is general — GrapMail's specific stacks (SwiftUI + WKWebView on iOS; Kotlin + WebView on Android) may respond differently, so measurement precedes conviction. The shared drive's intermittent I/O errors constrained repository operations and could recur; the mitigation recipe is documented, but the underlying storage behavior is outside this audit's control. Finally, prior-session notes R8/R9 are permanently lost (the archived zip contains R1–R7 only; E5), so this round's evidence is complete only with respect to what the current repository and receipts record.</p>
+</section>
+<section class="section" id="recommendations">
+<h2 class="section-title">Recommendations</h2>
+<ol>
+<li><strong>Deploy backend commit <code>f9c43384</code> to production now.</strong> Apply the exported patch (or push with credentials), rebuild, restart; run the smoke table — <code>/grapmail/files</code>, <code>/grapsee/auth/verify-human</code>, <code>/grapmail/notification-preview</code> must flip 404→401 and <code>/health</code> stay 200; store the output as a receipt. Hours of work; removes the "broken feature" class entirely. (E2, E3)</li>
+<li><strong>Regenerate Android Baseline Profiles around the real startup journey</strong> (cold start → inbox first frame), add the generation step to CI so profiles track releases, and measure on low/mid-tier devices where gains are largest. Re-run Macrobenchmark before/after to capture GrapMail-specific numbers. <a class="citation" href="#ref-9" aria-label="Reference 9">[9]</a><a class="citation" href="#ref-11" aria-label="Reference 11">[11]</a><a class="citation" href="#ref-12" aria-label="Reference 12">[12]</a><a class="citation" href="#ref-13" aria-label="Reference 13">[13]</a><a class="citation" href="#ref-14" aria-label="Reference 14">[14]</a></li>
+<li><strong>Warm the reader.</strong> Keep one bounded WKWebView instance alive off-screen, preload an inert shell when a mailbox opens, cache sanitized markup per message, keep declarative content rules compiled once, and instrument time-to-first-render so the improvement is measured, not assumed. <a class="citation" href="#ref-16" aria-label="Reference 16">[16]</a><a class="citation" href="#ref-17" aria-label="Reference 17">[17]</a><a class="citation" href="#ref-18" aria-label="Reference 18">[18]</a><a class="citation" href="#ref-19" aria-label="Reference 19">[19]</a><a class="citation" href="#ref-20" aria-label="Reference 20">[20]</a><a class="citation" href="#ref-21" aria-label="Reference 21">[21]</a><a class="citation" href="#ref-22" aria-label="Reference 22">[22]</a></li>
+<li><strong>Ship offline-first milestone 1</strong>: snapshot-first mailbox render (paint from the local store before any refresh), optimistic triage with an outbox for archive/move/send, and a local search index. Additive to the current model layers; removes network latency from the perception loop. <a class="citation" href="#ref-1" aria-label="Reference 1">[1]</a><a class="citation" href="#ref-2" aria-label="Reference 2">[2]</a><a class="citation" href="#ref-8" aria-label="Reference 8">[8]</a></li>
+<li><strong>Run the parity census every release</strong>: route table vs navigation graph vs dispatch switch across both platforms (the method that caught the iOS Scheduled orphan), verify newly reachable screens on device builds, and review send-later/snooze UX against the benchmark set. <a class="citation" href="#ref-1" aria-label="Reference 1">[1]</a><a class="citation" href="#ref-2" aria-label="Reference 2">[2]</a><a class="citation" href="#ref-6" aria-label="Reference 6">[6]</a></li>
+<li><strong>Install release rails</strong>: automate commit → build → deploy → smoke → receipt; add build-age monitoring per environment; keep the listing-diff and compare-and-swap practices from REPO-HEALTH-2026-11-19.md as permanent release hygiene. (E5, E6)</li>
+<li><strong>Continue the iterative rounds (R16+) with the same receipt discipline</strong>: each round refreshes probes, records evidence, and treats "done" as deployed-plus-verified. The queue: send-later UI parity, search operators, push deployment verification, and the instrumentation named above.</li>
+</ol>
+</section>
+<section class="section bibliography" id="bibliography">
+<h2 class="section-title">Bibliography</h2>
+<p>All URLs accessed 2026-11-19.</p>
+<div class="bib-entry" id="ref-1"><span class="bib-number">[1]</span><div class="bib-text">Superhuman vs Spark: Which Should You Choose? — Efficient App. <a class="external-link" href="https://efficient.app/compare/superhuman-vs-spark" target="_blank" rel="noopener noreferrer">https://efficient.app/compare/superhuman-vs-spark</a></div></div>
+<div class="bib-entry" id="ref-2"><span class="bib-number">[2]</span><div class="bib-text">Best Email Clients 2026: Superhuman vs Notion Mail vs Spark vs Gmail — video review, YouTube. <a class="external-link" href="https://www.youtube.com/watch?v=nd5zP5acUBs" target="_blank" rel="noopener noreferrer">https://www.youtube.com/watch?v=nd5zP5acUBs</a></div></div>
+<div class="bib-entry" id="ref-3"><span class="bib-number">[3]</span><div class="bib-text">Spark vs Superhuman: Which Email App in 2026? — UseCarly. <a class="external-link" href="https://www.usecarly.com/blog/spark-vs-superhuman" target="_blank" rel="noopener noreferrer">https://www.usecarly.com/blog/spark-vs-superhuman</a></div></div>
+<div class="bib-entry" id="ref-4"><span class="bib-number">[4]</span><div class="bib-text">Spark vs Superhuman: which one to choose in 2026? — Spark Mail blog (vendor-authored). <a class="external-link" href="https://sparkmailapp.com/blog/spark-vs-superhuman" target="_blank" rel="noopener noreferrer">https://sparkmailapp.com/blog/spark-vs-superhuman</a></div></div>
+<div class="bib-entry" id="ref-5"><span class="bib-number">[5]</span><div class="bib-text">Best Superhuman Alternatives in 2026 (Free &amp; Cheaper Options) — ToolFinder. <a class="external-link" href="https://toolfinder.com/comparisons/superhuman-vs-spark-mail" target="_blank" rel="noopener noreferrer">https://toolfinder.com/comparisons/superhuman-vs-spark-mail</a></div></div>
+<div class="bib-entry" id="ref-6"><span class="bib-number">[6]</span><div class="bib-text">Superhuman vs Spark on Mac: Speed, Cost and Account Support — aiemaily. <a class="external-link" href="https://aiemaily.com/blog/superhuman-vs-spark-on-mac" target="_blank" rel="noopener noreferrer">https://aiemaily.com/blog/superhuman-vs-spark-on-mac</a></div></div>
+<div class="bib-entry" id="ref-7"><span class="bib-number">[7]</span><div class="bib-text">Superhuman vs Spark: Is the Price Gap Worth It? — Catch. <a class="external-link" href="https://www.catchagent.ai/compare/superhuman-vs-spark" target="_blank" rel="noopener noreferrer">https://www.catchagent.ai/compare/superhuman-vs-spark</a></div></div>
+<div class="bib-entry" id="ref-8"><span class="bib-number">[8]</span><div class="bib-text">Does Superhuman work offline? Superhuman vs Microsoft Outlook — Fabric. <a class="external-link" href="https://fabric.so/comparison/superhuman-vs-outlook" target="_blank" rel="noopener noreferrer">https://fabric.so/comparison/superhuman-vs-outlook</a></div></div>
+<div class="bib-entry" id="ref-9"><span class="bib-number">[9]</span><div class="bib-text">Accelerating our Android apps with baseline profiles — Meta Engineering. <a class="external-link" href="https://engineering.fb.com/2025/10/01/android/accelerating-our-android-apps-with-baseline-profiles/" target="_blank" rel="noopener noreferrer">https://engineering.fb.com/2025/10/01/android/accelerating-our-android-apps-with-baseline-profiles/</a></div></div>
+<div class="bib-entry" id="ref-10"><span class="bib-number">[10]</span><div class="bib-text">Improving app performance with Baseline Profiles — Android Developers Blog. <a class="external-link" href="https://android-developers.googleblog.com/2022/01/improving-app-performance-with-baseline.html" target="_blank" rel="noopener noreferrer">https://android-developers.googleblog.com/2022/01/improving-app-performance-with-baseline.html</a></div></div>
+<div class="bib-entry" id="ref-11"><span class="bib-number">[11]</span><div class="bib-text">Baseline Profiles overview — Android Developers documentation. <a class="external-link" href="https://developer.android.com/topic/performance/baselineprofiles/overview" target="_blank" rel="noopener noreferrer">https://developer.android.com/topic/performance/baselineprofiles/overview</a></div></div>
+<div class="bib-entry" id="ref-12"><span class="bib-number">[12]</span><div class="bib-text">Android Baseline Profiles codelab — Google Developers. <a class="external-link" href="https://codelabs.developers.google.com/android-baseline-profiles-improve" target="_blank" rel="noopener noreferrer">https://codelabs.developers.google.com/android-baseline-profiles-improve</a></div></div>
+<div class="bib-entry" id="ref-13"><span class="bib-number">[13]</span><div class="bib-text">Expensify App issue #99839 — baseline profile startup measurement, GitHub. <a class="external-link" href="https://github.com/Expensify/App/issues/99839" target="_blank" rel="noopener noreferrer">https://github.com/Expensify/App/issues/99839</a></div></div>
+<div class="bib-entry" id="ref-14"><span class="bib-number">[14]</span><div class="bib-text">Baseline Profile, where art thou? — ProAndroidDev. <a class="external-link" href="https://proandroiddev.com/baseline-profile-where-art-thou-7d995d9e86f2" target="_blank" rel="noopener noreferrer">https://proandroiddev.com/baseline-profile-where-art-thou-7d995d9e86f2</a></div></div>
+<div class="bib-entry" id="ref-15"><span class="bib-number">[15]</span><div class="bib-text">Baseline profiles — Android Developers talk, YouTube. <a class="external-link" href="https://www.youtube.com/watch?v=WWdDzXgrkmg" target="_blank" rel="noopener noreferrer">https://www.youtube.com/watch?v=WWdDzXgrkmg</a></div></div>
+<div class="bib-entry" id="ref-16"><span class="bib-number">[16]</span><div class="bib-text">iOS WKWebView Preload and Cache: Boost Page Load Speed — ZhgChgLi. <a class="external-link" href="https://en.zhgchg.li/posts/zrealm-dev/ios-wkwebview-preload-and-cache-boost-page-load-speed-with-efficient-resource-management-5033090c18ba" target="_blank" rel="noopener noreferrer">https://en.zhgchg.li/posts/zrealm-dev/ios-wkwebview-preload-and-cache-boost-page-load-speed-with-efficient-resource-management-5033090c18ba</a></div></div>
+<div class="bib-entry" id="ref-17"><span class="bib-number">[17]</span><div class="bib-text">Tactics to speed up WKWebView rendering of loadHTMLString content — Stack Overflow. <a class="external-link" href="https://stackoverflow.com/questions/26684558/tactics-to-speed-up-wkwebview-rendering-of-loadhtmlstring-d-content" target="_blank" rel="noopener noreferrer">https://stackoverflow.com/questions/26684558/tactics-to-speed-up-wkwebview-rendering-of-loadhtmlstring-d-content</a></div></div>
+<div class="bib-entry" id="ref-18"><span class="bib-number">[18]</span><div class="bib-text">Preload strategies using WKWebView — Jonatán Urquiza, talk (YouTube). <a class="external-link" href="https://www.youtube.com/watch?v=ZQvyfFieBfs" target="_blank" rel="noopener noreferrer">https://www.youtube.com/watch?v=ZQvyfFieBfs</a></div></div>
+<div class="bib-entry" id="ref-19"><span class="bib-number">[19]</span><div class="bib-text">WKWebView — NSHipster. <a class="external-link" href="https://nshipster.com/wkwebview" target="_blank" rel="noopener noreferrer">https://nshipster.com/wkwebview</a></div></div>
+<div class="bib-entry" id="ref-20"><span class="bib-number">[20]</span><div class="bib-text">Why Is WKWebView So Heavy and Why Is Leaking It So Bad? — Embrace. <a class="external-link" href="https://embrace.io/blog/wkwebview-memory-leaks" target="_blank" rel="noopener noreferrer">https://embrace.io/blog/wkwebview-memory-leaks</a></div></div>
+<div class="bib-entry" id="ref-21"><span class="bib-number">[21]</span><div class="bib-text">WKWebView — Apple Developer Documentation. <a class="external-link" href="https://developer.apple.com/documentation/webkit/wkwebview" target="_blank" rel="noopener noreferrer">https://developer.apple.com/documentation/webkit/wkwebview</a></div></div>
+<div class="bib-entry" id="ref-22"><span class="bib-number">[22]</span><div class="bib-text">The Ultimate Guide to WKWebView — Hacking with Swift. <a class="external-link" href="https://www.hackingwithswift.com/articles/112/the-ultimate-guide-to-wkwebview" target="_blank" rel="noopener noreferrer">https://www.hackingwithswift.com/articles/112/the-ultimate-guide-to-wkwebview</a></div></div>
+</section>
+<section class="section" id="methodology-appendix">
+<h2 class="section-title">Methodology Appendix</h2>
+<p><strong>Pipeline.</strong> This report follows a standard deep-research pipeline (scope → plan → retrieve → triangulate → synthesize → critique → package) with citation tracking throughout. Internal audit evidence was integrated alongside external retrieval: repository verification and production probing supply the project-specific facts; public sources supply market and platform references. Every factual claim is cited immediately — internal claims to the evidence register below, external claims to numbered sources.</p>
+<p><strong>Internal evidence register.</strong></p>
+<ul>
+<li><strong>E1 — Mobile commit.</strong> <code>0fb5998e0689faf73089d7bf8e19fc39573aa8f0</code> (branch <code>feat/onboarding-native-scenes</code>; 21 files, +1211/−201). In-commit markers verified: RootView.swift L76 (<code>mailScheduled</code>), L833 (closure), L903–904 (dispatch); AttachmentThumb.kt present at HEAD. Receipt: receipts/COMMIT-RECEIPT-MOBILE.md.</li>
+<li><strong>E2 — Backend commit.</strong> <code>f9c43384d0d2dff34a56b51714225055ffa42be7</code> (branch <code>main</code>; 2 files, +114). Markers: auth-service index.ts L39 (import) / L131 (route mount); grapmail-files.ts added. Receipt: receipts/COMMIT-RECEIPT-BACKEND.md.</li>
+<li><strong>E3 — Production probes.</strong> 2026-11-19, anonymous: <code>/grapmail/files</code>, <code>/grapsee/auth/verify-human</code>, <code>/grapmail/notification-preview</code> → 404; <code>/grapmail/labels</code> → 401; <code>/health</code> → 200. Reproduce via the commands in DEPLOY-INSTRUCTIONS.md.</li>
+<li><strong>E4 — Applied-state matrix.</strong> ~21 files byte-identical (md5) to the A18/A19 applied-state ledgers across both repositories, including build.gradle.kts, MailboxViewModel.kt, RootView.swift, MailboxModel.swift, and the backend auth index.ts / grapmail-files.ts.</li>
+<li><strong>E5 — Receipts &amp; archive.</strong> A19 receipts folder (incident log, diffs, commit receipts) plus the A18 fixpack archive; R8/R9 notes are absent from the archive (documented loss).</li>
+<li><strong>E6 — Storage probes &amp; recovery.</strong> Cross-mount write/read verification (same physical files visible from both mount roots) and the index-recovery recipe now recorded in REPO-HEALTH-2026-11-19.md.</li>
+</ul>
+<p><strong>External evidence handling.</strong> 22 sources were registered in citation order <a class="citation" href="#ref-1" aria-label="Reference 1">[1]</a>–<a class="citation" href="#ref-22" aria-label="Reference 22">[22]</a> and cited with immediate attribution. Source mix: market comparisons and reviews <a class="citation" href="#ref-1" aria-label="Reference 1">[1]</a><a class="citation" href="#ref-3" aria-label="Reference 3">[3]</a><a class="citation" href="#ref-5" aria-label="Reference 5">[5]</a><a class="citation" href="#ref-6" aria-label="Reference 6">[6]</a><a class="citation" href="#ref-7" aria-label="Reference 7">[7]</a>, video reviews <a class="citation" href="#ref-2" aria-label="Reference 2">[2]</a><a class="citation" href="#ref-18" aria-label="Reference 18">[18]</a>, a vendor comparison flagged as such <a class="citation" href="#ref-4" aria-label="Reference 4">[4]</a>, platform documentation and engineering posts <a class="citation" href="#ref-9" aria-label="Reference 9">[9]</a><a class="citation" href="#ref-10" aria-label="Reference 10">[10]</a><a class="citation" href="#ref-11" aria-label="Reference 11">[11]</a><a class="citation" href="#ref-12" aria-label="Reference 12">[12]</a><a class="citation" href="#ref-13" aria-label="Reference 13">[13]</a><a class="citation" href="#ref-14" aria-label="Reference 14">[14]</a>, talks <a class="citation" href="#ref-15" aria-label="Reference 15">[15]</a><a class="citation" href="#ref-18" aria-label="Reference 18">[18]</a>, a forum thread <a class="citation" href="#ref-17" aria-label="Reference 17">[17]</a>, and web guides/docs <a class="citation" href="#ref-8" aria-label="Reference 8">[8]</a><a class="citation" href="#ref-16" aria-label="Reference 16">[16]</a><a class="citation" href="#ref-19" aria-label="Reference 19">[19]</a><a class="citation" href="#ref-20" aria-label="Reference 20">[20]</a><a class="citation" href="#ref-21" aria-label="Reference 21">[21]</a><a class="citation" href="#ref-22" aria-label="Reference 22">[22]</a>. Claim-support mapping was maintained during writing; vendor bias and paraphrase risks are flagged in Limitations.</p>
+<p><strong>Reproducibility.</strong> All internal claims trace to commits, probes, and receipts on the shared drive; all external claims trace to the numbered sources above. Commands for the key verifications are embedded in the receipts and in REPO-HEALTH-2026-11-19.md.</p>
+</section>
+    </main>
+    <footer class="report-footer">Generated as a standalone, citation-preserving research report.</footer>
+  </article>
+</body>
+</html>

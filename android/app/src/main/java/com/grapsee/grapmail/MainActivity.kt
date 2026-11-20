@@ -17,7 +17,7 @@ import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.testTagsAsResourceId
 import androidx.compose.ui.unit.dp
-import androidx.activity.ComponentActivity
+import androidx.fragment.app.FragmentActivity
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -116,7 +116,7 @@ import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalComposeUiApi::class)
-class MainActivity : ComponentActivity() {
+class MainActivity : FragmentActivity() {
     /**
      * The home-screen "Compose mail" request, held here because the intent that
      * carries it arrives before any composable exists to act on it.
@@ -129,6 +129,13 @@ class MainActivity : ComponentActivity() {
      * recomposition and open a composer nobody asked for.
      */
     private val composeRequest = androidx.compose.runtime.mutableStateOf(false)
+    /** The widget's / send-later notice's route request: which mail surface a
+     *  tap asked for, held until a signed-in graph consumes it. */
+    private val openScheduledRequest = androidx.compose.runtime.mutableStateOf(false)
+
+    /** The shortcuts' route request for the subscriptions board, held the same
+     *  way and for the same reason. */
+    private val openSubscriptionsRequest = androidx.compose.runtime.mutableStateOf(false)
     private val notificationTarget = androidx.compose.runtime.mutableStateOf<com.grapsee.grapmail.logic.Notifications.MailTarget?>(null)
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -195,6 +202,10 @@ class MainActivity : ComponentActivity() {
                         GrapMailNav(
                             composeRequest = composeRequest.value,
                             onComposeRequestConsumed = { composeRequest.value = false },
+                            openScheduled = openScheduledRequest.value,
+                            onOpenScheduledConsumed = { openScheduledRequest.value = false },
+                            openSubscriptions = openSubscriptionsRequest.value,
+                            onOpenSubscriptionsConsumed = { openSubscriptionsRequest.value = false },
                             notificationTarget = notificationTarget.value,
                             onNotificationConsumed = { notificationTarget.value = null },
                         )
@@ -213,6 +224,12 @@ class MainActivity : ComponentActivity() {
                         }
                     }
                 }
+
+                // The app lock's door — the last child of the root box, so it
+                // draws above everything and covers the whole window. It emits
+                // nothing when the preference is off; while it is closed it
+                // absorbs every tap and the back gesture (see AppLockGate).
+                com.grapsee.grapmail.ui.components.AppLockGate()
             }
         }
     }
@@ -235,6 +252,17 @@ class MainActivity : ComponentActivity() {
 
     private fun takeComposeRequest(intent: android.content.Intent?) {
         if (intent?.action == COMPOSE_ACTION) composeRequest.value = true
+        if (intent?.action == SCHEDULED_ACTION) openScheduledRequest.value = true
+        if (intent?.action == SUBSCRIPTIONS_ACTION) openSubscriptionsRequest.value = true
+        // The home-screen widget and the send-later notice name their
+        // destination as an extra rather than minting an intent action per
+        // surface: an explicit intent needs no filter, so one extra is the
+        // whole contract.
+        when (intent?.getStringExtra(EXTRA_MAIL_ACTION)) {
+            "compose" -> composeRequest.value = true
+            "scheduled", "open_scheduled" -> openScheduledRequest.value = true
+            "subscriptions" -> openSubscriptionsRequest.value = true
+        }
         com.grapsee.grapmail.logic.Notifications.target(intent)?.let {
             notificationTarget.value = it
             intent?.action = null
@@ -245,6 +273,15 @@ class MainActivity : ComponentActivity() {
         /** The action `res/xml/shortcuts.xml` fires. Declared once, matched in
          *  the manifest's intent filter and here. */
         const val COMPOSE_ACTION = "com.grapsee.grapmail.COMPOSE"
+
+        /** The extra the widget and the send-later notice carry: which surface
+         *  a tap asked for, without inventing an action per destination. */
+        const val EXTRA_MAIL_ACTION = "grapmail_action"
+
+        /** Shortcut actions for the launcher's long-press entries: each names
+         *  its surface outright, so no extra is required. */
+        const val SCHEDULED_ACTION = "com.grapsee.grapmail.SCHEDULED"
+        const val SUBSCRIPTIONS_ACTION = "com.grapsee.grapmail.SUBSCRIPTIONS"
     }
 }
 
@@ -386,6 +423,10 @@ object Routes {
 fun GrapMailNav(
     composeRequest: Boolean = false,
     onComposeRequestConsumed: () -> Unit = {},
+    openScheduled: Boolean = false,
+    onOpenScheduledConsumed: () -> Unit = {},
+    openSubscriptions: Boolean = false,
+    onOpenSubscriptionsConsumed: () -> Unit = {},
     notificationTarget: com.grapsee.grapmail.logic.Notifications.MailTarget? = null,
     onNotificationConsumed: () -> Unit = {},
 ) {
@@ -463,6 +504,14 @@ fun GrapMailNav(
         if (composeRequest) {
             onComposeRequestConsumed()
             nav.navigate(Routes.mailCompose("", "reply"))
+        }
+        if (openScheduled) {
+            onOpenScheduledConsumed()
+            nav.navigate(Routes.MAIL_SCHEDULED)
+        }
+        if (openSubscriptions) {
+            onOpenSubscriptionsConsumed()
+            nav.navigate(Routes.MAIL_SUBSCRIPTIONS)
         }
     }
 
@@ -549,6 +598,41 @@ fun GrapMailNav(
             // sign-in can still recover; if the refresh token was rejected, the
             // sticky expiry path lands here too. In both cases [signedIn] consumes
             // the shortcut only after a fresh session exists.
+            nav.navigate(Routes.SIGN_IN) { popUpTo(Routes.WELCOME) }
+        }
+    }
+
+    // The widget's and the send-later notice's request, held the same way and
+    // for the same reason: the scheduled list is account mail, and a screen
+    // that cannot cancel is a screen that pretends.
+    LaunchedEffect(openScheduled, dest) {
+        if (!openScheduled) return@LaunchedEffect
+        val ctx = nav.context.applicationContext
+        val stored = SessionStore.snapshot(ctx)
+        val ready = stored?.unexpired == true ||
+            (stored != null && com.grapsee.grapmail.data.SessionRefresh.refresh(ctx))
+        if (ready) {
+            onOpenScheduledConsumed()
+            nav.navigate(Routes.MAIL_SCHEDULED)
+        } else {
+            // Same contract as the shortcut: [signedIn] consumes the request
+            // once a fresh session exists.
+            nav.navigate(Routes.SIGN_IN) { popUpTo(Routes.WELCOME) }
+        }
+    }
+
+    // The subscriptions shortcut parks here too: a board that cannot fetch
+    // without a session should not pretend otherwise.
+    LaunchedEffect(openSubscriptions, dest) {
+        if (!openSubscriptions) return@LaunchedEffect
+        val ctx = nav.context.applicationContext
+        val stored = SessionStore.snapshot(ctx)
+        val ready = stored?.unexpired == true ||
+            (stored != null && com.grapsee.grapmail.data.SessionRefresh.refresh(ctx))
+        if (ready) {
+            onOpenSubscriptionsConsumed()
+            nav.navigate(Routes.MAIL_SUBSCRIPTIONS)
+        } else {
             nav.navigate(Routes.SIGN_IN) { popUpTo(Routes.WELCOME) }
         }
     }

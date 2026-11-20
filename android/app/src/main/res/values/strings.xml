@@ -3,10 +3,15 @@
     <string name="app_name">GrapMail</string>
     <string name="shortcut_compose_short">Compose mail</string>
     <string name="shortcut_compose_long">Write a new GrapMail message</string>
+    <string name="shortcut_scheduled_short">Scheduled sends</string>
+    <string name="shortcut_scheduled_long">See and cancel mail that is waiting to go out</string>
+    <string name="shortcut_subscriptions_short">Subscriptions</string>
+    <string name="shortcut_subscriptions_long">Review senders and unsubscribe in one place</string>
     <string name="notif_channel_new_mail">New mail</string>
     <string name="notif_channel_new_mail_desc">
         Tells you when a background check found messages you have not read yet.
         GrapMail has no push service, so these come from the app asking the
         server itself, when the system wakes it.
     </string>
+    <string name="widget_description">Unread mail at a glance — counts from GrapMail's own checks</string>
 </resources>

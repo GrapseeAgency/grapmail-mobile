@@ -31,6 +31,7 @@ import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Contacts
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.HelpOutline
+import androidx.compose.material.icons.rounded.Language
 import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.MailOutline
 import androidx.compose.material.icons.rounded.NotificationsActive
@@ -731,12 +732,53 @@ fun MailSettingsScreen(
                         askNotifications.launch(android.Manifest.permission.POST_NOTIFICATIONS)
                     }
                 })
+            // The app lock is a preference on this handset, not an account
+            // setting: it guards this device's copy of the mailbox. A device
+            // that cannot keep the promise says so instead of offering a lock
+            // it cannot hold.
+            var appLockOn by remember {
+                mutableStateOf(com.grapsee.grapmail.logic.AppLock.isEnabled(notifyContext))
+            }
+            val appLockUsable = remember {
+                com.grapsee.grapmail.logic.AppLock.available(notifyContext)
+            }
+            val toggleAppLock: () -> Unit = {
+                appLockOn = !appLockOn
+                com.grapsee.grapmail.logic.AppLock.setEnabled(notifyContext, appLockOn)
+            }
+            SettingRow(
+                Icons.Rounded.Lock, "App lock",
+                when {
+                    !appLockUsable -> "Not available on this device"
+                    appLockOn -> "On — asks for your fingerprint or face when opened"
+                    else -> "Require unlock when GrapMail is opened"
+                },
+                palette,
+                onClick = toggleAppLock.takeIf { appLockUsable },
+            )
+            // Android 13's per-app language: the system owns the picker; this
+            // row opens its page for this app. The languages it lists are what
+            // the app actually ships copy for — res/xml/locales_config.xml.
+            if (android.os.Build.VERSION.SDK_INT >= 33) {
+                SettingRow(
+                    Icons.Rounded.Language, "App language",
+                    "Opens the system's page for this app's language",
+                    palette,
+                    onClick = {
+                        val open = android.content.Intent(android.provider.Settings.ACTION_APP_LOCALE_SETTINGS)
+                            .setData(android.net.Uri.parse("package:${notifyContext.packageName}"))
+                        runCatching { notifyContext.startActivity(open) }
+                    },
+                )
+            }
             SettingRow(Icons.Rounded.Person, "Personal info",
                 "Name, birthday, photo", palette, onClick = onProfile)
             SettingRow(Icons.Rounded.Shield, "Data & privacy",
                 "What is kept, what you control", palette, onClick = onPrivacy)
             SettingRow(Icons.Rounded.Lock, "Encryption",
                 "Your end-to-end key, on this device", palette, onClick = onEncryption)
+
+            com.grapsee.grapmail.ui.mailfeatures.MailFeatureSettingsSection()
 
             SectionLabel("Support", palette)
             SettingRow(Icons.Rounded.HelpOutline, "Help & Support",

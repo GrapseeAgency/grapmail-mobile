@@ -1,0 +1,2065 @@
+From 0fb5998e0689faf73089d7bf8e19fc39573aa8f0 Mon Sep 17 00:00:00 2001
+From: GrapMail Audit <audit@grapmail.local>
+Date: Thu, 19 Nov 2026 04:23:25 +0000
+Subject: [PATCH] audit 2026-11-19: fixpack applied state + iOS Scheduled
+ wiring + attachment thumb
+
+---
+ android/app/build.gradle.kts                  |   5 +
+ android/app/src/main/AndroidManifest.xml      |   2 +-
+ .../java/com/grapsee/grapmail/MainActivity.kt |  32 +-
+ .../java/com/grapsee/grapmail/data/Api.kt     |  29 ++
+ .../grapmail/logic/MailboxViewModel.kt        |  75 ++-
+ .../grapsee/grapmail/logic/SignUpViewModel.kt |  45 ++
+ .../grapmail/ui/screens/HumanVerifyScreen.kt  | 223 ++++++---
+ .../ui/screens/mail/AttachmentThumb.kt        |  81 +++
+ .../grapmail/ui/screens/mail/ComposeScreen.kt |   7 +-
+ .../ui/screens/mail/MailSecondaryScreens.kt   |  24 +-
+ ios/GrapMail/APIClient.swift                  |  18 +
+ ios/GrapMail/FinishScreens.swift              | 241 ++++++---
+ ios/GrapMail/MailReaderViews.swift            |   6 +-
+ ios/GrapMail/MailSecondaryViews.swift         |   3 +
+ ios/GrapMail/MailSnapshot.swift               |   2 +-
+ ios/GrapMail/MailboxModel.swift               |  26 +-
+ ios/GrapMail/ProfileModel.swift.pre-avfix     | 468 ++++++++++++++++++
+ ios/GrapMail/RootView.swift                   |  41 +-
+ ios/GrapMail/SignUpModel.swift                |  41 +-
+ .../ScreenshotWalkUITests.swift               |  39 +-
+ ios/project.yml                               |   4 +-
+ 21 files changed, 1211 insertions(+), 201 deletions(-)
+ create mode 100644 android/app/src/main/java/com/grapsee/grapmail/ui/screens/mail/AttachmentThumb.kt
+ create mode 100644 ios/GrapMail/ProfileModel.swift.pre-avfix
+
+diff --git a/android/app/build.gradle.kts b/android/app/build.gradle.kts
+index d8df600..93d837f 100644
+--- a/android/app/build.gradle.kts
++++ b/android/app/build.gradle.kts
+@@ -146,6 +146,11 @@ dependencies {
+     implementation("com.squareup.okhttp3:okhttp:4.12.0")
+     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
+     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
++    // Attachment thumbnails (fixpack A2). Coil 3.0.x is the line built
++    // against Kotlin 2.0.x, which this project compiles with (Kotlin 2.0.20).
++    // Do not jump to 3.1+ without bumping Kotlin: 3.1.0 needs Kotlin 2.1.10.
++    implementation("io.coil-kt.coil3:coil-compose:3.0.4")
++    implementation("io.coil-kt.coil3:coil-network-okhttp:3.0.4")
+ 
+     implementation("androidx.datastore:datastore-preferences:1.1.1")
+     implementation(platform("com.google.firebase:firebase-bom:33.7.0"))
+diff --git a/android/app/src/main/AndroidManifest.xml b/android/app/src/main/AndroidManifest.xml
+index bd2c17f..3be6f3a 100644
+--- a/android/app/src/main/AndroidManifest.xml
++++ b/android/app/src/main/AndroidManifest.xml
+@@ -50,7 +50,7 @@
+             chooses "Open". Without this the app could only ever say "saved to
+             a path", because ACTION_VIEW on a file:// URI is rejected outright
+             on modern Android (FileUriExposedException) — which is exactly why
+-            the affordance was left unfinished. Granting read permission per
++            this provider was added. Granting read permission per
+             URI, and exposing only the attachment cache directory (see
+             res/xml/file_paths.xml), keeps the handoff to one file the person
+             just chose.
+diff --git a/android/app/src/main/java/com/grapsee/grapmail/MainActivity.kt b/android/app/src/main/java/com/grapsee/grapmail/MainActivity.kt
+index bab99b1..ef2ab59 100644
+--- a/android/app/src/main/java/com/grapsee/grapmail/MainActivity.kt
++++ b/android/app/src/main/java/com/grapsee/grapmail/MainActivity.kt
+@@ -658,7 +658,7 @@ fun GrapMailNav(
+             // The freshly-created credential can take a beat to become usable,
+             // so retry with a short backoff before giving up. iOS does the same
+             // (SignUpModel): without it the wizard strands a new user on the
+-            // sign-in screen instead of the human-verify -> created flow the
++            // sign-in screen instead of the created -> onboarding flow the
+             // design shows, and the CI walk loses those screens.
+             for (attempt in 0 until 4) {
+                 if (attempt > 0) { kotlinx.coroutines.delay(1_200) }
+@@ -1089,7 +1089,10 @@ fun GrapMailNav(
+                 onSignIn = { nav.navigate(Routes.SIGN_IN) },
+                 onNext = {
+                     vm.update { copy(step = 5) }
+-                    nav.navigate(Routes.STEP_TERMS)
++                    // Human verification moved BEFORE the Terms/create step
++                    // (2026-11-18): the register call consumes the server-issued
++                    // verificationId, so the challenge must be solved first.
++                    nav.navigate(Routes.HUMAN_VERIFY)
+                 },
+             )
+         }
+@@ -1101,7 +1104,14 @@ fun GrapMailNav(
+                 onCreated = { address, name ->
+                     autoSignIn(address, name) { signedIn ->
+                         if (signedIn) {
+-                            nav.navigate(Routes.HUMAN_VERIFY) { popUpTo(Routes.STEP_NAME) { inclusive = true } }
++                            // Account created and signed in — the wizard finishes
++                            // here now that verification runs before registration
++                            // (2026-11-18 reorder).
++                            if (com.grapsee.grapmail.ui.screens.OnboardingGate.isDone(nav.context)) {
++                                nav.navigate(Routes.HOME) { popUpTo(Routes.WELCOME) { inclusive = true } }
++                            } else {
++                                nav.navigate(Routes.onboarding(address, name)) { popUpTo(Routes.STEP_NAME) { inclusive = true } }
++                            }
+                         } else {
+                             // Account exists, session does not. Land on sign-in with
+                             // the address filled in rather than in a flow that has no
+@@ -1118,17 +1128,11 @@ fun GrapMailNav(
+                 vm = vm,
+                 onBack = { nav.popBackStack() },
+                 onDone = {
+-                    val s = vm.state.value
+-                    val address = s.createdAddress ?: ""
+-                    val name = s.createdName ?: s.firstName
+-                    // The walkthrough belongs to the first account this device
+-                    // ever created. A second account is somebody who has seen
+-                    // it; showing it again is an interruption, not a welcome.
+-                    if (com.grapsee.grapmail.ui.screens.OnboardingGate.isDone(nav.context)) {
+-                        nav.navigate(Routes.HOME) { popUpTo(Routes.WELCOME) { inclusive = true } }
+-                    } else {
+-                        nav.navigate(Routes.onboarding(address, name)) { popUpTo(Routes.HUMAN_VERIFY) { inclusive = true } }
+-                    }
++                    // Server-confirmed verdict only (Continue gates on it). Go
++                    // to the Terms/create step — the register call there spends
++                    // the verificationId; the wizard finishes from that step
++                    // (2026-11-18 reorder).
++                    nav.navigate(Routes.STEP_TERMS) { popUpTo(Routes.HUMAN_VERIFY) { inclusive = true } }
+                 },
+             )
+         }
+diff --git a/android/app/src/main/java/com/grapsee/grapmail/data/Api.kt b/android/app/src/main/java/com/grapsee/grapmail/data/Api.kt
+index 3eedf29..4503c74 100644
+--- a/android/app/src/main/java/com/grapsee/grapmail/data/Api.kt
++++ b/android/app/src/main/java/com/grapsee/grapmail/data/Api.kt
+@@ -54,6 +54,9 @@ import kotlin.coroutines.resumeWithException
+     val password: String,
+     val acceptedTerms: Boolean? = null,
+     val avatarPhoto: String? = null,
++    /** Consumed exactly once by the register gate (POST /auth/register);
++     *  without it the server answers 403 and no mailbox is created. */
++    val humanVerificationId: String? = null,
+     /** The gateway distinguishes the agency dashboard's CLIENT accounts from
+      *  GrapMail's USER accounts, and only USER accounts get a handle and a
+      *  mailbox. This app only ever creates USER accounts.
+@@ -98,6 +101,16 @@ import kotlin.coroutines.resumeWithException
+     val reason: String? = null,
+ )
+ 
++@Serializable
++data class VerifyHumanRequest(val token: String)
++
++@Serializable
++data class VerifyHumanResponse(
++    val success: Boolean = false,
++    val verificationId: String? = null,
++    val error: String? = null,
++)
++
+ @Serializable data class SignInRequest(val identifier: String, val password: String)
+ 
+ @Serializable data class RefreshRequest(val refreshToken: String)
+@@ -220,6 +233,7 @@ private fun apiErrorMessage(status: Int, code: String?): String = when (code) {
+     "CANNOT_REVOKE_CURRENT" -> "Sign out to end this session."
+     "TWOFA_REQUIRED_FOR_BACKUP_CODES" -> "Turn on two-step verification to use backup codes."
+     "NO_MAILBOX" -> "Your GrapMail inbox is not ready yet."
++    "HUMAN_VERIFICATION_REQUIRED" -> "Your verification expired or was already used — complete the check again."
+     else -> when (status) {
+         401 -> "Check your sign-in details or sign in again."
+         403 -> "This action is unavailable for your account."
+@@ -837,6 +851,21 @@ object Api {
+         return decodeResponse<CreateResponse>(body)
+     }
+ 
++    /**
++     * Exchanges a solved reCAPTCHA token for a single-use verification record.
++     * The server owns the verdict (siteverify) — nothing here trusts the device.
++     */
++    suspend fun verifyHuman(token: String): VerifyHumanResponse {
++        val request = Request.Builder()
++            .url("$AUTH/verify-human")
++            .header("x-device-id", DeviceId.value)
++            .post(postBody(json.encodeToString(VerifyHumanRequest.serializer(), VerifyHumanRequest(token))))
++            .build()
++        val (status, body) = execute(request)
++        if (status >= 400) fail(status, body)
++        return decodeResponse<VerifyHumanResponse>(body)
++    }
++
+     suspend fun signIn(identifier: String, password: String): SignInResponse {
+         val request = Request.Builder()
+             .url("$AUTH/login")
+diff --git a/android/app/src/main/java/com/grapsee/grapmail/logic/MailboxViewModel.kt b/android/app/src/main/java/com/grapsee/grapmail/logic/MailboxViewModel.kt
+index e4a4c78..7716b5d 100644
+--- a/android/app/src/main/java/com/grapsee/grapmail/logic/MailboxViewModel.kt
++++ b/android/app/src/main/java/com/grapsee/grapmail/logic/MailboxViewModel.kt
+@@ -1504,6 +1504,10 @@ class MailboxViewModel @JvmOverloads constructor(
+          *  and the composer draws it as one small tertiary line. */
+         val autosaving: Boolean = false,
+         val autosaveNote: String? = null,
++        /** True once the person has edited this compose. The signature seed
++         *  and a loaded draft fill fields without an edit, so a composer
++         *  nobody touched neither autosaves nor saves on close. */
++        val userEdited: Boolean = false,
+     ) {
+         val accepted: Boolean get() = resultStatus == "sent" || resultStatus == "queued" || resultStatus == "delivered"
+     }
+@@ -1512,10 +1516,19 @@ class MailboxViewModel @JvmOverloads constructor(
+     val compose: StateFlow<ComposeState> = _compose.asStateFlow()
+ 
+     fun composeUpdate(transform: (ComposeState) -> ComposeState) {
+-        _compose.update(transform)
++        // A person's own change: the compose is now theirs, so the autosave
++        // may carry it.
++        _compose.update { s -> transform(s).copy(userEdited = true) }
+         scheduleAutosave()
+     }
+ 
++    /** A programmatic fill — the signature seed, nothing the person did.
++     *  It arms no autosave: a composer nobody edited is not written to
++     *  Drafts (see [ComposeState.userEdited]). */
++    fun composeSeed(transform: (ComposeState) -> ComposeState) {
++        _compose.update(transform)
++    }
++
+     // ── autosave ─────────────────────────────────────────────────────────────
+     //
+     // The compose box saves itself. Every edit schedules a debounced draft
+@@ -1531,7 +1544,9 @@ class MailboxViewModel @JvmOverloads constructor(
+     /**
+      * The rules the debounce obeys, each one a refusal rather than a feature:
+      * an EMPTY compose saves nothing (a person opening the composer and
+-     * leaving must not find an empty draft row named after nothing); a send or
++     * leaving must not find an empty draft row named after nothing); a composer
++     * nobody edited saves nothing either — the seeded signature is a fill, not
++     * an edit; a send or
+      * a manual save in flight is not interrupted; and the autosave never
+      * writes the receipt — its outcome is the composer's own quiet line, not
+      * the "Saved to Drafts" banner the manual save earns.
+@@ -1539,6 +1554,7 @@ class MailboxViewModel @JvmOverloads constructor(
+     private fun scheduleAutosave() {
+         val s = _compose.value
+         if (s.sending || s.accepted) return
++        if (!s.userEdited) return
+         if (autosaveInFlight) {
+             autosaveNeedsFollowUp = true
+             return
+@@ -1923,12 +1939,14 @@ class MailboxViewModel @JvmOverloads constructor(
+                 val generation = held.generation
+                 val accepted = r.status in listOf("sent", "queued", "delivered")
+                 if (!accepted) android.util.Log.w("GrapMailApi", "Send was not accepted; delivery error present=${r.deliveryError != null}")
+-                if (generation == composeGeneration) _compose.update { it.copy(sending = false,
+-                    result = null, resultStatus = r.status,
+-                    error = if (accepted) null else "Could not send this message. Try again.") }
++                // One write, framed by the server: its message (or error /
++                // deliveryError) verbatim. The local sentence survives only
++                // as the last resort of a refusal — a delivered send with no
++                // server text shows none.
+                 if (generation == composeGeneration) _compose.update { it.copy(sending = false,
+                     result = r.message ?: r.error, resultStatus = r.status,
+-                    error = r.deliveryError ?: r.error) }
++                    error = r.deliveryError ?: r.error
++                        ?: if (accepted) null else "Could not send this message. Try again.") }
+                 if (accepted) {
+                     // A delivered send is the app having proven itself — the
+                     // review ask counts it and fires the store's flow when the
+@@ -2039,11 +2057,9 @@ class MailboxViewModel @JvmOverloads constructor(
+      * because a downloaded email attachment has no business being readable by
+      * every other app on the device.
+      *
+-     * Opening it is deliberately not attempted here: that needs a FileProvider
+-     * authority and a MIME-typed intent, and a half-wired "open" that throws on
+-     * some devices is worse than a saved file with a clear message about where it
+-     * went. Recorded as the sector's one unfinished affordance rather than left
+-     * implicit.
++     * Opening is not attempted here on purpose: this function only saves. The
++     * open path lives in `openAttachment()` below — FileProvider URI, MIME-typed
++     * ACTION_VIEW — so the handoff is written out rather than left implicit.
+      */
+     fun downloadAttachment(a: MailAttachmentDto, then: (String) -> Unit) {
+         viewModelScope.launch {
+@@ -2127,6 +2143,43 @@ class MailboxViewModel @JvmOverloads constructor(
+         }
+     }
+ 
++    /**
++     * Local copy of an image attachment for the thumbnail loader (fixpack A2).
++     *
++     * Same rules as `downloadAttachment`: the app-owned cache, a session check
++     * on both sides of the request, and a file that is deleted rather than kept
++     * when the account changes mid-flight. One difference — a thumbnail that
++     * cannot load returns null so the screen can fall back to the type icon,
++     * instead of a message about a file the person never asked to save.
++     *
++     * The cached name is derived from the attachment id, so a second visit is a
++     * file-length check rather than a download.
++     */
++    suspend fun attachmentPreviewFile(a: MailAttachmentDto): java.io.File? {
++        val app = getApplication<android.app.Application>()
++        val session = SessionStore.snapshot(app) ?: return null
++        return kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
++            val root = java.io.File(app.cacheDir, "attachment-previews").apply { mkdirs() }
++            val file = java.io.File(
++                root,
++                a.id.replace(Regex("[^A-Za-z0-9._-]"), "_").take(96) + ".img",
++            )
++            if (file.length() > 0L) return@withContext file
++            runCatching { Api.mailAttachmentFile(session.token, a.id, file) }
++                .mapCatching {
++                    if (!SessionStore.isCurrent(app, session.id)) {
++                        file.delete(); null
++                    } else if (file.length() > 0L) file
++                    else { file.delete(); null }
++                }
++                .getOrElse { error ->
++                    if (error is kotlinx.coroutines.CancellationException) throw error
++                    file.delete()
++                    null
++                }
++        }
++    }
++
+     private fun attachmentFilename(raw: String?): String =
+         raw.orEmpty().replace(Regex("[^A-Za-z0-9._-]"), "_")
+             .take(120).takeUnless { it.isBlank() || it == "." || it == ".." } ?: "attachment"
+diff --git a/android/app/src/main/java/com/grapsee/grapmail/logic/SignUpViewModel.kt b/android/app/src/main/java/com/grapsee/grapmail/logic/SignUpViewModel.kt
+index b09f097..2d4383f 100644
+--- a/android/app/src/main/java/com/grapsee/grapmail/logic/SignUpViewModel.kt
++++ b/android/app/src/main/java/com/grapsee/grapmail/logic/SignUpViewModel.kt
+@@ -57,6 +57,10 @@ class SignUpViewModel : ViewModel() {
+         val createdAddress: String? = null,
+         val createdName: String? = null,
+         val humanVerified: Boolean = false,
++        // Human-verification gate (2026-11-17): server-confirmed only.
++        val humanVerifying: Boolean = false,
++        val humanVerifyError: String? = null,
++        val humanVerificationId: String? = null,
+     )
+ 
+     private val _state = MutableStateFlow(UiState())
+@@ -161,6 +165,7 @@ class SignUpViewModel : ViewModel() {
+                             "data:image/png;base64," + android.util.Base64.encodeToString(it, android.util.Base64.NO_WRAP)
+                         },
+                         accountType = "USER",
++                        humanVerificationId = s.humanVerificationId,
+                     )
+                 )
+                 // The gateway envelope answers `grapmail` (and no account
+@@ -174,6 +179,13 @@ class SignUpViewModel : ViewModel() {
+                 onCreated(address, resp.account?.name ?: fullName)
+             } catch (e: ApiException) {
+                 update { copy(creating = false) }
++                // A spent or expired verification must not outlive its receipt:
++                // the stale verdict would keep passing the Continue gate and the
++                // bridge's idempotency guard for a check the server has already
++                // refused — the retry the copy below asks for could never happen.
++                if (e.code == "HUMAN_VERIFICATION_REQUIRED") {
++                    update { copy(humanVerified = false, humanVerificationId = null, humanVerifyError = null) }
++                }
+                 onError(
+                     when (e.code) {
+                         "HANDLE_TAKEN" -> "That GrapMail address is already taken. Try another one."
+@@ -183,6 +195,7 @@ class SignUpViewModel : ViewModel() {
+                         // length message that is wrong for a missing letter or symbol.
+                         "WEAK_PASSWORD" -> e.message ?: "Use at least 8 characters with a letter, a number and a symbol."
+                         "INVALID_NAME" -> "Enter your full name (at least 2 characters)."
++                        "HUMAN_VERIFICATION_REQUIRED" -> "Your verification expired or was already used — complete the check again."
+                         else -> e.message ?: "Could not create the account. Please try again."
+                     }
+                 )
+@@ -194,4 +207,36 @@ class SignUpViewModel : ViewModel() {
+     }
+ 
+     fun markHumanVerified() { update { copy(humanVerified = true) } }
++
++    /**
++     * Human verification (2026-11-17 overhaul): exchange the reCAPTCHA token
++     * received from the checkpoint page's JS bridge for a server verdict.
++     * Until {success:true} comes back, the screen keeps Continue off.
++     * Idempotent: duplicate bridge deliveries are ignored.
++     */
++    fun submitHumanVerification(token: String) {
++        if (token.isBlank()) return
++        if (_state.value.humanVerified || _state.value.humanVerifying) return
++        viewModelScope.launch {
++            update { copy(humanVerifying = true, humanVerifyError = null) }
++            try {
++                val resp = Api.verifyHuman(token)
++                if (resp.success) {
++                    update {
++                        copy(
++                            humanVerifying = false,
++                            humanVerified = true,
++                            humanVerificationId = resp.verificationId,
++                        )
++                    }
++                } else {
++                    update { copy(humanVerifying = false, humanVerifyError = "Verification failed — please try again.") }
++                }
++            } catch (e: kotlinx.coroutines.CancellationException) {
++                throw e
++            } catch (e: Exception) {
++                update { copy(humanVerifying = false, humanVerifyError = "Network error — please try again.") }
++            }
++        }
++    }
+ }
+diff --git a/android/app/src/main/java/com/grapsee/grapmail/ui/screens/HumanVerifyScreen.kt b/android/app/src/main/java/com/grapsee/grapmail/ui/screens/HumanVerifyScreen.kt
+index 1ce5f8c..95e5ba7 100644
+--- a/android/app/src/main/java/com/grapsee/grapmail/ui/screens/HumanVerifyScreen.kt
++++ b/android/app/src/main/java/com/grapsee/grapmail/ui/screens/HumanVerifyScreen.kt
+@@ -1,6 +1,11 @@
+ package com.grapsee.grapmail.ui.screens
+ 
+-import androidx.compose.foundation.Image
++import android.annotation.SuppressLint
++import android.os.Handler
++import android.os.Looper
++import android.webkit.JavascriptInterface
++import android.webkit.WebView
++import android.webkit.WebViewClient
+ import androidx.compose.foundation.background
+ import androidx.compose.foundation.border
+ import androidx.compose.foundation.clickable
+@@ -9,55 +14,117 @@ import androidx.compose.foundation.layout.Box
+ import androidx.compose.foundation.layout.Column
+ import androidx.compose.foundation.layout.Row
+ import androidx.compose.foundation.layout.Spacer
++import androidx.compose.foundation.layout.aspectRatio
+ import androidx.compose.foundation.layout.fillMaxSize
+ import androidx.compose.foundation.layout.fillMaxWidth
+ import androidx.compose.foundation.layout.height
+ import androidx.compose.foundation.layout.padding
+ import androidx.compose.foundation.layout.size
+ import androidx.compose.foundation.layout.width
+-import androidx.compose.foundation.layout.aspectRatio
+-import androidx.compose.ui.semantics.contentDescription
+-import androidx.compose.ui.semantics.semantics
+ import androidx.compose.foundation.rememberScrollState
+ import androidx.compose.foundation.shape.CircleShape
+ import androidx.compose.foundation.shape.RoundedCornerShape
+ import androidx.compose.foundation.verticalScroll
+ import androidx.compose.material.icons.Icons
+ import androidx.compose.material.icons.automirrored.rounded.ArrowBack
++import androidx.compose.material.icons.rounded.CheckCircle
+ import androidx.compose.material.icons.rounded.Refresh
++import androidx.compose.material3.CircularProgressIndicator
+ import androidx.compose.material3.Icon
+ import androidx.compose.material3.Text
+ import androidx.compose.runtime.Composable
+-import androidx.lifecycle.compose.collectAsStateWithLifecycle
++import androidx.compose.runtime.DisposableEffect
++import androidx.compose.runtime.LaunchedEffect
+ import androidx.compose.runtime.getValue
++import androidx.compose.runtime.mutableStateOf
++import androidx.compose.runtime.remember
++import androidx.compose.runtime.saveable.rememberSaveable
+ import androidx.compose.runtime.setValue
+ import androidx.compose.ui.Alignment
+ import androidx.compose.ui.Modifier
++import androidx.compose.ui.draw.alpha
+ import androidx.compose.ui.draw.clip
+-import androidx.compose.ui.res.painterResource
++import androidx.compose.ui.graphics.Color
++import androidx.compose.ui.platform.LocalContext
++import androidx.compose.ui.semantics.contentDescription
++import androidx.compose.ui.semantics.semantics
+ import androidx.compose.ui.text.font.FontWeight
+ import androidx.compose.ui.text.style.TextAlign
+ import androidx.compose.ui.unit.dp
+ import androidx.compose.ui.unit.sp
++import androidx.compose.ui.viewinterop.AndroidView
++import androidx.lifecycle.compose.collectAsStateWithLifecycle
+ import com.grapsee.grapmail.logic.SignUpViewModel
+-import com.grapsee.grapmail.ui.components.GradientButton
+-import com.grapsee.grapmail.ui.components.PuzzleSlider
+ import com.grapsee.grapmail.ui.theme.H1
+ import com.grapsee.grapmail.ui.theme.LocalPalette
+ 
+ /**
+- * Human verification — founder design verbatim: the shield + "Human
+- * Verification" badge illustration, ACCOUNT PROTECTION eyebrow, "Just one
+- * more step!" headline, the "Solve the puzzle" card with the photo and
+- * slider, the OR divider, "Get a new challenge", and "Skip for now" with
+- * its caption. GrapMail's own test — Telegram removed per the founder.
++ * Human verification — REAL challenge, no bypass (2026-11-17 overhaul).
++ *
++ * This replaces the decorative puzzle slider AND the "Skip for now" exit with
++ * an actual reCAPTCHA challenge hosted on the web checkpoint page
++ * (kit file web/04_verify-human-page.tsx → https://<your-web-app>/verify/human).
++ *
++ * Flow:
++ *  1. The card below hosts the checkpoint page in a WebView. The user solves
++ *     the real "I'm not a robot" checkbox / image challenge there.
++ *  2. On success the page calls the "GrapMailAndroid" JS bridge below with the
++ *     single-use reCAPTCHA token.
++ *  3. The token is verified by the GrapMail backend (POST /auth/verify-human).
++ *     Only a server-confirmed verdict flips `state.humanVerified`.
++ *  4. "Continue" is enabled ONLY after that verdict — there is no skip path.
++ *
++ * The back arrow still goes back a step and must never advance the flow.
+  */
++// TODO(deploy): point at your deployed web app (must be HTTPS). This is the
++// same /verify/human checkpoint page the iOS app loads. Do NOT override the
++// WebView User-Agent — reCAPTCHA evaluates it; the default is fine.
++private const val HUMAN_VERIFY_URL = "https://grapsee.com/verify/human?embed=android"
++
++/** JS bridge: the checkpoint page calls window.GrapMailAndroid.onVerifyToken(token). */
++private class VerifyBridge(private val onToken: (String) -> Unit) {
++    @JavascriptInterface
++    fun onVerifyToken(token: String) {
++        onToken(token)
++    }
++}
++
++@SuppressLint("SetJavaScriptEnabled") // reCAPTCHA requires JS; the page is our own first-party URL.
+ @Composable
+ fun HumanVerifyScreen(vm: SignUpViewModel, onBack: () -> Unit, onDone: () -> Unit) {
+     val palette = LocalPalette.current
+     val state by vm.state.collectAsStateWithLifecycle()
+-    var verified by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf(false) }
+-    var challenge by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf(0) }
++    val context = LocalContext.current
++
++    // Token received from the page bridge; handed to the ViewModel for the
++    // server-side exchange. The ViewModel guards against replay/duplicates.
++    var pendingToken by rememberSaveable { mutableStateOf<String?>(null) }
++    val mainHandler = remember { Handler(Looper.getMainLooper()) }
++
++    LaunchedEffect(pendingToken) {
++        val token = pendingToken ?: return@LaunchedEffect
++        vm.submitHumanVerification(token)
++    }
++
++    // The challenge WebView is created once and re-loaded by "Get a new challenge".
++    val webView = remember {
++        WebView(context).apply {
++            settings.javaScriptEnabled = true
++            settings.domStorageEnabled = true
++            webViewClient = WebViewClient() // keep every navigation inside the WebView
++            addJavascriptInterface(
++                VerifyBridge { token -> mainHandler.post { pendingToken = token } },
++                "GrapMailAndroid",
++            )
++            loadUrl(HUMAN_VERIFY_URL)
++        }
++    }
++    DisposableEffect(Unit) {
++        onDispose {
++            webView.removeJavascriptInterface("GrapMailAndroid")
++            webView.destroy()
++        }
++    }
+ 
+     Box(Modifier.fillMaxSize().background(palette.bg)) {
+         Column(
+@@ -67,8 +134,7 @@ fun HumanVerifyScreen(vm: SignUpViewModel, onBack: () -> Unit, onDone: () -> Uni
+                 .padding(horizontal = 24.dp),
+             horizontalAlignment = Alignment.CenterHorizontally,
+         ) {
+-            // Header: back + centered logo. The arrow goes back a step — it
+-            // must never advance the flow (onDone is Skip's callback only).
++            // Header: back + centered logo.
+             Box(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp)) {
+                 Icon(
+                     Icons.AutoMirrored.Rounded.ArrowBack,
+@@ -87,14 +153,8 @@ fun HumanVerifyScreen(vm: SignUpViewModel, onBack: () -> Unit, onDone: () -> Uni
+             Spacer(Modifier.height(6.dp))
+             com.grapsee.grapmail.ui.artwork.Artwork(
+                 "verify",
+-                // Bounded, and the bound is load-bearing. The first version
+-                // stretched this to 0.82 of the screen width at 2:1, which on
+-                // the smallest walk device made the scene twice as tall as
+-                // the PNG it replaced and pushed "Skip for now" below the
+-                // fold — the walk's tap then landed on the puzzle slider
+-                // instead ("Almost — try again"), verification never ended,
+-                // and every screen after it failed. A decorative
+-                // illustration does not get to move an action out of reach.
++                // Bounded on purpose: a decorative illustration must never push
++                // the Continue control out of reach (see the 2026-11 walk bug).
+                 modifier = Modifier.width(180.dp).aspectRatio(2f)
+                     .semantics { contentDescription = "Human verification" },
+             )
+@@ -111,7 +171,7 @@ fun HumanVerifyScreen(vm: SignUpViewModel, onBack: () -> Unit, onDone: () -> Uni
+ 
+             Spacer(Modifier.height(22.dp))
+ 
+-            // ── Solve the puzzle card ───────────────────────────────────────
++            // ── Security check card ─────────────────────────────────────────
+             Column(
+                 Modifier
+                     .fillMaxWidth()
+@@ -128,67 +188,108 @@ fun HumanVerifyScreen(vm: SignUpViewModel, onBack: () -> Unit, onDone: () -> Uni
+                             .background(palette.primarySolid),
+                         contentAlignment = Alignment.Center,
+                     ) {
+-                        Text("🧩", fontSize = 18.sp)
++                        Text("🔒", fontSize = 18.sp)
+                     }
+                     Spacer(Modifier.width(12.dp))
+                     Column {
+-                        Text("Solve the puzzle", fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = palette.textPrimary)
++                        Text("Security check", fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = palette.textPrimary)
+                         Text(
+-                            "Drag the puzzle piece to the correct position to complete the image.",
++                            "Complete the challenge to verify you're a real person.",
+                             fontSize = 13.sp, lineHeight = 18.sp, color = palette.textSecondary,
+                         )
+                     }
+                 }
+                 Spacer(Modifier.height(14.dp))
+-                key(challenge) {
+-                    PuzzleSlider(
+-                        verified = verified || state.humanVerified,
+-                        onVerified = { verified = true; vm.markHumanVerified() },
++
++                if (state.humanVerified) {
++                    // Server-confirmed verdict only. The WebView is no longer needed.
++                    Row(
++                        Modifier.fillMaxWidth().padding(vertical = 22.dp),
++                        horizontalArrangement = Arrangement.Center,
++                        verticalAlignment = Alignment.CenterVertically,
++                    ) {
++                        Icon(Icons.Rounded.CheckCircle, contentDescription = null, tint = palette.primarySolid, modifier = Modifier.size(22.dp))
++                        Spacer(Modifier.width(10.dp))
++                        Text("Verified — thank you!", fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = palette.textPrimary)
++                    }
++                } else {
++                    // Height is chosen so the reCAPTCHA image-challenge overlay fits.
++                    AndroidView(
++                        factory = { webView },
++                        modifier = Modifier
++                            .fillMaxWidth()
++                            .height(420.dp)
++                            .clip(RoundedCornerShape(12.dp))
++                            .border(1.dp, palette.border, RoundedCornerShape(12.dp)),
+                     )
+                 }
+             }
+ 
+-            Spacer(Modifier.height(20.dp))
++            Spacer(Modifier.height(14.dp))
++
++            if (state.humanVerifying) {
++                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
++                    CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp, color = palette.primarySolid)
++                    Spacer(Modifier.width(10.dp))
++                    Text("Checking…", fontSize = 13.sp, color = palette.textSecondary)
++                }
++            }
++            state.humanVerifyError?.let { message ->
++                Spacer(Modifier.height(10.dp))
++                Text(
++                    message,
++                    fontSize = 12.sp, lineHeight = 16.sp, textAlign = TextAlign.Center,
++                    color = Color(0xFFE5484D), // TODO(theme): swap for the palette error color if one exists
++                    modifier = Modifier.fillMaxWidth(),
++                )
++            }
+ 
+-            // OR divider
+-            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+-                Box(Modifier.weight(1f).height(1.dp).background(palette.border))
+-                Text("  OR  ", fontSize = 12.sp, fontWeight = FontWeight.Medium, color = palette.textTertiary)
+-                Box(Modifier.weight(1f).height(1.dp).background(palette.border))
++            if (!state.humanVerified) {
++                Spacer(Modifier.height(16.dp))
++                // Reloads the checkpoint page → fresh challenge (reCAPTCHA's own
++                // refresh button inside the widget does this too).
++                Row(
++                    Modifier
++                        .fillMaxWidth()
++                        .clip(RoundedCornerShape(14.dp))
++                        .border(1.dp, palette.primarySolid.copy(alpha = 0.5f), RoundedCornerShape(14.dp))
++                        .clickable { webView.reload() }
++                        .padding(vertical = 14.dp),
++                    horizontalArrangement = Arrangement.Center,
++                    verticalAlignment = Alignment.CenterVertically,
++                ) {
++                    Icon(Icons.Rounded.Refresh, contentDescription = null, tint = palette.primarySolid, modifier = Modifier.size(17.dp))
++                    Spacer(Modifier.width(8.dp))
++                    Text("Get a new challenge", fontSize = 14.sp, fontWeight = FontWeight.Medium, color = palette.primarySolid)
++                }
+             }
+ 
+-            Spacer(Modifier.height(16.dp))
++            Spacer(Modifier.height(18.dp))
+ 
+-            // Get a new challenge
+-            Row(
++            // Continue — the only exit from this screen, enabled only after the
++            // server-confirmed verdict. (The old "Skip for now" is deleted.)
++            val canContinue = state.humanVerified
++            Box(
+                 Modifier
+                     .fillMaxWidth()
++                    .alpha(if (canContinue) 1f else 0.45f)
+                     .clip(RoundedCornerShape(14.dp))
+-                    .border(1.dp, palette.primarySolid.copy(alpha = 0.5f), RoundedCornerShape(14.dp))
+-                    .clickable { verified = false; challenge++ }
+-                    .padding(vertical = 14.dp),
+-                horizontalArrangement = Arrangement.Center,
+-                verticalAlignment = Alignment.CenterVertically,
++                    .background(palette.primarySolid)
++                    .clickable(enabled = canContinue) { onDone() }
++                    .padding(vertical = 15.dp),
++                contentAlignment = Alignment.Center,
+             ) {
+-                Icon(Icons.Rounded.Refresh, contentDescription = null, tint = palette.primarySolid, modifier = Modifier.size(17.dp))
+-                Spacer(Modifier.width(8.dp))
+-                Text("Get a new challenge", fontSize = 14.sp, fontWeight = FontWeight.Medium, color = palette.primarySolid)
++                Text("Continue", fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = Color.White)
+             }
+ 
+-            Spacer(Modifier.height(18.dp))
+-            Text("Skip for now", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = palette.primarySolid,
+-                modifier = Modifier.clickable { onDone() })
+-            Spacer(Modifier.height(6.dp))
++            Spacer(Modifier.height(10.dp))
++            // Branding disclosure (mobile apps: no badge required, text optional).
++            // TODO(branding): linkify "Privacy Policy" / "Terms of Service" per the guidelines.
+             Text(
+-                "You can always complete verification later\nfrom your account settings.",
+-                fontSize = 12.sp, lineHeight = 17.sp, color = palette.textTertiary, textAlign = TextAlign.Center,
++                "This app is protected by reCAPTCHA and the Google Privacy Policy and Terms of Service apply.",
++                fontSize = 11.sp, lineHeight = 15.sp, color = palette.textTertiary, textAlign = TextAlign.Center,
+             )
+             Spacer(Modifier.height(20.dp))
+         }
+     }
+ }
+-
+-
+-@Composable
+-private fun <K> key(key: K, content: @Composable () -> Unit) =
+-    androidx.compose.runtime.key(key) { content() }
+diff --git a/android/app/src/main/java/com/grapsee/grapmail/ui/screens/mail/AttachmentThumb.kt b/android/app/src/main/java/com/grapsee/grapmail/ui/screens/mail/AttachmentThumb.kt
+new file mode 100644
+index 0000000..1c36673
+--- /dev/null
++++ b/android/app/src/main/java/com/grapsee/grapmail/ui/screens/mail/AttachmentThumb.kt
+@@ -0,0 +1,81 @@
++package com.grapsee.grapmail.ui.screens.mail
++
++import androidx.compose.foundation.layout.Box
++import androidx.compose.runtime.Composable
++import androidx.compose.runtime.getValue
++import androidx.compose.runtime.mutableStateOf
++import androidx.compose.runtime.produceState
++import androidx.compose.runtime.remember
++import androidx.compose.runtime.setValue
++import androidx.compose.ui.Alignment
++import androidx.compose.ui.Modifier
++import androidx.compose.ui.layout.ContentScale
++import androidx.compose.ui.platform.LocalContext
++import coil3.compose.AsyncImage
++import coil3.request.ImageRequest
++import coil3.request.crossfade
++import com.grapsee.grapmail.data.MailAttachmentDto
++import com.grapsee.grapmail.logic.MailboxViewModel
++
++/**
++ * Attachment thumbnails — unit 79's unfinished half.
++ *
++ * The old doc comment on `AttachmentPreviewScreen` was explicit: an image was
++ * offered as a download, not a thumbnail, "because there is no image loader in
++ * this build". This is that loader — Coil, fetching the bytes through the same
++ * authenticated path the download button uses (`MailboxViewModel.attachmentPreviewFile`),
++ * so the request carries the session's bearer header without the image library
++ * ever seeing a token.
++ *
++ * The fallback is the caller's own icon, not a broken box: non-image types, a
++ * file the person cannot access, and a decode that fails all land on the same
++ * visual the screens shipped with before. While bytes arrive the row shows that
++ * icon rather than a spinner — a loading state that flashes on every cache hit
++ * is noise, and for already-downloaded rows the fetch is a file copy.
++ *
++ * One recorded limit: this downloads the whole attachment once into the app
++ * cache. A 20 MB scanned page is fetched in full to draw a 38dp square. A
++ * server-side thumbnail route would fix that properly; noted here rather than
++ * pretended away.
++ *
++ * Placement: drop this file next to `MailSecondaryScreens.kt` in
++ * `ui/screens/mail/` — same package, so no import changes in the screens.
++ */
++@Composable
++fun AttachmentThumb(
++    vm: MailboxViewModel,
++    attachment: MailAttachmentDto,
++    modifier: Modifier = Modifier,
++    fallback: @Composable () -> Unit,
++) {
++    val mime = attachment.mimeType?.lowercase().orEmpty()
++    // SVG has no decoder on stock Android; promising a thumbnail for it would
++    // be the broken box the old comment refused to draw.
++    val previewable = mime.startsWith("image/") && !mime.startsWith("image/svg")
++
++    if (!previewable) {
++        Box(modifier, contentAlignment = Alignment.Center) { fallback() }
++        return
++    }
++
++    val file by produceState<java.io.File?>(initialValue = null, attachment.id) {
++        value = vm.attachmentPreviewFile(attachment)
++    }
++    var failed by remember(attachment.id) { mutableStateOf(false) }
++    val loaded = file
++
++    if (loaded == null || failed) {
++        Box(modifier, contentAlignment = Alignment.Center) { fallback() }
++    } else {
++        AsyncImage(
++            model = ImageRequest.Builder(LocalContext.current)
++                .data(loaded)
++                .crossfade(true)
++                .build(),
++            contentDescription = attachment.name,
++            contentScale = ContentScale.Crop,
++            onError = { failed = true },
++            modifier = modifier,
++        )
++    }
++}
+diff --git a/android/app/src/main/java/com/grapsee/grapmail/ui/screens/mail/ComposeScreen.kt b/android/app/src/main/java/com/grapsee/grapmail/ui/screens/mail/ComposeScreen.kt
+index 426ce84..276bb09 100644
+--- a/android/app/src/main/java/com/grapsee/grapmail/ui/screens/mail/ComposeScreen.kt
++++ b/android/app/src/main/java/com/grapsee/grapmail/ui/screens/mail/ComposeScreen.kt
+@@ -114,8 +114,11 @@ fun ComposeScreen(
+     }
+     val close = {
+         if (!state.sending && !uploading && !preparingSend) {
++            // The body alone does not qualify: the seeded signature is not
++            // the person's content. An edit, a recipient, or a subject is.
+             if (!waitingForDraft && !state.accepted && (attached.isNotEmpty() ||
+-                    listOf(state.to, state.cc, state.subject, state.body).any { it.isNotBlank() })
++                    state.userEdited ||
++                    listOf(state.to, state.cc, state.subject).any { it.isNotBlank() })
+             ) {
+                 saveDraft(onBack)
+             } else {
+@@ -162,7 +165,7 @@ fun ComposeScreen(
+             prepared = true
+             vm.prepareReply(replyId, mode, signature)
+         } else if (signature.isNotBlank()) {
+-            vm.composeUpdate { s ->
++            vm.composeSeed { s ->
+                 if (s.body.isBlank()) s.copy(body = "\n\n-- \n$signature") else s
+             }
+             prepared = true
+diff --git a/android/app/src/main/java/com/grapsee/grapmail/ui/screens/mail/MailSecondaryScreens.kt b/android/app/src/main/java/com/grapsee/grapmail/ui/screens/mail/MailSecondaryScreens.kt
+index c4ad45b..54cfdcf 100644
+--- a/android/app/src/main/java/com/grapsee/grapmail/ui/screens/mail/MailSecondaryScreens.kt
++++ b/android/app/src/main/java/com/grapsee/grapmail/ui/screens/mail/MailSecondaryScreens.kt
+@@ -438,8 +438,12 @@ fun FilesScreen(vm: MailboxViewModel, onBack: () -> Unit, onOpen: (String) -> Un
+                                 .padding(horizontal = 16.dp, vertical = 12.dp),
+                             verticalAlignment = Alignment.CenterVertically,
+                         ) {
+-                            Box(Modifier.size(38.dp).clip(RoundedCornerShape(10.dp))
+-                                .background(palette.softFill), contentAlignment = Alignment.Center) {
++                            AttachmentThumb(
++                                vm = vm,
++                                attachment = entry.attachment,
++                                modifier = Modifier.size(38.dp).clip(RoundedCornerShape(10.dp))
++                                    .background(palette.softFill),
++                            ) {
+                                 Icon(Icons.Rounded.AttachFile, null, tint = palette.primarySolid,
+                                     modifier = Modifier.size(18.dp))
+                             }
+@@ -469,10 +473,10 @@ fun FilesScreen(vm: MailboxViewModel, onBack: () -> Unit, onOpen: (String) -> Un
+ /**
+  * 79 — an attachment's own screen.
+  *
+- * It reports size, type and where it came from, and saves the bytes. It does not
+- * claim to preview formats the app cannot decode: an image is offered as a
+- * download, not a thumbnail, because there is no image loader in this build and
+- * pretending otherwise would show a broken box.
++ * It reports size, type and where it came from, and saves the bytes. Images are
++ * drawn as a thumbnail through the same authenticated fetch the download button
++ * uses (fixpack A2, Coil); every other format keeps the type icon rather than a
++ * box that would decode to nothing.
+  */
+ @Composable
+ fun AttachmentPreviewScreen(vm: MailboxViewModel, attachmentId: String, onBack: () -> Unit) {
+@@ -511,8 +515,12 @@ fun AttachmentPreviewScreen(vm: MailboxViewModel, attachmentId: String, onBack:
+                 return@Column
+             }
+             Spacer(Modifier.height(16.dp))
+-            Box(Modifier.size(84.dp).clip(RoundedCornerShape(18.dp)).background(palette.softFill),
+-                contentAlignment = Alignment.Center) {
++            AttachmentThumb(
++                vm = vm,
++                attachment = a,
++                modifier = Modifier.size(84.dp).clip(RoundedCornerShape(18.dp))
++                    .background(palette.softFill),
++            ) {
+                 Icon(Icons.Rounded.AttachFile, null, tint = palette.primarySolid, modifier = Modifier.size(34.dp))
+             }
+             Spacer(Modifier.height(16.dp))
+diff --git a/ios/GrapMail/APIClient.swift b/ios/GrapMail/APIClient.swift
+index bbb51e1..999ffc2 100644
+--- a/ios/GrapMail/APIClient.swift
++++ b/ios/GrapMail/APIClient.swift
+@@ -94,6 +94,7 @@ enum ApiError: Error, LocalizedError {
+             case "CANNOT_REVOKE_CURRENT": return "Sign out to end this session."
+             case "TWOFA_REQUIRED_FOR_BACKUP_CODES": return "Turn on two-step verification to use backup codes."
+             case "NO_MAILBOX": return "Your GrapMail inbox is not ready yet."
++            case "HUMAN_VERIFICATION_REQUIRED": return "Your verification expired or was already used — complete the check again."
+             default: break
+             }
+             switch status {
+@@ -169,6 +170,9 @@ struct CreateRequest: Codable {
+     var password: String
+     var acceptedTerms: Bool?
+     var avatarPhoto: String? = nil
++    /// Consumed exactly once by the register gate; without it the server
++    /// answers 403 human-verification-required and creates no mailbox.
++    var humanVerificationId: String? = nil
+     /// The gateway splits the agency dashboard's CLIENT accounts from GrapMail's
+     /// USER accounts; only USER accounts get a handle and a mailbox.
+     var accountType: String = "USER"
+@@ -210,6 +214,11 @@ struct CreateResponse: Codable {
+     }
+ }
+ 
++struct VerifyHumanResponse: Codable {
++    let success: Bool
++    let verificationId: String?
++}
++
+ struct CheckResponse: Codable {
+     var success: Bool = false
+     var available: Bool = false
+@@ -1353,6 +1362,15 @@ struct ApiClient {
+         return try await request("/grapsee/auth/register", method: "POST", body: body)
+     }
+ 
++    static func verifyHuman(token: String) async throws -> VerifyHumanResponse {
++        struct Body: Codable { let token: String }
++        return try await request(
++            "/grapsee/auth/verify-human",
++            method: "POST",
++            body: encoder.encode(Body(token: token))
++        )
++    }
++
+     static func signIn(identifier: String, password: String) async throws -> SignInResponse {
+         let body = try encoder.encode(SignInRequest(identifier: identifier, password: password))
+         return try await request("/grapsee/auth/login", method: "POST", body: body)
+diff --git a/ios/GrapMail/FinishScreens.swift b/ios/GrapMail/FinishScreens.swift
+index 0659389..ad47e9e 100644
+--- a/ios/GrapMail/FinishScreens.swift
++++ b/ios/GrapMail/FinishScreens.swift
+@@ -1,15 +1,33 @@
+ import SwiftUI
++import WebKit
++
++/// Human verification — REAL challenge, no bypass (2026-11-17 overhaul).
++///
++/// This replaces the old puzzle-slider card and the "Skip for now" exit. The
++/// user solves a genuine reCAPTCHA challenge hosted on the web checkpoint page
++/// (kit file web/04_verify-human-page.tsx → https://<your-web-app>/verify/human)
++/// inside a WKWebView. A server-confirmed verdict is the only path forward:
++/// "Continue" stays disabled and there is no skip — same semantics as the web app.
++///
++/// Integration (see PATCHES-ios.md):
++///  - Delete the old `HumanVerifyView` struct in FinishScreens.swift (everything
++///    from `struct HumanVerifyView` to just before `struct AccountCreatedView`)
++///    and either keep this file or paste its contents in its place.
++///  - Add to SignUpModel: `humanVerified` (server-confirmed), `humanVerifying`,
++///    `humanVerifyError` and `submitHumanVerification(token:)`.
++///  - Keep the RootView.swift call site unchanged — the initializer signature
++///    matches the old view.
++///
++/// Bridge contract (must match the checkpoint page):
++///   window.webkit.messageHandlers.grapmailVerify.postMessage(token)
+ 
+-/// Human verification — founder design verbatim: shield + badge illustration,
+-/// ACCOUNT PROTECTION, "Just one more step!", the Solve-the-puzzle card,
+-/// OR divider, Get a new challenge, Skip for now + caption.
+ struct HumanVerifyView: View {
+     @ObservedObject var model: SignUpModel
+     var onBack: (() -> Void)? = nil
+     let onDone: () -> Void
+ 
+-    @State private var verified = false
+-    @State private var challenge = 0
++    /// Bumped to force a fresh challenge (reloads the checkpoint page).
++    @State private var reloadKey = 0
+ 
+     var body: some View {
+         VStack(spacing: 0) {
+@@ -52,79 +70,170 @@ struct HumanVerifyView: View {
+                         .lineSpacing(3)
+                         .padding(.top, 8)
+ 
+-                    // Solve the puzzle card
+-                    VStack(alignment: .leading, spacing: 14) {
+-                        HStack(alignment: .top, spacing: 12) {
+-                            Circle()
+-                                .fill(GM.primarySolid)
+-                                .frame(width: 40, height: 40)
+-                                .overlay(Text("🧩").font(.system(size: 17)))
+-                            VStack(alignment: .leading, spacing: 2) {
+-                                Text("Solve the puzzle")
+-                                    .font(.system(size: 15, weight: .semibold))
+-                                    .foregroundColor(GM.textPrimary)
+-                                Text("Drag the puzzle piece to the correct position to complete the image.")
+-                                    .font(GMFont.caption)
+-                                    .foregroundColor(GM.textSecondary)
+-                                    .lineSpacing(2)
++                    securityCheckCard
++                        .padding(.top, 22)
++
++                    if !model.state.humanVerified {
++                        Button {
++                            reloadKey += 1
++                        } label: {
++                            HStack(spacing: 8) {
++                                Image(systemName: "arrow.clockwise")
++                                    .font(.system(size: 14))
++                                    .foregroundColor(GM.primarySolid)
++                                Text("Get a new challenge")
++                                    .font(.system(size: 14, weight: .medium))
++                                    .foregroundColor(GM.primarySolid)
+                             }
++                            .frame(maxWidth: .infinity)
++                            .frame(height: 50)
++                            .background(RoundedRectangle(cornerRadius: 14).strokeBorder(GM.primarySolid.opacity(0.5)))
+                         }
+-                        PuzzleSlider(verified: $verified) {
+-                            model.markHumanVerified()
+-                        }
+-                        .id(challenge)
+-                    }
+-                    .padding(16)
+-                    .frame(maxWidth: .infinity, alignment: .leading)
+-                    .background(RoundedRectangle(cornerRadius: GMShape.card, style: .continuous).fill(GM.card))
+-                    .overlay(RoundedRectangle(cornerRadius: GMShape.card, style: .continuous).strokeBorder(GM.border))
+-                    .padding(.top, 22)
+-
+-                    // OR divider
+-                    HStack(spacing: 12) {
+-                        Rectangle().fill(GM.border).frame(height: 1)
+-                        Text("OR").font(.system(size: 12, weight: .medium)).foregroundColor(GM.textTertiary)
+-                        Rectangle().fill(GM.border).frame(height: 1)
++                        .buttonStyle(.plain)
++                        .padding(.top, 16)
+                     }
+-                    .padding(.top, 20)
+-
+-                    Button {
+-                        verified = false
+-                        challenge += 1
+-                    } label: {
+-                        HStack(spacing: 8) {
+-                            Image(systemName: "arrow.clockwise")
+-                                .font(.system(size: 14))
+-                                .foregroundColor(GM.primarySolid)
+-                            Text("Get a new challenge")
+-                                .font(.system(size: 14, weight: .medium))
+-                                .foregroundColor(GM.primarySolid)
+-                        }
+-                        .frame(maxWidth: .infinity)
+-                        .frame(height: 50)
+-                        .background(RoundedRectangle(cornerRadius: 14).strokeBorder(GM.primarySolid.opacity(0.5)))
++
++                    // The ONLY way forward — enabled after the server-confirmed
++                    // verdict. (The old "Skip for now" is deleted.)
++                    Button(action: onDone) {
++                        Text("Continue")
++                            .font(.system(size: 15, weight: .semibold))
++                            .foregroundColor(.white)
++                            .frame(maxWidth: .infinity)
++                            .frame(height: 50)
++                            .background(RoundedRectangle(cornerRadius: 14).fill(GM.primarySolid))
+                     }
+                     .buttonStyle(.plain)
+-                    .padding(.top, 16)
++                    .disabled(!model.state.humanVerified)
++                    .opacity(model.state.humanVerified ? 1 : 0.45)
++                    .padding(.top, 18)
+ 
+-                    Text("Skip for now")
+-                        .font(.system(size: 14, weight: .semibold))
+-                        .foregroundColor(GM.primarySolid)
+-                        .padding(.top, 18)
+-                        .onTapGesture { onDone() }
+-                    Text("You can always complete verification later\nfrom your account settings.")
+-                        .font(.system(size: 12))
++                    // Branding disclosure (mobile apps: no badge required, text optional).
++                    // TODO(branding): linkify "Privacy Policy" / "Terms of Service" per the guidelines.
++                    Text("This app is protected by reCAPTCHA and the Google Privacy Policy and Terms of Service apply.")
++                        .font(.system(size: 11))
+                         .foregroundColor(GM.textTertiary)
+                         .multilineTextAlignment(.center)
+-                        .lineSpacing(3)
+-                        .padding(.top, 6)
++                        .padding(.top, 10)
++                        .padding(.horizontal, 12)
+                         .padding(.bottom, 20)
+                 }
+             }
+-            .padding(.horizontal, 24)
+         }
+-        .centeredForm()
+-        .background(GM.bg.ignoresSafeArea())
++    }
++
++    private var securityCheckCard: some View {
++        VStack(alignment: .leading, spacing: 14) {
++            HStack(alignment: .top, spacing: 12) {
++                Circle()
++                    .fill(GM.primarySolid)
++                    .frame(width: 40, height: 40)
++                    .overlay(Text("🔒").font(.system(size: 17)))
++                VStack(alignment: .leading, spacing: 2) {
++                    Text("Security check")
++                        .font(.system(size: 15, weight: .semibold))
++                        .foregroundColor(GM.textPrimary)
++                    Text("Complete the challenge to verify you're a real person.")
++                        .font(GMFont.caption)
++                        .foregroundColor(GM.textSecondary)
++                        .lineSpacing(2)
++                }
++            }
++
++            if model.state.humanVerified {
++                // Server-confirmed verdict only. The WebView is no longer needed.
++                HStack(spacing: 10) {
++                    Image(systemName: "checkmark.seal.fill")
++                        .foregroundColor(GM.primarySolid)
++                    Text("Verified — thank you!")
++                        .font(.system(size: 15, weight: .semibold))
++                        .foregroundColor(GM.textPrimary)
++                }
++                .frame(maxWidth: .infinity)
++                .padding(.vertical, 22)
++            } else {
++                // Height is chosen so the reCAPTCHA image-challenge overlay fits.
++                VerifyWebView(url: VerifyCheckpoint.url, reloadKey: reloadKey) { token in
++                    model.submitHumanVerification(token: token)
++                }
++                .frame(height: 420)
++                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
++                .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(GM.border))
++
++                if model.state.humanVerifying {
++                    HStack(spacing: 8) {
++                        ProgressView().scaleEffect(0.8)
++                        Text("Checking…")
++                            .font(.system(size: 13))
++                            .foregroundColor(GM.textSecondary)
++                    }
++                }
++                if let message = model.state.humanVerifyError {
++                    Text(message)
++                        .font(.system(size: 12))
++                        .foregroundColor(.red) // TODO(theme): swap for a palette error color if one exists
++                }
++            }
++        }
++        .padding(16)
++        .frame(maxWidth: .infinity, alignment: .leading)
++        .background(RoundedRectangle(cornerRadius: GMShape.card, style: .continuous).fill(GM.card))
++        .overlay(RoundedRectangle(cornerRadius: GMShape.card, style: .continuous).strokeBorder(GM.border))
++    }
++}
++
++/// Target of the checkpoint page (must be HTTPS — required by reCAPTCHA).
++enum VerifyCheckpoint {
++    // TODO(deploy): your deployed web app origin. Same page the Android app loads.
++    static let url = URL(string: "https://grapsee.com/verify/human?embed=ios")!
++}
++
++/// WKWebView host for the checkpoint page + the `grapmailVerify` JS bridge.
++private struct VerifyWebView: UIViewRepresentable {
++    let url: URL
++    var reloadKey: Int
++    let onToken: (String) -> Void
++
++    final class Coordinator: NSObject, WKScriptMessageHandler {
++        let onToken: (String) -> Void
++        var handledReloadKey = -1
++
++        init(onToken: @escaping (String) -> Void) {
++            self.onToken = onToken
++        }
++
++        func userContentController(_ controller: WKUserContentController, didReceive message: WKScriptMessage) {
++            guard message.name == "grapmailVerify" else { return }
++            if let token = message.body as? String, !token.isEmpty {
++                onToken(token)
++            }
++        }
++    }
++
++    func makeCoordinator() -> Coordinator { Coordinator(onToken: onToken) }
++
++    func makeUIView(context: Context) -> WKWebView {
++        let configuration = WKWebViewConfiguration()
++        configuration.userContentController.add(context.coordinator, name: "grapmailVerify")
++        let webView = WKWebView(frame: .zero, configuration: configuration)
++        webView.isOpaque = false
++        webView.backgroundColor = .clear
++        webView.scrollView.bounces = false
++        context.coordinator.handledReloadKey = reloadKey
++        webView.load(URLRequest(url: url))
++        return webView
++    }
++
++    func updateUIView(_ webView: WKWebView, context: Context) {
++        if context.coordinator.handledReloadKey != reloadKey {
++            context.coordinator.handledReloadKey = reloadKey
++            webView.load(URLRequest(url: url))
++        }
++    }
++
++    static func dismantleUIView(_ webView: WKWebView, coordinator: Coordinator) {
++        webView.configuration.userContentController.removeScriptMessageHandler(forName: "grapmailVerify")
++        webView.stopLoading()
+     }
+ }
+ 
+diff --git a/ios/GrapMail/MailReaderViews.swift b/ios/GrapMail/MailReaderViews.swift
+index d8f05c7..12c1a41 100644
+--- a/ios/GrapMail/MailReaderViews.swift
++++ b/ios/GrapMail/MailReaderViews.swift
+@@ -956,7 +956,7 @@ struct ComposeView: View {
+                     prepared = true
+                     vm.prepareReply(id: replyId, mode: mode, signature: signature)
+                 } else if !signature.isEmpty {
+-                    vm.composeUpdate { s in
++                    vm.composeSeed { s in
+                         if s.body.isEmpty { s.body = "\n\n-- \n" + signature }
+                     }
+                     prepared = true
+@@ -972,7 +972,9 @@ struct ComposeView: View {
+             Button {
+                 guard !vm.compose.sending, !preparingSend, !uploading else { return }
+                 let draft = vm.compose
+-                if !waitingForDraft && !draft.accepted && (!attached.isEmpty || [draft.to, draft.cc, draft.subject, draft.body].contains(where: { $0.nilIfBlank() != nil })) {
++                // The body alone does not qualify: the seeded signature is
++                // not the person's content. An edit, a recipient, or a subject is.
++                if !waitingForDraft && !draft.accepted && (!attached.isEmpty || draft.userEdited || [draft.to, draft.cc, draft.subject].contains(where: { $0.nilIfBlank() != nil })) {
+                     saveDraft(onSaved: onBack)
+                 } else {
+                     onBack()
+diff --git a/ios/GrapMail/MailSecondaryViews.swift b/ios/GrapMail/MailSecondaryViews.swift
+index 63235d8..7b60803 100644
+--- a/ios/GrapMail/MailSecondaryViews.swift
++++ b/ios/GrapMail/MailSecondaryViews.swift
+@@ -627,6 +627,7 @@ struct MailSettingsView: View {
+     let onBack: () -> Void
+     let onSecurity: () -> Void
+     let onScreener: () -> Void
++    let onScheduled: () -> Void
+     let onLabels: () -> Void
+     // The account-record band — the same rows Android's MailSettingsScreen
+     // gained; each one opens a screen over the one profile document.
+@@ -741,6 +742,8 @@ struct MailSettingsView: View {
+                                value: "Password, two-step, sessions", onClick: onSecurity)
+                     SettingRow(icon: "lock", title: "Screener",
+                                value: "Approval for unknown senders", onClick: onScreener)
++                    SettingRow(icon: "clock", title: "Scheduled",
++                               value: "Sends queued on the server", onClick: onScheduled)
+                     SettingRow(icon: "tag", title: "Labels",
+                                value: "Filters for the inbox", onClick: onLabels)
+                     SettingRow(icon: "envelope", title: "Mail settings",
+diff --git a/ios/GrapMail/MailSnapshot.swift b/ios/GrapMail/MailSnapshot.swift
+index b19ce1a..665949c 100644
+--- a/ios/GrapMail/MailSnapshot.swift
++++ b/ios/GrapMail/MailSnapshot.swift
+@@ -583,7 +583,7 @@ struct MailSnapshotView: View {
+             case "mail-settings":
+                 return AnyView(
+                 secondary(MailSettingsView(vm: model, onBack: {},
+-                                           onSecurity: {}, onScreener: {}, onLabels: {},
++                                           onSecurity: {}, onScreener: {}, onScheduled: {}, onLabels: {},
+                                            onNotes: {}, onTasks: {}, onPrefs: {},
+                                            onAddresses: {}, onConnections: {},
+                                            onSubscriptions: {},
+diff --git a/ios/GrapMail/MailboxModel.swift b/ios/GrapMail/MailboxModel.swift
+index 359d1b9..024968e 100644
+--- a/ios/GrapMail/MailboxModel.swift
++++ b/ios/GrapMail/MailboxModel.swift
+@@ -177,6 +177,10 @@ final class MailboxModel: ObservableObject {
+         /// and the composer draws it as one small tertiary line.
+         var autosaving = false
+         var autosaveNote: String?
++        /// True once the person has edited this compose. The signature seed
++        /// and a loaded draft fill fields without an edit, so a composer
++        /// nobody touched neither autosaves nor saves on close.
++        var userEdited = false
+         var accepted: Bool { resultStatus == "sent" || resultStatus == "queued" || resultStatus == "delivered" }
+     }
+ 
+@@ -1819,10 +1823,20 @@ final class MailboxModel: ObservableObject {
+     // ── compose ──────────────────────────────────────────────────────────────
+ 
+     func composeUpdate(_ transform: (inout ComposeState) -> Void) {
++        // A person's own change: the compose is now theirs, so the autosave
++        // may carry it.
+         transform(&compose)
++        compose.userEdited = true
+         scheduleAutosave()
+     }
+ 
++    /// A programmatic fill — the signature seed, nothing the person did.
++    /// It arms no autosave: a composer nobody edited is not written to
++    /// Drafts (see `ComposeState.userEdited`).
++    func composeSeed(_ transform: (inout ComposeState) -> Void) {
++        transform(&compose)
++    }
++
+     // ── autosave ─────────────────────────────────────────────────────────────
+ 
+     /// The compose box saves itself. Every edit schedules a debounced draft
+@@ -1836,13 +1850,16 @@ final class MailboxModel: ObservableObject {
+ 
+     /// The rules the debounce obeys, each one a refusal rather than a feature:
+     /// an EMPTY compose saves nothing (a person opening the composer and
+-    /// leaving must not find an empty draft row named after nothing); a send
++    /// leaving must not find an empty draft row named after nothing); a composer
++    /// nobody edited saves nothing either — the seeded signature is a fill, not
++    /// an edit; a send
+     /// or a manual save in flight is not interrupted; and the autosave never
+     /// writes the receipt — its outcome is the composer's own quiet line, not
+     /// the "Saved to Drafts" banner the manual save earns.
+     private func scheduleAutosave() {
+         let s = compose
+         if s.sending || s.accepted { return }
++        if !s.userEdited { return }
+         if autosaveInFlight {
+             autosaveNeedsFollowUp = true
+             return
+@@ -2170,9 +2187,12 @@ final class MailboxModel: ObservableObject {
+                 if self.composeGeneration == generation {
+                     var updated = self.compose
+                     updated.sending = false
+-                    updated.result = nil
++                    // The receipt shows the server's own words: its message
++                    // (or error / deliveryError) verbatim, the local sentence
++                    // kept only as the last resort of a refusal.
++                    updated.result = r.message ?? r.error
+                     updated.resultStatus = r.status
+-                    updated.error = sent ? nil : "Could not send this message. Try again."
++                    updated.error = r.deliveryError ?? r.error ?? (sent ? nil : "Could not send this message. Try again.")
+                     if sent { updated.draftId = "" }
+                     self.compose = updated
+                 }
+diff --git a/ios/GrapMail/ProfileModel.swift.pre-avfix b/ios/GrapMail/ProfileModel.swift.pre-avfix
+new file mode 100644
+index 0000000..9aae899
+--- /dev/null
++++ b/ios/GrapMail/ProfileModel.swift.pre-avfix
+@@ -0,0 +1,468 @@
++import Foundation
++import Combine
++import CryptoKit
++
++enum AccountPhotoCache {
++    private static let queue = DispatchQueue(label: "com.grapsee.grapmail.account-photo", qos: .userInitiated)
++    private static let maxBytes = 10 * 1024 * 1024
++
++    private static func location(token: String) -> URL? {
++        let parts = token.split(separator: ".")
++        guard parts.count == 3, parts[1].count <= 16_384 else { return nil }
++        var payload = parts[1].replacingOccurrences(of: "-", with: "+").replacingOccurrences(of: "_", with: "/")
++        payload += String(repeating: "=", count: (4 - payload.count % 4) % 4)
++        guard let bytes = Data(base64Encoded: payload),
++              let claims = (try? JSONSerialization.jsonObject(with: bytes)) as? [String: Any],
++              let account = claims["sub"] as? String, let session = claims["jti"] as? String,
++              let root = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first else { return nil }
++        // The locally stored token namespaces the cache. Authorization stays server-side.
++        let key = SHA256.hash(data: Data("\(account):\(session)".utf8))
++            .map { String(format: "%02x", $0) }.joined()
++        return root.appendingPathComponent("grapmail-account-photos", isDirectory: true).appendingPathComponent(key)
++    }
++
++    static func read(token: String) async -> Data? {
++        guard let file = location(token: token) else { return nil }
++        return await withCheckedContinuation { continuation in
++            queue.async {
++                guard let size = try? file.resourceValues(forKeys: [.fileSizeKey]).fileSize,
++                      (1...maxBytes).contains(size) else {
++                    continuation.resume(returning: nil)
++                    return
++                }
++                continuation.resume(returning: try? Data(contentsOf: file))
++            }
++        }
++    }
++
++    static func store(_ bytes: Data?, token: String) {
++        guard let file = location(token: token) else { return }
++        queue.async {
++            guard let bytes else { try? FileManager.default.removeItem(at: file); return }
++            guard !bytes.isEmpty, bytes.count <= maxBytes else { return }
++            try? FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
++            try? bytes.write(to: file, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
++        }
++    }
++}
++
++/// The account record and its writers — the eight screens the web client
++/// splits across `/mail/account/*`, `/mail/settings`, `/mail/notes` and
++/// `/mail/tasks` all read and change this one document
++/// (`auth-account-profile.ts`). Swift mirror of Android's `ProfileViewModel`;
++/// the two hold the same record with the same rules.
++///
++/// ── WHY ONE MODEL FOR EIGHT SCREENS ─────────────────────────────────────────
++/// The PATCH response carries the full updated profile (`:675-679`), so a save
++/// refreshes every screen from the same answer rather than firing a GET after
++/// it. Eight screens each fetching their own copy would disagree about the
++/// record during the window between the write and the read — the notes screen
++/// showing a list the tasks screen just overwrote is exactly the drift the
++/// shared record exists to prevent.
++///
++/// ── WHY THE NOTE IS PART OF THE STATE ───────────────────────────────────────
++/// A save must be able to say what actually happened: "Saved." only when the
++/// server accepted, the server's own refusal text otherwise (the route answers
++/// 422 with a human message and a stable code). A screen that shows a success
++/// banner over a refused write is the defect class this whole sector was built
++/// against.
++@MainActor
++final class ProfileModel: ObservableObject {
++
++    struct State {
++        /// Nil until the first read answers. The screens draw "Loading…" or
++        /// "could not be read" from this — never empty strings as if the
++        /// account had been asked and had nothing to say.
++        var profile: ProfileDto?
++        var loading = false
++        /// A failed load with nothing on screen.
++        var fatal: String?
++        /// A failed load that kept the previous record on screen.
++        var staleError: String?
++        /// The last save's outcome, shown by the screen that made it.
++        var note: String?
++        var noteIsBad = false
++        var busy = false
++        /// The photo bytes, loaded lazily. nil means never asked — the profile
++        /// carries only the URL, and the URL is same-origin-with-bearer, so
++        /// the bytes come from a second call that runs only when a screen
++        /// actually draws the avatar.
++        var avatar: Data?
++        var avatarTried = false
++    }
++
++    @Published var state = State()
++
++    /// Test-only seam for the snapshot host, same rule as the mailbox's: the
++    /// seed is the frame's content and the boot read must not race it — a live
++    /// profile arriving after the seed would photograph the CI account's real
++    /// (empty) notes list and call the populated branch unseen.
++    private var snapshotSeeded = false
++    func seedForSnapshot(_ profile: ProfileDto, avatarBytes: Data? = nil) {
++        snapshotSeeded = true
++        state.profile = profile
++        state.loading = false
++        state.avatar = avatarBytes
++        state.avatarTried = true
++    }
++
++    func showSignupAvatar(_ bytes: Data) {
++        if state.profile == nil, state.avatar == nil { state.avatar = bytes }
++        if let token { AccountPhotoCache.store(bytes, token: token) }
++    }
++
++    private var token: String? { SessionStore.token }
++
++    private var profileLoad: Task<Void, Never>?
++    private var avatarLoad: Task<Void, Never>?
++    private var profileLoadedAt: TimeInterval?
++    private var avatarWriteGeneration = 0
++
++    func watchAvatar() async {
++        guard !snapshotSeeded else { return }
++        let generation = SessionStore.generation
++        var revision = ""
++        while !Task.isCancelled, generation == SessionStore.generation, let token {
++            let writeGeneration = avatarWriteGeneration
++            do {
++                let latest = try await ApiClient.watchAvatar(token: token, revision: revision)
++                guard !Task.isCancelled, generation == SessionStore.generation else { return }
++                if latest != revision {
++                    while state.busy || profileLoad != nil {
++                        try await Task.sleep(nanoseconds: 100_000_000)
++                    }
++                    guard !Task.isCancelled, generation == SessionStore.generation else { return }
++                    guard writeGeneration == avatarWriteGeneration else { continue }
++                    let currentUrl = state.profile?.avatarUrl?.nilIfBlank()
++                    let inAppPhoto = currentUrl == nil || currentUrl?.hasPrefix("/api/grapsee/auth/account/avatar?v=") == true
++                    if state.profile != nil, inAppPhoto {
++                        let url = latest == "none" ? nil : "/api/grapsee/auth/account/avatar?v=\(latest)"
++                        if url != currentUrl || !state.avatarTried {
++                            let bytes: Data?
++                            if url == nil {
++                                bytes = nil
++                            } else {
++                                guard let photo = try await ApiClient.avatarBytes(token: token, revision: latest) else {
++                                    throw CocoaError(.fileReadUnknown)
++                                }
++                                bytes = photo
++                            }
++                            guard !Task.isCancelled, generation == SessionStore.generation else { return }
++                            guard writeGeneration == avatarWriteGeneration, !state.busy, profileLoad == nil,
++                                  state.profile?.avatarUrl?.nilIfBlank() == currentUrl else { continue }
++                            avatarLoad?.cancel()
++                            avatarLoad = nil
++                            var updated = state
++                            updated.profile?.avatarUrl = url
++                            updated.avatar = bytes
++                            updated.avatarTried = true
++                            state = updated
++                            AccountPhotoCache.store(bytes, token: token)
++                        }
++                        revision = latest
++                        continue
++                    }
++                    load(force: true)
++                    await profileLoad?.value
++                    await avatarLoad?.value
++                    if state.staleError == nil, state.fatal == nil, let profile = state.profile,
++                       profile.avatarUrl?.nilIfBlank() == nil || state.avatarTried {
++                        revision = latest
++                    } else {
++                        try await Task.sleep(nanoseconds: 3_000_000_000)
++                    }
++                }
++            } catch {
++                if let apiError = error as? ApiError,
++                   case let .http(_, code, _) = apiError, code == "AVATAR_CHANGED" { continue }
++                if Task.isCancelled { return }
++                try? await Task.sleep(nanoseconds: 3_000_000_000)
++            }
++        }
++    }
++
++    func load(force: Bool = false) {
++        guard !snapshotSeeded, profileLoad == nil, !state.busy, let token else { return }
++        if !force, state.staleError == nil, let profileLoadedAt, ProcessInfo.processInfo.systemUptime - profileLoadedAt < 30 { return }
++        if state.profile == nil { state.loading = true }
++        let generation = SessionStore.generation
++        profileLoad = Task { [weak self] in
++            guard let self, !Task.isCancelled else { return }
++            defer { if !Task.isCancelled { self.profileLoad = nil } }
++            do {
++                if self.state.profile == nil, self.state.avatar == nil,
++                   let cached = await AccountPhotoCache.read(token: token),
++                   await AvatarThumbnail.decode(cached) != nil {
++                    guard !Task.isCancelled, generation == SessionStore.generation else { return }
++                    if self.state.profile == nil, self.state.avatar == nil, !self.state.busy {
++                        self.state.avatar = cached
++                    }
++                }
++                guard !Task.isCancelled, generation == SessionStore.generation else { return }
++                let resp = try await ApiClient.profile(token: token)
++                guard !Task.isCancelled, generation == SessionStore.generation else { return }
++                var updated = self.state
++                if let fresh = resp.profile {
++                    if fresh.avatarUrl?.nilIfBlank() == nil {
++                        updated.avatar = nil
++                        AccountPhotoCache.store(nil, token: token)
++                    }
++                    if fresh.avatarUrl != updated.profile?.avatarUrl {
++                        self.avatarLoad?.cancel()
++                        self.avatarLoad = nil
++                        updated.avatarTried = false
++                    }
++                    updated.profile = fresh
++                    self.profileLoadedAt = ProcessInfo.processInfo.systemUptime
++                }
++                updated.loading = false
++                updated.fatal = updated.profile == nil ? "The account record is unavailable." : nil
++                updated.staleError = nil
++                self.state = updated
++                if self.avatarLoad == nil { self.loadAvatar() }
++            } catch {
++                guard !Task.isCancelled, generation == SessionStore.generation else { return }
++                let message = self.reason(error)
++                var updated = self.state
++                updated.loading = false
++                updated.fatal = updated.profile == nil ? message : nil
++                updated.staleError = updated.profile != nil ? message : nil
++                self.state = updated
++            }
++        }
++    }
++
++    func loadAvatar() {
++        guard !snapshotSeeded, !state.avatarTried, !state.busy, avatarLoad == nil, let token,
++              let url = state.profile?.avatarUrl?.nilIfBlank() else { return }
++        let generation = SessionStore.generation
++        avatarLoad = Task { [weak self] in
++            guard let self else { return }
++            defer { if !Task.isCancelled { self.avatarLoad = nil } }
++            do {
++                let inline = AvatarThumbnail.inline(url)
++                let bytes: Data?
++                if let inline, await AvatarThumbnail.decode(inline) != nil { bytes = inline }
++                else { bytes = try await ApiClient.avatarBytes(token: token) }
++                guard !Task.isCancelled, generation == SessionStore.generation,
++                      self.state.profile?.avatarUrl == url else { return }
++                var updated = self.state
++                updated.avatar = bytes
++                updated.avatarTried = true
++                self.state = updated
++                AccountPhotoCache.store(bytes, token: token)
++            } catch let error as ApiError {
++                guard !Task.isCancelled, generation == SessionStore.generation,
++                      self.state.profile?.avatarUrl == url else { return }
++                if case let .http(_, code, _) = error, code == "NO_AVATAR" {
++                    var updated = self.state
++                    updated.avatar = nil
++                    updated.avatarTried = true
++                    self.state = updated
++                    AccountPhotoCache.store(nil, token: token)
++                }
++            } catch {}
++        }
++    }
++
++    private func beginWrite() -> String? {
++        guard !state.busy, let token else { return nil }
++        avatarWriteGeneration += 1
++        profileLoad?.cancel()
++        profileLoad = nil
++        avatarLoad?.cancel()
++        avatarLoad = nil
++        var updated = state
++        updated.busy = true
++        updated.loading = false
++        updated.note = nil
++        state = updated
++        return token
++    }
++
++    /// Apply one partial write and settle the note from the server's answer.
++    ///
++    /// The PATCH response IS the new record, so there is no follow-up GET — a
++    /// second read would open a window where two screens show two versions of
++    /// the same document.
++    func save(label: String, personal: [String: String?] = [:],
++              settings: [String: Any?]? = nil,
++              connections: [[String: Any?]]? = nil) {
++        guard let token = beginWrite() else { return }
++        let generation = SessionStore.generation
++        Task {
++            do {
++                let resp = try await ApiClient.patchProfile(
++                    token: token, personal: personal, settings: settings,
++                    connections: connections)
++                guard generation == SessionStore.generation else { return }
++                state.busy = false
++                state.profile = resp.profile ?? state.profile
++                if resp.profile != nil { profileLoadedAt = ProcessInfo.processInfo.systemUptime }
++                let text = resp.message?.trimmingCharacters(in: .whitespacesAndNewlines)
++                state.note = (text?.isEmpty == false) ? text! : label
++                state.noteIsBad = false
++            } catch {
++                guard generation == SessionStore.generation else { return }
++                state.busy = false
++                state.note = reason(error)
++                state.noteIsBad = true
++            }
++        }
++    }
++
++    // ── the settings writers, one per editable key-group ─────────────────────
++
++    func saveSettings(_ patch: ProfileSettingsPatch) {
++        var settings: [String: Any?] = [:]
++        if let v = patch.signature { settings["signature"] = v }
++        if let v = patch.density { settings["density"] = v }
++        if let v = patch.signatures { settings["signatures"] = v }
++        if let v = patch.blockedSenders { settings["blockedSenders"] = v }
++        if let v = patch.safeSenders { settings["safeSenders"] = v }
++        if let v = patch.notes { settings["notes"] = v }
++        if let v = patch.tasks { settings["tasks"] = v }
++        if let v = patch.locale, let data = try? ApiClient.encoder.encode(v),
++           let obj = try? JSONSerialization.jsonObject(with: data) {
++            // A JSON object, not the encoded Data: JSONSerialization refuses
++            // raw bytes as a value, and `locale` is a whole nested object on
++            // the wire — the caller sends the copy it holds with the one field
++            // changed, exactly as Android does.
++            settings["locale"] = obj
++        }
++        // vacation and forwarding are DELIBERATELY absent from the patch type:
++        // the sieve interpreter supports the actions but no code turns these
++        // settings into rules, so the switches do not appear and nothing here
++        // writes a value no pipeline reads.
++        save(label: "Saved.", settings: settings)
++    }
++
++    /// The keep-list after one disconnect. `removeConnection` is what the
++    /// screen's Remove acts on; the write is the whole remaining list, because
++    /// that is the shape the route replaces.
++    func saveConnections(keep: [ProfileConnection]) {
++        let rows = keep.map { c -> [String: Any?] in
++            ["product": c.product, "host": c.host, "scopes": c.scopes,
++             "connectedAt": c.connectedAt]
++        }
++        save(label: "Removed.", connections: rows)
++    }
++
++    /// Mint or retire an alias — the two routes the mailbox API already
++    /// declares, reached from the Addresses screen.
++    ///
++    /// After either, the profile is re-read rather than patched locally: the
++    /// server mints the address itself, so a locally-invented row would be a
++    /// claim about a value nobody has seen, and the alias list on the profile
++    /// is the same table the settings rows quote — both must move together or
++    /// one is lying.
++    func aliasWrite(value: String, remove: Bool) {
++        guard let token = beginWrite() else { return }
++        let generation = SessionStore.generation
++        Task {
++            do {
++                var msg = ""
++                if remove {
++                    let r = try await ApiClient.mailDeleteAlias(token, address: value)
++                    guard generation == SessionStore.generation else { return }
++                    guard r.success else {
++                        state.busy = false
++                        state.note = r.error ?? "That alias could not be removed."
++                        state.noteIsBad = true
++                        return
++                    }
++                    msg = r.message ?? "Alias removed."
++                } else {
++                    let r = try await ApiClient.mailCreateAlias(token, label: value)
++                    guard generation == SessionStore.generation else { return }
++                    guard r.success else {
++                        state.busy = false
++                        state.note = r.error ?? r.message ?? "The alias could not be created."
++                        state.noteIsBad = true
++                        return
++                    }
++                    msg = r.message ?? "Alias created."
++                }
++                state.busy = false
++                state.noteIsBad = false
++                state.note = msg
++                snapshotSeeded = false  // a live write re-owns the record
++                load(force: true)
++            } catch {
++                guard generation == SessionStore.generation else { return }
++                state.busy = false
++                state.note = reason(error)
++                state.noteIsBad = true
++            }
++        }
++    }
++
++    /// Replace or clear the photo. On success the server's nonce-bearing URL
++    /// replaces the stale one immediately; on failure the old bytes stay — a
++    /// refused upload must not blank the photo that is still on the record.
++    func uploadAvatar(bytes: Data, filename: String, mime: String, onSaved: @escaping () -> Void = {}) {
++        guard let token = beginWrite() else { return }
++        let generation = SessionStore.generation
++        Task {
++            do {
++                let (resp, saved) = try await ApiClient.saveAvatar(
++                    token: token, bytes: bytes, filename: filename, mime: mime)
++                guard generation == SessionStore.generation else { return }
++                state.busy = false
++                state.avatar = saved
++                AccountPhotoCache.store(saved, token: token)
++                state.avatarTried = true
++                if let url = resp.avatarUrl { state.profile?.avatarUrl = url }
++                let text = resp.message?.trimmingCharacters(in: .whitespacesAndNewlines)
++                state.note = (text?.isEmpty == false) ? text! : "Profile photo updated."
++                state.noteIsBad = false
++                onSaved()
++                load(force: true)
++            } catch {
++                guard generation == SessionStore.generation else { return }
++                state.busy = false
++                state.note = "Couldn’t confirm your profile photo. Try again."
++                state.noteIsBad = true
++            }
++        }
++    }
++
++    func removeAvatar() {
++        guard let token = beginWrite() else { return }
++        let generation = SessionStore.generation
++        Task {
++            do {
++                let resp = try await ApiClient.deleteAvatar(token: token)
++                guard generation == SessionStore.generation else { return }
++                guard resp.success else { throw CocoaError(.fileWriteUnknown) }
++                state.busy = false
++                state.avatar = nil
++                AccountPhotoCache.store(nil, token: token)
++                state.avatarTried = true
++                state.profile?.avatarUrl = nil
++                let text = resp.message?.trimmingCharacters(in: .whitespacesAndNewlines)
++                state.note = (text?.isEmpty == false) ? text! : "Profile photo removed."
++                state.noteIsBad = false
++            } catch {
++                guard generation == SessionStore.generation else { return }
++                state.busy = false
++                state.note = reason(error)
++                state.noteIsBad = true
++            }
++        }
++    }
++
++    func clearNote() {
++        state.note = nil
++        state.noteIsBad = false
++    }
++
++    /// The server's refusal in the person's words, never a status number.
++    private func reason(_ error: Error) -> String {
++        if let api = error as? ApiError, case let .http(_, _, message) = api,
++           !message.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
++            return message
++        }
++        return "That change did not go through."
++    }
++}
+diff --git a/ios/GrapMail/RootView.swift b/ios/GrapMail/RootView.swift
+index 12537b7..e31ad9e 100644
+--- a/ios/GrapMail/RootView.swift
++++ b/ios/GrapMail/RootView.swift
+@@ -73,7 +73,7 @@ struct RootView: View {
+         case mailLabels, mailLabelCreate(id: String)
+         case mailContacts, mailContactDetail(address: String)
+         case mailFiles, mailAttachment(id: String)
+-        case mailSettings, mailScreener
++        case mailSettings, mailScreener, mailScheduled
+         // ── account-record band ──────────────────────────────────────────────
+         // The web client's `/mail/notes`, `/mail/tasks`, `/mail/settings`,
+         // `/mail/account/{profile,privacy,addresses,connections,support}` —
+@@ -634,35 +634,34 @@ struct RootView: View {
+                 case .stepPassword:
+                     PasswordStepView(model: model, onBack: { path.removeLast() }, onSignIn: { path.append(.signIn) }) {
+                         model.update { $0.step = 5 }
+-                        path.append(.stepTerms)
++                        // Human verification moved BEFORE the Terms/create step
++                        // (2026-11-18): the register call consumes the server-issued
++                        // verificationId, so the challenge must be solved first.
++                        path.append(.humanVerify)
+                     }
+                 case .stepTerms:
+                     TermsStepView(model: model, onBack: { path.removeLast() }, onSignIn: { path.append(.signIn) }) { address, name in
+-                        path.removeAll(where: { $0 == .stepName || $0 == .stepInfo || $0 == .stepAddress || $0 == .stepPassword || $0 == .stepTerms })
+-                        // The account exists at this point, but the auto
+-                        // sign-in may not have: without a token the next screens
+-                        // answer "sign in again". Send the person to sign-in with
++                        path.removeAll(where: { $0 == .stepName || $0 == .stepInfo || $0 == .stepAddress || $0 == .stepPassword || $0 == .stepTerms || $0 == .humanVerify })
++                        // The account now exists and the register call consumed the
++                        // verificationId (verification ran before this step,
++                        // 2026-11-18 reorder): finish the wizard. If the auto
++                        // sign-in did not land, send the person to sign-in with
+                         // the address filled in instead of into a dead flow.
+                         if SessionStore.hasValidSession {
+-                            path.append(.humanVerify)
++                            guard !OnboardingGate.isDone else { return enterMailbox() }
++                            path.append(.onboarding(address: address, name: name))
+                         } else {
+                             recovery.prefillIdentifier = address
+                             path.append(.signIn)
+                         }
+-                        _ = (address, name)
+                     }
+                 case .humanVerify:
+                     HumanVerifyView(model: model, onBack: { path.removeLast() }) {
+-                        let s = model.state
+-                        // The walkthrough belongs to the first account this
+-                        // device ever created. A second account is somebody who
+-                        // has already met the product; replaying it is an
+-                        // interruption, not a welcome.
+-                        guard !OnboardingGate.isDone else { return enterMailbox() }
+-                        path.append(.onboarding(
+-                            address: s.createdAddress ?? "",
+-                            name: s.createdName ?? s.firstName
+-                        ))
++                        // Server-confirmed verdict only (Continue gates on it). Go
++                        // to the Terms/create step — the register call there spends
++                        // the verificationId; the wizard finishes from that step
++                        // (2026-11-18 reorder).
++                        path.append(.stepTerms)
+                     }
+                 case let .created(address, name):
+                     AccountCreatedView(address: address, name: name) {
+@@ -831,6 +830,7 @@ struct RootView: View {
+                         onBack: { path.removeLast() },
+                         onSecurity: { path.append(.security) },
+                         onScreener: { path.append(.mailScreener) },
++                        onScheduled: { path.append(.mailScheduled) },
+                         onLabels: { path.append(.mailLabels) },
+                         onNotes: { path.append(.mailNotes) },
+                         onTasks: { path.append(.mailTasks) },
+@@ -900,6 +900,11 @@ struct RootView: View {
+                 case .e2eStatus, .e2eSetup, .e2eUnlock, .e2eDetails,
+                      .e2ePublish, .e2eChangePassphrase, .e2eRemove, .e2eRecipients:
+                     e2eDestination(route)
++                case .mailScheduled:
++                    ScheduledView(
++                        apiToken: SessionStore.token ?? "",
++                        onBack: { path.removeLast() }
++                    )
+                 case .mailScreener:
+                     ScreenerView(
+                         vm: mail,
+diff --git a/ios/GrapMail/SignUpModel.swift b/ios/GrapMail/SignUpModel.swift
+index ec4e54f..de26929 100644
+--- a/ios/GrapMail/SignUpModel.swift
++++ b/ios/GrapMail/SignUpModel.swift
+@@ -35,6 +35,10 @@ final class SignUpModel: ObservableObject {
+         var createdAddress: String?
+         var createdName: String?
+         var humanVerified = false
++        // Human-verification gate (2026-11-17): server-confirmed only.
++        var humanVerifying = false
++        var humanVerifyError: String?
++        var humanVerificationId: String?
+     }
+ 
+     @Published private(set) var state = UiState()
+@@ -128,7 +132,8 @@ final class SignUpModel: ObservableObject {
+                         grapmailHandle: s.chosenHandle.isEmpty ? nil : s.chosenHandle,
+                         password: s.password,
+                         acceptedTerms: true,
+-                        avatarPhoto: s.photo.map { "data:image/png;base64," + $0.base64EncodedString() }
++                        avatarPhoto: s.photo.map { "data:image/png;base64," + $0.base64EncodedString() },
++                        humanVerificationId: s.humanVerificationId
+                     )
+                 )
+                 // The gateway answers `grapmail` (and no account object); the
+@@ -146,7 +151,7 @@ final class SignUpModel: ObservableObject {
+                 // beat to become usable, so retry a few times before giving up
+                 // and letting RootView fall back to the sign-in screen: without
+                 // a session the wizard strands the new user on sign-in instead
+-                // of the human-verify → created flow the design shows.
++                // of the created → onboarding flow the design shows.
+                 for attempt in 0..<4 {
+                     if attempt > 0 {
+                         try? await Task.sleep(nanoseconds: 1_200_000_000)
+@@ -165,6 +170,13 @@ final class SignUpModel: ObservableObject {
+                 onCreated(address, resp.account?.name ?? fullName)
+             } catch let ApiError.http(_, code, message) {
+                 update { $0.creating = false }
++                // A spent or expired verification must not outlive its receipt:
++                // the stale verdict would keep passing the Continue gate and the
++                // bridge's idempotency guard for a check the server has already
++                // refused — the retry the copy below asks for could never happen.
++                if code == "HUMAN_VERIFICATION_REQUIRED" {
++                    update { $0.humanVerified = false; $0.humanVerificationId = nil; $0.humanVerifyError = nil }
++                }
+                 switch code {
+                 case "HANDLE_TAKEN": onError("That GrapMail address is already taken. Try another one.")
+                 // The server names which rule failed and the message is already in
+@@ -172,6 +184,7 @@ final class SignUpModel: ObservableObject {
+                 // symbol now that the whole policy is enforced.
+                 case "WEAK_PASSWORD": onError(message.isEmpty ? "Use at least 8 characters with a letter, a number and a symbol." : message)
+                 case "INVALID_NAME": onError("Enter your full name (at least 2 characters).")
++                case "HUMAN_VERIFICATION_REQUIRED": onError("Your verification expired or was already used — complete the check again.")
+                 default: onError(message.isEmpty ? "Could not create the account. Please try again." : message)
+                 }
+             } catch {
+@@ -182,4 +195,28 @@ final class SignUpModel: ObservableObject {
+     }
+ 
+     func markHumanVerified() { update { $0.humanVerified = true } }
++
++    /// Human verification (2026-11-17 overhaul): exchange the reCAPTCHA token
++    /// from the checkpoint page's JS bridge for a server verdict. Continue
++    /// stays disabled until {success:true}. Idempotent: duplicates ignored.
++    func submitHumanVerification(token: String) {
++        guard !token.isEmpty, !state.humanVerified, !state.humanVerifying else { return }
++        Task {
++            update { $0.humanVerifying = true; $0.humanVerifyError = nil }
++            do {
++                let resp = try await ApiClient.verifyHuman(token: token)
++                if resp.success {
++                    update {
++                        $0.humanVerifying = false
++                        $0.humanVerified = true
++                        $0.humanVerificationId = resp.verificationId
++                    }
++                } else {
++                    update { $0.humanVerifying = false; $0.humanVerifyError = "Verification failed — please try again." }
++                }
++            } catch {
++                update { $0.humanVerifying = false; $0.humanVerifyError = "Network error — please try again." }
++            }
++        }
++    }
+ }
+diff --git a/ios/GrapMailUITests/ScreenshotWalkUITests.swift b/ios/GrapMailUITests/ScreenshotWalkUITests.swift
+index f47a5db..d2dc2c1 100644
+--- a/ios/GrapMailUITests/ScreenshotWalkUITests.swift
++++ b/ios/GrapMailUITests/ScreenshotWalkUITests.swift
+@@ -146,6 +146,28 @@ final class ScreenshotWalkUITests: XCTestCase {
+         snap("05-step4-password-light")
+         tap(app.buttons["Next"].firstMatch, "Next (step 4)")
+ 
++        // Human verification (verify-before-register): the challenge now runs
++        // BEFORE any account exists — the backend consumes the verification id
++        // at Create Account — and this build has no skip path: Continue unlocks
++        // only once the server verdict lands.
++        let humanVerify = app.staticTexts["Just one more step!"].firstMatch
++        XCTAssertTrue(humanVerify.waitForExistence(timeout: 25),
++                      "after the password step: human verification did not appear")
++        sleep(8)   // the checkpoint WebView loads the widget
++        snap("07-human-verify-light")
++        // Continue stays disabled until the verdict (dev walk environments use
++        // the v2 test keys, which always pass). Poll the enable state instead
++        // of tapping blind: a disabled tap is a no-op that would stall here.
++        let verifyContinue = app.buttons["Continue"].firstMatch
++        var checkpointPassed = false
++        for _ in 1...12 {
++            if verifyContinue.exists && verifyContinue.isEnabled { checkpointPassed = true; break }
++            sleep(2)
++        }
++        XCTAssertTrue(checkpointPassed,
++                      "checkpoint verdict never arrived — widget unsolved (test keys not configured / no hand to solve it) or the verdict call failed")
++        tap(verifyContinue, "Continue (post-verification)")
++
+         // Step 5 — terms: the gate is REAL scroll detection. The document is
+         // a fixed 300pt card with its OWN inner ScrollView. Swiping the text
+         // element or dragging a coordinate inside the card scrolls the OUTER
+@@ -183,18 +205,15 @@ final class ScreenshotWalkUITests: XCTestCase {
+         snap("06-step5-terms-light")
+         create.tap()
+ 
+-        // After Create Account the app either auto-signs-in (human verify ->
+-        // created -> home) or, if the immediate session didn't take, routes to
+-        // sign-in with the address prefilled (RootView's documented fallback).
++        // After Create Account the app auto-signs-in to the created screens, or,
++        // if the immediate session didn't take, routes to sign-in with the
++        // address prefilled (RootView's documented fallback).
+         // Reach the signed-in home either way so the security leg always runs.
+-        let humanVerify = app.staticTexts["Just one more step!"].firstMatch
+         let signinScreen = app.staticTexts["Welcome back 👋"].firstMatch
+-        XCTAssertTrue(humanVerify.waitForExistence(timeout: 25) || signinScreen.exists,
+-                      "after Create Account: neither human verify nor sign-in appeared")
+-        if humanVerify.exists {
+-            snap("07-human-verify-light")
+-            tap(app.staticTexts["Skip for now"].firstMatch, "Skip for now", timeout: 8)
+-            require(app.staticTexts["You're all set!"].firstMatch, "Account created (A)", timeout: 15)
++        let createdA = app.staticTexts["You're all set!"].firstMatch
++        XCTAssertTrue(createdA.waitForExistence(timeout: 25) || signinScreen.exists,
++                      "after Create Account: neither created nor sign-in appeared")
++        if createdA.exists {
+             snap("08-created-a-light")
+             tap(app.buttons["Continue to Onboarding"].firstMatch, "Continue to Onboarding")
+             sleep(2)
+diff --git a/ios/project.yml b/ios/project.yml
+index 099c05a..38937ef 100644
+--- a/ios/project.yml
++++ b/ios/project.yml
+@@ -22,8 +22,8 @@ settings:
+     # tag (v0.3.0's first run refused a disagreeing build), and an iOS build of
+     # the same commit self-reporting 0.0.0.1 is the same disagreement kept
+     # quiet only because no iOS badging check exists yet.
+-    MARKETING_VERSION: "0.6.3"
+-    CURRENT_PROJECT_VERSION: "12"
++    MARKETING_VERSION: "0.6.4"
++    CURRENT_PROJECT_VERSION: "13"
+     # Empty on purpose for local development: a simulator build needs no team.
+     # CI's release job injects the team per invocation with
+     # DEVELOPMENT_TEAM="$APPLE_TEAM_ID" on the xcodebuild command line —
+-- 
+2.47.3
+

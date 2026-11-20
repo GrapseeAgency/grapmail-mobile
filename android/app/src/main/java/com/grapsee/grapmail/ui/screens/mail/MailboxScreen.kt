@@ -215,6 +215,8 @@ fun MailboxScreen(
     var showPermanentConfirm by remember { mutableStateOf(false) }
     var showSenderSheet by remember { mutableStateOf(false) }
     var searchDraft by remember(state.box) { mutableStateOf(state.query) }
+    var selectedCategory by remember(state.box) { mutableStateOf<String?>(null) }
+    var showFollowUps by remember { mutableStateOf(false) }
 
     LaunchedEffect(searchDraft) {
         kotlinx.coroutines.delay(350)
@@ -364,6 +366,56 @@ fun MailboxScreen(
                                 state.advAfter.isNotBlank() || state.advBefore.isNotBlank(),
                         )
                     }
+                    // F25: when a search reads like a question, say what was
+                    // understood and let one tap turn it into the filter
+                    // sheet's own fields — the sentence stays visible, so a
+                    // wrong parse is something the person can see, not guess.
+                    val nlParse = remember(searchDraft) {
+                        if (searchDraft.trim().length >= 6)
+                            com.grapsee.grapmail.features.NaturalSearch.parse(searchDraft)
+                        else null
+                    }
+                    if (nlParse != null && nlParse.explanation.isNotBlank() &&
+                        (nlParse.from != null || nlParse.to != null || nlParse.subject != null ||
+                            nlParse.hasAttachment == true || nlParse.afterDaysAgo != null ||
+                            nlParse.beforeDaysAgo != null || nlParse.afterDate != null ||
+                            nlParse.beforeDate != null)
+                    ) {
+                        androidx.compose.foundation.layout.Row(
+                            Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 2.dp),
+                            verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+                        ) {
+                            Text(
+                                nlParse.explanation,
+                                fontSize = 12.sp, maxLines = 1,
+                                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                                color = palette.textSecondary,
+                                modifier = Modifier.weight(1f),
+                            )
+                            Text(
+                                "Apply",
+                                fontSize = 12.sp, fontWeight = FontWeight.SemiBold,
+                                color = palette.primarySolid,
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .clickable {
+                                        vm.setAdvanced(
+                                            from = nlParse.from.orEmpty(),
+                                            to = nlParse.to.orEmpty(),
+                                            subject = nlParse.subject.orEmpty(),
+                                            files = nlParse.hasAttachment == true,
+                                            after = nlParse.afterDate ?: nlParse.afterDaysAgo
+                                                ?.let { java.time.LocalDate.now().minusDays(it.toLong()).toString() }
+                                                .orEmpty(),
+                                            before = nlParse.beforeDate ?: nlParse.beforeDaysAgo
+                                                ?.let { java.time.LocalDate.now().minusDays(it.toLong()).toString() }
+                                                .orEmpty(),
+                                        )
+                                    }
+                                    .padding(horizontal = 8.dp, vertical = 6.dp),
+                            )
+                        }
+                    }
                     Text(
                         state.box.title,
                         modifier = Modifier.padding(start = 16.dp, bottom = 6.dp),
@@ -372,8 +424,30 @@ fun MailboxScreen(
                         fontWeight = FontWeight.Medium,
                     )
                     BoxTabRow(state.box, drawerCounts(state), vm::open)
+                    if (state.box == com.grapsee.grapmail.data.MailBox.Inbox) {
+                        // F07 split inbox: the categories are read here, on the
+                        // device, from each row's sender and subject — and the
+                        // chips only ever filter what the list already holds.
+                        com.grapsee.grapmail.ui.mailfeatures.MailCategoryChipsRow(
+                            selected = selectedCategory,
+                            onSelect = { selectedCategory = it },
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 2.dp),
+                        )
+                    }
                 }
 
+                val followUpCtx = androidx.compose.ui.platform.LocalContext.current
+                val followUpPrefs = remember { com.grapsee.grapmail.logic.MailFeaturePrefs(followUpCtx) }
+                val followUpCount = followUpPrefs.overdueAwaitingReplies(followUpPrefs.followUpDays).size
+                if (followUpCount > 0) {
+                    com.grapsee.grapmail.ui.mailfeatures.FollowUpBanner(
+                        count = followUpCount,
+                        onOpen = { showFollowUps = true },
+                    )
+                }
+                if (showFollowUps) {
+                    com.grapsee.grapmail.ui.mailfeatures.FollowUpCenterScreen(onClose = { showFollowUps = false })
+                }
                 // The device's own path to the network, read before asking
                 // rather than after a failure. The chip below can only report a
                 // refresh that was refused; this says why, while the list is
@@ -454,7 +528,8 @@ fun MailboxScreen(
                         filtered = state.query.trim().length >= 3 || state.filter != MailFilter.All ||
                             state.advFrom.isNotBlank() || state.advTo.isNotBlank() ||
                             state.advSubject.isNotBlank() || state.advFiles ||
-                            state.advAfter.isNotBlank() || state.advBefore.isNotBlank(),
+                            state.advAfter.isNotBlank() || state.advBefore.isNotBlank() ||
+                            selectedCategory != null,
                         boxTitle = state.box.title,
                         onRetry = { vm.load() },
                     ) {
@@ -463,6 +538,31 @@ fun MailboxScreen(
                         val selectingRows = selectedIds.isNotEmpty()
                         val inTrashOrSpam = visibleBox == MailBox.Trash || visibleBox == MailBox.Spam
                         val inArchive = visibleBox == MailBox.Archive
+                        // F07/F13: the chips only filter what this list
+                        // already holds — one local read per row, sender and
+                        // subject decide the bucket, and the priority chip
+                        // also honours senders the person starred themselves.
+                        val featureCtx = androidx.compose.ui.platform.LocalContext.current
+                        val shownRows = androidx.compose.runtime.remember(state.rows, selectedCategory) {
+                            if (selectedCategory == null) state.rows
+                            else {
+                                val prioritySet = if (selectedCategory == "priority")
+                                    com.grapsee.grapmail.logic.MailFeaturePrefs(featureCtx).prioritySenders()
+                                else emptySet<String>()
+                                state.rows.filter { r ->
+                                    val decision = com.grapsee.grapmail.features.MailCategorizer.classify(
+                                        senderAddress = r.from?.address.orEmpty(),
+                                        subject = ((r.subject ?: "") + " " + (r.snippet ?: "")).trim(),
+                                        bodyText = "",
+                                    )
+                                    when (selectedCategory) {
+                                        "priority" -> decision.priority ||
+                                            prioritySet.contains(r.from?.address?.lowercase().orEmpty())
+                                        else -> decision.category.name.lowercase() == selectedCategory
+                                    }
+                                }
+                            }
+                        }
                         LazyColumn(
                             state = listState,
                             modifier = Modifier.fillMaxSize().testTag("mail-list"),
@@ -490,12 +590,12 @@ fun MailboxScreen(
                             // The box's own name is drawn above the card by the
                             // header, not as a scrolling row here: a title that
                             // scrolls away leaves the card unlabelled.
-                            itemsIndexed(state.rows, key = { _, r -> r.id }, contentType = { _, _ -> "row" }) { index, row ->
+                            itemsIndexed(shownRows, key = { _, r -> r.id }, contentType = { _, _ -> "row" }) { index, row ->
                                 SwipeableMessageRow(
                                     modifier = Modifier.animateItem(fadeInSpec = null, fadeOutSpec = null)
                                         .drawWithContent {
                                             drawContent()
-                                            if (index < state.rows.lastIndex) {
+                                            if (index < shownRows.lastIndex) {
                                                 val y = size.height - 0.5f
                                                 drawLine(palette.border, Offset(0f, y), Offset(size.width, y))
                                             }

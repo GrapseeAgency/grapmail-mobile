@@ -59,6 +59,7 @@ struct MailboxView: View {
     @State private var searchDraft = ""
     @State private var searchTask: Task<Void, Never>?
     @State private var searchRevision = 0
+    @State private var categoryFilter: String? = nil
 
     enum MailSheet: String, Identifiable {
         case sortFilter, move, label, snooze, permanent, sender, advanced
@@ -148,6 +149,7 @@ struct MailboxView: View {
                 if vm.state.selection.isEmpty {
                     BoxTabRow(activeBox: vm.state.box, counts: drawerCounts(vm.state), onSelect: open)
                 }
+                MailCategoryChipsRow(selected: $categoryFilter)
                 offlineBanner
                 staleBanner
                 listArea
@@ -418,11 +420,25 @@ struct MailboxView: View {
     /// and that card is drawn by `listArea`, once, around this whole list.
     /// The list itself keeps a clear background and hides its separators, so
     /// the only corners on screen are the container's.
+    private var shownRows: [MailMessage] {
+        guard let categoryFilter else { return vm.state.rows }
+        let priority = MailFeaturePrefs.shared.prioritySenders
+        return vm.state.rows.filter { row in
+            let decision = MailCategorizer.classify(
+                senderAddress: row.from?.address ?? "",
+                subject: row.subject ?? "",
+                hasListUnsubscribe: row.unsubscribe != nil,
+                knownSenders: priority)
+            if categoryFilter == "priority" { return decision.priority }
+            return decision.category.rawValue == categoryFilter
+        }
+    }
+
     @ViewBuilder private var messageList: some View {
-        let prefetchIDs = Set(vm.state.rows.suffix(4).map(\.id))
-        let lastID = vm.state.rows.last?.id
+        let prefetchIDs = Set(shownRows.suffix(4).map(\.id))
+        let lastID = shownRows.last?.id
         let list = List {
-            ForEach(vm.state.rows) { row in
+            ForEach(shownRows) { row in
                 rowView(for: row, prefetchIDs: prefetchIDs, showDivider: row.id != lastID)
             }
             listFooter

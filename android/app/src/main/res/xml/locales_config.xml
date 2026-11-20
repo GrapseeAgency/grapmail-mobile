@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    The languages the app itself ships copy for. The system's per-app language
+    page (Android 13+) reads this file; adding a translation is a matter of a
+    values-<locale> folder and one line here, not a code change.
+-->
+<locale-config xmlns:android="http://schemas.android.com/apk/res/android">
+    <locale android:name="en" />
+</locale-config>

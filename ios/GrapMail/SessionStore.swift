@@ -114,6 +114,8 @@ enum SessionStore {
         }
         if changed {
             MailPoll.clear()
+            WidgetBridge.clear()
+            if #available(iOS 16.2, *) { SendLaterActivityManager.endAll() }
             SecurityFlow.reset()
             AccountSecurityView.clearCachedVerdict()
             MailStore.shared.clearNow()
@@ -154,6 +156,8 @@ enum SessionStore {
 
     static func save(token: String, refreshToken: String? = nil, address: String, name: String, expiresAtRaw: Double? = nil) {
         MailPoll.clear()
+        WidgetBridge.clear()
+        if #available(iOS 16.2, *) { SendLaterActivityManager.endAll() }
         credentialsLock.withLock {
             let next = Account(address: address, name: name, token: token,
                                refreshToken: refreshToken, expiresAt: expiresAtRaw ?? 0)
@@ -226,6 +230,10 @@ enum SessionStore {
     static func clear() {
         credentialsLock.withLock { sessionGeneration = UUID() }
         MailPoll.clear()
+        WidgetBridge.clear()
+        // The Lock Screen card and the widget are the app's own surfaces and
+        // must not outlive the session that filled them.
+        if #available(iOS 16.2, *) { SendLaterActivityManager.endAll() }
         // The push deregistration is authenticated with THIS session's bearer,
         // so it must run before the Keychain deletes below remove it. Its own
         // teardown stays deferred inside there: it must not unregister a

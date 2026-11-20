@@ -247,6 +247,36 @@ sleep 1
 shot 05-step4-password-light
 must_tap "Next"
 
+echo "· human verification (verify-before-register — before any account exists)"
+# The challenge now runs BEFORE the account is created: the backend consumes
+# the verification id at Create Account, so the wizard demands the server
+# verdict at this step and treats Terms as the second half. There is no skip
+# in this build — Continue unlocks only after the verdict lands.
+if wait_nodes "n.get('text','')=='Just one more step!'" >/dev/null; then
+  echo "  ✓ human verification screen reached"
+else
+  echo "FAIL: human verification never appeared after the password step" >&2
+  FAILURES=$((FAILURES + 1))
+fi
+sleep 8   # the checkpoint WebView loads the widget
+shot 07-human-verify-light
+# Continue stays disabled until the verdict, and a disabled Material button's
+# child text still reports enabled=true in uiautomator (the same trap as
+# Create Account below), so poll: tap by position, then ask the next screen —
+# the Terms heading — whether the gate actually opened.
+HV_PASSED=0
+for _ in 1 2 3 4 5 6 7 8 9 10; do
+  must_tap_low "Continue" $((SH / 2))
+  sleep 3
+  if [ -n "$(find_nodes "n.get('text','')=='GrapMail Terms of Service'" | head -1)" ]; then HV_PASSED=1; break; fi
+done
+if [ "$HV_PASSED" = 1 ]; then
+  echo "  ✓ checkpoint verdict passed — Terms reached"
+else
+  echo "FAIL: human verification never passed — widget unsolved (test keys not configured / no hand to solve it) or the verdict call failed" >&2
+  FAILURES=$((FAILURES + 1))
+fi
+
 echo "· step 5 — terms → real account"
 # Anchor on the document heading BEFORE any page scroll (an outer-body swipe
 # first pushes the heading out of the dump and the anchored scrolls then miss
@@ -268,18 +298,12 @@ shot 06-step5-terms-light
 # the gate opened by reaching the next screen.
 must_tap_low "Create Account" $((SH / 2))
 sleep 6
-if wait_nodes "n.get('text','')=='Just one more step!'" >/dev/null; then
+if wait_nodes "n.get('text','')==\"You're all set!\"" >/dev/null; then
   echo "  ✓ terms gate opened on real scroll (account created for real)"
 else
-  echo "FAIL: human verification never reached — gate or creation broken" >&2
+  echo "FAIL: account creation never reached — gate or creation broken" >&2
   FAILURES=$((FAILURES + 1))
 fi
-
-echo "· human verification (account just created + auto-signed-in for real)"
-sleep 10
-shot 07-human-verify-light
-must_tap "Skip for now"
-sleep 2
 
 echo "· account created (A)"
 shot 08-created-a-light

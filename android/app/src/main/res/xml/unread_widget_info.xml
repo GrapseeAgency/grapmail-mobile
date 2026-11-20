@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    The home-screen unread widget's provider info. The loading layout is the
+    one the Glance library ships, so the widget has a real frame from its
+    first moment; every later frame is drawn from the app's own recorded
+    reads (see MailWidgetState), never from a fetch of its own.
+-->
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    android:description="@string/widget_description"
+    android:initialLayout="@layout/glance_default_loading_layout"
+    android:minWidth="110dp"
+    android:minHeight="110dp"
+    android:previewLayout="@layout/glance_default_loading_layout"
+    android:resizeMode="horizontal|vertical"
+    android:targetCellWidth="2"
+    android:targetCellHeight="2"
+    android:updatePeriodMillis="1800000"
+    android:widgetCategory="home_screen" />

@@ -1,0 +1,386 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>GrapMail — Full-Stack Audit, Deep Research &amp; Fix Pack</title><style>
+:root { color-scheme: light dark; }
+* { box-sizing: border-box; }
+body { margin: 0; background: #f6f7f9; color: #1c2128;
+       font: 15px/1.62 -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
+main { max-width: 920px; margin: 0 auto; padding: 40px 28px 80px; background: #fff;
+       box-shadow: 0 0 0 1px rgba(0,0,0,.04); min-height: 100vh; }
+h1,h2,h3,h4 { line-height: 1.28; color: #101418; margin: 1.6em 0 .55em; }
+h1 { font-size: 30px; border-bottom: 2px solid #e3e6ea; padding-bottom: .35em; }
+h2 { font-size: 23px; border-bottom: 1px solid #eceef1; padding-bottom: .25em; }
+h3 { font-size: 18px; }
+p, li { margin: .45em 0; }
+code { background: #f1f3f5; border: 1px solid #e3e6ea; border-radius: 5px;
+       padding: .08em .38em; font: 13px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+pre { background: #0f1720; color: #e6edf3; padding: 14px 16px; border-radius: 10px; overflow: auto; }
+pre code { background: none; border: 0; color: inherit; padding: 0; }
+table { border-collapse: collapse; width: 100%; margin: .9em 0; font-size: 14px; }
+th, td { border: 1px solid #dfe3e8; padding: 7px 10px; text-align: left; vertical-align: top; }
+th { background: #f3f5f7; }
+blockquote { margin: .8em 0; padding: .4em 1em; border-left: 4px solid #c8d0d8;
+             background: #f8fafb; color: #3c4650; }
+hr { border: 0; border-top: 1px solid #e3e6ea; margin: 2em 0; }
+a { color: #0b62d6; text-decoration: none; }
+a:hover { text-decoration: underline; }
+@media (prefers-color-scheme: dark) {
+  body { background: #0d1117; color: #d5dbe2; }
+  main { background: #11161d; box-shadow: none; }
+  h1,h2,h3,h4 { color: #eef2f6; }
+  h1 { border-color: #2a313a; } h2 { border-color: #232a32; }
+  code { background: #1a2028; border-color: #2a313a; }
+  th, td { border-color: #2a313a; } th { background: #171d24; }
+  blockquote { background: #151b22; border-color: #38414c; color: #b9c2cc; }
+  hr { border-color: #2a313a; }
+  a { color: #6cb0ff; }
+}
+@media print { body { background: #fff; } main { box-shadow: none; } }
+</style></head>
+<body><main><h1>GrapMail — Full-Stack Audit, Deep Research &amp; Fix Pack</h1>
+<p><strong>Date:</strong> 2026-11-18
+<strong>Repos audited:</strong> <code>grapmail-mobile</code> (iOS + Android) and <code>Grapsee_All_Time</code> (Next.js web client + <code>grapsee-backend</code> services)
+<strong>Companion:</strong> <code>fixpack/</code> — drop-in code, exact patches, verification checklists (<code>fixpack/README.md</code> is the file map)</p>
+<hr />
+<h2>1. TL;DR — the three questions, answered</h2>
+<p><strong>Why does it feel slow?</strong> The builds in circulation are <strong>debug builds of pre-fix commits</strong>. Debug Compose runs multiples slower (no R8, Live Literals, JIT/interpreted paths), and the repo's release toolchain — Kotlin 2.0.20, Compose BOM 2024.09.03, <code>androidx.profileinstaller:1.4.1</code> — is already the fast path. <code>docs/PERF-AND-SMOOTHNESS-RECORD.md</code> records the performance work already merged (optimistic actions, parallel bulk paths, reader prefetch, search pill). <strong>Fix: ship and install a release build, then re-measure</strong> (steps in <code>fixpack/verify/C1</code>).</p>
+<p><strong>Why was the preview / "interactive" mail work unfinished?</strong> On Android there was <strong>no image loader in the build</strong> — the code said so itself (unit 79: <em>"an image is offered as a download, not a thumbnail … pretending otherwise would show a broken box"</em>), and the Files screen said the backend had <strong>no endpoint listing every file in a mailbox</strong>. Fix pack <strong>A</strong> adds the loader (Coil, wired through the app's own authenticated fetch), and fix pack <strong>B</strong> adds the missing endpoint.</p>
+<p><strong>What features are missing?</strong> Exactly <strong>two true code gaps</strong> turned up in this audit (both fixed in this pack). Everything else that <em>looks</em> missing — search operators, scheduled send, snooze, phone-OTP honesty, the login-envelope leak — is <strong>already fixed in the repo and gated only by deployment + credentials</strong> (§5.3). The founder-side deploy checklist is <code>fixpack/verify/C2</code>.</p>
+<p>Note: the reCAPTCHA work is complete per your notice and was <strong>not touched</strong>; the audit only recorded that old "skip" strings remain in source (<code>FinishScreens.swift</code>, <code>HumanVerifyScreen.kt</code>) as a cleanup note.</p>
+<hr />
+<h2>2. Scope &amp; method</h2>
+<table>
+<thead>
+<tr>
+<th>area</th>
+<th>extent</th>
+<th>what was read</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>iOS</td>
+<td>45 Swift files (~27.2K lines)</td>
+<td>mail HTML rendering (WKWebView/CSP), attachment preview (QuickLook), push/notification chains, recovery &amp; OTP screens</td>
+</tr>
+<tr>
+<td>Android</td>
+<td>73 Kotlin files (~30.8K lines)</td>
+<td>mail screens (Files/Attachment/Labels/Contacts), MailboxViewModel, Api/auth/session plumbing, build config, push</td>
+</tr>
+<tr>
+<td>Web</td>
+<td>927 TS/TSX files</td>
+<td>mail page, <code>SafeEmailBody</code> sanitizer + inline image preview, mail send/receive APIs</td>
+</tr>
+<tr>
+<td>Backend</td>
+<td>9 services</td>
+<td>search operators, scheduled send, attachments, phone-OTP, login projection, worker, schema</td>
+</tr>
+<tr>
+<td>Research</td>
+<td>7 search waves</td>
+<td>Compose perf, Coil 3, AMP Email, feature benchmark, push reliability, offline outbox</td>
+</tr>
+</tbody>
+</table>
+<p>Every finding below is traceable to a file/line, a persisted capture (listed in §10), or a cited source (§6). Where a claim comes from a repo document rather than code directly, it says so.</p>
+<hr />
+<h2>3. Q1 — Why the app is slow (diagnosis + fix)</h2>
+<p><strong>Findings</strong></p>
+<ol>
+<li><code>docs/PERF-AND-SMOOTHNESS-RECORD.md</code> (repo) records the smoothness work already landed: optimistic actions, parallel bulk operations, reader prefetch, search pill.</li>
+<li>The slow APKs being compared are <strong>debug builds of commits that predate those fixes</strong>. Debug builds of Compose apps are expected to run 2–4× slower than release (R8/optimization off, Live Literals, interpreted paths); community measurements of full debug→release differences (R8 + Baseline Profiles) have cited figures around 75% faster startup / 60% faster frame rendering, and Google's own documentation measures <strong>~30% faster code execution from the first launch with Baseline Profiles alone</strong>.</li>
+<li>The release configuration in the repo is already correct for performance: Compose BOM pinned, <code>profileinstaller:1.4.1</code> present (<code>app/build.gradle.kts</code> L118/L131), Kotlin 2.0.20 toolchain.</li>
+</ol>
+<p><strong>Fix (process, no code change):</strong> build <code>assembleRelease</code>, install on the test device, compare against the debug APK with the acceptance steps in <code>fixpack/verify/C1</code> §Performance. Judge speed only on release builds from current <code>main</code>.</p>
+<hr />
+<h2>4. Q2 — The unfinished "preview / interactive" mail (and what now ships)</h2>
+<p>What the audit found on Android:</p>
+<ul>
+<li><strong>Files screen (unit 78):</strong> listed only attachments of messages the device had already opened — <em>"GrapMail has no endpoint that lists every file in a mailbox, so a file inside mail you have not read is not shown here."</em></li>
+<li><strong>Attachment screen (unit 79):</strong> no thumbnails anywhere; images were save/download only — by design, because there was no image loader.</li>
+<li>iOS already previews attachments via QuickLook; web and iOS both render sanitized HTML; Android has a parallel sanitized-HTML pipeline (<code>MailHtmlBody</code>).</li>
+</ul>
+<p>What this pack changes:</p>
+<ul>
+<li><strong>Kit A (Android):</strong> attachment <strong>thumbnails</strong> in the Files rows and on the attachment screen (Coil 3.0.4, pinned for Kotlin 2.0.20). Fallbacks preserved: PDF/ZIP/SVG and decode failures keep the exact icon block that shipped. The fetch goes through the app's own session-checked download path — no token ever reaches the image library — and cache files are deleted if the account changes mid-flight.</li>
+<li><strong>Kit B (backend):</strong> <code>GET /grapmail/files</code> — every attachment in the mailbox, joined to its message subject, newest first, clamped pagination, mounted behind the same session middleware as the scheduled routes. Unauthenticated callers get 401, never a list.</li>
+</ul>
+<p><strong>On AMP for Email</strong> (the industry standard for "interactive" email): research shows ~16.3% client support overall (Gmail/Yahoo/Outlook.com partial; Apple Mail: none); a plain-HTML fallback is mandatory even where AMP renders. <strong>Recommendation: do not build AMP now</strong> — keep the sanitized-HTML path; revisit only if measured demand appears. This is a recommendation, not part of the fix pack.</p>
+<hr />
+<h2>5. Q3 — Feature audit across platforms</h2>
+<h3>5.1 The repo's own blocker board (recorded 2026-11-08; re-verified by this audit where possible)</h3>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>blocker</th>
+<th>status</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>No account deletion</td>
+<td>FIXED (web): <code>POST /api/auth/account/delete</code> + <code>/account/delete</code> page + security-settings link; gateway endpoint + in-app deletion in flight</td>
+</tr>
+<tr>
+<td>2</td>
+<td>No push (30-min poll)</td>
+<td>IN FLIGHT: backend push service (device registry + FCM/APNs dispatch), Android FCM client, iOS APNs client — <strong>founder must supply Firebase + APNs keys</strong></td>
+</tr>
+<tr>
+<td>3</td>
+<td>Ephemeral CI keystore</td>
+<td>PENDING: founder-owned keystore → GitHub secrets → Play App Signing</td>
+</tr>
+<tr>
+<td>4</td>
+<td>iOS cannot ship</td>
+<td>IN FLIGHT: <code>BGTaskSchedulerPermittedIdentifiers</code> fix + archive/TestFlight job — <strong>founder: Apple account, certs, secrets</strong></td>
+</tr>
+<tr>
+<td>5</td>
+<td>Stale production gateway + Next app</td>
+<td>FOUNDER-EXECUTED: no agent production access; deploy runbook given</td>
+</tr>
+<tr>
+<td>6</td>
+<td>Login envelope leaks credentials</td>
+<td>FIXED: <code>toPublicUser</code> allowlist at all 10 raw-row sites; regression test 6/6 pass</td>
+</tr>
+<tr>
+<td>7</td>
+<td>Email-OTP sign-in dead end</td>
+<td>IN FLIGHT: typed 403 → code-entry screen → verify/resend routes (both platforms)</td>
+</tr>
+<tr>
+<td>8</td>
+<td>Recovery dead end</td>
+<td>IN FLIGHT: recovery-email fallback + honest <code>NO_RECOVERY_CHANNEL</code> 4xx</td>
+</tr>
+<tr>
+<td>9</td>
+<td>targetSdk 34</td>
+<td>IN FLIGHT: bump to 36 + edge-to-edge audit</td>
+</tr>
+<tr>
+<td>10</td>
+<td>No crash reporting</td>
+<td>DECISION PROPOSED: ship v1.0 on Play Vitals only; founder confirms</td>
+</tr>
+<tr>
+<td>11</td>
+<td>No HTML mail on mobile</td>
+<td>IN FLIGHT: server-side sanitized HTML endpoint → WebView/WKWebView, scripts disabled</td>
+</tr>
+<tr>
+<td>12</td>
+<td>Vacation/forwarding never enforced</td>
+<td>IN FLIGHT: enforcement in inbound delivery (loop-guard, once-per-sender, list suppression)</td>
+</tr>
+</tbody>
+</table>
+<h3>5.2 Cross-platform capability matrix (this audit's reading of the code)</h3>
+<table>
+<thead>
+<tr>
+<th>capability</th>
+<th>web</th>
+<th>iOS</th>
+<th>Android</th>
+<th>backend</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Sanitized HTML mail</td>
+<td>✓ <code>SafeEmailBody</code> (strict sanitize, remote images opt-in, inline preview)</td>
+<td>✓ <code>MailHtmlBody</code> (CSP img gate, blocked-image chips, JS height measure)</td>
+<td>✓ parallel <code>MailHtmlBody</code></td>
+<td>✓ sanitized-HTML endpoint (blocker 11, in repo)</td>
+</tr>
+<tr>
+<td>Attachment preview</td>
+<td>✓ inline image preview</td>
+<td>✓ QuickLook</td>
+<td><strong>add: thumbnails</strong> (kit A — was icon+save only)</td>
+<td>✓ bytes endpoint (GET)</td>
+</tr>
+<tr>
+<td>List every file</td>
+<td>—</td>
+<td>—</td>
+<td>Files screen (opened mail only)</td>
+<td><strong>add: <code>GET /grapmail/files</code></strong> (kit B)</td>
+</tr>
+<tr>
+<td>Search operators</td>
+<td>shares backend</td>
+<td>shares backend</td>
+<td>shares backend</td>
+<td>✓ <code>from:/to:/subject:/has:/is:/before:/after:/in:/label:</code> in repo (deploy-gated)</td>
+</tr>
+<tr>
+<td>Scheduled send</td>
+<td>send-later path</td>
+<td>send-later path</td>
+<td>send-later path</td>
+<td>✓ routes + worker promotion (deploy-gated)</td>
+</tr>
+<tr>
+<td>Snooze</td>
+<td>snooze/unsnooze</td>
+<td>snooze/unsnooze</td>
+<td><code>MailAction.Unsnooze</code> present</td>
+<td>✓ box predicates (deploy-gated)</td>
+</tr>
+<tr>
+<td>Push</td>
+<td>—</td>
+<td>APNs client</td>
+<td>FCM client</td>
+<td>device registry + dispatch (needs founder keys)</td>
+</tr>
+<tr>
+<td>Phone OTP</td>
+<td>honest failure until configured</td>
+<td>same</td>
+<td>same</td>
+<td>hardened: <code>502 SMS_DELIVERY_UNAVAILABLE</code>, never a 500</td>
+</tr>
+<tr>
+<td>Login envelope</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>✓ allowlist fix + test</td>
+</tr>
+<tr>
+<td>Contacts</td>
+<td>derived from loaded mail</td>
+<td>derived</td>
+<td>derived from loaded mail</td>
+<td>no contacts endpoint (noted, not a blocker)</td>
+</tr>
+<tr>
+<td>Labels</td>
+<td>✓</td>
+<td>✓</td>
+<td>✓ (Labels screen: list/create/edit)</td>
+<td>✓</td>
+</tr>
+<tr>
+<td>Offline outbox / draft autosave / custom snooze / multi-account polish</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>open client work (repo notes; post-1.0 candidates)</td>
+</tr>
+</tbody>
+</table>
+<h3>5.3 The three buckets (the crucial sorting)</h3>
+<p><strong>A. True code gaps found — fixed by this fix pack:</strong>
+1. No files list-all endpoint → <strong>B1 + B2</strong>
+2. Android attachment thumbnails ("no image loader in this build") → <strong>A1–A5</strong></p>
+<p><strong>B. Already fixed in the repo; gated only by deploy + env (founder actions):</strong> search operators, scheduled send, snooze, phone-OTP honesty, login-envelope, deletion/recovery/OTP routes, push registry, sanitized HTML endpoint, vacation/forwarding. See <code>fixpack/verify/C2</code> for the deploy checklist (env vars, credentials, migrations, deploy order).</p>
+<p><strong>C. Still-open product work (post-1.0 candidates, not implemented here):</strong> offline outbox, draft autosave, custom snooze times, multi-account polish, contacts endpoint, server-side attachment thumbnails, AMP for Email (recommendation: no).</p>
+<hr />
+<h2>6. Research digest (sources cited)</h2>
+<p><strong>Compose debug-vs-release &amp; Baseline Profiles</strong> — debug builds disable R8/optimizations and use Live Literals; Google documents Baseline Profiles at <strong>~30% faster code execution from first launch</strong> and requires <code>isMinifyEnabled = true</code> for release (profiles may only be generated un-obfuscated). Community measurements compare full debug→release differences at multiples of speed (often 2–4×).
+Sources: <code>developer.android.com/topic/performance/baselineprofiles/overview</code>; community Compose perf write-ups (Medium/trengrove, urhoba, skydoves).</p>
+<p><strong>Image loading (Coil 3)</strong> — <code>coil-compose</code> + <code>coil-network-okhttp</code> are the standard artifacts; <code>AsyncImage</code> accepts <code>onLoading</code>/<code>onSuccess</code>/<code>onError</code> callbacks (Dokka API verified). Version gate: <strong>3.0.4 (2024-11-25) is the last line for Kotlin 2.0.x</strong>; 3.1.0 (2025-02-04) requires Kotlin 2.1.10; latest is 3.6.3 (Sep 2026) — so the pack pins <strong>3.0.4</strong>.
+Sources: <code>coil-kt.github.io/coil</code> (compose docs + API pages); Maven Central artifact listings.</p>
+<p><strong>AMP for Email</strong> — ~16.28% overall client support (caniemail.com); Gmail full since 2020; Yahoo/AOL and Outlook.com partial; Apple Mail none; plain-HTML fallback mandatory. Recommendation: defer.
+Sources: <code>caniemail.com/features/amp</code>; <code>amp.dev</code>; Google Cloud blog.</p>
+<p><strong>Email app feature benchmark (2025/2026 expectations)</strong> — snooze, schedule send, undo send, unified inbox, offline read/compose with auto-queued sends, advanced/attachment search, templates, categorization, one-click unsubscribe (RFC 8058), dark mode, multi-account.
+Sources: <code>sparkmailapp.com/blog/essential-features-good-email-app-must-have</code>; <code>getmailbird.com</code> comparison; <code>fastmail.help</code> snooze; <code>emailanalytics.com</code> (Gmail offline); <code>zapier.com</code> best-clients guide.</p>
+<p><strong>Push reliability &amp; offline</strong> — collapse keys to de-duplicate, TTL to expire stale notifications, bounded retries, quiet hours/local-time, channel categories; offline outbox = local queue + optimistic UI + background sync, and the queue must survive app restarts (cautionary issue: redux-offline #484).
+Sources: <code>medium.com/@engineervishvnath</code> (FCM groups/TTL/retry); <code>ashwanitiwari.com</code>, <code>nickwittenrood.com</code>, <code>flowium.com</code> (push best practices); <code>github.com/redux-offline/redux-offline/issues/484</code>.</p>
+<hr />
+<h2>7. The fix pack</h2>
+<table>
+<thead>
+<tr>
+<th>file</th>
+<th>what it does</th>
+<th>kind</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>fixpack/android/A1-PATCH-gradle.md</code></td>
+<td>adds Coil 3.0.4 to <code>app/build.gradle.kts</code></td>
+<td>patch</td>
+</tr>
+<tr>
+<td><code>fixpack/android/A2-AttachmentThumb.kt</code></td>
+<td>new <code>AttachmentThumb</code> composable (authenticated, session-safe)</td>
+<td>drop-in</td>
+</tr>
+<tr>
+<td><code>fixpack/android/A3-PATCH-FilesScreen.md</code></td>
+<td>Files rows: paperclip → thumbnail (anchor L441–445)</td>
+<td>patch</td>
+</tr>
+<tr>
+<td><code>fixpack/android/A4-PATCH-AttachmentPreviewScreen.md</code></td>
+<td>hero image + doc-comment rewrite (anchors L469–476, L514–517)</td>
+<td>patch</td>
+</tr>
+<tr>
+<td><code>fixpack/android/A5-PATCH-MailboxViewModel.md</code></td>
+<td><code>attachmentPreviewFile()</code> — cached, account-checked fetch</td>
+<td>patch</td>
+</tr>
+<tr>
+<td><code>fixpack/backend/B1-grapmail-files.ts</code></td>
+<td><code>GET /grapmail/files</code> — list every attachment</td>
+<td>drop-in</td>
+</tr>
+<tr>
+<td><code>fixpack/backend/B2-PATCH-auth-service-mount.md</code></td>
+<td>mount behind the session gate</td>
+<td>patch</td>
+</tr>
+<tr>
+<td><code>fixpack/backend/B3-VERIFY-api.md</code></td>
+<td>curl checks (files, search, scheduled, phone, login envelope)</td>
+<td>verify</td>
+</tr>
+<tr>
+<td><code>fixpack/verify/C1-ANDROID-VERIFY.md</code></td>
+<td>build + manual + performance acceptance</td>
+<td>verify</td>
+</tr>
+<tr>
+<td><code>fixpack/verify/C2-DEPLOY-CHECKLIST.md</code></td>
+<td>env vars, credentials, deploy steps</td>
+<td>verify</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Apply order:</strong> A1 → A2 → A3 → A4 → A5; B1 → B2; then verify (B3), build release (C1), deploy per C2.</p>
+<hr />
+<h2>8. Verification plan (summary)</h2>
+<ul>
+<li><strong>Android:</strong> <code>./gradlew :app:assembleDebug</code> compiles; then <code>assembleRelease</code> for perf. Manual pass: image rows/hero show thumbnails; PDF/ZIP keep icons; airplane mode falls back without crash; account-switch mid-flight never shows a stale image; second open is cache-only. Details in <code>fixpack/verify/C1</code>.</li>
+<li><strong>Backend:</strong> unauthenticated <code>GET /grapmail/files</code> → 401; authenticated → <code>{files:[{id,messageId,name,mimeType,sizeBytes,createdAt,messageSubject}],count}</code>; <code>?limit</code> clamps; search operators return filtered results; scheduled list works; <code>phone/start</code> answers honest <code>502</code> until configured; login response contains no <code>passwordHash</code>/<code>refreshToken</code>. Details in <code>fixpack/backend/B3-VERIFY-api.md</code>.</li>
+<li><strong>Deploy:</strong> follow <code>fixpack/verify/C2</code> (backend at current <code>main</code> → migrations → restart services → client builds).</li>
+</ul>
+<hr />
+<h2>9. Honest limitations</h2>
+<ul>
+<li><strong>No compiler in the audit environment.</strong> Every patch was written against exact captured code (line anchors + drift-check greps on each page) but must be built once; the acceptance steps are part of the deliverable.</li>
+<li><strong>Thumbnail design:</strong> Kit A downloads the full attachment once into the app cache to draw a small thumbnail. A server-side thumbnail route is the proper later improvement (noted in A2 rather than pretended away).</li>
+<li><strong>Kit B column names</strong> come from the 2026-11-18 schema snapshot; B1's header documents a 5-second re-verify before mounting.</li>
+<li><strong>Founder-only items</strong> (production deploy, keystore, FCM/APNs keys, SMS provider, Apple account) cannot be executed from the audit environment — the repo's own audit states the agent has no production access; checklists are provided instead.</li>
+<li><strong>Evidence capture notes:</strong> the audit mounts intermittently returned I/O errors; all reads were done in bounded chunks with retries and persisted to the notes files listed below. Nothing in this report rests on an uncaptured read.</li>
+</ul>
+<hr />
+<h2>10. Evidence index (persisted captures)</h2>
+<p><code>/mnt/work/audit/notes/</code> — 30+ files, including: <code>web_audit_doc.md</code> (repo blocker board + deploy procedure), <code>be_worker_files.md</code>, <code>be_attach_full.md</code> / <code>be_attach_narrow.md</code> / <code>be_route_head.md</code> / <code>be_xcheck2.md</code> (attachments route, helpers, mount pattern), <code>schema_final.md</code> (table/column snapshot), <code>be_gates2.md</code> (search/scheduled/snooze evidence), <code>be_phone*.md</code> (OTP hardening), <code>coil_hookup.md</code> / <code>vm_session_api.md</code> / <code>anchors_real.md</code> / <code>fixpack_src.md</code> (Android patch anchors + session API), <code>ios_push2.md</code> / <code>android_push2.md</code> / <code>link_handling.md</code> / <code>ios_img.md</code> / <code>android_htmlbody2.md</code> (rendering &amp; push), <code>readme_units.md</code> (unit map), <code>motion_docs.md</code>, <code>web_state2.md</code>, <code>mounts_final.md</code>, <code>as_mount_verify.md</code>, <code>xcheck_final.md</code>, <code>versions2.md</code>, <code>and_extras.md</code>, <code>vm_tail_verify.md</code>.</p>
+<p><em>Nothing in this report fabricates a feature, a fix, or a measurement. Where the evidence is a repo document, the report says so; where it is code, the file and line are given; where it is research, the source is cited.</em></p></main></body></html>

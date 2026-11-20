@@ -336,6 +336,29 @@ pin("iOS's autosave refuses an empty compose",
     "s.to.trimmingCharacters(in: .whitespaces).isEmpty"
     in code_only(ios("MailboxModel.swift")))
 
+# An untouched composer must not age into a draft row: the signature seed
+# fills fields without an edit, so both platforms mark a compose "edited"
+# only when the person's own change goes through the edit path, and both
+# the autosave and the close buttons refuse a fill-only composer.
+pin("Android's edits mark the compose as edited",
+    "transform(s).copy(userEdited = true)" in code_only(android("logic/MailboxViewModel.kt")))
+pin("iOS's edits mark the compose as edited",
+    "compose.userEdited = true" in code_only(ios("MailboxModel.swift")))
+pin("Android's signature seed fills without arming the autosave",
+    "vm.composeSeed { s ->" in code_only(android("ui/screens/mail/ComposeScreen.kt")))
+pin("iOS's signature seed fills without arming the autosave",
+    "vm.composeSeed { s in" in code_only(ios("MailReaderViews.swift")))
+pin("Android's autosave refuses a compose nobody edited",
+    "if (!s.userEdited) return" in code_only(android("logic/MailboxViewModel.kt")))
+pin("iOS's autosave refuses a compose nobody edited",
+    "if !s.userEdited { return }" in code_only(ios("MailboxModel.swift")))
+pin("Android's close leaves no draft for a composer nobody edited",
+    "state.userEdited ||" in code_only(android("ui/screens/mail/ComposeScreen.kt")))
+pin("iOS's close leaves no draft for a composer nobody edited",
+    "draft.userEdited ||" in code_only(ios("MailReaderViews.swift")))
+pin("iOS's receipt carries the server's own message",
+    "updated.result = r.message ?? r.error" in code_only(ios("MailboxModel.swift")))
+
 
 # ── 3. nothing destroys mail without the confirmation sheet ──────────────────
 KT_BOX = android("ui/screens/mail/MailboxScreen.kt")
@@ -3456,6 +3479,23 @@ pin("aliases ship for what the server actually does with them",
     and "mailDeleteAlias" in code_only(SW_SEND_DTO)
     and "read = .reading" in code_only(SW_MODEL)
     and "AliasesState" in code_only(KT_VM))
+
+# The signup wizard's verification state is a receipt with a lifetime, not a
+# one-way flag. `/grapsee/auth/register` answers 403 HUMAN_VERIFICATION_REQUIRED
+# when the id it was handed is spent or expired, and both apps' copy tells the
+# user to complete the check again — which can only work if the stale verdict
+# and the spent id are cleared first. Left in place, `humanVerified` keeps
+# passing the Continue gate, and the bridge's idempotency guard
+# (`humanVerified || humanVerifying`) silently ignores the NEXT token a user
+# solves for. The retry the copy asks for could never happen; the app answers
+# "expired" forever. Clearing the trio re-arms the challenge on both platforms.
+KT_SVM = android("logic/SignUpViewModel.kt")
+SW_SM = ios("SignUpModel.swift")
+pin("a spent verification is cleared out of wizard state before the retry it asks for",
+    'if (e.code == "HUMAN_VERIFICATION_REQUIRED") {' in code_only(KT_SVM)
+    and 'copy(humanVerified = false, humanVerificationId = null, humanVerifyError = null)' in code_only(KT_SVM)
+    and 'if code == "HUMAN_VERIFICATION_REQUIRED" {' in code_only(SW_SM)
+    and '$0.humanVerified = false; $0.humanVerificationId = nil; $0.humanVerifyError = nil' in code_only(SW_SM))
 
 print()
 if failures:

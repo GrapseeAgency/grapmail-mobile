@@ -115,6 +115,9 @@ object Notifications {
 
     const val OPEN_MAIL = "com.grapsee.grapmail.OPEN_MAIL"
 
+    /** The inline reply's RemoteInput key; the typed text arrives under it. */
+    const val REPLY_INPUT = "grapmail.reply.text"
+
     fun target(intent: Intent?): MailTarget? {
         if (intent?.action != OPEN_MAIL) return null
         val id = intent.getStringExtra("messageId")?.takeIf { it.isNotBlank() } ?: return null
@@ -153,7 +156,17 @@ object Notifications {
                 if (target != null) {
                     addAction(0, "Archive", pendingUpdate(context, target.copy(action = "archive")))
                     addAction(0, "Mark as read", pendingUpdate(context, target.copy(action = "read")))
-                    addAction(0, "Reply", pendingOpen(context, target.copy(action = "reply")))
+                    val replyAddress = message?.from?.address?.trim()?.takeIf { it.isNotEmpty() }
+                    if (replyAddress != null && message?.isE2eEncrypted != true) {
+                        addAction(NotificationCompat.Action.Builder(
+                            0, "Reply",
+                            pendingReply(context, target, replyAddress, subject),
+                        ).addRemoteInput(
+                            android.app.RemoteInput.Builder(REPLY_INPUT).setLabel("Reply").build(),
+                        ).build())
+                    } else {
+                        addAction(0, "Reply", pendingOpen(context, target.copy(action = "reply")))
+                    }
                     addAction(0, "More", pendingOpen(context, target.copy(action = "more")))
                 }
             }
@@ -219,6 +232,34 @@ object Notifications {
         },
         PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
     )
+
+    /**
+     * The inline reply rides a broadcast so the text field can answer without
+     * the app opening: RemoteInput carries the typed text back into
+     * [MailNotificationActionReceiver], which sends it through the same
+     * endpoint a composer reply uses.
+     *
+     * Mutable by design — RemoteInput requires a mutable pending intent on
+     * Android 12+, and the flag is only set where the platform knows it.
+     */
+    private fun pendingReply(
+        context: Context, target: MailTarget, replyAddress: String, subject: String,
+    ) = PendingIntent.getBroadcast(
+        context, target.hashCode() + 17,
+        Intent(context, MailNotificationActionReceiver::class.java).apply {
+            action = OPEN_MAIL
+            data = android.net.Uri.Builder().scheme("grapmail").authority("notification")
+                .appendPath(target.messageId).appendPath("reply").build()
+            putExtra("messageId", target.messageId)
+            putExtra("threadId", target.threadId)
+            putExtra("sessionId", target.sessionId)
+            putExtra("mailAction", "reply.text")
+            putExtra("replyAddress", replyAddress)
+            putExtra("replySubject", subject)
+        },
+        PendingIntent.FLAG_UPDATE_CURRENT or
+            (if (android.os.Build.VERSION.SDK_INT >= 31) PendingIntent.FLAG_MUTABLE else 0),
+    )
 }
 
 class MailNotificationActionReceiver : BroadcastReceiver() {
@@ -227,6 +268,7 @@ class MailNotificationActionReceiver : BroadcastReceiver() {
         val action = when (target.action) {
             "archive" -> MailAction.Archive
             "read" -> MailAction.Read
+            "reply.text" -> null
             else -> return
         }
         val pending = goAsync()
@@ -236,6 +278,10 @@ class MailNotificationActionReceiver : BroadcastReceiver() {
                 withTimeoutOrNull(8_000) {
                     val session = com.grapsee.grapmail.data.SessionRefresh.forAccount(app, target.sessionId)
                         ?: return@withTimeoutOrNull
+                    if (action == null) {
+                        replyFromNotification(app, intent, target, session.token)
+                        return@withTimeoutOrNull
+                    }
                     Api.mailAction(session.token, target.messageId, action)
                     Notifications.dismiss(app, target.messageId)
                     if (!SessionStore.isCurrent(app, session.id)) return@withTimeoutOrNull
@@ -254,6 +300,32 @@ class MailNotificationActionReceiver : BroadcastReceiver() {
             } finally {
                 pending.finish()
             }
+        }
+    }
+
+    /**
+     * The typed reply, sent through the same authenticated endpoint the
+     * composer uses — threading by the message id that produced the
+     * notification, subject prefixed the way every mail client prefixes it.
+     * The notification is dismissed only after the server accepted it: a
+     * refusal keeps the shade entry so the text is not lost with it.
+     */
+    private suspend fun replyFromNotification(
+        app: Context, intent: Intent, target: Notifications.MailTarget, token: String,
+    ) {
+        val text = android.app.RemoteInput.getResultsFromIntent(intent)
+            ?.getCharSequence(Notifications.REPLY_INPUT)?.toString()
+            ?.trim().orEmpty()
+        if (text.isEmpty()) return
+        val address = intent.getStringExtra("replyAddress")?.takeIf { it.isNotBlank() } ?: return
+        val subject = intent.getStringExtra("replySubject").orEmpty()
+        val replySubject = if (subject.lowercase().startsWith("re:")) subject else "Re: $subject"
+        val r = Api.mailSend(token, com.grapsee.grapmail.data.MailSendRequest(
+            to = listOf(address), subject = replySubject,
+            bodyText = text, inReplyTo = target.messageId,
+        ))
+        if (r.status in listOf("sent", "queued", "delivered")) {
+            Notifications.dismiss(app, target.messageId)
         }
     }
 }

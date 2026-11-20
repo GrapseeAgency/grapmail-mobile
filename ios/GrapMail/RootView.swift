@@ -124,6 +124,12 @@ struct RootView: View {
     /// of the stub left every post-write screenshot a photograph of the home
     /// screen. The hook outranks the restore because no real launch carries it.
     @State private var path: [Route] = []
+    /// The app-lock cover (AppLock.swift). Owned at the stack so every
+    /// destination behind it is one gate.
+    @ObservedObject private var appLock = AppLock.shared
+    /// Set when the widget deep link arrives before the launch restore has
+    /// decided the stack; consumed by the onChange that consumes notifications.
+    @State private var pendingScheduled = false
     @State private var restoredSession = false
     @State private var renewingSession = false
     /// The ten codes live in SecurityFlow.backupCodes, not a view @State, so
@@ -183,6 +189,22 @@ struct RootView: View {
             // and a photograph set that contradicts itself screen by screen.
             .toolbar(.hidden, for: .navigationBar)
             .navigationBarBackButtonHidden(true)
+            // -- App lock: one cover over the whole signed-in stack (AppLock.swift).
+            // Scene changes arm it; a cold launch checks once the first frame exists.
+            .overlay {
+                if appLock.locked { AppLockOverlay(lock: appLock) }
+            }
+            .onChange(of: scenePhase) { phase in
+                switch phase {
+                case .background: appLock.noteBackground()
+                case .active: appLock.checkOnActive()
+                default: break
+                }
+            }
+            .onAppear { appLock.checkOnActive() }
+            // -- Widget deep links: grapmail://scheduled, tapped from the home widget
+            // or the send-later Live Activity -> the Scheduled screen, where cancel lives.
+            .onOpenURL { url in handleWidgetURL(url) }
             .task(id: scenePhase == .active && path.contains(.home) ? SessionStore.generation : nil) {
                 if scenePhase == .active, path.contains(.home) { await account.watchAvatar() }
             }
@@ -240,7 +262,10 @@ struct RootView: View {
             // asked for. Signed out, the honest route to writing a mail is
             // sign-in, not a composer whose every send would fail.
             .onChange(of: shortcuts.pendingMail) { _ in openNotificationMail() }
-            .onChange(of: restoredSession) { _ in openNotificationMail() }
+            .onChange(of: restoredSession) { _ in
+                openNotificationMail()
+                if pendingScheduled { openScheduledScreen() }
+            }
             .onChange(of: renewingSession) { _ in openNotificationMail() }
             .onChange(of: shortcuts.pendingCompose) { pending in
                 guard pending, restoredSession, !renewingSession else { return }
@@ -253,6 +278,26 @@ struct RootView: View {
                 MailPoll.scheduleNext()
             }
         }
+    }
+
+    /// grapmail://scheduled -- the widget and the send-later Live Activity tap
+    /// through here. Deferred while the launch restore has not decided the
+    /// stack, then consumed by the same onChange that consumes a cold-start
+    /// notification.
+    private func handleWidgetURL(_ url: URL) {
+        guard url.scheme == "grapmail", url.host == "scheduled" else { return }
+        if restoredSession, SessionStore.token != nil {
+            openScheduledScreen()
+        } else {
+            pendingScheduled = true
+        }
+    }
+
+    private func openScheduledScreen() {
+        pendingScheduled = false
+        guard SessionStore.token != nil else { return }
+        if path.last != .home { path = [.home] }
+        path.append(.mailScheduled)
     }
 
     private func openNotificationMail() {

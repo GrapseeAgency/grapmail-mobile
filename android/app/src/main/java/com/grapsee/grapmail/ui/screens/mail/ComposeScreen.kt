@@ -247,6 +247,17 @@ fun ComposeScreen(
         }
     }
     val sendEnabled = !waitingForDraft && !state.sending && !state.accepted && !preparingSend && !uploading && !state.pendingSend
+
+    // F12: a reply the server accepted is a thread now awaiting an answer.
+    // Recorded once, at the acceptance itself, so the follow-up center counts
+    // something that actually happened instead of something the person must
+    // remember to log.
+    val followUpContext = androidx.compose.ui.platform.LocalContext.current
+    androidx.compose.runtime.LaunchedEffect(state.accepted) {
+        if (state.accepted && mode == "reply" && replyId.isNotBlank()) {
+            com.grapsee.grapmail.logic.MailFeaturePrefs(followUpContext).markAwaitingReply(replyId)
+        }
+    }
     Column(Modifier.fillMaxSize().background(palette.bg).statusBarsPadding().imePadding()) {
         // The undo-send window: the message is held on this device for five
         // seconds, and this bar is its whole story — nothing has been sent,
@@ -350,6 +361,22 @@ Spacer(Modifier.width(10.dp))
 
             FieldRow(label = "Subject", value = state.subject, placeholder = "Add a subject",
                 onValue = { vm.composeUpdate { s -> s.copy(subject = it) } }, tag = "mail-subject")
+
+            androidx.compose.runtime.LaunchedEffect(Unit) {
+                kotlinx.coroutines.delay(700)
+                com.grapsee.grapmail.logic.MailFeaturePrefs.consumeStagedComposeInsert()?.let { staged ->
+                    if (staged.isNotBlank()) {
+                        vm.composeUpdate { s ->
+                            s.copy(body = if (s.body.isBlank()) staged else s.body + "\n\n" + staged)
+                        }
+                    }
+                }
+            }
+
+            com.grapsee.grapmail.ui.mailfeatures.MailComposeTools(
+                getBody = { state.body },
+                setBody = { b -> vm.composeUpdate { s -> s.copy(body = b) } },
+            )
 
             Divider(palette)
 

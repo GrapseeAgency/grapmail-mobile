@@ -1,8 +1,11 @@
 package com.grapsee.grapmail.ui.theme
 
+import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.darkColorScheme
+import androidx.compose.material3.dynamicDarkColorScheme
+import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Typography
@@ -13,6 +16,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
 import androidx.compose.ui.text.TextStyle
@@ -83,11 +87,21 @@ val LocalPalette = staticCompositionLocalOf {
 @Composable
 fun GrapMailTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
+    dynamicColor: Boolean = true,
     content: @Composable () -> Unit
 ) {
     val dark = darkTheme
     val base = LocalGrapMailColors.current
-    val palette = if (dark) Palette(
+    // Material You, with a light hand: on Android 12+ the accent family —
+    // buttons, links, the caret, the archive swipe — can follow the wallpaper
+    // through the platform's own scheme. The neutrals, text and status inks
+    // stay the design's: they were measured from the founder's references and
+    // are not the system's to repaint.
+    val scheme = if (dynamicColor && Build.VERSION.SDK_INT >= 31) {
+        val context = LocalContext.current
+        if (dark) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
+    } else null
+    val palette = (if (dark) Palette(
         bg = base.bgDark, bgTinted = base.bgDark, card = base.cardDark, softFill = base.softFillDark, infoFill = base.softFillDark,
         border = base.borderDark, borderSoft = base.borderDark,
         primaryTop = base.primaryTop, primaryBottom = base.primaryBottom, primarySolid = base.primarySolid,
@@ -115,10 +129,21 @@ fun GrapMailTheme(
         swipeArchive = base.swipeArchive, swipeTrash = base.swipeTrash,
         star = base.star,
         cursor = base.primarySolid,
-    )
+    )).let { p ->
+        if (scheme == null) p else p.copy(
+            primaryTop = scheme.primary,
+            primaryBottom = scheme.primary,
+            primarySolid = scheme.primary,
+            onPrimary = scheme.onPrimary,
+            buttonDisabled = scheme.primaryContainer,
+            infoFill = scheme.primaryContainer,
+            cursor = scheme.primary,
+            swipeArchive = scheme.primary,
+        )
+    }
     CompositionLocalProvider(LocalPalette provides palette) {
         MaterialTheme(
-            colorScheme = (if (dark) darkColorScheme() else lightColorScheme()).copy(
+            colorScheme = (scheme ?: (if (dark) darkColorScheme() else lightColorScheme())).copy(
                 primary = palette.primarySolid,
                 onPrimary = palette.onPrimary,
                 primaryContainer = palette.infoFill,

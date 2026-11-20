@@ -1,0 +1,713 @@
+<!doctype html>
+<html lang="en" data-theme="technical">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>Research Report: New Feature Roadmap for GrapMail&#x27;s Native iOS and Android Apps | Deep Research Report</title>
+  <style>
+    :root {
+      --ink: #18212f;
+      --muted: #5d6878;
+      --navy: #12324a;
+      --accent: #16708f;
+      --accent-soft: #eaf4f7;
+      --paper: #ffffff;
+      --canvas: #f2f4f6;
+      --line: #dce2e7;
+      --line-strong: #b9c4cd;
+      --radius: 12px;
+      --measure: 78ch;
+      --link: #0d6687;
+      --link-hover: #084a63;
+      --header-detail: #6fb4c9;
+      --header-muted: #9fd0df;
+      --summary-bg: linear-gradient(135deg, #edf6f8 0%, #f8fbfc 100%);
+      --summary-border: #cfe2e8;
+      --quote-bg: #f6f8f9;
+      --table-stripe: #f7f9fa;
+      --footer-bg: #edf1f3;
+      --title-font: ui-serif, Georgia, "Noto Serif CJK SC", "Songti SC", serif;
+    }
+
+    html[data-theme="editorial"] {
+      --ink: #29251f;
+      --muted: #746b5d;
+      --navy: #202a36;
+      --accent: #a87925;
+      --accent-soft: #f7efdf;
+      --canvas: #eeeae2;
+      --line: #ddd5c7;
+      --line-strong: #c6bba9;
+      --link: #805b1d;
+      --link-hover: #5f4212;
+      --header-detail: #d0a750;
+      --header-muted: #ddc58f;
+      --summary-bg: linear-gradient(135deg, #f7f0e3 0%, #fffdfa 100%);
+      --summary-border: #dfcda8;
+      --quote-bg: #f8f4ec;
+      --table-stripe: #faf7f1;
+      --footer-bg: #e9e3d8;
+    }
+
+    html[data-theme="analytical"] {
+      --ink: #172033;
+      --muted: #59657a;
+      --navy: #071b38;
+      --accent: #1768ac;
+      --accent-soft: #e7f1fa;
+      --canvas: #edf1f5;
+      --line: #d5dde6;
+      --line-strong: #aebccc;
+      --link: #0b5f9e;
+      --link-hover: #084674;
+      --header-detail: #55a8e0;
+      --header-muted: #9bcceb;
+      --summary-bg: linear-gradient(135deg, #eaf3fa 0%, #f9fbfd 100%);
+      --summary-border: #c4d9e8;
+      --quote-bg: #f3f6f9;
+      --table-stripe: #f3f6f9;
+      --footer-bg: #e6ebf0;
+      --radius: 7px;
+    }
+
+    html[data-theme="technical"] {
+      --ink: #17252d;
+      --muted: #566a73;
+      --navy: #102d34;
+      --accent: #008b82;
+      --accent-soft: #e1f4f1;
+      --canvas: #eaf0ef;
+      --line: #d0ddda;
+      --line-strong: #a8bdb8;
+      --link: #007269;
+      --link-hover: #00554f;
+      --header-detail: #50c2b8;
+      --header-muted: #9bd8d2;
+      --summary-bg: linear-gradient(135deg, #e4f3f1 0%, #f8fbfa 100%);
+      --summary-border: #bddbd6;
+      --quote-bg: #f1f7f6;
+      --table-stripe: #f2f7f6;
+      --footer-bg: #e2ecea;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; }
+
+    html {
+      scroll-behavior: smooth;
+      background: var(--canvas);
+    }
+
+    body {
+      margin: 0;
+      color: var(--ink);
+      background: var(--canvas);
+      font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI",
+        "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", Arial, sans-serif;
+      font-size: 16px;
+      line-height: 1.72;
+      text-rendering: optimizeLegibility;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    a {
+      color: var(--link);
+      text-decoration-thickness: 1px;
+      text-underline-offset: 0.16em;
+      overflow-wrap: anywhere;
+    }
+
+    a:hover { color: var(--link-hover); }
+    a:focus-visible { outline: 3px solid rgba(22, 112, 143, 0.3); outline-offset: 3px; }
+
+    .report-shell {
+      width: min(100% - 40px, 1040px);
+      margin: 32px auto 56px;
+      background: var(--paper);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      box-shadow: 0 18px 55px rgba(25, 42, 58, 0.09);
+      overflow: hidden;
+    }
+
+    .report-header {
+      position: relative;
+      padding: 48px clamp(28px, 6vw, 72px) 42px;
+      color: #f7fbfd;
+      background: var(--navy);
+      border-bottom: 5px solid var(--accent);
+    }
+
+    .report-header::after {
+      content: "";
+      position: absolute;
+      right: clamp(24px, 6vw, 72px);
+      bottom: 0;
+      width: min(28vw, 220px);
+      height: 5px;
+      background: var(--header-detail);
+    }
+
+    .eyebrow {
+      margin: 0 0 12px;
+      color: var(--header-muted);
+      font-size: 0.76rem;
+      font-weight: 750;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+    }
+
+    .report-header h1 {
+      max-width: 22ch;
+      margin: 0;
+      font-family: var(--title-font);
+      font-size: clamp(2rem, 5vw, 3.65rem);
+      font-weight: 650;
+      line-height: 1.1;
+      letter-spacing: -0.035em;
+      text-wrap: balance;
+    }
+
+    .report-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px 22px;
+      margin-top: 24px;
+      color: #cadce4;
+      font-size: 0.86rem;
+    }
+
+    .report-meta span + span::before {
+      content: "";
+      display: inline-block;
+      width: 4px;
+      height: 4px;
+      margin: 0 12px 2px 0;
+      border-radius: 50%;
+      background: var(--header-detail);
+    }
+
+    .report-content {
+      padding: 18px clamp(24px, 6vw, 72px) 64px;
+    }
+
+    .section {
+      max-width: var(--measure);
+      margin: 0 auto;
+      padding-top: 34px;
+    }
+
+    .section + .section {
+      margin-top: 18px;
+      border-top: 1px solid var(--line);
+    }
+
+    .section-title {
+      margin: 0 0 22px;
+      color: var(--navy);
+      font-family: var(--title-font);
+      font-size: clamp(1.55rem, 3vw, 2.1rem);
+      font-weight: 680;
+      line-height: 1.25;
+      letter-spacing: -0.018em;
+      text-wrap: balance;
+    }
+
+    .subsection-title {
+      margin: 28px 0 10px;
+      color: #203b50;
+      font-size: 1.16rem;
+      line-height: 1.4;
+    }
+
+    .subsubsection-title {
+      margin: 22px 0 8px;
+      color: #334b5d;
+      font-size: 1rem;
+      line-height: 1.45;
+    }
+
+    p { margin: 0 0 1em; }
+    strong { color: #142b3d; font-weight: 720; }
+
+    .executive-summary {
+      max-width: calc(var(--measure) + 4ch);
+      margin-top: 26px;
+      padding: 30px clamp(22px, 4vw, 38px) 24px;
+      background: var(--summary-bg);
+      border: 1px solid var(--summary-border);
+      border-top: 4px solid var(--accent);
+      border-radius: var(--radius);
+    }
+
+    .executive-summary .section-title { font-size: clamp(1.45rem, 3vw, 1.9rem); }
+
+    ul, ol {
+      margin: 0.8em 0 1.25em;
+      padding-left: 1.35em;
+    }
+
+    li { margin: 0.35em 0; padding-left: 0.25em; }
+    li::marker { color: var(--accent); font-weight: 700; }
+
+    blockquote {
+      margin: 22px 0;
+      padding: 16px 20px;
+      color: #334b5d;
+      background: var(--quote-bg);
+      border-left: 4px solid var(--accent);
+    }
+
+    code {
+      padding: 0.12em 0.34em;
+      color: #713f12;
+      background: #fff7df;
+      border: 1px solid #f0dfaa;
+      border-radius: 4px;
+      font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+      font-size: 0.88em;
+      overflow-wrap: anywhere;
+    }
+
+    pre {
+      max-width: 100%;
+      margin: 20px 0;
+      padding: 18px;
+      overflow: auto;
+      color: #e9f2f6;
+      background: #152936;
+      border-radius: 8px;
+    }
+
+    pre code { padding: 0; color: inherit; background: transparent; border: 0; }
+
+    .section-divider {
+      width: 52px;
+      margin: 28px 0;
+      border: 0;
+      border-top: 3px solid #b6d5df;
+    }
+
+    .citation {
+      display: inline-block;
+      min-width: 1.55em;
+      margin: 0 0.06em;
+      padding: 0 0.3em;
+      color: #0b607e;
+      background: var(--accent-soft);
+      border-radius: 4px;
+      font-size: 0.82em;
+      font-weight: 750;
+      line-height: 1.55;
+      text-decoration: none;
+    }
+
+    .table-wrap {
+      width: 100%;
+      max-width: 100%;
+      margin: 24px 0 28px;
+      overflow-x: auto;
+      border: 1px solid var(--line-strong);
+      border-radius: 9px;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    .data-table {
+      width: 100%;
+      min-width: 620px;
+      border-collapse: collapse;
+      background: #fff;
+      font-size: 0.88rem;
+      line-height: 1.5;
+    }
+
+    .data-table th {
+      padding: 12px 14px;
+      color: #f7fbfd;
+      background: var(--navy);
+      font-size: 0.78rem;
+      font-weight: 720;
+      letter-spacing: 0.025em;
+      text-align: left;
+      vertical-align: bottom;
+    }
+
+    .data-table td {
+      padding: 12px 14px;
+      border-top: 1px solid var(--line);
+      vertical-align: top;
+      overflow-wrap: anywhere;
+    }
+
+    .data-table tbody tr:nth-child(even) { background: var(--table-stripe); }
+
+    .bibliography {
+      max-width: calc(var(--measure) + 4ch);
+      margin-top: 42px;
+      padding: 34px clamp(22px, 4vw, 38px);
+      background: var(--table-stripe);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+    }
+
+    .bibliography + .section { margin-top: 36px; }
+
+    .bib-entry {
+      display: grid;
+      grid-template-columns: 2.8em minmax(0, 1fr);
+      gap: 8px;
+      padding: 13px 0;
+      border-top: 1px solid var(--line);
+      font-size: 0.9rem;
+      line-height: 1.55;
+    }
+
+    .bib-entry:first-of-type { border-top: 0; }
+    .bib-number { color: var(--accent); font-weight: 760; }
+    .bib-text { min-width: 0; overflow-wrap: anywhere; }
+
+    .report-footer {
+      padding: 18px clamp(24px, 6vw, 72px);
+      color: var(--muted);
+      background: var(--footer-bg);
+      border-top: 1px solid var(--line);
+      font-size: 0.78rem;
+    }
+
+    @media (max-width: 640px) {
+      body { font-size: 16px; }
+      .report-shell { width: 100%; margin: 0; border: 0; border-radius: 0; box-shadow: none; }
+      .report-header { padding: 34px 20px 30px; }
+      .report-content { padding: 10px 18px 44px; }
+      .section { padding-top: 28px; }
+      .executive-summary, .bibliography { padding: 24px 18px 20px; border-radius: 9px; }
+      .report-meta { display: grid; gap: 4px; }
+      .report-meta span + span::before { display: none; }
+      .data-table { min-width: 560px; }
+      .bib-entry { grid-template-columns: 2.4em minmax(0, 1fr); }
+    }
+
+    html[data-theme="editorial"] .report-header {
+      min-height: 330px;
+      display: grid;
+      align-content: center;
+      background: linear-gradient(135deg, #182330 0%, #2f3b48 100%);
+    }
+
+    html[data-theme="editorial"] .report-header h1 { max-width: 18ch; }
+    html[data-theme="editorial"] .section-title { letter-spacing: -0.01em; }
+
+    html[data-theme="analytical"] .report-header { padding-block: 38px 34px; }
+    html[data-theme="analytical"] .report-header h1 {
+      max-width: 28ch;
+      font-family: Inter, ui-sans-serif, "PingFang SC", sans-serif;
+      font-size: clamp(1.9rem, 4vw, 3rem);
+      font-weight: 760;
+    }
+
+    html[data-theme="technical"] .report-header {
+      background-color: var(--navy);
+      background-image:
+        linear-gradient(rgba(80, 194, 184, 0.08) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(80, 194, 184, 0.08) 1px, transparent 1px);
+      background-size: 28px 28px;
+    }
+
+    @media (max-width: 640px) {
+      html[data-theme="editorial"] .report-header {
+        min-height: 240px;
+        padding: 34px 20px 30px;
+      }
+      html[data-theme="analytical"] .report-header { padding: 30px 20px 28px; }
+    }
+
+    @media print {
+      @page { margin: 18mm; }
+      html, body { background: #fff; }
+      .report-shell { width: 100%; margin: 0; border: 0; box-shadow: none; }
+      .report-header { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+      .table-wrap { overflow: visible; }
+      .data-table { min-width: 0; }
+      a { color: inherit; text-decoration: none; }
+      .section, .bib-entry, tr { break-inside: avoid; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
+    }
+  </style>
+</head>
+<body>
+  <article class="report-shell">
+    <header class="report-header">
+      <p class="eyebrow">Deep Research Report</p>
+      <h1>Research Report: New Feature Roadmap for GrapMail&#x27;s Native iOS and Android Apps</h1>
+      <div class="report-meta" aria-label="Report metadata">
+        <span>2026-11-19</span>
+        <span>46 sources</span>
+      </div>
+    </header>
+    <main class="report-content">
+      <section class="section executive-summary" id="executive-summary">
+<h2 class="section-title">Executive Summary</h2>
+<p>GrapMail's mobile apps are confirmed native: the audited snapshot of the repository at commit <code>0fb5998e</code> contains 203 source files (48 Swift, 75 Kotlin), no cross-platform UI framework artifacts — both apps are built entirely on first-party toolkits <a class="citation" href="#ref-39" aria-label="Reference 39">[39]</a>. That foundation is what makes this roadmap practical to execute: nearly every candidate below relies on first-party platform capabilities that are documented, stable, and already shipping on iOS and Android.</p>
+<p>This report identifies <strong>27 candidate features</strong> in three tiers (P0 parity-critical, P1 strategic, P2 opportunistic). Cross-referencing platform documentation, competitor products (Apple Mail, Gmail, Spark, Superhuman, Proton, Canary), 2026 threat telemetry, and the internal audit, three gap families dominate:</p>
+<ul>
+<li><strong>System-integration gap.</strong> GrapMail currently ships none of: home/Lock-screen widgets (WidgetKit on iOS <a class="citation" href="#ref-41" aria-label="Reference 41">[41]</a>, Glance on Android <a class="citation" href="#ref-4" aria-label="Reference 4">[4]</a>), Live Activities <a class="citation" href="#ref-2" aria-label="Reference 2">[2]</a>, App Intents/Siri/Shortcuts exposure <a class="citation" href="#ref-3" aria-label="Reference 3">[3]</a>, inline notification reply <a class="citation" href="#ref-5" aria-label="Reference 5">[5]</a>, Android per-app language <a class="citation" href="#ref-6" aria-label="Reference 6">[6]</a>, or Material You dynamic color <a class="citation" href="#ref-7" aria-label="Reference 7">[7]</a>. Each mechanism is first-party, low-risk, and immediately user-visible.</li>
+<li><strong>Trust-and-safety gap.</strong> 2026 telemetry shows 1 in 3 email messages is malicious or unwanted, with 70% of malicious PDFs carrying QR codes <a class="citation" href="#ref-27" aria-label="Reference 27">[27]</a>, and Microsoft observed roughly 7.3 billion email-based phishing threats in Q3 2026 alone <a class="citation" href="#ref-28" aria-label="Reference 28">[28]</a>. Rival apps answer with phishing checks <a class="citation" href="#ref-26" aria-label="Reference 26">[26]</a>, tracker blocking <a class="citation" href="#ref-24" aria-label="Reference 24">[24]</a>, and one-click unsubscribe <a class="citation" href="#ref-25" aria-label="Reference 25">[25]</a>; the audit found none of these user-facing protections in GrapMail yet <a class="citation" href="#ref-39" aria-label="Reference 39">[39]</a>.</li>
+<li><strong>On-device intelligence opportunity.</strong> Apple now exposes an on-device model for "structured generation, summarization, and classification" to third-party apps <a class="citation" href="#ref-34" aria-label="Reference 34">[34]</a><a class="citation" href="#ref-30" aria-label="Reference 30">[30]</a>, and Apple Mail itself summarizes and categorizes mail "all on-device" <a class="citation" href="#ref-33" aria-label="Reference 33">[33]</a>. Gmail's 2026 wave — AI Overviews, mobile summary cards, Suggested Replies — shows the same direction with cloud models <a class="citation" href="#ref-43" aria-label="Reference 43">[43]</a><a class="citation" href="#ref-44" aria-label="Reference 44">[44]</a>.</li>
+</ul>
+<p><strong>Primary recommendation:</strong> ship the six P0 items first — inline notification reply (F01), home/Lock-screen widgets (F02), one-click unsubscribe completion (F03), block-sender and report-spam flows (F04), app lock (F05), and the snoozed-mailbox rollout (F06) — then commit to an on-device summarization and categorization preview in the following cycle.</p>
+<p><strong>Confidence level:</strong> High for platform feasibility, since every mechanism is documented first-party API surface <a class="citation" href="#ref-1" aria-label="Reference 1">[1]</a><a class="citation" href="#ref-2" aria-label="Reference 2">[2]</a><a class="citation" href="#ref-3" aria-label="Reference 3">[3]</a><a class="citation" href="#ref-4" aria-label="Reference 4">[4]</a><a class="citation" href="#ref-5" aria-label="Reference 5">[5]</a><a class="citation" href="#ref-6" aria-label="Reference 6">[6]</a><a class="citation" href="#ref-7" aria-label="Reference 7">[7]</a>. Medium for AI features on lower-end devices, where on-device model availability varies by device generation <a class="citation" href="#ref-9" aria-label="Reference 9">[9]</a><a class="citation" href="#ref-38" aria-label="Reference 38">[38]</a>.</p>
+<hr class="section-divider">
+</section>
+<section class="section" id="introduction">
+<h2 class="section-title">Introduction</h2>
+<h3 class="subsection-title">Research Question</h3>
+<p>What new features should GrapMail's native iOS and Android apps add next, and in what priority order — grounded in the 2026 mail-client landscape, first-party platform capabilities, security evidence, and the apps' current state?</p>
+<p>The question follows a completed nativeness audit that confirmed the apps are pure native <a class="citation" href="#ref-39" aria-label="Reference 39">[39]</a>; the natural next step is deciding what to build on that foundation. This report is research-only: it proposes and substantiates with citations; it does not modify product code.</p>
+<h3 class="subsection-title">Scope &amp; Methodology</h3>
+<p><strong>Scope.</strong> Feature candidates implementable with first-party frameworks only (SwiftUI/UIKit, WidgetKit, ActivityKit, App Intents; Jetpack Compose/Glance, Android platform services), consistent with the project's native-only guardrail. Excluded: server architecture changes beyond the already-identified snoozed-mailbox route <a class="citation" href="#ref-39" aria-label="Reference 39">[39]</a>, third-party-provider connectors (GrapMail is its own mail provider, so "import" means leaving other providers for GrapMail), and pricing or business-model questions.</p>
+<p><strong>Method.</strong> Six evidence streams: (1) repository census — 203 files exported at <code>0fb5998e</code> and swept for roughly 30 capability markers, producing a present/absent baseline <a class="citation" href="#ref-39" aria-label="Reference 39">[39]</a>; (2) platform documentation for the exact APIs that would implement each candidate — widgets <a class="citation" href="#ref-41" aria-label="Reference 41">[41]</a><a class="citation" href="#ref-1" aria-label="Reference 1">[1]</a>, Live Activities <a class="citation" href="#ref-2" aria-label="Reference 2">[2]</a>, App Intents <a class="citation" href="#ref-3" aria-label="Reference 3">[3]</a>, notifications and direct reply <a class="citation" href="#ref-5" aria-label="Reference 5">[5]</a>, per-app language <a class="citation" href="#ref-6" aria-label="Reference 6">[6]</a>, dynamic color <a class="citation" href="#ref-7" aria-label="Reference 7">[7]</a>; (3) competitor teardown — Apple Mail <a class="citation" href="#ref-9" aria-label="Reference 9">[9]</a><a class="citation" href="#ref-33" aria-label="Reference 33">[33]</a>, Gmail <a class="citation" href="#ref-43" aria-label="Reference 43">[43]</a><a class="citation" href="#ref-44" aria-label="Reference 44">[44]</a>, Spark <a class="citation" href="#ref-23" aria-label="Reference 23">[23]</a>, Superhuman <a class="citation" href="#ref-17" aria-label="Reference 17">[17]</a>, Proton <a class="citation" href="#ref-24" aria-label="Reference 24">[24]</a>, Canary <a class="citation" href="#ref-25" aria-label="Reference 25">[25]</a><a class="citation" href="#ref-26" aria-label="Reference 26">[26]</a>; (4) security and trust research — Barracuda's 2026 threat report <a class="citation" href="#ref-27" aria-label="Reference 27">[27]</a>, Microsoft's Q3 2026 email landscape <a class="citation" href="#ref-28" aria-label="Reference 28">[28]</a>, FTC consumer guidance <a class="citation" href="#ref-29" aria-label="Reference 29">[29]</a>; (5) accessibility guidance <a class="citation" href="#ref-31" aria-label="Reference 31">[31]</a><a class="citation" href="#ref-32" aria-label="Reference 32">[32]</a>; (6) on-device AI material <a class="citation" href="#ref-30" aria-label="Reference 30">[30]</a><a class="citation" href="#ref-34" aria-label="Reference 34">[34]</a><a class="citation" href="#ref-35" aria-label="Reference 35">[35]</a><a class="citation" href="#ref-36" aria-label="Reference 36">[36]</a><a class="citation" href="#ref-37" aria-label="Reference 37">[37]</a><a class="citation" href="#ref-38" aria-label="Reference 38">[38]</a>. In total, 46 sources are registered for this run, with 86 quote-level evidence entries backing every factual claim used in this report.</p>
+<p><strong>Time period.</strong> Platform documentation and competitor material as of November 2026; security data from 2026 reports; AI capability material from 2024–2026.</p>
+<h3 class="subsection-title">Key Assumptions</h3>
+<ol>
+<li>The audit baseline is commit <code>0fb5998e</code>; "absent" means "no implementation found in that snapshot's sources", not a statement about intent or other branches <a class="citation" href="#ref-39" aria-label="Reference 39">[39]</a>.</li>
+<li>GrapMail is its own provider (no third-party OAuth/IMAP sync in scope), so migration features refer to bringing users from other providers to GrapMail <a class="citation" href="#ref-39" aria-label="Reference 39">[39]</a>.</li>
+<li>Effort scale: <strong>S</strong> ≈ one sprint for one platform team; <strong>M</strong> ≈ two to four sprints; <strong>L</strong> ≈ a full cycle or multi-team work. Estimates are directional, not commitments.</li>
+<li>Tier definitions: <strong>P0</strong> = parity-critical, low-to-medium effort (users of rival apps get these today); <strong>P1</strong> = strategic differentiators; <strong>P2</strong> = opportunistic polish.</li>
+<li>Where platform features have availability caveats — Apple Intelligence device requirements and region limits <a class="citation" href="#ref-9" aria-label="Reference 9">[9]</a>, on-device model sizes on Android <a class="citation" href="#ref-38" aria-label="Reference 38">[38]</a> — the roadmap treats them as opt-in additions with graceful fallbacks, not hard dependencies.</li>
+</ol>
+<h3 class="subsection-title">How to Read the Roadmap</h3>
+<p>Each candidate carries an ID (F01–F27), a tier, an effort estimate, the native mechanism that implements it, and the evidence supporting its value. The findings sections below build the case in six groups (baseline, market bar, system integration, trust and safety, on-device intelligence, everyday productivity). The consolidated table in <strong>Prioritized Feature Roadmap</strong> is the actionable list.</p>
+<hr class="section-divider">
+</section>
+<section class="section" id="main-analysis">
+<h2 class="section-title">Main Analysis</h2>
+<h3 class="subsection-title">Finding 1: The Baseline — What GrapMail Already Ships</h3>
+<p>Before recommending anything, the audit pinned down exactly what exists at commit <code>0fb5998e</code>, so that nothing below duplicates shipped work and every recommendation extends a real surface. The repository census exported 203 files (48 Swift, 75 Kotlin) and swept them for roughly 30 capability markers <a class="citation" href="#ref-39" aria-label="Reference 39">[39]</a>.</p>
+<p>The present-feature inventory spans five clusters <a class="citation" href="#ref-39" aria-label="Reference 39">[39]</a>:</p>
+<ul>
+<li><strong>Core mail actions.</strong> Snooze with undo-triage pills, send-later scheduling wired to the backend <code>scheduled</code> route <a class="citation" href="#ref-39" aria-label="Reference 39">[39]</a><a class="citation" href="#ref-40" aria-label="Reference 40">[40]</a>, an undo-send window, and per-thread mute.</li>
+<li><strong>Organization.</strong> Labels, search with advanced client-side filters, signatures (global and per-account), and sender aliases.</li>
+<li><strong>Notifications.</strong> Mail-notification action buttons on both platforms (archive, mark read, reply, more); on iOS, a notification-service extension renders content previews and sender avatars; both apps schedule background refresh (iOS via BGTaskScheduler polling).</li>
+<li><strong>Account security foundations.</strong> End-to-end encryption plumbing, session management with 2FA and backup codes, and human-verification (CAPTCHA) flows.</li>
+<li><strong>Platform citizenship.</strong> Share sheet, <code>mailto:</code> handling, QuickLook attachment previews, and an update banner.</li>
+</ul>
+<p>The same sweep established the gaps this roadmap targets: neither app tree contains widgets, Live Activities, App Intents, per-app language support, dynamic color, biometric app lock, inline notification reply, phishing warnings, templates, smart replies, or mail categories <a class="citation" href="#ref-39" aria-label="Reference 39">[39]</a>. The snoozed-mailbox screen is implemented in-app but waits on a backend <code>?box=snoozed</code> route that is not yet deployed <a class="citation" href="#ref-39" aria-label="Reference 39">[39]</a>.</p>
+<p>Two planning consequences follow. First, several P0 candidates are small closures rather than new systems — inline reply extends the existing notification actions <a class="citation" href="#ref-5" aria-label="Reference 5">[5]</a>, one-click unsubscribe completes header parsing the apps already do <a class="citation" href="#ref-8" aria-label="Reference 8">[8]</a><a class="citation" href="#ref-25" aria-label="Reference 25">[25]</a>, and app lock extends the security layer <a class="citation" href="#ref-24" aria-label="Reference 24">[24]</a>. Second, the absence list is exactly where rivals concentrate their 2026 differentiation, as the next finding documents.</p>
+<h3 class="subsection-title">Finding 2: The 2026 Market Bar — What Leading Mail Apps Treat as Standard</h3>
+<p>Six reference products — two platform owners and four independents — define current user expectations.</p>
+<p><strong>Apple Mail (iOS 27).</strong> Long-pressing a message exposes Siri actions that summarize, find items, track packages, or read flight numbers; Write with Siri composes; Smart Replies are "tuned to your writing style"; and search "ranks results by relevance and intent" rather than keywords and recency <a class="citation" href="#ref-9" aria-label="Reference 9">[9]</a>. Apple also ships Priority Messages with AI summaries and sorts mail into Primary, Transactions, Updates, and Promotions — "done all on-device" <a class="citation" href="#ref-33" aria-label="Reference 33">[33]</a>. Availability is tiered: AI features require Apple Intelligence-class hardware and launch with initial region limits <a class="citation" href="#ref-9" aria-label="Reference 9">[9]</a>.</p>
+<p><strong>Gmail (2026, the "Gemini era").</strong> Google ships AI Overviews that "summarize email threads and answer questions using natural language", plus Suggested Replies, Help Me Write, Proofread, and an AI Inbox that filters out unimportant email <a class="citation" href="#ref-43" aria-label="Reference 43">[43]</a>. On mobile, Gemini summary cards appear "at the top of the email content" for long threads <a class="citation" href="#ref-44" aria-label="Reference 44">[44]</a>.</p>
+<p><strong>Spark.</strong> Markets four recurring pillars: "Prioritize key senders and screen unknowns", pin/snooze/reminders, "Filter out noisy newsletters", and AI that summarizes long threads, drafts "in your voice", and answers inbox questions <a class="citation" href="#ref-23" aria-label="Reference 23">[23]</a>.</p>
+<p><strong>Superhuman.</strong> Its power-user suite — Instant Reply, Auto Drafts (reply drafts prepared before the message is opened), Auto Summarize, Auto Labels, split inbox, follow-up reminders, and Ask AI — sets the workflow reference <a class="citation" href="#ref-17" aria-label="Reference 17">[17]</a>.</p>
+<p><strong>Proton.</strong> Differentiates through privacy defaults: zero-access encryption, tracker blocking, and 1-click import from other providers <a class="citation" href="#ref-24" aria-label="Reference 24">[24]</a>.</p>
+<p><strong>Canary.</strong> Bundles an AI writer, thread summaries, automatic categorization, read receipts, 1-click unsubscribe, templates, a misdirected-recipient warning, and tracker blocking on by default <a class="citation" href="#ref-25" aria-label="Reference 25">[25]</a><a class="citation" href="#ref-26" aria-label="Reference 26">[26]</a>.</p>
+<p>The threat baseline is rising underneath these product moves. Barracuda analyzed more than 3.1 billion emails for its 2026 report and found 1 in 3 malicious or unwanted, with QR codes embedded in 70% of malicious PDFs <a class="citation" href="#ref-27" aria-label="Reference 27">[27]</a>. Microsoft tracked roughly 7.3 billion email-based phishing threats in Q3 2026 alone <a class="citation" href="#ref-28" aria-label="Reference 28">[28]</a>. Consumer-protection guidance treats fast in-app reporting as a core recovery action after a suspicious message <a class="citation" href="#ref-29" aria-label="Reference 29">[29]</a>.</p>
+<p>Three standard-shifts follow, and each lands on a GrapMail gap:</p>
+<ol>
+<li><strong>System-level integration is table stakes.</strong> Widgets <a class="citation" href="#ref-41" aria-label="Reference 41">[41]</a><a class="citation" href="#ref-42" aria-label="Reference 42">[42]</a><a class="citation" href="#ref-4" aria-label="Reference 4">[4]</a>, notification interactions <a class="citation" href="#ref-5" aria-label="Reference 5">[5]</a>, and assistant hooks <a class="citation" href="#ref-3" aria-label="Reference 3">[3]</a> are how mail apps stay one tap from the inbox; GrapMail ships none of these yet <a class="citation" href="#ref-39" aria-label="Reference 39">[39]</a>.</li>
+<li><strong>Trust and safety are product features, not settings archaeology.</strong> Tracker blocking, unsubscribe, and phishing checks are marketed up front by Proton and Canary <a class="citation" href="#ref-24" aria-label="Reference 24">[24]</a><a class="citation" href="#ref-26" aria-label="Reference 26">[26]</a>, while attack telemetry makes each more urgent <a class="citation" href="#ref-27" aria-label="Reference 27">[27]</a><a class="citation" href="#ref-28" aria-label="Reference 28">[28]</a>; GrapMail's audit shows none of these user-facing controls <a class="citation" href="#ref-39" aria-label="Reference 39">[39]</a>.</li>
+<li><strong>Intelligence is moving on-device.</strong> Apple exposes an on-device foundation model to third-party apps for "structured generation, summarization, and classification" <a class="citation" href="#ref-34" aria-label="Reference 34">[34]</a>, reachable through a native Swift API whose prompts "never have to leave" the phone <a class="citation" href="#ref-35" aria-label="Reference 35">[35]</a>; Apple's own Mail uses this pattern for summaries and categories <a class="citation" href="#ref-33" aria-label="Reference 33">[33]</a>. For GrapMail, this is both a differentiation path and a cost argument — on-device intelligence avoids per-request cloud spend while keeping mail content local <a class="citation" href="#ref-37" aria-label="Reference 37">[37]</a>.</li>
+</ol>
+<hr class="section-divider">
+<h3 class="subsection-title">Finding 3: Native System Integration — The Highest-Certainty Upside</h3>
+<p>Some feature families carry execution risk; this one carries little. Every mechanism below is first-party platform API surface, documented and stable <a class="citation" href="#ref-1" aria-label="Reference 1">[1]</a><a class="citation" href="#ref-2" aria-label="Reference 2">[2]</a><a class="citation" href="#ref-3" aria-label="Reference 3">[3]</a><a class="citation" href="#ref-4" aria-label="Reference 4">[4]</a><a class="citation" href="#ref-5" aria-label="Reference 5">[5]</a><a class="citation" href="#ref-41" aria-label="Reference 41">[41]</a>, and several extend plumbing the apps already have — notification actions, background refresh, and send-later scheduling <a class="citation" href="#ref-39" aria-label="Reference 39">[39]</a>. High user visibility plus low architectural risk makes system integration the safest place to start.</p>
+<h3 class="subsection-title">F01 — Inline reply without leaving the notification</h3>
+<p>Both apps already show notification action buttons (archive, mark read, reply, more), but the reply action currently routes the user into the app <a class="citation" href="#ref-39" aria-label="Reference 39">[39]</a>. The platform mechanisms to keep the reply in the notification are standard: on Android, "the direct reply action, introduced in Android 7.0 (API level 24), lets users enter text directly into the notification" <a class="citation" href="#ref-5" aria-label="Reference 5">[5]</a>, within a notification that "can offer up to three action buttons that let the user respond directly from the notification" <a class="citation" href="#ref-5" aria-label="Reference 5">[5]</a>. iOS documents a text-input notification action type — an action that accepts typed input from the user <a class="citation" href="#ref-45" aria-label="Reference 45">[45]</a> — declared as part of the app's notification categories <a class="citation" href="#ref-46" aria-label="Reference 46">[46]</a>.</p>
+<p>Why first: replying is the most frequent daily interaction, and this converts it from a context switch into an inline gesture. Effort: S.</p>
+<h3 class="subsection-title">F02 — Home and Lock-screen widgets</h3>
+<p>WidgetKit exists to surface glanceable, up-to-date experiences <a class="citation" href="#ref-41" aria-label="Reference 41">[41]</a>; Apple's widget design guidance is built around timely, glanceable content <a class="citation" href="#ref-42" aria-label="Reference 42">[42]</a>. On Android, "Glance provides a set of composables to help you build responsive widgets for the home screen with less code" <a class="citation" href="#ref-4" aria-label="Reference 4">[4]</a> — a Compose-native path consistent with the existing Kotlin codebase <a class="citation" href="#ref-39" aria-label="Reference 39">[39]</a>.</p>
+<p>Recommended v1 scope: unread badge, latest three messages (sender and subject), and a compose shortcut. Beyond direct value, the widget extension is a prerequisite for two other items below (Live Activities <a class="citation" href="#ref-2" aria-label="Reference 2">[2]</a>; dynamic-color widgets <a class="citation" href="#ref-7" aria-label="Reference 7">[7]</a>). Effort: M.</p>
+<h3 class="subsection-title">F19 — Live Activities for Send Later</h3>
+<p>The apps already schedule sends <a class="citation" href="#ref-39" aria-label="Reference 39">[39]</a>; a pending-send countdown with a cancel action is a textbook Live Activity — "Live Activities display your app's current data on the Lock Screen, in the Dynamic Island, in CarPlay, and on a paired Mac or Apple Watch" <a class="citation" href="#ref-2" aria-label="Reference 2">[2]</a>. Implementation shares the widget extension ("add code to your existing widget extension or create a new widget extension if your app doesn't already include one") <a class="citation" href="#ref-2" aria-label="Reference 2">[2]</a>, with the requirement that apps "must support all presentations" <a class="citation" href="#ref-2" aria-label="Reference 2">[2]</a>. Effort: S — once F02's extension exists.</p>
+<h3 class="subsection-title">F15 — Siri, Spotlight, and Shortcuts integration</h3>
+<p>App Intents is the framework that makes app actions "discoverable by Apple Intelligence and support system experiences like Siri, Spotlight, Shortcuts, and widgets" <a class="citation" href="#ref-3" aria-label="Reference 3">[3]</a> — and the same documentation calls out hardware triggers such as the Action button <a class="citation" href="#ref-3" aria-label="Reference 3">[3]</a>. A first batch for GrapMail: compose-new, search, and jump-to-account intents. This seeds the assistant experiences Apple Mail already ships (summarize, track package, find flight <a class="citation" href="#ref-9" aria-label="Reference 9">[9]</a>) and is also the natural framework seam for future Focus-based account filtering. Effort: M.</p>
+<h3 class="subsection-title">F21 and F22 — Platform polish: per-app language and Material You</h3>
+<p>Two Android items that fit in a single polish sprint. "Starting in Android 13, Android includes a centralized location in system settings for setting per-app language preferences" <a class="citation" href="#ref-6" aria-label="Reference 6">[6]</a>; exposing GrapMail's locales there uses a generated LocaleConfig and the runtime LocaleManager APIs <a class="citation" href="#ref-6" aria-label="Reference 6">[6]</a>. Dynamic Color "enables users to personalize their devices to align tonally with the color scheme of their personal wallpaper" <a class="citation" href="#ref-7" aria-label="Reference 7">[7]</a> and "is also available separately for widgets and adaptive icons" <a class="citation" href="#ref-7" aria-label="Reference 7">[7]</a> — pairing directly with F02's Android widgets. Effort: S each.</p>
+<h3 class="subsection-title">Sequencing note</h3>
+<p>F01 and F02 lead because they lift daily engagement and unlock the widget-extension dependencies for F19 and F22; F21 rides along as low-risk polish; F15 lands after the core UX, seeding the intelligence layers in Finding 5.</p>
+<hr class="section-divider">
+<h3 class="subsection-title">Finding 4: Trust and Safety — Closing the Security Gap</h3>
+<p>The 2026 threat picture is quantified, and it argues for building protections into the app rather than leaving users to cope on their own. Barracuda's analysis of more than 3.1 billion emails found malicious or unwanted messages at a rate of "1 in 3" <a class="citation" href="#ref-27" aria-label="Reference 27">[27]</a>, with "70% of malicious PDFs and 56% of malicious Microsoft 365 documents" carrying QR codes <a class="citation" href="#ref-27" aria-label="Reference 27">[27]</a>; Microsoft's Q3 2026 email-landscape analysis logs QR-code phishing as an active growth vector as attackers shift away from file-based payloads <a class="citation" href="#ref-28" aria-label="Reference 28">[28]</a>. Consumer guidance treats the in-app report as a primary response to a suspicious message <a class="citation" href="#ref-29" aria-label="Reference 29">[29]</a>. Rival apps answer at the product level: Proton leads with tracker blocking alongside zero-access encryption <a class="citation" href="#ref-24" aria-label="Reference 24">[24]</a>, and Canary "checks each email for spoofed senders and fake links and warns you before you click", with "tracker blocking ... on by default on every plan" <a class="citation" href="#ref-26" aria-label="Reference 26">[26]</a>. GrapMail's audit shows none of these controls user-facing yet <a class="citation" href="#ref-39" aria-label="Reference 39">[39]</a> — which makes this family the highest-value build after system integration.</p>
+<h3 class="subsection-title">F03 — Finish one-click unsubscribe</h3>
+<p>The apps already parse <code>List-Unsubscribe</code> headers, including the one-click flag, and surface the affordance <a class="citation" href="#ref-39" aria-label="Reference 39">[39]</a>. RFC 8058 "describes a method for signaling a one-click function for the List-Unsubscribe email header field" <a class="citation" href="#ref-8" aria-label="Reference 8">[8]</a>, and its receiver requirements matter for implementation: the POST must follow explicit user consent <a class="citation" href="#ref-8" aria-label="Reference 8">[8]</a>. Shipping the completion — perform the POST on tap, confirm, archive the message — turns an existing parse into a full flow, and it is what Canary markets as "1-Click Unsubscribe" <a class="citation" href="#ref-25" aria-label="Reference 25">[25]</a>. Effort: S. Recommended additional scope: a subscription-manager view for bulk-unsubscribing from noisy senders, extending the existing subscriptions screen <a class="citation" href="#ref-39" aria-label="Reference 39">[39]</a>.</p>
+<h3 class="subsection-title">F04 — Block sender, report spam and phishing</h3>
+<p>Today this is thin to absent in the audit <a class="citation" href="#ref-39" aria-label="Reference 39">[39]</a>. A first-class flow — swipe or menu action → block address server-side and optionally report to spam → move and train — closes the most common trust gap <a class="citation" href="#ref-39" aria-label="Reference 39">[39]</a><a class="citation" href="#ref-40" aria-label="Reference 40">[40]</a>. Canary's pitch shows the user benefit of adding checks on top of provider filtering <a class="citation" href="#ref-26" aria-label="Reference 26">[26]</a>, and the FTC's guidance keeps "report" as the expected verb after a suspicious message <a class="citation" href="#ref-29" aria-label="Reference 29">[29]</a>. Effort: S.</p>
+<h3 class="subsection-title">F05 — App lock with biometrics</h3>
+<p>Mail is the keys-to-the-kingdom app: password resets, 2FA codes, invoices. Neither platform build ships an app lock yet <a class="citation" href="#ref-39" aria-label="Reference 39">[39]</a>, while the privacy-first competitors treat protection as table stakes <a class="citation" href="#ref-24" aria-label="Reference 24">[24]</a><a class="citation" href="#ref-25" aria-label="Reference 25">[25]</a>. Native mechanism: Face ID/Touch ID on iOS and BiometricPrompt with PIN fallback on Android; recommended behavior is lock-on-cold-start rather than every foreground, keeping the daily flow frictionless. Effort: S–M.</p>
+<h3 class="subsection-title">F16 — Tracker shield v2</h3>
+<p>Proton blocks known trackers as a headline feature <a class="citation" href="#ref-24" aria-label="Reference 24">[24]</a>; Canary ships tracker blocking by default <a class="citation" href="#ref-26" aria-label="Reference 26">[26]</a>. GrapMail's backend already renders message HTML through a dedicated route <a class="citation" href="#ref-40" aria-label="Reference 40">[40]</a> — a natural place to strip remote images and tracking pixels and rewrite URLs, with the client showing a "trackers blocked" indicator and a per-mailbox toggle. Effort: M.</p>
+<h3 class="subsection-title">F23 — QR-code phishing warnings</h3>
+<p>With "70% of malicious PDFs and 56% of malicious Microsoft 365 documents" containing QR codes <a class="citation" href="#ref-27" aria-label="Reference 27">[27]</a> and QR usage climbing through Q3 2026 <a class="citation" href="#ref-28" aria-label="Reference 28">[28]</a>, scanning belongs in the security backlog: detect QR codes in image attachments and message bodies locally, preview the decoded payload, and warn when it points to a lookalike or first-seen domain. Effort: M — shares scanning infrastructure with the on-device intelligence work in Finding 5.</p>
+<h3 class="subsection-title">Sequencing note</h3>
+<p>Bundle F03–F05 as a "trust release" — all small-effort, all user-visible; schedule F16 with the next backend web-rendering change; land F23 alongside the intelligence wave.</p>
+<hr class="section-divider">
+<h3 class="subsection-title">Finding 5: On-Device Intelligence — The Differentiation Window</h3>
+<p>2026 mail is an intelligence race, and the platform owners moved first. Apple Mail ships "Priority Messages" — urgent mail surfaced "with AI generated summaries of the email" — and sorts incoming mail into Primary, Transactions, Updates, and Promotions, which "Apple says is done all on-device" <a class="citation" href="#ref-33" aria-label="Reference 33">[33]</a>. Gmail entered what Google calls "the Gemini era": AI Overviews "summarize email threads and answer questions using natural language", Help Me Write drafts and polishes, and a new AI Inbox will "filter out unimportant emails, so you see what matters most" <a class="citation" href="#ref-43" aria-label="Reference 43">[43]</a>; on mobile, summary cards appear "at the top of the email content for messages where a summary is helpful" <a class="citation" href="#ref-44" aria-label="Reference 44">[44]</a>. Independents press the same buttons: Spark "summarizes long threads", produces "ready-to-send drafts in your voice", and answers inbox questions <a class="citation" href="#ref-23" aria-label="Reference 23">[23]</a>; Superhuman layers Instant Reply, Auto Drafts, Auto Summarize, Auto Labels, and Ask AI across the inbox <a class="citation" href="#ref-17" aria-label="Reference 17">[17]</a>; Canary ships an AI writer, thread summaries, and automatic categorization <a class="citation" href="#ref-25" aria-label="Reference 25">[25]</a>.</p>
+<p>For GrapMail, the strategic opening is delivery locus: on-device first. Apple's Foundation Models framework gives third-party apps "a small, on-device language model — not a general-purpose LLM, but a model optimized for structured generation, summarization, and classification" <a class="citation" href="#ref-34" aria-label="Reference 34">[34]</a>, exposed as "a native Swift API" whose prompts "never have to leave" the phone <a class="citation" href="#ref-35" aria-label="Reference 35">[35]</a>; Apple documents its own email-summarization adapters, including safety testing in which the summarization adapter "did not amplify sensitive content in over 99% of targeted adversarial examples" <a class="citation" href="#ref-36" aria-label="Reference 36">[36]</a>, and developer-facing coverage frames these features as working "offline and protect[ing] user privacy" <a class="citation" href="#ref-37" aria-label="Reference 37">[37]</a>. The Android analog is a Gemini-Nano-class model on current flagship silicon <a class="citation" href="#ref-38" aria-label="Reference 38">[38]</a>. For an encryption-positioned provider, keeping message text on the device during inference is both a privacy story and a cost story — and competitors make clear users increasingly expect the capability itself <a class="citation" href="#ref-23" aria-label="Reference 23">[23]</a><a class="citation" href="#ref-17" aria-label="Reference 17">[17]</a><a class="citation" href="#ref-25" aria-label="Reference 25">[25]</a>.</p>
+<h3 class="subsection-title">F07 — On-device categories and priority views</h3>
+<p><strong>Why.</strong> Apple's four-category sort plus Priority Messages established the pattern <a class="citation" href="#ref-33" aria-label="Reference 33">[33]</a>; Gmail's AI Inbox tells a mass audience that unimportant mail gets filtered automatically <a class="citation" href="#ref-43" aria-label="Reference 43">[43]</a>; Superhuman's Auto Labels show a response-oriented variant <a class="citation" href="#ref-17" aria-label="Reference 17">[17]</a>. <strong>What.</strong> Classify arriving mail into three to five buckets (for example: People, Transactions, Notices, Newsletters) and add a "Priority" slice for same-day actionable mail, computed at fetch time <a class="citation" href="#ref-34" aria-label="Reference 34">[34]</a>. <strong>Feasibility.</strong> On iOS, classification maps directly to the documented Foundation Models use case of "structured generation, summarization, and classification" <a class="citation" href="#ref-34" aria-label="Reference 34">[34]</a><a class="citation" href="#ref-37" aria-label="Reference 37">[37]</a>; on Android, gate on on-device model availability and fall back to rules for older devices <a class="citation" href="#ref-38" aria-label="Reference 38">[38]</a>. Effort: M.</p>
+<h3 class="subsection-title">F08 — Thread summaries</h3>
+<p><strong>Why.</strong> Every reference product ships it: Apple ("AI generated summaries" <a class="citation" href="#ref-33" aria-label="Reference 33">[33]</a>; Siri can "summarize" <a class="citation" href="#ref-9" aria-label="Reference 9">[9]</a>), Gmail (summary cards on mobile <a class="citation" href="#ref-44" aria-label="Reference 44">[44]</a>; thread summaries and natural-language questions <a class="citation" href="#ref-43" aria-label="Reference 43">[43]</a>), Spark <a class="citation" href="#ref-23" aria-label="Reference 23">[23]</a>, Superhuman's Auto Summarize <a class="citation" href="#ref-17" aria-label="Reference 17">[17]</a>, Canary <a class="citation" href="#ref-25" aria-label="Reference 25">[25]</a>. <strong>What.</strong> A collapsible summary card at the top of long threads, generated on-device where the model is available, with a manual "Summarize" action as fallback <a class="citation" href="#ref-34" aria-label="Reference 34">[34]</a><a class="citation" href="#ref-35" aria-label="Reference 35">[35]</a>. <strong>Feasibility.</strong> Summarization adapters are the exact deployment pattern Apple documents for foundation models <a class="citation" href="#ref-36" aria-label="Reference 36">[36]</a>; Android device-class constraints apply <a class="citation" href="#ref-38" aria-label="Reference 38">[38]</a>. Effort: M–L.</p>
+<h3 class="subsection-title">F09 — Personalized Smart Reply</h3>
+<p><strong>Why.</strong> iOS 27's pitch is personalization — suggestions "tuned to your writing style, which means the one-tap suggestions sound like things you might actually type" <a class="citation" href="#ref-9" aria-label="Reference 9">[9]</a>; Gmail ships Suggested Replies <a class="citation" href="#ref-43" aria-label="Reference 43">[43]</a>; Superhuman's Instant Reply covers quick acknowledgments and Auto Drafts pre-writes fuller replies <a class="citation" href="#ref-17" aria-label="Reference 17">[17]</a>. <strong>What.</strong> Three short reply chips above the compose bar for incoming messages, ranked by thread context and lightly personalized toward the user's typical phrasing <a class="citation" href="#ref-9" aria-label="Reference 9">[9]</a><a class="citation" href="#ref-35" aria-label="Reference 35">[35]</a>. Effort: M.</p>
+<h3 class="subsection-title">F10 — Compose assist: draft, rewrite, tone</h3>
+<p><strong>Why.</strong> Canary: "Compose emails effortlessly with AI-crafted messages tailored to your voice" <a class="citation" href="#ref-25" aria-label="Reference 25">[25]</a>; Spark: "ready-to-send drafts in your voice" <a class="citation" href="#ref-23" aria-label="Reference 23">[23]</a>; Gmail: Help Me Write <a class="citation" href="#ref-43" aria-label="Reference 43">[43]</a>; Apple: Write with Siri <a class="citation" href="#ref-9" aria-label="Reference 9">[9]</a>. <strong>What.</strong> Add "draft from a prompt", "rewrite", and "adjust tone" actions to the existing rich compose editor <a class="citation" href="#ref-39" aria-label="Reference 39">[39]</a>, invoked explicitly by the user and running through the on-device model first <a class="citation" href="#ref-34" aria-label="Reference 34">[34]</a><a class="citation" href="#ref-35" aria-label="Reference 35">[35]</a>. Effort: M.</p>
+<h3 class="subsection-title">F25 — Natural-language search</h3>
+<p><strong>Why.</strong> Apple's iOS 27 search overhaul "ranks results by relevance and intent" <a class="citation" href="#ref-9" aria-label="Reference 9">[9]</a>; Spark invites users to "Ask your inbox anything" <a class="citation" href="#ref-23" aria-label="Reference 23">[23]</a>; Gmail's AI Overviews "answer questions using natural language" <a class="citation" href="#ref-43" aria-label="Reference 43">[43]</a>; Superhuman's Ask AI does question-style retrieval <a class="citation" href="#ref-17" aria-label="Reference 17">[17]</a>. <strong>What.</strong> Layered over the existing search infrastructure <a class="citation" href="#ref-39" aria-label="Reference 39">[39]</a>: question-style queries mapped to structured filters, plus optional semantic reranking; on-device embeddings where feasible, server-side processing only with explicit consent and clear labeling. Effort: M–L.</p>
+<h3 class="subsection-title">Privacy architecture note</h3>
+<p>The recommended stance is <strong>on-device by default; cloud by explicit consent</strong>. The evidence base supports it technically <a class="citation" href="#ref-34" aria-label="Reference 34">[34]</a><a class="citation" href="#ref-35" aria-label="Reference 35">[35]</a><a class="citation" href="#ref-37" aria-label="Reference 37">[37]</a> and operationally: availability windows differ by device <a class="citation" href="#ref-9" aria-label="Reference 9">[9]</a><a class="citation" href="#ref-38" aria-label="Reference 38">[38]</a>, so feature-gating with graceful fallbacks is mandatory, and any future server-side inference should be opt-in and disclosed in plain language. This also aligns with the privacy-first posture of the reference competitors <a class="citation" href="#ref-24" aria-label="Reference 24">[24]</a><a class="citation" href="#ref-26" aria-label="Reference 26">[26]</a> while matching the direction Apple itself has taken <a class="citation" href="#ref-33" aria-label="Reference 33">[33]</a>.</p>
+<h3 class="subsection-title">Sequencing note</h3>
+<p>F08 ships first — highest wow-per-effort and shared model plumbing; F07 second (same plumbing, new surface); F09 next (compose-adjacent); F10 after F09 (same suggestion UX); F25 last (largest surface, needs search plumbing rework).</p>
+<hr class="section-divider">
+<h3 class="subsection-title">Finding 6: Everyday Productivity — Closing the Craft Gaps</h3>
+<p>The reference set treats everyday conveniences as headline capabilities: Canary advertises templates, read receipts, one-click unsubscribe, and automatic categorization as core product benefits <a class="citation" href="#ref-25" aria-label="Reference 25">[25]</a>; Spark leads with sender screening, reminders, and newsletter filtering <a class="citation" href="#ref-23" aria-label="Reference 23">[23]</a>; Superhuman's toolset centers on Split Inbox and follow-up reminders <a class="citation" href="#ref-17" aria-label="Reference 17">[17]</a>. Against these, the remaining GrapMail gaps are concentrated in daily-workflow craft — none individually large, but collectively decisive for the users who live in the app.</p>
+<h3 class="subsection-title">F06 — Complete the snoozed-mailbox experience</h3>
+<p><strong>Why.</strong> Snooze already ships as a triage action with undo support <a class="citation" href="#ref-39" aria-label="Reference 39">[39]</a>, but the dedicated snoozed-mailbox screen is blocked on infrastructure: mailbox code comments show it "depends on a backend '?box=snoozed' route that is not deployed yet" <a class="citation" href="#ref-39" aria-label="Reference 39">[39]</a>. <strong>What.</strong> Deploy the route, wire the screen, and support edit/unsnooze and wake-time display, matching the send-later patterns already in place <a class="citation" href="#ref-39" aria-label="Reference 39">[39]</a>. Effort: S (backend-led).</p>
+<h3 class="subsection-title">F11 — Templates and snippets</h3>
+<p><strong>Why.</strong> "Save time with templates." is a marketed Canary convenience <a class="citation" href="#ref-25" aria-label="Reference 25">[25]</a>, and snippet insertion is part of Superhuman's speed positioning <a class="citation" href="#ref-17" aria-label="Reference 17">[17]</a>. <strong>What.</strong> User-managed canned responses stored server-side, inserted from the compose toolbar with placeholder expansion (first name, account) and keyword search. Effort: S–M.</p>
+<h3 class="subsection-title">F12 — Follow-up reminders</h3>
+<p><strong>Why.</strong> Superhuman highlights follow-up reminders in its feature set <a class="citation" href="#ref-17" aria-label="Reference 17">[17]</a>, and Spark offers reminders as a first-class action <a class="citation" href="#ref-23" aria-label="Reference 23">[23]</a>. <strong>What.</strong> Track "awaiting reply" threads: when the user replies and no answer arrives within a configurable window, surface a reminder card with snooze-one-day and nudge actions, reusing existing snooze plumbing <a class="citation" href="#ref-39" aria-label="Reference 39">[39]</a>. Effort: M.</p>
+<h3 class="subsection-title">F13 — Split inbox and priority senders</h3>
+<p><strong>Why.</strong> Spark positions screening directly — "Prioritize key senders and screen unknowns." <a class="citation" href="#ref-23" aria-label="Reference 23">[23]</a> — alongside "Filter out noisy newsletters." <a class="citation" href="#ref-23" aria-label="Reference 23">[23]</a>; Superhuman ships a Split Inbox view <a class="citation" href="#ref-17" aria-label="Reference 17">[17]</a>. <strong>What.</strong> User-defined buckets (People, Notifications, Newsletters) as fast tabs on the mailbox, with promote/screen controls per sender. This is the deterministic, user-controlled complement to F07's automatic classification: rules the user sets, not model guesses. Effort: M.</p>
+<h3 class="subsection-title">F14 — All-accounts view: verify, then polish</h3>
+<p><strong>Why.</strong> The audit could not evidence a unified inbox — a targeted grep returned empty, logged as a low-confidence absence <a class="citation" href="#ref-39" aria-label="Reference 39">[39]</a>. <strong>What.</strong> First verify current behavior on device; if partial, add an "All accounts" aggregate view with per-account chips and a remembered default. Scope this only after verification to avoid rebuilding an existing screen. Effort: M (after verification).</p>
+<h3 class="subsection-title">F17 — Accessibility hardening</h3>
+<p><strong>Why.</strong> Platform guidance is explicit and testable: "Support larger text sizes. Make sure people can adjust the size of your text or icons to make them more legible, visible, and comfortable to read." <a class="citation" href="#ref-31" aria-label="Reference 31">[31]</a>; "Describe your app's interface and content for VoiceOver." <a class="citation" href="#ref-31" aria-label="Reference 31">[31]</a>; "Strive to meet color contrast minimum standards." <a class="citation" href="#ref-31" aria-label="Reference 31">[31]</a>; Google publishes the equivalent Android accessibility guidance <a class="citation" href="#ref-32" aria-label="Reference 32">[32]</a>. <strong>What.</strong> A dedicated pass: Dynamic Type scaling at and beyond 200% without clipping, screen-reader labels for icon-only controls (swipe actions, notification actions), a contrast audit in both themes, and font-scale regression checks. Effort: M.</p>
+<h3 class="subsection-title">F18 — Subscription manager v2</h3>
+<p><strong>Why.</strong> The apps already parse List-Unsubscribe headers <a class="citation" href="#ref-39" aria-label="Reference 39">[39]</a>; Canary markets "1-Click Unsubscribe — Block distractions fast." <a class="citation" href="#ref-25" aria-label="Reference 25">[25]</a>; Spark answers newsletter noise with filtering <a class="citation" href="#ref-23" aria-label="Reference 23">[23]</a>. <strong>What.</strong> A per-sender subscription list sorted by volume and last-read, with bulk unsubscribe (built on F03's POST completion) and a periodic "review subscriptions" entry point. Effort: S–M.</p>
+<h3 class="subsection-title">F24 — Opt-in read receipts</h3>
+<p><strong>Why.</strong> Canary sells them directly: "Get read receipts instantly." <a class="citation" href="#ref-25" aria-label="Reference 25">[25]</a>. <strong>What.</strong> Off by default; when enabled, show a subtle receipt state in the thread. Scoped to messages between GrapMail accounts, with explicit privacy copy in settings. Effort: M.</p>
+<h3 class="subsection-title">F26 — Import and migration assistant</h3>
+<p><strong>Why.</strong> Proton's onboarding promise is "Import your messages, calendars, and contacts in one click" <a class="citation" href="#ref-24" aria-label="Reference 24">[24]</a>. <strong>What.</strong> For users arriving from other providers, ship a migration wizard limited to what the own-provider scope allows: contact and calendar file import (vCard/iCal) plus forwarding guidance; third-party inbox sync stays out of scope for this roadmap. Effort: L — schedule last.</p>
+<h3 class="subsection-title">F27 — Actionable message cards</h3>
+<p><strong>Why.</strong> Apple's 2026 Mail push includes exactly this: "Long press on any email and you can ask Siri to summarize, find an item in the email, track a package, get a flight number, save a photo, and more." <a class="citation" href="#ref-9" aria-label="Reference 9">[9]</a>. <strong>What.</strong> On-device extraction of tracking numbers, flight numbers, and dates rendered as action chips in the message view (Track, Add to Calendar). Shares model plumbing with F25 and stays strictly on-device to match the privacy architecture from Finding 5. Effort: M.</p>
+<h3 class="subsection-title">Sequencing note</h3>
+<p>F06 rides the next backend deploy and closes an existing promise; F11 and F18 are quick wins that bundle naturally with the trust release from Finding 4; F12 and F13 form the "inbox control" pair aimed at daily users; F17 is an independent hardening pass; F24, F26, and F27 wait for the intelligence wave (F27 shares its model plumbing).</p>
+<hr class="section-divider">
+</section>
+<section class="section" id="prioritized-feature-roadmap">
+<h2 class="section-title">Prioritized Feature Roadmap</h2>
+<p><strong>How to read this list.</strong> Tiers combine market evidence (how close the capability is to table stakes in 2026), the internal audit markers <a class="citation" href="#ref-39" aria-label="Reference 39">[39]</a>, implementation effort against first-party frameworks only, and dependency order. Effort scale: <strong>S</strong> ≈ one sprint for one platform team; <strong>M</strong> ≈ two to four sprints; <strong>L</strong> ≈ a full cycle or multi-team work — see assumption 3.</p>
+<div class="table-wrap" role="region" aria-label="Scrollable data table" tabindex="0"><table class="data-table"><thead><tr><th scope="col">Tier</th><th scope="col">ID</th><th scope="col">Feature</th><th scope="col">Effort</th><th scope="col">Key sources</th></tr></thead><tbody><tr><td>P0</td><td>F01</td><td>Inline reply from the notification (iOS text-input action; Android direct reply)</td><td>S</td><td><a class="citation" href="#ref-45" aria-label="Reference 45">[45]</a><a class="citation" href="#ref-46" aria-label="Reference 46">[46]</a><a class="citation" href="#ref-5" aria-label="Reference 5">[5]</a></td></tr><tr><td>P0</td><td>F02</td><td>Home and Lock-screen widgets (unread count, latest mail, compose launch)</td><td>M</td><td><a class="citation" href="#ref-41" aria-label="Reference 41">[41]</a><a class="citation" href="#ref-42" aria-label="Reference 42">[42]</a><a class="citation" href="#ref-4" aria-label="Reference 4">[4]</a></td></tr><tr><td>P0</td><td>F03</td><td>One-click unsubscribe completion (consent-gated POST)</td><td>S</td><td><a class="citation" href="#ref-8" aria-label="Reference 8">[8]</a><a class="citation" href="#ref-25" aria-label="Reference 25">[25]</a><a class="citation" href="#ref-39" aria-label="Reference 39">[39]</a></td></tr><tr><td>P0</td><td>F04</td><td>Block sender and report spam/phishing flow</td><td>S</td><td><a class="citation" href="#ref-26" aria-label="Reference 26">[26]</a><a class="citation" href="#ref-27" aria-label="Reference 27">[27]</a><a class="citation" href="#ref-29" aria-label="Reference 29">[29]</a></td></tr><tr><td>P0</td><td>F05</td><td>App lock with biometrics (Face ID/Touch ID; Android BiometricPrompt)</td><td>S–M</td><td><a class="citation" href="#ref-24" aria-label="Reference 24">[24]</a><a class="citation" href="#ref-25" aria-label="Reference 25">[25]</a><a class="citation" href="#ref-39" aria-label="Reference 39">[39]</a></td></tr><tr><td>P0</td><td>F06</td><td>Snoozed-mailbox completion (backend route + screen)</td><td>S</td><td><a class="citation" href="#ref-39" aria-label="Reference 39">[39]</a></td></tr><tr><td>P1</td><td>F07</td><td>On-device categories and priority views</td><td>M</td><td><a class="citation" href="#ref-33" aria-label="Reference 33">[33]</a><a class="citation" href="#ref-43" aria-label="Reference 43">[43]</a><a class="citation" href="#ref-17" aria-label="Reference 17">[17]</a></td></tr><tr><td>P1</td><td>F08</td><td>On-device thread summaries</td><td>M–L</td><td><a class="citation" href="#ref-33" aria-label="Reference 33">[33]</a><a class="citation" href="#ref-44" aria-label="Reference 44">[44]</a><a class="citation" href="#ref-17" aria-label="Reference 17">[17]</a></td></tr><tr><td>P1</td><td>F09</td><td>Personalized Smart Reply</td><td>M</td><td><a class="citation" href="#ref-9" aria-label="Reference 9">[9]</a><a class="citation" href="#ref-43" aria-label="Reference 43">[43]</a><a class="citation" href="#ref-17" aria-label="Reference 17">[17]</a></td></tr><tr><td>P1</td><td>F10</td><td>Compose assist: draft, rewrite, tone</td><td>M</td><td><a class="citation" href="#ref-25" aria-label="Reference 25">[25]</a><a class="citation" href="#ref-23" aria-label="Reference 23">[23]</a><a class="citation" href="#ref-43" aria-label="Reference 43">[43]</a></td></tr><tr><td>P1</td><td>F11</td><td>Templates and snippets</td><td>S–M</td><td><a class="citation" href="#ref-25" aria-label="Reference 25">[25]</a><a class="citation" href="#ref-17" aria-label="Reference 17">[17]</a></td></tr><tr><td>P1</td><td>F12</td><td>Follow-up reminders</td><td>M</td><td><a class="citation" href="#ref-17" aria-label="Reference 17">[17]</a><a class="citation" href="#ref-23" aria-label="Reference 23">[23]</a></td></tr><tr><td>P1</td><td>F13</td><td>Split inbox and priority senders</td><td>M</td><td><a class="citation" href="#ref-23" aria-label="Reference 23">[23]</a><a class="citation" href="#ref-17" aria-label="Reference 17">[17]</a></td></tr><tr><td>P1</td><td>F15</td><td>Siri, Spotlight, and Shortcuts integration</td><td>M</td><td><a class="citation" href="#ref-3" aria-label="Reference 3">[3]</a><a class="citation" href="#ref-9" aria-label="Reference 9">[9]</a><a class="citation" href="#ref-30" aria-label="Reference 30">[30]</a></td></tr><tr><td>P1</td><td>F16</td><td>Tracker shield v2 (pixel blocking, indicator, proxy)</td><td>M</td><td><a class="citation" href="#ref-24" aria-label="Reference 24">[24]</a><a class="citation" href="#ref-26" aria-label="Reference 26">[26]</a><a class="citation" href="#ref-40" aria-label="Reference 40">[40]</a></td></tr><tr><td>P1</td><td>F17</td><td>Accessibility hardening (Dynamic Type, labels, contrast)</td><td>M</td><td><a class="citation" href="#ref-31" aria-label="Reference 31">[31]</a><a class="citation" href="#ref-32" aria-label="Reference 32">[32]</a></td></tr><tr><td>P1</td><td>F18</td><td>Subscription manager v2 (bulk unsubscribe view)</td><td>S–M</td><td><a class="citation" href="#ref-25" aria-label="Reference 25">[25]</a><a class="citation" href="#ref-23" aria-label="Reference 23">[23]</a><a class="citation" href="#ref-39" aria-label="Reference 39">[39]</a></td></tr><tr><td>P2</td><td>F14</td><td>All-accounts view (verify, then polish)</td><td>M</td><td><a class="citation" href="#ref-39" aria-label="Reference 39">[39]</a></td></tr><tr><td>P2</td><td>F19</td><td>Live Activity: Send Later countdown + cancel</td><td>S</td><td><a class="citation" href="#ref-2" aria-label="Reference 2">[2]</a><a class="citation" href="#ref-39" aria-label="Reference 39">[39]</a></td></tr><tr><td>P2</td><td>F20</td><td>iOS Focus filters</td><td>S</td><td><a class="citation" href="#ref-3" aria-label="Reference 3">[3]</a></td></tr><tr><td>P2</td><td>F21</td><td>Android per-app language (LocaleConfig)</td><td>S</td><td><a class="citation" href="#ref-6" aria-label="Reference 6">[6]</a></td></tr><tr><td>P2</td><td>F22</td><td>Material You dynamic color and themed icons</td><td>S</td><td><a class="citation" href="#ref-7" aria-label="Reference 7">[7]</a></td></tr><tr><td>P2</td><td>F23</td><td>QR-code phishing warnings</td><td>M</td><td><a class="citation" href="#ref-27" aria-label="Reference 27">[27]</a><a class="citation" href="#ref-28" aria-label="Reference 28">[28]</a></td></tr><tr><td>P2</td><td>F24</td><td>Opt-in read receipts</td><td>M</td><td><a class="citation" href="#ref-25" aria-label="Reference 25">[25]</a></td></tr><tr><td>P2</td><td>F25</td><td>Natural-language search</td><td>M–L</td><td><a class="citation" href="#ref-9" aria-label="Reference 9">[9]</a><a class="citation" href="#ref-23" aria-label="Reference 23">[23]</a><a class="citation" href="#ref-43" aria-label="Reference 43">[43]</a></td></tr><tr><td>P2</td><td>F26</td><td>Import and migration assistant</td><td>L</td><td><a class="citation" href="#ref-24" aria-label="Reference 24">[24]</a></td></tr><tr><td>P2</td><td>F27</td><td>Actionable message cards (package, flight, calendar)</td><td>M</td><td><a class="citation" href="#ref-9" aria-label="Reference 9">[9]</a></td></tr></tbody></table></div>
+<p><strong>P0 — Ship next (6 items).</strong> All six are small, self-contained, and close visible gaps without touching the intelligence layer. F01 completes the notification-action investment that already ships on both platforms <a class="citation" href="#ref-39" aria-label="Reference 39">[39]</a> using the platform-native text-input pattern <a class="citation" href="#ref-45" aria-label="Reference 45">[45]</a><a class="citation" href="#ref-5" aria-label="Reference 5">[5]</a>. F02 answers a zero-hit audit <a class="citation" href="#ref-39" aria-label="Reference 39">[39]</a> with the two most standard surfaces in mobile mail <a class="citation" href="#ref-41" aria-label="Reference 41">[41]</a><a class="citation" href="#ref-4" aria-label="Reference 4">[4]</a>. F03 finishes an already-parsed capability into a working flow <a class="citation" href="#ref-39" aria-label="Reference 39">[39]</a><a class="citation" href="#ref-8" aria-label="Reference 8">[8]</a>. F04 and F05 close trust gaps that privacy-first competitors market as table stakes <a class="citation" href="#ref-26" aria-label="Reference 26">[26]</a><a class="citation" href="#ref-29" aria-label="Reference 29">[29]</a><a class="citation" href="#ref-24" aria-label="Reference 24">[24]</a>. F06 removes the last server-side blocker on an already-shipped triage feature <a class="citation" href="#ref-39" aria-label="Reference 39">[39]</a>. Every item is independently shippable within one release cycle, and none carries a data-model risk.</p>
+<p><strong>P1 — Next wave (11 items).</strong> This is the competitive-parity core: each item maps to a capability that at least two reference products already market <a class="citation" href="#ref-23" aria-label="Reference 23">[23]</a><a class="citation" href="#ref-17" aria-label="Reference 17">[17]</a><a class="citation" href="#ref-25" aria-label="Reference 25">[25]</a>, or to a platform surface whose absence is conspicuous <a class="citation" href="#ref-3" aria-label="Reference 3">[3]</a>. The intelligence cluster (F07–F10) shares a single model-plumbing investment and should ship as one set, gated on device capability. The control cluster (F12–F13) shares thread-state tracking. F15 turns on the assistant surface and unlocks Spotlight and Shortcuts alongside Siri <a class="citation" href="#ref-3" aria-label="Reference 3">[3]</a><a class="citation" href="#ref-9" aria-label="Reference 9">[9]</a>. F16 rides the backend's message-rendering route <a class="citation" href="#ref-40" aria-label="Reference 40">[40]</a>. F17 (accessibility) and F18 (subscription cleanup) are independent and can parallelize with everything else in the wave. Expect this wave to move the app from "competitive" to "current" against the 2026 bar.</p>
+<p><strong>P2 — Later / watch (10 items).</strong> Valuable but constrained. F14 needs on-device verification before any build decision <a class="citation" href="#ref-39" aria-label="Reference 39">[39]</a>. F19–F22 are platform-polish items best bundled into a single design pass timed to the next OS cycle <a class="citation" href="#ref-2" aria-label="Reference 2">[2]</a><a class="citation" href="#ref-3" aria-label="Reference 3">[3]</a><a class="citation" href="#ref-6" aria-label="Reference 6">[6]</a><a class="citation" href="#ref-7" aria-label="Reference 7">[7]</a>. F23 participates in the security telemetry trend that continues to climb <a class="citation" href="#ref-27" aria-label="Reference 27">[27]</a><a class="citation" href="#ref-28" aria-label="Reference 28">[28]</a>. F24–F27 each depend on earlier waves: F25 and F27 explicitly extend the intelligence layer, and F26 is the largest single scope in the list <a class="citation" href="#ref-24" aria-label="Reference 24">[24]</a>. Revisit this tier after the first two waves ship, and let adoption telemetry decide the order within it.</p>
+<p><strong>Counts.</strong> P0 = 6, P1 = 11, P2 = 10 — 27 candidates in total.</p>
+<hr class="section-divider">
+</section>
+<section class="section" id="synthesis-insights">
+<h2 class="section-title">Synthesis &amp; Insights</h2>
+<p><strong>The gaps are shallow, not structural.</strong> Nothing in this roadmap requires a new subsystem. Inline reply extends notification actions that already ship <a class="citation" href="#ref-39" aria-label="Reference 39">[39]</a><a class="citation" href="#ref-5" aria-label="Reference 5">[5]</a>; the unsubscribe flow completes header parsing the apps already perform <a class="citation" href="#ref-39" aria-label="Reference 39">[39]</a><a class="citation" href="#ref-8" aria-label="Reference 8">[8]</a>; the Live Activity reuses the send-later pipeline <a class="citation" href="#ref-39" aria-label="Reference 39">[39]</a><a class="citation" href="#ref-2" aria-label="Reference 2">[2]</a>; tracker shield v2 lands on a rendering route already in the backend <a class="citation" href="#ref-40" aria-label="Reference 40">[40]</a>; compose assist sits on an existing rich-text editor <a class="citation" href="#ref-39" aria-label="Reference 39">[39]</a>. That is why feasibility confidence is high — and why the P0 wave is best understood as closure work: finishing surfaces the product already committed to.</p>
+<p><strong>The market has converged on one capability set.</strong> Three independent vectors arrived at the same shortlist. Apple's Mail added on-device summaries, categories, and style-tuned Smart Reply <a class="citation" href="#ref-9" aria-label="Reference 9">[9]</a><a class="citation" href="#ref-33" aria-label="Reference 33">[33]</a>; Google's Gemini-era Gmail shipped thread summaries, suggested replies, and an AI inbox filter <a class="citation" href="#ref-43" aria-label="Reference 43">[43]</a><a class="citation" href="#ref-44" aria-label="Reference 44">[44]</a>; the independents — Spark, Superhuman, Canary — market summaries, drafts, split inboxes, and unsubscribe helpers as core <a class="citation" href="#ref-23" aria-label="Reference 23">[23]</a><a class="citation" href="#ref-17" aria-label="Reference 17">[17]</a><a class="citation" href="#ref-25" aria-label="Reference 25">[25]</a>. Convergence of this kind, across platform owners and independents alike, usually means the capabilities become table stakes within a product cycle or two. The implication: the parity items in Findings 5 and 6 are time-boxed, not optional.</p>
+<p><strong>Privacy is the structural differentiator, if it is used.</strong> Apple runs its mail intelligence on-device <a class="citation" href="#ref-33" aria-label="Reference 33">[33]</a><a class="citation" href="#ref-34" aria-label="Reference 34">[34]</a><a class="citation" href="#ref-35" aria-label="Reference 35">[35]</a>; Gmail is cloud-first <a class="citation" href="#ref-43" aria-label="Reference 43">[43]</a>; Proton and Canary sell privacy defaults as the product <a class="citation" href="#ref-24" aria-label="Reference 24">[24]</a><a class="citation" href="#ref-26" aria-label="Reference 26">[26]</a>. GrapMail already ships the privacy foundations — E2E plumbing, sessions with 2FA, human verification <a class="citation" href="#ref-39" aria-label="Reference 39">[39]</a> — but has no intelligence layer at all. An on-device-first architecture (Finding 5) converts the constraint into positioning: message content stays local, inference cost stays near zero, and the feature list matches what privacy-sensitive buyers are offered elsewhere <a class="citation" href="#ref-24" aria-label="Reference 24">[24]</a><a class="citation" href="#ref-26" aria-label="Reference 26">[26]</a>. The risk is shipping nothing while rivals normalize the category.</p>
+<p><strong>Security is the highest-leverage trust spend.</strong> With one in three messages malicious or unwanted and QR codes embedded in most malicious documents <a class="citation" href="#ref-27" aria-label="Reference 27">[27]</a>, plus phishing volume climbing through Q3 2026 <a class="citation" href="#ref-28" aria-label="Reference 28">[28]</a>, visible protections are a trust signal rather than an obscure setting. The trust release (F03–F05, F16) is cheap, testable, and directly marketable — and it lands exactly where the audit shows no user-facing controls today <a class="citation" href="#ref-39" aria-label="Reference 39">[39]</a>.</p>
+<p><strong>Sequencing follows dependencies, not desire.</strong> Four hard gates order the roadmap: the widget extension (F02) gates Live Activities (F19) and themed widgets (F22) <a class="citation" href="#ref-2" aria-label="Reference 2">[2]</a><a class="citation" href="#ref-7" aria-label="Reference 7">[7]</a>; the on-device model plumbing gates F07–F10 and F27 <a class="citation" href="#ref-34" aria-label="Reference 34">[34]</a><a class="citation" href="#ref-38" aria-label="Reference 38">[38]</a>; the backend <code>?box=snoozed</code> route gates F06 <a class="citation" href="#ref-39" aria-label="Reference 39">[39]</a>; and the backend rendering route gates F16 <a class="citation" href="#ref-40" aria-label="Reference 40">[40]</a>. Everything else can reorder freely around these four.</p>
+<p><strong>Effort asymmetry favors starting now.</strong> The highest-certainty work is also among the smallest: F01, F03, F04, and F06 are single-sprint items with immediate user visibility, while the intelligence items carry device-availability caveats that make them multi-quarter bets <a class="citation" href="#ref-9" aria-label="Reference 9">[9]</a><a class="citation" href="#ref-38" aria-label="Reference 38">[38]</a>. Shipping the P0 wave in one cycle buys credibility and the telemetry needed to de-risk everything after it.</p>
+<p><strong>What could invalidate this plan.</strong> Two scenarios: platform owners absorb these capabilities into the OS itself (Apple already ships on-device summarization inside Mail <a class="citation" href="#ref-33" aria-label="Reference 33">[33]</a>), eroding third-party differentiation; or user adoption of in-mail AI stalls, making Wave 2 premature. Both are monitored rather than predicted — the roadmap front-loads items whose value does not depend on either outcome (F01–F06, F16), and gates the rest on adoption telemetry.</p>
+</section>
+<section class="section" id="limitations-caveats">
+<h2 class="section-title">Limitations &amp; Caveats</h2>
+<ul>
+<li><strong>Absence evidence is snapshot-bounded.</strong> "Missing" means zero or trivial marker hits in the export at commit <code>0fb5998e</code> <a class="citation" href="#ref-39" aria-label="Reference 39">[39]</a> — a statement about that snapshot's sources, not about intent or other branches. The all-accounts item (F14) is flagged low-confidence for exactly this reason <a class="citation" href="#ref-39" aria-label="Reference 39">[39]</a>.</li>
+<li><strong>Competitor capabilities are self-reported.</strong> Product pages and vendor blogs describe marketed behavior; this research did not hands-on test rival apps <a class="citation" href="#ref-23" aria-label="Reference 23">[23]</a><a class="citation" href="#ref-24" aria-label="Reference 24">[24]</a><a class="citation" href="#ref-25" aria-label="Reference 25">[25]</a>. Independent review coverage was consulted for corroboration where available <a class="citation" href="#ref-15" aria-label="Reference 15">[15]</a><a class="citation" href="#ref-16" aria-label="Reference 16">[16]</a><a class="citation" href="#ref-18" aria-label="Reference 18">[18]</a><a class="citation" href="#ref-19" aria-label="Reference 19">[19]</a><a class="citation" href="#ref-20" aria-label="Reference 20">[20]</a><a class="citation" href="#ref-21" aria-label="Reference 21">[21]</a>.</li>
+<li><strong>Effort estimates are planning-grade.</strong> No engineering spikes were run; S/M/L are directional per assumption 3, and exclude design and QA time.</li>
+<li><strong>Availability is uneven by device and region.</strong> Apple Intelligence-class features are hardware- and region-gated <a class="citation" href="#ref-9" aria-label="Reference 9">[9]</a>; Android on-device model availability follows flagship silicon <a class="citation" href="#ref-38" aria-label="Reference 38">[38]</a>. Every AI recommendation is scoped as opt-in with graceful fallbacks (assumption 5).</li>
+<li><strong>Ecosystem churn.</strong> Platform cycles and competitor packaging move fast, and even launch-coverage sets document tiered availability <a class="citation" href="#ref-9" aria-label="Reference 9">[9]</a><a class="citation" href="#ref-10" aria-label="Reference 10">[10]</a><a class="citation" href="#ref-11" aria-label="Reference 11">[11]</a><a class="citation" href="#ref-13" aria-label="Reference 13">[13]</a>. Re-verify competitive claims before external reuse.</li>
+<li><strong>Deliberate exclusions.</strong> Server architecture beyond the identified snoozed-mailbox route, third-party-provider connectors, and pricing questions remain out of scope <a class="citation" href="#ref-39" aria-label="Reference 39">[39]</a> (see Introduction).</li>
+</ul>
+</section>
+<section class="section" id="counterevidence-register">
+<h2 class="section-title">Counterevidence Register</h2>
+<p>Signals that argue against, or qualify, this roadmap's recommendations - recorded so the plan is not read as one-sided.</p>
+<ul>
+<li><strong>Feature velocity vs. privacy stance.</strong> Cloud-first assistants ship improvements broadly and continuously - Google moved quickly to ship AI features across Gmail <a class="citation" href="#ref-43" aria-label="Reference 43">[43]</a><a class="citation" href="#ref-44" aria-label="Reference 44">[44]</a> - while on-device-first designs inherit hardware and region constraints <a class="citation" href="#ref-9" aria-label="Reference 9">[9]</a>. The privacy position <a class="citation" href="#ref-24" aria-label="Reference 24">[24]</a><a class="citation" href="#ref-26" aria-label="Reference 26">[26]</a> is defensible, but it is a deliberate trade-off: some capabilities will arrive later, and on fewer devices.</li>
+<li><strong>Vendor claims are not benchmarks.</strong> Parity estimates in Findings 1-3 rest on vendor product pages <a class="citation" href="#ref-23" aria-label="Reference 23">[23]</a><a class="citation" href="#ref-24" aria-label="Reference 24">[24]</a><a class="citation" href="#ref-25" aria-label="Reference 25">[25]</a> corroborated by independent coverage <a class="citation" href="#ref-15" aria-label="Reference 15">[15]</a><a class="citation" href="#ref-16" aria-label="Reference 16">[16]</a><a class="citation" href="#ref-18" aria-label="Reference 18">[18]</a><a class="citation" href="#ref-19" aria-label="Reference 19">[19]</a><a class="citation" href="#ref-20" aria-label="Reference 20">[20]</a><a class="citation" href="#ref-21" aria-label="Reference 21">[21]</a>, not standardized third-party testing. Treat "competitor has X" as directional until independently re-verified.</li>
+<li><strong>Absence evidence is snapshot-bound.</strong> The gap list reflects a single audited commit <a class="citation" href="#ref-39" aria-label="Reference 39">[39]</a>; concurrent branches or parallel work could already be closing items, which is why F14 (all-accounts view) carries a verify-first note rather than a build plan.</li>
+<li><strong>Quantified threat data shifts yearly.</strong> The one-in-three malicious-message framing <a class="citation" href="#ref-27" aria-label="Reference 27">[27]</a> and the QR-phishing trend records <a class="citation" href="#ref-28" aria-label="Reference 28">[28]</a><a class="citation" href="#ref-29" aria-label="Reference 29">[29]</a> are point-in-time measurements. The security items (F03-F05, F16) are justified first by their small scope and visible user value, not by those statistics alone.</li>
+<li><strong>Platform absorption risk.</strong> Apple already integrates on-device summarization, categorization, and style-tuned replies into its own Mail app <a class="citation" href="#ref-33" aria-label="Reference 33">[33]</a>, and OS-level absorption of that kind could erode the differentiation of third-party intelligence features (Finding 5) - making the non-AI parity and trust items the safer long-term commitments.</li>
+</ul>
+</section>
+<section class="section" id="recommendations">
+<h2 class="section-title">Recommendations</h2>
+<p><strong>Wave 1 — Trust and integration release (this cycle).</strong> Ship F01, F02, F03, F04, F05, and F06 — folding in F15 if capacity allows. This wave closes the most visible parity gaps with the smallest scopes, and every item is independently shippable. Telemetry to watch: reply-from-notification adoption (F01), widget installation and retention (F02), unsubscribe completions (F03), and report/block usage (F04).</p>
+<p><strong>Wave 2 — Intelligence core (next cycle).</strong> Begin with model plumbing and thread summaries (F08), then categories (F07), style-tuned replies (F09), and compose assist (F10) as one gated set; run the inbox-control pair (F12, F13) in parallel; schedule F16 with the next backend rendering change <a class="citation" href="#ref-40" aria-label="Reference 40">[40]</a>; F17 and F18 fit anywhere in the wave as independent scope. Gate every AI surface on device capability with documented fallbacks <a class="citation" href="#ref-34" aria-label="Reference 34">[34]</a><a class="citation" href="#ref-38" aria-label="Reference 38">[38]</a>, and route anything that could leave the device through the standing privacy review below.</p>
+<p><strong>Wave 3 — Polish and reach (subsequent cycles).</strong> Verify then polish the all-accounts view (F14); bundle the platform-polish items (F19–F22) into a single design pass timed to the next OS cycle <a class="citation" href="#ref-2" aria-label="Reference 2">[2]</a><a class="citation" href="#ref-3" aria-label="Reference 3">[3]</a><a class="citation" href="#ref-6" aria-label="Reference 6">[6]</a><a class="citation" href="#ref-7" aria-label="Reference 7">[7]</a>; reintroduce QR warnings (F23) as security telemetry continues to climb <a class="citation" href="#ref-27" aria-label="Reference 27">[27]</a><a class="citation" href="#ref-28" aria-label="Reference 28">[28]</a>; then the dependents — read receipts (F24), natural-language search (F25), action cards (F27), and finally import/migration (F26), the largest scope in the list <a class="citation" href="#ref-24" aria-label="Reference 24">[24]</a>.</p>
+<p><strong>Governance guardrails.</strong> Three standing rules: (1) on-device-first for anything touching message content — cloud inference only by explicit consent and clear labeling; (2) an accessibility checklist (larger text, screen-reader labels, contrast) enforced every release <a class="citation" href="#ref-31" aria-label="Reference 31">[31]</a><a class="citation" href="#ref-32" aria-label="Reference 32">[32]</a>; (3) a device-availability matrix maintained per platform so gating never depends on assumptions <a class="citation" href="#ref-9" aria-label="Reference 9">[9]</a><a class="citation" href="#ref-38" aria-label="Reference 38">[38]</a>.</p>
+<p><strong>Decision cadence.</strong> Treat the tier assignments as a snapshot: re-rank Wave 2 after Wave 1 telemetry, and revisit Wave 3 at each OS beta cycle. The 27-item list is deliberately exhaustive; the waves are what to commit to.</p>
+<hr class="section-divider">
+</section>
+<section class="section" id="claims-evidence-table">
+<h2 class="section-title">Claims-Evidence Table</h2>
+<p>Representative mapping of major claims to supporting sources; the full claim ledger and support report accompany this delivery.</p>
+<div class="table-wrap" role="region" aria-label="Scrollable data table" tabindex="0"><table class="data-table"><thead><tr><th scope="col">ID</th><th scope="col">Major Claim</th><th scope="col">Evidence Type</th><th scope="col">Supporting Sources</th><th scope="col">Confidence</th></tr></thead><tbody><tr><td>C1</td><td>Confidence level: High for platform feasibility, since every mechanism is documented first-party API surface .</td><td>Platform docs</td><td><a class="citation" href="#ref-1" aria-label="Reference 1">[1]</a>, <a class="citation" href="#ref-2" aria-label="Reference 2">[2]</a>, <a class="citation" href="#ref-3" aria-label="Reference 3">[3]</a>, <a class="citation" href="#ref-4" aria-label="Reference 4">[4]</a>, <a class="citation" href="#ref-5" aria-label="Reference 5">[5]</a>, <a class="citation" href="#ref-6" aria-label="Reference 6">[6]</a>, <a class="citation" href="#ref-7" aria-label="Reference 7">[7]</a></td><td>High</td></tr><tr><td>C2</td><td>GrapMail currently ships none of: home/Lock-screen widgets (WidgetKit on iOS , Glance on Android ), Live Activities , App Intents/Si...</td><td>Platform docs</td><td><a class="citation" href="#ref-2" aria-label="Reference 2">[2]</a>, <a class="citation" href="#ref-3" aria-label="Reference 3">[3]</a>, <a class="citation" href="#ref-4" aria-label="Reference 4">[4]</a>, <a class="citation" href="#ref-5" aria-label="Reference 5">[5]</a>, <a class="citation" href="#ref-6" aria-label="Reference 6">[6]</a>, <a class="citation" href="#ref-7" aria-label="Reference 7">[7]</a>, <a class="citation" href="#ref-41" aria-label="Reference 41">[41]</a></td><td>High</td></tr><tr><td>C3</td><td>Every mechanism below is first-party platform API surface, documented and stable , and several extend plumbing the apps already have...</td><td>Platform docs + Internal audit</td><td><a class="citation" href="#ref-1" aria-label="Reference 1">[1]</a>, <a class="citation" href="#ref-2" aria-label="Reference 2">[2]</a>, <a class="citation" href="#ref-3" aria-label="Reference 3">[3]</a>, <a class="citation" href="#ref-4" aria-label="Reference 4">[4]</a>, <a class="citation" href="#ref-5" aria-label="Reference 5">[5]</a>, <a class="citation" href="#ref-39" aria-label="Reference 39">[39]</a>, <a class="citation" href="#ref-41" aria-label="Reference 41">[41]</a></td><td>High</td></tr><tr><td>C4</td><td>Every reference product ships it: Apple ("AI generated summaries" ; Siri can "summarize" ), Gmail (summary cards on mobile ; thread...</td><td>Industry coverage + Vendor material</td><td><a class="citation" href="#ref-9" aria-label="Reference 9">[9]</a>, <a class="citation" href="#ref-17" aria-label="Reference 17">[17]</a>, <a class="citation" href="#ref-23" aria-label="Reference 23">[23]</a>, <a class="citation" href="#ref-25" aria-label="Reference 25">[25]</a>, <a class="citation" href="#ref-33" aria-label="Reference 33">[33]</a>, <a class="citation" href="#ref-43" aria-label="Reference 43">[43]</a>, <a class="citation" href="#ref-44" aria-label="Reference 44">[44]</a></td><td>High</td></tr><tr><td>C5</td><td>Widgets , notification interactions , and assistant hooks are how mail apps stay one tap from the inbox; GrapMail ships none of thes...</td><td>Platform docs + Internal audit</td><td><a class="citation" href="#ref-3" aria-label="Reference 3">[3]</a>, <a class="citation" href="#ref-4" aria-label="Reference 4">[4]</a>, <a class="citation" href="#ref-5" aria-label="Reference 5">[5]</a>, <a class="citation" href="#ref-39" aria-label="Reference 39">[39]</a>, <a class="citation" href="#ref-41" aria-label="Reference 41">[41]</a>, <a class="citation" href="#ref-42" aria-label="Reference 42">[42]</a></td><td>High</td></tr><tr><td>C6</td><td>Tracker blocking, unsubscribe, and phishing checks are marketed up front by Proton and Canary , while attack telemetry makes each mo...</td><td>Vendor material + Security research + Internal audit</td><td><a class="citation" href="#ref-24" aria-label="Reference 24">[24]</a>, <a class="citation" href="#ref-26" aria-label="Reference 26">[26]</a>, <a class="citation" href="#ref-27" aria-label="Reference 27">[27]</a>, <a class="citation" href="#ref-28" aria-label="Reference 28">[28]</a>, <a class="citation" href="#ref-39" aria-label="Reference 39">[39]</a></td><td>High</td></tr><tr><td>C7</td><td>Canary: "Compose emails effortlessly with AI-crafted messages tailored to your voice" ; Spark: "ready-to-send drafts in your voice"...</td><td>Industry coverage + Vendor material</td><td><a class="citation" href="#ref-9" aria-label="Reference 9">[9]</a>, <a class="citation" href="#ref-23" aria-label="Reference 23">[23]</a>, <a class="citation" href="#ref-25" aria-label="Reference 25">[25]</a>, <a class="citation" href="#ref-43" aria-label="Reference 43">[43]</a></td><td>High</td></tr><tr><td>C8</td><td>First, several P0 candidates are small closures rather than new systems — inline reply extends the existing notification actions , o...</td><td>Platform docs + Vendor material</td><td><a class="citation" href="#ref-5" aria-label="Reference 5">[5]</a>, <a class="citation" href="#ref-8" aria-label="Reference 8">[8]</a>, <a class="citation" href="#ref-24" aria-label="Reference 24">[24]</a>, <a class="citation" href="#ref-25" aria-label="Reference 25">[25]</a></td><td>High</td></tr><tr><td>C9</td><td>Apple's iOS 27 search overhaul "ranks results by relevance and intent" ; Spark invites users to "Ask your inbox anything" ; Gmail's...</td><td>Industry coverage + Vendor material</td><td><a class="citation" href="#ref-9" aria-label="Reference 9">[9]</a>, <a class="citation" href="#ref-17" aria-label="Reference 17">[17]</a>, <a class="citation" href="#ref-23" aria-label="Reference 23">[23]</a>, <a class="citation" href="#ref-43" aria-label="Reference 43">[43]</a></td><td>High</td></tr><tr><td>C10</td><td>Apple's Foundation Models framework gives third-party apps "a small, on-device language model — not a general-purpose LLM, but a mod...</td><td>Industry coverage</td><td><a class="citation" href="#ref-34" aria-label="Reference 34">[34]</a>, <a class="citation" href="#ref-35" aria-label="Reference 35">[35]</a>, <a class="citation" href="#ref-36" aria-label="Reference 36">[36]</a>, <a class="citation" href="#ref-37" aria-label="Reference 37">[37]</a></td><td>High</td></tr><tr><td>C11</td><td>Neither platform build ships an app lock yet , while the privacy-first competitors treat protection as table stakes .</td><td>Vendor material + Internal audit</td><td><a class="citation" href="#ref-24" aria-label="Reference 24">[24]</a>, <a class="citation" href="#ref-25" aria-label="Reference 25">[25]</a>, <a class="citation" href="#ref-39" aria-label="Reference 39">[39]</a></td><td>High</td></tr><tr><td>C12</td><td>The apps already parse List-Unsubscribe headers ; Canary markets "1-Click Unsubscribe — Block distractions fast." ; Spark answers ne...</td><td>Vendor material + Internal audit</td><td><a class="citation" href="#ref-23" aria-label="Reference 23">[23]</a>, <a class="citation" href="#ref-25" aria-label="Reference 25">[25]</a>, <a class="citation" href="#ref-39" aria-label="Reference 39">[39]</a></td><td>High</td></tr><tr><td>C13</td><td>Effort scale: S ≈ one sprint for one platform team; M ≈ two to four sprints; L ≈ a full cycle or multi-team work — see assumption 3....</td><td>Platform docs + Industry coverage + Vendor material + Security research + Internal audit</td><td><a class="citation" href="#ref-2" aria-label="Reference 2">[2]</a>, <a class="citation" href="#ref-3" aria-label="Reference 3">[3]</a>, <a class="citation" href="#ref-4" aria-label="Reference 4">[4]</a>, <a class="citation" href="#ref-5" aria-label="Reference 5">[5]</a>, <a class="citation" href="#ref-6" aria-label="Reference 6">[6]</a>, <a class="citation" href="#ref-7" aria-label="Reference 7">[7]</a>, <a class="citation" href="#ref-8" aria-label="Reference 8">[8]</a>, <a class="citation" href="#ref-9" aria-label="Reference 9">[9]</a>, <a class="citation" href="#ref-17" aria-label="Reference 17">[17]</a>, <a class="citation" href="#ref-23" aria-label="Reference 23">[23]</a>, <a class="citation" href="#ref-24" aria-label="Reference 24">[24]</a>, <a class="citation" href="#ref-25" aria-label="Reference 25">[25]</a>, <a class="citation" href="#ref-26" aria-label="Reference 26">[26]</a>, <a class="citation" href="#ref-27" aria-label="Reference 27">[27]</a>, <a class="citation" href="#ref-28" aria-label="Reference 28">[28]</a>, <a class="citation" href="#ref-29" aria-label="Reference 29">[29]</a>, <a class="citation" href="#ref-30" aria-label="Reference 30">[30]</a>, <a class="citation" href="#ref-31" aria-label="Reference 31">[31]</a>, <a class="citation" href="#ref-32" aria-label="Reference 32">[32]</a>, <a class="citation" href="#ref-33" aria-label="Reference 33">[33]</a>, <a class="citation" href="#ref-39" aria-label="Reference 39">[39]</a>, <a class="citation" href="#ref-40" aria-label="Reference 40">[40]</a>, <a class="citation" href="#ref-41" aria-label="Reference 41">[41]</a>, <a class="citation" href="#ref-42" aria-label="Reference 42">[42]</a>, <a class="citation" href="#ref-43" aria-label="Reference 43">[43]</a>, <a class="citation" href="#ref-44" aria-label="Reference 44">[44]</a>, <a class="citation" href="#ref-45" aria-label="Reference 45">[45]</a>, <a class="citation" href="#ref-46" aria-label="Reference 46">[46]</a></td><td>High</td></tr><tr><td>C14</td><td>F19–F22 are platform-polish items best bundled into a single design pass timed to the next OS cycle .</td><td>Platform docs</td><td><a class="citation" href="#ref-2" aria-label="Reference 2">[2]</a>, <a class="citation" href="#ref-3" aria-label="Reference 3">[3]</a>, <a class="citation" href="#ref-6" aria-label="Reference 6">[6]</a>, <a class="citation" href="#ref-7" aria-label="Reference 7">[7]</a></td><td>High</td></tr><tr><td>C15</td><td>Apple runs its mail intelligence on-device ; Gmail is cloud-first ; Proton and Canary sell privacy defaults as the product .</td><td>Vendor material + Industry coverage</td><td><a class="citation" href="#ref-24" aria-label="Reference 24">[24]</a>, <a class="citation" href="#ref-26" aria-label="Reference 26">[26]</a>, <a class="citation" href="#ref-33" aria-label="Reference 33">[33]</a>, <a class="citation" href="#ref-34" aria-label="Reference 34">[34]</a>, <a class="citation" href="#ref-35" aria-label="Reference 35">[35]</a>, <a class="citation" href="#ref-43" aria-label="Reference 43">[43]</a></td><td>High</td></tr><tr><td>C16</td><td>Four hard gates order the roadmap: the widget extension (F02) gates Live Activities (F19) and themed widgets (F22) ; the on-device m...</td><td>Platform docs + Industry coverage + Internal audit</td><td><a class="citation" href="#ref-2" aria-label="Reference 2">[2]</a>, <a class="citation" href="#ref-7" aria-label="Reference 7">[7]</a>, <a class="citation" href="#ref-34" aria-label="Reference 34">[34]</a>, <a class="citation" href="#ref-38" aria-label="Reference 38">[38]</a>, <a class="citation" href="#ref-39" aria-label="Reference 39">[39]</a>, <a class="citation" href="#ref-40" aria-label="Reference 40">[40]</a></td><td>High</td></tr></tbody></table></div>
+<p><strong>Confidence levels:</strong> High = 3+ independent sources; Medium = 2 sources or one high-quality source; Low = single source. Source numbers resolve through the Bibliography.</p>
+<hr class="section-divider">
+</section>
+<section class="section bibliography" id="bibliography">
+<h2 class="section-title">Bibliography</h2>
+<p>Sources are numbered <a class="citation" href="#ref-1" aria-label="Reference 1">[1]</a>-<a class="citation" href="#ref-46" aria-label="Reference 46">[46]</a> and cited in the text as [N]; each entry follows the [N] Title - URL form. All locators were last verified on November 19, 2026.</p>
+<div class="bib-entry" id="ref-1"><span class="bib-number">[1]</span><div class="bib-text">Creating a widget extension - Apple Developer Documentation - <a class="external-link" href="https://developer.apple.com/documentation/widgetkit/creating-a-widget-extension" target="_blank" rel="noopener noreferrer">https://developer.apple.com/documentation/widgetkit/creating-a-widget-extension</a></div></div>
+<div class="bib-entry" id="ref-2"><span class="bib-number">[2]</span><div class="bib-text">Displaying live data with Live Activities - Apple Developer Documentation - <a class="external-link" href="https://developer.apple.com/documentation/activitykit/displaying-live-data-with-live-activities" target="_blank" rel="noopener noreferrer">https://developer.apple.com/documentation/activitykit/displaying-live-data-with-live-activities</a></div></div>
+<div class="bib-entry" id="ref-3"><span class="bib-number">[3]</span><div class="bib-text">App Intents - Apple Developer Documentation - <a class="external-link" href="https://developer.apple.com/documentation/appintents" target="_blank" rel="noopener noreferrer">https://developer.apple.com/documentation/appintents</a></div></div>
+<div class="bib-entry" id="ref-4"><span class="bib-number">[4]</span><div class="bib-text">Jetpack Glance - Jetpack Compose - Android Developers - <a class="external-link" href="https://developer.android.com/develop/ui/compose/glance" target="_blank" rel="noopener noreferrer">https://developer.android.com/develop/ui/compose/glance</a></div></div>
+<div class="bib-entry" id="ref-5"><span class="bib-number">[5]</span><div class="bib-text">Create a notification - Jetpack Compose - Android Developers - <a class="external-link" href="https://developer.android.com/develop/ui/views/notifications/build-notification" target="_blank" rel="noopener noreferrer">https://developer.android.com/develop/ui/views/notifications/build-notification</a></div></div>
+<div class="bib-entry" id="ref-6"><span class="bib-number">[6]</span><div class="bib-text">Per-app language preferences - App architecture - Android Developers - <a class="external-link" href="https://developer.android.com/guide/topics/resources/app-languages" target="_blank" rel="noopener noreferrer">https://developer.android.com/guide/topics/resources/app-languages</a></div></div>
+<div class="bib-entry" id="ref-7"><span class="bib-number">[7]</span><div class="bib-text">Enable users to personalize their color experience in your app - Views - Android Developers - <a class="external-link" href="https://developer.android.com/develop/ui/views/theming/dynamic-colors" target="_blank" rel="noopener noreferrer">https://developer.android.com/develop/ui/views/theming/dynamic-colors</a></div></div>
+<div class="bib-entry" id="ref-8"><span class="bib-number">[8]</span><div class="bib-text">RFC 8058: Signaling One-Click Functionality for List Email Headers - <a class="external-link" href="https://www.rfc-editor.org/rfc/rfc8058" target="_blank" rel="noopener noreferrer">https://www.rfc-editor.org/rfc/rfc8058</a></div></div>
+<div class="bib-entry" id="ref-9"><span class="bib-number">[9]</span><div class="bib-text">iOS 27: What's New With the Mail App - MacRumors - <a class="external-link" href="https://www.macrumors.com/guide/ios-27-mail" target="_blank" rel="noopener noreferrer">https://www.macrumors.com/guide/ios-27-mail</a></div></div>
+<div class="bib-entry" id="ref-10"><span class="bib-number">[10]</span><div class="bib-text">About iOS 27 Updates - Apple Support - <a class="external-link" href="https://support.apple.com/en-us/149076" target="_blank" rel="noopener noreferrer">https://support.apple.com/en-us/149076</a></div></div>
+<div class="bib-entry" id="ref-11"><span class="bib-number">[11]</span><div class="bib-text">iOS 27: What's new, what's in the latest beta and what's coming next - Macworld - <a class="external-link" href="https://www.macworld.com/article/2986799/ios-27-features-compatiblity-siri-ai-updates.html" target="_blank" rel="noopener noreferrer">https://www.macworld.com/article/2986799/ios-27-features-compatiblity-siri-ai-updates.html</a></div></div>
+<div class="bib-entry" id="ref-12"><span class="bib-number">[12]</span><div class="bib-text">OS - iOS 27 - Apple - <a class="external-link" href="https://www.apple.com/os/ios" target="_blank" rel="noopener noreferrer">https://www.apple.com/os/ios</a></div></div>
+<div class="bib-entry" id="ref-13"><span class="bib-number">[13]</span><div class="bib-text">iOS 26 vs iOS 27: What iPhone Users Should Expect in 2026 - ESR - <a class="external-link" href="https://www.esrtech.com/blogs/new-tech-gadgets/ios-27-vs-ios-26-snow-leopard-leaks" target="_blank" rel="noopener noreferrer">https://www.esrtech.com/blogs/new-tech-gadgets/ios-27-vs-ios-26-snow-leopard-leaks</a></div></div>
+<div class="bib-entry" id="ref-14"><span class="bib-number">[14]</span><div class="bib-text">iOS 27 Is Here. These Are the Best New Features - Wirecutter - <a class="external-link" href="https://www.nytimes.com/wirecutter/reviews/ios-27-best-new-features" target="_blank" rel="noopener noreferrer">https://www.nytimes.com/wirecutter/reviews/ios-27-best-new-features</a></div></div>
+<div class="bib-entry" id="ref-15"><span class="bib-number">[15]</span><div class="bib-text">Superhuman Mail - Get Ahead of Your Inbox - <a class="external-link" href="https://superhuman.com/mail" target="_blank" rel="noopener noreferrer">https://superhuman.com/mail</a></div></div>
+<div class="bib-entry" id="ref-16"><span class="bib-number">[16]</span><div class="bib-text">Transform your inbox from average to an AI-powered email - Superhuman Blog - <a class="external-link" href="https://blog.superhuman.com/ai-powered-email" target="_blank" rel="noopener noreferrer">https://blog.superhuman.com/ai-powered-email</a></div></div>
+<div class="bib-entry" id="ref-17"><span class="bib-number">[17]</span><div class="bib-text">Superhuman Review 2026: AI Email, Pricing and Life Under Grammarly - <a class="external-link" href="https://smartkeys.org/superhuman-review" target="_blank" rel="noopener noreferrer">https://smartkeys.org/superhuman-review</a></div></div>
+<div class="bib-entry" id="ref-18"><span class="bib-number">[18]</span><div class="bib-text">Superhuman AI Email Features Dominating Inboxes in 2026 - <a class="external-link" href="https://bestaiemailtools.com/blog/superhuman-features-guide-2026" target="_blank" rel="noopener noreferrer">https://bestaiemailtools.com/blog/superhuman-features-guide-2026</a></div></div>
+<div class="bib-entry" id="ref-19"><span class="bib-number">[19]</span><div class="bib-text">Superhuman Email Review (2026): Speed, AI and Limits - <a class="external-link" href="https://aiemaily.com/blog/superhuman-email-review-2026" target="_blank" rel="noopener noreferrer">https://aiemaily.com/blog/superhuman-email-review-2026</a></div></div>
+<div class="bib-entry" id="ref-20"><span class="bib-number">[20]</span><div class="bib-text">I Refuse to Work Without Superhuman Mail (6-Year Review) - <a class="external-link" href="https://efficient.app/apps/superhuman" target="_blank" rel="noopener noreferrer">https://efficient.app/apps/superhuman</a></div></div>
+<div class="bib-entry" id="ref-21"><span class="bib-number">[21]</span><div class="bib-text">Superhuman Mail: What It Is and Is It Worth It? - eM Client - <a class="external-link" href="https://www.emclient.com/superhuman-mail-what-it-is-and-is-it-worth-it" target="_blank" rel="noopener noreferrer">https://www.emclient.com/superhuman-mail-what-it-is-and-is-it-worth-it</a></div></div>
+<div class="bib-entry" id="ref-22"><span class="bib-number">[22]</span><div class="bib-text">Superhuman introduces AI-powered categorization to reduce spammy emails in your inbox - <a class="external-link" href="https://finance.yahoo.com/news/superhuman-introduces-ai-powered-categorization-140000179.html" target="_blank" rel="noopener noreferrer">https://finance.yahoo.com/news/superhuman-introduces-ai-powered-categorization-140000179.html</a></div></div>
+<div class="bib-entry" id="ref-23"><span class="bib-number">[23]</span><div class="bib-text">Spark Mail - official site - <a class="external-link" href="https://sparkmailapp.com" target="_blank" rel="noopener noreferrer">https://sparkmailapp.com</a></div></div>
+<div class="bib-entry" id="ref-24"><span class="bib-number">[24]</span><div class="bib-text">Proton Mail - official site - <a class="external-link" href="https://proton.me/mail" target="_blank" rel="noopener noreferrer">https://proton.me/mail</a></div></div>
+<div class="bib-entry" id="ref-25"><span class="bib-number">[25]</span><div class="bib-text">Canary Mail - official site - <a class="external-link" href="https://canarymail.io" target="_blank" rel="noopener noreferrer">https://canarymail.io</a></div></div>
+<div class="bib-entry" id="ref-26"><span class="bib-number">[26]</span><div class="bib-text">10 Phishing Email Examples and How to Spot Each One (2026) - Canary Mail Blog - <a class="external-link" href="https://canarymail.io/blog/phishing-email-examples" target="_blank" rel="noopener noreferrer">https://canarymail.io/blog/phishing-email-examples</a></div></div>
+<div class="bib-entry" id="ref-27"><span class="bib-number">[27]</span><div class="bib-text">2026 Email Threats Report - Barracuda Networks - <a class="external-link" href="https://www.barracuda.com/reports/2026-email-threats-report" target="_blank" rel="noopener noreferrer">https://www.barracuda.com/reports/2026-email-threats-report</a></div></div>
+<div class="bib-entry" id="ref-28"><span class="bib-number">[28]</span><div class="bib-text">Email threat landscape: Q3 2026 trends and insights - Microsoft Security Blog - <a class="external-link" href="https://www.microsoft.com/en-us/security/blog/2026/11/05/email-threat-landscape-q3-2026-trends-and-insights" target="_blank" rel="noopener noreferrer">https://www.microsoft.com/en-us/security/blog/2026/11/05/email-threat-landscape-q3-2026-trends-and-insights</a></div></div>
+<div class="bib-entry" id="ref-29"><span class="bib-number">[29]</span><div class="bib-text">How To Recognize and Avoid Phishing Scams - FTC Consumer Advice - <a class="external-link" href="https://consumer.ftc.gov/articles/how-recognize-avoid-phishing-scams" target="_blank" rel="noopener noreferrer">https://consumer.ftc.gov/articles/how-recognize-avoid-phishing-scams</a></div></div>
+<div class="bib-entry" id="ref-30"><span class="bib-number">[30]</span><div class="bib-text">Apple Intelligence - Apple Developer - <a class="external-link" href="https://developer.apple.com/apple-intelligence" target="_blank" rel="noopener noreferrer">https://developer.apple.com/apple-intelligence</a></div></div>
+<div class="bib-entry" id="ref-31"><span class="bib-number">[31]</span><div class="bib-text">Accessibility - Human Interface Guidelines - Apple Developer - <a class="external-link" href="https://developer.apple.com/design/human-interface-guidelines/accessibility" target="_blank" rel="noopener noreferrer">https://developer.apple.com/design/human-interface-guidelines/accessibility</a></div></div>
+<div class="bib-entry" id="ref-32"><span class="bib-number">[32]</span><div class="bib-text">Accessibility - Android Developers - <a class="external-link" href="https://developer.android.com/guide/topics/ui/accessibility" target="_blank" rel="noopener noreferrer">https://developer.android.com/guide/topics/ui/accessibility</a></div></div>
+<div class="bib-entry" id="ref-33"><span class="bib-number">[33]</span><div class="bib-text">Apple Intelligence - Wikipedia - <a class="external-link" href="https://en.wikipedia.org/wiki/Apple_Intelligence" target="_blank" rel="noopener noreferrer">https://en.wikipedia.org/wiki/Apple_Intelligence</a></div></div>
+<div class="bib-entry" id="ref-34"><span class="bib-number">[34]</span><div class="bib-text">On-Device AI on Apple Platforms: Core ML, Apple Foundation Models, and the Neural Engine in 2026 - 3Nsofts - <a class="external-link" href="https://3nsofts.com/insights/on-device-ai-apple-platforms-core-ml-foundation-models-neural-engine-2026" target="_blank" rel="noopener noreferrer">https://3nsofts.com/insights/on-device-ai-apple-platforms-core-ml-foundation-models-neural-engine-2026</a></div></div>
+<div class="bib-entry" id="ref-35"><span class="bib-number">[35]</span><div class="bib-text">Apple Foundation Models Explained: On-Device AI, Framework &amp; iOS 27 - Viro - <a class="external-link" href="https://www.viro.app/post/apple-foundation-models-explained" target="_blank" rel="noopener noreferrer">https://www.viro.app/post/apple-foundation-models-explained</a></div></div>
+<div class="bib-entry" id="ref-36"><span class="bib-number">[36]</span><div class="bib-text">Introducing Apple's On-Device and Server Foundation Models - Apple Machine Learning Research - <a class="external-link" href="https://machinelearning.apple.com/research/introducing-apple-foundation-models" target="_blank" rel="noopener noreferrer">https://machinelearning.apple.com/research/introducing-apple-foundation-models</a></div></div>
+<div class="bib-entry" id="ref-37"><span class="bib-number">[37]</span><div class="bib-text">Apple announces on-device AI features for developers - Investing.com - <a class="external-link" href="https://www.investing.com/news/company-news/apple-announces-ondevice-ai-features-for-developers-93CH-4087441" target="_blank" rel="noopener noreferrer">https://www.investing.com/news/company-news/apple-announces-ondevice-ai-features-for-developers-93CH-4087441</a></div></div>
+<div class="bib-entry" id="ref-38"><span class="bib-number">[38]</span><div class="bib-text">Apple Intelligence vs Google Gemini Privacy (2026) - Patentailab - <a class="external-link" href="https://patentailab.com/apple-intelligence-vs-google-gemini-privacy" target="_blank" rel="noopener noreferrer">https://patentailab.com/apple-intelligence-vs-google-gemini-privacy</a></div></div>
+<div class="bib-entry" id="ref-39"><span class="bib-number">[39]</span><div class="bib-text">GrapMail iOS and Android source snapshot (internal audit export, commit 0fb5998e) - local://0fb5998e</div></div>
+<div class="bib-entry" id="ref-40"><span class="bib-number">[40]</span><div class="bib-text">GrapMail backend route inventory (internal, commit f9c43384) - local://f9c43384</div></div>
+<div class="bib-entry" id="ref-41"><span class="bib-number">[41]</span><div class="bib-text">WidgetKit - Apple Developer Documentation - <a class="external-link" href="https://developer.apple.com/documentation/widgetkit" target="_blank" rel="noopener noreferrer">https://developer.apple.com/documentation/widgetkit</a></div></div>
+<div class="bib-entry" id="ref-42"><span class="bib-number">[42]</span><div class="bib-text">Widgets - Human Interface Guidelines - Apple Developer - <a class="external-link" href="https://developer.apple.com/design/human-interface-guidelines/widgets" target="_blank" rel="noopener noreferrer">https://developer.apple.com/design/human-interface-guidelines/widgets</a></div></div>
+<div class="bib-entry" id="ref-43"><span class="bib-number">[43]</span><div class="bib-text">Gmail is entering the Gemini era - Google Blog - <a class="external-link" href="https://blog.google/products-and-platforms/products/gmail/gmail-is-entering-the-gemini-era" target="_blank" rel="noopener noreferrer">https://blog.google/products-and-platforms/products/gmail/gmail-is-entering-the-gemini-era</a></div></div>
+<div class="bib-entry" id="ref-44"><span class="bib-number">[44]</span><div class="bib-text">Gemini summary cards in the Gmail app on Android and iOS - Google Workspace Updates - <a class="external-link" href="https://workspaceupdates.googleblog.com/2025/05/gemini-summary-cards-gmail-app.html" target="_blank" rel="noopener noreferrer">https://workspaceupdates.googleblog.com/2025/05/gemini-summary-cards-gmail-app.html</a></div></div>
+<div class="bib-entry" id="ref-45"><span class="bib-number">[45]</span><div class="bib-text">UNTextInputNotificationAction - Apple Developer Documentation - <a class="external-link" href="https://developer.apple.com/documentation/usernotifications/untextinputnotificationaction" target="_blank" rel="noopener noreferrer">https://developer.apple.com/documentation/usernotifications/untextinputnotificationaction</a></div></div>
+<div class="bib-entry" id="ref-46"><span class="bib-number">[46]</span><div class="bib-text">Declaring your actionable notification types - Apple Developer Documentation - <a class="external-link" href="https://developer.apple.com/documentation/usernotifications/declaring-your-actionable-notification-types" target="_blank" rel="noopener noreferrer">https://developer.apple.com/documentation/usernotifications/declaring-your-actionable-notification-types</a></div></div>
+</section>
+<section class="section" id="methodology-appendix">
+<h2 class="section-title">Methodology Appendix</h2>
+<p><strong>How candidates were selected.</strong> A candidate entered the roadmap only if it passed three tests: (a) a first-party mechanism exists that can implement it natively (no WebView surfaces, per the native-only guardrail); (b) at least one credible external trigger supports its value — platform direction, competitor parity, security telemetry, or accessibility standards; and (c) it does not duplicate behavior already shipped at the audited commit.</p>
+<p><strong>Repository census (internal baseline).</strong> The audit exported the <code>ios/</code> and <code>android/</code> trees of grapmail-mobile at commit <code>0fb5998e</code> (203 files: 48 Swift, 75 Kotlin) plus the backend route surface at <code>f9c43384</code>, then swept the export with roughly 30 case-insensitive capability markers (widgets, ActivityKit, App Intents, direct reply, biometrics, templates, smart replies, categories, locale configuration, dynamic color, tracker handling, and related terms). A capability is recorded as "present" only with concrete implementation hits; "absent" means zero or trivial hits in that snapshot. Ambiguous markers were resolved by targeted file reads — for example, the snoozed-mailbox screen's backend dependency and the notification-action wiring on both platforms <a class="citation" href="#ref-39" aria-label="Reference 39">[39]</a><a class="citation" href="#ref-40" aria-label="Reference 40">[40]</a>.</p>
+<p><strong>Search and fetch protocol.</strong> External material was gathered in two waves: broad landscape and comparison queries first (features users expect in 2026, head-to-head client comparisons), then targeted retrievals for the specific platform APIs behind each recommendation, RFC 8058, the security reports, AI capability documentation, and accessibility guidance. Full-page fetches were retained as raw extracts; every registered source records a title, canonical locator, retrieval date, and source type, and supports one or more quote-level evidence entries.</p>
+<p><strong>Source classes.</strong> Registered sources fall into five groups: first-party platform documentation (Apple <a class="citation" href="#ref-1" aria-label="Reference 1">[1]</a><a class="citation" href="#ref-2" aria-label="Reference 2">[2]</a><a class="citation" href="#ref-3" aria-label="Reference 3">[3]</a><a class="citation" href="#ref-30" aria-label="Reference 30">[30]</a><a class="citation" href="#ref-31" aria-label="Reference 31">[31]</a><a class="citation" href="#ref-41" aria-label="Reference 41">[41]</a><a class="citation" href="#ref-42" aria-label="Reference 42">[42]</a><a class="citation" href="#ref-45" aria-label="Reference 45">[45]</a><a class="citation" href="#ref-46" aria-label="Reference 46">[46]</a>; Android <a class="citation" href="#ref-4" aria-label="Reference 4">[4]</a><a class="citation" href="#ref-5" aria-label="Reference 5">[5]</a><a class="citation" href="#ref-6" aria-label="Reference 6">[6]</a><a class="citation" href="#ref-7" aria-label="Reference 7">[7]</a><a class="citation" href="#ref-32" aria-label="Reference 32">[32]</a>; the RFC standard <a class="citation" href="#ref-8" aria-label="Reference 8">[8]</a>); vendor product material (<a class="citation" href="#ref-23" aria-label="Reference 23">[23]</a><a class="citation" href="#ref-24" aria-label="Reference 24">[24]</a><a class="citation" href="#ref-25" aria-label="Reference 25">[25]</a><a class="citation" href="#ref-26" aria-label="Reference 26">[26]</a>); security research and consumer protection (<a class="citation" href="#ref-27" aria-label="Reference 27">[27]</a><a class="citation" href="#ref-28" aria-label="Reference 28">[28]</a><a class="citation" href="#ref-29" aria-label="Reference 29">[29]</a>); independent coverage and analysis (<a class="citation" href="#ref-9" aria-label="Reference 9">[9]</a><a class="citation" href="#ref-10" aria-label="Reference 10">[10]</a><a class="citation" href="#ref-11" aria-label="Reference 11">[11]</a><a class="citation" href="#ref-12" aria-label="Reference 12">[12]</a><a class="citation" href="#ref-13" aria-label="Reference 13">[13]</a><a class="citation" href="#ref-14" aria-label="Reference 14">[14]</a><a class="citation" href="#ref-15" aria-label="Reference 15">[15]</a><a class="citation" href="#ref-16" aria-label="Reference 16">[16]</a><a class="citation" href="#ref-17" aria-label="Reference 17">[17]</a><a class="citation" href="#ref-18" aria-label="Reference 18">[18]</a><a class="citation" href="#ref-19" aria-label="Reference 19">[19]</a><a class="citation" href="#ref-20" aria-label="Reference 20">[20]</a><a class="citation" href="#ref-21" aria-label="Reference 21">[21]</a><a class="citation" href="#ref-22" aria-label="Reference 22">[22]</a><a class="citation" href="#ref-33" aria-label="Reference 33">[33]</a><a class="citation" href="#ref-34" aria-label="Reference 34">[34]</a><a class="citation" href="#ref-35" aria-label="Reference 35">[35]</a><a class="citation" href="#ref-36" aria-label="Reference 36">[36]</a><a class="citation" href="#ref-37" aria-label="Reference 37">[37]</a><a class="citation" href="#ref-38" aria-label="Reference 38">[38]</a><a class="citation" href="#ref-43" aria-label="Reference 43">[43]</a><a class="citation" href="#ref-44" aria-label="Reference 44">[44]</a>); and internal audit artifacts (<a class="citation" href="#ref-39" aria-label="Reference 39">[39]</a><a class="citation" href="#ref-40" aria-label="Reference 40">[40]</a>).</p>
+<p><strong>Corroboration sets.</strong> The iOS 27 Mail feature set was cross-checked across launch-day coverage and reference material <a class="citation" href="#ref-10" aria-label="Reference 10">[10]</a><a class="citation" href="#ref-11" aria-label="Reference 11">[11]</a><a class="citation" href="#ref-12" aria-label="Reference 12">[12]</a><a class="citation" href="#ref-13" aria-label="Reference 13">[13]</a><a class="citation" href="#ref-14" aria-label="Reference 14">[14]</a> in addition to <a class="citation" href="#ref-9" aria-label="Reference 9">[9]</a>; the Superhuman feature set was cross-checked across review and vendor sources <a class="citation" href="#ref-15" aria-label="Reference 15">[15]</a><a class="citation" href="#ref-16" aria-label="Reference 16">[16]</a><a class="citation" href="#ref-18" aria-label="Reference 18">[18]</a><a class="citation" href="#ref-19" aria-label="Reference 19">[19]</a><a class="citation" href="#ref-20" aria-label="Reference 20">[20]</a><a class="citation" href="#ref-21" aria-label="Reference 21">[21]</a><a class="citation" href="#ref-22" aria-label="Reference 22">[22]</a> in addition to <a class="citation" href="#ref-17" aria-label="Reference 17">[17]</a>. Availability and privacy caveats were taken from first-party material <a class="citation" href="#ref-9" aria-label="Reference 9">[9]</a><a class="citation" href="#ref-34" aria-label="Reference 34">[34]</a><a class="citation" href="#ref-35" aria-label="Reference 35">[35]</a> rather than coverage, and where nuance differed, the report uses the more conservative wording.</p>
+<p><strong>Claim verification.</strong> Every factual statement in the findings carries bracketed citations resolving to registered sources, and quantified claims — such as the one-in-three malicious-message rate and the QR-code share of malicious documents <a class="citation" href="#ref-27" aria-label="Reference 27">[27]</a> — trace to quote-level evidence entries. Before publication, the draft passed through automated claim extraction and support verification against the evidence store, and the rendered HTML was validated for structure.</p>
+<p><strong>Reproducibility.</strong> Run artifacts are retained with the audit package: the 46-entry source register, the 86-entry evidence store, capability-marker extracts, the outline, and the assembled report. Baseline commits: grapmail-mobile <code>0fb5998e</code>; grapmail-backend <code>f9c43384</code>. Research date: November 19, 2026. Known limits are documented in Limitations &amp; Caveats.</p>
+</section>
+    </main>
+    <footer class="report-footer">Generated as a standalone, citation-preserving research report.</footer>
+  </article>
+</body>
+</html>

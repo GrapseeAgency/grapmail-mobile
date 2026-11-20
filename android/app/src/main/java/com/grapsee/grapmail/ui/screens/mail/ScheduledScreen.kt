@@ -41,6 +41,34 @@ fun ScheduledScreen(onBack: () -> Unit, vm: MailboxViewModel) {
     val state by vm.scheduled.collectAsState()
     LaunchedEffect(Unit) { vm.loadScheduled() }
 
+    // F19: while future sends exist, mirror them onto the device's own shade —
+    // one notice per scheduled message, kept in step with this list on every
+    // load and cancellation, and taken down when the list no longer holds the
+    // message it stood for. The times shown are the server's `scheduled_at`,
+    // the same instant this screen prints.
+    val watchdogContext = androidx.compose.ui.platform.LocalContext.current
+    val watchedIds = androidx.compose.runtime.remember {
+        androidx.compose.runtime.mutableStateOf(emptySet<Int>())
+    }
+    androidx.compose.runtime.LaunchedEffect(state.messages) {
+        val current = state.messages.map { it.id.hashCode() }.toSet()
+        for (gone in watchedIds.value - current) {
+            com.grapsee.grapmail.ui.mailfeatures.SendLaterWatchdog.clear(watchdogContext, gone)
+        }
+        for (m in state.messages) {
+            val at = m.scheduledFor?.let {
+                runCatching { java.time.ZonedDateTime.parse(it).toInstant().toEpochMilli() }.getOrNull()
+            } ?: 0L
+            com.grapsee.grapmail.ui.mailfeatures.SendLaterWatchdog.show(
+                watchdogContext,
+                m.id.hashCode(),
+                m.subject?.takeIf { s -> s.isNotBlank() } ?: "Scheduled mail",
+                at,
+            )
+        }
+        watchedIds.value = current
+    }
+
     Column(Modifier.fillMaxSize().background(palette.bg).statusBarsPadding()) {
         Row(
             Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),

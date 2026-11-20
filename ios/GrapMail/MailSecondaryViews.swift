@@ -775,6 +775,8 @@ struct MailSettingsView: View {
                                value: notificationValue,
                                onClick: { askNotifications() })
                         .accessibilityIdentifier("mail-notifications-row")
+                    // App lock — Face ID in front of the whole mailbox (AppLock.swift).
+                    AppLockRow()
                     SettingRow(icon: "person", title: "Personal info",
                                value: "Name, birthday, photo", onClick: onProfile)
                     SettingRow(icon: "checkmark.shield", title: "Data & privacy",

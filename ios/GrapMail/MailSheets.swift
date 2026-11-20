@@ -71,6 +71,22 @@ struct AdvancedSearchSheet: View {
         VStack(alignment: .leading, spacing: 0) {
             SheetTitle(text: "Search filters")
             VStack(alignment: .leading, spacing: 10) {
+                MailMagicSearchField { parsed in
+                    if !parsed.from.isEmpty { from = parsed.from }
+                    if !parsed.to.isEmpty { to = parsed.to }
+                    if !parsed.subject.isEmpty { subject = parsed.subject }
+                    if let filesWanted = parsed.hasAttachment { files = filesWanted }
+                    if let daysAgo = parsed.afterDaysAgo {
+                        after = MailMagicSearchField.isoDay(offsetDays: -daysAgo)
+                    } else if let fixed = parsed.afterDate {
+                        after = fixed
+                    }
+                    if let daysAgo = parsed.beforeDaysAgo {
+                        before = MailMagicSearchField.isoDay(offsetDays: -daysAgo)
+                    } else if let fixed = parsed.beforeDate {
+                        before = fixed
+                    }
+                }
                 AdvRow(label: "From", placeholder: "A name or address in the sender", text: $from)
                 AdvRow(label: "To", placeholder: "A name or address in the recipients", text: $to)
                 AdvRow(label: "Subject", placeholder: "A word the subject contains", text: $subject)

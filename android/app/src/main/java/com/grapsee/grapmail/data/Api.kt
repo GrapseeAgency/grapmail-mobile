@@ -1372,6 +1372,22 @@ object Api {
         return read(r) { decodeResponse(it) }
     }
 
+    /**
+     * One-click unsubscribe (RFC 8058), sent through the account's own server:
+     * the web route at `POST /grapmail/unsubscribe` performs the request the
+     * list advertised and answers `{ success: true }`. No browser opens and the
+     * list's own answer is not observable from here — the caller reports only
+     * what was witnessed.
+     */
+    suspend fun mailUnsubscribeOneClick(
+        token: String, address: String, url: String,
+    ): MailUnsubscribeOneClickResponse {
+        val r = authed("$BASE/grapmail/unsubscribe", token).post(postBody(
+            json.encodeToString(MailUnsubscribeOneClickRequest.serializer(),
+                MailUnsubscribeOneClickRequest(address, url, true)))).build()
+        return read(r) { decodeResponse(it) }
+    }
+
     suspend fun mailDraft(token: String, req: MailDraftRequest): MailDraftResponse {
         val r = authed("$MAIL/draft", token).post(postBody(
             json.encodeToString(MailDraftRequest.serializer(), req))).build()
@@ -1677,6 +1693,21 @@ object Api {
 // Field names are the keys the handlers destructure, not the app's vocabulary.
 // `MailLabelCreateRequest.colour` is spelled the way `grapmail-labels.ts:105`
 // reads it for exactly that reason.
+
+/** `POST /grapmail/unsubscribe` — the keys the web route destructures. */
+@Serializable
+data class MailUnsubscribeOneClickRequest(
+    val address: String,
+    val url: String,
+    val oneClick: Boolean = true,
+)
+
+/** `{ success: true }` from the route; refusals arrive as non-2xx. */
+@Serializable
+data class MailUnsubscribeOneClickResponse(
+    val success: Boolean = false,
+    val error: String? = null,
+)
 
 @Serializable
 data class MailSendRequest(

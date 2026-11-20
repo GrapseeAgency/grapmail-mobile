@@ -1653,6 +1653,58 @@ final class MailboxModel: ObservableObject {
     /// How many loaded rows the reader is stepping between, for its own label.
     func loadedRowCount() -> Int { state.rows.count }
 
+    /// Send the one-click unsubscribe the list itself advertised.
+    ///
+    /// Not a message action, and it files nothing: the request goes to the
+    /// account's server, which performs the POST the list asked for. The only
+    /// thing this can report is what it witnessed — the request was accepted
+    /// for delivery. What the list does with it is not observable from here,
+    /// so the note never says "unsubscribed".
+    func unsubscribeOneClick(address: String, url: String, onNote: @escaping (String) -> Void) {
+        guard let token else {
+            onNote("You are signed out, so this could not be sent.")
+            return
+        }
+        Task {
+            do {
+                let r = try await ApiClient.mailUnsubscribeOneClick(
+                    token: token, address: address, url: url)
+                GMHaptics.filing()
+                onNote(r.success
+                      ? "One-click request sent — the list's answer is not visible from here."
+                      : (r.error ?? "The one-click request was not accepted."))
+            } catch {
+                GMHaptics.failure()
+                onNote(Self.describe(error))
+            }
+        }
+    }
+
+    /// Record a standing decision against one sender, from wherever that
+    /// sender was last seen. Future mail is refused at the door — this is not
+    /// a message action, so the message in front of the user does not move,
+    /// the same rule the screener queue keeps. The confirmation reuses the
+    /// decision's own sentence so the two doors cannot drift.
+    func blockSender(_ sender: String, onNote: @escaping (String) -> Void) {
+        guard let token else {
+            onNote("You are signed out, so this could not be saved.")
+            return
+        }
+        Task {
+            do {
+                let r = try await ApiClient.mailScreenerDecision(
+                    token: token, sender: sender, scope: .address, decision: .blocked)
+                GMHaptics.filing()
+                onNote(r.success
+                      ? "Blocked. " + MailDecision.blocked.note
+                      : (r.error ?? "The block was not accepted."))
+            } catch {
+                GMHaptics.failure()
+                onNote(Self.describe(error))
+            }
+        }
+    }
+
     /// Mark one message unread from inside the reader, and report the outcome to
     /// the reader.
     ///

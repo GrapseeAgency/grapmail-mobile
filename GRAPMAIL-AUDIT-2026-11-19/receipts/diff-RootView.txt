@@ -1,0 +1,31 @@
+--- /mnt/work/audit3/check/RootView.swift	2026-11-18 05:47:57.000000000 +0000
++++ /mnt/work/audit3/edit/RootView.swift	2026-11-19 03:24:40.737431000 +0000
+@@ -73,7 +73,7 @@
+         case mailLabels, mailLabelCreate(id: String)
+         case mailContacts, mailContactDetail(address: String)
+         case mailFiles, mailAttachment(id: String)
+-        case mailSettings, mailScreener
++        case mailSettings, mailScreener, mailScheduled
+         // ── account-record band ──────────────────────────────────────────────
+         // The web client's `/mail/notes`, `/mail/tasks`, `/mail/settings`,
+         // `/mail/account/{profile,privacy,addresses,connections,support}` —
+@@ -830,6 +830,7 @@
+                         onBack: { path.removeLast() },
+                         onSecurity: { path.append(.security) },
+                         onScreener: { path.append(.mailScreener) },
++                        onScheduled: { path.append(.mailScheduled) },
+                         onLabels: { path.append(.mailLabels) },
+                         onNotes: { path.append(.mailNotes) },
+                         onTasks: { path.append(.mailTasks) },
+@@ -899,6 +900,11 @@
+                 case .e2eStatus, .e2eSetup, .e2eUnlock, .e2eDetails,
+                      .e2ePublish, .e2eChangePassphrase, .e2eRemove, .e2eRecipients:
+                     e2eDestination(route)
++                case .mailScheduled:
++                    ScheduledView(
++                        apiToken: SessionStore.token ?? "",
++                        onBack: { path.removeLast() }
++                    )
+                 case .mailScreener:
+                     ScreenerView(
+                         vm: mail,

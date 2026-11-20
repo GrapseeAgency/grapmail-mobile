@@ -1,0 +1,122 @@
+name: Build
+
+# The compile gate. Deliberately separate from android.yml and ios.yml:
+# those two boot emulators and walk 60+ screens, which is the right check for
+# "does the product behave" and the wrong check for "does the code compile".
+# A 120-minute walk that fails at minute 3 on an unresolved reference tells you
+# nothing you could not have learned in six minutes, and it teaches people to
+# stop reading the red X.
+#
+# This workflow answers exactly two questions, on every push and every PR:
+#   - does the Kotlin compile into an installable debug APK?
+#   - does the Swift compile for the simulator?
+# It runs no tests, no emulator, no signing. Green here means "the tree is
+# buildable", nothing more — and it says so rather than implying more.
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+  workflow_dispatch:
+
+# One run per ref: a push that supersedes an in-flight build makes that build's
+# verdict irrelevant, and a queue of stale compiles is how a six-minute check
+# becomes a forty-minute wait.
+concurrency:
+  group: build-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  android:
+    name: Android — assembleDebug
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      # compileSdk is 36 (Android 16). The runner image ships 34/35 and a
+      # missing platform fails the build with "failed to find target with hash
+      # string android-36", which reads like a code error and is not one. Ask
+      # the SDK manager for it, and only when it is actually absent, so the
+      # step stays a no-op on images that already carry it.
+      - name: Ensure the compile SDK is installed
+        run: |
+          SDK="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
+          echo "ANDROID_HOME=$SDK" >> "$GITHUB_ENV"
+          if [ ! -d "$SDK/platforms/android-36" ]; then
+            yes | "$SDK/cmdline-tools/latest/bin/sdkmanager" "platforms;android-36" >/dev/null
+          fi
+          ls "$SDK/platforms"
+
+      # google-services.json is gitignored and the Gradle file treats its
+      # absence as "no Firebase, poll instead". CI therefore builds the
+      # polling configuration — the same one a contributor gets — rather than
+      # inventing a fake client config that would hide a real misconfiguration.
+      - name: Build the debug APK
+        working-directory: android
+        run: |
+          chmod +x gradlew
+          ./gradlew :app:assembleDebug --no-daemon --stacktrace
+
+      - name: Upload the APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: grapmail-android-debug-build
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+
+  ios:
+    name: iOS — simulator build
+    runs-on: macos-15
+    timeout-minutes: 35
+    env:
+      SCHEME: GrapMail
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      # The .xcodeproj is generated, never committed: project.yml is the source
+      # of truth, and a checked-in project file is a second copy of the same
+      # facts that drifts silently.
+      - name: Generate Xcode project
+        working-directory: ios
+        run: xcodegen generate
+
+      # CODE_SIGNING_ALLOWED=NO is what makes this runnable without a team:
+      # a simulator build needs no identity, and asking for one turns a
+      # compile check into a secrets check. The release job in ios.yml is the
+      # one that signs, and it is the only one that should.
+      - name: Build for the simulator
+        working-directory: ios
+        run: |
+          set -o pipefail
+          xcodebuild build \
+            -project GrapMail.xcodeproj \
+            -scheme "$SCHEME" \
+            -configuration Debug \
+            -destination 'generic/platform=iOS Simulator' \
+            -skipPackagePluginValidation \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            | tee /tmp/xcodebuild.log | tail -n 60
+
+      # A failed xcodebuild prints hundreds of lines and the error is rarely in
+      # the last sixty. Pull the actual diagnostics out so the job page answers
+      # "what broke" without downloading a log.
+      - name: Surface the compiler diagnostics
+        if: failure()
+        run: |
+          grep -E "error:|warning: .*(unused|deprecated)" /tmp/xcodebuild.log \
+            | sed -E 's#^/Users/runner/work/[^/]+/[^/]+/##' \
+            | sort -u | head -n 60 || echo "no diagnostics matched"

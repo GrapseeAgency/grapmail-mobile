@@ -1,0 +1,109 @@
+/**
+ * Files — every attachment in the mailbox, in one list.
+ *
+ * ── WHY THIS FILE EXISTS ────────────────────────────────────────────────────
+ * The Android Files screen (unit 78) carried an honest note: "GrapMail has no
+ * endpoint that lists every file in a mailbox, so a file inside mail you have
+ * not read is not shown here." The app could only index attachments of messages
+ * it had already opened. This is the missing endpoint: one read-only GET that
+ * returns the account's attachments joined to their message subject, newest
+ * first, for the client to merge over its local index.
+ *
+ * ── READ-ONLY BY DESIGN ─────────────────────────────────────────────────────
+ * Listing is the whole surface. Upload stays multipart POST /grapmail/attachments
+ * and deletion stays DELETE /grapmail/attachments/:id — both already exist and
+ * both carry their own scoping. Nothing here writes.
+ *
+ * ── COLUMN NAMES (verify in 5 seconds before mounting) ─────────────────────
+ * Written against the 2026-11-18 snapshot of `services/shared/src/db/schema.ts`:
+ * attachments keys are owner_user_id / message_id / name / mime_type /
+ * size_bytes / created_at, and the message subject column is `subject`. If your
+ * working copy has drifted:
+ *   grep -n "grapmail_attachments\|grapmail_messages" services/shared/src/db/schema.ts
+ * and adjust the two SELECT lists — the route is deliberately one query.
+ * `created_at` is normalized to an ISO string in the projection below (the
+ * driver hands back Date objects for timestamps), so the client always gets a
+ * string it can sort and print.
+ *
+ * ── MOUNTING ────────────────────────────────────────────────────────────────
+ * Mirrors `grapmail-scheduled.ts`: a plain Hono app that takes no view on auth,
+ * mounted behind the session gate in `services/auth-service/src/index.ts`
+ * (see fixpack B2 — three `app.use`/`app.route` lines + one import).
+ * Kept out of `grapmail.ts` because that file is a byte-faithful recovery and
+ * new surface belongs beside it, not inside it — the same reason the scheduled
+ * routes got their own file.
+ */
+import { Hono } from 'hono'
+import { sql } from 'drizzle-orm'
+import { db } from '../db/client.js'
+import { resultRows } from '../lib/mail-feature-store.js'
+
+export interface FilesDatabase {
+  execute(query: ReturnType<typeof sql>): Promise<unknown>
+}
+
+export type FilesRoutes = Hono<{ Variables: { userId: string } }>
+
+export interface FilesRouteDeps {
+  /**
+   * Injectable for the same reason the scheduled routes' database is: a test
+   * can mount the router without owning a pool, and a caller that owns a pool
+   * passes it instead.
+   */
+  database?: FilesDatabase
+}
+
+export function grapmailFilesRoutes(deps: FilesRouteDeps = {}): FilesRoutes {
+  const database = deps.database ?? db
+  const app = new Hono<{ Variables: { userId: string } }>()
+
+  app.get('/files', async (c) => {
+    const userId = c.get('userId')
+    if (!userId) return c.json({ error: 'Unauthorized' }, 401)
+
+    // Clamped page size: the screen shows a scrolling list, and a mailbox with
+    // 40k attachments should not be one query away from a 40k-row response.
+    const limitRaw = Number(c.req.query('limit') ?? '500')
+    const offsetRaw = Number(c.req.query('offset') ?? '0')
+    const limit = Number.isFinite(limitRaw)
+      ? Math.min(Math.max(Math.trunc(limitRaw), 1), 1000)
+      : 500
+    const offset = Number.isFinite(offsetRaw) ? Math.max(Math.trunc(offsetRaw), 0) : 0
+
+    const rows = resultRows<{
+      id: string
+      message_id: string | null
+      name: string | null
+      mime_type: string | null
+      size_bytes: number | null
+      created_at: Date | string | null
+      message_subject: string | null
+    }>(await database.execute(sql`
+      SELECT a.id, a.message_id, a.name, a.mime_type, a.size_bytes, a.created_at,
+             m.subject AS message_subject
+      FROM grapmail_attachments a
+      LEFT JOIN grapmail_messages m ON m.id = a.message_id
+      WHERE a.owner_user_id = ${userId}
+      ORDER BY a.created_at DESC
+      LIMIT ${limit} OFFSET ${offset}
+    `))
+
+    const files = rows.map((r) => ({
+      id: r.id,
+      messageId: r.message_id,
+      name: r.name,
+      mimeType: r.mime_type,
+      sizeBytes: r.size_bytes,
+      // The driver hands timestamps back as Date; the client only ever sees
+      // strings.
+      createdAt: r.created_at instanceof Date ? r.created_at.toISOString() : r.created_at,
+      messageSubject: r.message_subject,
+    }))
+
+    return c.json({ files, count: files.length })
+  })
+
+  return app
+}
+
+export default grapmailFilesRoutes

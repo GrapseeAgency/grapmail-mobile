@@ -49,6 +49,9 @@ class MailPollWorker(
     private suspend fun pollMailbox(): Result {
         val session = SessionStore.snapshot(applicationContext)
         if (session == null) {
+            // Nothing signed in means the widget has nothing true to draw; it
+            // is cleared rather than left holding a stale count.
+            com.grapsee.grapmail.widget.MailWidgetState.clear(applicationContext)
             report("silent signed-out")
             return Result.success()
         }
@@ -120,6 +123,18 @@ class MailPollWorker(
                 .getOrNull()
         } else null
         if (!SessionStore.isCurrent(applicationContext, session.id)) return Result.success()
+        // The widget follows the read this poll just made: its count and the
+        // newest sender line, nothing the poll did not witness.
+        com.grapsee.grapmail.widget.MailWidgetState.publish(
+            applicationContext, unread,
+            recent?.firstOrNull()?.let { head ->
+                (head.from?.name.orEmpty()).takeIf { it.isNotBlank() } ?: head.subject
+            },
+            recent = recent?.take(3)?.map { m ->
+                val who = (m.from?.name.orEmpty()).takeIf { it.isNotBlank() } ?: "Unknown sender"
+                who to (m.subject ?: "(no subject)")
+            },
+        )
         val announced = prefs.getString("announcedIds", null)
             .takeIf { prefs.getString("announcedSessionId", null) == session.id }
             ?.split(' ')?.filter { it.isNotEmpty() }.orEmpty() +
@@ -214,7 +229,13 @@ class MailPollWorker(
             runCatching { Api.mailStats(session.token) }
                 .onFailure { if (it is kotlinx.coroutines.CancellationException) throw it }
                 .getOrNull()?.let { stats ->
-                    if (SessionStore.isCurrent(applicationContext, session.id)) completedPolls.tryEmit(PollResult(session.id, stats))
+                    if (SessionStore.isCurrent(applicationContext, session.id)) {
+                        completedPolls.tryEmit(PollResult(session.id, stats))
+                        com.grapsee.grapmail.widget.MailWidgetState.publish(
+                            applicationContext, stats.inbox?.unread,
+                            (row.from?.name.orEmpty()).takeIf { it.isNotBlank() } ?: row.subject,
+                        )
+                    }
                 }
         }
         return Result.success()

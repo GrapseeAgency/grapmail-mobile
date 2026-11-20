@@ -1,0 +1,25 @@
+EXPECT MainActivity md5=3c42c510beb29b7daa4e55fdf1c4db8d size=76890
+EXPECT RootView md5=36a709ef86007441fdae0e1635cda9b8 size=52076
+MainActivity: SIZE-OK (76890)
+RootView: SIZE-OK (52076)
+MK MAIN-1 OK (=1)
+MK MAIN-2 OK (=1)
+MK MAIN-3 OK (=1)
+MK MAIN-4 OK (=0)
+MK MAIN-5 OK (=1)
+MK MAIN-6 OK (=1)
+MK MAIN-7 OK (=1)
+MK RV-1 OK (=1)
+MK RV-2 OK (=1)
+MK RV-3 OK (=1)
+MK RV-4 OK (=0)
+MK RV-5 OK (=1)
+MK RV-6 OK (=1)
+MK RV-7 OK (=3)
+MK RV-8 OK (=0)
+POSTCOPY MainActivity.kt md5-identical
+POSTCOPY RootView.swift md5-identical
+== git scoped ==
+ M android/app/src/main/java/com/grapsee/grapmail/MainActivity.kt
+ M ios/GrapMail/RootView.swift
+GATE: PASS

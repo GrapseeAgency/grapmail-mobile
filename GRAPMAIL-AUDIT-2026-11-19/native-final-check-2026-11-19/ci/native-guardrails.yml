@@ -1,0 +1,39 @@
+# native-guardrails.yml — proposed CI job for grapmail-mobile (pure-native guard)
+#
+# Install:
+#   1. Commit tools/native-guardrails.sh to the repository.
+#   2. Copy this file to .github/workflows/native-guardrails.yml
+#   3. Done — pushes and PRs now run the native guard.
+#
+# The guard is bash + git only (no Xcode/Android toolchains needed) and runs in seconds.
+name: native-guardrails
+
+on:
+  push:
+    branches: ["main", "feat/**"]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  native-guardrails:
+    name: Keep iOS/Android apps pure-native
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Run native guardrails
+        shell: bash
+        run: |
+          set -o pipefail
+          bash tools/native-guardrails.sh . HEAD | tee guardrails-receipt.txt
+
+      - name: Upload receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-guardrails-receipt
+          path: guardrails-receipt.txt
+          if-no-files-found: error

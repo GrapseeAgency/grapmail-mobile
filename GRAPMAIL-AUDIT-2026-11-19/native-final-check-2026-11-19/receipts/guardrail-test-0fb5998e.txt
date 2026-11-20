@@ -1,0 +1,11 @@
+PASS: no hybrid/cross-platform artifacts in the file tree
+PASS: no hybrid framework tokens in ios/ + android/ sources
+INFO: WebKit usage iOS=5 (budget 5) | WebView usage Android=5 (budget 5)
+PASS: XcodeGen manifest present (ios/project.yml)
+PASS: Gradle Kotlin DSL present (android/app/build.gradle.kts)
+PASS: Swift sources present
+PASS: Kotlin sources present
+PASS: no Java sources
+----
+RESULT: fails=0 warns=0
+NATIVE-GUARDRAIL: PASS

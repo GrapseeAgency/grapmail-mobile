@@ -129,6 +129,11 @@ final class ShortcutRouter: ObservableObject {
     }
 
     func consume() { pendingCompose = false }
+
+    /// The same door a quick action knocks on, opened for App Intents and
+    /// Siri: one flag, one consumer, so a draft asked for by voice and a
+    /// draft asked for by long-press arrive at the same place.
+    func requestCompose() { pendingCompose = true }
 }
 
 // ── the background read ─────────────────────────────────────────────────────
@@ -198,8 +203,12 @@ enum MailPoll {
         defaults.set(count, forKey: lastSeenKey)
         if let recent { defaults.set(recent.first?.id ?? "", forKey: newestMessageKey) }
         else { defaults.removeObject(forKey: newestMessageKey) }
+        // The widget and Lock Screen card show what this read actually saw -
+        // the same numbers, at the moment they were true. Written before any
+        // early return so a read that announces nothing still corrects it.
+        WidgetBridge.update(unread: count, account: SessionStore.address, latest: recent?.first, recent: recent ?? [], signedIn: true)
         guard didSee, canNotify else { return false }
-        guard announceArrivals else { return true }
+        guard announceArrivals, !UserDefaults.standard.bool(forKey: "gm.focusQuiet") else { return true }
 
         let arrivals: [MailMessage]?
         if let priorHead, let recent, priorHead.isEmpty || recent.contains(where: { $0.id == priorHead }) {
@@ -245,7 +254,14 @@ enum MailPoll {
         if let message, let account = SessionStore.address, !account.isEmpty {
             content.subtitle = account
             content.categoryIdentifier = actionCategory
-            content.userInfo = ["messageId": message.id, "threadId": message.threadId ?? "", "account": account]
+            // The reply path needs the sender's address and the subject at the
+            // moment the person answers; both are carried here so the inline
+            // send never has to fetch the message back. `e2e` marks a sealed
+            // message, where replying inline would send plaintext.
+            content.userInfo = ["messageId": message.id, "threadId": message.threadId ?? "", "account": account,
+                                "sender": message.from?.address ?? "",
+                                "subject": message.isE2eEncrypted ? "" : (message.subject ?? ""),
+                                "e2e": message.isE2eEncrypted ? "1" : "0"]
         }
 
         var notification: UNNotificationContent = content
@@ -499,7 +515,13 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
             UNNotificationCategory(identifier: MailPoll.actionCategory, actions: [
                 UNNotificationAction(identifier: "archive", title: "Archive"),
                 UNNotificationAction(identifier: "read", title: "Mark as read"),
-                UNNotificationAction(identifier: "reply", title: "Reply", options: [.foreground]),
+                // Inline reply: the person answers without the app ever coming
+                // forward. `reply.text` is the text field itself; `reply` stays
+                // as the door into the full composer - the option the encrypted
+                // path falls back to.
+                UNTextInputNotificationAction(identifier: "reply.text", title: "Reply", options: [],
+                                              textInputButtonTitle: "Send", textInputPlaceholder: "Reply…"),
+                UNNotificationAction(identifier: "reply", title: "Reply in app", options: [.foreground]),
                 UNNotificationAction(identifier: "more", title: "More", options: [.foreground]),
             ], intentIdentifiers: [], options: [])
         ])
@@ -609,6 +631,33 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
                     }
                 }
             }
+            return
+        }
+        if action == "reply.text" {
+            // Inline reply. Sent through the same authenticated endpoint the
+            // composer uses, threading by the message id that produced the
+            // notification. Encrypted messages and announcements with no
+            // sender fall back to the composer instead of guessing.
+            let text = ((response as? UNTextInputNotificationResponse)?.userText ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+            let sender = (info["sender"] as? String)?.nilIfBlank()
+            let encrypted = (info["e2e"] as? String) == "1"
+            if !text.isEmpty, !encrypted, let sender {
+                Task {
+                    defer { completionHandler() }
+                    guard let token = await ApiClient.pushBearer(for: account) else { return }
+                    let subject = (info["subject"] as? String)?.nilIfBlank()
+                    let replySubject = subject.map { $0.lowercased().hasPrefix("re:") ? $0 : "Re: \($0)" } ?? ""
+                    let request = MailSendRequest(to: [sender], subject: replySubject,
+                                                  bodyText: text, inReplyTo: messageId)
+                    if (try? await ApiClient.mailSend(token: token, request)) != nil {
+                        await MailStore.shared.invalidate(.sent, generation: SessionStore.generation)
+                    }
+                }
+                return
+            }
+            ShortcutRouter.shared.pendingMail = .init(messageId: messageId,
+                threadId: (info["threadId"] as? String)?.nilIfBlank(), account: account, reply: true, more: false)
+            completionHandler()
             return
         }
         if [UNNotificationDefaultActionIdentifier, "reply", "more"].contains(action) {

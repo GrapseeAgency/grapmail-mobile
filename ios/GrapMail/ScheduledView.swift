@@ -114,6 +114,11 @@ struct ScheduledView: View {
             let r = try await ApiClient.mailScheduledList(apiToken)
             messages = r.messages ?? []
             loaded = true
+            // The Lock Screen countdown for the soonest send rides the same
+            // read the list below renders (SendLaterActivityManager).
+            if #available(iOS 16.2, *) {
+                SendLaterActivityManager.sync(messages: messages)
+            }
         } catch {
             self.error = apiMessage(error, fallback: "Could not update scheduled mail. Try again.")
             loaded = true
@@ -128,6 +133,11 @@ struct ScheduledView: View {
                 _ = try await ApiClient.mailScheduledCancel(apiToken, id: id)
                 messages.removeAll { $0.id == id }
                 note = "Cancelled — it will not be sent."
+                if #available(iOS 16.2, *) {
+                    // The cancelled send leaves the list and the Lock Screen in
+                    // the same beat; the next soonest send, if any, takes over.
+                    SendLaterActivityManager.sync(messages: messages)
+                }
             } catch {
                 note = apiMessage(error, fallback: "Could not update scheduled mail. Try again.")
             }
