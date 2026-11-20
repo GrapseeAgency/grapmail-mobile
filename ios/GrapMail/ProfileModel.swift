@@ -137,7 +137,9 @@ final class ProfileModel: ObservableObject {
         while !Task.isCancelled, generation == SessionStore.generation, let token {
             let writeGeneration = avatarWriteGeneration
             while state.busy || profileLoad != nil {
-                try await Task.sleep(nanoseconds: 200_000_000)
+                // the sleep's only failure is cancellation, and the guard
+                // below answers that — the wait itself must never throw
+                try? await Task.sleep(nanoseconds: 200_000_000)
                 guard !Task.isCancelled, generation == SessionStore.generation else { return }
             }
             guard writeGeneration == avatarWriteGeneration else { continue }
