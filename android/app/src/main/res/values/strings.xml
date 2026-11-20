@@ -13,5 +13,5 @@
         GrapMail has no push service, so these come from the app asking the
         server itself, when the system wakes it.
     </string>
-    <string name="widget_description">Unread mail at a glance — counts from GrapMail's own checks</string>
+    <string name="widget_description">Unread mail at a glance: counts from GrapMail background checks</string>
 </resources>

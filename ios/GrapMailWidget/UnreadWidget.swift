@@ -79,6 +79,14 @@ struct UnreadWidgetView: View {
         return "\(unread) unread\(latest)"
     }
 
+    // accessoryInline accepts a single Text and nothing else — a VStack or an
+    // Image there is refused at render time, so this is deliberately not a
+    // Group. The switch above named `inline` before it existed, which is what
+    // the simulator build caught: cannot find 'inline' in scope.
+    private var inline: some View {
+        Text(inlineText)
+    }
+
     private var circular: some View {
         VStack(spacing: 1) {
             Text(countText).font(.system(size: 22, weight: .bold, design: .rounded))
