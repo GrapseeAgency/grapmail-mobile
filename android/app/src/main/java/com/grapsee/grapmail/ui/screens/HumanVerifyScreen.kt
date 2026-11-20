@@ -111,6 +111,11 @@ fun HumanVerifyScreen(vm: SignUpViewModel, onBack: () -> Unit, onDone: () -> Uni
         WebView(context).apply {
             settings.javaScriptEnabled = true
             settings.domStorageEnabled = true
+            // Google's image-grid challenge grows wider than a phone card;
+            // without these the WebView clips the challenge's own Verify
+            // button and a solved grid can never be submitted.
+            settings.useWideViewPort = true
+            settings.loadWithOverviewMode = true
             webViewClient = WebViewClient() // keep every navigation inside the WebView
             addJavascriptInterface(
                 VerifyBridge { token -> mainHandler.post { pendingToken = token } },
