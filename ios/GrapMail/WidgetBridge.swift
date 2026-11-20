@@ -22,7 +22,10 @@ enum WidgetBridge {
         guard let defaults = UserDefaults(suiteName: WidgetShared.suiteName) else { return }
         if let unread { defaults.set(unread, forKey: WidgetShared.Key.unread) }
         if let account, !account.isEmpty { defaults.set(account, forKey: WidgetShared.Key.account) }
-        let sender = latest?.from?.display.nilIfBlank() ?? latest?.from?.address.nilIfBlank()
+        // display is a non-optional String on the model, so optional chaining
+        // stops at `from` and the result is String?. nilIfBlank() is declared
+        // on String, not String?, so the optional is flattened first.
+        let sender = (latest?.from?.display ?? "").nilIfBlank() ?? latest?.from?.address.nilIfBlank()
         if let sender {
             defaults.set(sender, forKey: WidgetShared.Key.sender)
         } else {

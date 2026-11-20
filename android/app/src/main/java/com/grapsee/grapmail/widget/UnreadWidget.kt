@@ -2,12 +2,14 @@ package com.grapsee.grapmail.widget
 
 import android.content.Context
 import android.content.Intent
+import android.content.res.Configuration
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.glance.GlanceId
 import androidx.glance.GlanceModifier
+import androidx.glance.LocalContext
 import androidx.glance.action.ActionParameters
 import androidx.glance.action.actionStartActivity
 import androidx.glance.action.clickable
@@ -28,7 +30,6 @@ import androidx.glance.text.FontWeight
 import androidx.glance.text.Text
 import androidx.glance.text.TextStyle
 import androidx.glance.unit.ColorProvider
-import androidx.glance.unit.ColorProviders
 import com.grapsee.grapmail.MainActivity
 
 /**
@@ -69,16 +70,32 @@ class StartComposeCallback : ActionCallback {
 // Brand tokens as the widget draws them — the same measured values the app's
 // palettes carry, in their light and dark pairs.
 //
-// ColorProviders (plural) is the light/dark pair: Glance 1.1.1 has no
-// ColorProvider(day = …, night = …) overload, which is what a single
-// ColorProvider(...) call with two colours failed on.
-private val canvas = ColorProviders(light = Color(0xFFFBFCFE), dark = Color(0xFF0A0A0C))
-private val ink = ColorProviders(light = Color(0xFF0F172A), dark = Color(0xFFEAEAEA))
-private val sub = ColorProviders(light = Color(0xFF5B6B84), dark = Color(0xFF9E9EA5))
-private val accent = ColorProviders(light = Color(0xFF1A6DF0), dark = Color(0xFF8AB4F8))
+// Glance 1.1.1 has exactly one factory, ColorProvider(color). There is no
+// ColorProvider(day = …, night = …) overload (that is what the first attempt
+// called), and androidx.glance.color.ColorProviders is a Material colour
+// scheme, not a light/dark pair (that is what the second attempt imported).
+// So the pair is resolved here from the launcher's current uiMode and each
+// token becomes a single-colour provider.
+private class WidgetPalette(context: Context) {
+    private val night = (context.resources.configuration.uiMode and
+        Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES
+
+    private fun of(light: Color, dark: Color): ColorProvider =
+        ColorProvider(if (night) dark else light)
+
+    val canvas = of(Color(0xFFFBFCFE), Color(0xFF0A0A0C))
+    val ink = of(Color(0xFF0F172A), Color(0xFFEAEAEA))
+    val sub = of(Color(0xFF5B6B84), Color(0xFF9E9EA5))
+    val accent = of(Color(0xFF1A6DF0), Color(0xFF8AB4F8))
+}
 
 @Composable
 private fun UnreadContent(snapshot: MailWidgetState.Snapshot) {
+    val palette = WidgetPalette(LocalContext.current)
+    val canvas = palette.canvas
+    val ink = palette.ink
+    val sub = palette.sub
+    val accent = palette.accent
     Column(
         modifier = GlanceModifier
             .fillMaxSize()
