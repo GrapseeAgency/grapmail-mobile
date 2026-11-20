@@ -272,7 +272,7 @@ enum MailPoll {
             content.body = [subject, preview].compactMap { $0 }.joined(separator: "\n")
             content.threadIdentifier = message.threadId ?? message.id
             if let address = message.from?.address?.nilIfBlank(),
-               let avatar = senderAvatar(sender, address: address) {
+               let avatar = await senderAvatar(sender, address: address) {
                 let person = INPerson(
                     personHandle: INPersonHandle(value: address, type: .emailAddress),
                     nameComponents: nil, displayName: sender, image: avatar,
@@ -302,36 +302,47 @@ enum MailPoll {
 
     @MainActor
     private static func notificationImage(token: String, id: String) async -> URL? {
-        guard let file = try? await ApiClient.mailAttachmentFile(token: token, id: id) else { return nil }
-        defer { try? FileManager.default.removeItem(at: file) }
-        guard let count = try? file.resourceValues(forKeys: [.fileSizeKey]).fileSize,
-              (1...2_097_152).contains(count), let data = try? Data(contentsOf: file),
-              let image = await AvatarThumbnail.decode(data, maxSize: 768),
-              let jpeg = UIImage(cgImage: image).jpegData(compressionQuality: 0.85) else { return nil }
-        let preview = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".jpg")
-        do {
-            try jpeg.write(to: preview)
-            return preview
-        } catch {
-            return nil
+        // The file read, decode and JPEG encode run detached — this path is a
+        // background task, and burning BGTask budget on the main actor for an
+        // image that ends up inside a notification is waste. Main only hands
+        // the finished URL to the notification.
+        let work = Task.detached { () -> URL? in
+            guard let file = try? await ApiClient.mailAttachmentFile(token: token, id: id) else { return nil }
+            defer { try? FileManager.default.removeItem(at: file) }
+            guard let count = try? file.resourceValues(forKeys: [.fileSizeKey]).fileSize,
+                  (1...2_097_152).contains(count), let data = try? Data(contentsOf: file),
+                  let image = await AvatarThumbnail.decode(data, maxSize: 768),
+                  let jpeg = UIImage(cgImage: image).jpegData(compressionQuality: 0.85) else { return nil }
+            let preview = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".jpg")
+            do {
+                try jpeg.write(to: preview)
+                return preview
+            } catch {
+                return nil
+            }
         }
+        return await work.value
     }
 
     @MainActor
-    private static func senderAvatar(_ sender: String, address: String) -> INImage? {
-        let size: CGFloat = 128
-        let image = UIGraphicsImageRenderer(size: CGSize(width: size, height: size)).image { _ in
-            UIColor(MailUI.tint(address: address, display: sender)).setFill()
-            UIBezierPath(ovalIn: CGRect(x: 0, y: 0, width: size, height: size)).fill()
-            let initial = String(sender.prefix(1)).uppercased() as NSString
-            let attributes: [NSAttributedString.Key: Any] = [
-                .font: UIFont.boldSystemFont(ofSize: 54), .foregroundColor: UIColor.white,
-            ]
-            let bounds = initial.size(withAttributes: attributes)
-            initial.draw(at: CGPoint(x: (size - bounds.width) / 2, y: (size - bounds.height) / 2),
-                         withAttributes: attributes)
+    private static func senderAvatar(_ sender: String, address: String) async -> INImage? {
+        // The oval render + PNG encode run detached; main only awaits the image.
+        let work = Task.detached { () -> INImage? in
+            let size: CGFloat = 128
+            let image = UIGraphicsImageRenderer(size: CGSize(width: size, height: size)).image { _ in
+                UIColor(MailUI.tint(address: address, display: sender)).setFill()
+                UIBezierPath(ovalIn: CGRect(x: 0, y: 0, width: size, height: size)).fill()
+                let initial = String(sender.prefix(1)).uppercased() as NSString
+                let attributes: [NSAttributedString.Key: Any] = [
+                    .font: UIFont.boldSystemFont(ofSize: 54), .foregroundColor: UIColor.white,
+                ]
+                let bounds = initial.size(withAttributes: attributes)
+                initial.draw(at: CGPoint(x: (size - bounds.width) / 2, y: (size - bounds.height) / 2),
+                             withAttributes: attributes)
+            }
+            return image.pngData().map { INImage(imageData: $0) }
         }
-        return image.pngData().map { INImage(imageData: $0) }
+        return await work.value
     }
 
     /// Ask for the notification permission from the settings screen, on a tap.

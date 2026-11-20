@@ -1179,7 +1179,7 @@ private fun LabelStrip(s: MailboxViewModel.MailboxUiState) {
         item {
             LabelChip("Inbox", s.unreadCount, null, s.query.isEmpty() && s.filter == MailFilter.All)
         }
-        items(s.labels) { l ->
+        items(s.labels, key = { it.id }) { l ->
             LabelChip(l.name, l.unread, l.color, false)
         }
     }

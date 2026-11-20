@@ -614,8 +614,8 @@ struct E2eRecipientsScreen: View {
                     }
                     if !vm.state.lookup.isEmpty {
                         Spacer().frame(height: 10)
-                        ForEach(vm.state.lookup.indices) { i in
-                            lookupRow(vm.state.lookup[i])
+                        ForEach(vm.state.lookup, id: \.address) { entry in
+                            lookupRow(entry)
                         }
                         Spacer().frame(height: 10)
                         E2eButton(text: "Back to compose", enabled: true, quiet: true,
