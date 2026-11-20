@@ -27,6 +27,7 @@ import com.grapsee.grapmail.data.MailStore
 import com.grapsee.grapmail.data.inverse
 import com.grapsee.grapmail.data.pastLine
 import com.grapsee.grapmail.data.SessionStore
+import com.grapsee.grapmail.data.SessionSnapshot
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -970,13 +971,13 @@ class MailboxViewModel @JvmOverloads constructor(
         defaultFailure: String = "That action didn't go through.",
         write: suspend (String) -> Unit,
     ): Pair<List<String>, String?> {
-        if (ids.isEmpty()) return emptyList<String>() to null
-        val permits = kotlinx.coroutines.sync.Semaphore(4)
+        if (ids.isEmpty()) return emptyList() to null
+        val permits = Semaphore(4)
         val done = java.util.Collections.synchronizedList(mutableListOf<String>())
         var failure: String? = null
-        kotlinx.coroutines.coroutineScope {
+        coroutineScope {
             ids.map { id ->
-                kotlinx.coroutines.async {
+                async {
                     permits.withPermit {
                         try {
                             if (session != null && !SessionStore.isCurrent(app, session.id)) return@withPermit

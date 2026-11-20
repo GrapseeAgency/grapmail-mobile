@@ -130,11 +130,11 @@ class ProfileViewModel @JvmOverloads constructor(
                 continue
             }
             val latest = runCatching { Api.watchAvatar(session.token, revision) }.getOrNull()
-                ?: run {
-                    // network blip: back off instead of hammering
-                    kotlinx.coroutines.delay(5_000)
-                    continue
-                }
+            if (latest == null) {
+                // network blip: back off instead of hammering
+                kotlinx.coroutines.delay(5_000)
+                continue
+            }
             // floor between polls so a fast-answering server can never turn
             // this into a hot spin
             kotlinx.coroutines.delay(250)

@@ -633,12 +633,12 @@ fun MailSmartPanel(message: MailMessageFullDto?, messages: List<MailMessageFullD
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         summary?.let { ThreadSummaryCard(it) }
-        if (cards.isNotEmpty()) {
+        if (!cards.isNullOrEmpty()) {
             // Named, not trailing: ActionCardsRow's last parameter is `modifier`,
             // so a trailing lambda would be read as a Modifier and every field
             // access inside it (card.url/label/value) became an unresolved
             // reference at compile time.
-            ActionCardsRow(cards, onOpen = { card ->
+            ActionCardsRow(cards.orEmpty(), onOpen = { card ->
                 val url = card.url
                 if (url != null) {
                     MailFeatureIntents.openUrl(context, url)
@@ -647,12 +647,12 @@ fun MailSmartPanel(message: MailMessageFullDto?, messages: List<MailMessageFullD
                 }
             })
         }
-        if (verdicts.isNotEmpty()) {
+        if (!verdicts.isNullOrEmpty()) {
             Row(
                 Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                verdicts.forEach { v ->
+                verdicts.orEmpty().forEach { v ->
                     AssistChip(
                         onClick = { warning = v },
                         label = {
