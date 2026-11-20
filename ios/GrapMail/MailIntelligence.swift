@@ -43,8 +43,34 @@ enum MailCategorizer {
     /// optional because list rows do not carry bodies and a chip filter must
     /// not require a fetch. `knownSenders` is the person's own list — the one
     /// signal that outranks every pattern below.
+    /// Repeated renders classify the same rows over and over — the mailbox
+    /// list evaluates classify() for every visible row on every pass. The
+    /// decision depends only on these inputs, so a bounded cache makes the
+    /// repeats O(1). bodyText joins the key by hash: full bodies would bloat
+    /// every key, and a 64-bit hash collision is rarer than the misfile it
+    /// could cause being noticed.
+    private static let classifyCache = NSCache<NSString, DecisionBox>()
+    private static let classifyCacheLock = NSLock()
+
+    private final class DecisionBox: NSObject {
+        let decision: CategoryDecision
+        init(_ decision: CategoryDecision) { self.decision = decision }
+    }
+
     static func classify(senderAddress: String, subject: String, bodyText: String = "",
                          hasListUnsubscribe: Bool = false, knownSenders: Set<String> = []) -> CategoryDecision {
+        let cacheKey = "\(senderAddress)|\(subject)|\(hasListUnsubscribe)|\(knownSenders.sorted().joined(separator: ","))|\(bodyText.hashValue)" as NSString
+        if let boxed = classifyCache.object(forKey: cacheKey) { return boxed.decision }
+        let decision = classifyUncached(senderAddress: senderAddress, subject: subject,
+                                        bodyText: bodyText, hasListUnsubscribe: hasListUnsubscribe,
+                                        knownSenders: knownSenders)
+        classifyCache.countLimit = 600
+        classifyCache.setObject(DecisionBox(decision), forKey: cacheKey)
+        return decision
+    }
+
+    private static func classifyUncached(senderAddress: String, subject: String, bodyText: String = "",
+                                         hasListUnsubscribe: Bool = false, knownSenders: Set<String> = []) -> CategoryDecision {
         let address = senderAddress.lowercased()
         let text = (subject + "\n" + bodyText).lowercased()
 
