@@ -971,7 +971,7 @@ class MailboxViewModel @JvmOverloads constructor(
         defaultFailure: String = "That action didn't go through.",
         write: suspend (String) -> Unit,
     ): Pair<List<String>, String?> {
-        if (ids.isEmpty()) return emptyList() to null
+        if (ids.isEmpty()) return emptyList<String>() to null
         val permits = Semaphore(4)
         val done = java.util.Collections.synchronizedList(mutableListOf<String>())
         var failure: String? = null

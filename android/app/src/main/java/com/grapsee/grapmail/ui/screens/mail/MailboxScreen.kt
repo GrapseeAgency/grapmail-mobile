@@ -453,14 +453,18 @@ fun MailboxScreen(
                     followUpCount = recountFollowUps()
                 }
                 val followUpLifecycleOwner = androidx.compose.ui.platform.LocalLifecycleOwner.current
+                val followUpScope = remember { kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO) }
                 androidx.compose.runtime.DisposableEffect(followUpLifecycleOwner) {
                     val followUpObserver = androidx.lifecycle.LifecycleEventObserver { _, event ->
                         if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
-                            followUpCount = recountFollowUps()
+                            followUpScope.launch { followUpCount = recountFollowUps() }
                         }
                     }
                     followUpLifecycleOwner.lifecycle.addObserver(followUpObserver)
-                    onDispose { followUpLifecycleOwner.lifecycle.removeObserver(followUpObserver) }
+                    onDispose {
+                        followUpLifecycleOwner.lifecycle.removeObserver(followUpObserver)
+                        followUpScope.cancel()
+                    }
                 }
                 if (followUpCount > 0) {
                     com.grapsee.grapmail.ui.mailfeatures.FollowUpBanner(
@@ -1118,9 +1122,10 @@ internal fun AccountPhoto(bytes: ByteArray?, name: String, address: String?, siz
             bytes?.let { com.grapsee.grapmail.data.AvatarPhoto.thumbnail(it)?.asImageBitmap() }
         }
     }
-    if (thumbnail != null) {
+    val shownThumbnail = thumbnail
+    if (shownThumbnail != null) {
         androidx.compose.foundation.Image(
-            bitmap = thumbnail,
+            bitmap = shownThumbnail,
             contentDescription = null,
             modifier = Modifier.size(size).clip(CircleShape),
             contentScale = androidx.compose.ui.layout.ContentScale.Crop,
