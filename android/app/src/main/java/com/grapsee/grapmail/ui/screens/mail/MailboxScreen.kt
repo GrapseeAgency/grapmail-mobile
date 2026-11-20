@@ -139,6 +139,7 @@ import com.grapsee.grapmail.ui.components.SenderAvatar
 import com.grapsee.grapmail.ui.components.SelectionToolbar
 import com.grapsee.grapmail.ui.components.UnreadPill
 import com.grapsee.grapmail.ui.theme.LocalPalette
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 
 /**
