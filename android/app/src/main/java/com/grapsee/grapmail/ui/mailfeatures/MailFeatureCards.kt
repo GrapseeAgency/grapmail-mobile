@@ -570,37 +570,54 @@ fun MailSmartPanel(message: MailMessageFullDto?, messages: List<MailMessageFullD
     val context = LocalContext.current
     val prefs = remember { MailFeaturePrefs(context) }
 
-    val summary = remember(messages.size, message.id) {
-        if (messages.size >= 3) {
-            ThreadSummarizer.summarize(
-                messages.map { m ->
-                    ThreadMessageText(
-                        senderName = "",
-                        body = m.bodyText.orEmpty(),
-                        fromMe = m.direction == "outbound",
-                    )
-                },
-            )
-        } else null
+    // The four intelligence passes are pure functions, but they cost real CPU
+    // (sentence splitting, ten-plus regexes, a tracker sweep over the full
+    // HTML). They used to run synchronously inside remember() — on the main
+    // thread, in composition, during the reader's first frame. produceState
+    // moves them to Default while the panel shows its previous state.
+    val summary by androidx.compose.runtime.produceState<com.grapsee.grapmail.features.ThreadSummary?>(
+        initialValue = null, messages.size, message.id,
+    ) {
+        value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+            if (messages.size >= 3) {
+                ThreadSummarizer.summarize(
+                    messages.map { m ->
+                        ThreadMessageText(
+                            senderName = "",
+                            body = m.bodyText.orEmpty(),
+                            fromMe = m.direction == "outbound",
+                        )
+                    },
+                )
+            } else null
+        }
     }
-    val cards = remember(message.id) {
-        ActionCardExtractor.extract(message.subject.orEmpty(), message.bodyText.orEmpty())
+    val cards by androidx.compose.runtime.produceState<List<com.grapsee.grapmail.features.ActionCard>?>(
+        initialValue = null, message.id,
+    ) {
+        value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+            ActionCardExtractor.extract(message.subject.orEmpty(), message.bodyText.orEmpty())
+        }
     }
-    val verdicts = remember(message.id) {
-        Regex("https?://[^\\s<>\"']+")
-            .findAll(message.bodyText.orEmpty())
-            .map { m -> UrlSafety.analyze(m.value) }
-            .filter { v -> v.risk != UrlRisk.LOW }
-            .distinctBy { v -> v.displayHost }
-            .take(4)
-            .toList()
+    val verdicts by androidx.compose.runtime.produceState<List<com.grapsee.grapmail.features.UrlVerdict>?>(
+        initialValue = null, message.id,
+    ) {
+        value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+            Regex("https?://[^\\s<>\"']+")
+                .findAll(message.bodyText.orEmpty())
+                .map { m -> UrlSafety.analyze(m.value) }
+                .filter { v -> v.risk != UrlRisk.LOW }
+                .distinctBy { v -> v.displayHost }
+                .take(4)
+                .toList()
+        }
     }
-    val trackerScan = remember(message.id) {
+    val trackerScan by androidx.compose.runtime.produceState<com.grapsee.grapmail.features.TrackerScanResult?>(
+        initialValue = null, message.id, prefs.allowRemoteImages,
+    ) {
         val html = message.bodyHtml
-        if (message.hasHtml && !html.isNullOrBlank()) {
-            TrackerShield.scan(html, prefs.allowRemoteImages)
-        } else {
-            null
+        value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+            if (message.hasHtml && !html.isNullOrBlank()) TrackerShield.scan(html, prefs.allowRemoteImages) else null
         }
     }
     var warning by remember { mutableStateOf<UrlVerdict?>(null) }

@@ -128,17 +128,26 @@ final class ProfileModel: ObservableObject {
     func watchAvatar() async {
         guard !snapshotSeeded else { return }
         let generation = SessionStore.generation
+        // The watch holds one server-side long-poll open until the avatar
+        // revision moves. The old loop re-downloaded and re-decoded the full
+        // photo every four seconds — nine hundred times an hour for a field
+        // that changes roughly never — and fell through to a full profile GET
+        // on every poll when the account had no photo at all.
+        var revision = ""
         while !Task.isCancelled, generation == SessionStore.generation, let token {
-            do {
-                try await Task.sleep(nanoseconds: 4_000_000_000)
+            let writeGeneration = avatarWriteGeneration
+            while state.busy || profileLoad != nil {
+                try await Task.sleep(nanoseconds: 200_000_000)
                 guard !Task.isCancelled, generation == SessionStore.generation else { return }
-                let writeGeneration = avatarWriteGeneration
-                while state.busy || profileLoad != nil {
-                    try await Task.sleep(nanoseconds: 200_000_000)
-                    guard !Task.isCancelled, generation == SessionStore.generation else { return }
-                }
+            }
+            guard writeGeneration == avatarWriteGeneration else { continue }
+            do {
+                let latest = try await ApiClient.watchAvatar(token: token, revision: revision)
+                guard !Task.isCancelled, generation == SessionStore.generation else { return }
                 guard writeGeneration == avatarWriteGeneration else { continue }
-                let photo = try await ApiClient.avatarBytes(token: token)
+                if latest == revision { continue }
+                revision = latest
+                let photo = try await ApiClient.avatarBytes(token: token, revision: latest)
                 guard !Task.isCancelled, generation == SessionStore.generation else { return }
                 guard writeGeneration == avatarWriteGeneration, !state.busy, profileLoad == nil else { continue }
                 if let photo {
@@ -154,11 +163,16 @@ final class ProfileModel: ObservableObject {
                 }
             } catch let error as ApiError {
                 guard !Task.isCancelled, generation == SessionStore.generation else { return }
-                if case let .http(_, code, _) = error, code == "NO_AVATAR" { continue }
-                try? await Task.sleep(nanoseconds: 2_000_000_000)
+                if case let .http(_, code, _) = error, code == "NO_AVATAR" {
+                    // no photo on the account: asking again sooner than a
+                    // minute is pure churn
+                    try? await Task.sleep(nanoseconds: 60_000_000_000)
+                    continue
+                }
+                try? await Task.sleep(nanoseconds: 5_000_000_000)
             } catch {
                 if Task.isCancelled { return }
-                try? await Task.sleep(nanoseconds: 2_000_000_000)
+                try? await Task.sleep(nanoseconds: 5_000_000_000)
             }
         }
     }

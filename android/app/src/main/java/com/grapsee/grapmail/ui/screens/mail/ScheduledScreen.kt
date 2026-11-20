@@ -14,7 +14,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -35,10 +35,20 @@ import java.time.format.FormatStyle
  * deliver at `scheduledFor` — and cancelling clears `scheduled_at`, which is
  * why the note says "it will not be sent" rather than "deleted".
  */
+// One formatter for the whole list. Constructing a DateTimeFormatter is an
+// ICU lookup per call, and the old inline version ran it once per visible
+// row on every recomposition, alongside a fresh ISO parse of the same field.
+private val scheduledWhenFormatter: DateTimeFormatter =
+    DateTimeFormatter.ofLocalizedDateTime(FormatStyle.MEDIUM)
+
+private fun scheduledWhenText(iso: String): String = runCatching {
+    "Sends " + scheduledWhenFormatter.format(ZonedDateTime.parse(iso))
+}.getOrDefault("Sends at the server's instant")
+
 @Composable
 fun ScheduledScreen(onBack: () -> Unit, vm: MailboxViewModel) {
     val palette = LocalPalette.current
-    val state by vm.scheduled.collectAsState()
+    val state by vm.scheduled.collectAsStateWithLifecycle()
     LaunchedEffect(Unit) { vm.loadScheduled() }
 
     // F19: while future sends exist, mirror them onto the device's own shade —
@@ -120,10 +130,8 @@ fun ScheduledScreen(onBack: () -> Unit, vm: MailboxViewModel) {
                             )
                             Spacer(Modifier.height(2.dp))
                             Text(
-                                m.scheduledFor?.let {
-                                    "Sends " + DateTimeFormatter.ofLocalizedDateTime(FormatStyle.MEDIUM)
-                                        .format(ZonedDateTime.parse(it))
-                                } ?: "Awaiting the server's instant",
+                                m.scheduledFor?.let { scheduledWhenText(it) }
+                                    ?: "Awaiting the server's instant",
                                 fontSize = 12.sp, color = palette.textTertiary,
                             )
                             Spacer(Modifier.height(6.dp))

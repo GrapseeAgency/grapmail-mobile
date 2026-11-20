@@ -807,9 +807,12 @@ object Api {
     }
 
     private fun fail(status: Int, body: String): Nothing {
-        val code = runCatching { json.parseToJsonElement(body).jsonObjectOrNull()?.get("code")?.toString()?.trim('"') }.getOrNull()
-        val message = runCatching { json.parseToJsonElement(body).jsonObjectOrNull()?.get("message")?.toString()?.trim('"') }.getOrNull()
-            ?: runCatching { json.parseToJsonElement(body).jsonObjectOrNull()?.get("error")?.toString()?.trim('"') }.getOrNull()
+        // one parse for all three keys — the old version re-parsed the body
+        // for code, then message, then error
+        val parsed = runCatching { json.parseToJsonElement(body).jsonObjectOrNull() }.getOrNull()
+        val code = parsed?.get("code")?.toString()?.trim('"')
+        val message = parsed?.get("message")?.toString()?.trim('"')
+            ?: parsed?.get("error")?.toString()?.trim('"')
             ?: "Request failed ($status)"
         throw ApiException(status, code, message)
     }

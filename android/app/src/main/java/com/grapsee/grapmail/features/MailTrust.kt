@@ -326,6 +326,9 @@ object TrackerShield {
             if (isTracker || !allowRemoteImages) blocked.add(host)
         }
 
+        // Removal happens in one pass over the html: the old version rebuilt
+        // the whole string per tracker tag — O(tags x html) on newsletter mail.
+        val removeTags = ArrayList<String>()
         var out = html
         if (!allowRemoteImages || trackerCount > 0) {
             for (m in tags) {
@@ -334,9 +337,10 @@ object TrackerShield {
                 if (!isRemote(src)) continue
                 val host = hostOf(src) ?: continue
                 val isTracker = onePixel.containsMatchIn(tag) || trackerHostHints.any { host.contains(it) }
-                if (isTracker || !allowRemoteImages) {
-                    out = out.replace(tag, "")
-                }
+                if (isTracker || !allowRemoteImages) removeTags.add(tag)
+            }
+            if (removeTags.isNotEmpty()) {
+                out = Regex(removeTags.joinToString("|") { Regex.escape(it) }).replace(html, "")
             }
         }
 

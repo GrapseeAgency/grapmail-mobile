@@ -215,7 +215,7 @@ class MainActivity : FragmentActivity() {
                         // a compatible update exists, closed by the person and
                         // re-offered with tomorrow's daily check.
                         val updateBannerVisible = com.grapsee.grapmail.logic.AppUpdate.bannerVisible
-                            .collectAsState().value
+                            .collectAsStateWithLifecycle().value
                         if (updateBannerVisible) {
                             com.grapsee.grapmail.ui.components.UpdateBanner(
                                 onUpdate = { com.grapsee.grapmail.logic.AppUpdate.startUpdate(this@MainActivity) },

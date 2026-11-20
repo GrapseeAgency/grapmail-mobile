@@ -951,6 +951,49 @@ class MailboxViewModel @JvmOverloads constructor(
      * the server already knows which mail is waiting, so `actOn(id, Unsnooze)` on a
      * row in that box is the permanent path. This is the immediate one.
      */
+    /**
+     * Runs one write per id in parallel, bounded by the same four permits the
+     * bulk action path uses, and reports the ids whose write landed plus the
+     * first failure. The undo, restore and delete paths used to issue their
+     * writes serially while `busy` held the toolbar: a twenty-item undo was
+     * twenty round trips with the UI locked.
+     *
+     * `write` throws on failure — a non-cancellation exception is recorded as
+     * the run's first failure and costs that id its place in the done list.
+     * A null [session] skips the is-current guard (paths that authenticate by
+     * token alone).
+     */
+    private suspend fun parallelWrites(
+        ids: List<String>,
+        session: SessionSnapshot?,
+        app: android.app.Application,
+        defaultFailure: String = "That action didn't go through.",
+        write: suspend (String) -> Unit,
+    ): Pair<List<String>, String?> {
+        if (ids.isEmpty()) return emptyList<String>() to null
+        val permits = kotlinx.coroutines.sync.Semaphore(4)
+        val done = java.util.Collections.synchronizedList(mutableListOf<String>())
+        var failure: String? = null
+        kotlinx.coroutines.coroutineScope {
+            ids.map { id ->
+                kotlinx.coroutines.async {
+                    permits.withPermit {
+                        try {
+                            if (session != null && !SessionStore.isCurrent(app, session.id)) return@withPermit
+                            write(id)
+                            done.add(id)
+                        } catch (e: kotlinx.coroutines.CancellationException) {
+                            throw e
+                        } catch (e: Exception) {
+                            failure = failure ?: (e.message ?: defaultFailure)
+                        }
+                    }
+                }
+            }.awaitAll()
+        }
+        return done.toList() to failure
+    }
+
     fun undoSnooze() {
         val ids = _state.value.snoozeUndoIds
         if (ids.isEmpty() || _state.value.busy || pendingRowActions.isNotEmpty()) return
@@ -961,16 +1004,8 @@ class MailboxViewModel @JvmOverloads constructor(
                 _state.update { it.copy(busy = false, actionError = "Sign in again.") }
                 return@launch
             }
-            var failure: String? = null
-            val restored = mutableListOf<String>()
-            for (id in ids) {
-                if (!SessionStore.isCurrent(app, session.id)) return@launch
-                runCatching { Api.mailAction(session.token, id, MailAction.Unsnooze, null) }
-                    .onSuccess { restored.add(id) }
-                    .onFailure {
-                        if (it is kotlinx.coroutines.CancellationException) throw it
-                        failure = it.message ?: "That action didn't go through."
-                    }
+            val (restored, failure) = parallelWrites(ids, session, app) { id ->
+                Api.mailAction(session.token, id, MailAction.Unsnooze, null)
             }
             if (!SessionStore.isCurrent(app, session.id)) return@launch
             if (restored.isNotEmpty()) invalidateFor(MailAction.Unsnooze, session.id)
@@ -1019,19 +1054,9 @@ class MailboxViewModel @JvmOverloads constructor(
                 _state.update { it.copy(busy = false, actionError = "Sign in again.") }
                 return@launch
             }
-            var failure: String? = null
-            val redone = mutableListOf<String>()
-            for (id in ids) {
-                if (!SessionStore.isCurrent(app, session.id)) return@launch
-                runCatching { Api.mailAction(session.token, id, inv, null) }
-                    .onSuccess {
-                        if (!SessionStore.isCurrent(app, session.id)) return@launch
-                        redone.add(id); applyLocally(id, inv, session.id)
-                    }
-                    .onFailure {
-                        if (it is kotlinx.coroutines.CancellationException) throw it
-                        failure = it.message ?: "That action didn't go through."
-                    }
+            val (redone, failure) = parallelWrites(ids, session, app) { id ->
+                Api.mailAction(session.token, id, inv, null)
+                applyLocally(id, inv, session.id)
             }
             if (!SessionStore.isCurrent(app, session.id)) return@launch
             if (redone.isNotEmpty()) invalidateFor(inv, session.id)
@@ -1287,25 +1312,17 @@ class MailboxViewModel @JvmOverloads constructor(
                 _state.update { it.copy(busy = false, actionError = "Sign in again.") }
                 return@launch
             }
-            var failure: String? = null
-            val removed = mutableSetOf<String>()
-            for (id in ids) {
-                runCatching { Api.mailDeletePermanent(t, id) }
-                    .onSuccess {
-                        removed.add(id)
-                        MailStore.remove(id, MailBox.Trash)
-                        MailStore.forgetBody(id)
-                        // The message is gone, so its label pairs are gone with it.
-                        // Left in the map they would be resurrected if the same id
-                        // ever appeared again, showing a tick for mail that does not
-                        // exist — and the next read would say nothing about it.
-                        MailStore.forgetAssignments(id)
-                    }
-                    .onFailure {
-                        if (it is kotlinx.coroutines.CancellationException) throw it
-                        failure = it.message ?: "That message could not be deleted."
-                    }
+            val (removedIds, failure) = parallelWrites(ids, null, getApplication(), defaultFailure = "That message could not be deleted.") { id ->
+                Api.mailDeletePermanent(t, id)
+                MailStore.remove(id, MailBox.Trash)
+                MailStore.forgetBody(id)
+                // The message is gone, so its label pairs are gone with it.
+                // Left in the map they would be resurrected if the same id
+                // ever appeared again, showing a tick for mail that does not
+                // exist — and the next read would say nothing about it.
+                MailStore.forgetAssignments(id)
             }
+            val removed = removedIds.toSet()
             _state.update {
                 it.copy(busy = false, selection = it.selection - removed, actionError = failure,
                     rows = it.rows.filterNot { row -> row.id in removed })
@@ -2159,6 +2176,11 @@ class MailboxViewModel @JvmOverloads constructor(
         val app = getApplication<android.app.Application>()
         val session = SessionStore.snapshot(app) ?: return null
         return kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            // A thumbnail only needs a few kilobytes; the poll worker caps its
+            // own image fetches at 2 MB for the same reason. Bigger attachments
+            // keep the fallback icon instead of pulling a 20 MB file to draw a
+            // 38dp square.
+            if ((a.sizeBytes ?: 0) > 2_000_000) return@withContext null
             val root = java.io.File(app.cacheDir, "attachment-previews").apply { mkdirs() }
             val file = java.io.File(
                 root,
@@ -2880,20 +2902,17 @@ class MailboxViewModel @JvmOverloads constructor(
 
             if (_screener.value.busy) return@launch
             _screener.update { it.copy(busy = true, error = null) }
-            var failure: String? = null
-            var saved = 0
-            for (s in senders) {
-                runCatching { Api.mailScreenerDecision(t, s, scope, decision) }
-                    .onSuccess { r ->
-                        // `success` is the store's own word for the write landing.
-                        // A 200 that did not say so is not counted as saved.
-                        if (r.success) saved++ else failure = r.error ?: "The server refused that decision."
-                    }
-                    .onFailure { e ->
+            val (decided, failure) = parallelWrites(senders, null, getApplication()) { s ->
+                val r = runCatching { Api.mailScreenerDecision(t, s, scope, decision) }
+                    .getOrElse { e ->
                         if (e is kotlinx.coroutines.CancellationException) throw e
-                        failure = mailReason(e)
+                        throw RuntimeException(mailReason(e))
                     }
+                // `success` is the store's own word for the write landing.
+                // A 200 that did not say so is not counted as saved.
+                if (!r.success) throw RuntimeException(r.error ?: "The server refused that decision.")
             }
+            val saved = decided.size
             _screener.update { it.copy(busy = false, error = failure) }
             then(
                 when {

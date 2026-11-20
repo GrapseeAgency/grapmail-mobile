@@ -330,7 +330,13 @@ class MailNotificationActionReceiver : BroadcastReceiver() {
             to = listOf(address), subject = replySubject,
             bodyText = text, inReplyTo = target.messageId,
         ))
-        if (r.status in listOf("sent", "queued", "delivered")) {
+        // The send endpoint answers with the outgoing queue's vocabulary —
+        // "queued" (always: the worker is the delivery path) and "scheduled"
+        // (never here, an inline reply carries no scheduledFor). "sent" stays
+        // because an older server build answered with it. "delivered" is an
+        // inbound row's status and can never arrive from this call; naming it
+        // here would read like the app claiming a delivery it did not see.
+        if (r.status in listOf("sent", "queued", "scheduled")) {
             Notifications.dismiss(app, target.messageId)
         }
     }

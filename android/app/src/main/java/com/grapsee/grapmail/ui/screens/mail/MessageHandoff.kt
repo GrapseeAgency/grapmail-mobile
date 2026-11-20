@@ -249,8 +249,20 @@ private fun fetchRemoteImage(url: String): RemoteImageOutcome {
                     "That address is not an image (${type.ifBlank { "no type given" }}).")
             }
             val bytes = resp.body?.bytes()
-            val decoded = bytes?.let {
-                android.graphics.BitmapFactory.decodeByteArray(it, 0, it.size)
+            // A 6000x4000 newsletter image decoded full-size costs ~90 MB of
+            // bitmap RAM for a box that draws at 420dp. Bounds-decode first,
+            // then sample down to roughly the display size — the same pattern
+            // MailPollWorker's notification image already uses.
+            val decoded = bytes?.let { data ->
+                val bounds = android.graphics.BitmapFactory.Options().apply {
+                    inJustDecodeBounds = true
+                }
+                android.graphics.BitmapFactory.decodeByteArray(data, 0, data.size, bounds)
+                val maxSide = maxOf(bounds.outWidth, bounds.outHeight).coerceAtLeast(1)
+                var sample = 1
+                while (maxSide / (sample * 2) >= 1080) sample *= 2
+                android.graphics.BitmapFactory.Options().apply { inSampleSize = sample }
+                    .let { opts -> android.graphics.BitmapFactory.decodeByteArray(data, 0, data.size, opts) }
             }
             if (decoded == null) {
                 RemoteImageOutcome.Problem("The image could not be read.")

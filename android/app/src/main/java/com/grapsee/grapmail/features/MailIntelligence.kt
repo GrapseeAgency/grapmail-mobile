@@ -522,11 +522,19 @@ data class NaturalSearchParse(
 
 object NaturalSearch {
 
+    private val naturalSearchPatterns = java.util.concurrent.ConcurrentHashMap<String, Regex>()
+    private val whitespaceRun = Regex("\\s+")
+
     fun parse(question: String): NaturalSearchParse {
         var q = " " + question.trim() + " "
 
+        // Patterns compile once per app run instead of once per keystroke:
+        // parse() runs on the main thread for every character the search box
+        // takes, and the old code rebuilt each Regex every time.
         fun consume(pattern: String): String? {
-            val m = Regex(pattern, RegexOption.IGNORE_CASE).find(q) ?: return null
+            val m = (naturalSearchPatterns.getOrPut(pattern) {
+                Regex(pattern, RegexOption.IGNORE_CASE)
+            }).find(q) ?: return null
             q = q.removeRange(m.range)
             return m.groupValues.getOrNull(1)?.trim().orEmpty()
         }
@@ -610,7 +618,7 @@ object NaturalSearch {
         scaffolding.forEach { w ->
             rest = rest.replace(Regex("(?i)\\b" + Regex.escape(w) + "\\b"), " ")
         }
-        rest = rest.replace(Regex("\\s+"), " ").trim()
+        rest = whitespaceRun.replace(rest, " ").trim()
         val text = rest.takeIf { it.length >= 2 }
 
         val parts = ArrayList<String>()

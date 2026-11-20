@@ -118,16 +118,33 @@ class ProfileViewModel @JvmOverloads constructor(
     }
 
     private suspend fun watchAvatar(session: SessionSnapshot) {
-        var lastUrl = state.value.profile?.avatarUrl
+        // The watch holds one server-side long-poll open until the avatar
+        // revision moves. The old loop re-downloaded the entire profile
+        // document every six seconds — ten heavy round trips a minute for a
+        // field that changes roughly never.
+        var revision = ""
         while (viewModelScope.isActive) {
-            kotlinx.coroutines.delay(6_000)
             if (SessionStore.snapshot(getApplication())?.token != session.token) return
-            if (state.value.busy) continue
+            if (state.value.busy) {
+                kotlinx.coroutines.delay(2_000)
+                continue
+            }
+            val latest = runCatching { Api.watchAvatar(session.token, revision) }.getOrNull()
+                ?: run {
+                    // network blip: back off instead of hammering
+                    kotlinx.coroutines.delay(5_000)
+                    continue
+                }
+            // floor between polls so a fast-answering server can never turn
+            // this into a hot spin
+            kotlinx.coroutines.delay(250)
+            if (latest == revision) continue
+            revision = latest
+            // the avatar actually changed — a full profile read is now worth
+            // it, and the state below keeps its old shape
             val resp = runCatching { Api.profile(session.token) }.getOrNull() ?: continue
             val url = resp.profile?.avatarUrl ?: continue
-            if (url == lastUrl) continue
             val bytes = runCatching { Api.avatarBytes(session.token) }.getOrNull() ?: continue
-            lastUrl = url
             val current = state.value.avatar
             if (current == null || !bytes.contentEquals(current)) {
                 AvatarPhoto.remember(session, bytes)

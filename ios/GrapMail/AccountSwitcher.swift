@@ -141,7 +141,12 @@ struct AccountSwitcher: View {
             savedPhotos[account.id] = cached
         }
         var revision = ""
-        while !Task.isCancelled, let token = await ApiClient.pushBearer(for: account.address) {
+        // A parked account with a dead bearer retried every three seconds for
+        // as long as the switcher popover existed — forever. Five consecutive
+        // failures is terminal for this watch; one healthy pass resets it.
+        var failures = 0
+        while !Task.isCancelled, failures < 5,
+              let token = await ApiClient.pushBearer(for: account.address) {
             do {
                 let latest = try await ApiClient.watchAvatar(token: token, revision: revision)
                 if latest != revision {
@@ -151,10 +156,13 @@ struct AccountSwitcher: View {
                     AccountPhotoCache.store(photo, token: token)
                     revision = latest
                 }
+                failures = 0
             } catch {
                 if let apiError = error as? ApiError,
-                   case let .http(_, code, _) = apiError, code == "AVATAR_CHANGED" { continue }
+                   case let .http(_, code, _) = apiError, code == "AVATAR_CHANGED" { failures = 0; continue }
                 if Task.isCancelled { return }
+                failures += 1
+                if failures >= 5 { return }
                 try? await Task.sleep(nanoseconds: 3_000_000_000)
             }
         }

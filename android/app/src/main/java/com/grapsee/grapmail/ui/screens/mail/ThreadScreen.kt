@@ -305,11 +305,17 @@ fun ThreadScreen(
                 Text(text, fontSize = 12.sp, color = if (isError) palette.error else palette.textSecondary,
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 4.dp))
             }
-            com.grapsee.grapmail.ui.mailfeatures.SmartReplyStrip(
-                suggestions = com.grapsee.grapmail.features.SmartReplyEngine.suggest(
+            // The suggestion engine lowercases the body and runs its scan
+            // battery; keyed to the message it computes once per mail instead
+            // of once per recomposition (polls, state writes, focus changes).
+            val smartSuggestions = remember(message.id) {
+                com.grapsee.grapmail.features.SmartReplyEngine.suggest(
                     subject = message.subject.orEmpty(),
                     bodyText = message.bodyText.orEmpty(),
-                ),
+                )
+            }
+            com.grapsee.grapmail.ui.mailfeatures.SmartReplyStrip(
+                suggestions = smartSuggestions,
                 onPick = { suggestion ->
                     com.grapsee.grapmail.logic.MailFeaturePrefs.stageComposeInsert(suggestion)
                     onReply(message, "reply")
@@ -440,7 +446,7 @@ private fun ThreadMessageCard(
     // the same rule iOS applies. Null means show nothing: a button that opens a
     // broken or dangerous URL is worse than no button, and most mail simply has no
     // such header.
-    val unsubUrl = unsubscribeTarget(message.unsubscribe)
+    val unsubUrl = remember(message.id, message.unsubscribe) { unsubscribeTarget(message.unsubscribe) }
     val shape = RoundedCornerShape(20.dp)
     val sender = message.from?.display?.takeIf { it.isNotBlank() }
         ?: message.from?.address?.takeIf { it.isNotBlank() } ?: "Unknown sender"

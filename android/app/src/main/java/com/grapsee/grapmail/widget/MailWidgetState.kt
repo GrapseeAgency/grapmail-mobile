@@ -42,17 +42,31 @@ object MailWidgetState {
      * [recent] carries the newest three (sender, subject) pairs when the caller
      * has them; a null [recent] keeps whatever the last real read stored.
      */
+    /** What the widgets are currently showing; an unchanged read skips the redraw. */
+    private var lastPublished: Triple<Int, String, String?>? = null
+
     suspend fun publish(
         context: Context,
         unread: Int?,
         latest: String?,
         recent: List<Pair<String, String>>? = null,
     ) {
-        val editor = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+        val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        val editor = prefs.edit()
             .putInt(KEY_UNREAD, unread ?: -1)
             .putString(KEY_LATEST, latest?.take(120))
         if (recent != null) editor.putString(KEY_RECENT, encode(recent))
         editor.apply()
+        // Every publish used to wake Glance and redraw every widget even when
+        // unread, latest and recent were byte-identical — one redraw per poll
+        // with nothing new to show. Compare the effective triple and skip.
+        val signature = Triple(
+            unread ?: -1,
+            latest?.take(120) ?: prefs.getString(KEY_LATEST, null).orEmpty(),
+            recent?.let { encode(it) } ?: prefs.getString(KEY_RECENT, null),
+        )
+        if (signature == lastPublished) return
+        lastPublished = signature
         runCatching { UnreadWidget().updateAll(context) }
     }
 

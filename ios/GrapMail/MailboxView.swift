@@ -435,10 +435,14 @@ struct MailboxView: View {
     }
 
     @ViewBuilder private var messageList: some View {
-        let prefetchIDs = Set(shownRows.suffix(4).map(\.id))
-        let lastID = shownRows.last?.id
+        // shownRows classifies every row (lowercased subject/body scans); the
+        // old body evaluated it four times per render — once per call site.
+        // One local, four consumers.
+        let rows = shownRows
+        let prefetchIDs = Set(rows.suffix(4).map(\.id))
+        let lastID = rows.last?.id
         let list = List {
-            ForEach(shownRows) { row in
+            ForEach(rows) { row in
                 rowView(for: row, prefetchIDs: prefetchIDs, showDivider: row.id != lastID)
             }
             listFooter

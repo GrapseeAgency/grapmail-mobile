@@ -438,7 +438,30 @@ fun MailboxScreen(
 
                 val followUpCtx = androidx.compose.ui.platform.LocalContext.current
                 val followUpPrefs = remember { com.grapsee.grapmail.logic.MailFeaturePrefs(followUpCtx) }
-                val followUpCount = followUpPrefs.overdueAwaitingReplies(followUpPrefs.followUpDays).size
+                // The overdue scan walks the entire prefs map — one entry per
+                // read receipt, growing without bound — so it must never run
+                // inside composition, where every poll result, keystroke and
+                // selection tap would re-walk it on the main thread. It is
+                // computed off the hot path and refreshed when the screen
+                // resumes or the follow-up sheet closes.
+                var followUpCount by remember { androidx.compose.runtime.mutableIntStateOf(0) }
+                suspend fun recountFollowUps(): Int =
+                    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                        followUpPrefs.overdueAwaitingReplies(followUpPrefs.followUpDays).size
+                    }
+                androidx.compose.runtime.LaunchedEffect(followUpPrefs.followUpDays, showFollowUps) {
+                    followUpCount = recountFollowUps()
+                }
+                val followUpLifecycleOwner = androidx.compose.ui.platform.LocalLifecycleOwner.current
+                androidx.compose.runtime.DisposableEffect(followUpLifecycleOwner) {
+                    val followUpObserver = androidx.lifecycle.LifecycleEventObserver { _, event ->
+                        if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
+                            followUpCount = recountFollowUps()
+                        }
+                    }
+                    followUpLifecycleOwner.lifecycle.addObserver(followUpObserver)
+                    onDispose { followUpLifecycleOwner.lifecycle.removeObserver(followUpObserver) }
+                }
                 if (followUpCount > 0) {
                     com.grapsee.grapmail.ui.mailfeatures.FollowUpBanner(
                         count = followUpCount,
@@ -913,7 +936,14 @@ private fun AccountSwitcherPopup(
                         }
                     } catch (error: Exception) {
                         if (error is kotlinx.coroutines.CancellationException) throw error
-                        if (error is com.grapsee.grapmail.data.ApiException && error.code == "AVATAR_CHANGED") continue
+                        if (error is com.grapsee.grapmail.data.ApiException && error.code == "AVATAR_CHANGED") {
+                            // the revision moved under us mid-fetch; the next
+                            // long-poll re-anchors from the new state — but a
+                            // floor here keeps a fast-answering server from
+                            // spinning this loop hot
+                            kotlinx.coroutines.delay(1_000)
+                            continue
+                        }
                         kotlinx.coroutines.delay(3_000)
                     }
                 }
@@ -1078,8 +1108,15 @@ private fun SwitcherActionRow(icon: androidx.compose.ui.graphics.vector.ImageVec
 
 @Composable
 internal fun AccountPhoto(bytes: ByteArray?, name: String, address: String?, size: androidx.compose.ui.unit.Dp) {
-    val thumbnail = remember(bytes) {
-        bytes?.let { com.grapsee.grapmail.data.AvatarPhoto.thumbnail(it)?.asImageBitmap() }
+    // Two full bitmap decodes over up to 10 MB of photo bytes used to run on
+    // the main thread every time the bytes identity changed. Decode on Default
+    // instead; the old thumbnail shows until the new one lands.
+    val thumbnail by androidx.compose.runtime.produceState<androidx.compose.ui.graphics.ImageBitmap?>(
+        initialValue = null, bytes,
+    ) {
+        value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+            bytes?.let { com.grapsee.grapmail.data.AvatarPhoto.thumbnail(it)?.asImageBitmap() }
+        }
     }
     if (thumbnail != null) {
         androidx.compose.foundation.Image(

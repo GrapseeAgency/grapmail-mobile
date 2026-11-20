@@ -145,10 +145,18 @@ struct ScheduledView: View {
         }
     }
 
-    static func whenText(_ iso: String) -> String {
+    // One parser, one formatter, built once. The old version constructed a
+    // DateFormatter (an ICU setup) and an ISO8601DateFormatter per row per
+    // render of the scheduled list.
+    private static let isoParser = ISO8601DateFormatter()
+    private static let whenFormatter: DateFormatter = {
         let f = DateFormatter()
         f.dateStyle = .medium
         f.timeStyle = .short
-        return ISO8601DateFormatter().date(from: iso).map(f.string(from:)) ?? iso
+        return f
+    }()
+
+    static func whenText(_ iso: String) -> String {
+        Self.isoParser.date(from: iso).map(Self.whenFormatter.string(from:)) ?? iso
     }
 }

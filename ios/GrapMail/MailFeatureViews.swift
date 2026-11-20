@@ -141,39 +141,23 @@ struct MailSmartPanelView: View {
     @State private var receiptNoted = false
     @State private var linkAlert: LinkAlert?
 
-    private var scan: TrackerScan {
-        TrackerShield.scan(message.bodyHtml ?? "")
-    }
-
-    private var decision: CategoryDecision {
-        MailCategorizer.classify(
-            senderAddress: message.from?.address ?? "",
-            subject: message.subject ?? "",
-            bodyText: message.bodyText ?? "",
-            hasListUnsubscribe: message.unsubscribe != nil,
-            knownSenders: MailFeaturePrefs.shared.prioritySenders)
-    }
-
-    private var cards: [MailActionCard] {
-        ActionCardExtractor.extract(subject: message.subject ?? "", body: message.bodyText ?? "")
-    }
-
-    private var linkVerdicts: [UrlVerdict] {
-        let text = message.bodyText?.isEmpty == false ? (message.bodyText ?? "") : (message.bodyHtml ?? "")
-        return Self.suspiciousLinks(in: text)
-    }
+    // The five intelligence passes (tracker sweep, category decision, action
+    // cards, link verdicts, receipt sniff) re-ran their regex batteries over
+    // the full body on EVERY render of this view — every poll, every flag,
+    // every count change. They are computed once per message, off the main
+    // render, and held as state. Nil until the first pass lands.
+    @State private var scan: TrackerScan?
+    @State private var decision: CategoryDecision?
+    @State private var cards: [MailActionCard] = []
+    @State private var linkVerdicts: [UrlVerdict] = []
+    @State private var asksReceipt = false
 
     private var isPriority: Bool {
         prioritySet || MailFeaturePrefs.shared.prioritySenders.contains((message.from?.address ?? "").lowercased())
     }
 
-    private var asksReceipt: Bool {
-        let text = (message.bodyText ?? "").lowercased()
-        return text.contains("read receipt") || text.contains("return receipt")
-    }
-
     private var showsTrackerBanner: Bool {
-        MailFeaturePrefs.shared.trackerShieldEnabled && (scan.trackerCount > 0 || scan.remoteImageCount > 0)
+        MailFeaturePrefs.shared.trackerShieldEnabled && (scan?.trackerCount ?? 0 > 0 || scan?.remoteImageCount ?? 0 > 0)
     }
 
     static func suspiciousLinks(in text: String) -> [UrlVerdict] {
@@ -191,6 +175,8 @@ struct MailSmartPanelView: View {
         return Array(out.prefix(4))
     }
 
+    @State private var summary: ThreadSummary?
+
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 8) {
@@ -203,7 +189,7 @@ struct MailSmartPanelView: View {
                 }
                 Spacer(minLength: 0)
             }
-            if let summary = ThreadSummarizer.summarize(threadMessages) {
+            if let summary {
                 summaryCard(summary)
             }
             if showsTrackerBanner {
@@ -226,6 +212,22 @@ struct MailSmartPanelView: View {
         .sheet(item: $linkAlert) { alert in
             UrlWarningSheet(verdict: alert.verdict, onOpen: onOpenUrl, onClose: { linkAlert = nil })
         }
+        .task(id: "\(message.id)#\(threadMessages.count)") {
+            // one computation per open message; the render just reads state
+            let bodyText = message.bodyText ?? ""
+            scan = TrackerShield.scan(message.bodyHtml ?? "")
+            decision = MailCategorizer.classify(
+                senderAddress: message.from?.address ?? "",
+                subject: message.subject ?? "",
+                bodyText: bodyText,
+                hasListUnsubscribe: message.unsubscribe != nil,
+                knownSenders: MailFeaturePrefs.shared.prioritySenders)
+            cards = ActionCardExtractor.extract(subject: message.subject ?? "", body: bodyText)
+            linkVerdicts = Self.suspiciousLinks(in: bodyText.isEmpty == false ? bodyText : (message.bodyHtml ?? ""))
+            let lowered = bodyText.lowercased()
+            asksReceipt = lowered.contains("read receipt") || lowered.contains("return receipt")
+            summary = ThreadSummarizer.summarize(threadMessages)
+        }
     }
 
     // MARK: rows
@@ -246,6 +248,7 @@ struct MailSmartPanelView: View {
     }
 
     private var categoryLabel: String {
+        guard let decision else { return "GENERAL" }
         switch decision.category {
         case .people: return decision.priority ? "PEOPLE - PRIORITY" : "PEOPLE"
         case .transactions: return "TRANSACTIONS"
@@ -256,6 +259,7 @@ struct MailSmartPanelView: View {
     }
 
     private var categoryColor: Color {
+        guard let decision else { return GM.textSecondary }
         switch decision.category {
         case .people: return GM.primarySolid
         case .transactions: return GM.success
@@ -360,12 +364,12 @@ struct MailSmartPanelView: View {
                 .font(.system(.caption))
                 .foregroundColor(GM.warning)
             VStack(alignment: .leading, spacing: 2) {
-                Text("\(scan.trackerCount) tracker \(scan.trackerCount == 1 ? "pixel" : "pixels") blocked - \(scan.remoteImageCount) remote images held")
+                Text("\(scan?.trackerCount ?? 0) tracker \(scan?.trackerCount ?? 0 == 1 ? "pixel" : "pixels") blocked - \(scan?.remoteImageCount ?? 0) remote images held")
                     .font(.system(.caption).weight(.medium))
                     .foregroundColor(GM.textPrimary)
                     .fixedSize(horizontal: false, vertical: true)
-                if !scan.hosts.isEmpty {
-                    Text(scan.hosts.joined(separator: ", "))
+                if !(scan?.hosts ?? []).isEmpty {
+                    Text((scan?.hosts ?? []).joined(separator: ", "))
                         .font(.system(.caption2))
                         .foregroundColor(GM.textTertiary)
                         .lineLimit(2)
@@ -588,10 +592,9 @@ struct MailComposeTools: View {
     // second one is a redeclaration.
     @Binding var draft: String
     @State private var remindIfNoReply = UserDefaults.standard.bool(forKey: "gm.pendingFollowUp")
-
-    private var rewrites: [RewriteSuggestion] {
-        ComposeAssistant.rewrite(draft)
-    }
+    // The rewrite battery ran ten-plus regexes over the whole draft on every
+    // keystroke. Now it waits for the typing to settle and computes once.
+    @State private var rewrites: [RewriteSuggestion] = []
 
     var body: some View {
         HStack(spacing: 8) {
@@ -624,6 +627,12 @@ struct MailComposeTools: View {
             }
             .buttonStyle(.plain)
             Spacer(minLength: 0)
+        }
+        .task(id: draft) {
+            guard draft.count >= 24 else { rewrites = []; return }
+            try? await Task.sleep(nanoseconds: 400_000_000)
+            guard !Task.isCancelled else { return }
+            rewrites = ComposeAssistant.rewrite(draft)
         }
     }
 
