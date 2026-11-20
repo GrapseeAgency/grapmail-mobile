@@ -30,6 +30,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Verify generated app icons
+        run: |
+          brew install librsvg
+          python3 -m venv "$RUNNER_TEMP/app-icons"
+          "$RUNNER_TEMP/app-icons/bin/python" -m pip install Pillow==11.3.0
+          "$RUNNER_TEMP/app-icons/bin/python" scripts/app-icons.py --check
+
       - name: Install XcodeGen
         run: brew install xcodegen
 
@@ -243,6 +250,13 @@ jobs:
       APPSTORE_PROVISIONING_PROFILE: ${{ secrets.APPSTORE_PROVISIONING_PROFILE }}
     steps:
       - uses: actions/checkout@v4
+
+      - name: Verify generated app icons
+        run: |
+          brew install librsvg
+          python3 -m venv "$RUNNER_TEMP/app-icons"
+          "$RUNNER_TEMP/app-icons/bin/python" -m pip install Pillow==11.3.0
+          "$RUNNER_TEMP/app-icons/bin/python" scripts/app-icons.py --check
 
       - name: Refuse to run without the signing secrets
         # A missing secret must end the run RED naming what is absent. A quiet

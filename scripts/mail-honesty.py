@@ -3145,12 +3145,7 @@ pin("Android's splash theme is installed before the window content exists",
     # the blank window and nothing says so.
     and 'android:theme="@style/Theme.GrapMail.Splash"' in KT_MANIFEST)
 
-# One mark, three surfaces: the launcher, the splash and the iOS launch screen
-# are the same two paths, so the brand does not change shape between them.
-# The 3D mark cannot be a hand-written vector, so the launcher ships as raster
-# adaptive layers: one foreground + one themed monochrome per density, both XMLs
-# (adaptive + round), roundIcon in the manifest, the iOS 1024, and the splash
-# vector. A missing density or a leaked debug receiver fails here, not in CI.
+# The generated launcher layers and the separate splash assets must exist.
 _DENS = ("mdpi", "hdpi", "xhdpi", "xxhdpi", "xxxhdpi")
 _LAUNCHER_FILES = tuple(
     ROOT / "android/app/src/main/res" / f"mipmap-{d}" / n
@@ -3160,7 +3155,7 @@ _ADAPTIVE = ROOT / "android/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml"
 _round_xml = ROOT / "android/app/src/main/res/mipmap-anydpi-v26/ic_launcher_round.xml"
 _debug_src = ROOT / "android/app/src/debug"
 pin("the new logo is the launcher on every density, themed, round, iOS and splash",
-    all(f.exists() and f.stat().st_size > 1000 for f in _LAUNCHER_FILES)
+    all(f.is_file() for f in _LAUNCHER_FILES)
     and _ADAPTIVE.exists()
     and "ic_launcher_foreground" in _ADAPTIVE.read_text(encoding="utf-8")
     and "ic_launcher_monochrome" in _ADAPTIVE.read_text(encoding="utf-8")
@@ -3169,7 +3164,6 @@ pin("the new logo is the launcher on every density, themed, round, iOS and splas
     # The iOS 1024 icon lives in the Xcode asset catalog (the artwork/ staging
     # folder it once pointed at does not exist in this tree).
     and (ROOT / "ios/GrapMail/Assets.xcassets/AppIcon.appiconset/AppIcon-1024.png").exists()
-    and (ROOT / "ios/GrapMail/Assets.xcassets/AppIcon.appiconset/AppIcon-1024.png").stat().st_size > 40000
     and "@drawable/grapmail_splash_icon" in (ROOT / "android/app/src/main/res/values/themes.xml")
         .read_text(encoding="utf-8")
     and not (ROOT / "android/app/src/main/res/drawable/splash_logo.xml").exists()

@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="264" height="264" viewBox="0 0 264 264">
+  <defs>
+    <linearGradient id="back" x1="0%" y1="0%" x2="67%" y2="100%" gradientUnits="objectBoundingBox">
+      <stop stop-color="#d0e2ff"/>
+      <stop offset="1" stop-color="#5889dd"/>
+    </linearGradient>
+    <linearGradient id="paper" x1="0%" y1="0%" x2="2%" y2="100%">
+      <stop stop-color="#fff"/>
+      <stop offset="1" stop-color="#eef4ff"/>
+    </linearGradient>
+    <linearGradient id="fold" x1="0%" y1="0%" x2="65%" y2="100%">
+      <stop stop-color="#f9fcff"/>
+      <stop offset="1" stop-color="#b8cff3"/>
+    </linearGradient>
+    <linearGradient id="front" x1="0%" y1="0%" x2="18%" y2="100%">
+      <stop stop-color="#f2f7ff"/>
+      <stop offset="1" stop-color="#d1e1fa"/>
+    </linearGradient>
+  </defs>
+  <path fill="url(#back)" d="M0 106Q0 95 9 88L113 8Q132 -8 151 8L255 88Q264 95 264 106V223Q264 262 225 262H39Q0 262 0 223Z"/>
+  <path fill="url(#paper)" d="M49 30L231 55Q240 56 238 66L222 195H24L39 39Q40 29 49 30Z"/>
+  <path fill="url(#fold)" d="M0 106Q0 94 10 102L133 194L254 102Q264 94 264 106V223Q264 262 225 262H39Q0 262 0 223Z"/>
+  <path fill="url(#front)" d="M12 252L101 174Q113 163 127 163H144Q158 163 169 174L252 252Q242 262 225 262H39Q22 262 12 252Z"/>
+</svg>

@@ -57,6 +57,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Verify generated app icons
+        run: |
+          sudo apt-get update && sudo apt-get install -y librsvg2-bin
+          python3 -m venv "$RUNNER_TEMP/app-icons"
+          "$RUNNER_TEMP/app-icons/bin/python" -m pip install Pillow==11.3.0
+          "$RUNNER_TEMP/app-icons/bin/python" scripts/app-icons.py --check
+
       - name: Resolve the emulator profile
         id: profile
         run: |
@@ -209,6 +216,13 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v4
+
+      - name: Verify generated app icons
+        run: |
+          sudo apt-get update && sudo apt-get install -y librsvg2-bin
+          python3 -m venv "$RUNNER_TEMP/app-icons"
+          "$RUNNER_TEMP/app-icons/bin/python" -m pip install Pillow==11.3.0
+          "$RUNNER_TEMP/app-icons/bin/python" scripts/app-icons.py --check
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
