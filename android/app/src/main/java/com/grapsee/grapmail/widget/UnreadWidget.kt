@@ -28,6 +28,7 @@ import androidx.glance.text.FontWeight
 import androidx.glance.text.Text
 import androidx.glance.text.TextStyle
 import androidx.glance.unit.ColorProvider
+import androidx.glance.unit.ColorProviders
 import com.grapsee.grapmail.MainActivity
 
 /**
@@ -67,10 +68,14 @@ class StartComposeCallback : ActionCallback {
 
 // Brand tokens as the widget draws them — the same measured values the app's
 // palettes carry, in their light and dark pairs.
-private val canvas = ColorProvider(day = Color(0xFFFBFCFE), night = Color(0xFF0A0A0C))
-private val ink = ColorProvider(day = Color(0xFF0F172A), night = Color(0xFFEAEAEA))
-private val sub = ColorProvider(day = Color(0xFF5B6B84), night = Color(0xFF9E9EA5))
-private val accent = ColorProvider(day = Color(0xFF1A6DF0), night = Color(0xFF8AB4F8))
+//
+// ColorProviders (plural) is the light/dark pair: Glance 1.1.1 has no
+// ColorProvider(day = …, night = …) overload, which is what a single
+// ColorProvider(...) call with two colours failed on.
+private val canvas = ColorProviders(light = Color(0xFFFBFCFE), dark = Color(0xFF0A0A0C))
+private val ink = ColorProviders(light = Color(0xFF0F172A), dark = Color(0xFFEAEAEA))
+private val sub = ColorProviders(light = Color(0xFF5B6B84), dark = Color(0xFF9E9EA5))
+private val accent = ColorProviders(light = Color(0xFF1A6DF0), dark = Color(0xFF8AB4F8))
 
 @Composable
 private fun UnreadContent(snapshot: MailWidgetState.Snapshot) {

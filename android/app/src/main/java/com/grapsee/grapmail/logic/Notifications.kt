@@ -16,6 +16,7 @@ import android.graphics.Paint
 import android.graphics.Typeface
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
+import androidx.core.app.RemoteInput
 import androidx.core.content.ContextCompat
 import com.grapsee.grapmail.MainActivity
 import com.grapsee.grapmail.R
@@ -162,7 +163,12 @@ object Notifications {
                             0, "Reply",
                             pendingReply(context, target, replyAddress, subject),
                         ).addRemoteInput(
-                            android.app.RemoteInput.Builder(REPLY_INPUT).setLabel("Reply").build(),
+                            // androidx.core.app.RemoteInput, not android.app:
+                            // addRemoteInput takes the compat type, and the
+                            // framework one is a different class that does not
+                            // convert — it compiled as a type mismatch, not a
+                            // behaviour difference.
+                            RemoteInput.Builder(REPLY_INPUT).setLabel("Reply").build(),
                         ).build())
                     } else {
                         addAction(0, "Reply", pendingOpen(context, target.copy(action = "reply")))

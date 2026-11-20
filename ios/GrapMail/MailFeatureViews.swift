@@ -88,11 +88,13 @@ struct MailCategoryChipsRow: View {
 // MARK: - Smart reply strip (F09)
 
 struct SmartReplyStrip: View {
-    let body: String
+    // `text`, not `body`: a View already owns `body`, and a stored property of
+    // the same name is a redeclaration the compiler refuses outright.
+    let text: String
     let onPick: (String) -> Void
 
     private var suggestions: [String] {
-        SmartReplyAssistant.suggest(for: body)
+        SmartReplyAssistant.suggest(for: text)
     }
 
     var body: some View {
@@ -582,11 +584,13 @@ struct MailMagicSearchField: View {
 
 struct MailComposeTools: View {
     @Binding var subject: String
-    @Binding var body: String
+    // `draft`, not `body`: the View protocol already declares `body`, and a
+    // second one is a redeclaration.
+    @Binding var draft: String
     @State private var remindIfNoReply = UserDefaults.standard.bool(forKey: "gm.pendingFollowUp")
 
     private var rewrites: [RewriteSuggestion] {
-        ComposeAssistant.rewrite(body)
+        ComposeAssistant.rewrite(draft)
     }
 
     var body: some View {
@@ -595,7 +599,7 @@ struct MailComposeTools: View {
                 ForEach(ComposeAssistant.templates, id: \.name) { template in
                     Button(template.name) {
                         subject = template.subject
-                        body = template.body
+                        draft = template.body
                     }
                 }
             } label: {
@@ -605,7 +609,7 @@ struct MailComposeTools: View {
                 Menu {
                     ForEach(rewrites, id: \.title) { suggestion in
                         Button(suggestion.title) {
-                            body = suggestion.text
+                            draft = suggestion.text
                         }
                     }
                 } label: {

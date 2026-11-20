@@ -28,7 +28,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import com.grapsee.grapmail.data.MailMessageFullDto
-import com.grapsee.grapmail.data.MailRowDto
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -618,14 +617,18 @@ fun MailSmartPanel(message: MailMessageFullDto?, messages: List<MailMessageFullD
     ) {
         summary?.let { ThreadSummaryCard(it) }
         if (cards.isNotEmpty()) {
-            ActionCardsRow(cards) { card ->
+            // Named, not trailing: ActionCardsRow's last parameter is `modifier`,
+            // so a trailing lambda would be read as a Modifier and every field
+            // access inside it (card.url/label/value) became an unresolved
+            // reference at compile time.
+            ActionCardsRow(cards, onOpen = { card ->
                 val url = card.url
                 if (url != null) {
                     MailFeatureIntents.openUrl(context, url)
                 } else {
                     MailFeatureIntents.copyText(context, card.label, card.value)
                 }
-            }
+            })
         }
         if (verdicts.isNotEmpty()) {
             Row(

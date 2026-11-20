@@ -114,7 +114,7 @@ struct ThreadView: View {
                                 body: m.bodyText ?? "",
                                 fromMe: m.direction == "outbound")
                         })
-                    SmartReplyStrip(body: activeMessage.bodyText ?? "") { suggestion in
+                    SmartReplyStrip(text: activeMessage.bodyText ?? "") { suggestion in
                         MailFeaturePrefs.shared.stageInsert(suggestion)
                         onReply(activeMessage.id, "reply")
                     }
@@ -1101,7 +1101,7 @@ struct ComposeView: View {
             subject: Binding(
                 get: { vm.compose.subject },
                 set: { value in vm.composeUpdate { $0.subject = value } }),
-            body: Binding(
+            draft: Binding(
                 get: { vm.compose.body },
                 set: { value in vm.composeUpdate { $0.body = value } }))
         Divider().overlay(GM.border)

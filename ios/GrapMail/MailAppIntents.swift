@@ -42,17 +42,21 @@ struct MailAppShortcuts: AppShortcutsProvider {
 struct MailFocusFilter: SetFocusFilterIntent {
     static var title: LocalizedStringResource = "GrapMail"
 
+    // Optional, with no default: AppIntents' @Parameter has no wrappedValue
+    // initialiser for a non-optional that carries one, which is the "extra
+    // argument 'wrappedValue'" the simulator build reported. A nil means the
+    // person has not answered, and that is read as "not paused".
     @Parameter(title: "Pause mail notifications")
-    var pauseNotifications: Bool = false
+    var pauseNotifications: Bool?
 
     var displayRepresentation: DisplayRepresentation {
         DisplayRepresentation(
             title: "GrapMail",
-            subtitle: pauseNotifications ? "Notifications paused" : "Notifications on")
+            subtitle: (pauseNotifications ?? false) ? "Notifications paused" : "Notifications on")
     }
 
     func perform() async throws -> some IntentResult {
-        UserDefaults.standard.set(pauseNotifications, forKey: "gm.focusQuiet")
+        UserDefaults.standard.set(pauseNotifications ?? false, forKey: "gm.focusQuiet")
         return .result()
     }
 }
