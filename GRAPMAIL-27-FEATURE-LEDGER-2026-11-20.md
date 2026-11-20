@@ -51,3 +51,10 @@ Legend: ➕ = added/extended & wired in this pass · ⚙ = existing surface veri
 - **F14**: verified as existing on all three platforms per the audit's "verify, then polish" framing.
 - Sprint notes per repo: `GRAPMAIL-SPRINT-APPLIED-2026-11-20.md` in `grapmail-mobile` and in
   `Grapsee_All_Time`.
+
+
+> **Honest-scope note (2026-11-21 release audit):** F24's receipt chips note
+> the read **on the device** — no server-side receipt exists yet, so no chip
+> may claim a receipt was "sent". F26 validates pasted vCard/iCal content
+> **without any import action wired** — it is an inspector, not an importer.
+> Both ship as acknowledgement/inspection until the server side exists.

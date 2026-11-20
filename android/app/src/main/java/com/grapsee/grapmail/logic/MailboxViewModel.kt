@@ -417,6 +417,15 @@ class MailboxViewModel @JvmOverloads constructor(
         viewModelScope.launch {
             com.grapsee.grapmail.logic.MailboxEvents.inboxChanged.collect {
                 if (snapshotMode || _state.value.busy || _state.value.selecting) return@collect
+                // The same guards acceptPoll applies: a worker read may not
+                // interrupt deep scrolling, an active search, pagination in
+                // flight, or another folder. At the top of the inbox the
+                // reload keeps the live feel; anywhere else the folder counts
+                // still update through the poll result and the next natural
+                // refresh answers.
+                if (_state.value.box != MailBox.Inbox) return@collect
+                if (searchTerm != null || loadJob?.isActive == true) return@collect
+                if (!canRefreshInBackground(atTop = true)) return@collect
                 load(replace = true, forceCounts = false)
             }
         }

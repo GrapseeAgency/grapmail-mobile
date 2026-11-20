@@ -57,6 +57,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Verify GrapMail app icons
+        run: |
+          python3 -m venv "$RUNNER_TEMP/grapmail-icons"
+          "$RUNNER_TEMP/grapmail-icons/bin/python" -m pip install Pillow==11.3.0
+          "$RUNNER_TEMP/grapmail-icons/bin/python" scripts/generate-grapmail-icons.py --check
+
       - name: Resolve the emulator profile
         id: profile
         run: |
@@ -210,6 +216,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Verify GrapMail app icons
+        run: |
+          python3 -m venv "$RUNNER_TEMP/grapmail-icons"
+          "$RUNNER_TEMP/grapmail-icons/bin/python" -m pip install Pillow==11.3.0
+          "$RUNNER_TEMP/grapmail-icons/bin/python" scripts/generate-grapmail-icons.py --check
+
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
@@ -276,10 +288,15 @@ jobs:
               echo '`CI_KEYSTORE_FILE` / `CI_KEYSTORE_PASSWORD` / `CI_KEYSTORE_ALIAS`), verified as'
               echo 'an openable keystore/alias pair before the build ran. Updates signed the same'
               echo 'way install over this build.'
+              echo 'release_signed=true'
               echo 'EOF_SIGNING'
             } >> "$GITHUB_OUTPUT"
           else
             {
+              echo 'release_signed=false'
+              echo 'EOF_SIGNING'
+            } >> "$GITHUB_OUTPUT"
+          fi
               echo 'label<<EOF_SIGNING'
               echo 'Signed with an **ephemeral CI key generated for this job and discarded after'
               echo 'it** (test-signed). That makes the APK installable and verifiable, but it is'
@@ -440,7 +457,14 @@ jobs:
           cp android/app/build/outputs/apk/release/app-release.apk download/GrapMail-${{ github.ref_name }}.apk
           echo "Staged: download/GrapMail-${{ github.ref_name }}.apk"
 
+      - name: Refuse to publish a test-signed build as a production release
+        if: steps.signing.outputs.release_signed != 'true'
+        run: |
+          echo "::error::the APK in this run was signed with the ephemeral CI key — it cannot become the latest production release (updates signed with the real key cannot install over it). Add CI_KEYSTORE_FILE (base64), CI_KEYSTORE_PASSWORD and CI_KEYSTORE_ALIAS as repository secrets, then re-tag."
+          exit 1
+
       - name: Publish to the Releases page
+        if: steps.signing.outputs.release_signed == 'true'
         uses: softprops/action-gh-release@v2
         with:
           name: GrapMail ${{ github.ref_name }}
@@ -449,7 +473,8 @@ jobs:
 
             Install `GrapMail-${{ github.ref_name }}.apk` directly on your Android device.
 
-            Signed with the founder's distribution key. R8 minification on, not debuggable.
+            R8 minification on, not debuggable. This release only exists when the
+            founder's distribution key signed it.
 
             ${{ steps.signing.outputs.label }}
           files: download/GrapMail-${{ github.ref_name }}.apk

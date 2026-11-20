@@ -432,7 +432,7 @@ fun FollowUpBanner(count: Int, onOpen: () -> Unit, modifier: Modifier = Modifier
 @Composable
 fun ReadReceiptChip(sent: Boolean, modifier: Modifier = Modifier) {
     Text(
-        if (sent) "Read receipt sent" else "Read receipt on",
+        if (sent) "Receipt noted on this device" else "Read receipt on",
         fontSize = 11.sp,
         modifier = modifier,
     )
