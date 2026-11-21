@@ -282,7 +282,7 @@ jobs:
         working-directory: android
         run: |
           chmod +x gradlew
-          ./gradlew assembleRelease bundleRelease --no-daemon
+          ./gradlew assembleRelease bundleRelease --no-daemon testReleaseUnitTest
 
       - name: Prove the artifact is what the page will call it
         # Every claim here is read out of the APK, not out of the build command:

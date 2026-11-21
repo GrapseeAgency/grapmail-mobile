@@ -53,7 +53,7 @@ import kotlinx.coroutines.sync.withPermit
  * (`isThread` exists on its tap for the same reason). A stepper that hardcoded
  * `true` would reopen the same dead end one button further in.
  */
-data class MailStep(val id: String, val isThread: Boolean)
+data class MailStep(val id: String, val isThread: Boolean, val messageId: String)
 
 /**
  * The mailbox's state and its only writer.
@@ -323,6 +323,7 @@ class MailboxViewModel @JvmOverloads constructor(
         readerJob = null
         earlierThreadJob = null
         readerTarget = null
+        threadLoadedFor = null
         _thread.value = ThreadState()
     }
 
@@ -2357,7 +2358,7 @@ class MailboxViewModel @JvmOverloads constructor(
      * read here and memoised — a row re-rendering must not re-read a payload.
      */
     fun openThread(threadId: String, focusedId: String? = null) {
-        if (readerTarget == null && threadLoadedFor == threadId) return
+        if (snapshotMode && threadLoadedFor == threadId) return
         loadReader(threadId, isThread = true) {
             val context = getApplication<Application>()
             val session = SessionStore.snapshot(context) ?: run {
@@ -2379,20 +2380,20 @@ class MailboxViewModel @JvmOverloads constructor(
                     )
                     kotlinx.coroutines.currentCoroutineContext().ensureActive()
                     if (!SessionStore.isCurrent(context, session.id)) return@loadReader
-                    threadLoadedFor = threadId
                     val exact = if (focusedId != null && focused == null && page.messages.none { it.id == focusedId }) {
                         runCatching { Api.mailMessage(session.token, focusedId).message }
                             .onFailure { if (it is kotlinx.coroutines.CancellationException) throw it }
-                            .getOrNull()?.takeIf { it.threadId == threadId }
+                            .getOrNull()?.takeIf { it.id == focusedId }
                     } else focused
                     if (!SessionStore.isCurrent(context, session.id)) return@loadReader
-                    _thread.update { it.copy(
-                        messages = (page.messages + listOfNotNull(exact))
-                            .distinctBy { message -> message.id }.sortedBy { message -> message.createdAt.orEmpty() },
-                        nextCursor = page.nextCursor,
-                        hasMore = page.hasMore,
-                        loading = false,
-                    ) }
+                    val messages = (page.messages + listOfNotNull(exact)).ifEmpty { initial }
+                        .distinctBy { it.id }.sortedBy { it.createdAt.orEmpty() }
+                    if (messages.isEmpty()) {
+                        _thread.value = ThreadState(error = "This conversation has no available messages.")
+                    } else {
+                        threadLoadedFor = threadId
+                        _thread.value = ThreadState(messages = messages, nextCursor = page.nextCursor, hasMore = page.hasMore)
+                    }
                 }
                 .onFailure { e ->
                     if (e is kotlinx.coroutines.CancellationException) throw e
@@ -2479,7 +2480,7 @@ class MailboxViewModel @JvmOverloads constructor(
      * on the thread route would show "could not be opened" for mail that exists.
      */
     fun stepOf(row: MailMessageDto?): MailStep? =
-        row?.let { MailStep(it.threadId ?: it.id, it.threadId != null) }
+        row?.let { MailStep(it.threadId ?: it.id, it.threadId != null, it.id) }
 
     /** The reader's position within the loaded rows, 1-based; 0 when absent. */
     fun loadedPositionOf(id: String): Int {
@@ -2567,7 +2568,7 @@ class MailboxViewModel @JvmOverloads constructor(
     }
 
     fun openMessage(id: String) {
-        if (readerTarget == null && threadLoadedFor == id) return
+        if (snapshotMode && threadLoadedFor == id) return
         loadReader(id, isThread = false) {
             val context = getApplication<Application>()
             val session = SessionStore.snapshot(context)

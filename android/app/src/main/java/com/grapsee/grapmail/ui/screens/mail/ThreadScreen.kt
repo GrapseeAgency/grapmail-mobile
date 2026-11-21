@@ -114,7 +114,10 @@ fun ThreadScreen(
     val focusIndex = if (initialMessageId == null) -1 else thread.messages.indexOfFirst { it.id == initialMessageId }
     LaunchedEffect(focusIndex) {
         if (focusIndex >= 0 && !didFocus) {
-            listState.scrollToItem(focusIndex + if (isThread && (thread.hasMore || thread.loadingEarlier)) 2 else 1)
+            if (focusIndex > 0) {
+                val headerCount = if (isThread && (thread.hasMore || thread.loadingEarlier)) 3 else 2
+                listState.scrollToItem(focusIndex + headerCount)
+            }
             didFocus = true
         }
     }
@@ -145,7 +148,9 @@ fun ThreadScreen(
         }
     }
 
-    LaunchedEffect(threadId, isThread) { if (isThread) vm.openThread(threadId, initialMessageId) else vm.openMessage(threadId) }
+    LaunchedEffect(threadId, isThread, initialMessageId) {
+        if (isThread) vm.openThread(threadId, initialMessageId) else vm.openMessage(threadId)
+    }
     androidx.compose.runtime.DisposableEffect(vm, threadId, isThread) {
         onDispose { vm.leaveReader(threadId, isThread) }
     }
@@ -209,19 +214,19 @@ fun ThreadScreen(
             }
         }
 
-        if (thread.loading && thread.messages.isEmpty()) {
+        if (thread.messages.isEmpty() && thread.error == null) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Text("Opening this conversation…", fontSize = 14.sp, color = palette.textSecondary)
             }
             return@Column
         }
 
-        if (thread.error != null && thread.messages.isEmpty()) {
+        if (thread.messages.isEmpty()) {
             Column(Modifier.fillMaxSize().padding(32.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                 Text("This conversation could not be opened.", fontSize = 17.sp,
                     fontWeight = FontWeight.SemiBold, color = palette.textPrimary)
                 Spacer(Modifier.height(8.dp))
-                Text("Check your connection and try again.", fontSize = 14.sp, color = palette.textSecondary)
+                Text(thread.error.orEmpty(), fontSize = 14.sp, color = palette.textSecondary)
                 Spacer(Modifier.height(16.dp))
                 com.grapsee.grapmail.ui.components.GradientButton("Try again", onClick = {
                     if (isThread) vm.openThread(threadId, initialMessageId) else vm.openMessage(threadId)

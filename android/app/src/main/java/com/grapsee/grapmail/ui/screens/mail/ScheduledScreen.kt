@@ -25,9 +25,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.grapsee.grapmail.logic.MailboxViewModel
 import com.grapsee.grapmail.ui.theme.LocalPalette
-import java.time.ZonedDateTime
-import java.time.format.DateTimeFormatter
-import java.time.format.FormatStyle
+import com.grapsee.grapmail.data.parseMailInstant
+import com.grapsee.grapmail.ui.components.absoluteDateTimeOrRaw
 
 /**
  * The account's future sends, soonest first, each with its cancel. The data
@@ -35,15 +34,7 @@ import java.time.format.FormatStyle
  * deliver at `scheduledFor` — and cancelling clears `scheduled_at`, which is
  * why the note says "it will not be sent" rather than "deleted".
  */
-// One formatter for the whole list. Constructing a DateTimeFormatter is an
-// ICU lookup per call, and the old inline version ran it once per visible
-// row on every recomposition, alongside a fresh ISO parse of the same field.
-private val scheduledWhenFormatter: DateTimeFormatter =
-    DateTimeFormatter.ofLocalizedDateTime(FormatStyle.MEDIUM)
-
-private fun scheduledWhenText(iso: String): String = runCatching {
-    "Sends " + scheduledWhenFormatter.format(ZonedDateTime.parse(iso))
-}.getOrDefault("Sends at the server's instant")
+private fun scheduledWhenText(iso: String): String = "Sends " + absoluteDateTimeOrRaw(iso)
 
 @Composable
 fun ScheduledScreen(onBack: () -> Unit, vm: MailboxViewModel) {
@@ -66,9 +57,11 @@ fun ScheduledScreen(onBack: () -> Unit, vm: MailboxViewModel) {
             com.grapsee.grapmail.ui.mailfeatures.SendLaterWatchdog.clear(watchdogContext, gone)
         }
         for (m in state.messages) {
-            val at = m.scheduledFor?.let {
-                runCatching { java.time.ZonedDateTime.parse(it).toInstant().toEpochMilli() }.getOrNull()
-            } ?: 0L
+            val at = parseMailInstant(m.scheduledFor)?.toEpochMilli()
+            if (at == null) {
+                com.grapsee.grapmail.ui.mailfeatures.SendLaterWatchdog.clear(watchdogContext, m.id.hashCode())
+                continue
+            }
             com.grapsee.grapmail.ui.mailfeatures.SendLaterWatchdog.show(
                 watchdogContext,
                 m.id.hashCode(),

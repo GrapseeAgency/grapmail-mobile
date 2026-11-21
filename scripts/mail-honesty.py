@@ -2881,10 +2881,10 @@ pin("the stepper names the loaded range, not the box's total",
 # exists — the same dead end the list's own `isThread` flag exists to avoid,
 # reopened one button further in.
 pin("the step target decides the route from the row, never a hardcoded flag",
-    "MailStep(it.threadId ?: it.id, it.threadId != null)" in code_only(KT_VM)
+    "MailStep(it.threadId ?: it.id, it.threadId != null, it.id)" in code_only(KT_VM)
     and "MailStep(id: row.threadId ?? row.id, isThread: row.threadId != nil)"
         in code_only(SW_MODEL)
-    and code_only(KT_MAIN).count("Routes.mailThread(step.id, step.isThread)") == 2
+    and code_only(KT_MAIN).count("Routes.mailThread(step.id, step.isThread, focus = step.messageId.takeIf { step.isThread })") == 2
     and code_only(SW_ROOT).count(".mailThread(id: step.id, isThread: step.isThread)") == 2
     and "Routes.mailThread(id, true)" not in code_only(KT_MAIN)
     and "isThread: true" not in code_only(SW_ROOT))

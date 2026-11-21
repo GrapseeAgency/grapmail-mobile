@@ -13,7 +13,9 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.grapsee.grapmail.ui.theme.LocalPalette
@@ -61,6 +63,7 @@ private fun hex(c: androidx.compose.ui.graphics.Color): String =
 private fun mailDocument(
     html: String,
     allowImages: Boolean,
+    dark: Boolean,
     text: String,
     muted: String,
     border: String,
@@ -69,9 +72,18 @@ private fun mailDocument(
 ): String {
     val imageSources = if (allowImages) "https: http:" else "'none'"
     val authoredColors = html.contains(" style=\"") || html.contains(" bgcolor=\"")
-    val canvas = if (authoredColors) "#FFFFFF" else "transparent"
-    val foreground = if (authoredColors) "#1F2937" else text
-    val linkColor = if (authoredColors) "#174EA6" else link
+    val lightDesign = authoredColors && !dark
+    val canvas = if (lightDesign) "#FFFFFF" else "transparent"
+    val foreground = if (lightDesign) "#1F2937" else text
+    val linkColor = if (lightDesign) "#174EA6" else link
+    val mutedColor = if (lightDesign) "#4B5563" else muted
+    val chipColor = if (lightDesign) "#F3F4F6" else chip
+    val darkOverrides = if (dark) {
+        "body *:not(img){color:$text!important;background:transparent!important;}" +
+            "body a,body a *{color:$link!important;}" +
+            "body blockquote,body blockquote *:not(a){color:$muted!important;}" +
+            "body blockquote a,body blockquote a *{color:$link!important;}"
+    } else ""
     return "<!DOCTYPE html><html><head><meta charset=\"utf-8\"/>" +
         "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"/>" +
         "<meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'none'; " +
@@ -85,12 +97,13 @@ private fun mailDocument(
         "table,div{max-width:100%!important;}" +
         "table,div,td,th{min-width:0!important;overflow-wrap:anywhere;}" +
         "pre,code{font-family:monospace;font-size:13px;white-space:pre-wrap;overflow-wrap:anywhere;}" +
-        "blockquote{margin:8px 0;padding:2px 12px;border-left:3px solid " + border + ";color:" + muted + ";}" +
+        "blockquote{margin:8px 0;padding:2px 12px;border-left:3px solid " + border + ";color:" + mutedColor + ";}" +
         // A blocked remote image has no `src` at all — Chromium draws its alt
         // text as an inline broken image, and this turns that into a
         // deliberate-looking chip instead of a broken-image glyph.
         "img[data-blocked-src],img[data-grapmail-blocked-src],img[data-cid-src]{display:inline-block;min-height:16px;padding:4px 10px;" +
-        "border:1px dashed " + border + ";border-radius:8px;background:" + chip + ";color:" + muted + ";font-size:12px;}" +
+        "border:1px dashed " + border + ";border-radius:8px;background:" + chipColor + ";color:" + mutedColor + ";font-size:12px;}" +
+        darkOverrides +
         "</style></head><body>" + html + "</body></html>"
 }
 
@@ -103,8 +116,10 @@ internal fun HtmlMailBody(
     modifier: Modifier = Modifier,
 ) {
     val palette = LocalPalette.current
+    val textZoom = (LocalConfiguration.current.fontScale * 100).toInt()
     val document = remember(html, allowImages, palette) {
-        mailDocument(html, allowImages, hex(palette.textPrimary), hex(palette.textSecondary),
+        mailDocument(html, allowImages, palette.card.luminance() < 0.5f,
+            hex(palette.textPrimary), hex(palette.textSecondary),
             hex(palette.border), hex(palette.primarySolid), hex(palette.bgTinted))
     }
     // CSS height of the loaded document, in dp. Measured on finish and once
@@ -139,7 +154,7 @@ internal fun HtmlMailBody(
                 settings.displayZoomControls = false
                 settings.useWideViewPort = true
                 settings.loadWithOverviewMode = true
-                settings.textZoom = 100
+                settings.textZoom = textZoom
                 settings.javaScriptCanOpenWindowsAutomatically = false
                 // No second window to open: the sanitizer forces target=_blank
                 // on links, and this makes that a hand-off, not a popup.
@@ -172,6 +187,10 @@ internal fun HtmlMailBody(
             }
         },
         update = { webView ->
+            if (webView.settings.textZoom != textZoom) {
+                webView.settings.textZoom = textZoom
+                webView.postDelayed(measureHeight(webView), 100)
+            }
             // Re-feed only on a real change: update runs on every recomposition,
             // and loadHTML-style reloads would restart rendering mid-scroll.
             if (feed.document != document || feed.allowImages != allowImages) {

@@ -1288,8 +1288,8 @@ fun GrapMailNav(
             MailboxScreen(
                 vm = viewModel<MailboxViewModel>(entry),
                 accountPhoto = personal.avatar,
-                onOpenThread = { id, isThread ->
-                    nav.navigate(Routes.mailThread(id, isThread))
+                onOpenThread = { id, isThread, messageId ->
+                    nav.navigate(Routes.mailThread(id, isThread, focus = messageId.takeIf { isThread }))
                 },
                 onCompose = { nav.navigate(Routes.mailCompose("", "reply")) },
                 // A draft opens in the composer, not the reader: the row is
@@ -1346,12 +1346,12 @@ fun GrapMailNav(
                 // list's tap does — a neighbour that is a single message would
                 // otherwise be opened on the thread route and 404.
                 onStepPrev = { step ->
-                    nav.navigate(Routes.mailThread(step.id, step.isThread)) {
+                    nav.navigate(Routes.mailThread(step.id, step.isThread, focus = step.messageId.takeIf { step.isThread })) {
                         popUpTo(Routes.MAIL_THREAD) { inclusive = true }
                     }
                 },
                 onStepNext = { step ->
-                    nav.navigate(Routes.mailThread(step.id, step.isThread)) {
+                    nav.navigate(Routes.mailThread(step.id, step.isThread, focus = step.messageId.takeIf { step.isThread })) {
                         popUpTo(Routes.MAIL_THREAD) { inclusive = true }
                     }
                 },

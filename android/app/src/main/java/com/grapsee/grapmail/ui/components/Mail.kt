@@ -61,9 +61,10 @@ import com.grapsee.grapmail.data.MailMessageDto
 import com.grapsee.grapmail.ui.theme.GrapMailAvatarRampDark
 import com.grapsee.grapmail.ui.theme.GrapMailAvatarRampLight
 import com.grapsee.grapmail.ui.theme.LocalPalette
-import java.text.SimpleDateFormat
-import java.util.TimeZone
-import java.util.Calendar
+import com.grapsee.grapmail.data.parseMailInstant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.time.format.FormatStyle
 import java.util.Date
 import java.util.Locale
 
@@ -313,78 +314,34 @@ fun SenderAvatar(display: String, address: String?, size: Dp = 40.dp, modifier: 
  */
 fun mailTime(iso: String?, now: Date = Date()): String? {
     if (iso.isNullOrBlank()) return null
-    val tz = TimeZone.getDefault()
-    val nowMillis = now.time
-    val cacheKey = tz.id + '\u0000' + iso + '\u0000' + (nowMillis / 60_000)
+    val zone = ZoneId.systemDefault()
+    val locale = Locale.getDefault(Locale.Category.FORMAT)
+    val today = now.toInstant().atZone(zone).toLocalDate()
+    val cacheKey = "${zone.id}|${locale.toLanguageTag()}|$today|$iso"
     formattedMailTimes.get(cacheKey)?.let { return it }
 
-    val millis = parseMailIso(iso) ?: return null
-    val then = Calendar.getInstance().apply { timeInMillis = millis }
-    val today = Calendar.getInstance().apply { time = now }
-    val sameYear = then.get(Calendar.YEAR) == today.get(Calendar.YEAR)
-    val sameDay = sameYear && then.get(Calendar.DAY_OF_YEAR) == today.get(Calendar.DAY_OF_YEAR)
-    val formatted = if (sameDay) {
-        mailDateFormatter("h:mm a").format(Date(millis))
-    } else {
-        val yesterday = (today.clone() as Calendar).apply { add(Calendar.DAY_OF_YEAR, -1) }
-        if (then.get(Calendar.YEAR) == yesterday.get(Calendar.YEAR) &&
-            then.get(Calendar.DAY_OF_YEAR) == yesterday.get(Calendar.DAY_OF_YEAR)) {
-            "Yesterday"
-        } else if (then.get(Calendar.YEAR) == today.get(Calendar.YEAR)) {
-            mailDateFormatter("MMM d").format(Date(millis))
-        } else {
-            mailDateFormatter("MMM d, yyyy").format(Date(millis))
-        }
+    val then = parseMailInstant(iso)?.atZone(zone) ?: return null
+    val date = then.toLocalDate()
+    val formatted = when {
+        date == today -> shortMailTime.withLocale(locale).format(then)
+        date == today.minusDays(1) -> "Yesterday"
+        date.year == today.year -> shortMailDate.withLocale(locale).format(then)
+        else -> olderMailDate.withLocale(locale).format(then)
     }
     formattedMailTimes.put(cacheKey, formatted)
     return formatted
 }
 
 private val formattedMailTimes = android.util.LruCache<String, String>(2_048)
-private val mailDateFormatters = ThreadLocal.withInitial { mutableMapOf<String, SimpleDateFormat>() }
+private val shortMailTime = DateTimeFormatter.ofLocalizedTime(FormatStyle.SHORT)
+private val olderMailDate = DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM)
+private val shortMailDate = DateTimeFormatter.ofPattern("MMM d")
+private val fullMailDate = DateTimeFormatter.ofLocalizedDateTime(FormatStyle.MEDIUM, FormatStyle.SHORT)
 
-private fun mailDateFormatter(pattern: String): SimpleDateFormat =
-    mailDateFormatters.get()!!.getOrPut(pattern) {
-        SimpleDateFormat(pattern, Locale.US).apply { isLenient = true }
-    }.apply {
-        timeZone = TimeZone.getDefault()
-    }
-
-private val mailDatePatterns = listOf(
-    "yyyy-MM-dd'T'HH:mm:ss.SSSXXX", "yyyy-MM-dd'T'HH:mm:ssXXX",
-    "yyyy-MM-dd'T'HH:mm:ss'Z'", "yyyy-MM-dd'T'HH:mm:ssZ", "yyyy-MM-dd HH:mm:ss",
-)
-private val parsedMailDates = android.util.LruCache<String, Long>(1_024)
-
-/** ISO-8601 with or without fractional seconds and zone; null if unparseable. */
-private fun parseMailIso(iso: String?): Long? {
-    if (iso.isNullOrBlank()) return null
-    // Zone-less server dates use the current local zone, so changing zones must
-    // not reuse a value parsed under the previous one.
-    val cacheKey = TimeZone.getDefault().id + '\u0000' + iso
-    parsedMailDates.get(cacheKey)?.let { return it }
-    for (p in mailDatePatterns) {
-        runCatching {
-            mailDateFormatter(p).parse(iso)?.time
-        }.getOrNull()?.let {
-            parsedMailDates.put(cacheKey, it)
-            return it
-        }
-    }
-    return null
-}
-
-/**
- * The full date and time a message body needs, falling back to the raw string
- * rather than a fabricated one.
- *
- * The fallback matters: showing "Jan 1, 1970" for an unparseable instant would
- * present a wrong date as a fact about someone's mail. Showing the server's own
- * string is uglier and true.
- */
 fun absoluteDateTimeOrRaw(iso: String): String {
-    val millis = parseMailIso(iso) ?: return iso
-    return mailDateFormatter("EEEE, MMMM d, yyyy · h:mm a").format(Date(millis))
+    val instant = parseMailInstant(iso) ?: return iso
+    return fullMailDate.withLocale(Locale.getDefault(Locale.Category.FORMAT))
+        .withZone(ZoneId.systemDefault()).format(instant)
 }
 
 // ── the row ──────────────────────────────────────────────────────────────────

@@ -3,6 +3,9 @@ package com.grapsee.grapmail.ui.mailfeatures
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -10,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Card
@@ -27,6 +31,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.Role
 import com.grapsee.grapmail.data.MailMessageFullDto
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -45,6 +50,7 @@ import com.grapsee.grapmail.features.UrlSafety
 import com.grapsee.grapmail.features.UrlVerdict
 import com.grapsee.grapmail.logic.MailFeaturePrefs
 import com.grapsee.grapmail.logic.MailTemplate
+import com.grapsee.grapmail.ui.theme.LocalPalette
 
 /**
  * GrapMail 2026-11 feature wave — shared Compose surfaces.
@@ -464,6 +470,7 @@ fun MailComposeTools(getBody: () -> String, setBody: (String) -> Unit) {
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun MailFeatureSettingsSection() {
     val context = androidx.compose.ui.platform.LocalContext.current
@@ -482,7 +489,9 @@ fun MailFeatureSettingsSection() {
         Modifier.fillMaxWidth().padding(top = 18.dp),
         verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {
-        Text("Privacy & intelligence", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+        com.grapsee.grapmail.ui.screens.mail.SectionLabel(
+            "Privacy & intelligence", LocalPalette.current,
+        )
         MailFeatureSwitchRow(
             "On-device intelligence",
             "Categories, summaries and replies stay on this device",
@@ -509,7 +518,7 @@ fun MailFeatureSettingsSection() {
         }
         MailFeatureSwitchRow(
             "Read receipts",
-            "Off by default — share read state with GrapMail senders",
+            "Keep receipt acknowledgements on this device",
             receipts,
         ) {
             receipts = it
@@ -523,8 +532,8 @@ fun MailFeatureSettingsSection() {
             followups = it
             prefs.followUpsEnabled = it
         }
-        Row(
-            Modifier.fillMaxWidth().padding(top = 4.dp),
+        FlowRow(
+            Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             TextButton(onClick = { showFollowUps = true }) { Text("Follow-up center", fontSize = 13.sp) }
@@ -546,15 +555,20 @@ private fun MailFeatureSwitchRow(
     checked: Boolean,
     onChange: (Boolean) -> Unit,
 ) {
+    val palette = LocalPalette.current
     Row(
-        Modifier.fillMaxWidth().padding(vertical = 6.dp),
+        Modifier.fillMaxWidth()
+            .toggleable(value = checked, role = Role.Switch, onValueChange = onChange)
+            .heightIn(min = 56.dp)
+            .padding(horizontal = 20.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        Column(Modifier.weight(1f)) {
-            Text(title, fontSize = 14.sp)
-            Text(subtitle, fontSize = 11.sp)
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(title, fontSize = 15.sp, color = palette.textPrimary)
+            Text(subtitle, fontSize = 13.sp, color = palette.textSecondary)
         }
-        Switch(checked = checked, onCheckedChange = onChange)
+        Switch(checked = checked, onCheckedChange = null)
     }
 }
 

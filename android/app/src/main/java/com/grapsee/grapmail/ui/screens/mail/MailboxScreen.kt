@@ -161,7 +161,7 @@ import kotlinx.coroutines.launch
 @Composable
 fun MailboxScreen(
     vm: MailboxViewModel,
-    onOpenThread: (id: String, isThread: Boolean) -> Unit,
+    onOpenThread: (id: String, isThread: Boolean, messageId: String) -> Unit,
     onCompose: () -> Unit,
     /** A draft row opens the composer on its own text, not the reader. */
     onOpenDraft: (id: String) -> Unit,
@@ -661,7 +661,7 @@ fun MailboxScreen(
                                                 onOpenDraft(row.id)
                                             } else {
                                                 val tid = row.threadId
-                                                onOpenThread(tid ?: row.id, tid != null)
+                                                onOpenThread(tid ?: row.id, tid != null, row.id)
                                             }
                                         },
                                         onStar = {

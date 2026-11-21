@@ -46,7 +46,11 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
@@ -707,24 +711,34 @@ fun MailSettingsScreen(
             var notifyAllowed by androidx.compose.runtime.remember {
                 mutableStateOf(com.grapsee.grapmail.logic.Notifications.allowed(notifyContext))
             }
+            val notificationLifecycle = LocalLifecycleOwner.current.lifecycle
+            DisposableEffect(notificationLifecycle, notifyContext) {
+                val observer = LifecycleEventObserver { _, event ->
+                    if (event == Lifecycle.Event.ON_RESUME) {
+                        notifyAllowed = com.grapsee.grapmail.logic.Notifications.allowed(notifyContext)
+                    }
+                }
+                notificationLifecycle.addObserver(observer)
+                onDispose { notificationLifecycle.removeObserver(observer) }
+            }
             val askNotifications = androidx.activity.compose.rememberLauncherForActivityResult(
                 androidx.activity.result.contract.ActivityResultContracts.RequestPermission(),
-            ) { granted ->
-                // Re-read the system's state rather than trusting the callback:
-                // the grant can be refused with "don't ask again", and the
-                // channel's own importance is what a later post will meet.
-                notifyAllowed = granted &&
-                    com.grapsee.grapmail.logic.Notifications.allowed(notifyContext)
+            ) {
+                notifyAllowed = com.grapsee.grapmail.logic.Notifications.allowed(notifyContext)
+                if (notifyAllowed) {
+                    com.grapsee.grapmail.logic.PushSync.registerAsync(notifyContext.applicationContext)
+                }
             }
             SettingRow(Icons.Rounded.NotificationsActive, "New mail notifications",
                 if (notifyAllowed) "On — GrapMail checks for new mail in the background"
                 else "Off — tap to allow new-mail alerts",
                 palette,
                 onClick = {
-                    if (notifyAllowed) {
-                        // Already answered: the system will not show a second
-                        // prompt, so open the app's notification page instead of
-                        // pretending a tap here changes anything.
+                    val needsPermission = android.os.Build.VERSION.SDK_INT >= 33 &&
+                        androidx.core.content.ContextCompat.checkSelfPermission(
+                            notifyContext, android.Manifest.permission.POST_NOTIFICATIONS,
+                        ) != android.content.pm.PackageManager.PERMISSION_GRANTED
+                    if (!needsPermission) {
                         val open = android.content.Intent(android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS)
                             .putExtra(android.provider.Settings.EXTRA_APP_PACKAGE, notifyContext.packageName)
                         runCatching { notifyContext.startActivity(open) }

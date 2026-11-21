@@ -741,7 +741,7 @@ private fun seedThread(vm: MailboxViewModel, id: String, encrypted: Boolean) {
 private fun liveHomeFrame(vm: MailboxViewModel) {
     MailboxScreen(
         vm = vm,
-        onOpenThread = { _, _ -> },
+        onOpenThread = { _, _, _ -> },
         onCompose = {},
         onOpenDraft = {},
         onProfile = {},
