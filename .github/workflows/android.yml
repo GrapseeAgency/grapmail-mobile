@@ -338,6 +338,15 @@ jobs:
           openssl x509 -in "$RUNNER_TEMP/grapmail-aab.pem" -outform DER > "$RUNNER_TEMP/grapmail-aab.der"
           cmp "$RUNNER_TEMP/grapmail-upload.der" "$RUNNER_TEMP/grapmail-aab.der"
 
+      - name: Save signed candidate for independent device verification
+        uses: actions/upload-artifact@v4
+        with:
+          name: grapmail-android-signed-candidate
+          if-no-files-found: error
+          path: |
+            android/app/build/outputs/apk/release/app-release.apk
+            android/app/build/outputs/bundle/release/app-release.aab
+
       - name: Free disk space (emulator needs ~10GB)
         run: |
           sudo rm -rf /usr/local/lib/android/sdk/ndk /usr/local/lib/android/sdk/build-tools/* \
