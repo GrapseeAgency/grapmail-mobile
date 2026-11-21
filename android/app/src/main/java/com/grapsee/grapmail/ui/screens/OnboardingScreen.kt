@@ -109,6 +109,9 @@ private const val ONBOARDING_HOST_STYLES = """
 html, body { background: transparent !important; }
 body { display: block !important; min-height: 0 !important; margin: 0 !important; }
 body::before, body::after, #universe { display: none !important; }
+/* Keep the animated gradients and shapes, without allocating a large
+   offscreen texture for every SVG bloom and shadow on each frame. */
+svg [filter] { filter: none !important; }
 body > main {
     position: fixed !important;
     inset: 0 !important;
