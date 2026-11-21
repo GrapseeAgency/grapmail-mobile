@@ -810,7 +810,7 @@ fun MailSettingsScreen(
 @Composable
 internal fun SectionLabel(text: String, palette: com.grapsee.grapmail.ui.theme.Palette) {
     Text(text.uppercase(), fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp,
-        color = palette.textTertiary, modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp))
+        color = palette.textSecondary, modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp))
 }
 
 @Composable
@@ -830,13 +830,10 @@ internal fun SettingRow(
     ) {
         Icon(icon, null, tint = palette.textSecondary, modifier = Modifier.size(20.dp))
         Spacer(Modifier.width(14.dp))
-        Column(Modifier.weight(1f)) {
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text(title, fontSize = 15.sp, color = palette.textPrimary)
-            Text(subtitle, fontSize = 12.sp, color = palette.textSecondary,
-                maxLines = 1, overflow = TextOverflow.Ellipsis)
-        }
-        trailing?.let {
-            Text(it, fontSize = 12.sp, color = palette.warnInk)
+            Text(subtitle, fontSize = 13.sp, color = palette.textSecondary)
+            trailing?.let { Text(it, fontSize = 12.sp, color = palette.warnInk) }
         }
     }
 }

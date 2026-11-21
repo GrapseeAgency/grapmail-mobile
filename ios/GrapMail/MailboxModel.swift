@@ -272,6 +272,7 @@ final class MailboxModel: ObservableObject {
         readerTask = nil
         earlierThreadTask = nil
         readerTarget = nil
+        threadLoadedFor = nil
         thread = ThreadState()
     }
     private var accountLoaded = false
@@ -1520,7 +1521,11 @@ final class MailboxModel: ObservableObject {
     /// Opening a thread. The list payload has no bodies by design, so the bodies
     /// are read here and memoised — a row re-rendering must not re-read a payload.
     func openThread(_ threadId: String, focusedID: String? = nil) {
-        guard let token, readerTarget != nil || threadLoadedFor != threadId else { return }
+        if snapshotSeeded && threadLoadedFor == threadId { return }
+        guard let token else {
+            thread = ThreadState(error: "Sign in again.")
+            return
+        }
         loadReader(threadId, isThread: true) { [weak self] in
             guard let self else { return }
             let cached = await MailStore.shared.thread(threadId)
@@ -1553,6 +1558,12 @@ final class MailboxModel: ObservableObject {
                 if let exact, !visible.contains(where: { $0.id == exact.id }) {
                     visible.append(exact)
                     visible.sort { ($0.createdAt ?? "") < ($1.createdAt ?? "") }
+                }
+                if visible.isEmpty {
+                    self.thread = initial.isEmpty
+                        ? ThreadState(error: "This conversation has no available messages.")
+                        : ThreadState(messages: initial, nextCursor: cached?.nextCursor, hasMore: cached?.hasMore ?? false)
+                    return
                 }
                 self.thread = ThreadState(
                     messages: visible,
@@ -1771,20 +1782,15 @@ final class MailboxModel: ObservableObject {
     }
 
     func openMessage(_ id: String) {
-        guard let token, readerTarget != nil || threadLoadedFor != id else { return }
+        if snapshotSeeded && threadLoadedFor == id { return }
+        guard let token else {
+            thread = ThreadState(error: "Sign in again.")
+            return
+        }
         loadReader(id, isThread: false) { [weak self] in
             guard let self else { return }
             if let cached = await MailStore.shared.notificationMessage(id) {
                 guard !Task.isCancelled, self.sessionIsLive else { return }
-                // Recorded on the hit as well as the fetch, because this field IS the
-                // memo: without it the guard above never fires and every return to an
-                // already-read message costs another actor hop. What is deliberately
-                // NOT changed here is the synchronous `loading` state above — the
-                // cache can only be consulted across an `await`, and clearing the
-                // spinner instead of raising it would leave the PREVIOUS message on
-                // screen during that hop. A brief loader over the right content beats
-                // a moment of the wrong content, which is the trade the reviewer's
-                // suggested shape would have made.
                 self.threadLoadedFor = id
                 self.thread = ThreadState(messages: [cached])
                 return

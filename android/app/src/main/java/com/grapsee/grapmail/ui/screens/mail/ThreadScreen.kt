@@ -625,7 +625,7 @@ private fun ThreadMessageCard(
             Spacer(Modifier.height(16.dp))
             Text("${message.attachments.size} attachment" +
                 (if (message.attachments.size == 1) "" else "s"),
-                fontSize = 12.sp, fontWeight = FontWeight.Bold, color = palette.textTertiary)
+                fontSize = 12.sp, fontWeight = FontWeight.Bold, color = palette.textSecondary)
             Spacer(Modifier.height(8.dp))
             message.attachments.forEach { a ->
                 AttachmentRow(a, busy = downloading[a.id] == true, notice = notice[a.id], onDownload = { onDownload(a) })

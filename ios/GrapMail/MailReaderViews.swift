@@ -47,7 +47,7 @@ struct ThreadView: View {
     var body: some View {
         VStack(spacing: 0) {
             header
-            if vm.thread.loading && vm.thread.messages.isEmpty {
+            if vm.thread.messages.isEmpty && vm.thread.error == nil {
                 CenteredState(title: "Opening this conversation…")
             } else if vm.thread.error != nil, vm.thread.messages.isEmpty {
                 failedBody
@@ -274,7 +274,8 @@ struct ThreadView: View {
             Text("This conversation could not be opened.")
                 .font(.system(size: 17, weight: .semibold))
                 .foregroundColor(GM.textPrimary)
-            Text("Check your connection and try again.").font(.system(size: 14)).foregroundColor(GM.textSecondary)
+            Text(vm.thread.error ?? "Check your connection and try again.")
+                .font(.system(size: 14)).foregroundColor(GM.textSecondary)
             GradientButton(title: "Try again",
                            action: { isThread ? vm.openThread(id, focusedID: initialMessageId) : vm.openMessage(id) })
                 .padding(.top, 8)
