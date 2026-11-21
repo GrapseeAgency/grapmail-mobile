@@ -363,7 +363,17 @@ jobs:
           emulator-boot-timeout: 900
           disable-animations: true
           emulator-options: -no-window -no-audio -no-boot-anim -gpu swiftshader_indirect -no-snapshot
-          script: bash scripts/android-release-launch.sh android/app/build/outputs/apk/release/app-release.apk
+          script: |
+            bash scripts/android-release-launch.sh android/app/build/outputs/apk/release/app-release.apk
+            bash scripts/android-onboarding-render.sh "$RUNNER_TEMP/grapmail-icons/bin/python"
+
+      - name: Upload onboarding diagnostics on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: grapmail-onboarding-diagnostics
+          path: screenshots-release/*.png
+          if-no-files-found: ignore
 
       - name: Upload verified release artifacts
         uses: actions/upload-artifact@v4
@@ -373,7 +383,7 @@ jobs:
           path: |
             android/app/build/outputs/apk/release/app-release.apk
             android/app/build/outputs/bundle/release/app-release.aab
-            screenshots-release/launch.png
+            screenshots-release/*.png
 
       - name: Stage release downloads
         if: github.ref_type == 'tag'

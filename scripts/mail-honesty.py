@@ -2519,7 +2519,7 @@ pin("every Route case is dispatched by some sector switch",
     enum_block is not None and len(route_cases) >= 60 and not _missing)
 
 pin("release CI launches the signed APK before uploading artifacts",
-    WF_TEXT.index("script: bash scripts/android-release-launch.sh")
+    WF_TEXT.index("bash scripts/android-release-launch.sh")
     < WF_TEXT.index("name: Upload verified release artifacts"))
 pin("the new signature fields speak to TalkBack and VoiceOver",
     'contentDescription = "Signature for $address"' in code_only(KT_ACCT)

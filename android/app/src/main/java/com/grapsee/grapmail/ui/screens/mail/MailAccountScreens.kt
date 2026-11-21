@@ -949,6 +949,7 @@ fun PrivacyScreen(
     onPrefs: () -> Unit,
     onDeleteAccount: () -> Unit,
     onSupport: () -> Unit,
+    onLegal: (com.grapsee.grapmail.ui.screens.GrapMailLegalDocument) -> Unit,
 ) {
     val palette = LocalPalette.current
     val state by vm.state.collectAsStateWithLifecycle()
@@ -1002,11 +1003,10 @@ fun PrivacyScreen(
                 color = palette.primarySolid, modifier = Modifier.clickable(onClick = onDeleteAccount)
                     .padding(vertical = 6.dp))
             SectionLabel("The documents", palette)
-            Text("Privacy Policy · Terms of Service", fontSize = 14.sp,
-                color = palette.primarySolid,
-                modifier = Modifier.clickable {
-                    openExternal(vm.getApplication(), "https://grapsee.com/legal/privacy-policy")
-                }.padding(vertical = 6.dp))
+            for (document in com.grapsee.grapmail.ui.screens.GrapMailLegalDocument.entries) {
+                Text(document.title, fontSize = 14.sp, color = palette.primarySolid,
+                    modifier = Modifier.fillMaxWidth().clickable { onLegal(document) }.padding(vertical = 12.dp))
+            }
             Spacer(Modifier.height(24.dp))
         }
     }

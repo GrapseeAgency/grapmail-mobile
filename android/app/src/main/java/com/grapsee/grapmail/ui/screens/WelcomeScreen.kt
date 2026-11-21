@@ -19,9 +19,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -46,7 +44,11 @@ import com.grapsee.grapmail.ui.theme.LocalPalette
  * which collapse to zero and clip content off-screen.
  */
 @Composable
-fun WelcomeScreen(onCreateAccount: () -> Unit, onSignIn: () -> Unit) {
+fun WelcomeScreen(
+    onCreateAccount: () -> Unit,
+    onSignIn: () -> Unit,
+    onLegal: (GrapMailLegalDocument) -> Unit,
+) {
     val palette = LocalPalette.current
     Column(
         Modifier
@@ -96,14 +98,10 @@ fun WelcomeScreen(onCreateAccount: () -> Unit, onSignIn: () -> Unit) {
         Spacer(Modifier.height(20.dp))
         Text(
             buildAnnotatedString {
-                append("By continuing, you agree to our ")
-                pushStyle(SpanStyle(color = palette.primarySolid, fontWeight = FontWeight.Medium))
-                append("Terms of Service")
-                pop()
-                append("\nand ")
-                pushStyle(SpanStyle(color = palette.primarySolid, fontWeight = FontWeight.Medium))
-                append("Privacy Policy")
-                pop()
+                append("Read the ")
+                appendLegalLink(GrapMailLegalDocument.Terms, palette.primarySolid, onLegal)
+                append(" and ")
+                appendLegalLink(GrapMailLegalDocument.Privacy, palette.primarySolid, onLegal)
                 append(".")
             },
             fontSize = 12.sp,

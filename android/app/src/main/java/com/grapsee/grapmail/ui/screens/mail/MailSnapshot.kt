@@ -345,7 +345,7 @@ fun MailSnapshotScreen(name: String) {
             "account-profile" -> ProfileEditScreen(profileVm, onBack = {})
             "account-privacy" -> PrivacyScreen(profileVm, onBack = {}, onProfile = {},
                 onPhone = {}, onAddresses = {}, onPrefs = {}, onDeleteAccount = {},
-                onSupport = {})
+                onSupport = {}, onLegal = {})
             "mail-support" -> SupportScreen(profileVm, onBack = {}, onForgot = {},
                 onPhone = {}, onAddresses = {})
             // The encryption band. Every frame renders the live screen over the

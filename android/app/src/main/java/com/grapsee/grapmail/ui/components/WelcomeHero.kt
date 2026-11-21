@@ -1,6 +1,7 @@
 package com.grapsee.grapmail.ui.components
 
 import android.annotation.SuppressLint
+import android.webkit.JavascriptInterface
 import android.graphics.Color as AndroidColor
 import android.view.View
 import android.webkit.WebResourceRequest
@@ -42,9 +43,27 @@ import java.io.ByteArrayInputStream
  * The animation is JS + CSS compositor work inside the WebView, so it stays off
  * the Compose recomposition path entirely.
  */
-@SuppressLint("SetJavaScriptEnabled")
 @Composable
 fun WelcomeHero(accent: Color, modifier: Modifier = Modifier) {
+    BundledAnimation(
+        asset = "GrapMail_Autoplay_Mailbox.html",
+        accent = accent,
+        description = "Animated preview: a GrapMail inbox on a phone rising out of an envelope",
+        modifier = modifier,
+    )
+}
+
+@SuppressLint("SetJavaScriptEnabled")
+@Composable
+internal fun BundledAnimation(
+    asset: String,
+    accent: Color,
+    description: String,
+    modifier: Modifier = Modifier,
+    hostStyles: String = "",
+    interactive: Boolean = false,
+    onOpenMailbox: (() -> Unit)? = null,
+) {
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     // A holder, not state: this must not key the effect below. Keying it made
     // the first effect's dispose clear the state, which recomposed, disposed the
@@ -54,8 +73,7 @@ fun WelcomeHero(accent: Color, modifier: Modifier = Modifier) {
 
     Box(
         modifier = modifier.semantics {
-            contentDescription =
-                "Animated preview: a GrapMail inbox on a phone rising out of an envelope"
+            contentDescription = description
         }
     ) {
         AndroidView(
@@ -65,25 +83,34 @@ fun WelcomeHero(accent: Color, modifier: Modifier = Modifier) {
                 // system would make to open a drawable, and cheaper than a
                 // temporary thread hand-off that would flash an empty frame.
                 val html = viewContext.assets
-                    .open(ASSET)
+                    .open(asset)
                     .bufferedReader()
                     .use { themeAnimationHtml(it.readText(), accent) }
+                    .let { if (hostStyles.isEmpty()) it else it.replaceFirst("</head>", "$hostStyles</head>") }
 
                 WebView(viewContext).apply {
                     setBackgroundColor(AndroidColor.TRANSPARENT)
                     isVerticalScrollBarEnabled = false
                     isHorizontalScrollBarEnabled = false
                     overScrollMode = View.OVER_SCROLL_NEVER
-                    isFocusable = false
-                    isFocusableInTouchMode = false
-                    isLongClickable = false
-                    isHapticFeedbackEnabled = false
-                    setOnLongClickListener { true }
-                    // A disabled view does not take focus, hover, long-press or
-                    // touch slop from the screen's scroll container. The page
-                    // needs no input, so nothing is lost.
-                    isEnabled = false
-                    importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS
+                    if (!interactive) {
+                        isFocusable = false
+                        isFocusableInTouchMode = false
+                        isLongClickable = false
+                        isHapticFeedbackEnabled = false
+                        isEnabled = false
+                        importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS
+                    }
+
+                    if (onOpenMailbox != null) {
+                        addJavascriptInterface(object {
+                            @JavascriptInterface
+                            fun postMessage(message: String) {
+                                if (runCatching { org.json.JSONObject(message).optString("type") }.getOrNull()
+                                    == "grapmail:open-mailbox") post { onOpenMailbox() }
+                            }
+                        }, "ReactNativeWebView")
+                    }
 
                     settings.apply {
                         javaScriptEnabled = true
@@ -104,7 +131,7 @@ fun WelcomeHero(accent: Color, modifier: Modifier = Modifier) {
                         override fun shouldOverrideUrlLoading(
                             view: WebView?,
                             request: WebResourceRequest?,
-                        ): Boolean = true // the hero never navigates anywhere
+                        ): Boolean = true // the animation never navigates
 
                         override fun shouldInterceptRequest(
                             view: WebView?,
@@ -130,6 +157,12 @@ fun WelcomeHero(accent: Color, modifier: Modifier = Modifier) {
                     holder[0] = this
                 }
             },
+            onRelease = { view ->
+                if (holder[0] === view) holder[0] = null
+                view.removeJavascriptInterface("ReactNativeWebView")
+                view.stopLoading()
+                view.destroy()
+            },
         )
     }
 
@@ -147,11 +180,8 @@ fun WelcomeHero(accent: Color, modifier: Modifier = Modifier) {
         lifecycle.addObserver(observer)
         onDispose {
             lifecycle.removeObserver(observer)
-            holder[0]?.destroy()
-            holder[0] = null
         }
     }
 }
 
-private const val ASSET = "GrapMail_Autoplay_Mailbox.html"
 private const val ASSET_BASE = "file:///android_asset/"

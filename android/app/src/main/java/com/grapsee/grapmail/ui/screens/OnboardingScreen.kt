@@ -1,14 +1,5 @@
 package com.grapsee.grapmail.ui.screens
 
-import android.annotation.SuppressLint
-import android.graphics.Color as AndroidColor
-import android.view.View
-import android.webkit.JavascriptInterface
-import android.webkit.WebResourceRequest
-import android.webkit.WebResourceResponse
-import android.webkit.WebSettings
-import android.webkit.WebView
-import android.webkit.WebViewClient
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -33,7 +24,6 @@ import androidx.compose.material.icons.automirrored.rounded.ArrowForward
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
@@ -43,25 +33,17 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.viewinterop.AndroidView
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleEventObserver
-import androidx.lifecycle.compose.LocalLifecycleOwner
+import com.grapsee.grapmail.ui.components.BundledAnimation
 import com.grapsee.grapmail.ui.components.GradientButton
 import com.grapsee.grapmail.ui.components.GrapMailLogo
-import com.grapsee.grapmail.ui.components.themeAnimationHtml
 import com.grapsee.grapmail.ui.theme.LocalPalette
 import com.grapsee.grapmail.ui.theme.ScreenBackground
-import java.io.ByteArrayInputStream
 
 data class OnboardingSceneData(
     val index: Int,
@@ -83,7 +65,7 @@ val ONBOARDING_SCENES = listOf(
         title = "Welcome to Your Sanctuary",
         description = "Your new address is ready; welcome to a cleaner way to communicate.",
         ctaText = "Get Started",
-        assetName = "file:///android_asset/onboarding/onboarding_scene_1.html",
+        assetName = "onboarding/onboarding_scene_1.html",
     ),
     OnboardingSceneData(
         index = 1,
@@ -91,7 +73,7 @@ val ONBOARDING_SCENES = listOf(
         title = "You Decide Who Reaches You",
         description = "Unknown senders wait in the Screener until you decide.",
         ctaText = "Next",
-        assetName = "file:///android_asset/onboarding/onboarding_scene_2.html",
+        assetName = "onboarding/onboarding_scene_2.html",
     ),
     OnboardingSceneData(
         index = 2,
@@ -99,7 +81,7 @@ val ONBOARDING_SCENES = listOf(
         title = "Tame the Clutter",
         description = "Unsubscribe, snooze, and return to what matters.",
         ctaText = "Next",
-        assetName = "file:///android_asset/onboarding/onboarding_scene_3.html",
+        assetName = "onboarding/onboarding_scene_3.html",
     ),
     OnboardingSceneData(
         index = 3,
@@ -107,7 +89,7 @@ val ONBOARDING_SCENES = listOf(
         title = "Choose Your Rhythm",
         description = "Set your theme and decide when GrapMail can interrupt you.",
         ctaText = "Next",
-        assetName = "file:///android_asset/onboarding/onboarding_scene_4.html",
+        assetName = "onboarding/onboarding_scene_4.html",
     ),
     OnboardingSceneData(
         index = 4,
@@ -115,242 +97,29 @@ val ONBOARDING_SCENES = listOf(
         title = "Your Inbox Is Yours Again",
         description = "Welcome home; your new mailbox is ready.",
         ctaText = "Open My Mailbox",
-        assetName = "file:///android_asset/onboarding/onboarding_scene_5.html",
+        assetName = "onboarding/onboarding_scene_5.html",
     ),
 )
 
-/** The artwork's own outer colour; the page around it is this colour so the
- *  frame has no edge — the scene dissolves into the screen instead of sitting
- *  in an invisible box. */
-/**
- * The five onboarding pages. The artwork is the founder's standalone HTML,
- * bundled in `assets/onboarding/` and rendered by a WebView. The host supplies
- * the palette, headline and navigation.
- *
- * The one thing the artwork needs from its host is a viewport. A WebView parses
- * the document before Compose has laid it out, so the initial containing block
- * is 0 tall, `height:100%` on `html`/`body` resolves to 0, and the page's own
- * `overflow:hidden` clips the entire scene away — the blank panel this screen
- * used to be. `HOST_FIT` is a single injected style block that anchors the
- * document to the viewport height instead of to its parent (the same
- * `native-host-fit` correction the bundled welcome page carries, and the same
- * `loadDataWithBaseURL` delivery that page uses on device). The palette is
- * applied before loading so each scene starts in the current app colors.
- */
-@SuppressLint("SetJavaScriptEnabled")
-@Composable
-fun OnboardingHero(
-    scene: OnboardingSceneData,
-    accent: Color,
-    onOpenMailbox: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val lifecycle = LocalLifecycleOwner.current.lifecycle
-    val holder = remember { arrayOfNulls<WebView>(1) }
-    val target = scene.assetName
-
-    Box(
-        modifier = modifier.semantics {
-            contentDescription = "Animated scene: ${scene.title}"
-        }
-    ) {
-        AndroidView(
-            modifier = Modifier
-                .fillMaxSize()
-                .onSizeChanged { holder[0]?.evaluateJavascript(NATIVE_FIT, null) },
-            factory = { ctx ->
-                // The scene is read from the APK and handed to the view in one
-                // go, so the document never has to resolve a file path and the
-                // viewport fit is in place before the first layout.
-                val html = ctx.assets
-                    .open(target.removePrefix(ASSET_PREFIX))
-                    .bufferedReader()
-                    .use { themeAnimationHtml(it.readText(), accent) }
-                    .let { src ->
-                        // Host-mode background removal: the scenes are authored
-                        // as full-viewport animations with their own navy field,
-                        // which paints a hard-edged plate inside the app. Strip
-                        // only those background layers; every illustration rule
-                        // (SVG, canvas, gradients on the artwork itself) stays.
-                        val stripped = if (src.contains("</head>"))
-                            src.replaceFirst("</head>", HOST_BG + "</head>")
-                        else src
-                        // Before </body> so the body exists when the fit runs;
-                        // appended if a scene ever ships without the tag.
-                        if (stripped.contains("</body>"))
-                            stripped.replaceFirst("</body>", HOST_FIT + "</body>")
-                        else stripped + HOST_FIT
-                    }
-
-                WebView(ctx).apply {
-                    setBackgroundColor(AndroidColor.TRANSPARENT)
-                    isVerticalScrollBarEnabled = false
-                    isHorizontalScrollBarEnabled = false
-                    overScrollMode = View.OVER_SCROLL_NEVER
-
-                    settings.apply {
-                        javaScriptEnabled = true
-                        // One local file, drawn by the app: the scene may not
-                        // reach the network, keep storage, or open a link.
-                        blockNetworkLoads = true
-                        allowFileAccess = true
-                        allowContentAccess = false
-                        @Suppress("DEPRECATION")
-                        allowFileAccessFromFileURLs = false
-                        @Suppress("DEPRECATION")
-                        allowUniversalAccessFromFileURLs = false
-                        domStorageEnabled = false
-                        databaseEnabled = false
-                        cacheMode = WebSettings.LOAD_NO_CACHE
-                        setSupportZoom(false)
-                        builtInZoomControls = false
-                        displayZoomControls = false
-                        textZoom = 100
-                    }
-
-                    // Scene 5 asks the host to open the mailbox, and scene 4 can
-                    // announce a preference. Both are one-way notes; unknown
-                    // types are ignored rather than guessed at.
-                    addJavascriptInterface(object {
-                        @JavascriptInterface
-                        fun postMessage(msg: String) {
-                            if (msg.contains("open-mailbox")) post { onOpenMailbox() }
-                        }
-                    }, "ReactNativeWebView")
-
-                    webViewClient = object : WebViewClient() {
-                        override fun onPageFinished(view: WebView?, url: String?) {
-                            super.onPageFinished(view, url)
-                            view?.evaluateJavascript(NATIVE_FIT, null)
-                        }
-
-                        override fun shouldOverrideUrlLoading(
-                            view: WebView?,
-                            request: WebResourceRequest?,
-                        ): Boolean {
-                            val url = request?.url?.toString().orEmpty()
-                            if (url.startsWith("grapmail:")) {
-                                view?.post { onOpenMailbox() }
-                                return true
-                            }
-                            return true
-                        }
-
-                        override fun shouldInterceptRequest(
-                            view: WebView?,
-                            request: WebResourceRequest?,
-                        ): WebResourceResponse? {
-                            val url = request?.url?.toString().orEmpty()
-                            val allowed = url.startsWith(ASSET_BASE) ||
-                                url.startsWith("data:") || url.startsWith("about:")
-                            return if (allowed) null else WebResourceResponse(
-                                "text/plain", "utf-8", ByteArrayInputStream(ByteArray(0)),
-                            )
-                        }
-                    }
-
-                    loadDataWithBaseURL(ASSET_BASE, html, "text/html", "UTF-8", null)
-                    holder[0] = this
-                }
-            },
-            update = { },
-        )
-    }
-
-    // A WebView keeps its timers running while it believes it is visible;
-    // pausing with the screen is what makes leaving the app stop the scene
-    // instead of animating behind the launcher.
-    DisposableEffect(lifecycle, target) {
-        val observer = LifecycleEventObserver { _, event ->
-            when (event) {
-                Lifecycle.Event.ON_RESUME -> holder[0]?.onResume()
-                Lifecycle.Event.ON_PAUSE -> holder[0]?.onPause()
-                else -> Unit
-            }
-        }
-        lifecycle.addObserver(observer)
-        onDispose {
-            lifecycle.removeObserver(observer)
-            holder[0]?.destroy()
-            holder[0] = null
-        }
-    }
-}
-
-/**
- * Host-mode background removal.
- *
- * Each scene is authored as a standalone full-viewport animation and therefore
- * paints its own navy field (`html`/`body` background, fixed `body` atmosphere
- * layers, and scene 4's `#universe`/`.background` sky). Inside the app that
- * field ends at the WebView's edge and reads as a hard-edged plate around the
- * illustration. The host page paints one continuous dark surface behind all
- * five scenes, so those background layers are removed here. Every illustration
- * geometry and timing still render as authored.
- */
-private const val HOST_BG = """
-<style id="native-host-bg">
+// Anchor the scene directly to the WebView viewport, as the welcome artwork
+// does. Percentage heights on the document body otherwise depend on a first
+// layout measurement that can resolve to zero in the embedded WebView.
+private const val ONBOARDING_HOST_STYLES = """
+<style id="native-host-fit">
 html, body { background: transparent !important; }
-body::before, body::after, body:before, body:after { display: none !important; }
-#universe, .background { display: none !important; }
+body { display: block !important; min-height: 0 !important; margin: 0 !important; }
+body::before, body::after, #universe { display: none !important; }
+body > main {
+    position: fixed !important;
+    inset: 0 !important;
+    width: auto !important;
+    height: auto !important;
+    max-width: none !important;
+    max-height: none !important;
+    margin: 0 !important;
+}
 </style>
 """
-
-/**
- * The viewport anchor, appended to the document body.
- *
- * A WebView parses the document before Compose has laid it out, so the initial
- * containing block is 0 tall and never grows: `height:100%` on `html`/`body`
- * resolves to 0 (the five scenes' roots all use it), `100vh` resolves to 0 too
- * in this state, and `body{overflow:hidden}` then clips the whole scene away —
- * the blank panel this screen used to be. A pixel height measured from the live
- * viewport is the only value that does resolve, so this pins it, retries for a
- * handful of frames while layout settles, and re-pins on resize.
- *
- * This script only updates the document height.
- */
-private const val HOST_FIT = """
-<script id="native-host-fit">
-(function () {
-  var html = document.documentElement;
-  function fit() {
-    var h = window.innerHeight || html.clientHeight || 0;
-    if (!h || !document.body) return false;
-    html.style.height = h + 'px';
-    document.body.style.height = h + 'px';
-    return true;
-  }
-  var frames = 0;
-  (function settle() {
-    fit();
-    if (++frames < 40) requestAnimationFrame(settle);
-  })();
-  window.addEventListener('resize', fit, { passive: true });
-  window.addEventListener('orientationchange', fit, { passive: true });
-})();
-</script>
-"""
-
-/**
- * Belt and braces for the one case CSS cannot express on older WebViews: a
- * resize (rotation, split screen, keyboard) after the first layout. Pinning the
- * document to the measured viewport in pixels keeps the percentage heights the
- * scenes are authored with resolving against the new size.
- */
-private const val NATIVE_FIT = """
-(function () {
-  var h = window.innerHeight || document.documentElement.clientHeight || 0;
-  if (!h) return;
-  document.documentElement.style.height = h + 'px';
-  document.body.style.height = h + 'px';
-  void document.body.offsetHeight;
-})();
-"""
-
-private const val ASSET_BASE = "file:///android_asset/onboarding/"
-
-/** The APK-relative form of [ASSET_BASE], for opening the same file directly. */
-private const val ASSET_PREFIX = "file:///android_asset/"
 
 @Composable
 fun OnboardingScreen(
@@ -390,10 +159,13 @@ fun OnboardingScreen(
                 // starts the next page from the authored first frame instead
                 // of resuming the previous scene's timeline.
                 key(scene.index, palette.primarySolid) {
-                    OnboardingHero(
-                        scene = scene,
+                    BundledAnimation(
+                        asset = scene.assetName,
                         accent = palette.primarySolid,
-                        onOpenMailbox = onFinish,
+                        description = "Animated scene: ${scene.title}",
+                        hostStyles = ONBOARDING_HOST_STYLES,
+                        interactive = true,
+                        onOpenMailbox = onFinish.takeIf { sceneIndex == ONBOARDING_SCENES.lastIndex },
                         modifier = Modifier
                             .width(heroWidth)
                             .height(heroHeight)

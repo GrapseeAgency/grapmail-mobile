@@ -28,10 +28,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.grapsee.grapmail.logic.SignUpViewModel
@@ -52,9 +50,9 @@ fun TermsStepScreen(
     onBack: () -> Unit,
     onSignIn: () -> Unit,
     onCreated: (address: String, name: String) -> Unit,
+    onLegal: (GrapMailLegalDocument) -> Unit,
 ) {
     val palette = LocalPalette.current
-    val context = androidx.compose.ui.platform.LocalContext.current
     val state by vm.state.collectAsStateWithLifecycle()
     val scroll = rememberScrollState()
     val scrolledToEnd = rememberScrolledToEnd(scroll)
@@ -101,7 +99,7 @@ fun TermsStepScreen(
             Text(
                 buildAnnotatedString {
                     append("By creating an account, you agree to our ")
-                    withStyle(SpanStyle(color = palette.primarySolid)) { append("Terms of Service") }
+                    appendLegalLink(GrapMailLegalDocument.Terms, palette.primarySolid, onLegal)
                     append(" and confirm that you are at least 13 years old. You are responsible for keeping your account secure and for all activity that happens under your account.")
                 },
                 fontSize = 13.sp, lineHeight = 20.sp, color = palette.textSecondary,
@@ -111,8 +109,8 @@ fun TermsStepScreen(
             Spacer(Modifier.height(6.dp))
             Text(
                 buildAnnotatedString {
-                    append("We collect and process your data to provide and improve GrapMail services. Your information will not be shared with third parties without your consent, except as required by law. You can read the full details in our ")
-                    withStyle(SpanStyle(color = palette.primarySolid)) { append("Privacy Policy") }
+                    append("GrapMail uses your account and mailbox data to operate the service. Read about account data, notifications, remote images and deletion in the ")
+                    appendLegalLink(GrapMailLegalDocument.Privacy, palette.primarySolid, onLegal)
                     append(".")
                 },
                 fontSize = 13.sp, lineHeight = 20.sp, color = palette.textSecondary,
@@ -120,27 +118,11 @@ fun TermsStepScreen(
         }
 
         Spacer(Modifier.height(12.dp))
-        Text("Read our Terms of Service ↗", fontSize = 13.sp, fontWeight = FontWeight.Medium, color = palette.primarySolid,
-            modifier = Modifier
-                .clip(RoundedCornerShape(8.dp))
-                .clickable {
-                    context.startActivity(android.content.Intent(
-                        android.content.Intent.ACTION_VIEW,
-                        android.net.Uri.parse("https://grapsee.com/legal/terms-of-service"),
-                    ))
-                }
-                .padding(6.dp))
-        Spacer(Modifier.height(8.dp))
-        Text("Read our Privacy Policy ↗", fontSize = 13.sp, fontWeight = FontWeight.Medium, color = palette.primarySolid,
-            modifier = Modifier
-                .clip(RoundedCornerShape(8.dp))
-                .clickable {
-                    context.startActivity(android.content.Intent(
-                        android.content.Intent.ACTION_VIEW,
-                        android.net.Uri.parse("https://grapsee.com/legal/privacy-policy"),
-                    ))
-                }
-                .padding(6.dp))
+        Text(buildAnnotatedString {
+            appendLegalLink(GrapMailLegalDocument.Terms, palette.primarySolid, onLegal)
+            append("  ·  ")
+            appendLegalLink(GrapMailLegalDocument.Privacy, palette.primarySolid, onLegal)
+        }, fontSize = 14.sp, lineHeight = 22.sp, modifier = Modifier.padding(vertical = 6.dp))
 
         Spacer(Modifier.height(16.dp))
 
@@ -170,12 +152,7 @@ fun TermsStepScreen(
             Spacer(Modifier.width(12.dp))
             Column {
                 Text(
-                    buildAnnotatedString {
-                        append("I agree to the ")
-                        withStyle(SpanStyle(color = palette.primarySolid, fontWeight = FontWeight.Medium)) { append("Terms of Service") }
-                        append(" and ")
-                        withStyle(SpanStyle(color = palette.primarySolid, fontWeight = FontWeight.Medium)) { append("Privacy Policy") }
-                    },
+                    "I agree to the Terms of Service and Privacy Policy.",
                     fontSize = 13.sp, color = palette.textPrimary,
                 )
                 Spacer(Modifier.height(4.dp))

@@ -1,5 +1,7 @@
 package com.grapsee.grapmail
 
+import com.grapsee.grapmail.ui.screens.GrapMailLegalDocument
+import com.grapsee.grapmail.ui.screens.GrapMailLegalScreen
 import android.os.Bundle
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -332,6 +334,13 @@ object Routes {
     const val STEP_PASSWORD = "signup/password"
     const val STEP_TERMS = "signup/terms"
     const val HUMAN_VERIFY = "signup/verify"
+    const val LEGAL_TERMS = "legal/terms"
+    const val LEGAL_PRIVACY = "legal/privacy"
+
+    fun legal(document: GrapMailLegalDocument): String = when (document) {
+        GrapMailLegalDocument.Terms -> LEGAL_TERMS
+        GrapMailLegalDocument.Privacy -> LEGAL_PRIVACY
+    }
     const val CREATED = "signup/created/{address}/{name}"
     const val CREATED_ALT = "signup/created-alt/{address}/{name}"
     const val ONBOARDING = "signup/onboarding/{address}/{name}"
@@ -835,7 +844,14 @@ fun GrapMailNav(
             WelcomeScreen(
                 onCreateAccount = { nav.navigate(Routes.STEP_NAME) },
                 onSignIn = { nav.navigate(Routes.SIGN_IN) },
+                onLegal = { nav.navigate(Routes.legal(it)) },
             )
+        }
+        composable(Routes.LEGAL_TERMS) {
+            GrapMailLegalScreen(GrapMailLegalDocument.Terms, onBack = { nav.popBackStack() })
+        }
+        composable(Routes.LEGAL_PRIVACY) {
+            GrapMailLegalScreen(GrapMailLegalDocument.Privacy, onBack = { nav.popBackStack() })
         }
         composable(Routes.SIGN_IN) {
             SignInScreen(
@@ -1183,6 +1199,7 @@ fun GrapMailNav(
         composable(Routes.STEP_TERMS) {
             TermsStepScreen(
                 vm = vm,
+                onLegal = { nav.navigate(Routes.legal(it)) },
                 onBack = { nav.popBackStack() },
                 onSignIn = { nav.navigate(Routes.SIGN_IN) },
                 onCreated = { address, name ->
@@ -1481,6 +1498,7 @@ fun GrapMailNav(
             val profile: com.grapsee.grapmail.logic.ProfileViewModel = signedInViewModel(nav, entry)
             com.grapsee.grapmail.ui.screens.mail.PrivacyScreen(
                 vm = profile,
+                onLegal = { nav.navigate(Routes.legal(it)) },
                 onBack = { nav.popBackStack() },
                 onProfile = { nav.navigate(Routes.ACCOUNT_PROFILE) },
                 onPhone = { nav.navigate(Routes.PHONE_VERIFY) },
