@@ -358,11 +358,11 @@ jobs:
         with:
           api-level: 34
           arch: x86_64
-          target: google_apis
-          profile: pixel_6
+          target: default
+          profile: pixel
           emulator-boot-timeout: 900
           disable-animations: true
-          emulator-options: -no-window -no-audio -no-boot-anim -gpu swiftshader_indirect -no-snapshot
+          emulator-options: -no-window -no-audio -no-boot-anim -skin 360x800 -gpu swiftshader_indirect -feature -Vulkan -no-snapshot
           script: |
             bash scripts/android-release-launch.sh android/app/build/outputs/apk/release/app-release.apk "$RUNNER_TEMP/grapmail-icons/bin/python"
             bash scripts/android-onboarding-render.sh "$RUNNER_TEMP/grapmail-icons/bin/python"

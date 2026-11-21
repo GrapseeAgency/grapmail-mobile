@@ -17,6 +17,8 @@ for attempt in {1..8}; do
     if adb shell pidof "$package" >/dev/null &&
        adb shell dumpsys activity activities | grep -E 'topResumedActivity|mResumedActivity' > /tmp/grapmail-release-activity.txt &&
        grep -Fq "$package/" /tmp/grapmail-release-activity.txt &&
+       adb shell dumpsys window | grep -E 'mCurrentFocus=' > /tmp/grapmail-release-window.txt &&
+       grep -Fq "$package/" /tmp/grapmail-release-window.txt &&
        timeout 8 adb exec-out screencap -p > "$frame" &&
        "$python" - "$frame" <<'PY'
 import sys
@@ -36,5 +38,6 @@ done
 
 echo "GrapMail did not show a visible screen after launch." >&2
 cat /tmp/grapmail-release-activity.txt >&2 || true
+cat /tmp/grapmail-release-window.txt >&2 || true
 adb logcat -d -s AndroidRuntime:E >&2
 exit 1
