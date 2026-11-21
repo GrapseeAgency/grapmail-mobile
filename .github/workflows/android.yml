@@ -364,7 +364,7 @@ jobs:
           disable-animations: true
           emulator-options: -no-window -no-audio -no-boot-anim -gpu swiftshader_indirect -no-snapshot
           script: |
-            bash scripts/android-release-launch.sh android/app/build/outputs/apk/release/app-release.apk
+            bash scripts/android-release-launch.sh android/app/build/outputs/apk/release/app-release.apk "$RUNNER_TEMP/grapmail-icons/bin/python"
             bash scripts/android-onboarding-render.sh "$RUNNER_TEMP/grapmail-icons/bin/python"
 
       - name: Upload onboarding diagnostics on failure
