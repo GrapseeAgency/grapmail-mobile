@@ -42,6 +42,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
@@ -78,10 +79,16 @@ private const val FIT_CHECKPOINT = """
         document.head.appendChild(viewport);
     }
     viewport.content = 'width=440';
-    var main = document.querySelector('main');
-    if (main) {
-        main.style.padding = '12px';
-        main.style.boxSizing = 'border-box';
+    var style = document.createElement('style');
+    style.textContent = [
+        'html, body, main { background: transparent !important; }',
+        'main { padding: 12px !important; box-sizing: border-box !important; }',
+        'main > div > div:first-child, main > div > div:first-child + p { display: none; }',
+        'main > div > p { color: inherit !important; }',
+    ].join(' ');
+    if (!document.getElementById('grapmail-android-checkpoint')) {
+        style.id = 'grapmail-android-checkpoint';
+        document.head.appendChild(style);
     }
     window.dispatchEvent(new Event('resize'));
 })();
@@ -136,7 +143,7 @@ fun HumanVerifyScreen(vm: SignUpViewModel, onBack: () -> Unit, onDone: () -> Uni
                     factory = { context ->
                         WebView(context).apply {
                             webView = this
-                            setBackgroundColor(android.graphics.Color.TRANSPARENT)
+                            setBackgroundColor(palette.card.toArgb())
                             settings.javaScriptEnabled = true
                             settings.domStorageEnabled = true
                             settings.allowFileAccess = false
@@ -176,6 +183,7 @@ fun HumanVerifyScreen(vm: SignUpViewModel, onBack: () -> Unit, onDone: () -> Uni
                             loadUrl(HUMAN_VERIFY_URL)
                         }
                     },
+                    update = { it.setBackgroundColor(palette.card.toArgb()) },
                     onRelease = { view ->
                         if (webView === view) webView = null
                         view.removeJavascriptInterface("GrapMailAndroid")
