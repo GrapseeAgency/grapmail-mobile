@@ -90,6 +90,7 @@ struct HumanVerifyView: View {
                             .background(RoundedRectangle(cornerRadius: 14).strokeBorder(GM.primarySolid.opacity(0.5)))
                         }
                         .buttonStyle(.plain)
+                        .disabled(model.state.humanVerifying)
                         .padding(.top, 16)
                     }
 

@@ -119,6 +119,11 @@ final class SignUpModel: ObservableObject {
             return
         }
         let s = state
+        guard s.humanVerified, let verificationId = s.humanVerificationId,
+              !verificationId.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            onError("Complete the human verification check to continue.")
+            return
+        }
         update { $0.creating = true; $0.error = nil }
         Task {
             do {
@@ -133,7 +138,7 @@ final class SignUpModel: ObservableObject {
                         password: s.password,
                         acceptedTerms: true,
                         avatarPhoto: s.photo.map { "data:image/png;base64," + $0.base64EncodedString() },
-                        humanVerificationId: s.humanVerificationId
+                        humanVerificationId: verificationId
                     )
                 )
                 // The gateway answers `grapmail` (and no account object); the
@@ -201,21 +206,33 @@ final class SignUpModel: ObservableObject {
     /// stays disabled until {success:true}. Idempotent: duplicates ignored.
     func submitHumanVerification(token: String) {
         guard !token.isEmpty, !state.humanVerified, !state.humanVerifying else { return }
+        update { $0.humanVerifying = true; $0.humanVerifyError = nil }
         Task {
-            update { $0.humanVerifying = true; $0.humanVerifyError = nil }
             do {
                 let resp = try await ApiClient.verifyHuman(token: token)
-                if resp.success {
+                if resp.success, let verificationId = resp.verificationId,
+                   !verificationId.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                     update {
                         $0.humanVerifying = false
                         $0.humanVerified = true
-                        $0.humanVerificationId = resp.verificationId
+                        $0.humanVerificationId = verificationId
                     }
                 } else {
                     update { $0.humanVerifying = false; $0.humanVerifyError = "Verification failed — please try again." }
                 }
+            } catch ApiError.http(let status, _, _) {
+                let message: String
+                switch status {
+                case 500...599:
+                    message = "The verification service is temporarily unavailable. Try a new challenge in a moment."
+                case 429:
+                    message = "Too many verification attempts. Wait a moment and try again."
+                default:
+                    message = "Verification failed. Get a new challenge and try again."
+                }
+                update { $0.humanVerifying = false; $0.humanVerifyError = message }
             } catch {
-                update { $0.humanVerifying = false; $0.humanVerifyError = "Network error — please try again." }
+                update { $0.humanVerifying = false; $0.humanVerifyError = "Could not complete verification. Get a new challenge and try again." }
             }
         }
     }

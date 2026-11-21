@@ -2150,14 +2150,17 @@ pin("the data-flow doc states the deletion gap in the screens' own words",
 pin("the data-flow doc names every on-device store the code writes",
     all(s in DFLOW for s in ("Keychain", "UserDefaults", "Keystore",
                              "grapmail-e2e-protected-key/1", "MailStore")))
-pin("the Android release job builds and verifies the signed release APK",
-    "./gradlew assembleRelease --no-daemon" in WF_TEXT
+pin("the Android release job builds and verifies both production artifacts",
+    "./gradlew assembleRelease bundleRelease --no-daemon" in WF_TEXT
     and 'APK=android/app/build/outputs/apk/release/app-release.apk' in WF_TEXT
-    and '"$APKSIGNER" verify --print-certs "$APK"' in WF_TEXT)
-pin("the Android release page carries exactly the staged APK",
-    re.findall(r"^\s*files:\s*(.*)$", WF_TEXT, re.MULTILINE)
-    == ["download/GrapMail-${{ github.ref_name }}.apk"]
-    and "cp android/app/build/outputs/apk/release/app-release.apk download/GrapMail-${{ github.ref_name }}.apk" in WF_TEXT)
+    and 'AAB=android/app/build/outputs/bundle/release/app-release.aab' in WF_TEXT
+    and '"$APKSIGNER" verify --print-certs "$APK"' in WF_TEXT
+    and 'jarsigner -verify "$AAB"' in WF_TEXT
+    and 'cmp "$RUNNER_TEMP/grapmail-upload.der" "$RUNNER_TEMP/grapmail-aab.der"' in WF_TEXT)
+pin("the Android release page carries the verified APK and AAB",
+    all(f"download/GrapMail-${{{{ github.ref_name }}}}.{extension}" in WF_TEXT
+        for extension in ("apk", "aab"))
+    and 'fail_on_unmatched_files: true' in WF_TEXT)
 
 # The manifest is a plist Apple parses at upload time — a structure error or a
 # reason code off Apple's list is an email from App Review two weeks after the
@@ -2389,16 +2392,14 @@ pin("the mailto strip is case-proof and its failure is spoken",
     'while (t.startsWith("mailto:", ignoreCase = true))' in code_only(KT_MAIL_C)
     and "could not be opened, so nothing was drafted" in code_only(SW_SUBS))
 
-# 6. THE VERSION. One release, two apps: whatever the gradle build calls
-# itself, the Xcode project must answer the same -- the tag gate proved the
-# Android half right by failing a disagreeing tag; nothing yet proves iOS's
-# half, so this pin is the proof until a badging step exists.
+# Android's first Play Store release has its own version and build number.
 GRADLE = (ROOT / "android/app/build.gradle.kts").read_text(encoding="utf-8")
 PYML = (ROOT / "ios/project.yml").read_text(encoding="utf-8")
-_m = re.search(r'versionName = "([^"]+)"', GRADLE)
-_p = re.search(r'MARKETING_VERSION: "([^"]+)"', PYML)
-pin("both apps self-report the same marketing version",
-    _m is not None and _p is not None and _m.group(1) == _p.group(1))
+pin("the first Play Store release uses version 0.0.1 and version code 1",
+    'versionName = "0.0.1"' in GRADLE
+    and re.search(r'^\s*versionCode = 1\s*$', GRADLE, re.MULTILINE) is not None
+    and 'WANT=0.0.1' in WF_TEXT
+    and "versionCode='1'" in WF_TEXT)
 
 # ── 33. the second review round, pinned (§33) ───────────────────────────
 # Completeness, correctness and impact each re-read the session with fresh
@@ -2517,8 +2518,9 @@ _missing = [n for n in route_cases
 pin("every Route case is dispatched by some sector switch",
     enum_block is not None and len(route_cases) >= 60 and not _missing)
 
-pin("the release job's ceiling covers its own full walk",
-    "timeout-minutes: 150" in WF_TEXT and "timeout-minutes: 120" in WF_TEXT)
+pin("release CI launches the signed APK before uploading artifacts",
+    WF_TEXT.index("script: bash scripts/android-release-launch.sh")
+    < WF_TEXT.index("name: Upload verified release artifacts"))
 pin("the new signature fields speak to TalkBack and VoiceOver",
     'contentDescription = "Signature for $address"' in code_only(KT_ACCT)
     and 'accessibilityLabel("Signature for \\(address)")' in code_only(SW_ACCT))

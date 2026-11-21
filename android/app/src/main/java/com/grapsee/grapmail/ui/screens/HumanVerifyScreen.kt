@@ -38,7 +38,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -98,11 +97,12 @@ fun HumanVerifyScreen(vm: SignUpViewModel, onBack: () -> Unit, onDone: () -> Uni
 
     // Token received from the page bridge; handed to the ViewModel for the
     // server-side exchange. The ViewModel guards against replay/duplicates.
-    var pendingToken by rememberSaveable { mutableStateOf<String?>(null) }
+    var pendingToken by remember { mutableStateOf<String?>(null) }
     val mainHandler = remember { Handler(Looper.getMainLooper()) }
 
     LaunchedEffect(pendingToken) {
         val token = pendingToken ?: return@LaunchedEffect
+        pendingToken = null
         vm.submitHumanVerification(token)
     }
 
@@ -258,7 +258,7 @@ fun HumanVerifyScreen(vm: SignUpViewModel, onBack: () -> Unit, onDone: () -> Uni
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(14.dp))
                         .border(1.dp, palette.primarySolid.copy(alpha = 0.5f), RoundedCornerShape(14.dp))
-                        .clickable { webView.reload() }
+                        .clickable(enabled = !state.humanVerifying) { webView.reload() }
                         .padding(vertical = 14.dp),
                     horizontalArrangement = Arrangement.Center,
                     verticalAlignment = Alignment.CenterVertically,

@@ -3,10 +3,15 @@ name: Android
 on:
   push:
     branches: [main]
-    tags: ["v*"]
+    tags: ["v0.0.1"]
   pull_request:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      signed_candidate:
+        description: Build and verify signed Android artifacts without publishing a release
+        type: boolean
+        default: false
 
 # One run per ref at a time. Without this, every push queues another 30-minute
 # walk behind the last one: a session that pushes five fixes waits 2.5 hours for
@@ -20,6 +25,7 @@ concurrency:
 
 jobs:
   build-test-screenshot:
+    if: github.ref_type != 'tag' && !(github.event_name == 'workflow_dispatch' && inputs.signed_candidate)
     name: Build, live-test & screenshot (${{ matrix.device }})
     runs-on: ubuntu-latest
     # 60 was right until the mailbox band landed: the walk now relaunches the app
@@ -199,18 +205,10 @@ jobs:
           path: android/app/build/outputs/apk/debug/app-debug.apk
 
   release:
-    name: Build, live-test & publish the production APK
-    if: startsWith(github.ref, 'refs/tags/v')
-    needs: build-test-screenshot
+    name: Build and verify production APK and AAB
+    if: github.ref_name == 'v0.0.1' && github.ref_type == 'tag' || (github.event_name == 'workflow_dispatch' && inputs.signed_candidate)
     runs-on: ubuntu-latest
-    # 90 was set when this job built, proved and published. The release page
-    # grew a FULL walk of the release APK on an emulator — the same script the
-    # debug legs need a 120-minute ceiling for, and this job also spends time
-    # on R8, signing and the badging proofs first. A ceiling the walk has
-    # demonstrably outgrown on a loaded runner would kill the publish step
-    # that sits AFTER it: the tag ships nothing. 150 is the debug ceiling
-    # plus the build/verify overhead, headroom over the worst documented run.
-    timeout-minutes: 150
+    timeout-minutes: 60
     permissions:
       contents: write
     steps:
@@ -228,150 +226,63 @@ jobs:
           distribution: temurin
           java-version: "17"
 
-      # The job this replaces ran `assembleDebug` and published `app-debug.apk`
-      # under a release name. A debug APK is debuggable, unminified, signed with
-      # the Android debug key that every machine on earth already has, and
-      # installable alongside itself — it is not a product artifact and calling it
-      # one on the Releases page made the page say something false about the file
-      # next to it. This job builds the release variant: R8, resource shrinking,
-      # no debug flag.
+      - name: Run source guardrails
+        run: |
+          python3 scripts/mail-honesty.py --quiet
+          python3 scripts/api-parity.py
 
-      # ── the signing identity, resolved before anything is built ──────────────
-      #
-      # Two possible signers, and the release page must name the one that was
-      # actually used:
-      #
-      #   1. The founder's distribution key, as repository secrets:
-      #      CI_KEYSTORE_FILE (the .jks, base64-encoded), CI_KEYSTORE_PASSWORD,
-      #      CI_KEYSTORE_ALIAS. When all three exist the key is decoded, VERIFIED
-      #      (a bad paste must refuse the build, not silently fall back to the
-      #      ephemeral key — a release page that says founder-signed over a
-      #      test-signed file is the lie this whole section exists to prevent),
-      #      and exported for the build step below. Nothing in
-      #      build.gradle.kts changes: it reads CI_KEYSTORE_* from the
-      #      environment and has since the signing block was written.
-      #   2. The ephemeral CI key, generated inside the build step exactly as
-      #      before — used once, never stored, honestly labelled test-signed.
-      #
-      # The password is never echoed: it travels through `env:` (GitHub masks
-      # registered secrets) with an explicit ::add-mask belt-and-braces, and
-      # every keytool call reads it with `-storepass:env`, so it never appears
-      # in a process list or a log line.
-      - name: Resolve the distribution key
-        id: signing
+      - name: Resolve the production upload key
         env:
           FOUNDER_KEY_B64: ${{ secrets.CI_KEYSTORE_FILE }}
-          FOUNDER_KEY_PASSWORD: ${{ secrets.CI_KEYSTORE_PASSWORD }}
-          FOUNDER_KEY_ALIAS: ${{ secrets.CI_KEYSTORE_ALIAS }}
+          CI_KEYSTORE_PASSWORD: ${{ secrets.CI_KEYSTORE_PASSWORD }}
+          CI_KEYSTORE_ALIAS: ${{ secrets.CI_KEYSTORE_ALIAS }}
         run: |
-          set -eu
-          if [ -n "$FOUNDER_KEY_B64" ]; then
-            echo "::add-mask::$FOUNDER_KEY_PASSWORD"
-            echo "::add-mask::$FOUNDER_KEY_B64"
-            base64 -d > /tmp/founder-release.keystore <<< "$FOUNDER_KEY_B64"
-            # The verification is the point: the decoded file must open with
-            # the password AND contain the alias, or the job stops here.
-            if ! keytool -list -keystore /tmp/founder-release.keystore \
-                 -storepass:env FOUNDER_KEY_PASSWORD -alias "$FOUNDER_KEY_ALIAS" > /tmp/ks-verify.txt 2>&1; then
-              echo "::error::CI_KEYSTORE_* secrets were set but do not open as a keystore/alias pair."
-              echo "::error::Refusing to build with the ephemeral key instead: a release page"
-              echo "::error::that says founder-signed must be founder-signed."
-              sed -n '1,8p' /tmp/ks-verify.txt >&2
-              exit 1
-            fi
-            echo "CI_KEYSTORE_FILE=/tmp/founder-release.keystore" >> "$GITHUB_ENV"
-            echo "CI_KEYSTORE_PASSWORD=$FOUNDER_KEY_PASSWORD" >> "$GITHUB_ENV"
-            echo "CI_KEYSTORE_ALIAS=$FOUNDER_KEY_ALIAS" >> "$GITHUB_ENV"
-            {
-              echo 'label<<EOF_SIGNING'
-              echo 'Signed with **the founder'"'"'s distribution key** (repository secrets'
-              echo '`CI_KEYSTORE_FILE` / `CI_KEYSTORE_PASSWORD` / `CI_KEYSTORE_ALIAS`), verified as'
-              echo 'an openable keystore/alias pair before the build ran. Updates signed the same'
-              echo 'way install over this build.'
-              echo 'release_signed=true'
-              echo 'EOF_SIGNING'
-            } >> "$GITHUB_OUTPUT"
-          else
-            {
-              echo 'release_signed=false'
-              echo 'EOF_SIGNING'
-            } >> "$GITHUB_OUTPUT"
+          set -euo pipefail
+          if [[ -z "$FOUNDER_KEY_B64" || -z "$CI_KEYSTORE_PASSWORD" || -z "$CI_KEYSTORE_ALIAS" ]]; then
+            echo "::error::Set CI_KEYSTORE_FILE, CI_KEYSTORE_PASSWORD and CI_KEYSTORE_ALIAS before building a signed release."
+            exit 1
           fi
-              echo 'label<<EOF_SIGNING'
-              echo 'Signed with an **ephemeral CI key generated for this job and discarded after'
-              echo 'it** (test-signed). That makes the APK installable and verifiable, but it is'
-              echo 'not the product'"'"'s signing identity: an update signed with a different key'
-              echo 'cannot be installed over this one. To make this the real distribution'
-              echo 'artifact, add the founder'"'"'s keystore as repository secrets'
-              echo '(`CI_KEYSTORE_FILE` base64-encoded, plus `CI_KEYSTORE_PASSWORD` and'
-              echo '`CI_KEYSTORE_ALIAS`); the Gradle block already reads exactly those three.'
-              echo 'EOF_SIGNING'
-            } >> "$GITHUB_OUTPUT"
-          fi
+          umask 077
+          key="$RUNNER_TEMP/grapmail-upload.jks"
+          base64 --decode <<< "$FOUNDER_KEY_B64" > "$key"
+          keytool -list -keystore "$key" -storepass:env CI_KEYSTORE_PASSWORD -alias "$CI_KEYSTORE_ALIAS" > /dev/null
+          keytool -exportcert -keystore "$key" -storepass:env CI_KEYSTORE_PASSWORD -alias "$CI_KEYSTORE_ALIAS" > "$RUNNER_TEMP/grapmail-upload.der"
+          # Pin the public certificate of the supplied production keystore.
+          echo "34400558533b1e70639390b4dbe74e8ae66da38400215b7d49f88bd714a37b0f  $RUNNER_TEMP/grapmail-upload.der" | sha256sum --check --status \
+            || { echo "::error::CI keystore does not match the approved GrapMail upload certificate"; exit 1; }
+          {
+            printf 'CI_KEYSTORE_FILE=%s\n' "$key"
+            printf 'CI_KEYSTORE_PASSWORD=%s\n' "$CI_KEYSTORE_PASSWORD"
+            printf 'CI_KEYSTORE_ALIAS=%s\n' "$CI_KEYSTORE_ALIAS"
+          } >> "$GITHUB_ENV"
 
-      # Optional Firebase client config. When the founder adds
-      # CI_GOOGLE_SERVICES_JSON (the google-services.json, base64), it lands in
-      # android/app/ and the google-services plugin applies itself — the Gradle
-      # file checks for the file's existence, so a build without it stays a
-      # build without Firebase and the app falls back to polling, honestly.
-      # The file is gitignored; this is the only way it travels.
-      - name: Resolve the Firebase client config (optional)
+      - name: Resolve the Firebase Android client config
         env:
           GOOGLE_SERVICES_B64: ${{ secrets.CI_GOOGLE_SERVICES_JSON }}
         run: |
-          if [ -n "$GOOGLE_SERVICES_B64" ]; then
-            echo "::add-mask::$GOOGLE_SERVICES_B64"
-            base64 -d > android/app/google-services.json <<< "$GOOGLE_SERVICES_B64"
-            python3 -c "import json,sys; json.load(open('android/app/google-services.json'))" \
-              || { echo "::error::CI_GOOGLE_SERVICES_JSON is not valid JSON"; exit 1; }
-            echo "google-services.json resolved — this build carries Firebase push"
-          else
-            echo "no CI_GOOGLE_SERVICES_JSON — this build polls only (push disabled, honestly)"
+          set -euo pipefail
+          if [[ -z "$GOOGLE_SERVICES_B64" ]]; then
+            echo "::error::Set CI_GOOGLE_SERVICES_JSON to build the release with Firebase notifications."
+            exit 1
           fi
+          base64 --decode <<< "$GOOGLE_SERVICES_B64" > android/app/google-services.json
+          python3 - <<'PYTHON'
+          import json
+          from pathlib import Path
 
-      - name: Build the release APK
+          config = json.loads(Path("android/app/google-services.json").read_text())
+          if not any(
+              client["client_info"].get("android_client_info", {}).get("package_name") == "com.grapsee.grapmail"
+              for client in config["client"]
+          ):
+              raise SystemExit("Firebase config does not contain com.grapsee.grapmail")
+          PYTHON
+
+      - name: Build the signed APK and AAB
         working-directory: android
         run: |
           chmod +x gradlew
-          if [ -n "${CI_KEYSTORE_FILE:-}" ]; then
-            # The founder's key arrived through the job environment from the
-            # resolve step. Nothing is generated here: the identity that signs
-            # this build must be the one the release page names.
-            echo "Signing with the resolved distribution key (alias: $CI_KEYSTORE_ALIAS)"
-          else
-          # Ephemeral signing identity: generated here, used once, never stored —
-          # the private half is left on a runner that is about to be destroyed.
-          # Reached only when the founder's secrets are absent, so the release
-          # page says the APK is test-signed, because a build that cannot be
-          # updated over a different key is a decision, and it should not be
-          # made silently by a CI file.
-          KS=/tmp/ci-release.keystore
-          PW=$(openssl rand -hex 24)
-          export CI_KEYSTORE_PASSWORD="$PW"
-          # :env, not argv — a password in a command line is visible to any
-          # process list reader for the keytool's short life, and the one-word
-          # change removes that habit from the recipe in case this step is
-          # ever edited toward a real distribution key. gradle reads the same
-          # export below, so nothing else moves.
-          keytool -genkeypair -v -keystore "$KS" -storepass:env CI_KEYSTORE_PASSWORD \
-            -keypass:env CI_KEYSTORE_PASSWORD -alias grapmail-ci -keyalg RSA -keysize 2048 \
-            -validity 3650 \
-            -dname "CN=GrapMail CI test signature (not the distribution key), OU=ephemeral, O=Grapsee, C=US" >&2
-          # `export`, not `$GITHUB_ENV`. The first attempt wrote these to
-          # GITHUB_ENV in this same step and ran gradlew on the line below it —
-          # and GITHUB_ENV only reaches the NEXT step, so the build saw no
-          # keystore, AGP applied no signing config, and it emitted
-          # `app-release-unsigned.apk`. The prove step then failed on the missing
-          # `app-release.apk` and nothing unverified was published, which is what
-          # the gate is for. But a variable that has to be in the environment of
-          # the command on the next line belongs in the environment, not in a
-          # file the runner reads after the step is over.
-          export CI_KEYSTORE_FILE="$KS"
-          export CI_KEYSTORE_PASSWORD="$PW"
-          export CI_KEYSTORE_ALIAS=grapmail-ci
-          fi
-          ./gradlew assembleRelease --no-daemon
-          ls -la app/build/outputs/apk/release/
+          ./gradlew assembleRelease bundleRelease --no-daemon
 
       - name: Prove the artifact is what the page will call it
         # Every claim here is read out of the APK, not out of the build command:
@@ -397,7 +308,13 @@ jobs:
           head -2 /tmp/badging.txt
           grep -q "package: name='com.grapsee.grapmail'" /tmp/badging.txt \
             || { echo "::error::wrong applicationId in the release APK"; exit 1; }
-          WANT=${GITHUB_REF_NAME#v}
+          WANT=0.0.1
+          if [[ "$GITHUB_REF_TYPE" == tag && "${GITHUB_REF_NAME#v}" != "$WANT" ]]; then
+            echo "::error::This release must use tag v$WANT"
+            exit 1
+          fi
+          grep -q "versionCode='1'" /tmp/badging.txt \
+            || { echo "::error::APK versionCode is not 1"; exit 1; }
           grep -q "versionName='$WANT'" /tmp/badging.txt \
             || { echo "::error::APK versionName is not $WANT — the tag and the build disagree"; exit 1; }
           if "$AAPT" dump xmltree "$APK" AndroidManifest.xml | grep -Ew "debuggable"; then
@@ -407,7 +324,19 @@ jobs:
           echo "manifest carries no android:debuggable"
           "$AAPT" dump badging "$APK" | grep -q "sdkVersion:'26'" || echo "note: minSdk line not found in badging"
           APKSIGNER=$(ls "$ANDROID_HOME"/build-tools/*/apksigner | tail -1)
-          "$APKSIGNER" verify --print-certs "$APK" | head -6
+          "$APKSIGNER" verify --print-certs "$APK" > "$RUNNER_TEMP/grapmail-apk-certs.txt"
+          expected=$(sha256sum "$RUNNER_TEMP/grapmail-upload.der" | cut -d ' ' -f 1)
+          actual=$(awk '/certificate SHA-256 digest:/ { print $NF }' "$RUNNER_TEMP/grapmail-apk-certs.txt")
+          [[ "$actual" == "$expected" ]] || { echo "::error::APK signing certificate does not match the upload key"; exit 1; }
+          echo "Verified signing certificate SHA-256: $actual"
+
+          AAB=android/app/build/outputs/bundle/release/app-release.aab
+          test -s "$AAB"
+          jarsigner -verify "$AAB" > "$RUNNER_TEMP/grapmail-aab-verify.txt"
+          grep -q 'jar verified' "$RUNNER_TEMP/grapmail-aab-verify.txt"
+          keytool -printcert -jarfile "$AAB" -rfc > "$RUNNER_TEMP/grapmail-aab.pem"
+          openssl x509 -in "$RUNNER_TEMP/grapmail-aab.pem" -outform DER > "$RUNNER_TEMP/grapmail-aab.der"
+          cmp "$RUNNER_TEMP/grapmail-upload.der" "$RUNNER_TEMP/grapmail-aab.der"
 
       - name: Free disk space (emulator needs ~10GB)
         run: |
@@ -424,13 +353,7 @@ jobs:
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
 
-      # R8 problems are invisible to every gate this repo has: the code compiles,
-      # the class exists, and the method the runtime needs is simply not in the
-      # bytecode — which is exactly how `@JvmOverloads` cost eight runs a launcher
-      # screenshot. A minified build therefore has to be RUN before it is published,
-      # and the only honest way to run it here is the same live walk the debug build
-      # passes, against this APK, on a real emulator.
-      - name: Live-test the RELEASE APK on the emulator
+      - name: Launch the minified release APK on Android
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 34
@@ -440,43 +363,38 @@ jobs:
           emulator-boot-timeout: 900
           disable-animations: true
           emulator-options: -no-window -no-audio -no-boot-anim -gpu swiftshader_indirect -no-snapshot
-          script: bash scripts/android-walk.sh android/app/build/outputs/apk/release/app-release.apk screenshots-release
+          script: bash scripts/android-release-launch.sh android/app/build/outputs/apk/release/app-release.apk
 
-      - name: Upload the release APK and its own screenshots
-        if: always()
+      - name: Upload verified release artifacts
         uses: actions/upload-artifact@v4
         with:
           name: grapmail-android-release
+          if-no-files-found: error
           path: |
             android/app/build/outputs/apk/release/app-release.apk
-            screenshots-release/*.png
+            android/app/build/outputs/bundle/release/app-release.aab
+            screenshots-release/launch.png
 
-      - name: Stage APK for download
+      - name: Stage release downloads
+        if: github.ref_type == 'tag'
         run: |
           mkdir -p download
-          cp android/app/build/outputs/apk/release/app-release.apk download/GrapMail-${{ github.ref_name }}.apk
-          echo "Staged: download/GrapMail-${{ github.ref_name }}.apk"
-
-      - name: Refuse to publish a test-signed build as a production release
-        if: steps.signing.outputs.release_signed != 'true'
-        run: |
-          echo "::error::the APK in this run was signed with the ephemeral CI key — it cannot become the latest production release (updates signed with the real key cannot install over it). Add CI_KEYSTORE_FILE (base64), CI_KEYSTORE_PASSWORD and CI_KEYSTORE_ALIAS as repository secrets, then re-tag."
-          exit 1
+          cp android/app/build/outputs/apk/release/app-release.apk download/GrapMail-${GITHUB_REF_NAME}.apk
+          cp android/app/build/outputs/bundle/release/app-release.aab download/GrapMail-${GITHUB_REF_NAME}.aab
 
       - name: Publish to the Releases page
-        if: steps.signing.outputs.release_signed == 'true'
+        if: github.ref_type == 'tag'
         uses: softprops/action-gh-release@v2
         with:
           name: GrapMail ${{ github.ref_name }}
           body: |
-            ## Download
+            GrapMail 0.0.1 (version code 1).
 
-            Install `GrapMail-${{ github.ref_name }}.apk` directly on your Android device.
-
-            R8 minification on, not debuggable. This release only exists when the
-            founder's distribution key signed it.
-
-            ${{ steps.signing.outputs.label }}
-          files: download/GrapMail-${{ github.ref_name }}.apk
+            Use the AAB for Play Console and the APK for direct installation.
+            Both artifacts are signed with the configured production upload key.
+          files: |
+            download/GrapMail-${{ github.ref_name }}.apk
+            download/GrapMail-${{ github.ref_name }}.aab
+          fail_on_unmatched_files: true
           prerelease: false
           make_latest: "true"

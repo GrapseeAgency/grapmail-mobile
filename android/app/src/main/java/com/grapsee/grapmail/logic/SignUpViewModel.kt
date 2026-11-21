@@ -148,6 +148,11 @@ class SignUpViewModel : ViewModel() {
     fun createAccount(onCreated: (address: String, name: String) -> Unit, onError: (String) -> Unit) {
         val s = _state.value
         if (!s.termsAgreed) { onError("Please read and agree to the terms to continue."); return }
+        val verificationId = s.humanVerificationId
+        if (!s.humanVerified || verificationId.isNullOrBlank()) {
+            onError("Complete the human verification check to continue.")
+            return
+        }
         viewModelScope.launch {
             update { copy(creating = true, error = null) }
             try {
@@ -165,7 +170,7 @@ class SignUpViewModel : ViewModel() {
                             "data:image/png;base64," + android.util.Base64.encodeToString(it, android.util.Base64.NO_WRAP)
                         },
                         accountType = "USER",
-                        humanVerificationId = s.humanVerificationId,
+                        humanVerificationId = verificationId,
                     )
                 )
                 // The gateway envelope answers `grapmail` (and no account
@@ -217,16 +222,17 @@ class SignUpViewModel : ViewModel() {
     fun submitHumanVerification(token: String) {
         if (token.isBlank()) return
         if (_state.value.humanVerified || _state.value.humanVerifying) return
+        update { copy(humanVerifying = true, humanVerifyError = null) }
         viewModelScope.launch {
-            update { copy(humanVerifying = true, humanVerifyError = null) }
             try {
                 val resp = Api.verifyHuman(token)
-                if (resp.success) {
+                val verificationId = resp.verificationId
+                if (resp.success && !verificationId.isNullOrBlank()) {
                     update {
                         copy(
                             humanVerifying = false,
                             humanVerified = true,
-                            humanVerificationId = resp.verificationId,
+                            humanVerificationId = verificationId,
                         )
                     }
                 } else {
@@ -234,8 +240,15 @@ class SignUpViewModel : ViewModel() {
                 }
             } catch (e: kotlinx.coroutines.CancellationException) {
                 throw e
+            } catch (e: ApiException) {
+                val message = when {
+                    e.status >= 500 -> "The verification service is temporarily unavailable. Try a new challenge in a moment."
+                    e.status == 429 -> "Too many verification attempts. Wait a moment and try again."
+                    else -> "Verification failed. Get a new challenge and try again."
+                }
+                update { copy(humanVerifying = false, humanVerifyError = message) }
             } catch (e: Exception) {
-                update { copy(humanVerifying = false, humanVerifyError = "Network error — please try again.") }
+                update { copy(humanVerifying = false, humanVerifyError = "Could not complete verification. Get a new challenge and try again.") }
             }
         }
     }
