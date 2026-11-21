@@ -80,6 +80,20 @@ body::after{content:"";position:fixed;inset:0;pointer-events:none;opacity:.24;ba
 .wrap.paused *{animation-play-state:paused!important}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}.art .letter{transform:translateY(-39px) scale(1.05)!important;opacity:1!important}.art .open-flap{transform:scaleY(-1)!important}.art .halo,.art .halo2,.art .seal{opacity:1!important;transform:none!important}.art .seal-check,.art .shield-trace{stroke-dashoffset:0!important}.art .letter-light{opacity:.6!important}}
 </style>
+<style id="native-host-fit">
+/* Size from the WebView viewport. Percentage heights can collapse and clip the scene. */
+html, body { height: 100vh !important; background: var(--grapmail-native-background, transparent) !important; }
+body::before, body::after, #universe { display: none !important; }
+body > main {
+    position: fixed !important;
+    inset: 0 !important;
+    width: auto !important;
+    height: auto !important;
+    max-width: none !important;
+    max-height: none !important;
+    margin: 0 !important;
+}
+</style>
 </head>
 <body>
 <main class="wrap" tabindex="0" role="img" aria-label="Cinematic animated GrapMail sanctuary envelope. A sculpted sapphire-blue envelope opens, a white glass letter floats upward and a protective shield of light forms around it. Tap to replay.">

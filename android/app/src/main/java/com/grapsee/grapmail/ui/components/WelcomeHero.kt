@@ -2,7 +2,6 @@ package com.grapsee.grapmail.ui.components
 
 import android.annotation.SuppressLint
 import android.webkit.JavascriptInterface
-import android.graphics.Color as AndroidColor
 import android.view.View
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
@@ -16,6 +15,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.viewinterop.AndroidView
@@ -44,10 +44,11 @@ import java.io.ByteArrayInputStream
  * the Compose recomposition path entirely.
  */
 @Composable
-fun WelcomeHero(accent: Color, modifier: Modifier = Modifier) {
+fun WelcomeHero(accent: Color, backdrop: Color, modifier: Modifier = Modifier) {
     BundledAnimation(
         asset = "GrapMail_Autoplay_Mailbox.html",
         accent = accent,
+        backdrop = backdrop,
         description = "Animated preview: a GrapMail inbox on a phone rising out of an envelope",
         modifier = modifier,
     )
@@ -58,9 +59,9 @@ fun WelcomeHero(accent: Color, modifier: Modifier = Modifier) {
 internal fun BundledAnimation(
     asset: String,
     accent: Color,
+    backdrop: Color,
     description: String,
     modifier: Modifier = Modifier,
-    hostStyles: String = "",
     interactive: Boolean = false,
     onOpenMailbox: (() -> Unit)? = null,
 ) {
@@ -86,10 +87,25 @@ internal fun BundledAnimation(
                     .open(asset)
                     .bufferedReader()
                     .use { themeAnimationHtml(it.readText(), accent) }
-                    .let { if (hostStyles.isEmpty()) it else it.replaceFirst("</head>", "$hostStyles</head>") }
+                    .let { document ->
+                        val background = (backdrop.toArgb() and 0xFFFFFF).toString(16).padStart(6, '0')
+                        val style = "<style>:root { --grapmail-native-background: #$background; color-scheme: only light; }</style>"
+                        document.replaceFirst("</head>", "$style</head>")
+                    }
 
                 WebView(viewContext).apply {
-                    setBackgroundColor(AndroidColor.TRANSPARENT)
+                    // Opaque, not transparent. A transparent WebView forces
+                    // Chromium to composite the whole document into an
+                    // alpha-blended layer; on several Android WebView builds
+                    // (and every emulator using SwiftShader) that layer is
+                    // drawn at a few percent alpha, so the artwork is there in
+                    // the DOM — DevTools shows it — but the screen shows an
+                    // empty box. Painting the screen's own backdrop colour
+                    // instead costs nothing visually (the welcome page is
+                    // transparent by design and the five scenes paint their own
+                    // gradient over it) and keeps the view on the ordinary,
+                    // fully opaque compositing path.
+                    setBackgroundColor(backdrop.toArgb())
                     isVerticalScrollBarEnabled = false
                     isHorizontalScrollBarEnabled = false
                     overScrollMode = View.OVER_SCROLL_NEVER

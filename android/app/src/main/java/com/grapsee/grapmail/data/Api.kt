@@ -860,7 +860,7 @@ object Api {
      */
     suspend fun verifyHuman(token: String): VerifyHumanResponse {
         val request = Request.Builder()
-            .url("$AUTH/verify-human")
+            .url("$AUTH/verify-human-mobile")
             .header("x-device-id", DeviceId.value)
             .post(postBody(json.encodeToString(VerifyHumanRequest.serializer(), VerifyHumanRequest(token))))
             .build()

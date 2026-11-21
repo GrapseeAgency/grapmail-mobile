@@ -3,6 +3,7 @@ package com.grapsee.grapmail
 import com.grapsee.grapmail.ui.screens.GrapMailLegalDocument
 import com.grapsee.grapmail.ui.screens.GrapMailLegalScreen
 import android.os.Bundle
+import android.webkit.WebView
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
@@ -149,6 +150,7 @@ class MainActivity : FragmentActivity() {
         // this library has.
         installSplashScreen()
         super.onCreate(savedInstanceState)
+        if (BuildConfig.DEBUG) WebView.setWebContentsDebuggingEnabled(true)
         enableEdgeToEdge()
         takeComposeRequest(intent)
         lifecycleScope.launch {
@@ -440,6 +442,11 @@ fun GrapMailNav(
     onNotificationConsumed: () -> Unit = {},
 ) {
     val nav = rememberNavController()
+    // Compose hands the nav controller a themed ContextWrapper, not the
+    // Activity itself, so `nav.context as? Activity` is null in a themed app —
+    // which silently skipped every `--es gmSnapshot` screen the CI walk asks
+    // for and left the walk staring at the welcome screen. Unwrap the chain.
+    val hostActivity = remember(nav.context) { nav.context.findActivity() }
     // The runtime notification ask (Android 13+). Registered here, in the
     // navigation scope where maybeAskNotifications lives, because the ask fires
     // at the moments that scope owns: a completed sign-in, or the first cold
@@ -783,7 +790,7 @@ fun GrapMailNav(
     // proves, and a password change breaks the sign-in leg. The walk starts the
     // activity with `--es gmSnapshot <name>` and this renders that one screen,
     // offline, with closures that do nothing. No real launch carries the extra.
-    val snapshot = (nav.context as? android.app.Activity)?.intent?.getStringExtra("gmSnapshot")
+    val snapshot = hostActivity?.intent?.getStringExtra("gmSnapshot")
     if (snapshot != null) {
         // The onboarding pages are reachable in the real flow only after a
         // signup write, so the walk opens them here: `onboarding-1` ..
@@ -810,7 +817,6 @@ fun GrapMailNav(
     val backStack by nav.currentBackStackEntryAsState()
     val onHome = backStack?.destination?.route == Routes.HOME ||
         (backStack == null && dest == Routes.HOME)
-    val hostActivity = nav.context as? android.app.Activity
     val activityLifecycle = LocalLifecycleOwner.current.lifecycle
     BackHandler(enabled = onHome) { hostActivity?.moveTaskToBack(true) }
 
@@ -1597,4 +1603,22 @@ private inline fun <reified VM : androidx.lifecycle.ViewModel> signedInViewModel
 ): VM {
     val home = remember(nav, destination) { nav.getBackStackEntry(Routes.HOME) }
     return viewModel(home)
+}
+
+
+/**
+ * The Activity behind a Compose `LocalContext`, or `navController.context`.
+ *
+ * Compose wraps the Activity in a `ContextThemeWrapper` for theming, and a
+ * wrapper is not an `Activity`, so the direct cast is null in this app. Every
+ * screen that asked for "the Activity" (the snapshot entry point, the
+ * back-to-home handler) silently got nothing. Walk the base-context chain.
+ */
+internal fun android.content.Context.findActivity(): android.app.Activity? {
+    var context: android.content.Context = this
+    while (context is android.content.ContextWrapper) {
+        if (context is android.app.Activity) return context
+        context = context.baseContext
+    }
+    return context as? android.app.Activity
 }

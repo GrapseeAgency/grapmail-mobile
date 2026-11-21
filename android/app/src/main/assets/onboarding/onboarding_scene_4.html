@@ -30,7 +30,21 @@
 #replay{position:absolute;z-index:11;top:27px;right:22px;border:1px solid #75bbff44;background:#0b28515a;color:#b9e4ff;font-size:18px;width:31px;height:31px;border-radius:50%;cursor:pointer;display:grid;place-items:center}#replay:hover{background:#164d85aa}
 #tap{position:absolute;z-index:13;width:22px;height:22px;border:1px solid #e7ffffd4;border-radius:50%;opacity:0;pointer-events:none;box-shadow:0 0 0 6px #99e9ff26,0 0 17px #abffffb9;transform:translate(-50%,-50%) scale(.5)}#tap.pop{animation:tap .47s ease-out both}@keyframes tap{20%{opacity:1;transform:translate(-50%,-50%) scale(1)}to{opacity:0;transform:translate(-50%,-50%) scale(1.8)}}
 @media(prefers-reduced-motion:reduce){*,*:before,*:after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}
-</style></head>
+</style><style id="native-host-fit">
+/* Size from the WebView viewport. Percentage heights can collapse and clip the scene. */
+html, body { height: 100vh !important; background: var(--grapmail-native-background, transparent) !important; }
+body::before, body::after, #universe { display: none !important; }
+body > main {
+    position: fixed !important;
+    inset: 0 !important;
+    width: auto !important;
+    height: auto !important;
+    max-width: none !important;
+    max-height: none !important;
+    margin: 0 !important;
+}
+</style>
+</head>
 <body><div id="universe"></div><main id="art" aria-label="Animated GrapMail scene four: choose your rhythm. The mailbox switches between night and day as notifications become calmer."><section id="stage" aria-label="GrapMail animated theme artwork">
 <div class="background"><div class="sky night-sky"></div><div class="sky day-sky"></div></div>
 <div id="horizon"></div><div id="discs"><div id="moon"></div><div id="sun"></div></div>

@@ -100,6 +100,20 @@ body::after{content:"";position:fixed;inset:0;pointer-events:none;background:lin
 @media(hover:hover){.choice-buttons button:hover{filter:brightness(1.14)}}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition-duration:.01ms!important;scroll-behavior:auto!important}#portalGroup,#mailbox{opacity:1!important;transform:none!important}#shieldRim{stroke-dashoffset:0!important}#screenerEtching{opacity:1!important}.floating-sigil{opacity:1!important}}
 </style>
+<style id="native-host-fit">
+/* Size from the WebView viewport. Percentage heights can collapse and clip the scene. */
+html, body { height: 100vh !important; background: var(--grapmail-native-background, transparent) !important; }
+body::before, body::after, #universe { display: none !important; }
+body > main {
+    position: fixed !important;
+    inset: 0 !important;
+    width: auto !important;
+    height: auto !important;
+    max-width: none !important;
+    max-height: none !important;
+    margin: 0 !important;
+}
+</style>
 </head>
 <body>
 <main class="viewport" id="viewport" aria-label="GrapMail Screener gate, an animated interactive product illustration">

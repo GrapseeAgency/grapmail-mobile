@@ -101,29 +101,6 @@ val ONBOARDING_SCENES = listOf(
     ),
 )
 
-// Anchor the scene directly to the WebView viewport, as the welcome artwork
-// does. Percentage heights on the document body otherwise depend on a first
-// layout measurement that can resolve to zero in the embedded WebView.
-private const val ONBOARDING_HOST_STYLES = """
-<style id="native-host-fit">
-html, body { background: transparent !important; }
-body { display: block !important; min-height: 0 !important; margin: 0 !important; }
-body::before, body::after, #universe { display: none !important; }
-/* Keep the animated gradients and shapes, without allocating a large
-   offscreen texture for every SVG bloom and shadow on each frame. */
-svg [filter] { filter: none !important; }
-body > main {
-    position: fixed !important;
-    inset: 0 !important;
-    width: auto !important;
-    height: auto !important;
-    max-width: none !important;
-    max-height: none !important;
-    margin: 0 !important;
-}
-</style>
-"""
-
 @Composable
 fun OnboardingScreen(
     onFinish: () -> Unit,
@@ -131,7 +108,7 @@ fun OnboardingScreen(
     initialScene: Int = 0,
 ) {
     val palette = LocalPalette.current
-    val heroFraction = if (LocalConfiguration.current.fontScale > 1.15f) 0.38f else 0.54f
+    val heroFraction = if (LocalConfiguration.current.fontScale > 1.15f) 0.38f else 0.48f
     ScreenBackground(palette.bg) {
         var sceneIndex by remember {
             mutableIntStateOf(initialScene.coerceIn(0, ONBOARDING_SCENES.lastIndex))
@@ -158,15 +135,13 @@ fun OnboardingScreen(
                     onSkip = { onFinish() },
                 )
 
-                // A new scene is a new document: keying the hero is what
-                // starts the next page from the authored first frame instead
-                // of resuming the previous scene's timeline.
-                key(scene.index, palette.primarySolid) {
+                // Reload the bundled scene for artwork or theme changes.
+                key(scene.index, palette.primarySolid, palette.bg) {
                     BundledAnimation(
                         asset = scene.assetName,
                         accent = palette.primarySolid,
+                        backdrop = palette.bg,
                         description = "Animated scene: ${scene.title}",
-                        hostStyles = ONBOARDING_HOST_STYLES,
                         interactive = true,
                         onOpenMailbox = onFinish.takeIf { sceneIndex == ONBOARDING_SCENES.lastIndex },
                         modifier = Modifier

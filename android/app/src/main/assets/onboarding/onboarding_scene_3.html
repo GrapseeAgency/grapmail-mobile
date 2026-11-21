@@ -60,6 +60,20 @@ svg.art{position:absolute;inset:0;width:440px;height:560px;z-index:1;overflow:vi
 .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap}
 @media (prefers-reduced-motion:reduce){*,*:before,*:after{animation-duration:.001ms!important;animation-iteration-count:1!important;transition-duration:.001ms!important}#sparks{display:none}}
 </style>
+<style id="native-host-fit">
+/* Size from the WebView viewport. Percentage heights can collapse and clip the scene. */
+html, body { height: 100vh !important; background: var(--grapmail-native-background, transparent) !important; }
+body::before, body::after, #universe { display: none !important; }
+body > main {
+    position: fixed !important;
+    inset: 0 !important;
+    width: auto !important;
+    height: auto !important;
+    max-width: none !important;
+    max-height: none !important;
+    margin: 0 !important;
+}
+</style>
 </head>
 <body>
 <main id="viewport" class="viewport" aria-label="GrapMail animated scene three: Tame the Clutter">

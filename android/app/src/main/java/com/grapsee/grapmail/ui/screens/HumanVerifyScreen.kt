@@ -9,7 +9,11 @@ import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -25,7 +29,7 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
-import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -41,8 +45,10 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
@@ -56,182 +62,181 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.grapsee.grapmail.logic.SignUpViewModel
 import com.grapsee.grapmail.ui.theme.LocalPalette
 
-private const val HUMAN_VERIFY_URL = "https://grapsee.com/verify/human?embed=android"
+private const val CHECKPOINT_PATH = "/verify/grapmail-mobile.html"
+private const val CHECKPOINT_URL = "https://grapsee.com$CHECKPOINT_PATH"
 
-/** The bridge forwards candidate tokens. Only the server response can unlock Continue. */
-private class VerifyBridge(private val onToken: (String) -> Unit) {
+private class VerifyBridge(
+    private val onToken: (String) -> Unit,
+    private val onError: () -> Unit,
+) {
     @JavascriptInterface
     fun onVerifyToken(token: String) = onToken(token)
+
+    @JavascriptInterface
+    fun onVerificationError() = onError()
 }
 
 private fun Uri.isCheckpoint(): Boolean =
-    scheme == "https" && host == "grapsee.com" && (port == -1 || port == 443) && path == "/verify/human"
-
-// The image challenge is wider than its checkbox and lives outside the embed's
-// scaled wrapper. Give the top-level checkpoint a wide, scrollable viewport so
-// the entire provider UI, including its Verify button, fits on narrow phones.
-private const val FIT_CHECKPOINT = """
-(function () {
-    var viewport = document.querySelector('meta[name="viewport"]');
-    if (!viewport) {
-        viewport = document.createElement('meta');
-        viewport.name = 'viewport';
-        document.head.appendChild(viewport);
-    }
-    viewport.content = 'width=440';
-    var style = document.createElement('style');
-    style.textContent = [
-        'html, body, main { background: transparent !important; }',
-        'main { padding: 12px !important; box-sizing: border-box !important; }',
-        'main > div > div:first-child, main > div > div:first-child + p { display: none; }',
-        'main > div > p { color: inherit !important; }',
-    ].join(' ');
-    if (!document.getElementById('grapmail-android-checkpoint')) {
-        style.id = 'grapmail-android-checkpoint';
-        document.head.appendChild(style);
-    }
-    window.dispatchEvent(new Event('resize'));
-})();
-"""
+    scheme == "https" && host == "grapsee.com" && (port == -1 || port == 443) && path == CHECKPOINT_PATH
 
 @SuppressLint("SetJavaScriptEnabled")
 @Composable
 fun HumanVerifyScreen(vm: SignUpViewModel, onBack: () -> Unit, onDone: () -> Unit) {
     val palette = LocalPalette.current
     val state by vm.state.collectAsStateWithLifecycle()
-    val canContinue = state.humanVerified && !state.humanVerificationId.isNullOrBlank()
+    val compact = LocalConfiguration.current.screenHeightDp < 700 || LocalConfiguration.current.fontScale > 1.15f
+    val verified = state.humanVerified && !state.humanVerificationId.isNullOrBlank()
     val submitToken by rememberUpdatedState(vm::submitHumanVerification)
+    val handler = remember { Handler(Looper.getMainLooper()) }
     var webView by remember { mutableStateOf<WebView?>(null) }
-    var pageFailed by remember { mutableStateOf(false) }
-    val mainHandler = remember { Handler(Looper.getMainLooper()) }
+    var showChallenge by remember { mutableStateOf(false) }
+    var challengeError by remember { mutableStateOf(false) }
 
     Column(
         Modifier.fillMaxSize().background(palette.bg).statusBarsPadding().navigationBarsPadding(),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Row(
-            Modifier.widthIn(max = 560.dp).fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            IconButton(onClick = onBack) {
+        Row(Modifier.widthIn(max = 560.dp).fillMaxWidth().padding(horizontal = 8.dp)) {
+            IconButton(onClick = {
+                if (showChallenge) showChallenge = false else onBack()
+            }) {
                 Icon(Icons.AutoMirrored.Rounded.ArrowBack, "Back", tint = palette.textPrimary)
             }
-            Text("Verify your account", fontSize = 20.sp, fontWeight = FontWeight.SemiBold,
-                color = palette.textPrimary, modifier = Modifier.weight(1f).padding(end = 12.dp))
         }
 
-        Box(
-            Modifier.weight(1f).widthIn(max = 560.dp).fillMaxWidth().padding(horizontal = 8.dp)
-                .clip(RoundedCornerShape(16.dp)).background(palette.card),
-            contentAlignment = Alignment.Center,
-        ) {
-            if (canContinue) {
-                Column(
-                    Modifier.padding(20.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    Icon(Icons.Rounded.CheckCircle, null, tint = palette.primarySolid,
-                        modifier = Modifier.size(36.dp))
-                    Text("Verification complete", color = palette.textPrimary,
-                        fontSize = 18.sp, fontWeight = FontWeight.SemiBold, textAlign = TextAlign.Center,
-                        modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite })
-                }
-            } else {
-                AndroidView(
-                    modifier = Modifier.fillMaxSize().testTag("signup-captcha"),
-                    factory = { context ->
-                        WebView(context).apply {
-                            webView = this
-                            setBackgroundColor(palette.card.toArgb())
-                            settings.javaScriptEnabled = true
-                            settings.domStorageEnabled = true
-                            settings.allowFileAccess = false
-                            settings.allowContentAccess = false
-                            settings.useWideViewPort = true
-                            settings.loadWithOverviewMode = true
-                            settings.setSupportZoom(true)
-                            settings.builtInZoomControls = true
-                            settings.displayZoomControls = false
-                            webViewClient = object : WebViewClient() {
-                                override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean =
-                                    request.isForMainFrame && !request.url.isCheckpoint()
-
-                                override fun onPageFinished(view: WebView, url: String) {
-                                    if (Uri.parse(url).isCheckpoint()) view.evaluateJavascript(FIT_CHECKPOINT, null)
-                                }
-
-                                override fun onReceivedError(view: WebView, request: WebResourceRequest, error: WebResourceError) {
-                                    if (request.isForMainFrame) pageFailed = true
-                                }
-
-                                override fun onReceivedHttpError(
-                                    view: WebView,
-                                    request: WebResourceRequest,
-                                    response: android.webkit.WebResourceResponse,
-                                ) {
-                                    if (request.isForMainFrame) pageFailed = true
-                                }
+        if (showChallenge) {
+            AndroidView(
+                modifier = Modifier.weight(1f).widthIn(max = 560.dp).fillMaxWidth().testTag("signup-captcha"),
+                factory = { context ->
+                    WebView(context).apply {
+                        webView = this
+                        setBackgroundColor(palette.bg.toArgb())
+                        settings.javaScriptEnabled = true
+                        settings.domStorageEnabled = true
+                        settings.allowFileAccess = false
+                        settings.allowContentAccess = false
+                        settings.useWideViewPort = true
+                        settings.loadWithOverviewMode = true
+                        settings.setSupportZoom(true)
+                        settings.builtInZoomControls = true
+                        settings.displayZoomControls = false
+                        fun fail() {
+                            if (webView === this) {
+                                challengeError = true
+                                showChallenge = false
                             }
-                            addJavascriptInterface(VerifyBridge { token ->
-                                mainHandler.post {
-                                    if (webView === this && url?.let { Uri.parse(it).isCheckpoint() } == true) {
+                        }
+                        webViewClient = object : WebViewClient() {
+                            override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean =
+                                request.isForMainFrame && !request.url.isCheckpoint()
+
+                            override fun onReceivedError(view: WebView, request: WebResourceRequest, error: WebResourceError) {
+                                if (request.isForMainFrame) fail()
+                            }
+
+                            override fun onReceivedHttpError(
+                                view: WebView,
+                                request: WebResourceRequest,
+                                response: android.webkit.WebResourceResponse,
+                            ) {
+                                if (request.isForMainFrame) fail()
+                            }
+                        }
+                        addJavascriptInterface(VerifyBridge(
+                            onToken = { token ->
+                                handler.post {
+                                    if (webView === this && url?.let { Uri.parse(it).isCheckpoint() } == true && token.isNotBlank()) {
                                         submitToken(token)
+                                        showChallenge = false
                                     }
                                 }
-                            }, "GrapMailAndroid")
-                            loadUrl(HUMAN_VERIFY_URL)
-                        }
-                    },
-                    update = { it.setBackgroundColor(palette.card.toArgb()) },
-                    onRelease = { view ->
-                        if (webView === view) webView = null
-                        view.removeJavascriptInterface("GrapMailAndroid")
-                        view.stopLoading()
-                        view.destroy()
-                    },
-                )
-            }
-        }
-
-        Column(
-            Modifier.widthIn(max = 560.dp).fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(4.dp),
-        ) {
-            val error = state.humanVerifyError
-            val status = when {
-                canContinue -> "Continue to Terms of Service."
-                state.humanVerifying -> "Checking verification…"
-                pageFailed -> "The challenge could not load. Try again."
-                error != null -> error
-                else -> "Complete the reCAPTCHA to continue."
-            }
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
+                            },
+                            onError = { handler.post { fail() } },
+                        ), "GrapMailAndroid")
+                        loadUrl(CHECKPOINT_URL)
+                    }
+                },
+                onRelease = { view ->
+                    if (webView === view) webView = null
+                    view.removeJavascriptInterface("GrapMailAndroid")
+                    view.stopLoading()
+                    view.destroy()
+                },
+            )
+            TextButton(onClick = { showChallenge = false }) { Text("Cancel verification") }
+        } else {
+            Column(
+                Modifier.weight(1f).widthIn(max = 560.dp).fillMaxWidth()
+                    .verticalScroll(rememberScrollState()).padding(horizontal = 24.dp, vertical = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(if (compact) 10.dp else 14.dp),
             ) {
-                if (state.humanVerifying) {
-                    CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                Text("Verify your account", color = palette.textPrimary, fontSize = 30.sp,
+                    lineHeight = 36.sp, fontWeight = FontWeight.Bold)
+                Text("Complete a quick security check to continue.", color = palette.textSecondary,
+                    fontSize = 15.sp, lineHeight = 22.sp)
+                Column(
+                    Modifier.fillMaxWidth().background(palette.card, RoundedCornerShape(24.dp))
+                        .border(1.dp, palette.textSecondary.copy(alpha = 0.18f), RoundedCornerShape(24.dp))
+                        .padding(if (compact) 14.dp else 20.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    VerificationShield(if (compact) 62.dp else 84.dp)
+                    Text(if (verified) "Verification complete" else "Security check",
+                        color = palette.textPrimary, fontSize = 22.sp, fontWeight = FontWeight.SemiBold,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite })
+                    if (!verified) {
+                        Button(
+                            onClick = { challengeError = false; showChallenge = true },
+                            enabled = !state.humanVerifying,
+                            modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+                        ) {
+                            if (state.humanVerifying) {
+                                CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
+                            } else Text(if (challengeError || state.humanVerifyError != null) "Try again" else "Verify I’m human")
+                        }
+                        val error = if (challengeError) "The challenge couldn’t load. Please try again." else state.humanVerifyError
+                        if (error != null || state.humanVerifying) {
+                            Text(error ?: "Checking verification…",
+                                color = if (error == null) palette.textSecondary else palette.error,
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite })
+                        }
+                    }
                 }
-                Text(status, fontSize = 13.sp, textAlign = TextAlign.Center,
-                    color = if (!canContinue && (pageFailed || error != null)) palette.error else palette.textSecondary)
             }
-            if (!canContinue && !state.humanVerifying) {
-                TextButton(onClick = {
-                    pageFailed = false
-                    webView?.loadUrl(HUMAN_VERIFY_URL)
-                }) { Text("Get a new challenge") }
-            }
+
             Button(
                 onClick = onDone,
-                enabled = canContinue,
+                enabled = verified,
                 colors = ButtonDefaults.buttonColors(containerColor = palette.primarySolid, contentColor = palette.onPrimary),
-                modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).testTag("signup-verify-continue"),
-            ) {
-                Text("Continue", fontWeight = FontWeight.SemiBold)
-            }
+                modifier = Modifier.widthIn(max = 560.dp).fillMaxWidth().padding(horizontal = 24.dp, vertical = 12.dp)
+                    .heightIn(min = 48.dp).testTag("signup-verify-continue"),
+            ) { Text("Continue", fontWeight = FontWeight.SemiBold) }
         }
+    }
+}
+
+@Composable
+private fun VerificationShield(diameter: androidx.compose.ui.unit.Dp) {
+    val palette = LocalPalette.current
+    Box(Modifier.size(diameter), contentAlignment = Alignment.Center) {
+        Canvas(Modifier.fillMaxSize()) {
+            val w = size.width
+            val h = size.height
+            val shield = Path().apply {
+                moveTo(w * .5f, h * .04f)
+                quadraticTo(w * .7f, h * .18f, w * .88f, h * .21f)
+                lineTo(w * .86f, h * .51f)
+                quadraticTo(w * .84f, h * .8f, w * .5f, h * .96f)
+                quadraticTo(w * .16f, h * .8f, w * .14f, h * .51f)
+                lineTo(w * .12f, h * .21f)
+                quadraticTo(w * .3f, h * .18f, w * .5f, h * .04f)
+                close()
+            }
+            drawPath(shield, Brush.verticalGradient(listOf(palette.primarySolid, palette.primarySolid.copy(alpha = .72f))))
+        }
+        Icon(Icons.Rounded.Lock, contentDescription = null, tint = palette.onPrimary, modifier = Modifier.size(32.dp))
     }
 }

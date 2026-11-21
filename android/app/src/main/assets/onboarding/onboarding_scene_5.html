@@ -28,7 +28,21 @@ body:before{content:"";position:fixed;inset:-20%;background:radial-gradient(elli
 #sent{position:absolute;z-index:13;left:50%;top:435px;transform:translate(-50%,8px);opacity:0;pointer-events:none;text-align:center;border-radius:13px;background:#0b3877e8;border:1px solid #a4efff9c;padding:9px 15px;font-size:12px;font-weight:750;box-shadow:0 0 25px #3bafff8c;transition:opacity .35s,transform .4s;white-space:nowrap}#sent.show{opacity:1;transform:translate(-50%,0)}
 #replay{position:absolute;z-index:15;top:33px;right:29px;width:32px;height:32px;border-radius:50%;background:#0e315a9c;border:1px solid #4baaff73;display:grid;place-items:center;font-size:18px;color:#c3eaff;cursor:pointer}
 @media(prefers-reduced-motion:reduce){*,*:before,*:after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}
-</style></head>
+</style><style id="native-host-fit">
+/* Size from the WebView viewport. Percentage heights can collapse and clip the scene. */
+html, body { height: 100vh !important; background: var(--grapmail-native-background, transparent) !important; }
+body::before, body::after, #universe { display: none !important; }
+body > main {
+    position: fixed !important;
+    inset: 0 !important;
+    width: auto !important;
+    height: auto !important;
+    max-width: none !important;
+    max-height: none !important;
+    margin: 0 !important;
+}
+</style>
+</head>
 <body><main id="art" aria-label="GrapMail scene five animation. Privacy, organized mail, and comfort combine into a personalized mailbox ready to open."><section id="stage" class="phase-empty" aria-label="Your Inbox Is Yours Again animated artwork">
 <canvas id="skyParticles" width="880" height="1120"></canvas><div id="halo"></div>
 <svg id="ring" viewBox="0 0 440 560" aria-hidden="true"><defs><linearGradient id="ringColor"><stop stop-color="#1c7bff" stop-opacity=".03"/><stop offset=".38" stop-color="#96eaff" stop-opacity=".8"/><stop offset=".59" stop-color="#b8f6ff" stop-opacity=".37"/><stop offset="1" stop-color="#1c7bff" stop-opacity=".05"/></linearGradient></defs><g class="turn"><ellipse cx="220" cy="258" rx="201" ry="66" transform="rotate(-22 220 258)" stroke="url(#ringColor)" fill="none" stroke-width="1.6"/></g><g class="reverse"><ellipse cx="220" cy="258" rx="173" ry="188" transform="rotate(21 220 258)" stroke="#5cabff" stroke-opacity=".18" fill="none" stroke-width="1.2"/></g><path d="M48 298Q220 189 391 299" stroke="#83dfff" stroke-opacity=".15" fill="none"/></svg><div id="centerflare"></div>

@@ -77,6 +77,7 @@ fun WelcomeScreen(
         androidx.compose.runtime.key(palette.primarySolid) {
             WelcomeHero(
                 accent = palette.primarySolid,
+                backdrop = palette.bg,
                 modifier = Modifier.widthIn(max = 360.dp).fillMaxWidth().aspectRatio(400f / 440f),
             )
         }
