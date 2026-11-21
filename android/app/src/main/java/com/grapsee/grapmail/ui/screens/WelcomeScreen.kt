@@ -72,12 +72,12 @@ fun WelcomeScreen(onCreateAccount: () -> Unit, onSignIn: () -> Unit) {
         // The hero is authored at 400 x 440. Bounded to 360dp so it sits inside
         // the text column on wide phones/tablets, then centred by the parent.
         Spacer(Modifier.height(16.dp))
-        WelcomeHero(
-            Modifier
-                .widthIn(max = 360.dp)
-                .fillMaxWidth()
-                .aspectRatio(400f / 440f)
-        )
+        androidx.compose.runtime.key(palette.primarySolid) {
+            WelcomeHero(
+                accent = palette.primarySolid,
+                modifier = Modifier.widthIn(max = 360.dp).fillMaxWidth().aspectRatio(400f / 440f),
+            )
+        }
 
         Spacer(Modifier.height(24.dp))
 

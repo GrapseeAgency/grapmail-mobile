@@ -252,7 +252,7 @@ echo "· human verification (verify-before-register — before any account exist
 # the verification id at Create Account, so the wizard demands the server
 # verdict at this step and treats Terms as the second half. There is no skip
 # in this build — Continue unlocks only after the verdict lands.
-if wait_nodes "n.get('text','')=='Just one more step!'" >/dev/null; then
+if wait_nodes "n.get('text','')=='Verify your account'" >/dev/null; then
   echo "  ✓ human verification screen reached"
 else
   echo "FAIL: human verification never appeared after the password step" >&2

@@ -211,8 +211,6 @@ class SignUpViewModel : ViewModel() {
         }
     }
 
-    fun markHumanVerified() { update { copy(humanVerified = true) } }
-
     /**
      * Human verification (2026-11-17 overhaul): exchange the reCAPTCHA token
      * received from the checkpoint page's JS bridge for a server verdict.

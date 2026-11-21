@@ -12,6 +12,8 @@ import android.webkit.WebViewClient
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -42,6 +44,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -55,7 +58,8 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.grapsee.grapmail.ui.components.GradientButton
 import com.grapsee.grapmail.ui.components.GrapMailLogo
-import com.grapsee.grapmail.ui.theme.GrapMailTheme
+import com.grapsee.grapmail.ui.components.themeAnimationHtml
+import com.grapsee.grapmail.ui.theme.LocalPalette
 import com.grapsee.grapmail.ui.theme.ScreenBackground
 import java.io.ByteArrayInputStream
 
@@ -118,16 +122,10 @@ val ONBOARDING_SCENES = listOf(
 /** The artwork's own outer colour; the page around it is this colour so the
  *  frame has no edge — the scene dissolves into the screen instead of sitting
  *  in an invisible box. */
-private val SceneBg = Color(0xFF020817)
-private val SceneInk = Color(0xFFF3F9FF)
-private val SceneSub = Color(0xFFA0B8D6)
-private val SceneAccent = Color(0xFF63CBFF)
-private val SceneHairline = Color(0xFF172B47)
-
 /**
  * The five onboarding pages. The artwork is the founder's standalone HTML,
- * bundled untouched in `assets/onboarding/` and rendered by a WebView; only the
- * host is written here (headline, walkthrough controls, Skip, CTA).
+ * bundled in `assets/onboarding/` and rendered by a WebView. The host supplies
+ * the palette, headline and navigation.
  *
  * The one thing the artwork needs from its host is a viewport. A WebView parses
  * the document before Compose has laid it out, so the initial containing block
@@ -136,14 +134,14 @@ private val SceneHairline = Color(0xFF172B47)
  * used to be. `HOST_FIT` is a single injected style block that anchors the
  * document to the viewport height instead of to its parent (the same
  * `native-host-fit` correction the bundled welcome page carries, and the same
- * `loadDataWithBaseURL` delivery that page uses on device). It changes no rule
- * of any scene: the artwork keeps every stylesheet, script, SVG and timing it
- * was authored with, byte for byte, and nothing else in the file is touched.
+ * `loadDataWithBaseURL` delivery that page uses on device). The palette is
+ * applied before loading so each scene starts in the current app colors.
  */
 @SuppressLint("SetJavaScriptEnabled")
 @Composable
 fun OnboardingHero(
     scene: OnboardingSceneData,
+    accent: Color,
     onOpenMailbox: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -167,7 +165,7 @@ fun OnboardingHero(
                 val html = ctx.assets
                     .open(target.removePrefix(ASSET_PREFIX))
                     .bufferedReader()
-                    .use { it.readText() }
+                    .use { themeAnimationHtml(it.readText(), accent) }
                     .let { src ->
                         // Host-mode background removal: the scenes are authored
                         // as full-viewport animations with their own navy field,
@@ -288,8 +286,7 @@ fun OnboardingHero(
  * field ends at the WebView's edge and reads as a hard-edged plate around the
  * illustration. The host page paints one continuous dark surface behind all
  * five scenes, so those background layers are removed here. Every illustration
- * rule is left alone: SVG geometry, canvas particles, gradients and glows on
- * the artwork itself all still render exactly as authored.
+ * geometry and timing still render as authored.
  */
 private const val HOST_BG = """
 <style id="native-host-bg">
@@ -310,9 +307,7 @@ body::before, body::after, body:before, body:after { display: none !important; }
  * viewport is the only value that does resolve, so this pins it, retries for a
  * handful of frames while layout settles, and re-pins on resize.
  *
- * It writes two lengths and nothing else. No colour, font, transform, timing or
- * markup of the artwork is touched: every scene still runs the exact stylesheet
- * and script it was authored with.
+ * This script only updates the document height.
  */
 private const val HOST_FIT = """
 <script id="native-host-fit">
@@ -363,117 +358,116 @@ fun OnboardingScreen(
     /** Test-only: the snapshot host opens directly on one scene. */
     initialScene: Int = 0,
 ) {
-    // The onboarding is a dark cinematic page on purpose: the five scenes are
-    // authored on one continuous airy navy field, and a light page would put a
-    // visible plate around artwork that is meant to dissolve into the screen.
-    GrapMailTheme(darkTheme = true) {
-        ScreenBackground(SceneBg) {
-            var sceneIndex by remember {
-                mutableIntStateOf(initialScene.coerceIn(0, ONBOARDING_SCENES.lastIndex))
-            }
-            val scene = ONBOARDING_SCENES[sceneIndex]
+    val palette = LocalPalette.current
+    val heroFraction = if (LocalConfiguration.current.fontScale > 1.15f) 0.38f else 0.54f
+    ScreenBackground(palette.bg) {
+        var sceneIndex by remember {
+            mutableIntStateOf(initialScene.coerceIn(0, ONBOARDING_SCENES.lastIndex))
+        }
+        val scene = ONBOARDING_SCENES[sceneIndex]
 
-            BoxWithConstraints(
-                Modifier.fillMaxSize().background(SceneBg).testTag("onboarding"),
+        BoxWithConstraints(
+            Modifier.fillMaxSize().background(palette.bg).testTag("onboarding"),
+        ) {
+            // The artwork is authored in a 440 x 560 box. Keep that exact
+            // ratio — taking the full width but capping only the height used
+            // to squash the box, which clipped the bottom of scene 2's
+            // screener card. Cap the width instead, centre the result, and
+            // the whole scene fits with room for the copy and the CTA.
+            val heroWidth = minOf(maxWidth, maxHeight * heroFraction * (440f / 560f))
+            val heroHeight = heroWidth * (560f / 440f)
+
+            Column(
+                Modifier.fillMaxSize(),
+                horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                // The artwork is authored in a 440 x 560 box. Keep that exact
-                // ratio — taking the full width but capping only the height used
-                // to squash the box, which clipped the bottom of scene 2's
-                // screener card. Cap the width instead, centre the result, and
-                // the whole scene fits with room for the copy and the CTA.
-                val heroWidth = minOf(maxWidth, maxHeight * 0.54f * (440f / 560f))
-                val heroHeight = heroWidth * (560f / 440f)
+                OnboardingTopBar(
+                    canSkip = sceneIndex > 0,
+                    onSkip = { onFinish() },
+                )
+
+                // A new scene is a new document: keying the hero is what
+                // starts the next page from the authored first frame instead
+                // of resuming the previous scene's timeline.
+                key(scene.index, palette.primarySolid) {
+                    OnboardingHero(
+                        scene = scene,
+                        accent = palette.primarySolid,
+                        onOpenMailbox = onFinish,
+                        modifier = Modifier
+                            .width(heroWidth)
+                            .height(heroHeight)
+                            .testTag("onboarding-hero"),
+                    )
+                }
 
                 Column(
-                    Modifier.fillMaxSize(),
+                    Modifier
+                        .fillMaxWidth()
+                        .weight(1f)
+                        .verticalScroll(rememberScrollState())
+                        .padding(horizontal = 24.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center,
                 ) {
-                    OnboardingTopBar(
-                        canSkip = sceneIndex > 0,
-                        onSkip = { onFinish() },
+                    Text(
+                        scene.eyebrow,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 1.8.sp,
+                        color = palette.primarySolid,
                     )
-
-                    // A new scene is a new document: keying the hero is what
-                    // starts the next page from the authored first frame instead
-                    // of resuming the previous scene's timeline.
-                    key(scene.index) {
-                        OnboardingHero(
-                            scene = scene,
-                            onOpenMailbox = onFinish,
-                            modifier = Modifier
-                                .width(heroWidth)
-                                .height(heroHeight)
-                                .testTag("onboarding-hero"),
-                        )
-                    }
-
-                    Column(
-                        Modifier
-                            .fillMaxWidth()
-                            .weight(1f)
-                            .padding(horizontal = 24.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.Center,
-                    ) {
-                        Text(
-                            scene.eyebrow,
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold,
-                            letterSpacing = 1.8.sp,
-                            color = SceneAccent,
-                        )
-                        Spacer(Modifier.height(8.dp))
-                        Text(
-                            scene.title,
-                            fontSize = 27.sp,
-                            lineHeight = 33.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            letterSpacing = (-0.4).sp,
-                            color = SceneInk,
-                            textAlign = TextAlign.Center,
-                            modifier = Modifier.fillMaxWidth(),
-                        )
-                        Spacer(Modifier.height(10.dp))
-                        Text(
-                            scene.description,
-                            fontSize = 15.sp,
-                            lineHeight = 22.sp,
-                            color = SceneSub,
-                            textAlign = TextAlign.Center,
-                            modifier = Modifier.fillMaxWidth(),
-                        )
-                    }
-
-                    PageDots(
-                        count = ONBOARDING_SCENES.size,
-                        index = sceneIndex,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(bottom = 20.dp),
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        scene.title,
+                        fontSize = 27.sp,
+                        lineHeight = 33.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        letterSpacing = (-0.4).sp,
+                        color = palette.textPrimary,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth(),
                     )
-
-                    GradientButton(
-                        text = scene.ctaText,
-                        onClick = {
-                            if (sceneIndex < ONBOARDING_SCENES.lastIndex) sceneIndex++
-                            else onFinish()
-                        },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 24.dp)
-                            .testTag("onboarding-cta"),
-                        trailing = {
-                            Spacer(Modifier.size(8.dp))
-                            Icon(
-                                Icons.AutoMirrored.Rounded.ArrowForward,
-                                contentDescription = null,
-                                modifier = Modifier.size(18.dp),
-                            )
-                        },
+                    Spacer(Modifier.height(10.dp))
+                    Text(
+                        scene.description,
+                        fontSize = 15.sp,
+                        lineHeight = 22.sp,
+                        color = palette.textSecondary,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth(),
                     )
-
-                    Spacer(Modifier.height(28.dp))
                 }
+
+                PageDots(
+                    count = ONBOARDING_SCENES.size,
+                    index = sceneIndex,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 20.dp),
+                )
+
+                GradientButton(
+                    text = scene.ctaText,
+                    onClick = {
+                        if (sceneIndex < ONBOARDING_SCENES.lastIndex) sceneIndex++
+                        else onFinish()
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 24.dp)
+                        .testTag("onboarding-cta"),
+                    trailing = {
+                        Spacer(Modifier.size(8.dp))
+                        Icon(
+                            Icons.AutoMirrored.Rounded.ArrowForward,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp),
+                        )
+                    },
+                )
+
+                Spacer(Modifier.height(28.dp))
             }
         }
     }
@@ -481,6 +475,7 @@ fun OnboardingScreen(
 
 @Composable
 private fun OnboardingTopBar(canSkip: Boolean, onSkip: () -> Unit) {
+    val palette = LocalPalette.current
     Row(
         Modifier
             .fillMaxWidth()
@@ -495,7 +490,7 @@ private fun OnboardingTopBar(canSkip: Boolean, onSkip: () -> Unit) {
                 "Skip",
                 fontSize = 15.sp,
                 fontWeight = FontWeight.SemiBold,
-                color = SceneSub,
+                color = palette.textSecondary,
                 modifier = Modifier
                     .clip(RoundedCornerShape(10.dp))
                     .clickable(onClick = onSkip)
@@ -512,6 +507,7 @@ private fun OnboardingTopBar(canSkip: Boolean, onSkip: () -> Unit) {
 
 @Composable
 private fun PageDots(count: Int, index: Int, modifier: Modifier = Modifier) {
+    val palette = LocalPalette.current
     Row(
         modifier,
         horizontalArrangement = Arrangement.spacedBy(7.dp, Alignment.CenterHorizontally),
@@ -523,10 +519,10 @@ private fun PageDots(count: Int, index: Int, modifier: Modifier = Modifier) {
                 Modifier
                     .size(width = if (active) 22.dp else 6.dp, height = 5.dp)
                     .clip(if (active) RoundedCornerShape(3.dp) else CircleShape)
-                    .background(if (active) SceneAccent else SceneHairline)
+                    .background(if (active) palette.primarySolid else palette.border)
                     .border(
                         0.5.dp,
-                        if (active) Color.Transparent else SceneHairline,
+                        if (active) Color.Transparent else palette.border,
                         if (active) RoundedCornerShape(3.dp) else CircleShape,
                     )
             )

@@ -2723,7 +2723,7 @@ pin("artwork call sites are bounded, never a screen-width fraction",
     all("fillMaxWidth(0." not in code_only(s) or "Artwork(" not in code_only(s)
         for s in _ART_SITES)
     and all("aspectRatio(2f)" in code_only(s) for s in _ART_SITES
-            if s != android("ui/screens/WelcomeScreen.kt"))
+            if "Artwork(" in code_only(s))
     and ("Modifier.width(150.dp)" in code_only(android("ui/screens/WelcomeScreen.kt"))
          or "widthIn(max = 360.dp)" in code_only(android("ui/screens/WelcomeScreen.kt")))
     and ("ContentScale.Fit" in code_only(android("ui/screens/WelcomeScreen.kt"))

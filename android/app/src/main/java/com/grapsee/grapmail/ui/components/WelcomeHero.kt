@@ -14,6 +14,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.viewinterop.AndroidView
@@ -43,7 +44,7 @@ import java.io.ByteArrayInputStream
  */
 @SuppressLint("SetJavaScriptEnabled")
 @Composable
-fun WelcomeHero(modifier: Modifier = Modifier) {
+fun WelcomeHero(accent: Color, modifier: Modifier = Modifier) {
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     // A holder, not state: this must not key the effect below. Keying it made
     // the first effect's dispose clear the state, which recomposed, disposed the
@@ -66,7 +67,7 @@ fun WelcomeHero(modifier: Modifier = Modifier) {
                 val html = viewContext.assets
                     .open(ASSET)
                     .bufferedReader()
-                    .use { it.readText() }
+                    .use { themeAnimationHtml(it.readText(), accent) }
 
                 WebView(viewContext).apply {
                     setBackgroundColor(AndroidColor.TRANSPARENT)
