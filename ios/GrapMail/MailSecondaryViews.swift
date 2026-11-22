@@ -822,11 +822,12 @@ private struct SettingRow: View {
     var onClick: (() -> Void)? = nil
 
     var body: some View {
-        content
-            .padding(.horizontal, 20).padding(.vertical, 12)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .contentShape(Rectangle())
-            .onTapGesture { onClick?() }
+        if let onClick {
+            Button(action: onClick) { content }
+                .buttonStyle(.plain)
+        } else {
+            content
+        }
     }
 
     private var content: some View {
@@ -834,15 +835,24 @@ private struct SettingRow: View {
             Image(systemName: icon).font(.system(size: 17))
                 .foregroundColor(GM.textSecondary).frame(width: 22)
             VStack(alignment: .leading, spacing: 2) {
-                Text(title).font(.body).foregroundColor(GM.textPrimary)
+                Text(title).font(.body.weight(.medium)).foregroundColor(GM.textPrimary)
                 Text(value).font(.footnote).foregroundColor(GM.textSecondary)
                     .fixedSize(horizontal: false, vertical: true)
+                if let trailing {
+                    Text(trailing).font(.caption).foregroundColor(GM.warnInk)
+                }
             }
-            Spacer()
-            if let trailing {
-                Text(trailing).font(.caption).foregroundColor(GM.warnInk)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            if onClick != nil {
+                Image(systemName: "chevron.forward")
+                    .font(.caption.weight(.semibold))
+                    .foregroundColor(GM.textSecondary)
+                    .accessibilityHidden(true)
             }
         }
+        .padding(.horizontal, 20)
+        .padding(.vertical, 12)
+        .contentShape(Rectangle())
     }
 }
 

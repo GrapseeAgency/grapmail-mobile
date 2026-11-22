@@ -117,14 +117,15 @@ struct GradientButton: View {
         } label: {
             HStack(spacing: 10) {
                 if busy {
-                    ProgressView().tint(.white)
+                    ProgressView().tint(enabled ? .white : GM.textSecondary)
                 } else {
                     Text(title)
                         .font(.body.weight(.semibold))
                         .multilineTextAlignment(.center)
                         .fixedSize(horizontal: false, vertical: true)
-                        .foregroundColor(.white)
-                    trailing
+                        .foregroundColor(enabled ? .white : GM.textSecondary)
+                    if enabled { trailing }
+                    else { trailing?.opacity(0.5) }
                 }
             }
             .padding(.horizontal, 16)
@@ -132,7 +133,7 @@ struct GradientButton: View {
             .frame(maxWidth: .infinity, minHeight: 54)
             .background {
                 RoundedRectangle(cornerRadius: GMShape.button, style: .continuous)
-                    .fill(enabled ? AnyShapeStyle(Color.brandGradient) : AnyShapeStyle(GM.buttonDisabled))
+                    .fill(enabled ? GM.primarySolid : GM.softFill)
             }
         }
         .buttonStyle(PressScaleStyle())
@@ -199,7 +200,7 @@ struct AppTextField: View {
             // labels rendered nowhere. Show it like Android does.
             if let title {
                 Text(title)
-                    .font(.system(size: 13, weight: .medium))
+                    .font(.subheadline.weight(.medium))
                     .foregroundColor(GM.textSecondary)
             }
             HStack(spacing: 10) {
@@ -211,22 +212,27 @@ struct AppTextField: View {
             Group {
                 if isPassword && !visible {
                     SecureField(hint ?? "", text: $value)
-                        .font(.system(size: 15))
+                        .font(.body)
                 } else {
                     TextField(hint ?? "", text: $value)
-                        .font(.system(size: 15))
+                        .font(.body)
                         .keyboardType(keyboardType)
                         .autocorrectionDisabled()
                         .textInputAutocapitalization(.never)
                         .onSubmit { if dismissOnReturn { focused = false } }
                 }
             }
+            .focused($focused)
+            .accessibilityLabel(title ?? hint ?? "")
             if isPassword {
                 Button { visible.toggle() } label: {
                     Image(systemName: visible ? "eye.slash" : "eye")
                         .font(.system(size: 14))
-                        .foregroundColor(GM.textTertiary)
+                        .foregroundColor(GM.textSecondary)
+                        .frame(minWidth: 44, minHeight: 44)
                 }
+                .buttonStyle(.plain)
+                .accessibilityLabel(visible ? "Hide password" : "Show password")
             }
             }
             .padding(.horizontal, 14)
