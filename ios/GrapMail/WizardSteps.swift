@@ -21,7 +21,7 @@ struct NameStepView: View {
         WizardScaffold(
             step: 1,
             title: "What's your name?",
-            subtitle: Text("Let's get started. This will be used for your GrapMail account and profile."),
+            subtitle: Text("This name appears on your GrapMail profile."),
             onBack: onBack,
             onSignIn: onSignIn,
             bodyContent: {
@@ -53,7 +53,7 @@ struct NameStepView: View {
                         }
                     }
                 }
-                .padding(.top, 24)
+                .padding(.top, 4)
             },
             bottom: {
                 GradientButton(

@@ -5,15 +5,17 @@ import SwiftUI
 struct WelcomeView: View {
     let onCreateAccount: () -> Void
     let onSignIn: () -> Void
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     var body: some View {
         // ScrollView-backed so nothing clips on the smallest phones (SE) and
         // in landscape; the min-height keeps the full-screen distribution
         // on regular devices.
         GeometryReader { viewport in
+            let compact = viewport.size.height < 700 || dynamicTypeSize.isAccessibilitySize
             ScrollView {
                 VStack(spacing: 0) {
-                    Spacer(minLength: 64)
+                    Spacer(minLength: compact ? 20 : 64)
 
                     VStack(spacing: 0) {
                         Text("Welcome to")
@@ -23,7 +25,7 @@ struct WelcomeView: View {
                             .font(.system(size: 30, weight: .bold))
                             .foregroundColor(GM.primarySolid)
                     }
-                    Text("A faster, safer and more private way\nto stay connected.")
+                    Text("A faster, safer and more private way to stay connected.")
                         .font(.system(size: 14))
                         .foregroundColor(GM.textSecondary)
                         .multilineTextAlignment(.center)
@@ -36,7 +38,7 @@ struct WelcomeView: View {
                         WelcomeHeroView()
                     }
                     .aspectRatio(400.0 / 440.0, contentMode: .fit)
-                    .frame(maxWidth: 360)
+                    .frame(maxWidth: compact ? 200 : 360)
                     .padding(.top, 16)
                     .accessibilityHidden(true)
 

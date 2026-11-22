@@ -268,6 +268,8 @@ struct FieldErrorRow: View {
 /// Wizard chrome — back + centered logo, CREATE ACCOUNT eyebrow, title,
 /// subtitle, stepper, scrollable body, action, "Already have an account?".
 struct WizardScaffold<Body: View, Bottom: View>: View {
+    @Environment(\.dynamicTypeSize) private var textSize
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
     let step: Int
     let title: String
     let subtitle: Text
@@ -278,7 +280,7 @@ struct WizardScaffold<Body: View, Bottom: View>: View {
 
     var body: some View {
         ScrollView {
-          VStack(spacing: 0) {
+            VStack(spacing: 0) {
             ZStack {
                 if let onBack {
                     HStack {
@@ -298,7 +300,7 @@ struct WizardScaffold<Body: View, Bottom: View>: View {
             .padding(.vertical, 6)
 
             VStack(alignment: .leading, spacing: 0) {
-                Text("CREATE ACCOUNT")
+                Text(textSize.isAccessibilitySize || verticalSizeClass == .compact ? "Step \(step) of 5" : "CREATE ACCOUNT")
                     .font(.system(size: 12, weight: .bold))
                     .kerning(1.6)
                     .foregroundColor(GM.textTertiary)
@@ -311,8 +313,9 @@ struct WizardScaffold<Body: View, Bottom: View>: View {
                     .font(.system(size: 14))
                     .foregroundColor(GM.textSecondary)
                     .padding(.top, 8)
-                StepProgress(step: step)
-                    .padding(.top, 22)
+                if !textSize.isAccessibilitySize && verticalSizeClass != .compact {
+                    StepProgress(step: step).padding(.top, 22)
+                }
                 VStack(alignment: .leading, spacing: 0) {
                     bodyContent()
                 }
@@ -337,7 +340,7 @@ struct WizardScaffold<Body: View, Bottom: View>: View {
             }
             .padding(.horizontal, 24)
         }
-          .centeredForm()
+            .centeredForm()
         }
         .background(GM.bg.ignoresSafeArea())
     }

@@ -67,7 +67,7 @@ fun NameStepScreen(vm: SignUpViewModel, onBack: () -> Unit, onSignIn: () -> Unit
     WizardScaffold(
         step = 1,
         title = "What's your name?",
-        subtitle = AnnotatedSubtitle(boldLead = "Let's get started.", rest = "This will be used for your GrapMail account and profile."),
+        subtitle = AnnotatedSubtitle(rest = "This name appears on your GrapMail profile."),
         onBack = onBack,
         onSignIn = onSignIn,
         bottomBar = {
@@ -85,7 +85,6 @@ fun NameStepScreen(vm: SignUpViewModel, onBack: () -> Unit, onSignIn: () -> Unit
         FieldWithError(
             label = "First name",
             value = state.firstName,
-            hint = "Enter your first name",
             onValueChange = {
                 vm.update { copy(firstName = it) }
                 if (firstError != null) firstError = Validators.firstName(it)
@@ -95,11 +94,10 @@ fun NameStepScreen(vm: SignUpViewModel, onBack: () -> Unit, onSignIn: () -> Unit
             imeAction = ImeAction.Next,
             keyboardActions = KeyboardActions(onNext = { focus.moveFocus(FocusDirection.Next) }),
         )
-        Spacer(Modifier.height(18.dp))
+        Spacer(Modifier.height(12.dp))
         FieldWithError(
             label = "Last name",
             value = state.lastName,
-            hint = "Enter your last name",
             onValueChange = {
                 vm.update { copy(lastName = it) }
                 if (lastError != null) lastError = Validators.lastName(it)
@@ -121,7 +119,6 @@ fun NameStepScreen(vm: SignUpViewModel, onBack: () -> Unit, onSignIn: () -> Unit
 private fun FieldWithError(
     label: String,
     value: String,
-    hint: String,
     onValueChange: (String) -> Unit,
     error: String?,
     showError: Boolean,
@@ -139,7 +136,6 @@ private fun FieldWithError(
             label = label,
             value = value,
             onValueChange = onValueChange,
-            hint = hint,
             showLabel = false,
             imeAction = imeAction,
             keyboardActions = keyboardActions,

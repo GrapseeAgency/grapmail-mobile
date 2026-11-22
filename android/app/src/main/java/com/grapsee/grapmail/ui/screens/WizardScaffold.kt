@@ -22,6 +22,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
@@ -50,6 +51,8 @@ fun WizardScaffold(
     body: @Composable () -> Unit,
 ) {
     val palette = LocalPalette.current
+    val config = LocalConfiguration.current
+    val compact = config.screenWidthDp < 380 || config.screenHeightDp < 680 || config.fontScale > 1.15f
     Box(Modifier.fillMaxSize().background(palette.bg).imePadding(), contentAlignment = Alignment.TopCenter) {
         Column(
             Modifier
@@ -75,15 +78,21 @@ fun WizardScaffold(
                     .fillMaxWidth()
                     .padding(horizontal = 24.dp),
             ) {
-                Spacer(Modifier.height(10.dp))
-                Text("CREATE ACCOUNT", fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.6.sp, color = palette.textTertiary)
-                Spacer(Modifier.height(8.dp))
+                if (compact) {
+                    Text("Step $step of 5", fontSize = 13.sp, fontWeight = FontWeight.Medium, color = palette.textSecondary)
+                } else {
+                    Spacer(Modifier.height(10.dp))
+                    Text("CREATE ACCOUNT", fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.6.sp, color = palette.textTertiary)
+                }
+                Spacer(Modifier.height(6.dp))
                 Text(title, style = H2, color = palette.textPrimary)
-                Spacer(Modifier.height(8.dp))
+                Spacer(Modifier.height(6.dp))
                 Text(subtitle.build(), fontSize = 14.sp, lineHeight = 21.sp, color = palette.textSecondary)
-                Spacer(Modifier.height(22.dp))
-                StepProgress(step = step)
-                Spacer(Modifier.height(22.dp))
+                if (!compact) {
+                    Spacer(Modifier.height(22.dp))
+                    StepProgress(step = step)
+                }
+                Spacer(Modifier.height(if (compact) 14.dp else 22.dp))
                 body()
                 Spacer(Modifier.height(14.dp))
                 bottomBar()
