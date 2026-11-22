@@ -903,6 +903,44 @@ struct MailE2eAddressesRequest: Encodable {
     var addresses: [String]
 }
 
+/// `POST /avatars/resolve` body.
+struct MailAvatarsRequest: Encodable {
+    var addresses: [String]
+}
+
+/// One sender's picture. `kind` is `person`, `brand` or `monogram`; `source`
+/// says which source answered. `verifiedBrand` is only ever true for a brand
+/// logo that passed brand authentication, never for a person.
+struct MailAvatar: Decodable {
+    var kind = "monogram"
+    var source = "fallback"
+    var path: String?
+    var revision: String?
+    var verifiedBrand = false
+
+    private enum CodingKeys: String, CodingKey { case kind, source, path, revision, verifiedBrand }
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        kind = c.lenient(.kind, "monogram")
+        source = c.lenient(.source, "fallback")
+        path = c.lenientOpt(.path)
+        revision = c.lenientOpt(.revision)
+        verifiedBrand = c.lenient(.verifiedBrand, false)
+    }
+}
+
+struct MailAvatarsResponse: Decodable {
+    var success = false
+    var avatars: [String: MailAvatar] = [:]
+
+    private enum CodingKeys: String, CodingKey { case success, avatars }
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        success = c.lenient(.success, false)
+        avatars = c.lenient(.avatars, [:])
+    }
+}
+
 /// `POST /send` — `grapmail.ts:1136-1143`.
 ///
 /// `status` is the truth about the send and `deliveryError` is the server's own
@@ -1617,6 +1655,30 @@ extension ApiClient {
         try await request("\(mailBase)/e2e/lookup", method: "POST",
                           body: try encoder.encode(MailE2eAddressesRequest(addresses: addresses)),
                           bearer: token)
+    }
+
+    /// `POST /avatars/resolve` — which of these senders have a photo. The server
+    /// answers only for the mailbox's own correspondents and its own addresses;
+    /// everyone else comes back as a monogram. At most 100 per call.
+    static func mailAvatars(
+        _ token: String, addresses: [String],
+    ) async throws -> MailAvatarsResponse {
+        try await request("\(mailBase)/avatars/resolve", method: "POST",
+                          body: try encoder.encode(MailAvatarsRequest(addresses: addresses)),
+                          bearer: token)
+    }
+
+    /// `GET /avatars/photo` — one sender's photo bytes for one revision. A 409
+    /// means the photo changed since it was resolved; the caller re-resolves.
+    static func mailAvatarBytes(token: String, address: String, revision: String) async throws -> Data {
+        var parts = URLComponents(string: "\(base)\(mailBase)/avatars/photo")
+        parts?.queryItems = [URLQueryItem(name: "address", value: address), URLQueryItem(name: "v", value: revision)]
+        let (data, http) = try await mailBinary(
+            url: parts?.url, method: "GET", bearer: token, body: nil, contentType: nil)
+        guard http.statusCode < 400 else {
+            throw mailFailure(data: data, http: http)
+        }
+        return data
     }
 
     /// `GET /attachments/:id` — the bytes, not JSON. Separate from `request`,

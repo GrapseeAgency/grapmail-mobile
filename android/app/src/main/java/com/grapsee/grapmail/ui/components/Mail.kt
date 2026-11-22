@@ -42,6 +42,7 @@ import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -289,16 +290,39 @@ fun SenderAvatar(display: String, address: String?, size: Dp = 40.dp, modifier: 
         val ramp = if (appearance) GrapMailAvatarRampDark else GrapMailAvatarRampLight
         ramp[rampIndex((address ?: "").ifBlank { display }, ramp.size)]
     }
+    // The sender's own photo when they are a GrapMail correspondent who set one
+    // (data/SenderPhotos.kt). The initial is drawn until it arrives and whenever
+    // there is none, so a slow or failed lookup looks exactly like before.
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val photo by androidx.compose.runtime.produceState(
+        initialValue = remember(address) { com.grapsee.grapmail.data.SenderPhotos.cached(address) },
+        address,
+    ) {
+        val wanted = address?.trim().orEmpty()
+        if (wanted.isNotEmpty() && value == null) {
+            value = com.grapsee.grapmail.data.SenderPhotos.photo(context, wanted)
+        }
+    }
     Box(
         modifier.size(size).clip(CircleShape).background(tint),
         contentAlignment = Alignment.Center,
     ) {
-        Text(
-            initial,
-            fontSize = (size.value * 0.42f).sp,
-            fontWeight = FontWeight.SemiBold,
-            color = Color.White,
-        )
+        val image = photo
+        if (image != null) {
+            androidx.compose.foundation.Image(
+                bitmap = image,
+                contentDescription = null,
+                contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                modifier = Modifier.size(size).clip(CircleShape),
+            )
+        } else {
+            Text(
+                initial,
+                fontSize = (size.value * 0.42f).sp,
+                fontWeight = FontWeight.SemiBold,
+                color = Color.White,
+            )
+        }
     }
 }
 
