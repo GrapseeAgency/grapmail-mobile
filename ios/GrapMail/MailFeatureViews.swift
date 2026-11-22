@@ -184,7 +184,8 @@ struct MailSmartPanelView: View {
                 if !isPriority {
                     prioritizeButton
                 }
-                if asksReceipt {
+                // Settings → Opened-mail markers: off means no chip.
+                if asksReceipt && MailFeaturePrefs.shared.readReceiptsEnabled {
                     receiptChip
                 }
                 Spacer(minLength: 0)
@@ -314,7 +315,7 @@ struct MailSmartPanelView: View {
                     HStack(spacing: 4) {
                         Image(systemName: "envelope.open")
                             .font(.system(.caption2))
-                        Text("Read receipt - acknowledge")
+                        Text("Mark acknowledged")
                             .font(.system(.caption2).weight(.medium))
                     }
                     .foregroundColor(GM.textSecondary)
@@ -673,9 +674,11 @@ struct MailFeatureSettingsSection: View {
                 .foregroundColor(GM.textTertiary)
 
             VStack(spacing: 12) {
+                // Nothing is ever sent to the sender, so the row says so: the old
+                // "Read receipts" name promised a receipt that does not exist.
                 MailFeatureSwitchRow(
-                    title: "Read receipts",
-                    subtitle: "Remember which messages asked for a receipt, and mark them acknowledged when you choose.",
+                    title: "Opened-mail markers",
+                    subtitle: "When a message asks for a read receipt, let me mark it acknowledged on this device. Nothing is sent to the sender.",
                     isOn: receiptsBinding)
                 MailFeatureSwitchRow(
                     title: "Tracker shield",
@@ -683,7 +686,7 @@ struct MailFeatureSettingsSection: View {
                     isOn: shieldBinding)
                 MailFeatureSwitchRow(
                     title: "Load remote images",
-                    subtitle: "Off keeps senders from learning when you opened a message.",
+                    subtitle: "On loads images as a message opens, which tells senders when you read it. Off waits until you tap Show images.",
                     isOn: imagesBinding)
             }
 

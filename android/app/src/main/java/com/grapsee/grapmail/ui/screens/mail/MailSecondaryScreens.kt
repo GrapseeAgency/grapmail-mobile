@@ -681,7 +681,7 @@ fun MailSettingsScreen(
             SettingRow(Icons.Rounded.Settings, "Labels",
                 "Filters for the inbox", palette, onClick = onLabels)
             SettingRow(Icons.Rounded.MailOutline, "Mail settings",
-                "Signature, density, language, senders", palette, onClick = onPrefs)
+                "Signature, auto-reply, forwarding, dates, senders", palette, onClick = onPrefs)
             SettingRow(Icons.Rounded.PersonAddAlt1, "Addresses",
                 "Primary and aliases", palette, onClick = onAddresses)
             SettingRow(Icons.Rounded.Person, "Connected accounts",

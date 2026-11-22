@@ -130,26 +130,51 @@ enum MailTime {
      */
     static func short(_ iso: String?, now: Date = Date()) -> String? {
         guard let raw = iso, !raw.isEmpty else { return nil }
+        // Mail settings → time zone and date order, when the account chose them;
+        // this device's own otherwise.
+        let display = MailDisplay.shared
+        let zone = display.zone
+        let order = display.dateFormat
         let nowMinute = Int(now.timeIntervalSince1970 / 60)
-        let key = "\(TimeZone.current.identifier)\u{0}\(raw)\u{0}\(nowMinute)" as NSString
+        let key = "\(zone.identifier)\u{0}\(order)\u{0}\(raw)\u{0}\(nowMinute)" as NSString
         if let cached = formattedTimes.object(forKey: key) {
             return cached as String
         }
         guard let date = parse(raw) else { return nil }
-        let cal = Calendar.current
+        var cal = Calendar.current
+        cal.timeZone = zone
         let result: String
         if cal.isDate(date, inSameDayAs: now) {
-            result = fmt("h:mm a", date)
+            result = fmt("h:mm a", date, zone)
         } else if let yesterday = cal.date(byAdding: .day, value: -1, to: now),
            cal.isDate(date, inSameDayAs: yesterday) {
             result = "Yesterday"
         } else if cal.component(.year, from: date) == cal.component(.year, from: now) {
-            result = fmt("MMM d", date)
+            result = fmt(sameYearPattern(order), date, zone)
         } else {
-            result = fmt("MMM d, yyyy", date)
+            result = fmt(olderPattern(order), date, zone)
         }
         formattedTimes.setObject(result as NSString, forKey: key)
         return result
+    }
+
+    // The three orders Mail settings offers, matching its own examples
+    // ("25/10/26", "10/25/26", "2026-10-25") and the website's list.
+    private static func sameYearPattern(_ order: String) -> String {
+        switch order {
+        case "dmy": return "d MMM"
+        case "ymd": return "MM-dd"
+        default: return "MMM d"
+        }
+    }
+
+    private static func olderPattern(_ order: String) -> String {
+        switch order {
+        case "dmy": return "dd/MM/yy"
+        case "mdy": return "MM/dd/yy"
+        case "ymd": return "yyyy-MM-dd"
+        default: return "MMM d, yyyy"
+        }
     }
 
     private static let formattedTimes: NSCache<NSString, NSString> = {
@@ -164,7 +189,11 @@ enum MailTime {
     static func full(_ iso: String?) -> String? {
         guard let raw = iso, !raw.isEmpty else { return nil }
         guard let date = parse(raw) else { return raw }
-        return fmt("EEEE, MMMM d, yyyy 'at' h:mm a", date)
+        let display = MailDisplay.shared
+        if display.dateFormat.isEmpty {
+            return fmt("EEEE, MMMM d, yyyy 'at' h:mm a", date, display.zone)
+        }
+        return fmt(olderPattern(display.dateFormat) + " 'at' h:mm a", date, display.zone)
     }
 
     private static let parsers = [
@@ -210,8 +239,24 @@ enum MailTime {
         return f
     }
 
-    private static func fmt(_ pattern: String, _ date: Date) -> String {
-        (formatters[pattern] ?? makeFormatter(pattern)).string(from: date)
+    private static let zonedFormatters: NSCache<NSString, DateFormatter> = {
+        let cache = NSCache<NSString, DateFormatter>()
+        cache.countLimit = 64
+        return cache
+    }()
+
+    private static func fmt(_ pattern: String, _ date: Date, _ zone: TimeZone = .autoupdatingCurrent) -> String {
+        if zone == .autoupdatingCurrent {
+            return (formatters[pattern] ?? makeFormatter(pattern)).string(from: date)
+        }
+        let key = "\(zone.identifier)\u{0}\(pattern)" as NSString
+        let formatter = zonedFormatters.object(forKey: key) ?? {
+            let f = makeFormatter(pattern)
+            f.timeZone = zone
+            zonedFormatters.setObject(f, forKey: key)
+            return f
+        }()
+        return formatter.string(from: date)
     }
 }
 
@@ -229,6 +274,11 @@ struct MessageRow: View, Equatable {
     let onSelect: () -> Void
     let onOpen: () -> Void
     let onStar: () -> Void
+    /// Mail settings → list density and date display. Observed, so the row redraws
+    /// the moment either changes rather than on the next scroll.
+    // Internal, not private: a private stored property would make the
+    // memberwise initializer private and break every caller in other files.
+    @ObservedObject var display = MailDisplay.shared
 
     static func == (lhs: MessageRow, rhs: MessageRow) -> Bool {
         lhs.message.id == rhs.message.id &&
@@ -276,7 +326,8 @@ struct MessageRow: View, Equatable {
                     .font(.system(size: 14, weight: unread ? .medium : .regular))
                     .foregroundColor(GM.textPrimary).lineLimit(1)
                 HStack(spacing: 4) {
-                    if let snippet = message.snippet, !snippet.isEmpty {
+                    // Compact drops the preview line, so more messages fit.
+                    if !display.compact, let snippet = message.snippet, !snippet.isEmpty {
                         Text(snippet).font(.system(size: 13)).foregroundColor(GM.textSecondary)
                             .lineLimit(1)
                     }
@@ -317,8 +368,9 @@ struct MessageRow: View, Equatable {
             }
             .frame(minWidth: 44, alignment: .trailing)
         }
-        .padding(.horizontal, 16).padding(.vertical, 12)
+        .padding(.horizontal, 16).padding(.vertical, display.compact ? 7 : 12)
         .contentShape(Rectangle())
+        .onAppear { display.refreshOnce() }
         .onTapGesture { selecting ? onSelect() : onOpen() }
         .onLongPressGesture(perform: onSelect)
         .accessibilityIdentifier(selecting ? "mail-row-select" : "mail-row")

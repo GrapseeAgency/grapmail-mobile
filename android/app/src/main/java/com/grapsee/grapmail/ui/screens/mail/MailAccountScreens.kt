@@ -1215,9 +1215,9 @@ fun SupportScreen(
     val faq = remember {
         listOf(
             "I forgot my password. What now?" to
-                "A GrapMail account has no second inbox, so recovery proves the account with " +
-                "the phone number on file: a 6-digit code goes to that number and the new " +
-                "password is set only after the code is presented.",
+                "Tap Forgot password on the sign-in screen. GrapMail emails a reset link to the " +
+                "recovery email on your account, so add and verify one in Personal info before " +
+                "you need it.",
             "Can I sign in with my phone number?" to
                 "Yes. The sign-in page accepts either the GrapMail address or the phone " +
                 "number you verified, but the number is never the identity of the account, " +

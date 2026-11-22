@@ -611,18 +611,19 @@ struct LinkPhoneResponse: Codable {
 /// so this is not a preference the app may store while ignoring.
 struct LocaleInfo: Codable {
     var language = "en-US"
-    var timezone = "Asia/Dhaka"
-    /// `dmy`, `mdy` or `ymd`.
-    var dateFormat = "dmy"
+    /// An IANA zone, or empty for this device's own zone.
+    var timezone = ""
+    /// `dmy`, `mdy` or `ymd`, or empty to follow this device's locale.
+    var dateFormat = ""
 
     private enum CodingKeys: String, CodingKey { case language, timezone, dateFormat }
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         language = c.lenient(.language, "en-US")
-        timezone = c.lenient(.timezone, "Asia/Dhaka")
-        dateFormat = c.lenient(.dateFormat, "dmy")
+        timezone = c.lenient(.timezone, "")
+        dateFormat = c.lenient(.dateFormat, "")
     }
-    init(language: String = "en-US", timezone: String = "Asia/Dhaka", dateFormat: String = "dmy") {
+    init(language: String = "en-US", timezone: String = "", dateFormat: String = "") {
         self.language = language; self.timezone = timezone; self.dateFormat = dateFormat
     }
 }
@@ -647,6 +648,9 @@ struct VacationInfo: Codable {
         message = c.lenient(.message, "")
     }
     init() {}
+    init(enabled: Bool, from: String, to: String, message: String) {
+        self.enabled = enabled; self.from = from; self.to = to; self.message = message
+    }
 }
 
 /// `settings.forwarding` — same rule as `VacationInfo`: carried, not offered.
@@ -663,6 +667,9 @@ struct ForwardingInfo: Codable {
         keepCopy = c.lenient(.keepCopy, true)
     }
     init() {}
+    init(enabled: Bool, address: String, keepCopy: Bool = true) {
+        self.enabled = enabled; self.address = address; self.keepCopy = keepCopy
+    }
 }
 
 /// The mail-preference half of the profile document (`:69-80`). Every default
@@ -766,6 +773,9 @@ struct ProfileSettingsPatch {
     var notes: [String]? = nil
     var tasks: [String]? = nil
     var locale: LocaleInfo? = nil
+    /// Sent whole: the server checks the switch, the window and the message together.
+    var vacation: VacationInfo? = nil
+    var forwarding: ForwardingInfo? = nil
 }
 
 struct ProfileDto: Codable {

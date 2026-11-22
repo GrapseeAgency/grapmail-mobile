@@ -361,10 +361,20 @@ struct MailPrefsView: View {
     let onBack: () -> Void
     @State private var fieldsReady = false
     @State private var signature = ""
-    @State private var language = ""
     @State private var timezone = ""
+    @State private var zoneError: String?
     @State private var safeDraft = ""
     @State private var blockedDraft = ""
+    @State private var safeError: String?
+    @State private var blockedError: String?
+    @State private var awayOn = false
+    @State private var awayMessage = ""
+    @State private var awayFrom = ""
+    @State private var awayTo = ""
+    @State private var awayError: String?
+    @State private var forwardOn = false
+    @State private var forwardTo = ""
+    @State private var forwardError: String?
     /// The per-address overrides being edited, seeded from the profile. The
     /// web's `Signature per address` section is the reference: one box per
     /// address the account can send as, empty means "use the main one".
@@ -411,8 +421,13 @@ struct MailPrefsView: View {
         .task(id: s != nil) {
             guard !fieldsReady, let settings = s else { return }
             signature = settings.signature
-            language = settings.locale.language
             timezone = settings.locale.timezone
+            awayOn = settings.vacation.enabled
+            awayMessage = settings.vacation.message
+            awayFrom = settings.vacation.from
+            awayTo = settings.vacation.to
+            forwardOn = settings.forwarding.enabled
+            forwardTo = settings.forwarding.address
             overrides = settings.signatures
             fieldsReady = true
         }
@@ -506,29 +521,43 @@ struct MailPrefsView: View {
                 }
             }
 
-            AccountSectionLabel(text: "Language and dates")
-            AppTextField(title: "Language", value: $language, hint: "en-US")
-            AppTextField(title: "Time zone", value: $timezone, hint: "Asia/Dhaka")
-                .padding(.top, 8)
+            // The app's own language is iOS's per-app setting (Settings → GrapMail
+            // → Language), so it is not repeated here as a free-text field that
+            // nothing on this device read.
+            AccountSectionLabel(text: "Time zone and dates")
+            Text("How times and dates appear in your mailbox list.")
+                .font(.system(size: 12)).foregroundColor(GM.textTertiary)
+            AccountRadioRow(title: "This device's time zone (\(TimeZone.current.identifier))",
+                            selected: (s?.locale.timezone ?? "").isEmpty) {
+                zoneError = nil
+                if let loc = s?.locale, !loc.timezone.isEmpty {
+                    vm.saveSettings(ProfileSettingsPatch(locale: LocaleInfo(
+                        language: loc.language, timezone: "", dateFormat: loc.dateFormat)))
+                }
+            }
+            AppTextField(title: "Another time zone", value: $timezone, error: zoneError,
+                         hint: "e.g. Europe/London")
+                .padding(.top, 4)
+                .onChange(of: timezone) { _ in zoneError = nil }
             Button {
                 guard let loc = s?.locale else { return }
+                guard let zone = MailDisplay.zone(timezone.trimmed) else {
+                    zoneError = "That isn't a time zone. Use a name like Europe/London or America/New_York."
+                    return
+                }
                 vm.saveSettings(ProfileSettingsPatch(locale: LocaleInfo(
-                    language: language.trimmed.isEmpty ? loc.language : language.trimmed,
-                    timezone: timezone.trimmed.isEmpty ? loc.timezone : timezone.trimmed,
-                    dateFormat: loc.dateFormat)))
+                    language: loc.language, timezone: zone.identifier, dateFormat: loc.dateFormat)))
             } label: {
-                Text("Save language and time zone")
+                Text("Use this time zone")
                     .font(.system(size: 14, weight: .semibold))
-                    .foregroundColor(GM.primarySolid).padding(.vertical, 8)
+                    .foregroundColor(zoneDirty ? GM.primarySolid : GM.textTertiary).padding(.vertical, 8)
             }
-            .disabled(vm.state.busy ||
-                      (language.trimmed == s?.locale.language &&
-                       timezone.trimmed == s?.locale.timezone))
+            .disabled(vm.state.busy || !zoneDirty)
             .buttonStyle(.plain)
-            Text("Dates in messages and the list:")
+            Text("Dates in the mailbox list:")
                 .font(.system(size: 13)).foregroundColor(GM.textSecondary)
-            ForEach([("dmy", "day first (25/10/26)"), ("mdy", "month first (10/25/26)"),
-                     ("ymd", "year first (2026-10-25)")], id: \.0) { code, label in
+            ForEach([("", "Automatic — follows this device"), ("dmy", "day first (25/10/26)"),
+                     ("mdy", "month first (10/25/26)"), ("ymd", "year first (2026-10-25)")], id: \.0) { code, label in
                 AccountRadioRow(title: label, selected: s?.locale.dateFormat == code) {
                     if let loc = s?.locale, loc.dateFormat != code {
                         vm.saveSettings(ProfileSettingsPatch(
@@ -538,14 +567,31 @@ struct MailPrefsView: View {
                 }
             }
 
+            autoReplySection
+            forwardingSection
+
+            // These two lists are enforced on delivery: the server turns each entry
+            // into a Screener decision (safe = approved, blocked = blocked), and a
+            // block applies whether or not the Screener is on. A sender can be on
+            // one list only, so adding to one takes it off the other.
             AccountSectionLabel(text: "Senders you always accept")
-            Text("A safe sender skips the approval queue even when two-step checking is on.")
+            Text("Mail from these senders always lands in your inbox, even when the Screener is on. " +
+                 "Use an address (name@example.com) or a whole domain (example.com).")
                 .font(.system(size: 12)).foregroundColor(GM.textTertiary)
-            AccountAddRow(hint: "address@example.com", value: $safeDraft,
+            AccountAddRow(hint: "name@example.com or example.com", value: $safeDraft,
                           busy: vm.state.busy, marker: "gm-add-safe") {
-                let next = ((s?.safeSenders ?? []) + [safeDraft.trimmed.lowercased()]).uniq()
-                vm.saveSettings(ProfileSettingsPatch(safeSenders: next))
+                guard let sender = Self.normalizedSender(safeDraft) else {
+                    safeError = "Enter an address like name@example.com, or a domain like example.com."
+                    return
+                }
+                vm.saveSettings(ProfileSettingsPatch(
+                    blockedSenders: (s?.blockedSenders ?? []).filter { $0 != sender },
+                    safeSenders: ((s?.safeSenders ?? []) + [sender]).uniq()))
                 safeDraft = ""
+            }
+            .onChange(of: safeDraft) { _ in safeError = nil }
+            if let safeError {
+                Text(safeError).font(.system(size: 12)).foregroundColor(GM.error)
             }
             ForEach(s?.safeSenders ?? [], id: \.self) { e in
                 AccountListRow(text: e, marker: "gm-safe-row") {
@@ -555,14 +601,23 @@ struct MailPrefsView: View {
             }
 
             AccountSectionLabel(text: "Senders you block")
-            Text("Blocked senders are refused at the door: nothing arrives and nothing " +
-                 "queues for approval.")
+            Text("Mail from blocked senders goes straight to Trash. " +
+                 "Use an address (name@example.com) or a whole domain (example.com).")
                 .font(.system(size: 12)).foregroundColor(GM.textTertiary)
-            AccountAddRow(hint: "address@example.com", value: $blockedDraft,
+            AccountAddRow(hint: "name@example.com or example.com", value: $blockedDraft,
                           busy: vm.state.busy, marker: "gm-add-blocked") {
-                let next = ((s?.blockedSenders ?? []) + [blockedDraft.trimmed.lowercased()]).uniq()
-                vm.saveSettings(ProfileSettingsPatch(blockedSenders: next))
+                guard let sender = Self.normalizedSender(blockedDraft) else {
+                    blockedError = "Enter an address like name@example.com, or a domain like example.com."
+                    return
+                }
+                vm.saveSettings(ProfileSettingsPatch(
+                    blockedSenders: ((s?.blockedSenders ?? []) + [sender]).uniq(),
+                    safeSenders: (s?.safeSenders ?? []).filter { $0 != sender }))
                 blockedDraft = ""
+            }
+            .onChange(of: blockedDraft) { _ in blockedError = nil }
+            if let blockedError {
+                Text(blockedError).font(.system(size: 12)).foregroundColor(GM.error)
             }
             ForEach(s?.blockedSenders ?? [], id: \.self) { e in
                 AccountListRow(text: e, marker: "gm-blocked-row") {
@@ -571,6 +626,165 @@ struct MailPrefsView: View {
                 }
             }
         }
+    }
+
+    private var zoneDirty: Bool {
+        !timezone.trimmed.isEmpty && timezone.trimmed != s?.locale.timezone
+    }
+
+    // MARK: auto-reply and forwarding
+    //
+    // Both are enforced on delivery by the backend (lib/mail-automation.ts), and
+    // used to be editable only on the website.
+
+    private var autoReplySection: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            AccountSectionLabel(text: "Auto-reply")
+            Text("While it's on, people who write to you get this message once every 4 days. " +
+                 "Mailing lists and no-reply senders never get one.")
+                .font(.system(size: 12)).foregroundColor(GM.textTertiary)
+            Toggle("Send auto-replies", isOn: $awayOn)
+                .font(.system(size: 15)).padding(.vertical, 6)
+                .onChange(of: awayOn) { _ in awayError = nil }
+            TextEditor(text: $awayMessage)
+                .font(.system(size: 15))
+                .frame(minHeight: 80)
+                .padding(8)
+                .overlay(alignment: .topLeading) {
+                    if awayMessage.isEmpty {
+                        Text("I'm away until Monday and will reply when I'm back.")
+                            .font(.system(size: 15)).foregroundColor(GM.textTertiary)
+                            .padding(.leading, 13).padding(.top, 16)
+                            .allowsHitTesting(false)
+                    }
+                }
+                .overlay(RoundedRectangle(cornerRadius: GMShape.input)
+                    .strokeBorder(awayError == nil ? GM.border : GM.error))
+                .accessibilityLabel("Auto-reply message")
+            HStack(spacing: 10) {
+                AppTextField(title: "First day", value: $awayFrom, hint: "YYYY-MM-DD (optional)")
+                AppTextField(title: "Last day", value: $awayTo, hint: "YYYY-MM-DD (optional)")
+            }
+            .padding(.top, 8)
+            if let awayError {
+                Text(awayError).font(.system(size: 12)).foregroundColor(GM.error).padding(.top, 4)
+            }
+            Button {
+                awayError = Self.vacationProblem(on: awayOn, message: awayMessage,
+                                                 from: awayFrom.trimmed, to: awayTo.trimmed)
+                guard awayError == nil else { return }
+                vm.saveSettings(ProfileSettingsPatch(vacation: VacationInfo(
+                    enabled: awayOn, from: awayFrom.trimmed, to: awayTo.trimmed, message: awayMessage)))
+            } label: {
+                Text("Save auto-reply")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(awayDirty ? GM.primarySolid : GM.textTertiary)
+                    .padding(.vertical, 8)
+            }
+            .disabled(!awayDirty || vm.state.busy)
+            .buttonStyle(.plain)
+        }
+    }
+
+    private var awayDirty: Bool {
+        guard let v = s?.vacation else { return false }
+        return v.enabled != awayOn || v.message != awayMessage ||
+            v.from != awayFrom.trimmed || v.to != awayTo.trimmed
+    }
+
+    private var forwardingSection: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            AccountSectionLabel(text: "Forwarding")
+            Text("Send a copy of every message you receive to another address. The original " +
+                 "always stays in GrapMail, and the copy is plain text. Turning it on also puts a " +
+                 "security notice in your inbox, so you'd notice if someone else did.")
+                .font(.system(size: 12)).foregroundColor(GM.textTertiary)
+            Toggle("Forward my mail", isOn: $forwardOn)
+                .font(.system(size: 15)).padding(.vertical, 6)
+                .onChange(of: forwardOn) { _ in forwardError = nil }
+            AppTextField(title: "Forward to", value: $forwardTo, error: forwardError,
+                         hint: "name@example.com", keyboardType: .emailAddress)
+                .onChange(of: forwardTo) { _ in forwardError = nil }
+            Button {
+                let address = forwardTo.trimmed.lowercased()
+                let own = Set(signatureAddresses.map { $0.lowercased() })
+                if forwardOn && address.isEmpty {
+                    forwardError = "Add the address to forward to."
+                } else if !address.isEmpty && Self.normalizedSender(address)?.contains("@") != true {
+                    forwardError = "Forward to a full email address."
+                } else if own.contains(address) {
+                    forwardError = "Forwarding to your own address would loop."
+                } else {
+                    vm.saveSettings(ProfileSettingsPatch(forwarding: ForwardingInfo(
+                        enabled: forwardOn, address: address)))
+                }
+            } label: {
+                Text("Save forwarding")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(forwardDirty ? GM.primarySolid : GM.textTertiary)
+                    .padding(.vertical, 8)
+            }
+            .disabled(!forwardDirty || vm.state.busy)
+            .buttonStyle(.plain)
+        }
+    }
+
+    private var forwardDirty: Bool {
+        guard let f = s?.forwarding else { return false }
+        return f.enabled != forwardOn || f.address != forwardTo.trimmed.lowercased()
+    }
+
+    /// A sender the safe and blocked lists accept: an address, or a bare domain.
+    static func normalizedSender(_ raw: String) -> String? {
+        var value = raw.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        if value.hasPrefix("@") { value.removeFirst() }
+        let address = "^[^\\s@]+@[^\\s@]+\\.[^\\s@]{2,}$"
+        let domain = "^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\\.)+[a-z]{2,}$"
+        let ok = value.range(of: address, options: .regularExpression) != nil ||
+            value.range(of: domain, options: .regularExpression) != nil
+        return ok ? value : nil
+    }
+
+    /// The rules the server and the delivery path apply to an auto-reply.
+    static func vacationProblem(on: Bool, message: String, from: String, to: String) -> String? {
+        let start = from.isEmpty ? nil : AccountDates.parse(from)
+        let end = to.isEmpty ? nil : AccountDates.parse(to)
+        if !from.isEmpty && start == nil { return "Write the first day as YYYY-MM-DD." }
+        if !to.isEmpty && end == nil { return "Write the last day as YYYY-MM-DD." }
+        if let start, let end, end < start { return "The last day is before the first day." }
+        if on && message.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return "Write the auto-reply before turning it on."
+        }
+        return nil
+    }
+}
+
+/// `YYYY-MM-DD` dates, parsed strictly (no "2026-02-31" rolling into March).
+enum AccountDates {
+    private static let formatter: DateFormatter = {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.timeZone = TimeZone(identifier: "UTC")
+        f.dateFormat = "yyyy-MM-dd"
+        f.isLenient = false
+        return f
+    }()
+
+    static func parse(_ value: String) -> Date? {
+        guard let date = formatter.date(from: value), formatter.string(from: date) == value else { return nil }
+        return date
+    }
+
+    /// The sign-up rule: a real date, not in the future, 1900 or later, age 13+.
+    static func birthdayProblem(_ value: String) -> String? {
+        let text = value.trimmingCharacters(in: .whitespaces)
+        if text.isEmpty { return nil }
+        guard let date = parse(text) else { return "Enter your birthday as YYYY-MM-DD." }
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = TimeZone(identifier: "UTC")!
+        if date > Date() || cal.component(.year, from: date) < 1900 { return "Enter a real birthday." }
+        let age = cal.dateComponents([.year], from: date, to: Date()).year ?? 0
+        return age < 13 ? "A GrapMail account needs you to be at least 13." : nil
     }
 }
 
@@ -1057,9 +1271,9 @@ struct ProfileEditView: View {
     @State private var first = ""
     @State private var last = ""
     @State private var display = ""
-    @State private var recoveryEmail = ""
-    @State private var recoveryPhone = ""
     @State private var birthday = ""
+    @State private var formError: String?
+    @State private var showRecoveryEmail = false
     @State private var gender = ""
     @State private var photoError: String?
     @State private var photoItem: PhotosPickerItem?
@@ -1093,14 +1307,21 @@ struct ProfileEditView: View {
             first = profile.firstName ?? ""
             last = profile.lastName ?? ""
             display = profile.displayName ?? ""
-            recoveryEmail = profile.recoveryEmail ?? ""
-            recoveryPhone = profile.recoveryPhone ?? ""
             birthday = profile.birthday ?? ""
             gender = profile.gender ?? ""
             fieldsReady = true
         }
         .task(id: vm.state.busy ? nil : p?.avatarUrl) {
             if !vm.state.busy { vm.loadAvatar() }
+        }
+        // The recovery email is proven with a code before it counts, so it is
+        // changed in that flow, then the record is re-read for the new state.
+        .sheet(isPresented: $showRecoveryEmail, onDismiss: { vm.load(force: true) }) {
+            RecoveryEmailView(
+                onBack: { showRecoveryEmail = false },
+                onDone: { showRecoveryEmail = false },
+                currentEmail: p?.recoveryEmail
+            )
         }
         .task(id: vm.state.avatar) {
             guard let data = vm.state.avatar else { avatarPreview = nil; return }
@@ -1175,17 +1396,40 @@ struct ProfileEditView: View {
             }
             AccountSectionLabel(text: "How you appear")
             AppTextField(title: "Display name", value: $display, hint: "What recipients see")
+            // A plain save here used to store the recovery email unverified, and
+            // reset links are only sent to a verified one. The recovery phone is
+            // gone: GrapMail recovers by email only, and nothing read it.
             AccountSectionLabel(text: "Recovery")
-            AppTextField(title: "Recovery email", value: $recoveryEmail,
-                         hint: "A mailbox you can still reach", keyboardType: .emailAddress)
-            AppTextField(title: "Recovery phone", value: $recoveryPhone,
-                         hint: "+8801XXXXXXXXX", keyboardType: .phonePad)
-                .padding(.top, 8)
+            Text(recoveryLine)
+                .font(.system(size: 14)).foregroundColor(GM.textSecondary)
+                .padding(.top, 4)
             Button {
+                showRecoveryEmail = true
+            } label: {
+                Text((p?.recoveryEmail ?? "").isEmpty ? "Add recovery email" : "Change recovery email")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(GM.primarySolid).padding(.vertical, 8)
+            }
+            .buttonStyle(.plain)
+            if let formError {
+                Text(formError).font(.system(size: 13)).foregroundColor(GM.error).padding(.vertical, 6)
+            }
+            Button {
+                // The same rules sign-up applies, checked before the request so
+                // the person sees which field is wrong.
+                if first.trimmed.count < 2 {
+                    formError = "Enter your first name (2+ characters)."
+                } else if last.trimmed.count < 2 {
+                    formError = "Enter your last name (2+ characters)."
+                } else if display.trimmed.count > 60 {
+                    formError = "Keep the display name to 60 characters."
+                } else {
+                    formError = AccountDates.birthdayProblem(birthday)
+                }
+                guard formError == nil else { return }
                 vm.save(label: "Saved.", personal: [
-                    "firstName": first, "lastName": last, "birthday": birthday,
-                    "gender": gender, "displayName": display,
-                    "recoveryEmail": recoveryEmail, "recoveryPhone": recoveryPhone,
+                    "firstName": first.trimmed, "lastName": last.trimmed, "birthday": birthday.trimmed,
+                    "gender": gender, "displayName": display.trimmed,
                 ])
             } label: {
                 Text(vm.state.busy ? "Saving…" : "Save")
@@ -1200,6 +1444,13 @@ struct ProfileEditView: View {
             .padding(.vertical, 10)
             .accessibilityIdentifier("gm-profile-save")
         }
+    }
+
+    private var recoveryLine: String {
+        guard let email = p?.recoveryEmail, !email.isEmpty else {
+            return "No recovery email yet. Without one, a forgotten password can't be reset."
+        }
+        return p?.recoveryEmailVerified == true ? "\(email) · verified" : "\(email) · not verified yet"
     }
 }
 
@@ -1405,9 +1656,9 @@ struct SupportView: View {
 
     private let faq: [(String, String)] = [
         ("I forgot my password. What now?",
-         "A GrapMail account has no second inbox, so recovery proves the account with "
-         + "the phone number on file: a 6-digit code goes to that number and the new "
-         + "password is set only after the code is presented."),
+         "Tap Forgot password on the sign-in screen. GrapMail emails a reset link to the "
+         + "recovery email on your account, so add and verify one in Personal info before "
+         + "you need it."),
         ("Can I sign in with my phone number?",
          "Yes. The sign-in page accepts either the GrapMail address or the phone "
          + "number you verified, but the number is never the identity of the account, "
