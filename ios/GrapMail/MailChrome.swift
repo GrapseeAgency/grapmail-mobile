@@ -188,15 +188,14 @@ struct BoxTabRow: View {
     let onSelect: (MailBox) -> Void
 
     var body: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
-                chip(.others, icon: "envelope", tint: GM.primarySolid, badge: Color(red: 0.08, green: 0.38, blue: 0.78))
-                chip(.starred, icon: "star", tint: GM.star, badge: Color(red: 0.59, green: 0.34, blue: 0.10))
-                chip(.sent, icon: "paperplane", tint: Color(red: 0.67, green: 0.39, blue: 1),
-                     badge: Color(red: 0.41, green: 0.16, blue: 0.80))
-            }
-            .padding(.horizontal, 16)
+        FolderChipLayout(spacing: 8) {
+            chip(.others, icon: "envelope", tint: GM.primarySolid, badge: Color(red: 0.08, green: 0.38, blue: 0.78))
+            chip(.starred, icon: "star", tint: GM.star, badge: Color(red: 0.59, green: 0.34, blue: 0.10))
+            chip(.sent, icon: "paperplane", tint: Color(red: 0.67, green: 0.39, blue: 1),
+                 badge: Color(red: 0.41, green: 0.16, blue: 0.80))
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 16)
         .padding(.bottom, 10)
         .accessibilityIdentifier("mail-box-tabs")
     }
@@ -204,6 +203,48 @@ struct BoxTabRow: View {
     private func chip(_ box: MailBox, icon: String, tint: Color, badge: Color) -> some View {
         BoxTab(title: box.title, icon: icon, tint: tint, badgeColor: badge,
                count: counts[box] ?? nil, active: activeBox == box) { onSelect(box) }
+    }
+}
+
+/// Measures each chip at the available width and wraps at chip boundaries.
+private struct FolderChipLayout: Layout {
+    let spacing: CGFloat
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let items = positions(width: proposal.width ?? .infinity, subviews: subviews)
+        return CGSize(
+            width: items.map(\.maxX).max() ?? 0,
+            height: items.map(\.maxY).max() ?? 0
+        )
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        for (view, rect) in zip(subviews, positions(width: bounds.width, subviews: subviews)) {
+            view.place(
+                at: CGPoint(x: bounds.minX + rect.minX, y: bounds.minY + rect.minY),
+                anchor: .topLeading,
+                proposal: ProposedViewSize(width: rect.width, height: rect.height)
+            )
+        }
+    }
+
+    private func positions(width: CGFloat, subviews: Subviews) -> [CGRect] {
+        var x: CGFloat = 0
+        var y: CGFloat = 0
+        var rowHeight: CGFloat = 0
+        return subviews.map { view in
+            let natural = view.sizeThatFits(.unspecified)
+            let size = natural.width <= width ? natural : view.sizeThatFits(ProposedViewSize(width: width, height: nil))
+            if x > 0 && x + size.width > width {
+                x = 0
+                y += rowHeight + spacing
+                rowHeight = 0
+            }
+            let rect = CGRect(origin: CGPoint(x: x, y: y), size: size)
+            x += size.width + spacing
+            rowHeight = max(rowHeight, size.height)
+            return rect
+        }
     }
 }
 

@@ -11,6 +11,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.horizontalScroll
@@ -1191,15 +1193,16 @@ private fun LabelStrip(s: MailboxViewModel.MailboxUiState) {
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 internal fun BoxTabRow(activeBox: MailBox, counts: Map<MailBox, Int?>, onSelect: (MailBox) -> Unit) {
     val palette = LocalPalette.current
-    Row(
+    FlowRow(
         Modifier.fillMaxWidth()
-            .horizontalScroll(rememberScrollState())
             .padding(start = 16.dp, end = 16.dp, bottom = 10.dp)
             .testTag("mail-box-tabs"),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         BoxTab(MailBox.All.title, Icons.Outlined.Mail, palette.primarySolid, palette.tabBadgeAll,
             counts[MailBox.All], activeBox == MailBox.All) { onSelect(MailBox.All) }

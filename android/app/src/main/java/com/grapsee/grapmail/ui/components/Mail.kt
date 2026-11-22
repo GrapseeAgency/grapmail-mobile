@@ -15,9 +15,11 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -546,27 +548,29 @@ fun BoxTab(
     onClick: () -> Unit,
 ) {
     val palette = LocalPalette.current
+    val shape = RoundedCornerShape(14.dp)
     Row(
         Modifier.testTag("mail-box-tab-$title")
-            .clip(CircleShape)
+            .clip(shape)
             .background(if (active) tint.copy(alpha = 0.14f) else palette.card)
-            .border(1.dp, if (active) tint else palette.border, CircleShape)
+            .border(1.dp, if (active) tint else palette.border, shape)
             .selectable(selected = active, role = Role.Tab, onClick = onClick)
-            .height(44.dp)
-            .padding(horizontal = 10.dp),
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
+            .heightIn(min = 48.dp)
+            .padding(horizontal = 12.dp, vertical = 7.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(icon, null, tint = tint, modifier = Modifier.size(17.dp))
         Text(title, color = palette.textPrimary, fontSize = 13.sp,
-            fontWeight = FontWeight.Medium, softWrap = false, maxLines = 1)
+            fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f, fill = false))
         if (count != null && count > 0) {
             Text(
                 if (count > 99) "99+" else count.toString(),
-                color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.SemiBold,
+                color = Color.White, fontSize = 11.sp, lineHeight = 14.sp, fontWeight = FontWeight.SemiBold,
                 softWrap = false, maxLines = 1,
-                modifier = Modifier.background(badgeColor, CircleShape)
-                    .padding(horizontal = 6.dp, vertical = 2.dp),
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                modifier = Modifier.background(badgeColor, RoundedCornerShape(percent = 50))
+                    .widthIn(min = 24.dp).padding(horizontal = 6.dp, vertical = 1.dp),
             )
         }
     }

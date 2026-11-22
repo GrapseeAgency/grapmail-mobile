@@ -375,31 +375,37 @@ struct BoxTab: View {
     let active: Bool
     let onClick: () -> Void
 
+    @ScaledMetric(relativeTo: .caption) private var badgeWidth = 24.0
+    private let shape = RoundedRectangle(cornerRadius: 14, style: .continuous)
+
     var body: some View {
         Button(action: onClick) {
-            HStack(spacing: 6) {
+            HStack(spacing: 8) {
                 Image(systemName: icon)
                     .font(.system(size: 16, weight: .medium))
                     .foregroundColor(tint)
                     .accessibilityHidden(true)
                 Text(title)
-                    .font(.system(size: 13, weight: .medium))
+                    .font(.subheadline.weight(.medium))
+                    .fixedSize(horizontal: false, vertical: true)
                     .foregroundColor(GM.textPrimary)
                 if let count, count > 0 {
                     Text(count > 99 ? "99+" : String(count))
-                        .font(.system(size: 11, weight: .semibold))
+                        .font(.caption2.weight(.semibold).monospacedDigit())
+                        .fixedSize()
                         .foregroundColor(.white)
                         .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
+                        .padding(.vertical, 1)
+                        .frame(minWidth: badgeWidth)
                         .background(badgeColor, in: Capsule())
                 }
             }
-            .fixedSize(horizontal: true, vertical: false)
-            .padding(.horizontal, 10)
-            .frame(height: 44)
-            .background(active ? tint.opacity(0.14) : GM.card, in: Capsule())
-            .overlay(Capsule().strokeBorder(active ? tint : GM.border).allowsHitTesting(false))
-            .contentShape(Capsule())
+            .padding(.horizontal, 12)
+            .padding(.vertical, 7)
+            .frame(minHeight: 44)
+            .background(active ? tint.opacity(0.14) : GM.card, in: shape)
+            .overlay(shape.strokeBorder(active ? tint : GM.border).allowsHitTesting(false))
+            .contentShape(shape)
         }
         .buttonStyle(.plain)
         .accessibilityAddTraits(active ? .isSelected : [])
