@@ -1472,23 +1472,28 @@ for side, src, guard_word in (("Android", KT_PVM, "snapshotMode"), ("iOS", SW_PV
     pin(f"{side}'s profile model keeps the snapshot seed out of the boot-read race",
         guard_word in src)
 
-# NO DEAD TOGGLES: the profile stores vacation/forwarding and the sieve
-# interpreter supports the actions, but no code turns a setting into a rule,
-# so neither the write type nor any screen may carry the switch. The web page
-# promises "only settings that do something"; a mobile toggle writing what no
-# pipeline reads would break that promise quietly, from a Settings screen.
+# AUTO-REPLY AND FORWARDING ARE LIVE, so both platforms carry the switch. This
+# pin used to forbid them, on the reading that "no code turns a setting into a
+# rule" -- true of the Sieve interpreter, but the backend enforces both another
+# way: services/shared/src/lib/mail-automation.ts reads users.settings.vacation
+# and .forwarding for every inbound message (run from both delivery paths via
+# lib/inbound-hooks.ts), sends the once-per-sender reply and queues the forward.
+# A toggle that reaches that pipeline is not a dead toggle; one that is missing
+# from a platform is a setting only the website could change.
 kt_api_c, sw_apic_c = code_only(KT_API), code_only(SW_APIC)
 kt_patch_seg = kt_api_c[kt_api_c.find("class ProfileSettingsPatch"):
                         kt_api_c.find("class ProfilePatch")]
 sw_patch_seg = sw_apic_c[sw_apic_c.find("struct ProfileSettingsPatch"):
                           sw_apic_c.find("struct ProfileDto")]
-pin("Android's settings patch has no vacation or forwarding key",
-    "vacation" not in kt_patch_seg.lower() and "forwarding" not in kt_patch_seg.lower())
-pin("iOS's settings patch has no vacation or forwarding key",
-    "vacation" not in sw_patch_seg.lower() and "forwarding" not in sw_patch_seg.lower())
-pin("neither platform's account screens edit vacation or forwarding",
-    not re.search(r"VacationDto\(|ForwardingDto\(|VacationInfo\(|ForwardingInfo\(",
-                  code_only(KT_ACCT) + code_only(SW_ACCT)))
+pin("Android's settings patch carries vacation and forwarding",
+    "val vacation: VacationDto?" in kt_patch_seg and "val forwarding: ForwardingDto?" in kt_patch_seg)
+pin("iOS's settings patch carries vacation and forwarding",
+    "var vacation: VacationInfo?" in sw_patch_seg and "var forwarding: ForwardingInfo?" in sw_patch_seg)
+pin("both platforms' account screens edit vacation and forwarding",
+    re.search(r"VacationDto\(", code_only(KT_ACCT)) is not None
+    and re.search(r"ForwardingDto\(", code_only(KT_ACCT)) is not None
+    and re.search(r"VacationInfo\(", code_only(SW_ACCT)) is not None
+    and re.search(r"ForwardingInfo\(", code_only(SW_ACCT)) is not None)
 
 # The settings surface edits ONLY fields with a verified enforcement point:
 # the signature the compose appends, the per-address overrides compose prefers,
@@ -1500,7 +1505,7 @@ pin("the prefs screen's writes name exactly the enforced keys",
     {m.group(1) for m in re.finditer(r"ProfileSettingsPatch\(\s*([A-Za-z]+) =",
                                       code_only(KT_ACCT))} ==
     {"signature", "density", "locale", "signatures", "safeSenders",
-     "blockedSenders", "notes", "tasks"}
+     "blockedSenders", "notes", "tasks", "vacation", "forwarding"}
     and len({m.group(1) for m in re.finditer(
         r"ProfileSettingsPatch\(\s*([A-Za-z]+) =", code_only(KT_ACCT))}) >= 5)
 
@@ -2962,9 +2967,16 @@ pin("Both readers load bodies only for open conversation cards",
 # The opt-in starts closed and belongs to one message. A shared flag would carry
 # a consent given for one sender's mail to the next one's, and Android's card is
 # reused across a step — an unkeyed `remember` would have kept it open.
-pin("the opt-in starts closed and is keyed to its own message",
-    "remember(message.id) { mutableStateOf(false) }" in code_only(KT_THREAD)
-    and "@State private var shownImages = false" in code_only(SW_READ))
+#
+# The one standing consent is the person's own setting (Android: Tracker shield
+# off; iOS: Load remote images on). Both default to holding images, so a fresh
+# install still starts closed; the setting only seeds each message's own state,
+# which stays keyed to that message.
+pin("the opt-in starts closed unless the person's setting says load, and is keyed to its own message",
+    "remember(message.id) { mutableStateOf(imagesByDefault) }" in code_only(KT_THREAD)
+    and "val imagesByDefault = !com.grapsee.grapmail.logic.MailFeaturePrefs(" in code_only(KT_THREAD)
+    and ").trackerShieldEnabled" in code_only(KT_THREAD)
+    and "@State private var shownImages = MailFeaturePrefs.shared.allowRemoteImages" in code_only(SW_READ))
 
 # Nothing reaches the sender's server until the person asks — and the engine
 # agrees with the reader now: the sanctioned HTML carries no remote `src` until
