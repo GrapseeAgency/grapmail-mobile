@@ -562,7 +562,7 @@ Spacer(Modifier.width(10.dp))
             }
 
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                OutlineButton("Save draft", onClick = { saveDraft {} }, fill = false)
+                OutlineButton("Save draft", onClick = { saveDraft {} }, modifier = Modifier.weight(1f), fill = false)
                 GradientButton(if (state.sending) "Sending…" else "Send", onClick = sendMessage,
                     enabled = sendEnabled, modifier = Modifier.weight(1f))
             }
@@ -592,26 +592,35 @@ private fun FieldRow(
     trailing: (@Composable () -> Unit)? = null,
 ) {
     val palette = LocalPalette.current
-    Row(
-        Modifier.fillMaxWidth().padding(vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(label, fontSize = 14.sp, color = palette.textSecondary, modifier = Modifier.width(56.dp))
-        BasicTextField(
-            cursorBrush = androidx.compose.ui.graphics.SolidColor(LocalPalette.current.cursor),
-            value = value,
-            onValueChange = onValue,
-            maxLines = 3,
-            textStyle = TextStyle(fontSize = 15.sp, color = palette.textPrimary),
-            modifier = Modifier.weight(1f).testTag(tag),
-            decorationBox = { inner ->
-                Box {
-                    if (value.isEmpty()) Text(placeholder, fontSize = 15.sp, color = palette.textTertiary)
-                    inner()
-                }
-            },
-        )
-        if (trailing != null) { Spacer(Modifier.width(10.dp)); trailing() }
+    val stackedLabel = LocalDensity.current.fontScale > 1.3f
+    Column(Modifier.fillMaxWidth().padding(vertical = 12.dp)) {
+        if (stackedLabel) {
+            Text(label, fontSize = 14.sp, color = palette.textSecondary)
+            Spacer(Modifier.height(6.dp))
+        }
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            if (!stackedLabel) {
+                Text(label, fontSize = 14.sp, color = palette.textSecondary, modifier = Modifier.width(56.dp))
+            }
+            BasicTextField(
+                cursorBrush = androidx.compose.ui.graphics.SolidColor(palette.cursor),
+                value = value,
+                onValueChange = onValue,
+                maxLines = 3,
+                textStyle = TextStyle(fontSize = 15.sp, color = palette.textPrimary),
+                modifier = Modifier.weight(1f).testTag(tag),
+                decorationBox = { inner ->
+                    Box {
+                        if (value.isEmpty()) Text(placeholder, fontSize = 15.sp, color = palette.textTertiary)
+                        inner()
+                    }
+                },
+            )
+            if (trailing != null) {
+                Spacer(Modifier.width(10.dp))
+                trailing()
+            }
+        }
     }
 }
 

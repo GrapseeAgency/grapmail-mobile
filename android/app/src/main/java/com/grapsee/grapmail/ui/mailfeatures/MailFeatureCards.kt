@@ -446,6 +446,7 @@ fun ReadReceiptChip(sent: Boolean, modifier: Modifier = Modifier) {
     )
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun MailComposeTools(getBody: () -> String, setBody: (String) -> Unit) {
     val context = androidx.compose.ui.platform.LocalContext.current
@@ -453,10 +454,10 @@ fun MailComposeTools(getBody: () -> String, setBody: (String) -> Unit) {
     remember { prefs.seedDefaultTemplates() }
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
         ComposeAssistRow(getBody = getBody, setBody = setBody)
-        Row(
+        FlowRow(
             Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically,
+            verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
             TemplatePickerChip(
                 prefs = prefs,
@@ -467,7 +468,7 @@ fun MailComposeTools(getBody: () -> String, setBody: (String) -> Unit) {
                     setBody(if (current.isBlank()) text else current + "\n\n" + text)
                 },
             )
-            Text("Assist runs fully on-device", fontSize = 11.sp)
+            Text("Assist runs fully on-device", fontSize = 11.sp, color = LocalPalette.current.textSecondary)
         }
     }
 }
