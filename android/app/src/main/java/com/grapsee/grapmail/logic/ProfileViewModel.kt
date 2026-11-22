@@ -174,6 +174,7 @@ class ProfileViewModel @JvmOverloads constructor(
                 .onSuccess { resp ->
                     val fresh = resp.profile
                     if (fresh != null) profileLoadedAt = android.os.SystemClock.elapsedRealtime()
+                    com.grapsee.grapmail.data.MailDisplayPrefs.apply(getApplication(), fresh?.settings)
                     if (fresh != null && fresh.avatarUrl != state.value.profile?.avatarUrl) {
                         avatarLoad?.cancel()
                         avatarLoad = null
@@ -270,6 +271,7 @@ class ProfileViewModel @JvmOverloads constructor(
             runCatching { Api.patchProfile(t, patch) }
                 .onSuccess { resp ->
                     if (resp.profile != null) profileLoadedAt = android.os.SystemClock.elapsedRealtime()
+                    com.grapsee.grapmail.data.MailDisplayPrefs.apply(getApplication(), resp.profile?.settings)
                     _state.update {
                         it.copy(
                             busy = false,

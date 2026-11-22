@@ -298,6 +298,14 @@ shot 06-step5-terms-light
 # the gate opened by reaching the next screen.
 must_tap_low "Create Account" $((SH / 2))
 sleep 6
+# The optional recovery-email step now follows account creation. The walk does
+# not add one (it would send a real code to a real mailbox), so it skips it.
+if [ -n "$(find_nodes "n.get('text','')=='Skip for now'" | head -1)" ]; then
+  echo "  · recovery email step — skipped"
+  shot 07b-recovery-email-light
+  must_tap "Skip for now"
+  sleep 3
+fi
 if wait_nodes "n.get('text','')==\"You're all set!\"" >/dev/null; then
   echo "  ✓ terms gate opened on real scroll (account created for real)"
 else

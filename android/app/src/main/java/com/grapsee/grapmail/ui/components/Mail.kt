@@ -314,10 +314,14 @@ fun SenderAvatar(display: String, address: String?, size: Dp = 40.dp, modifier: 
  */
 fun mailTime(iso: String?, now: Date = Date()): String? {
     if (iso.isNullOrBlank()) return null
-    val zone = ZoneId.systemDefault()
+    // Mail settings → time zone and date format, when the account chose them;
+    // the device's own otherwise. Read as snapshot state, so a row redraws the
+    // moment either changes.
+    val zone = com.grapsee.grapmail.data.MailDisplayPrefs.zone()
+    val dateFormat = com.grapsee.grapmail.data.MailDisplayPrefs.dateFormat
     val locale = Locale.getDefault(Locale.Category.FORMAT)
     val today = now.toInstant().atZone(zone).toLocalDate()
-    val cacheKey = "${zone.id}|${locale.toLanguageTag()}|$today|$iso"
+    val cacheKey = "${zone.id}|${locale.toLanguageTag()}|$dateFormat|$today|$iso"
     formattedMailTimes.get(cacheKey)?.let { return it }
 
     val then = parseMailInstant(iso)?.atZone(zone) ?: return null
@@ -325,8 +329,8 @@ fun mailTime(iso: String?, now: Date = Date()): String? {
     val formatted = when {
         date == today -> shortMailTime.withLocale(locale).format(then)
         date == today.minusDays(1) -> "Yesterday"
-        date.year == today.year -> shortMailDate.withLocale(locale).format(then)
-        else -> olderMailDate.withLocale(locale).format(then)
+        date.year == today.year -> sameYearDate(dateFormat).withLocale(locale).format(then)
+        else -> olderDate(dateFormat).withLocale(locale).format(then)
     }
     formattedMailTimes.put(cacheKey, formatted)
     return formatted
@@ -338,10 +342,35 @@ private val olderMailDate = DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM
 private val shortMailDate = DateTimeFormatter.ofPattern("MMM d")
 private val fullMailDate = DateTimeFormatter.ofLocalizedDateTime(FormatStyle.MEDIUM, FormatStyle.SHORT)
 
+// The three orders Mail settings offers, matching its own examples
+// ("25/10/26", "10/25/26", "2026-10-25") and the website's list.
+private val dmyShort = DateTimeFormatter.ofPattern("d MMM")
+private val ymdShort = DateTimeFormatter.ofPattern("MM-dd")
+private val dmyOlder = DateTimeFormatter.ofPattern("dd/MM/yy")
+private val mdyOlder = DateTimeFormatter.ofPattern("MM/dd/yy")
+private val ymdOlder = DateTimeFormatter.ofPattern("yyyy-MM-dd")
+
+private fun sameYearDate(format: String): DateTimeFormatter = when (format) {
+    "dmy" -> dmyShort
+    "ymd" -> ymdShort
+    else -> shortMailDate
+}
+
+private fun olderDate(format: String): DateTimeFormatter = when (format) {
+    "dmy" -> dmyOlder
+    "mdy" -> mdyOlder
+    "ymd" -> ymdOlder
+    else -> olderMailDate
+}
+
 fun absoluteDateTimeOrRaw(iso: String): String {
     val instant = parseMailInstant(iso) ?: return iso
-    return fullMailDate.withLocale(Locale.getDefault(Locale.Category.FORMAT))
-        .withZone(ZoneId.systemDefault()).format(instant)
+    val locale = Locale.getDefault(Locale.Category.FORMAT)
+    val zone = com.grapsee.grapmail.data.MailDisplayPrefs.zone()
+    val format = com.grapsee.grapmail.data.MailDisplayPrefs.dateFormat
+    if (format.isEmpty()) return fullMailDate.withLocale(locale).withZone(zone).format(instant)
+    val at = instant.atZone(zone)
+    return olderDate(format).withLocale(locale).format(at) + ", " + shortMailTime.withLocale(locale).format(at)
 }
 
 // ── the row ──────────────────────────────────────────────────────────────────
@@ -365,6 +394,7 @@ fun MessageRow(
     modifier: Modifier = Modifier,
 ) {
     val palette = LocalPalette.current
+    val compact = com.grapsee.grapmail.data.MailDisplayPrefs.compact
     Row(
         modifier
             .fillMaxWidth()
@@ -372,7 +402,9 @@ fun MessageRow(
                 onClick = { if (selecting) onSelect() else onOpen() },
                 onLongClick = onSelect,
             )
-            .padding(horizontal = 16.dp, vertical = 12.dp),
+            // Mail settings → list density. Compact trims the row and drops the
+            // preview line, so more messages fit on a screen.
+            .padding(horizontal = 16.dp, vertical = if (compact) 7.dp else 12.dp),
         verticalAlignment = Alignment.Top,
     ) {
         // Selection checkbox or nothing — the unread dot moved to the time
@@ -420,7 +452,7 @@ fun MessageRow(
                 modifier = Modifier.padding(top = 2.dp),
             )
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 2.dp)) {
-                if (!message.snippet.isNullOrBlank()) {
+                if (!compact && !message.snippet.isNullOrBlank()) {
                     Text(
                         message.snippet!!,
                         fontSize = 13.sp,

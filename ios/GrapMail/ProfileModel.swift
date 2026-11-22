@@ -208,6 +208,7 @@ final class ProfileModel: ObservableObject {
                     }
                     updated.profile = fresh
                     self.profileLoadedAt = ProcessInfo.processInfo.systemUptime
+                    MailDisplay.shared.apply(fresh.settings)
                 }
                 updated.loading = false
                 updated.fatal = updated.profile == nil ? "The account record is unavailable." : nil
@@ -296,6 +297,7 @@ final class ProfileModel: ObservableObject {
                 state.busy = false
                 state.profile = resp.profile ?? state.profile
                 if resp.profile != nil { profileLoadedAt = ProcessInfo.processInfo.systemUptime }
+                MailDisplay.shared.apply(resp.profile?.settings)
                 let text = resp.message?.trimmingCharacters(in: .whitespacesAndNewlines)
                 state.note = (text?.isEmpty == false) ? text! : label
                 state.noteIsBad = false
@@ -327,10 +329,14 @@ final class ProfileModel: ObservableObject {
             // changed, exactly as Android does.
             settings["locale"] = obj
         }
-        // vacation and forwarding are DELIBERATELY absent from the patch type:
-        // the sieve interpreter supports the actions but no code turns these
-        // settings into rules, so the switches do not appear and nothing here
-        // writes a value no pipeline reads.
+        // Auto-reply and forwarding are enforced on delivery by the backend
+        // (lib/mail-automation.ts reads users.settings for every inbound message).
+        for (key, value) in [("vacation", patch.vacation.flatMap { try? ApiClient.encoder.encode($0) }),
+                             ("forwarding", patch.forwarding.flatMap { try? ApiClient.encoder.encode($0) })] {
+            if let data = value, let obj = try? JSONSerialization.jsonObject(with: data) {
+                settings[key] = obj
+            }
+        }
         save(label: "Saved.", settings: settings)
     }
 

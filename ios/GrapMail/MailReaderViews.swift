@@ -353,7 +353,8 @@ private struct ThreadMessageCard: View {
     /// The images the sender's HTML part points at, and whether this message has
     /// asked for them. Both belong to the message, and the card is rebuilt per
     /// message -- an opt-in given for one mail must not travel to the next.
-    @State private var shownImages = false
+    // Settings → Load remote images: on loads them as the message opens.
+    @State private var shownImages = MailFeaturePrefs.shared.allowRemoteImages
     private var showsBody: Bool { expanded }
     @State private var detailsError: String?
     @State private var detailsAttempt = 0

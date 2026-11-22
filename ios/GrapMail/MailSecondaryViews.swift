@@ -747,7 +747,7 @@ struct MailSettingsView: View {
                     SettingRow(icon: "tag", title: "Labels",
                                value: "Filters for the inbox", onClick: onLabels)
                     SettingRow(icon: "envelope", title: "Mail settings",
-                               value: "Signature, density, language, senders", onClick: onPrefs)
+                               value: "Signature, auto-reply, forwarding, dates, senders", onClick: onPrefs)
                     SettingRow(icon: "person.badge.plus", title: "Addresses",
                                value: "Primary and aliases", onClick: onAddresses)
                     SettingRow(icon: "person", title: "Connected accounts",

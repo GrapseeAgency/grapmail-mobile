@@ -505,6 +505,9 @@ private fun apiErrorMessage(status: Int, code: String?): String = when (code) {
     val notes: List<String>? = null,
     val tasks: List<String>? = null,
     val locale: LocaleDto? = null,
+    /** Sent whole: the server checks the switch, the window and the message together. */
+    val vacation: VacationDto? = null,
+    val forwarding: ForwardingDto? = null,
 )
 
 /**
@@ -539,8 +542,8 @@ private fun apiErrorMessage(status: Int, code: String?): String = when (code) {
  */
 @Serializable data class ProfileSettingsDto(
     val signature: String = "",
-    /** `comfortable` or `compact` — the list's row height, which the app applies,
-     *  not merely stores. Anything else is read back as comfortable. */
+    /** `comfortable` or `compact` — the list's row height. Applied by the mailbox
+     *  list through MailDisplayPrefs. Anything else is read back as comfortable. */
     val density: String = "comfortable",
     /** Per-address signatures, keyed by the full alias address (`:74`). */
     val signatures: Map<String, String> = emptyMap(),
@@ -578,9 +581,10 @@ private fun apiErrorMessage(status: Int, code: String?): String = when (code) {
  */
 @Serializable data class LocaleDto(
     val language: String = "en-US",
-    val timezone: String = "Asia/Dhaka",
-    /** `dmy`, `mdy` or `ymd`. */
-    val dateFormat: String = "dmy",
+    /** An IANA zone, or empty for this device's own zone. */
+    val timezone: String = "",
+    /** `dmy`, `mdy` or `ymd`, or empty to follow this device's locale. */
+    val dateFormat: String = "",
 )
 
 /**

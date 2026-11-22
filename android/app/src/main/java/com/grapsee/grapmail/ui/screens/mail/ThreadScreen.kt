@@ -422,7 +422,12 @@ private fun ThreadMessageCard(
     // The images the sender's HTML part points at, and whether this message has
     // asked for them. Both belong to the message: stepping from here must not
     // carry an opt-in that was given for somebody else's mail.
-    var shownImages by androidx.compose.runtime.remember(message.id) { mutableStateOf(false) }
+    // Settings → Tracker shield. On (the default) holds remote images until the
+    // person asks; off loads them as the message opens.
+    val imagesByDefault = !com.grapsee.grapmail.logic.MailFeaturePrefs(
+        androidx.compose.ui.platform.LocalContext.current,
+    ).trackerShieldEnabled
+    var shownImages by androidx.compose.runtime.remember(message.id) { mutableStateOf(imagesByDefault) }
     // The formatted body is fetched when the card composes and again when the
     // images gate is answered — the two variants are different renders, and
     // the model memoises both per message.

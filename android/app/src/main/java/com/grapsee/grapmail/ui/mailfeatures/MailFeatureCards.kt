@@ -438,7 +438,7 @@ fun FollowUpBanner(count: Int, onOpen: () -> Unit, modifier: Modifier = Modifier
 @Composable
 fun ReadReceiptChip(sent: Boolean, modifier: Modifier = Modifier) {
     Text(
-        if (sent) "Receipt noted on this device" else "Read receipt on",
+        if (sent) "Opened · noted on this device" else "Opened-mail markers on",
         fontSize = 11.sp,
         modifier = modifier,
     )
@@ -450,7 +450,8 @@ fun MailComposeTools(getBody: () -> String, setBody: (String) -> Unit) {
     val prefs = remember { MailFeaturePrefs(context) }
     remember { prefs.seedDefaultTemplates() }
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        ComposeAssistRow(getBody = getBody, setBody = setBody)
+        // On-device suggestions belong to the same switch as summaries.
+        if (prefs.smartFeaturesEnabled) ComposeAssistRow(getBody = getBody, setBody = setBody)
         Row(
             Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -502,7 +503,7 @@ fun MailFeatureSettingsSection() {
         }
         MailFeatureSwitchRow(
             "Tracker shield",
-            "Strip tracking pixels and remote images before display",
+            "Hold remote images and tracking pixels until you tap Show images. Off loads them automatically.",
             shield,
         ) {
             shield = it
@@ -517,8 +518,8 @@ fun MailFeatureSettingsSection() {
             prefs.qrWarningsEnabled = it
         }
         MailFeatureSwitchRow(
-            "Read receipts",
-            "Keep receipt acknowledgements on this device",
+            "Opened-mail markers",
+            "Mark messages you've opened, on this device only. Nothing is sent to the sender.",
             receipts,
         ) {
             receipts = it
@@ -593,7 +594,8 @@ fun MailSmartPanel(message: MailMessageFullDto?, messages: List<MailMessageFullD
         initialValue = null, messages.size, message.id,
     ) {
         value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
-            if (messages.size >= 3) {
+            // Settings → On-device intelligence: off means no summary.
+            if (messages.size >= 3 && prefs.smartFeaturesEnabled) {
                 ThreadSummarizer.summarize(
                     messages.map { m ->
                         ThreadMessageText(
@@ -610,13 +612,16 @@ fun MailSmartPanel(message: MailMessageFullDto?, messages: List<MailMessageFullD
         initialValue = null, message.id,
     ) {
         value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
-            ActionCardExtractor.extract(message.subject.orEmpty(), message.bodyText.orEmpty())
+            if (!prefs.smartFeaturesEnabled) emptyList()
+            else ActionCardExtractor.extract(message.subject.orEmpty(), message.bodyText.orEmpty())
         }
     }
     val verdicts by androidx.compose.runtime.produceState<List<com.grapsee.grapmail.features.UrlVerdict>?>(
         initialValue = null, message.id,
     ) {
         value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+            // Settings → QR & link warnings: off means no link review.
+            if (!prefs.qrWarningsEnabled) return@withContext emptyList<com.grapsee.grapmail.features.UrlVerdict>()
             Regex("https?://[^\\s<>\"']+")
                 .findAll(message.bodyText.orEmpty())
                 .map { m -> UrlSafety.analyze(m.value) }

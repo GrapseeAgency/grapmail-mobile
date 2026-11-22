@@ -217,6 +217,27 @@ fun MailboxScreen(
     var showSenderSheet by remember { mutableStateOf(false) }
     var searchDraft by remember(state.box) { mutableStateOf(state.query) }
     var selectedCategory by remember(state.box) { mutableStateOf<String?>(null) }
+    // Settings → Privacy & intelligence → On-device intelligence. Re-read when
+    // this screen resumes, so switching it off in Settings takes effect on the
+    // way back, and a hidden category filter cannot keep narrowing the list.
+    val smartCtx = androidx.compose.ui.platform.LocalContext.current
+    var smartOn by remember { mutableStateOf(com.grapsee.grapmail.logic.MailFeaturePrefs(smartCtx).smartFeaturesEnabled) }
+    val smartLifecycle = androidx.compose.ui.platform.LocalLifecycleOwner.current
+    androidx.compose.runtime.DisposableEffect(smartLifecycle) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
+                smartOn = com.grapsee.grapmail.logic.MailFeaturePrefs(smartCtx).smartFeaturesEnabled
+            }
+        }
+        smartLifecycle.lifecycle.addObserver(observer)
+        onDispose { smartLifecycle.lifecycle.removeObserver(observer) }
+    }
+    LaunchedEffect(smartOn) { if (!smartOn) selectedCategory = null }
+    // Mail settings → density, date format and time zone, applied to the rows
+    // below. The saved copy draws the first frame; the account is re-read once
+    // so a change made on the website shows up here too.
+    remember { com.grapsee.grapmail.data.MailDisplayPrefs.ensureLoaded(smartCtx) }
+    LaunchedEffect(Unit) { com.grapsee.grapmail.data.MailDisplayPrefs.refresh(smartCtx) }
     var showFollowUps by remember { mutableStateOf(false) }
 
     LaunchedEffect(searchDraft) {
@@ -425,7 +446,7 @@ fun MailboxScreen(
                         fontWeight = FontWeight.Medium,
                     )
                     BoxTabRow(state.box, drawerCounts(state), vm::open)
-                    if (state.box == com.grapsee.grapmail.data.MailBox.Inbox) {
+                    if (state.box == com.grapsee.grapmail.data.MailBox.Inbox && smartOn) {
                         // F07 split inbox: the categories are read here, on the
                         // device, from each row's sender and subject — and the
                         // chips only ever filter what the list already holds.
@@ -448,7 +469,9 @@ fun MailboxScreen(
                 var followUpCount by remember { androidx.compose.runtime.mutableIntStateOf(0) }
                 suspend fun recountFollowUps(): Int =
                     kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-                        followUpPrefs.overdueAwaitingReplies(followUpPrefs.followUpDays).size
+                        // Settings → Follow-up reminders: off means no banner.
+                        if (!followUpPrefs.followUpsEnabled) 0
+                        else followUpPrefs.overdueAwaitingReplies(followUpPrefs.followUpDays).size
                     }
                 androidx.compose.runtime.LaunchedEffect(followUpPrefs.followUpDays, showFollowUps) {
                     followUpCount = recountFollowUps()
