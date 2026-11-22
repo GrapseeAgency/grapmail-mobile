@@ -592,7 +592,7 @@ private fun FieldRow(
     trailing: (@Composable () -> Unit)? = null,
 ) {
     val palette = LocalPalette.current
-    val stackedLabel = LocalDensity.current.fontScale > 1.3f
+    val stackedLabel = LocalDensity.current.fontScale >= 1.2f
     Column(Modifier.fillMaxWidth().padding(vertical = 12.dp)) {
         if (stackedLabel) {
             Text(label, fontSize = 14.sp, color = palette.textSecondary)
