@@ -330,7 +330,7 @@ fun MailSnapshotScreen(name: String) {
                 onScreener = {}, onLabels = {}, onNotes = {}, onTasks = {}, onPrefs = {},
                 onAddresses = {}, onConnections = {}, onSubscriptions = {}, onProfile = {},
                 onPrivacy = {},
-                onEncryption = {}, onHelp = {}, onSignOut = {})
+                onEncryption = {}, onNotificationPrefs = {}, onHelp = {}, onSignOut = {})
             "mail-notes" -> NotesScreen(profileVm, onBack = {})
             "mail-tasks" -> TasksScreen(profileVm, onBack = {})
             "mail-settings-prefs" -> MailPrefsScreen(profileVm, onBack = {})

@@ -209,3 +209,69 @@ No new permission: the platform's push needs none beyond
 `android.permission.POST_NOTIFICATIONS`, which the app already asks for on
 its settings row, and both producers of the `grapmail-new-mail` channel check
 that grant before posting.
+
+## Device security: trusted devices, security events, and recovery
+
+The device-security slice (backend migrations 0040-0043) adds four surfaces the
+apps now call. The server holds only PUBLIC halves of device keys; nothing in
+this section sends a hardware identifier, a serial number, or an IMEI anywhere.
+
+### Device identity keys (`security/DeviceKeyManager.kt`, `DeviceKeyManager.swift`)
+
+| Platform | Key | Backing | Signature | Wire name |
+| --- | --- | --- | --- | --- |
+| iOS | Curve25519 (Ed25519), raw 32-byte key in the Keychain (`grapmail.device-key`, `AfterFirstUnlockThisDeviceOnly`) | CryptoKit | signs the raw nonce bytes, no pre-hash | `ed25519` |
+| Android | EC P-256 in AndroidKeyStore (`grapmail.device-key`, hardware/TEE-backed, `SHA256withECDSA`) | Keystore | signs the raw nonce bytes with SHA-256/ECDSA, DER-encoded | `es256` |
+
+Both export the public half as base64 SPKI DER, which is what the server stores
+and verifies. The private half never leaves the platform key store.
+
+### Enrollment (`security/TrustedDeviceManager.kt`, `.swift`)
+
+Enroll-once after sign-in: `POST /grapsee/auth/devices/enroll`
+`{installationId, platform, publicKey, displayName, keyAlgorithm}`. The ledger
+is per account email; the server upserts on (user, installation id), so a
+re-enroll refreshes the key, and revoking this device's own row re-arms the
+offer. A refusal never blocks sign-in.
+
+### Security events and alerts
+
+- Read: `GET /grapsee/auth/security/events`, acknowledge:
+  `POST /grapsee/auth/security/events/:id/ack` (single-use, "This was me").
+- Push: a server security event fans out to every OTHER device with a live
+  session. The payload is metadata only (`type: "security.alert"`, `eventId`,
+  `eventType`, `action`, `occurredAt`, `canAcknowledge`); no raw IP, no risk
+  internals. Android routes it to the `grapmail-security` channel
+  (IMPORTANCE_HIGH) with "This was me" / "Secure account" actions; iOS uses the
+  `grapmail.security` category with the same two actions, and the security
+  payload short-circuits the mail-poll wake. Security alerts are mandatory and
+  never suppressed by quiet hours; informational ones respect preferences.
+
+### Notification preferences (`GET`/`PATCH /grapsee/grapmail/push/notification-prefs`)
+
+Scopes: `mail`, `security`, `account`; a per-device row overrides the
+account-wide row. Quiet hours (minutes-from-midnight + the device's UTC offset,
+mail only) are enforced server-side at claim time; security alerts bypass them.
+The apps write `deviceKey: "account"` and `eventType: ""` for scope rows.
+
+### Recovery without a phone
+
+- Trusted device: `POST /grapsee/auth/recovery/device/challenge` returns a
+  nonce; the device signs it with its key;
+  `POST /grapsee/auth/recovery/device/verify` returns a one-time grant;
+  `POST /grapsee/auth/recovery/password/reset-with-grant` resets the password,
+  closes every session and retires every push registration.
+- All devices lost: `POST /grapsee/auth/recovery/password/reset-with-code`
+  consumes a single-use recovery code
+  (`POST /grapsee/auth/recovery/codes/generate`, displayed once, stored server-side
+  only as a hash).
+- The reset paths are rate-limited, cooldown-gated after recent resets, and
+  answer identical refusals for unknown identifiers.
+
+### Passkeys (server live, clients pending)
+
+The backend mounts the full WebAuthn surface (`/grapsee/auth/passkeys/*`,
+usernameless discoverable sign-in, session-backed tokens, clone tripwire on
+the signature counter). The native clients do not call it yet: platform
+passkey APIs (Android Credential Manager, `ASAuthorization` on iOS) are the
+remaining client work, and this file will be updated when it lands.

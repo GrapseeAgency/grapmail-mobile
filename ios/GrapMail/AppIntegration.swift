@@ -518,6 +518,79 @@ final class NotificationRegistration {
     }
 }
 
+// ── security alerts ─────────────────────────────────────────────────────────
+
+/// The APNs surface for account-security alerts. The backend sends them as
+/// mail pushes are sent, with two differences the app routes on: the payload's
+/// top-level custom key `type` reads "security.alert", and `aps.category` reads
+/// "grapmail.security" — the category the OS renders the two action buttons
+/// from. The alert text itself is the server's; this app adds only the answers
+/// the buttons promise: "This was me" acknowledges the event in the background,
+/// and "Secure account" (or a plain tap on the banner) deep links into the
+/// security hub. Mail notification behavior above is deliberately untouched:
+/// a security alert carries no messageId, so it never reaches the mail paths.
+enum SecurityPush {
+    static let category = "grapmail.security"
+    static let payloadType = "security.alert"
+    static let ackAction = "ack"
+    static let secureAction = "secure"
+
+    /// The payload's own discriminator. Not the category: a notification the
+    /// app re-renders locally would carry a category but no custom `type`, and
+    /// this must be true only of what the backend actually sent.
+    static func isSecurityAlert(_ userInfo: [AnyHashable: Any]) -> Bool {
+        (userInfo["type"] as? String) == payloadType
+    }
+
+    /// One category with the two actions the alert offers. "This was me" runs
+    /// in the background (no app launch); "Secure account" brings the app
+    /// forward, which is the point — securing the account happens in it.
+    static var registeredCategory: UNNotificationCategory {
+        UNNotificationCategory(identifier: category, actions: [
+            UNNotificationAction(identifier: ackAction, title: "This was me"),
+            UNNotificationAction(identifier: secureAction, title: "Secure account", options: [.foreground]),
+        ], intentIdentifiers: [], options: [])
+    }
+
+    /// A security alert's response, whichever button (or tap) produced it.
+    static func handle(response: UNNotificationResponse, completion: @escaping () -> Void) {
+        let info = response.notification.request.content.userInfo
+        let eventId = (info["eventId"] as? String) ?? ""
+        let action = response.actionIdentifier
+        if action == ackAction {
+            Task {
+                defer { completion() }
+                await acknowledge(eventId: eventId)
+            }
+            return
+        }
+        if action == secureAction || action == UNNotificationDefaultActionIdentifier {
+            // Same door as a mail push: the notification posts, the signed-in
+            // stack consumes it. The hub refetches on entry, so no event data
+            // needs to ride along.
+            DispatchQueue.main.async {
+                NotificationCenter.default.post(name: .gmOpenAccountSecurity, object: nil)
+            }
+            completion()
+            return
+        }
+        completion()
+    }
+
+    /// "This was me": a write against the stored session, refreshed through
+    /// the same bearer path push registration uses, so a stale token does not
+    /// turn an honest acknowledgement into a silent failure. A refused ack
+    /// (already acknowledged, event gone) stays quiet — the write is the goal,
+    /// and there is no screen to report to from a notification action.
+    static func acknowledge(eventId: String) async {
+        guard !eventId.isEmpty else { return }
+        guard let address = SessionStore.address, let token = await ApiClient.pushBearer(for: address) else { return }
+        let generation = SessionStore.generation
+        guard generation == SessionStore.generation else { return }
+        _ = try? await ApiClient.acknowledgeSecurityEvent(token: token, id: eventId)
+    }
+}
+
 // ── the app delegate ────────────────────────────────────────────────────────
 
 /// The UIKit hooks SwiftUI's `App` lifecycle does not expose: background task
@@ -544,7 +617,13 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
                                               textInputButtonTitle: "Send", textInputPlaceholder: "Reply…"),
                 UNNotificationAction(identifier: "reply", title: "Reply in app", options: [.foreground]),
                 UNNotificationAction(identifier: "more", title: "More", options: [.foreground]),
-            ], intentIdentifiers: [], options: [])
+            ], intentIdentifiers: [], options: []),
+            // Security alerts are their own category: the OS renders "This was
+            // me" / "Secure account" from it, and the response handler below
+            // routes by it. setNotificationCategories REPLACES the set, so both
+            // categories live in this one call — registering the security one
+            // separately would wipe the mail actions.
+            SecurityPush.registeredCategory,
         ])
         BGTaskScheduler.shared.register(forTaskWithIdentifier: MailPoll.refreshIdentifier, using: .main) { task in
             guard let refresh = task as? BGAppRefreshTask else { task.setTaskCompleted(success: false); return }
@@ -558,6 +637,9 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
             refresh.expirationHandler = { work.cancel() }
         }
         Task { await NotificationRegistration.shared.reconcile() }
+        // Trusted-device enrollment rides the same session-change signal the
+        // push registration does: once per (account, install), after sign-in.
+        TrustedDeviceManager.shared.observeSessions()
         // save() posts .gmSessionChanged: a fresh sign-in re-registers so the
         // push token attaches to the account that just signed in, not to the
         // previous one. Restore-at-launch is covered by the reconcile above.
@@ -594,6 +676,15 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
     func application(_ application: UIApplication,
                      didReceiveRemoteNotification userInfo: [AnyHashable: Any],
                      fetchCompletionHandler completionHandler: @escaping (UIBackgroundFetchResult) -> Void) {
+        // A security alert is not mail: APNs has already presented it, the app
+        // holds nothing to cache for it, and the mail baseline must not move
+        // because of it. The wake carries no work — complete without touching
+        // the poll so the unread count cannot be "refreshed" into announcing
+        // mail nobody received a notification for.
+        if SecurityPush.isSecurityAlert(userInfo) {
+            completionHandler(.newData)
+            return
+        }
         // An alert has already been presented by APNs. Refresh the mailbox
         // baseline in that case so the same arrival does not alert twice.
         let hasAlert = (userInfo["aps"] as? [String: Any])?["alert"] != nil
@@ -632,6 +723,13 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
                                 withCompletionHandler completionHandler: @escaping () -> Void) {
         let request = response.notification.request
         let info = request.content.userInfo
+        // Security alerts route by their own category before the mail guard:
+        // the payload carries no mailbox or messageId, so the mail path would
+        // drop it silently and both buttons would do nothing.
+        if request.content.categoryIdentifier == SecurityPush.category || SecurityPush.isSecurityAlert(info) {
+            SecurityPush.handle(response: response) { completionHandler() }
+            return
+        }
         let isRemote = request.trigger is UNPushNotificationTrigger
         let accountKey = isRemote ? "mailbox" : "account"
         guard isRemote || request.content.categoryIdentifier == MailPoll.actionCategory,

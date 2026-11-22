@@ -31,6 +31,15 @@ class AccountFlowViewModel : ViewModel() {
         val maskedPhone: String? = null,
         /** The 6-digit code, proven when the password screen submits. */
         val code: String = "",
+        /**
+         * The trusted-device grant, minted when THIS device signed the
+         * forgot-password challenge and the server accepted the signature.
+         * Spent by reset-with-grant. Held here — memory only, dead with the
+         * flow — for the same reason the password and the code are: a
+         * recovery credential in a saved route argument is a credential on
+         * disk.
+         */
+        val recoveryGrant: String? = null,
         /** Address the backend reported after a completed reset. */
         val resetAddress: String? = null,
         val foundAddress: String? = null,
@@ -48,7 +57,15 @@ class AccountFlowViewModel : ViewModel() {
     val state: StateFlow<State> = _state.asStateFlow()
 
     fun clearSignIn() {
-        update { copy(password = "", code = "", challengeId = null, emailOtpAddress = null, expiresAt = 0L) }
+        update {
+            copy(
+                password = "", code = "", challengeId = null,
+                emailOtpAddress = null, expiresAt = 0L,
+                // A grant survives only until it is spent or the flow changes
+                // course; a sign-in that restarts the flow must not inherit one.
+                recoveryGrant = null,
+            )
+        }
     }
 
     fun update(block: State.() -> State) {

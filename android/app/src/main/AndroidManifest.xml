@@ -84,6 +84,16 @@
             android:exported="false" />
 
         <!--
+            The security alert's "This was me": acknowledges the event the
+            notification is about through the authenticated endpoint, then
+            dismisses that notification. Non-exported, explicit intent only —
+            nothing else may ack an account's security events.
+        -->
+        <receiver
+            android:name=".logic.SecurityNotificationActionReceiver"
+            android:exported="false" />
+
+        <!--
             The home-screen unread widget. A launcher host binds this receiver
             to draw the app's own last read (see MailWidgetState) — the widget
             never fetches; it shows what a real read already found.

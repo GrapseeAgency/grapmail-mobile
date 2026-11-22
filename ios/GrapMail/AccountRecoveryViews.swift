@@ -27,6 +27,11 @@ struct ForgotPasswordView: View {
     let onNeedsManualReview: () -> Void
     let onFindAddress: () -> Void
     let onSupport: () -> Void
+    /// The trusted-device path: this install holds an enrolled Ed25519 key the
+    /// account can verify, so a signature can stand in for the texted code.
+    /// Only offered when a key exists (DeviceKeyManager.hasKey) — offering it
+    /// from a device that never enrolled would route into a refusal.
+    let onTrustedDevice: () -> Void
 
     @State private var identifier = ""
     @State private var error: String?
@@ -69,6 +74,21 @@ struct ForgotPasswordView: View {
                     Spacer()
                 }
                 .padding(.top, 8)
+                // The device that signed in has a key the account enrolled:
+                // offer the path that needs no code at all. The typed address
+                // rides along in the model, so the verification screen does
+                // not ask for it a second time.
+                if DeviceKeyManager.hasKey() {
+                    HStack {
+                        Spacer()
+                        AccountLink(title: "Use a trusted device instead", action: {
+                            model.identifier = identifier.trimmingCharacters(in: .whitespaces)
+                            onTrustedDevice()
+                        })
+                        Spacer()
+                    }
+                    .padding(.top, 4)
+                }
                 FooterNote(
                     text: "Need help? Contact our support team.",
                     linkText: "support team",

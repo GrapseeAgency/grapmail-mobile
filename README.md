@@ -109,6 +109,46 @@ build on a Mac before it goes to a device.
 Everything hits the **real API** at `https://grapsee.com/api` — no mocks, no
 stubs, no fake data anywhere.
 
+## Device security sector — trusted devices, recovery codes, security alerts
+
+The device-security slice lands on both platforms behind the same hub:
+
+- **Trusted Devices** — the device list with platform, last-seen and revocation
+  (revoking the held device re-arms the "Trust this device" offer). Backed by
+  `security/DeviceKeyManager.kt` / `DeviceKeyManager.swift`: an EC P-256 key in
+  AndroidKeyStore (`es256`, SHA256withECDSA) and a Curve25519 key in the iOS
+  Keychain (`ed25519`, raw signing). The server stores public halves only;
+  nothing here sends IMEIs, serials or hardware inventories — the identity is
+  the app-scoped installation id (`x-device-id`), disclosed and revocable.
+- **Recovery Codes** — generate, copy-all, saved-confirmation gate; ten codes,
+  single-use, stored server-side only as SHA-256 hashes. These are the
+  all-devices-lost path (`/auth/recovery/password/reset-with-code`), distinct
+  from the 2FA backup codes.
+- **Trusted-device recovery** — on the forgot-password screen, "Use a trusted
+  device instead": challenge nonce signed by the device key, verified server-side
+  into a one-time grant, then the reset form posts the grant. The option appears
+  only when this installation holds a device key.
+- **Notification Preferences** — mail/account/security scopes with server-side
+  quiet hours for mail (minutes-from-midnight plus the device's UTC offset);
+  security alerts are mandatory and render as "Always delivered".
+- **Security-alert push** — a `security.alert` payload wakes its own
+  high-importance channel on Android (`grapmail-security`) and its own APNs
+  category on iOS (`grapmail.security`), each with "This was me" (acknowledge,
+  single-use) and "Secure account" (deep link) actions. The payload carries
+  metadata only.
+
+Endpoints this batch added (all exercised on both platforms via the shared
+contract suite server-side): `GET/POST /auth/devices(/...)`,
+`GET/POST /auth/security/events(...)`,
+`POST /auth/recovery/device/challenge|verify`,
+`POST /auth/recovery/password/reset-with-grant|reset-with-code`,
+`GET/POST /auth/recovery/codes/...`,
+`GET/PATCH /grapmail/push/notification-prefs`.
+
+Passkeys: the server surface is live (`/auth/passkeys/*`); the native clients
+call it in a later batch via the platform credential APIs. See DATA-FLOW.md
+for the full contract.
+
 > **Sign-in moved to the gateway (2026-11-08).** The app used to sign in against
 > the website's JSONL store (`/api/auth/account/*`), whose `st1` session ids the
 > mailbox gateway does not verify — the two stores shared no users, so a token

@@ -13,5 +13,11 @@
         GrapMail has no push service, so these come from the app asking the
         server itself, when the system wakes it.
     </string>
+    <string name="notif_channel_security">Security alerts</string>
+    <string name="notif_channel_security_desc">
+        Tells you the moment something happens to your account: a sign-in from
+        a new device, a password change, a trusted-device change. These are
+        never silenced by quiet hours.
+    </string>
     <string name="widget_description">Unread mail at a glance: counts from GrapMail background checks</string>
 </resources>

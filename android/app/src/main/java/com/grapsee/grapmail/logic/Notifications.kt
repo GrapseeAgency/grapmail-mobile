@@ -54,14 +54,24 @@ import kotlinx.coroutines.withTimeoutOrNull
  */
 object Notifications {
     const val CHANNEL_NEW_MAIL = "grapmail-new-mail"
-    private const val NOTIFICATION_ID = 4200
 
-    /** Create the channel. Idempotent — the system ignores a repeat with the
+    /**
+     * The security channel, distinct from the mail one on purpose: a stranger
+     * signing in is not a message waiting, and the channel's IMPORTANCE_HIGH
+     * is what lets it break through while a person has mail alerts muted.
+     * Quiet hours never apply to this channel — the notification-prefs screen
+     * says the same thing on its security row.
+     */
+    const val CHANNEL_SECURITY = "grapmail-security"
+    private const val NOTIFICATION_ID = 4200
+    private const val SECURITY_NOTIFICATION_ID = 4300
+
+    /** Create the channels. Idempotent — the system ignores a repeat with the
      *  same id, so this is safe from every entry point that could need it. */
     fun ensureChannel(context: Context) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
         val manager = context.getSystemService(NotificationManager::class.java) ?: return
-        val channel = NotificationChannel(
+        val mail = NotificationChannel(
             CHANNEL_NEW_MAIL,
             context.getString(R.string.notif_channel_new_mail),
             NotificationManager.IMPORTANCE_DEFAULT,
@@ -72,7 +82,16 @@ object Notifications {
             // contradictory tally of the same thing.
             setShowBadge(false)
         }
-        manager.createNotificationChannel(channel)
+        val security = NotificationChannel(
+            CHANNEL_SECURITY,
+            context.getString(R.string.notif_channel_security),
+            NotificationManager.IMPORTANCE_HIGH,
+        ).apply {
+            description = context.getString(R.string.notif_channel_security_desc)
+            setShowBadge(false)
+        }
+        manager.createNotificationChannel(mail)
+        manager.createNotificationChannel(security)
     }
 
     /** Whether the person has allowed alerts. Android 13 made this runtime, and
@@ -212,6 +231,99 @@ object Notifications {
         NotificationManagerCompat.from(context).cancel(id, NOTIFICATION_ID)
     }
 
+    fun dismissSecurity(context: Context, eventId: String) {
+        NotificationManagerCompat.from(context).cancel(eventId, SECURITY_NOTIFICATION_ID)
+    }
+
+    // ── Security alerts ──────────────────────────────────────────────────────
+    //
+    // The push payload the backend sends when something happens to the
+    // account: data.type == "security.alert", with the event's id, type,
+    // action, timestamp and a canAcknowledge flag. The server renders the
+    // title and body when the payload carries a notification block; when it
+    // does not (data-only), this function falls back to the event type it can
+    // name and a line that claims nothing more than that something happened.
+    //
+    // The security channel is judged by the runtime permission and the app's
+    // overall notification state, NOT by the mail channel's switch: muting
+    // new-mail alerts must never mute the account's own alarm.
+
+    /** The deep-link action "Secure account" fires; MainActivity routes it to the hub. */
+    const val OPEN_SECURITY = "com.grapsee.grapmail.OPEN_SECURITY"
+
+    /** The broadcast action "This was me" fires; [SecurityNotificationActionReceiver] answers it. */
+    const val ACTION_SECURITY_ACK = "com.grapsee.grapmail.SECURITY_ACK"
+
+    private fun securityAlertsAllowed(context: Context): Boolean {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) !=
+                PackageManager.PERMISSION_GRANTED) return false
+        val manager = context.getSystemService(NotificationManager::class.java) ?: return false
+        return manager.areNotificationsEnabled()
+    }
+
+    /** The alert's spoken title, when the payload did not carry a rendered one. */
+    private fun securityFallbackTitle(eventType: String): String = when {
+        eventType.contains("signin", ignoreCase = true) -> "New GrapMail sign-in"
+        eventType.contains("password", ignoreCase = true) -> "Your GrapMail password was changed"
+        eventType.contains("device", ignoreCase = true) -> "Trusted device change"
+        else -> "GrapMail security alert"
+    }
+
+    fun securityAlert(context: Context, data: Map<String, String>, title: String?, body: String?): Boolean {
+        if (!securityAlertsAllowed(context)) return false
+        ensureChannel(context)
+        val eventId = data["eventId"]?.takeIf { it.isNotBlank() && it.length <= 200 } ?: return false
+        val eventType = data["eventType"].orEmpty()
+        val canAcknowledge = data["canAcknowledge"] == "1"
+        val shownTitle = title?.takeIf { it.isNotBlank() } ?: securityFallbackTitle(eventType)
+        val shownBody = body?.takeIf { it.isNotBlank() } ?: "Open GrapMail to review this security alert."
+        val content = NotificationCompat.Builder(context, CHANNEL_SECURITY)
+            .setSmallIcon(R.mipmap.ic_launcher_monochrome)
+            .setContentTitle(shownTitle)
+            .setContentText(shownBody)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(shownBody))
+            .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setAutoCancel(true)
+            .apply {
+                if (canAcknowledge) {
+                    addAction(0, "This was me", pendingAck(context, eventId))
+                }
+                addAction(0, "Secure account", pendingOpenSecurity(context))
+            }
+            .build()
+        return try {
+            // Tagged by the event, so a second alert about a different event
+            // arrives as its own entry and an ack dismisses exactly the one
+            // that was acknowledged.
+            NotificationManagerCompat.from(context).notify(eventId, SECURITY_NOTIFICATION_ID, content)
+            true
+        } catch (e: SecurityException) {
+            false
+        }
+    }
+
+    private fun pendingAck(context: Context, eventId: String) = PendingIntent.getBroadcast(
+        context, eventId.hashCode(),
+        Intent(context, SecurityNotificationActionReceiver::class.java).apply {
+            action = ACTION_SECURITY_ACK
+            data = android.net.Uri.Builder().scheme("grapmail").authority("security")
+                .appendPath(eventId).build()
+            putExtra("eventId", eventId)
+        },
+        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+    )
+
+    private fun pendingOpenSecurity(context: Context) = PendingIntent.getActivity(
+        context, OPEN_SECURITY.hashCode(),
+        Intent(context, MainActivity::class.java).apply {
+            action = OPEN_SECURITY
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+        },
+        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+    )
+
     private fun pendingUpdate(context: Context, target: MailTarget) = PendingIntent.getBroadcast(
         context, target.hashCode(),
         Intent(context, MailNotificationActionReceiver::class.java).apply {
@@ -341,6 +453,39 @@ class MailNotificationActionReceiver : BroadcastReceiver() {
         // here would read like the app claiming a delivery it did not see.
         if (r.status in listOf("sent", "queued", "scheduled")) {
             Notifications.dismiss(app, target.messageId)
+        }
+    }
+}
+
+/**
+ * The security alert's "This was me" — acknowledges the event through the
+ * same endpoint the security hub uses, then dismisses exactly the notification
+ * that was acknowledged (tagged by its event id). goAsync plus the push scope,
+ * because the call needs a bearer and the bearer may need a rotation first;
+ * the notification stays if the ack is refused, so a failed "this was me"
+ * never claims it was.
+ */
+class SecurityNotificationActionReceiver : BroadcastReceiver() {
+    override fun onReceive(context: Context, intent: Intent) {
+        if (intent.action != Notifications.ACTION_SECURITY_ACK) return
+        val eventId = intent.getStringExtra("eventId")?.takeIf { it.isNotBlank() } ?: return
+        val pending = goAsync()
+        val app = context.applicationContext
+        PushSync.scope.launch {
+            try {
+                withTimeoutOrNull(8_000) {
+                    val session = com.grapsee.grapmail.data.SessionRefresh.forAccount(
+                        app, SessionStore.snapshot(app)?.id ?: "",
+                    ) ?: return@withTimeoutOrNull
+                    Api.acknowledgeSecurityEvent(session.token, eventId)
+                    Notifications.dismissSecurity(app, eventId)
+                }
+            } catch (error: Exception) {
+                if (error is kotlinx.coroutines.CancellationException) throw error
+                android.util.Log.w("GrapMailNotify", "Security ack failed: ${error.javaClass.simpleName}")
+            } finally {
+                pending.finish()
+            }
         }
     }
 }

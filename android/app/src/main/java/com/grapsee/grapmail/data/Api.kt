@@ -637,6 +637,206 @@ private fun apiErrorMessage(status: Int, code: String?): String = when (code) {
 @Serializable private data class SignOutEverywhereRequest(val signOutEverywhere: Boolean)
 @Serializable private data class VerifyPasswordRequest(val password: String)
 
+// ── Device trust, security events, device recovery & notification prefs ─────
+//
+// The trusted-device contract: the device proves itself with a private key the
+// server never saw a copy of. Enroll carries the PUBLIC half only (base64 SPKI
+// DER); recovery signs a server-issued nonce and never sends the key. Every
+// field name below is the key the route destructures, not this app's vocabulary
+// — `keyAlgorithm: "es256"` names the signature scheme the server's verifier
+// must use, and `installationId` is the same x-device-id value every call here
+// already carries as a header.
+
+/** POST /grapsee/auth/devices/enroll — the enroll body, an upsert keyed on installationId. */
+@Serializable data class DeviceEnrollRequest(
+    val installationId: String,
+    val platform: String = "android",
+    /** Base64 SPKI DER. The PRIVATE half has no field to travel in, by construction. */
+    val publicKey: String,
+    val displayName: String,
+    val keyAlgorithm: String = "es256",
+)
+
+/** One row of GET /grapsee/auth/devices. `trustState` is the server's own verdict. */
+@Serializable data class TrustedDeviceDto(
+    val id: String = "",
+    val displayName: String = "",
+    val platform: String = "",
+    val trustState: String = "",
+    val attestationLevel: String? = null,
+    val createdAt: String? = null,
+    val lastSeenAt: String? = null,
+    val revokedAt: String? = null,
+) {
+    /** A row is out of the trusted set the moment it carries a revoke time. */
+    val isRevoked: Boolean get() = revokedAt != null
+}
+
+@Serializable data class DeviceEnrollResponse(
+    val success: Boolean = false,
+    val device: TrustedDeviceDto? = null,
+    val error: String? = null,
+    val code: String? = null,
+)
+
+@Serializable data class DevicesResponse(
+    val success: Boolean = false,
+    val devices: List<TrustedDeviceDto> = emptyList(),
+    val error: String? = null,
+)
+
+@Serializable data class DeviceRevokeResponse(
+    val success: Boolean = false,
+    val revoked: Boolean = false,
+    val error: String? = null,
+    val code: String? = null,
+)
+
+/** POST /grapsee/auth/devices/:id/attest — the level names the hardware proof. */
+@Serializable data class DeviceAttestRequest(val attestationLevel: String)
+
+@Serializable data class DeviceAttestResponse(
+    val success: Boolean = false,
+    val attestationLevel: String? = null,
+    val error: String? = null,
+    val code: String? = null,
+)
+
+/**
+ * One row of GET /grapsee/auth/security/events. `signals` is read as the
+ * server's array of signal words; an absent array is no answer, not an empty
+ * one, so the screen may not claim "no signals" from a null.
+ */
+@Serializable data class SecurityEventDto(
+    val id: String = "",
+    val eventType: String = "",
+    val riskScore: Int? = null,
+    val signals: List<String>? = null,
+    val action: String? = null,
+    val country: String? = null,
+    val originLabel: String? = null,
+    val occurredAt: String? = null,
+    val acknowledgedAt: String? = null,
+) {
+    /** Acknowledged is a time the server wrote, not a flag the client derives. */
+    val isAcknowledged: Boolean get() = acknowledgedAt != null
+}
+
+@Serializable data class SecurityEventsResponse(
+    val success: Boolean = false,
+    val events: List<SecurityEventDto> = emptyList(),
+    val error: String? = null,
+)
+
+@Serializable data class SecurityEventAckResponse(
+    val success: Boolean = false,
+    val error: String? = null,
+    val code: String? = null,
+)
+
+/** POST /grapsee/auth/recovery/device/challenge — asks for a nonce to sign. */
+@Serializable data class DeviceChallengeRequest(val identifier: String)
+
+@Serializable data class DeviceChallengeResponse(
+    val success: Boolean = false,
+    val challengeId: String? = null,
+    /** Base64; the bytes to sign are the DECODED value, never this string. */
+    val nonce: String? = null,
+    val expiresAt: Long? = null,
+    val error: String? = null,
+    val code: String? = null,
+)
+
+/** POST /grapsee/auth/recovery/device/verify — proves the key over the nonce. */
+@Serializable data class DeviceVerifyRequest(
+    val identifier: String,
+    val challengeId: String,
+    val nonce: String,
+    val installationId: String,
+    val signature: String,
+)
+
+@Serializable data class DeviceVerifyResponse(
+    val success: Boolean = false,
+    /** 64 hex chars, one-time, spent by reset-with-grant. Handled like the
+     *  proofs above: memory only, never a navigation argument. */
+    val recoveryGrant: String? = null,
+    val expiresInSeconds: Long? = null,
+    val error: String? = null,
+    val code: String? = null,
+)
+
+@Serializable data class ResetWithGrantRequest(
+    val identifier: String,
+    val grant: String,
+    val password: String,
+)
+
+@Serializable data class ResetWithCodeRequest(
+    val identifier: String,
+    val code: String,
+    val password: String,
+)
+
+@Serializable data class ResetGrantResponse(
+    val success: Boolean = false,
+    val requiresSignIn: Boolean = false,
+    val error: String? = null,
+    val code: String? = null,
+)
+
+/** POST /grapsee/auth/recovery/codes/generate — ten one-time recovery codes. */
+@Serializable data class RecoveryCodesResponse(
+    val success: Boolean = false,
+    val codes: List<String> = emptyList(),
+    val error: String? = null,
+    val code: String? = null,
+)
+
+@Serializable data class RecoveryCodesStatusResponse(
+    val success: Boolean = false,
+    val usable: Boolean = false,
+    val error: String? = null,
+)
+
+/**
+ * One row of GET /grapmail/push/notification-prefs. `deviceKey` is "account"
+ * for the account-level rows this screen edits, or a device uuid for rows the
+ * device wrote itself; the screen matches on the scope and ignores rows that
+ * name another surface.
+ */
+@Serializable data class NotificationPrefDto(
+    val deviceKey: String = "",
+    val scope: String = "",
+    val eventType: String? = null,
+    val enabled: Boolean = false,
+    val quietStartMin: Int? = null,
+    val quietEndMin: Int? = null,
+    val quietTzOffsetMin: Int? = null,
+    val updatedAt: String? = null,
+)
+
+@Serializable data class NotificationPrefsResponse(
+    val success: Boolean = false,
+    val prefs: List<NotificationPrefDto> = emptyList(),
+    val error: String? = null,
+)
+
+@Serializable data class NotificationPrefPatchResponse(
+    val success: Boolean = false,
+    val pref: NotificationPrefDto? = null,
+    val error: String? = null,
+    val code: String? = null,
+)
+
+/** The PATCH quiet object, `null` on the wire when quiet hours are cleared. */
+@Serializable
+data class QuietHoursBody(
+    val startMin: Int,
+    val endMin: Int,
+    val tzOffsetMin: Int,
+)
+
 object Api {
     val BASE: String = com.grapsee.grapmail.BuildConfig.API_BASE
 
@@ -1209,6 +1409,227 @@ object Api {
             .post(postBody("{}"))
             .build()
         return read(req) { decodeResponse<ProfileResponse>(it) }
+    }
+
+    // ── Device trust, security events & device recovery ─────────────────────
+    //
+    // Mounted under $AUTH (the /grapsee/auth gateway) exactly like the account
+    // routes: one gateway, one verifier, one token. The unauthed recovery
+    // calls carry x-device-id the way every other unauthed call here does —
+    // the header is what the backend's throttles and device matching key on —
+    // and the authed ones reuse `authed` so the bearer-401 interceptor applies
+    // to them too.
+
+    /**
+     * POST /devices/enroll — publish this device's PUBLIC key to the account's
+     * trusted set. The endpoint upserts on `installationId`, so re-enrolling
+     * with the same key refreshes the row instead of duplicating it.
+     */
+    suspend fun enrollDevice(token: String, req: DeviceEnrollRequest): DeviceEnrollResponse {
+        val request = authed("$AUTH/devices/enroll", token)
+            .post(postBody(json.encodeToString(DeviceEnrollRequest.serializer(), req)))
+            .build()
+        val (status, body) = execute(request)
+        if (status >= 400) fail(status, body)
+        return decodeResponse<DeviceEnrollResponse>(body)
+    }
+
+    suspend fun listDevices(token: String): DevicesResponse =
+        read(authed("$AUTH/devices", token).get().build()) { decodeResponse<DevicesResponse>(it) }
+
+    /** POST /devices/:id/revoke — take one device out of the trusted set. */
+    suspend fun revokeDevice(token: String, id: String): DeviceRevokeResponse {
+        val request = authed("$AUTH/devices/${enc(id)}/revoke", token)
+            .post(postBody("{}"))
+            .build()
+        val (status, body) = execute(request)
+        if (status >= 400) fail(status, body)
+        return decodeResponse<DeviceRevokeResponse>(body)
+    }
+
+    /**
+     * POST /devices/:id/attest — declare the hardware proof the platform can
+     * offer for this device. Level vocabulary: "none" | "play_integrity" |
+     * "app_attest" | "hardware".
+     */
+    suspend fun attestDevice(token: String, id: String, attestationLevel: String): DeviceAttestResponse {
+        val request = authed("$AUTH/devices/${enc(id)}/attest", token)
+            .post(postBody(json.encodeToString(DeviceAttestRequest.serializer(), DeviceAttestRequest(attestationLevel))))
+            .build()
+        val (status, body) = execute(request)
+        if (status >= 400) fail(status, body)
+        return decodeResponse<DeviceAttestResponse>(body)
+    }
+
+    /** GET /security/events — the account's security trail, newest first. */
+    suspend fun securityEvents(token: String): SecurityEventsResponse =
+        read(authed("$AUTH/security/events", token).get().build()) {
+            decodeResponse<SecurityEventsResponse>(it)
+        }
+
+    /** POST /security/events/:id/ack — the notification's "This was me". */
+    suspend fun acknowledgeSecurityEvent(token: String, id: String): SecurityEventAckResponse {
+        val request = authed("$AUTH/security/events/${enc(id)}/ack", token)
+            .post(postBody("{}"))
+            .build()
+        val (status, body) = execute(request)
+        if (status >= 400) fail(status, body)
+        return decodeResponse<SecurityEventAckResponse>(body)
+    }
+
+    /**
+     * Step 1 of trusted-device password recovery: ask for a nonce to sign.
+     * No bearer — this runs on the forgot-password screen, where the person
+     * has nothing to authenticate with but the device key itself.
+     */
+    suspend fun deviceChallenge(identifier: String): DeviceChallengeResponse {
+        val request = Request.Builder()
+            .url("$AUTH/recovery/device/challenge")
+            .header("x-device-id", DeviceId.value)
+            .post(postBody(json.encodeToString(DeviceChallengeRequest.serializer(), DeviceChallengeRequest(identifier))))
+            .build()
+        val (status, body) = execute(request)
+        if (status >= 400) fail(status, body)
+        return decodeResponse<DeviceChallengeResponse>(body)
+    }
+
+    /**
+     * Step 2: prove the key. `signature` is base64 of SHA256withECDSA over the
+     * DECODED nonce bytes; `nonce` echoes the base64 string the challenge
+     * returned, because the route re-derives the bytes from it.
+     */
+    suspend fun deviceVerify(
+        identifier: String,
+        challengeId: String,
+        nonce: String,
+        installationId: String,
+        signature: String,
+    ): DeviceVerifyResponse {
+        val request = Request.Builder()
+            .url("$AUTH/recovery/device/verify")
+            .header("x-device-id", DeviceId.value)
+            .post(
+                postBody(
+                    json.encodeToString(
+                        DeviceVerifyRequest.serializer(),
+                        DeviceVerifyRequest(identifier, challengeId, nonce, installationId, signature),
+                    )
+                )
+            )
+            .build()
+        val (status, body) = execute(request)
+        if (status >= 400) fail(status, body)
+        return decodeResponse<DeviceVerifyResponse>(body)
+    }
+
+    /**
+     * Spend a recovery grant on a new password. The route answers
+     * `requiresSignIn: true` and nothing else useful — the grant is consumed,
+     * so a retry after a failure here cannot reuse it.
+     */
+    suspend fun resetWithGrant(identifier: String, grant: String, password: String): ResetGrantResponse {
+        val request = Request.Builder()
+            .url("$AUTH/recovery/password/reset-with-grant")
+            .header("x-device-id", DeviceId.value)
+            .post(
+                postBody(
+                    json.encodeToString(
+                        ResetWithGrantRequest.serializer(),
+                        ResetWithGrantRequest(identifier, grant, password),
+                    )
+                )
+            )
+            .build()
+        val (status, body) = execute(request)
+        if (status >= 400) fail(status, body)
+        return decodeResponse<ResetGrantResponse>(body)
+    }
+
+    /** The code-based twin of [resetWithGrant]: a recovery code stands in for the grant. */
+    suspend fun resetWithCode(identifier: String, code: String, password: String): ResetGrantResponse {
+        val request = Request.Builder()
+            .url("$AUTH/recovery/password/reset-with-code")
+            .header("x-device-id", DeviceId.value)
+            .post(
+                postBody(
+                    json.encodeToString(
+                        ResetWithCodeRequest.serializer(),
+                        ResetWithCodeRequest(identifier, code, password),
+                    )
+                )
+            )
+            .build()
+        val (status, body) = execute(request)
+        if (status >= 400) fail(status, body)
+        return decodeResponse<ResetGrantResponse>(body)
+    }
+
+    /** POST /recovery/codes/generate — mint ten one-time recovery codes. */
+    suspend fun generateRecoveryCodes(token: String): RecoveryCodesResponse {
+        val request = authed("$AUTH/recovery/codes/generate", token)
+            .post(postBody("{}"))
+            .build()
+        val (status, body) = execute(request)
+        if (status >= 400) fail(status, body)
+        return decodeResponse<RecoveryCodesResponse>(body)
+    }
+
+    /** GET /recovery/codes/status — "does the account still have usable codes?" */
+    suspend fun recoveryCodesStatus(token: String): RecoveryCodesStatusResponse =
+        read(authed("$AUTH/recovery/codes/status", token).get().build()) {
+            decodeResponse<RecoveryCodesStatusResponse>(it)
+        }
+
+    // ── Push notification preferences ────────────────────────────────────────
+    //
+    // Under the MAIL base, not AUTH: delivery is the mail service's concern.
+    // The rows this screen edits all carry deviceKey "account"; rows keyed to
+    // a device uuid belong to whatever that device chose and are read, never
+    // rewritten, here.
+
+    suspend fun getNotificationPrefs(token: String): NotificationPrefsResponse =
+        read(authed("$MAIL/push/notification-prefs", token).get().build()) {
+            decodeResponse<NotificationPrefsResponse>(it)
+        }
+
+    /**
+     * PATCH one preference row. Built as an explicit JSON object rather than a
+     * data-class encode: `quiet` must reach the wire as a real JSON `null`
+     * when quiet hours are cleared, and the sparse encoder used for partial
+     * profile writes omits nulls entirely — a "clear quiet hours" that sent
+     * nothing would change nothing, which is the silent no-op this file's
+     * partial-write comments exist to prevent.
+     */
+    suspend fun patchNotificationPrefs(
+        token: String,
+        deviceKey: String,
+        scope: String,
+        eventType: String,
+        enabled: Boolean,
+        quiet: QuietHoursBody?,
+    ): NotificationPrefPatchResponse {
+        val payload = kotlinx.serialization.json.buildJsonObject {
+            put("deviceKey", kotlinx.serialization.json.JsonPrimitive(deviceKey))
+            put("scope", kotlinx.serialization.json.JsonPrimitive(scope))
+            put("eventType", kotlinx.serialization.json.JsonPrimitive(eventType))
+            put("enabled", kotlinx.serialization.json.JsonPrimitive(enabled))
+            put(
+                "quiet",
+                quiet?.let {
+                    kotlinx.serialization.json.buildJsonObject {
+                        put("startMin", kotlinx.serialization.json.JsonPrimitive(it.startMin))
+                        put("endMin", kotlinx.serialization.json.JsonPrimitive(it.endMin))
+                        put("tzOffsetMin", kotlinx.serialization.json.JsonPrimitive(it.tzOffsetMin))
+                    }
+                } ?: kotlinx.serialization.json.JsonNull,
+            )
+        }
+        val request = authed("$MAIL/push/notification-prefs", token)
+            .method("PATCH", postBody(payload.toString()))
+            .build()
+        val (status, body) = execute(request)
+        if (status >= 400) fail(status, body)
+        return decodeResponse<NotificationPrefPatchResponse>(body)
     }
 
     // ── Mailbox sector ───────────────────────────────────────────────────────

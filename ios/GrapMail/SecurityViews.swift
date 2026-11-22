@@ -17,6 +17,11 @@ struct AccountSecurityView: View {
     let onPassword: () -> Void
     let onSignOutAll: () -> Void
     let onSupport: () -> Void
+    // The device-security band: the one-time recovery codes the
+    // all-devices-lost path spends, and the trusted-device list the enrolled
+    // keys live on.
+    var onRecoveryCodes: (() -> Void)? = nil
+    var onTrustedDevices: (() -> Void)? = nil
 
     private static var cachedVerdict: (generation: UUID, profile: ProfileDto)?
 
@@ -148,6 +153,23 @@ struct AccountSecurityView: View {
                     ? "\(profile?.backupCodesRemaining ?? 0) codes unused."
                     : "Generate and manage backup codes for 2FA.",
                 action: onBackupCodes
+            )
+            SecurityDivider()
+            // The 2FA backup codes above answer "lost phone"; these answer
+            // "lost everything" — ten one-time codes that sign you back in
+            // without a password at all.
+            SecurityRowView(
+                icon: "key.fill",
+                title: "Account Recovery Codes",
+                subtitle: "One-time codes for signing in if you lose your password.",
+                action: onRecoveryCodes
+            )
+            SecurityDivider()
+            SecurityRowView(
+                icon: "checkmark.seal",
+                title: "Trusted Devices",
+                subtitle: "Devices that hold a key this account trusts.",
+                action: onTrustedDevices
             )
             SecurityDivider()
             SecurityRowView(

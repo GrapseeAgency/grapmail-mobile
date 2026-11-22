@@ -620,6 +620,7 @@ fun MailSettingsScreen(
     onProfile: () -> Unit,
     onPrivacy: () -> Unit,
     onEncryption: () -> Unit,
+    onNotificationPrefs: () -> Unit,
     onHelp: () -> Unit,
     onSignOut: () -> Unit,
 ) {
@@ -760,6 +761,12 @@ fun MailSettingsScreen(
                     hideMailPreviews = !hideMailPreviews
                     PushSync.setGenericPreviews(notifyContext, hideMailPreviews)
                 })
+            // The account-level rows: what the server sends for this account
+            // (mail, security, account scopes) and its quiet-hours window —
+            // per-account state, unlike the two rows above, which are per-device.
+            SettingRow(Icons.Rounded.NotificationsActive, "Notification preferences",
+                "Mail, security and account alerts, plus quiet hours",
+                palette, onClick = onNotificationPrefs)
             // The app lock is a preference on this handset, not an account
             // setting: it guards this device's copy of the mailbox. A device
             // that cannot keep the promise says so instead of offering a lock

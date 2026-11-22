@@ -50,6 +50,20 @@ class PushService : FirebaseMessagingService() {
 
     override fun onMessageReceived(message: RemoteMessage) {
         val context = applicationContext
+        // Security alerts post their own notification and never touch the mail
+        // read: the payload names an event, not a message, and waking the poll
+        // for it would run a mailbox refresh the alert did not ask for. The
+        // server renders title/body when the payload carries a notification
+        // block; a data-only alert falls back to the event type's own words.
+        if (message.data["type"] == "security.alert") {
+            Notifications.securityAlert(
+                context,
+                message.data,
+                message.notification?.title,
+                message.notification?.body,
+            )
+            return
+        }
         val id = message.data["messageId"]?.takeIf { it.isNotBlank() && it.length <= 300 }
         val mailbox = message.data["mailbox"]?.takeIf { it.length <= 320 }
         if (id != null && mailbox.isNullOrBlank()) return

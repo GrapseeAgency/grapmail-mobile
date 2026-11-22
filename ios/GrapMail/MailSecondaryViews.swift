@@ -647,6 +647,10 @@ struct MailSettingsView: View {
     let onEncryption: () -> Void
     let onHelp: () -> Void
     let onSignOut: () -> Void
+    // Optional with a default so the snapshot host's bare `secondary(...)`
+    // call keeps compiling unchanged; the row simply renders without a
+    // chevron when no push was wired.
+    var onNotificationPrefs: (() -> Void)? = nil
 
     /// The system's own answer about alerts for this app, read when the screen
     /// appears — never assumed, never remembered from a previous visit.
@@ -780,6 +784,14 @@ struct MailSettingsView: View {
                                value: notificationValue,
                                onClick: { askNotifications() })
                         .accessibilityIdentifier("mail-notifications-row")
+                    // The account's per-scope alert switches (mail / security /
+                    // account) and the mail quiet-hours window. The system
+                    // authorization row above answers "may the app alert at
+                    // all"; this one answers "which alerts".
+                    SettingRow(icon: "bell.badge", title: "Notification preferences",
+                               value: "Mail, security and account alerts",
+                               onClick: onNotificationPrefs)
+                        .accessibilityIdentifier("mail-notification-prefs-row")
                     // App lock — Face ID in front of the whole mailbox (AppLock.swift).
                     AppLockRow()
                     SettingRow(icon: "person", title: "Personal info",
