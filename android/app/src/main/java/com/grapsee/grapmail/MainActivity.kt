@@ -1527,7 +1527,11 @@ fun GrapMailNav(
         }
         composable(Routes.ACCOUNT_PROFILE) { entry ->
             val profile: com.grapsee.grapmail.logic.ProfileViewModel = signedInViewModel(nav, entry)
-            com.grapsee.grapmail.ui.screens.mail.ProfileEditScreen(vm = profile, onBack = { nav.popBackStack() })
+            com.grapsee.grapmail.ui.screens.mail.ProfileEditScreen(
+                vm = profile,
+                onBack = { nav.popBackStack() },
+                onRecoveryEmail = { nav.navigate(Routes.RECOVERY_EMAIL) },
+            )
         }
         composable(Routes.ACCOUNT_PRIVACY) { entry ->
             val profile: com.grapsee.grapmail.logic.ProfileViewModel = signedInViewModel(nav, entry)

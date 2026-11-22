@@ -756,9 +756,27 @@ fun MailSettingsScreen(
             val appLockUsable = remember {
                 com.grapsee.grapmail.logic.AppLock.available(notifyContext)
             }
+            // Both directions go through the platform prompt. Turning the lock
+            // off without it would let anyone holding an unlocked phone remove
+            // the one thing standing between them and the mailbox; turning it on
+            // without it could lock out a person whose fingerprint is not enrolled
+            // the way they think it is.
+            val lockActivity = remember(notifyContext) {
+                generateSequence(notifyContext) { (it as? android.content.ContextWrapper)?.baseContext }
+                    .filterIsInstance<androidx.fragment.app.FragmentActivity>()
+                    .firstOrNull()
+            }
             val toggleAppLock: () -> Unit = {
-                appLockOn = !appLockOn
-                com.grapsee.grapmail.logic.AppLock.setEnabled(notifyContext, appLockOn)
+                val want = !appLockOn
+                val activity = lockActivity
+                if (activity != null) {
+                    com.grapsee.grapmail.logic.AppLock.prompt(activity) { verified ->
+                        if (verified) {
+                            appLockOn = want
+                            com.grapsee.grapmail.logic.AppLock.setEnabled(notifyContext, want)
+                        }
+                    }
+                }
             }
             SettingRow(
                 Icons.Rounded.Lock, "App lock",

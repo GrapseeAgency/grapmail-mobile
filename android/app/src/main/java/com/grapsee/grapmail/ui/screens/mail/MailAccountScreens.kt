@@ -281,10 +281,12 @@ fun MailPrefsScreen(vm: ProfileViewModel, onBack: () -> Unit) {
     val state by vm.state.collectAsStateWithLifecycle()
     val s = state.profile?.settings
     var signature by remember(s?.signature) { mutableStateOf(s?.signature ?: "") }
-    var language by remember(s?.locale) { mutableStateOf(s?.locale?.language ?: "") }
     var timezone by remember(s?.locale) { mutableStateOf(s?.locale?.timezone ?: "") }
+    var zoneError by remember { mutableStateOf<String?>(null) }
     var blockedDraft by remember { mutableStateOf("") }
     var safeDraft by remember { mutableStateOf("") }
+    var blockedError by remember { mutableStateOf<String?>(null) }
+    var safeError by remember { mutableStateOf<String?>(null) }
     // The per-address overrides being edited, seeded from the profile. The
     // web's "Signature per address" section is the reference: one box per
     // address compose can send as, empty means "use the main one".
@@ -382,53 +384,82 @@ fun MailPrefsScreen(vm: ProfileViewModel, onBack: () -> Unit) {
                 if (s.density != "compact") vm.saveSettings(ProfileSettingsPatch(density = "compact"))
             })
 
-            SectionLabel("Language and dates", palette)
-            AppTextField("Language", language, { language = it },
-                hint = "en-US")
-            AppTextField("Time zone", timezone, { timezone = it },
-                hint = "Asia/Dhaka", modifier = Modifier.padding(top = 8.dp))
-            Text("Save language and time zone", fontSize = 14.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = palette.primarySolid,
-                modifier = Modifier.clickable(enabled = !state.busy &&
-                    (language.isNotBlank() || timezone.isNotBlank()) &&
-                    (language != s.locale.language || timezone != s.locale.timezone)) {
-                    vm.saveSettings(ProfileSettingsPatch(locale = LocaleDto(
-                        language = language.ifBlank { s.locale.language },
-                        timezone = timezone.ifBlank { s.locale.timezone },
-                        dateFormat = s.locale.dateFormat)))
+            // The app's own language is the system's per-app setting (Settings →
+            // App language), so it is not repeated here as a free-text field that
+            // nothing on this device read.
+            SectionLabel("Time zone and dates", palette)
+            Text("How times and dates appear in your mailbox list.", fontSize = 12.sp,
+                color = palette.textTertiary)
+            val deviceZone = java.time.ZoneId.systemDefault().id
+            RadioRow("This device's time zone ($deviceZone)", s.locale.timezone.isBlank(), {
+                zoneError = null
+                if (s.locale.timezone.isNotBlank()) vm.saveSettings(ProfileSettingsPatch(
+                    locale = s.locale.copy(timezone = "")))
+            })
+            AppTextField("Another time zone", timezone, { timezone = it.trim(); zoneError = null },
+                hint = "e.g. Europe/London", error = zoneError, modifier = Modifier.padding(top = 4.dp))
+            val zoneDirty = timezone.isNotBlank() && timezone != s.locale.timezone
+            Text("Use this time zone", fontSize = 14.sp, fontWeight = FontWeight.SemiBold,
+                color = if (zoneDirty && !state.busy) palette.primarySolid else palette.textTertiary,
+                modifier = Modifier.clickable(enabled = zoneDirty && !state.busy) {
+                    val zone = com.grapsee.grapmail.data.MailDisplayPrefs.zoneOrNull(timezone)
+                    if (zone == null) {
+                        zoneError = "That isn't a time zone. Use a name like Europe/London or America/New_York."
+                    } else {
+                        vm.saveSettings(ProfileSettingsPatch(locale = s.locale.copy(timezone = zone.id)))
+                    }
                 }.padding(vertical = 8.dp))
-            Text("Dates in messages and the list:", fontSize = 13.sp,
+            Text("Dates in the mailbox list:", fontSize = 13.sp,
                 color = palette.textSecondary)
-            listOf("dmy" to "day first (25/10/26)", "mdy" to "month first (10/25/26)",
-                "ymd" to "year first (2026-10-25)").forEach { (code, label) ->
+            listOf("" to "Automatic — follows this device", "dmy" to "day first (25/10/26)",
+                "mdy" to "month first (10/25/26)", "ymd" to "year first (2026-10-25)").forEach { (code, label) ->
                 RadioRow(label, s.locale.dateFormat == code, {
                     if (s.locale.dateFormat != code) vm.saveSettings(ProfileSettingsPatch(
                         locale = s.locale.copy(dateFormat = code)))
                 })
             }
 
+            // These two lists are enforced on delivery: the server turns each entry
+            // into a Screener decision (safe = approved, blocked = blocked), and a
+            // block applies whether or not the Screener is on. A sender can be on
+            // one list only, so adding to one takes it off the other.
             SectionLabel("Senders you always accept", palette)
-            Text("A safe sender skips the approval queue even when two-step checking is on.",
+            Text("Mail from these senders always lands in your inbox, even when the Screener is on. " +
+                "Use an address (name@example.com) or a whole domain (example.com).",
                 fontSize = 12.sp, color = palette.textTertiary)
-            AddRow("address@example.com", safeDraft, { safeDraft = it }, {
-                vm.saveSettings(ProfileSettingsPatch(
-                    safeSenders = (s.safeSenders + safeDraft.trim().lowercase()).distinct()))
-                safeDraft = ""
+            AddRow("name@example.com or example.com", safeDraft, { safeDraft = it; safeError = null }, {
+                val sender = normalizedSender(safeDraft)
+                if (sender == null) {
+                    safeError = "Enter an address like name@example.com, or a domain like example.com."
+                } else {
+                    vm.saveSettings(ProfileSettingsPatch(
+                        safeSenders = (s.safeSenders + sender).distinct(),
+                        blockedSenders = s.blockedSenders.filter { it != sender }))
+                    safeDraft = ""
+                }
             }, state.busy, "gm-add-safe")
+            safeError?.let { Text(it, fontSize = 12.sp, color = palette.error) }
             s.safeSenders.forEach { e ->
                 ListRow(e, { vm.saveSettings(ProfileSettingsPatch(
                     safeSenders = s.safeSenders.filter { it != e })) }, "gm-safe-row")
             }
 
             SectionLabel("Senders you block", palette)
-            Text("Blocked senders are refused at the door: nothing arrives and nothing queues " +
-                "for approval.", fontSize = 12.sp, color = palette.textTertiary)
-            AddRow("address@example.com", blockedDraft, { blockedDraft = it }, {
-                vm.saveSettings(ProfileSettingsPatch(
-                    blockedSenders = (s.blockedSenders + blockedDraft.trim().lowercase()).distinct()))
-                blockedDraft = ""
+            Text("Mail from blocked senders goes straight to Trash. " +
+                "Use an address (name@example.com) or a whole domain (example.com).",
+                fontSize = 12.sp, color = palette.textTertiary)
+            AddRow("name@example.com or example.com", blockedDraft, { blockedDraft = it; blockedError = null }, {
+                val sender = normalizedSender(blockedDraft)
+                if (sender == null) {
+                    blockedError = "Enter an address like name@example.com, or a domain like example.com."
+                } else {
+                    vm.saveSettings(ProfileSettingsPatch(
+                        blockedSenders = (s.blockedSenders + sender).distinct(),
+                        safeSenders = s.safeSenders.filter { it != sender }))
+                    blockedDraft = ""
+                }
             }, state.busy, "gm-add-blocked")
+            blockedError?.let { Text(it, fontSize = 12.sp, color = palette.error) }
             s.blockedSenders.forEach { e ->
                 ListRow(e, { vm.saveSettings(ProfileSettingsPatch(
                     blockedSenders = s.blockedSenders.filter { it != e })) }, "gm-blocked-row")
@@ -436,6 +467,26 @@ fun MailPrefsScreen(vm: ProfileViewModel, onBack: () -> Unit) {
             Spacer(Modifier.height(24.dp))
         }
     }
+}
+
+/** A sender the safe and blocked lists accept: an address, or a bare domain. */
+private fun normalizedSender(raw: String): String? {
+    val value = raw.trim().lowercase().removePrefix("@")
+    val address = Regex("^[^\\s@]+@[^\\s@]+\\.[^\\s@]{2,}$")
+    val domain = Regex("^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\\.)+[a-z]{2,}$")
+    return value.takeIf { address.matches(it) || domain.matches(it) }
+}
+
+/** The same birthday rule sign-up applies: a real date, not in the future, 13 or older. */
+private fun birthdayProblem(value: String): String? {
+    val text = value.trim()
+    if (text.isEmpty()) return null
+    val date = runCatching { java.time.LocalDate.parse(text) }.getOrNull()
+        ?: return "Enter your birthday as YYYY-MM-DD."
+    val today = java.time.LocalDate.now()
+    if (date.isAfter(today) || date.year < 1900) return "Enter a real birthday."
+    if (java.time.Period.between(date, today).years < 13) return "A GrapMail account needs you to be at least 13."
+    return null
 }
 
 // ── 96 · addresses ───────────────────────────────────────────────────────────
@@ -824,15 +875,14 @@ fun ConnectionDetailScreen(vm: ProfileViewModel, product: String, onBack: () -> 
  * how the person appears to recipients.
  */
 @Composable
-fun ProfileEditScreen(vm: ProfileViewModel, onBack: () -> Unit) {
+fun ProfileEditScreen(vm: ProfileViewModel, onBack: () -> Unit, onRecoveryEmail: () -> Unit = {}) {
     val palette = LocalPalette.current
     val state by vm.state.collectAsStateWithLifecycle()
     val p = state.profile
     var first by remember(p?.firstName) { mutableStateOf(p?.firstName ?: "") }
     var last by remember(p?.lastName) { mutableStateOf(p?.lastName ?: "") }
     var display by remember(p?.displayName) { mutableStateOf(p?.displayName ?: "") }
-    var recoveryEmail by remember(p?.recoveryEmail) { mutableStateOf(p?.recoveryEmail ?: "") }
-    var recoveryPhone by remember(p?.recoveryPhone) { mutableStateOf(p?.recoveryPhone ?: "") }
+    var formError by remember { mutableStateOf<String?>(null) }
     var birthday by remember(p?.birthday) { mutableStateOf(p?.birthday ?: "") }
     var gender by remember(p?.gender) { mutableStateOf(p?.gender ?: "") }
     var photoError by remember { mutableStateOf<String?>(null) }
@@ -854,6 +904,19 @@ fun ProfileEditScreen(vm: ProfileViewModel, onBack: () -> Unit) {
     }
 
     LaunchedEffect(Unit) { vm.load() }
+    // Coming back from the recovery email screen, re-read the record so the
+    // "verified" line is the server's answer, not the one from before.
+    val editLifecycle = androidx.compose.ui.platform.LocalLifecycleOwner.current
+    androidx.compose.runtime.DisposableEffect(editLifecycle) {
+        var firstResume = true
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
+                if (firstResume) firstResume = false else vm.load(force = true)
+            }
+        }
+        editLifecycle.lifecycle.addObserver(observer)
+        onDispose { editLifecycle.lifecycle.removeObserver(observer) }
+    }
     LaunchedEffect(p?.avatarUrl, state.busy) {
         if (!state.busy) vm.loadAvatar()
     }
@@ -908,22 +971,43 @@ fun ProfileEditScreen(vm: ProfileViewModel, onBack: () -> Unit) {
             SectionLabel("How you appear", palette)
             AppTextField("Display name", display, { display = it },
                 hint = "What recipients see")
+            // The recovery email is proven with a code before it counts, so it is
+            // changed through that flow rather than typed here: a plain save
+            // would store the address unverified, and reset links are only ever
+            // sent to a verified one. The recovery phone field is gone because
+            // GrapMail recovers by email only and nothing read it.
             SectionLabel("Recovery", palette)
-            AppTextField("Recovery email", recoveryEmail, { recoveryEmail = it },
-                hint = "A mailbox you can still reach", keyboard = KeyboardType.Email)
-            AppTextField("Recovery phone", recoveryPhone, { recoveryPhone = it },
-                hint = "+8801XXXXXXXXX", keyboard = KeyboardType.Phone,
-                modifier = Modifier.padding(top = 8.dp))
+            val recovery = p.recoveryEmail?.takeIf { it.isNotBlank() }
+            Text(
+                when {
+                    recovery == null -> "No recovery email yet. Without one, a forgotten password can't be reset."
+                    p.recoveryEmailVerified == true -> "$recovery · verified"
+                    else -> "$recovery · not verified yet"
+                },
+                fontSize = 14.sp, color = palette.textSecondary, modifier = Modifier.padding(top = 4.dp))
+            Text(if (recovery == null) "Add recovery email" else "Change recovery email",
+                fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = palette.primarySolid,
+                modifier = Modifier.clickable(onClick = onRecoveryEmail).padding(vertical = 8.dp))
+            formError?.let {
+                Text(it, fontSize = 13.sp, color = palette.error, modifier = Modifier.padding(vertical = 6.dp))
+            }
             Text("Save", fontSize = 15.sp, fontWeight = FontWeight.SemiBold,
                 color = palette.onPrimary, textAlign = TextAlign.Center,
                 modifier = Modifier.fillMaxWidth().testTag("gm-profile-save")
                     .background(if (state.busy) palette.buttonDisabled else palette.primarySolid,
                         RoundedCornerShape(24.dp))
                     .clickable(enabled = !state.busy) {
-                        vm.save("Saved.", ProfilePatch(
-                            firstName = first, lastName = last, birthday = birthday,
-                            gender = gender, displayName = display,
-                            recoveryEmail = recoveryEmail, recoveryPhone = recoveryPhone))
+                        // The same rules sign-up applies, checked before the
+                        // request so the person sees which field is wrong.
+                        formError = when {
+                            first.trim().length < 2 -> "Enter your first name (2+ characters)."
+                            last.trim().length < 2 -> "Enter your last name (2+ characters)."
+                            display.trim().length > 60 -> "Keep the display name to 60 characters."
+                            else -> birthdayProblem(birthday)
+                        }
+                        if (formError == null) vm.save("Saved.", ProfilePatch(
+                            firstName = first.trim(), lastName = last.trim(), birthday = birthday.trim(),
+                            gender = gender, displayName = display.trim()))
                     }.padding(vertical = 14.dp))
             Spacer(Modifier.height(24.dp))
         }
