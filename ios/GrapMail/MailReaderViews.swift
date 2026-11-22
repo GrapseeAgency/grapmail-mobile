@@ -898,11 +898,6 @@ struct ComposeView: View {
     }
 
     var body: some View {
-        // One language with Android's compose and with Gmail/Apple Mail:
-        // fields on top, the body filling everything down to a pinned action
-        // bar. The ScrollView this replaces floored the body at 240pt and
-        // left the whole lower half of frame 76 empty -- the top-heavy
-        // dead-zone layout the design audit set out to remove.
         VStack(spacing: 0) {
             header
             if waitingForDraft {
@@ -917,21 +912,19 @@ struct ComposeView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                 .padding(16)
             } else {
-                VStack(alignment: .leading, spacing: 0) {
-                    fields
-                    suggestions
-                    // GeometryReader, not the editor's own maxHeight: .infinity.
-                    // The infinity proposal is greedy -- a VStack handed it also
-                    // PROPOSED the leftover to its siblings, and frame 76's
-                    // re-photograph showed the Send button grown to a 700pt blue
-                    // block. Inside the reader the editor gets an exact height
-                    // and everyone else keeps their own.
-                    GeometryReader { g in
-                        bodyEditor.frame(height: max(240, g.size.height))
+                GeometryReader { viewport in
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: 0) {
+                            fields
+                            suggestions
+                            bodyEditor
+                                .frame(height: max(176, viewport.size.height - 160))
+                                .clipped()
+                        }
+                        .padding(.horizontal, 16)
+                        .frame(maxWidth: .infinity)
                     }
                 }
-                .padding(.horizontal, 16)
-                .frame(maxWidth: .infinity)
                 if let notice {
                     ScrollView(.vertical, showsIndicators: false) {
                         Text(notice)

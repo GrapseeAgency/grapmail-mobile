@@ -80,10 +80,6 @@ fun GradientButton(
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
     val scale by animateFloatAsState(if (pressed) 0.97f else 1f, animationSpec = tween(120), label = "press")
-    val fill by animateColorAsState(
-        if (enabled) palette.primaryTop else palette.buttonDisabled,
-        tween(180), label = "fill"
-    )
     androidx.compose.material3.Button(
         onClick = onClick,
         enabled = enabled && !busy,
@@ -119,8 +115,13 @@ fun GradientButton(
                     strokeWidth = 2.5.dp,
                 )
             } else {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(text, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                Row(
+                    Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(text, modifier = Modifier.weight(1f, fill = false),
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                        fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
                     trailing?.invoke()
                 }
             }
@@ -151,7 +152,9 @@ fun OutlineButton(
         border = androidx.compose.foundation.BorderStroke(1.5.dp, palette.border),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(text, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = palette.textPrimary)
+            Text(text, modifier = Modifier.weight(1f, fill = false),
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = palette.textPrimary)
             trailing?.invoke()
         }
     }

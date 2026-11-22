@@ -54,6 +54,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -101,7 +102,7 @@ fun AccountScreen(
         // The designs are drawn on an 852pt phone. On a short one (a 640dp
         // device, an SE) the artwork gives way first and the action scrolls
         // with the copy — never a clipped field with the button pinned over it.
-        val tight = maxHeight < 660.dp
+        val tight = maxHeight < 660.dp || LocalDensity.current.fontScale > 1.3f
         Column(Modifier.fillMaxSize()) {
             AccountHeader(onBack)
             Column(

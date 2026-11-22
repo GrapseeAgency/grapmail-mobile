@@ -115,28 +115,25 @@ struct GradientButton: View {
             guard enabled, !busy else { return }
             action()
         } label: {
-            ZStack {
-                RoundedRectangle(cornerRadius: GMShape.button, style: .continuous)
-                    .fill(enabled ? AnyShapeStyle(Color.brandGradient) : AnyShapeStyle(GM.buttonDisabled))
-                HStack(spacing: 10) {
-                    if busy {
-                        ProgressView().tint(.white)
-                    } else {
-                        Text(title)
-                            .font(.system(size: 16, weight: .semibold))
-                            .foregroundColor(.white)
-                        trailing
-                    }
+            HStack(spacing: 10) {
+                if busy {
+                    ProgressView().tint(.white)
+                } else {
+                    Text(title)
+                        .font(.body.weight(.semibold))
+                        .multilineTextAlignment(.center)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .foregroundColor(.white)
+                    trailing
                 }
             }
-            // Exact 54, not a floor: `minHeight` alone is a greedy frame --
-            // handed leftover height by a VStack (the compose action bar sits
-            // under a growing editor) it grew the Send button to a 700pt
-            // block, frame 76's re-photograph. Android's twin measures to
-            // exactly 54dp under the same parent; parity is now the number
-            // itself, not the wish.
-            .frame(height: 54)
-            .frame(maxWidth: .infinity)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 10)
+            .frame(maxWidth: .infinity, minHeight: 54)
+            .background {
+                RoundedRectangle(cornerRadius: GMShape.button, style: .continuous)
+                    .fill(enabled ? AnyShapeStyle(Color.brandGradient) : AnyShapeStyle(GM.buttonDisabled))
+            }
         }
         .buttonStyle(PressScaleStyle())
         .disabled(!enabled || busy)
@@ -160,12 +157,15 @@ struct OutlineActionButton: View {
         Button(action: action) {
             HStack(spacing: 10) {
                 Text(title)
-                    .font(.system(size: 16, weight: .semibold))
+                    .font(.body.weight(.semibold))
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
                     .foregroundColor(GM.textPrimary)
                 trailing
             }
-            .frame(height: 54)
-            .frame(maxWidth: .infinity)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 10)
+            .frame(maxWidth: .infinity, minHeight: 54)
             .background(
                 RoundedRectangle(cornerRadius: GMShape.button, style: .continuous)
                     .strokeBorder(GM.border, lineWidth: 1.5)

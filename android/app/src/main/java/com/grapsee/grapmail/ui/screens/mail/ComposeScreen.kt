@@ -16,7 +16,13 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -317,13 +323,15 @@ Spacer(Modifier.width(10.dp))
             return@Column
         }
 
-        // Fields on top, the body filling everything between them and the
-        // pinned action bar: the compose idiom Gmail and Apple Mail ship.
-        // The scrollable Column this replaces left the body at a 240dp floor
-        // with a dead zone under it -- frame 76's photograph showed the whole
-        // lower half of the screen empty, the exact top-heavy layout the
-        // design audit set out to remove. No outer scroll: the body grows.
-        Column(Modifier.fillMaxSize().padding(horizontal = 16.dp)) {
+        val configuration = LocalConfiguration.current
+        val density = LocalDensity.current
+        val imeHeight = with(density) { WindowInsets.ime.getBottom(density).toDp() }
+        val shortEditor = configuration.screenHeightDp.dp - imeHeight < 440.dp ||
+            density.fontScale > 1.3f
+        val form = Modifier.fillMaxSize().let {
+            if (shortEditor) it.verticalScroll(rememberScrollState()) else it
+        }
+        Column(form.padding(horizontal = 16.dp)) {
 
             FieldRow(label = "To", value = state.to, placeholder = "Search contacts or type email…",
                 onValue = { vm.composeUpdate { s -> s.copy(to = it) } },
@@ -431,7 +439,7 @@ Spacer(Modifier.width(10.dp))
             }) {
                 Text(if (showFormatting || state.bodyHtml != null) "Switch to plain text" else "Format message")
             }
-            Box(Modifier.weight(1f).heightIn(min = 240.dp)) {
+            Box(if (shortEditor) Modifier.height(176.dp) else Modifier.weight(1f)) {
                 if (showFormatting || state.bodyHtml != null) {
                     ComposeFormattingEditor(
                         state.body, state.bodyHtml,
