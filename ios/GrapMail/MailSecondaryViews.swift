@@ -651,6 +651,9 @@ struct MailSettingsView: View {
     // call keeps compiling unchanged; the row simply renders without a
     // chevron when no push was wired.
     var onNotificationPrefs: (() -> Void)? = nil
+    // Same contract as the row above: the per-account mute screen, reached
+    // only where the route was wired.
+    var onPerAccountNotifications: (() -> Void)? = nil
 
     /// The system's own answer about alerts for this app, read when the screen
     /// appears — never assumed, never remembered from a previous visit.
@@ -792,6 +795,14 @@ struct MailSettingsView: View {
                                value: "Mail, security and account alerts",
                                onClick: onNotificationPrefs)
                         .accessibilityIdentifier("mail-notification-prefs-row")
+                    // The per-account mute: which signed-in account may alert
+                    // at all on this device. The row above shapes the alerts
+                    // one account sends; this one is the off switch per
+                    // account.
+                    SettingRow(icon: "bell.slash", title: "Per-account notifications",
+                               value: "Silence one signed-in account on this device",
+                               onClick: onPerAccountNotifications)
+                        .accessibilityIdentifier("mail-per-account-notifications-row")
                     // App lock — Face ID in front of the whole mailbox (AppLock.swift).
                     AppLockRow()
                     SettingRow(icon: "person", title: "Personal info",
@@ -822,6 +833,150 @@ struct MailSettingsView: View {
             // when the screen appears rather than carrying a remembered value
             // the person may have changed in Settings since.
             readNotificationStatus()
+        }
+    }
+}
+
+// ── 80a per-account notifications ────────────────────────────────────────────
+
+/// One mute per account, on this device. The register route mints a device
+/// row per signed-in account and answers its id; the PATCH on that row is
+/// what silences the account — and it must travel with the muted account's
+/// own bearer, which is why the toggle re-derives that account's bearer
+/// instead of reusing the mailbox's active one. The switch is optimistic and
+/// reverts with the reason on a refused write, the pattern the security
+/// prefs' toggles follow. The device-wide previews toggle in the settings
+/// stays untouched: this screen changes who hears, not what the preview
+/// shows.
+struct PerAccountNotificationsView: View {
+    let onBack: () -> Void
+
+    struct Row: Identifiable {
+        let address: String
+        var deviceRowId: String?
+        var muted: Bool
+        var preview: String
+        var id: String { address.lowercased() }
+    }
+
+    @State private var rows: [Row] = []
+    @State private var loaded = false
+    @State private var saving: String?
+    @State private var error: String?
+
+    var body: some View {
+        MailScaffold(title: "Per-account notifications", onBack: onBack) {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 14) {
+                    if !loaded {
+                        Text("Checking…")
+                            .font(.system(size: 13)).foregroundColor(GM.textTertiary)
+                    } else if rows.isEmpty {
+                        Text("No accounts are signed in on this device.")
+                            .font(.system(size: 13)).foregroundColor(GM.textSecondary)
+                    } else {
+                        ForEach(rows) { row in
+                            rowView(row)
+                        }
+                    }
+                    if let error {
+                        Text(error).font(.system(size: 12)).foregroundColor(GM.error)
+                    }
+                    Text("Silencing one account stops its mail alerts on this device. " +
+                         "Mandatory security alerts still arrive — the server keeps those " +
+                         "on for every account.")
+                        .font(.system(size: 12)).foregroundColor(GM.textSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .padding(20)
+            }
+        }
+        .task { load() }
+    }
+
+    private func rowView(_ row: Row) -> some View {
+        HStack(spacing: 12) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(row.address)
+                    .font(.system(size: 15)).foregroundColor(GM.textPrimary)
+                    .lineLimit(1).truncationMode(.middle)
+                Text(row.deviceRowId == nil
+                     ? "Not registered for push on this device"
+                     : row.muted ? "Muted — this account's alerts are silenced"
+                     : "Alerts arrive normally")
+                    .font(.system(size: 12)).foregroundColor(GM.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 8)
+            if saving == row.address {
+                ProgressView()
+            } else {
+                Toggle("Muted", isOn: Binding(
+                    get: { rows.first { $0.address == row.address }?.muted ?? row.muted },
+                    set: { setMuted(row, muted: $0) }
+                ))
+                .labelsHidden()
+                .tint(GM.primarySolid)
+                .disabled(row.deviceRowId == nil)
+                .accessibilityIdentifier("per-account-mute-\(row.id)")
+            }
+        }
+        .padding(.vertical, 6)
+    }
+
+    // ── reads and writes ─────────────────────────────────────────────────────
+
+    private func load() {
+        // A local read, not a fetch: the sessions this device holds and the
+        // mute record stored beside them are the whole state, and the server
+        // is asked only when the person moves a switch.
+        rows = SessionStore.accounts().map { account in
+            let state = AccountPushPrefs.read(mailbox: account.address)
+            let previews = UserDefaults.standard.object(forKey: "mailGenericPreviews") as? Bool
+            return Row(
+                address: account.address,
+                deviceRowId: state?.deviceRowId,
+                muted: state?.muted ?? false,
+                preview: state?.preview ?? (previews == true ? "generic" : "full"),
+            )
+        }
+        loaded = true
+    }
+
+    private func setMuted(_ row: Row, muted: Bool) {
+        guard let deviceRowId = row.deviceRowId else { return }
+        let previous = rows
+        // Optimistic: the switch answers at once and reverts with the reason
+        // if the server refuses the write.
+        rows = rows.map {
+            $0.address == row.address
+                ? Row(address: $0.address, deviceRowId: $0.deviceRowId, muted: muted, preview: $0.preview)
+                : $0
+        }
+        saving = row.address
+        error = nil
+        Task {
+            do {
+                // The mute must be authenticated AS the muted account, so the
+                // bearer is that account's own — not the mailbox's active one.
+                guard let bearer = await ApiClient.pushBearer(for: row.address) else {
+                    throw ApiError.http(status: 401, code: nil, message: "Sign in again.")
+                }
+                let answer = try await ApiClient.setAccountPushPreferences(
+                    token: bearer, deviceRowId: deviceRowId,
+                    enabled: !muted, preview: row.preview)
+                let confirmed = !answer.enabled
+                _ = AccountPushPrefs.setMuted(confirmed, mailbox: row.address)
+                rows = rows.map {
+                    $0.address == row.address
+                        ? Row(address: $0.address, deviceRowId: $0.deviceRowId, muted: confirmed, preview: $0.preview)
+                        : $0
+                }
+            } catch {
+                rows = previous
+                self.error = apiMessage(error, fallback: "The change did not save. Try again.")
+            }
+            saving = nil
         }
     }
 }

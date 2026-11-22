@@ -434,6 +434,10 @@ final class NotificationRegistration {
         let registration = address.flatMap { PreviewCredential.read(mailbox: $0) }
         if let address {
             PreviewCredential.clear(mailbox: address)
+            // The per-account mute record goes with the registration: the
+            // device row the DELETE removes no longer exists, and a stored
+            // mute against it is a record of nothing.
+            AccountPushPrefs.clear(mailbox: address)
             let center = UNUserNotificationCenter.current()
             center.getDeliveredNotifications { notifications in
                 let removed = notifications.filter {
@@ -497,7 +501,8 @@ final class NotificationRegistration {
                 do {
                     let secret = try await ApiClient.registerPush(
                         token: bearer, pushToken: hex,
-                        genericPreview: UserDefaults.standard.object(forKey: "mailGenericPreviews") as? Bool
+                        genericPreview: UserDefaults.standard.object(forKey: "mailGenericPreviews") as? Bool,
+                        mailbox: account.address
                     )
                     if SessionStore.account(account.address) == nil {
                         try? await ApiClient.unregisterPush(token: bearer, pushToken: hex)

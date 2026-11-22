@@ -36,6 +36,7 @@ import androidx.compose.material.icons.rounded.Language
 import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.MailOutline
 import androidx.compose.material.icons.rounded.NotificationsActive
+import androidx.compose.material.icons.rounded.NotificationsOff
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.PersonAddAlt1
 import androidx.compose.material.icons.rounded.Settings
@@ -57,9 +58,11 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.launch
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -71,8 +74,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.grapsee.grapmail.data.Api
 import com.grapsee.grapmail.data.MailAliasDto
 import com.grapsee.grapmail.data.MailLabelDto
+import com.grapsee.grapmail.data.SessionRefresh
+import com.grapsee.grapmail.data.SessionStore
+import com.grapsee.grapmail.logic.AccountPushState
 import com.grapsee.grapmail.logic.MailboxViewModel
 import com.grapsee.grapmail.ui.components.CountBadge
 import com.grapsee.grapmail.ui.components.GradientButton
@@ -621,6 +628,7 @@ fun MailSettingsScreen(
     onPrivacy: () -> Unit,
     onEncryption: () -> Unit,
     onNotificationPrefs: () -> Unit,
+    onPerAccountNotifications: () -> Unit,
     onHelp: () -> Unit,
     onSignOut: () -> Unit,
 ) {
@@ -767,6 +775,12 @@ fun MailSettingsScreen(
             SettingRow(Icons.Rounded.NotificationsActive, "Notification preferences",
                 "Mail, security and account alerts, plus quiet hours",
                 palette, onClick = onNotificationPrefs)
+            // The per-account mute: which signed-in account may alert at all
+            // on this handset. The row above shapes the alerts one account
+            // sends; this one is the off switch per account.
+            SettingRow(Icons.Rounded.NotificationsOff, "Per-account notifications",
+                "Silence one signed-in account on this device",
+                palette, onClick = onPerAccountNotifications)
             // The app lock is a preference on this handset, not an account
             // setting: it guards this device's copy of the mailbox. A device
             // that cannot keep the promise says so instead of offering a lock
@@ -824,6 +838,143 @@ fun MailSettingsScreen(
                 modifier = Modifier.padding(horizontal = 20.dp).clickable(onClick = onSignOut)
                     .testTag("mail-sign-out"))
             Spacer(Modifier.height(30.dp))
+        }
+    }
+}
+
+// ── 80a per-account notifications ────────────────────────────────────────────
+
+/**
+ * One mute per account, on this device. The register route mints a device row
+ * per signed-in account and answers its id; the PATCH on that row is what
+ * silences the account — and it must travel with the muted account's own
+ * bearer, which is why the toggle refreshes that account's session instead of
+ * reusing the mailbox's active one. The switch is optimistic and reverts with
+ * the reason on a refused write, the pattern the screener's switch follows.
+ * The device-wide previews toggle in the settings stays untouched: this
+ * screen changes who hears, not what the preview shows.
+ */
+@Composable
+fun PerAccountNotificationsScreen(onBack: () -> Unit) {
+    val palette = LocalPalette.current
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val scope = rememberCoroutineScope()
+    var rows by remember { mutableStateOf<List<AccountPushState>?>(null) }
+    var failed by remember { mutableStateOf(false) }
+    var busyEmail by remember { mutableStateOf<String?>(null) }
+    var error by remember { mutableStateOf<String?>(null) }
+
+    suspend fun load() {
+        try {
+            rows = PushSync.accountPushState(context)
+            failed = false
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            rows = null
+            failed = true
+        }
+    }
+
+    LaunchedEffect(Unit) { load() }
+
+    fun setMuted(row: AccountPushState, muted: Boolean) {
+        val deviceRowId = row.deviceRowId ?: return
+        val previous = rows
+        // Optimistic: the switch answers at once and reverts with the reason
+        // if the server refuses the write.
+        rows = rows?.map { if (it.email == row.email) it.copy(muted = muted) else it }
+        scope.launch {
+            busyEmail = row.email
+            error = null
+            try {
+                val stored = SessionStore.snapshotAll(context)
+                    .firstOrNull { it.address.equals(row.email, ignoreCase = true) }
+                    ?: throw IllegalStateException("Sign in again.")
+                val session = SessionRefresh.forAccount(context, stored.id)
+                    ?: throw IllegalStateException("Sign in again.")
+                val answer = Api.setAccountPushPreferences(
+                    session.token, deviceRowId,
+                    enabled = !muted,
+                    preview = row.preview,
+                )
+                val confirmed = answer.enabled?.let { !it } ?: muted
+                PushSync.setMuted(context, row.email, confirmed)
+                rows = rows?.map { if (it.email == row.email) it.copy(muted = confirmed) else it }
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                rows = previous
+                error = e.message ?: "The change did not save. Try again."
+            } finally {
+                busyEmail = null
+            }
+        }
+    }
+
+    MailScaffold("Per-account notifications", onBack) {
+        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+            SectionLabel("Signed-in accounts", palette)
+            val current = rows
+            when {
+                current == null && !failed ->
+                    Text("Checking…", fontSize = 13.sp, color = palette.textTertiary,
+                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp))
+                current == null -> {
+                    Text("The account list did not load.", fontSize = 13.sp,
+                        color = palette.textSecondary,
+                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp))
+                    androidx.compose.material3.TextButton(onClick = { scope.launch { load() } }) {
+                        Text("Retry")
+                    }
+                }
+                current.isEmpty() ->
+                    Text("No accounts are signed in on this device.", fontSize = 13.sp,
+                        color = palette.textSecondary,
+                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp))
+                else -> current.forEach { row ->
+                    val busy = busyEmail == row.email
+                    Row(
+                        Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(Icons.Rounded.Person, null, tint = palette.textSecondary,
+                            modifier = Modifier.size(20.dp))
+                        Spacer(Modifier.width(14.dp))
+                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Text(row.email, fontSize = 15.sp, fontWeight = FontWeight.Medium,
+                                color = palette.textPrimary)
+                            Text(
+                                when {
+                                    row.deviceRowId == null -> "Not registered for push on this device"
+                                    row.muted -> "Muted — this account's alerts are silenced"
+                                    else -> "Alerts arrive normally"
+                                },
+                                fontSize = 13.sp, color = palette.textSecondary,
+                            )
+                        }
+                        if (busy) {
+                            CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
+                        } else {
+                            Switch(
+                                checked = row.muted,
+                                onCheckedChange = { setMuted(row, it) },
+                                enabled = row.deviceRowId != null,
+                                colors = SwitchDefaults.colors(checkedTrackColor = palette.primarySolid),
+                            )
+                        }
+                    }
+                }
+            }
+            error?.let {
+                Spacer(Modifier.height(8.dp))
+                Text(it, fontSize = 12.sp, color = palette.error,
+                    modifier = Modifier.padding(horizontal = 20.dp))
+            }
+            Spacer(Modifier.height(14.dp))
+            NoteBar("Silencing one account stops its mail alerts on this device. " +
+                "Mandatory security alerts still arrive — the server keeps those on for every account.")
+            Spacer(Modifier.height(20.dp))
         }
     }
 }

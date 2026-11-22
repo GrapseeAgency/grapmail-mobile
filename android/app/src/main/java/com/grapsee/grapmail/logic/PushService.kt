@@ -84,6 +84,20 @@ class PushService : FirebaseMessagingService() {
     }
 }
 
+/**
+ * One signed-in account's per-account push state on this device, as the
+ * per-account notifications screen reads it. `deviceRowId` is null when no
+ * registration this app could read a row id from exists — the mute write
+ * addresses the row, so the screen shows such an account as not registered
+ * rather than offering a toggle wired to nothing.
+ */
+data class AccountPushState(
+    val email: String,
+    val deviceRowId: String?,
+    val muted: Boolean,
+    val preview: String,
+)
+
 /** Registration bookkeeping shared by the service, the sign-in doors and the app's launch. */
 object PushSync {
     private const val PREFS = "grapmail-push"
@@ -100,6 +114,66 @@ object PushSync {
     fun setGenericPreviews(context: Context, enabled: Boolean) {
         prefs(context).edit().putBoolean("genericPreviews", enabled).apply()
         registerAsync(context.applicationContext)
+    }
+
+    // ── per-account mute state ───────────────────────────────────────────────
+    //
+    // The same prefs store that tracks the FCM token also keeps one record per
+    // account: the device row the register route minted for it (`device.id`,
+    // the handle the mute write addresses), the mute flag the server last
+    // confirmed, and the preview mode the registration carried. Keyed by the
+    // lowercased address, the identity the session store answers with.
+
+    private fun deviceRowKey(address: String) = "deviceRow:${address.lowercase()}"
+    private fun mutedKey(address: String) = "muted:${address.lowercase()}"
+    private fun previewKey(address: String) = "preview:${address.lowercase()}"
+
+    /**
+     * Record the row a successful registration minted. The muted flag carries
+     * only when the row id is UNCHANGED — the route upserts on (account,
+     * token), so a same id means the server still holds the mute it was set
+     * on; a NEW id is a row the server created with notifications enabled,
+     * and the local flag must say so rather than carry a mute across to a row
+     * that never had one.
+     */
+    fun storeDeviceRow(context: Context, address: String, rowId: String, preview: String?) {
+        val preferences = prefs(context)
+        val key = address.lowercase()
+        val carried = preferences.getString(deviceRowKey(key), null) == rowId &&
+            preferences.getBoolean(mutedKey(key), false)
+        val editor = preferences.edit().putString(deviceRowKey(key), rowId)
+        preview?.let { editor.putString(previewKey(key), it) }
+        editor.putBoolean(mutedKey(key), carried).apply()
+    }
+
+    /** Flip the stored mute once the server confirmed the same value. */
+    fun setMuted(context: Context, address: String, muted: Boolean) {
+        prefs(context).edit().putBoolean(mutedKey(address.lowercase()), muted).apply()
+    }
+
+    /** Drop the per-account record beside the registration teardown. */
+    private fun forgetAccount(context: Context, address: String) {
+        val key = address.lowercase()
+        prefs(context).edit()
+            .remove(deviceRowKey(key))
+            .remove(mutedKey(key))
+            .remove(previewKey(key))
+            .apply()
+    }
+
+    /** Every signed-in account with its stored per-account push state. */
+    suspend fun accountPushState(context: Context): List<AccountPushState> {
+        val preferences = prefs(context)
+        return SessionStore.snapshotAll(context).map { stored ->
+            val key = stored.address.lowercase()
+            AccountPushState(
+                email = stored.address,
+                deviceRowId = preferences.getString(deviceRowKey(key), null),
+                muted = preferences.getBoolean(mutedKey(key), false),
+                preview = preferences.getString(previewKey(key), null)
+                    ?: if (genericPreviews(context)) "generic" else "full",
+            )
+        }
     }
 
     /** A build without the Firebase client config has no initialized app. */
@@ -133,9 +207,20 @@ object PushSync {
                 val preferences = prefs(context)
                 val preview = preferences.getBoolean("genericPreviews", false)
                     .takeIf { preferences.contains("genericPreviews") }
-                Api.registerPush(session.token, deviceToken, preview)
+                val registered = Api.registerPush(session.token, deviceToken, preview)
                 if (SessionStore.snapshotAll(context).none { it.id == session.id }) {
                     Api.unregisterPush(session.token, deviceToken)
+                } else {
+                    // The row id is the per-account mute handle; it is stored
+                    // only for an account still held, so a sign-out that raced
+                    // the registration cannot leave a record of a row the
+                    // unregister above just retired.
+                    registered.device?.id?.let { rowId ->
+                        storeDeviceRow(
+                            context, session.address, rowId,
+                            preview?.let { if (it) "generic" else "full" },
+                        )
+                    }
                 }
             } catch (cancelled: kotlinx.coroutines.CancellationException) {
                 throw cancelled
@@ -163,6 +248,10 @@ object PushSync {
         } catch (_: Exception) {
             // Registration teardown is best-effort. Local sign-out still proceeds.
         }
+        // The per-account record goes with the registration: the row the
+        // DELETE removed no longer exists, and a stored mute against it is the
+        // same lie as a registration nobody sends.
+        forgetAccount(context, session.address)
     }
 
     /** Drop the local registration record without a network call — the path

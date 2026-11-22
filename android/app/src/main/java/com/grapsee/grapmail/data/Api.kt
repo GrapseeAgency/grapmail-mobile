@@ -975,6 +975,18 @@ data class QuietHoursBody(
     val tzOffsetMin: Int,
 )
 
+/**
+ * The echo PATCH /grapsee/grapmail/push/devices/:id/preferences answers with —
+ * the mute and the preview mode the server now holds for that one device row.
+ * Both nullable: the route's contract names them, but an echo that arrived
+ * without one must fall back to what the client asked for, not to an invented
+ * default.
+ */
+@Serializable data class PushDevicePrefsResponse(
+    val enabled: Boolean? = null,
+    val preview: String? = null,
+)
+
 object Api {
     val BASE: String = com.grapsee.grapmail.BuildConfig.API_BASE
 
@@ -1246,7 +1258,8 @@ object Api {
 
     private val launchApi by lazy { LaunchApi(BASE, DeviceId.value, userAgent) }
     suspend fun deleteAccount(token: String, password: String) = launchApi.deleteAccount(token, password)
-    suspend fun registerPush(token: String, pushToken: String, genericPreview: Boolean?) = launchApi.registerPush(token, pushToken, genericPreview)
+    suspend fun registerPush(token: String, pushToken: String, genericPreview: Boolean?): RegisterPushResponse =
+        launchApi.registerPush(token, pushToken, genericPreview)
     suspend fun unregisterPush(token: String, pushToken: String) = launchApi.unregisterPush(token, pushToken)
 
     /**
@@ -1847,6 +1860,36 @@ object Api {
         val (status, body) = execute(request)
         if (status >= 400) fail(status, body)
         return decodeResponse<NotificationPrefPatchResponse>(body)
+    }
+
+    /**
+     * The per-account mute: `enabled = false` silences THIS account's mail
+     * notifications on THIS device. The bearer must be the muted account's
+     * own — the route updates only a device row the bearer's account owns, so
+     * a session for a different mailbox cannot silence another one's alerts.
+     * Mandatory security alerts stay on regardless; the server keeps those.
+     *
+     * `preview` rides the same strict body the route requires (`full` or
+     * `generic`): callers pass the mode the account was last registered with,
+     * because the write replaces both columns and a mute sent blind would
+     * quietly rewrite what the previews toggle had chosen.
+     */
+    suspend fun setAccountPushPreferences(
+        token: String,
+        deviceRowId: String,
+        enabled: Boolean,
+        preview: String = "full",
+    ): PushDevicePrefsResponse {
+        val payload = kotlinx.serialization.json.buildJsonObject {
+            put("enabled", kotlinx.serialization.json.JsonPrimitive(enabled))
+            put("preview", kotlinx.serialization.json.JsonPrimitive(preview))
+        }
+        val request = authed("$MAIL/push/devices/${enc(deviceRowId)}/preferences", token)
+            .method("PATCH", postBody(payload.toString()))
+            .build()
+        val (status, body) = execute(request)
+        if (status >= 400) fail(status, body)
+        return decodeResponse<PushDevicePrefsResponse>(body)
     }
 
     // ── Mailbox sector ───────────────────────────────────────────────────────

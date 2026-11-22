@@ -93,6 +93,9 @@ struct RootView: View {
         // Per-scope notification preferences (mail / security / account),
         // edited on the account-wide preference row the push backend reads.
         case mailNotifPrefs
+        // The per-account mute: one signed-in account's alerts silenced on
+        // this device. Hangs off mailSettings like the per-scope row beside it.
+        case perAccountNotifications
         case accountProfile, accountPrivacy, mailSupport
         // The web's `/mail/account/connections/<product>`: one linked app in
         // full. The product rides as a route payload, mirroring the encoded
@@ -985,10 +988,13 @@ struct RootView: View {
                         onEncryption: { path.append(.e2eStatus) },
                         onHelp: { path.append(.mailSupport) },
                         onSignOut: signOutOfMailbox,
-                        onNotificationPrefs: { path.append(.mailNotifPrefs) }
+                        onNotificationPrefs: { path.append(.mailNotifPrefs) },
+                        onPerAccountNotifications: { path.append(.perAccountNotifications) }
                     )
                 case .mailNotifPrefs:
                     NotificationPrefsView(onBack: { path.removeLast() })
+                case .perAccountNotifications:
+                    PerAccountNotificationsView(onBack: { path.removeLast() })
                 case .mailNotes:
                     NotesView(vm: account, onBack: { path.removeLast() })
                 case .mailTasks:

@@ -351,6 +351,9 @@ object Routes {
     const val SEC_PASSKEYS = "security/passkeys"
     const val SEC_RECOVERY_CODES = "security/recovery-codes"
     const val MAIL_NOTIFY_PREFS = "mail/settings/notifications"
+    // The per-account mute — one signed-in account's alerts silenced on this
+    // device. Hangs off the settings screen like the per-scope row beside it.
+    const val MAIL_PER_ACCOUNT_NOTIFY = "mail/settings/per-account-notifications"
     const val SEC_ALERT = "security/alert"
     const val SEC_SECURE = "security/secure"
     const val STEP_NAME = "signup/name"
@@ -1589,8 +1592,14 @@ fun GrapMailNav(
                 onPrivacy = { nav.navigate(Routes.ACCOUNT_PRIVACY) },
                 onEncryption = { nav.navigate(Routes.E2E_STATUS) },
                 onNotificationPrefs = { nav.navigate(Routes.MAIL_NOTIFY_PREFS) },
+                onPerAccountNotifications = { nav.navigate(Routes.MAIL_PER_ACCOUNT_NOTIFY) },
                 onHelp = { nav.navigate(Routes.MAIL_SUPPORT) },
                 onSignOut = ::signOutOfMailbox,
+            )
+        }
+        composable(Routes.MAIL_PER_ACCOUNT_NOTIFY) {
+            com.grapsee.grapmail.ui.screens.mail.PerAccountNotificationsScreen(
+                onBack = { nav.popBackStack() },
             )
         }
         composable(Routes.MAIL_NOTES) { entry ->

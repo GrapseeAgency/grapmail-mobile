@@ -1679,6 +1679,27 @@ struct NotificationPrefResponse: Decodable {
     }
 }
 
+/// One push_devices row as the register route answers it. `id` is the mute
+/// handle: the per-account preference write addresses THIS row, so the client
+/// keeps it beside the account the registration ran for.
+struct PushDeviceDto: Decodable {
+    var id = ""
+    var platform = ""
+    var deviceId = ""
+    var createdAt: String?
+    var lastSeenAt: String?
+
+    private enum CodingKeys: String, CodingKey { case id, platform, deviceId, createdAt, lastSeenAt }
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = c.lenient(.id, "")
+        platform = c.lenient(.platform, "")
+        deviceId = c.lenient(.deviceId, "")
+        createdAt = c.lenientOpt(.createdAt)
+        lastSeenAt = c.lenientOpt(.lastSeenAt)
+    }
+}
+
 private struct TwoFactorEnableRequest: Codable { var twoFactor: String; var proof: String; var phoneProof: String }
 private struct TwoFactorDisableRequest: Codable { var twoFactor: String; var currentPassword: String }
 private struct PasswordChangeRequest: Codable { var currentPassword: String; var newPassword: String }
@@ -2112,8 +2133,10 @@ struct ApiClient {
 
     /// The backend keeps this device's push token so it can wake the app when
     /// mail reaches the mailbox. `deviceId` is the same `x-device-id` the other
-    /// routes carry, so the server can tell one install from another.
-    static func registerPush(token: String, pushToken: String, genericPreview: Bool?) async throws -> String? {
+    /// routes carry, so the server can tell one install from another. The 201
+    /// body also names the push_devices row the registration minted — the mute
+    /// handle — which is stored under the account the registration ran for.
+    static func registerPush(token: String, pushToken: String, genericPreview: Bool?, mailbox: String) async throws -> String? {
         struct Body: Encodable {
             let token: String
             let platform: String
@@ -2125,6 +2148,7 @@ struct ApiClient {
             let message: String?
             let previewSecret: String?
             let previewDevice: String?
+            let device: PushDeviceDto?
         }
         let response: Registration = try await request(
             "/grapsee/grapmail/push/register", method: "POST",
@@ -2134,6 +2158,17 @@ struct ApiClient {
         guard response.success else {
             throw ApiError.http(status: 200, code: nil,
                                 message: response.message ?? "Push registration was not confirmed.")
+        }
+        // The row id is what the per-account mute addresses; keep it keyed to
+        // the account it was minted under, the same keying the preview
+        // credential uses. A registration whose row could not be stored still
+        // stands — only the mute handle is missing, and the mute screen says
+        // "not registered" rather than pretending one exists.
+        if let device = response.device, !device.id.isEmpty,
+           !AccountPushPrefs.store(deviceRowId: device.id,
+                                   preview: genericPreview.map { $0 ? "generic" : "full" },
+                                   mailbox: mailbox) {
+            print("Push device row could not be saved.")
         }
         guard let secret = response.previewSecret else { return nil }
         return response.previewDevice.map { "\($0).\(secret)" } ?? secret
@@ -2169,6 +2204,35 @@ struct ApiClient {
             throw ApiError.http(status: 200, code: nil,
                                 message: response.message ?? "Push deregistration was not confirmed.")
         }
+    }
+
+    /// PATCH devices/:id/preferences — mute or unmute ONE account's
+    /// notifications on THIS device. The bearer must be the muted account's
+    /// own: the route updates only a device row the bearer's account owns, so
+    /// a session for a different mailbox cannot silence another one's alerts.
+    /// Mandatory security alerts stay on regardless — the server keeps those.
+    /// The body is strict (`enabled` + `preview`), and the write replaces both
+    /// columns, so callers pass the preview mode the account was last
+    /// registered with instead of letting a mute rewrite it blind.
+    static func setAccountPushPreferences(token: String, deviceRowId: String, enabled: Bool,
+                                          preview: String = "full") async throws -> (enabled: Bool, preview: String) {
+        struct Body: Encodable { let enabled: Bool; let preview: String }
+        struct Preferences: Decodable {
+            var enabled: Bool?
+            var preview: String?
+
+            private enum CodingKeys: String, CodingKey { case enabled, preview }
+            init(from decoder: Decoder) throws {
+                let c = try decoder.container(keyedBy: CodingKeys.self)
+                enabled = c.lenientOpt(.enabled)
+                preview = c.lenientOpt(.preview)
+            }
+        }
+        let encodedId = deviceRowId.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? deviceRowId
+        let response: Preferences = try await request(
+            "\(mailBase)/push/devices/\(encodedId)/preferences", method: "PATCH",
+            body: encoder.encode(Body(enabled: enabled, preview: preview)), bearer: token)
+        return (response.enabled ?? enabled, response.preview ?? preview)
     }
 
     static func twoFactorCode(challengeId: String, code: String) async throws -> TwoFactorResponse {
