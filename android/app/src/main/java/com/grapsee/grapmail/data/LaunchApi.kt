@@ -32,12 +32,13 @@ internal class LaunchApi(
         buildJsonObject { put("password", password) }.toString(),
     )
 
-    suspend fun registerPush(token: String, pushToken: String): ActionResponse = post(
+    suspend fun registerPush(token: String, pushToken: String, genericPreview: Boolean?): ActionResponse = post(
         "/grapsee/grapmail/push/register", token,
         buildJsonObject {
             put("platform", "android")
             put("token", pushToken)
             put("deviceId", deviceId)
+            genericPreview?.let { put("preview", if (it) "generic" else "full") }
         }.toString(),
     )
 

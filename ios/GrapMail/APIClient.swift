@@ -1404,8 +1404,13 @@ struct ApiClient {
     /// The backend keeps this device's push token so it can wake the app when
     /// mail reaches the mailbox. `deviceId` is the same `x-device-id` the other
     /// routes carry, so the server can tell one install from another.
-    static func registerPush(token: String, pushToken: String) async throws -> String? {
-        struct Body: Encodable { let token: String; let platform: String; let deviceId: String }
+    static func registerPush(token: String, pushToken: String, genericPreview: Bool?) async throws -> String? {
+        struct Body: Encodable {
+            let token: String
+            let platform: String
+            let deviceId: String
+            let preview: String?
+        }
         struct Registration: Decodable {
             let success: Bool
             let message: String?
@@ -1414,7 +1419,8 @@ struct ApiClient {
         }
         let response: Registration = try await request(
             "/grapsee/grapmail/push/register", method: "POST",
-            body: encoder.encode(Body(token: pushToken, platform: "ios", deviceId: DeviceId.value)),
+            body: encoder.encode(Body(token: pushToken, platform: "ios", deviceId: DeviceId.value,
+                                      preview: genericPreview.map { $0 ? "generic" : "full" })),
             bearer: token)
         guard response.success else {
             throw ApiError.http(status: 200, code: nil,

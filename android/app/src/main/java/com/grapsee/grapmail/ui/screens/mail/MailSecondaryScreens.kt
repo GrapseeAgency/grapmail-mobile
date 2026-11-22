@@ -1,5 +1,6 @@
 package com.grapsee.grapmail.ui.screens.mail
 
+import com.grapsee.grapmail.logic.PushSync
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -748,6 +749,16 @@ fun MailSettingsScreen(
                     } else {
                         askNotifications.launch(android.Manifest.permission.POST_NOTIFICATIONS)
                     }
+                })
+            var hideMailPreviews by remember {
+                mutableStateOf(PushSync.genericPreviews(notifyContext))
+            }
+            SettingRow(Icons.Rounded.Lock, "Mail notification previews",
+                if (hideMailPreviews) "Hidden on this device" else "Show sender and subject",
+                palette,
+                onClick = {
+                    hideMailPreviews = !hideMailPreviews
+                    PushSync.setGenericPreviews(notifyContext, hideMailPreviews)
                 })
             // The app lock is a preference on this handset, not an account
             // setting: it guards this device's copy of the mailbox. A device

@@ -145,11 +145,11 @@ struct SignInView: View {
                 // presence is the gate, not the `requireOtp` flag, which this
                 // backend omits on ordinary sign-ins. Reading an absent flag as
                 // "no code needed" would sign a 2FA account in on the password.
-                if resp.secondFactorRequired, let cid = resp.challengeId {
+                if resp.secondFactorRequired {
                     model.identifier = identifier.trimmingCharacters(in: .whitespaces)
                     model.password = password
                     password = ""
-                    model.challengeId = cid
+                    model.challengeId = resp.challengeId
                     // The CHALLENGE's expiry, for the code countdown — deliberately
                     // `expiresAt` and not `expiresAtDate`: the latter falls back to
                     // the session's `expiresIn`, and a countdown that claims the
@@ -278,8 +278,10 @@ struct TwoFactorView: View {
             onBack: onBack,
             illustration: "ill_account_2fa",
             eyebrow: "Two-step verification",
-            title: "Enter your 6-digit code",
-            subtitle: "We've sent a verification code to your GrapMail account. Please enter the 6-digit code to continue.",
+            title: model.challengeId == nil ? "Use a backup code" : "Enter your 6-digit code",
+            subtitle: model.challengeId == nil
+                ? "A verification text is unavailable. Use one of your saved backup codes to continue."
+                : "Enter the six-digit code we sent to your phone.",
             content: {
                 CodeCells(length: 6, value: $code)
                 HStack {

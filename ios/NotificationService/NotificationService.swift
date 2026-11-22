@@ -19,6 +19,18 @@ final class NotificationService: UNNotificationServiceExtension {
     override func didReceive(_ request: UNNotificationRequest,
                              withContentHandler contentHandler: @escaping (UNNotificationContent) -> Void) {
         let original = request.content
+        if original.userInfo["encrypted"] as? String == "1",
+           let encrypted = original.mutableCopy() as? UNMutableNotificationContent {
+            encrypted.title = "GrapMail"
+            encrypted.subtitle = ""
+            encrypted.body = "New encrypted message"
+            encrypted.attachments = []
+            var info = encrypted.userInfo
+            for key in ["previewTicket", "sender", "subject"] { info.removeValue(forKey: key) }
+            encrypted.userInfo = info
+            contentHandler(encrypted)
+            return
+        }
         guard let content = original.mutableCopy() as? UNMutableNotificationContent,
               let ticket = original.userInfo["previewTicket"] as? String,
               let mailbox = original.userInfo["mailbox"] as? String,

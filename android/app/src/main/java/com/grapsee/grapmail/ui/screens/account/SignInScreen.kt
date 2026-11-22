@@ -94,10 +94,6 @@ fun SignInScreen(
             try {
                 val resp = Api.signIn(submittedIdentifier, submittedPassword)
                 if (resp.secondFactorRequired) {
-                    if (!resp.emailOtpRequired && resp.challengeId.isNullOrBlank()) {
-                        error = "The verification challenge is incomplete. Sign in again."
-                        return@launch
-                    }
                     flow.update {
                         copy(
                             identifier = submittedIdentifier,

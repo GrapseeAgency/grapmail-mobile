@@ -127,13 +127,15 @@ object Notifications {
     }
 
     fun newMail(context: Context, grew: Int, total: Int, message: MailMessageDto? = null,
-                account: String? = null, sessionId: String? = null, image: Bitmap? = null): Boolean {
+                account: String? = null, sessionId: String? = null, image: Bitmap? = null,
+                hidePreview: Boolean = false): Boolean {
         if (!allowed(context)) return false
         ensureChannel(context)
-        val sender = message?.let { it.from?.display?.trim()?.takeIf(String::isNotEmpty) ?: "New sender" }
-        val summary = "$total unread in the inbox"
-        val subject = if (message?.isE2eEncrypted == true) "New encrypted message"
-        else message?.subject?.takeIf { it.isNotBlank() } ?: "(no subject)"
+        val encrypted = message?.isE2eEncrypted == true
+        val privateContent = encrypted || hidePreview
+        val sender = message?.takeUnless { privateContent }?.let { it.from?.display?.trim()?.takeIf(String::isNotEmpty) ?: "New sender" }
+        val summary = if (total > 0) "$total unread in the inbox" else "Open GrapMail to read it"
+        val subject = message?.subject?.takeIf { it.isNotBlank() } ?: "(no subject)"
         val target = if (message != null && sessionId != null) MailTarget(message.id, message.threadId, sessionId, "open") else null
         val preview = message?.snippet?.trim()?.takeIf { it.isNotEmpty() && !message.isE2eEncrypted }
         val expandedText = if (sender != null) listOfNotNull(subject, preview).joinToString("\n") else summary
@@ -142,10 +144,11 @@ object Notifications {
             // The small icon is a monochrome alpha silhouette — the platform tints it;
             // the full-color mark only ever appears on the launcher and the splash.
             .setSmallIcon(R.mipmap.ic_launcher_monochrome)
-            .setContentTitle(sender ?: "$grew new message" + (if (grew == 1) "" else "s"))
+            .setContentTitle(if (encrypted) "New encrypted message"
+                else sender ?: "$grew new message" + (if (grew == 1) "" else "s"))
             .setContentText(compactText)
-            .setSubText(account?.takeIf { it.isNotBlank() })
-            .setStyle(if (image != null) {
+            .setSubText(account?.takeIf { !privateContent && it.isNotBlank() })
+            .setStyle(if (image != null && !privateContent) {
                 NotificationCompat.BigPictureStyle().bigPicture(image).setSummaryText(expandedText)
             } else {
                 NotificationCompat.BigTextStyle().bigText(expandedText)
@@ -158,7 +161,7 @@ object Notifications {
                     addAction(0, "Archive", pendingUpdate(context, target.copy(action = "archive")))
                     addAction(0, "Mark as read", pendingUpdate(context, target.copy(action = "read")))
                     val replyAddress = message?.from?.address?.trim()?.takeIf { it.isNotEmpty() }
-                    if (replyAddress != null && message?.isE2eEncrypted != true) {
+                    if (replyAddress != null && !privateContent) {
                         addAction(NotificationCompat.Action.Builder(
                             0, "Reply",
                             pendingReply(context, target, replyAddress, subject),

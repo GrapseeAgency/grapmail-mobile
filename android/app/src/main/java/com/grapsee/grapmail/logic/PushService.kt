@@ -18,6 +18,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.sync.withLock
 
 /**
  * The push half of new-mail delivery, beside the poll (which stays: a signal
@@ -50,11 +51,14 @@ class PushService : FirebaseMessagingService() {
     override fun onMessageReceived(message: RemoteMessage) {
         val context = applicationContext
         val id = message.data["messageId"]?.takeIf { it.isNotBlank() && it.length <= 300 }
-        val mailbox = message.data["mailbox"]
+        val mailbox = message.data["mailbox"]?.takeIf { it.length <= 320 }
+        if (id != null && mailbox.isNullOrBlank()) return
         val request = OneTimeWorkRequestBuilder<MailPollWorker>()
-            .setInputData(workDataOf("messageId" to id, "mailbox" to mailbox,
-                "threadId" to message.data["threadId"], "sender" to message.data["sender"],
-                "subject" to message.data["subject"], "encrypted" to message.data["encrypted"]))
+            .setInputData(workDataOf(
+                "messageId" to id,
+                "mailbox" to mailbox,
+                "privatePreview" to (message.data["privatePreview"] == "1"),
+            ))
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S &&
             message.priority == RemoteMessage.PRIORITY_HIGH
         ) request.setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
@@ -77,6 +81,13 @@ object PushSync {
     private fun prefs(context: Context) =
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 
+    fun genericPreviews(context: Context): Boolean = prefs(context).getBoolean("genericPreviews", false)
+
+    fun setGenericPreviews(context: Context, enabled: Boolean) {
+        prefs(context).edit().putBoolean("genericPreviews", enabled).apply()
+        registerAsync(context.applicationContext)
+    }
+
     /** A build without the Firebase client config has no initialized app. */
     fun configured(context: Context): Boolean = FirebaseApp.getApps(context).isNotEmpty()
 
@@ -94,16 +105,21 @@ object PushSync {
      * session bearer. A missing config, a missing session or a refused POST
      * each leave the registration where it was — the poll covers delivery.
      */
-    suspend fun register(context: Context) {
-        if (!configured(context)) return
-        if (!Notifications.allowed(context)) return
-        val deviceToken = runCatching { FirebaseMessaging.getInstance().token.await() }.getOrNull() ?: return
+    private val registrationLock = kotlinx.coroutines.sync.Mutex()
+
+    suspend fun register(context: Context) = registrationLock.withLock {
+        if (!configured(context)) return@withLock
+        if (!Notifications.allowed(context)) return@withLock
+        val deviceToken = runCatching { FirebaseMessaging.getInstance().token.await() }.getOrNull() ?: return@withLock
         prefs(context).edit().putString(KEY_TOKEN, deviceToken).apply()
         val sessions = SessionStore.snapshotAll(context)
         for (stored in sessions) {
             val session = com.grapsee.grapmail.data.SessionRefresh.forAccount(context, stored.id) ?: continue
             try {
-                Api.registerPush(session.token, deviceToken)
+                val preferences = prefs(context)
+                val preview = preferences.getBoolean("genericPreviews", false)
+                    .takeIf { preferences.contains("genericPreviews") }
+                Api.registerPush(session.token, deviceToken, preview)
                 if (SessionStore.snapshotAll(context).none { it.id == session.id }) {
                     Api.unregisterPush(session.token, deviceToken)
                 }

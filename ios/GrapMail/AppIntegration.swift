@@ -220,7 +220,8 @@ enum MailPoll {
         guard grew > 0 else { return false }
         let message = grew == 1 ? arrivals?.first : nil
         var previewFile: URL?
-        if let id = message?.id,
+        if !UserDefaults.standard.bool(forKey: "mailGenericPreviews"),
+           let id = message?.id,
            let details = await cacheNotificationMessage(id: id, token: token, generation: generation),
            !details.isE2eEncrypted,
            let item = details.attachments.first(where: {
@@ -247,28 +248,32 @@ enum MailPoll {
         let content = UNMutableNotificationContent()
         content.title = "\(grew) new message\(grew == 1 ? "" : "s")"
         content.body = "\(total) unread in the inbox"
+        let encrypted = message?.isE2eEncrypted == true
+        let privatePreview = encrypted || UserDefaults.standard.bool(forKey: "mailGenericPreviews")
+        if encrypted { content.title = "New encrypted message" }
         content.sound = .default
-        if let previewFile, let attachment = try? UNNotificationAttachment(identifier: "image", url: previewFile) {
+        if !privatePreview, let previewFile, let attachment = try? UNNotificationAttachment(identifier: "image", url: previewFile) {
             content.attachments = [attachment]
         }
         if let message, let account = SessionStore.address, !account.isEmpty {
-            content.subtitle = account
+            if !privatePreview { content.subtitle = account }
             content.categoryIdentifier = actionCategory
             // The reply path needs the sender's address and the subject at the
             // moment the person answers; both are carried here so the inline
             // send never has to fetch the message back. `e2e` marks a sealed
             // message, where replying inline would send plaintext.
             content.userInfo = ["messageId": message.id, "threadId": message.threadId ?? "", "account": account,
-                                "sender": message.from?.address ?? "",
-                                "subject": message.isE2eEncrypted ? "" : (message.subject ?? ""),
-                                "e2e": message.isE2eEncrypted ? "1" : "0"]
+                                "sender": privatePreview ? "" : (message.from?.address ?? ""),
+                                "subject": privatePreview ? "" : (message.subject ?? ""),
+                                "e2e": message.isE2eEncrypted ? "1" : "0",
+                                "privatePreview": privatePreview ? "1" : "0"]
         }
 
         var notification: UNNotificationContent = content
-        if let message, let sender = message.from?.display.nilIfBlank() {
+        if !privatePreview, let message, let sender = message.from?.display.nilIfBlank() {
             content.title = sender
-            let subject = message.isE2eEncrypted ? "New encrypted message" : (message.subject?.nilIfBlank() ?? "(no subject)")
-            let preview = message.isE2eEncrypted ? nil : message.snippet?.nilIfBlank()
+            let subject = message.subject?.nilIfBlank() ?? "(no subject)"
+            let preview = message.snippet?.nilIfBlank()
             content.body = [subject, preview].compactMap { $0 }.joined(separator: "\n")
             content.threadIdentifier = message.threadId ?? message.id
             if let address = message.from?.address?.nilIfBlank(),
@@ -479,6 +484,8 @@ final class NotificationRegistration {
         UNUserNotificationCenter.current().removeAllPendingNotificationRequests()
     }
 
+    func refreshPreferences() { postRegistration() }
+
     private func postRegistration() {
         guard let token = deviceToken else { return }
         let hex = Self.hex(token)
@@ -488,7 +495,10 @@ final class NotificationRegistration {
                 guard !Task.isCancelled else { return }
                 guard let bearer = await ApiClient.pushBearer(for: account.address) else { continue }
                 do {
-                    let secret = try await ApiClient.registerPush(token: bearer, pushToken: hex)
+                    let secret = try await ApiClient.registerPush(
+                        token: bearer, pushToken: hex,
+                        genericPreview: UserDefaults.standard.object(forKey: "mailGenericPreviews") as? Bool
+                    )
                     if SessionStore.account(account.address) == nil {
                         try? await ApiClient.unregisterPush(token: bearer, pushToken: hex)
                     } else if !Task.isCancelled, let secret,
@@ -605,6 +615,12 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
         let info = request.content.userInfo
         let account = info["mailbox"] as? String ?? info["account"] as? String
         guard account.map({ SessionStore.account($0) != nil }) ?? (SessionStore.token != nil) else {
+            completionHandler([])
+            return
+        }
+        if request.trigger is UNPushNotificationTrigger,
+           UserDefaults.standard.bool(forKey: "mailGenericPreviews"),
+           info["messageId"] != nil, info["privatePreview"] as? String != "1" {
             completionHandler([])
             return
         }

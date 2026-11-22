@@ -908,7 +908,7 @@ object Api {
 
     private val launchApi by lazy { LaunchApi(BASE, DeviceId.value, userAgent) }
     suspend fun deleteAccount(token: String, password: String) = launchApi.deleteAccount(token, password)
-    suspend fun registerPush(token: String, pushToken: String) = launchApi.registerPush(token, pushToken)
+    suspend fun registerPush(token: String, pushToken: String, genericPreview: Boolean?) = launchApi.registerPush(token, pushToken, genericPreview)
     suspend fun unregisterPush(token: String, pushToken: String) = launchApi.unregisterPush(token, pushToken)
 
     /**
