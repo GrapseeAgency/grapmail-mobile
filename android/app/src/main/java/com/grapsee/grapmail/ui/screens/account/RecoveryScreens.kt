@@ -90,12 +90,14 @@ fun ForgotPasswordScreen(
                         challengeId = resp.challengeId,
                         expiresAt = resp.expiresAt ?: 0L,
                         maskedPhone = resp.maskedPhone,
+                        resetChannel = resp.channel,
                         code = "",
                     )
                 }
-                // No challenge means no code went out — the account has no
-                // number to text, or has none registered at all. That is the
-                // manual-review path, not a failure to report as an error.
+                // No challenge means no code went out. GrapMail recovers by
+                // email, so this is normally the reset link going to the
+                // verified recovery address (channel "email"); the pending
+                // screen says which.
                 if (resp.challengeId != null) onCodeSent() else onNeedsManualReview()
             } catch (e: ApiException) {
                 busy = false
@@ -112,7 +114,7 @@ fun ForgotPasswordScreen(
         illustration = "account-forgot",
         eyebrow = "Forgot password",
         title = "Reset your password",
-        body = "Enter your GrapMail address or phone number and we'll send you instructions to reset your password securely.",
+        body = "Enter your GrapMail address and we'll email a reset link to the recovery email on your account.",
         footer = {
             GradientButton(
                 "Continue",
@@ -142,10 +144,10 @@ fun ForgotPasswordScreen(
         },
     ) {
         AppTextField(
-            label = "GrapMail address or phone number",
+            label = "GrapMail address",
             value = identifier,
             onValueChange = { identifier = it; error = null },
-            hint = "GrapMail address or phone number",
+            hint = "GrapMail address",
             showLabel = false,
             keyboard = KeyboardType.Email,
             leading = {
@@ -485,10 +487,11 @@ fun RecoveryPendingScreen(
             try {
                 val resp = Api.forgotPassword(state.identifier)
                 busy = false
-                notice = if (resp.challengeId != null) {
-                    "A code is on its way. Check your phone."
-                } else {
-                    "Still in review. We'll message you as soon as it clears."
+                flow.update { copy(resetChannel = resp.channel) }
+                notice = when {
+                    resp.challengeId != null -> "A code is on its way. Check your phone."
+                    resp.channel == "email" -> "A new reset link is on its way. Check your recovery email."
+                    else -> "Still in review. We'll message you as soon as it clears."
                 }
             } catch (e: ApiException) {
                 busy = false
@@ -505,7 +508,7 @@ fun RecoveryPendingScreen(
         illustration = "account-pending",
         footer = {
             GradientButton(
-                "Try Again",
+                if (state.resetChannel == "email") "Send again" else "Try Again",
                 onClick = { retry() },
                 busy = busy,
                 trailing = {
@@ -533,10 +536,11 @@ fun RecoveryPendingScreen(
             Spacer(Modifier.height(4.dp))
         },
     ) {
-        StatusChip("Account Recovery Pending", ChipTone.Warning)
+        val emailed = state.resetChannel == "email"
+        StatusChip(if (emailed) "Reset link sent" else "Account Recovery Pending", if (emailed) ChipTone.Success else ChipTone.Warning)
         Spacer(Modifier.height(16.dp))
         Text(
-            "We're still working\non your recovery",
+            if (emailed) "Check your\nrecovery email" else "We're still working\non your recovery",
             fontSize = 28.sp,
             lineHeight = 34.sp,
             fontWeight = FontWeight.Bold,
@@ -545,15 +549,17 @@ fun RecoveryPendingScreen(
         )
         Spacer(Modifier.height(10.dp))
         Text(
-            "There might be a short delay while we verify your information. You'll get an update soon at your verified phone number or email.",
+            if (emailed) "We sent a password reset link to the recovery email on your account. Open it on any device to choose a new password."
+            else "There might be a short delay while we verify your information. You'll get an update soon at your verified phone number or email.",
             fontSize = 15.sp,
             lineHeight = 23.sp,
             color = palette.textSecondary,
         )
         Spacer(Modifier.height(18.dp))
         InfoPanel(
-            title = "What's happening?",
-            body = "We're verifying your recovery request. This usually takes a few minutes, but can take up to 24 hours in some cases.",
+            title = if (emailed) "Didn't get it?" else "What's happening?",
+            body = if (emailed) "The link works for 1 hour. Check your spam folder, or tap Send again for a new one."
+            else "We're verifying your recovery request. This usually takes a few minutes, but can take up to 24 hours in some cases.",
             icon = {
                 Icon(Icons.Rounded.Schedule, contentDescription = null, tint = palette.primarySolid, modifier = Modifier.size(18.dp))
             },

@@ -14,6 +14,7 @@ import androidx.compose.material.icons.rounded.AlternateEmail
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.DeleteForever
 import androidx.compose.material.icons.rounded.Devices
+import androidx.compose.material.icons.rounded.Email
 import androidx.compose.material.icons.rounded.HeadsetMic
 import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.Logout
@@ -69,6 +70,7 @@ fun AccountSecurityScreen(
     onTwoFactor: () -> Unit,
     onDisableTwoFactor: () -> Unit,
     onPhone: () -> Unit,
+    onRecoveryEmail: () -> Unit = {},
     onSessions: () -> Unit,
     onActivity: () -> Unit,
     onBackupCodes: () -> Unit,
@@ -117,7 +119,13 @@ fun AccountSecurityScreen(
     val twoFactorOn = profile?.twoFactorState == true
     val hasPhone = !profile?.phone.isNullOrBlank()
     val phoneVerified = hasPhone && profile?.phoneVerified == true
-    val secure = twoFactorOn && phoneVerified
+    // GrapMail resets passwords by email only, so an account without a verified
+    // recovery email is one forgotten password from a lock-out. That outranks
+    // every other item here, and it is the reminder for people who skipped the
+    // step at sign-up.
+    val hasRecoveryEmail = !profile?.recoveryEmail.isNullOrBlank()
+    val recoveryVerified = hasRecoveryEmail && profile?.recoveryEmailVerified == true
+    val secure = twoFactorOn && phoneVerified && recoveryVerified
 
     AccountScreen(
         onBack = onBack,
@@ -145,13 +153,20 @@ fun AccountSecurityScreen(
                 }
                 else -> {
                     StatusChip(
-                        if (secure) "Your account is secure" else "One thing left to do",
+                        when {
+                            secure -> "Your account is secure"
+                            !recoveryVerified -> "Add a recovery email"
+                            else -> "One thing left to do"
+                        },
                         if (secure) ChipTone.Success else ChipTone.Warning,
                     )
                     Spacer(Modifier.height(10.dp))
                     Text(
-                        if (secure) "All essential security features are active and your account is protected."
-                        else "Turn on two-step verification to protect your account even if your password is ever exposed.",
+                        when {
+                            secure -> "All essential security features are active and your account is protected."
+                            !recoveryVerified -> "Without a verified recovery email, a forgotten password can lock you out. It takes a minute to add one."
+                            else -> "Turn on two-step verification to protect your account even if your password is ever exposed."
+                        },
                         fontSize = 12.sp,
                         lineHeight = 17.sp,
                         color = LocalPalette.current.textSecondary,
@@ -202,6 +217,21 @@ fun AccountSecurityScreen(
             },
             chipTone = if (phoneVerified) ChipTone.Success else ChipTone.Warning,
             onClick = onPhone,
+        )
+        RowDivider()
+        SecurityRow(
+            icon = Icons.Rounded.Email,
+            title = "Recovery Email",
+            subtitle = profile?.recoveryEmail?.takeIf { it.isNotBlank() }
+                ?: if (loading) null else "Where we send a link if you forget your password.",
+            chip = when {
+                loading || failed -> null
+                !hasRecoveryEmail -> "Add"
+                recoveryVerified -> "Verified"
+                else -> "Unverified"
+            },
+            chipTone = if (recoveryVerified) ChipTone.Success else ChipTone.Warning,
+            onClick = onRecoveryEmail,
         )
         SectionLabel("Account Management")
         SecurityRow(
