@@ -29,6 +29,8 @@ class AccountFlowViewModel : ViewModel() {
         val emailOtpAddress: String? = null,
         val expiresAt: Long = 0L,
         val maskedPhone: String? = null,
+        /** The masked address a two-step sign-in code was emailed to. */
+        val factorDestination: String? = null,
         /** "email" when forgot-password emailed a reset link instead of sending a code. */
         val resetChannel: String? = null,
         /** The 6-digit code, proven when the password screen submits. */
@@ -50,7 +52,7 @@ class AccountFlowViewModel : ViewModel() {
     val state: StateFlow<State> = _state.asStateFlow()
 
     fun clearSignIn() {
-        update { copy(password = "", code = "", challengeId = null, emailOtpAddress = null, expiresAt = 0L) }
+        update { copy(password = "", code = "", challengeId = null, emailOtpAddress = null, expiresAt = 0L, factorDestination = null) }
     }
 
     fun update(block: State.() -> State) {

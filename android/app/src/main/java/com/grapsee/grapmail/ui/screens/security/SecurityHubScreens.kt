@@ -319,12 +319,12 @@ fun TwoFactorEnableScreen(onBack: () -> Unit, onContinue: () -> Unit) {
         InfoCard {
             NeedRow(Icons.Rounded.Security, "More Protection", "Prevents unauthorized access, even if your password is compromised.")
             RowDivider()
-            NeedRow(Icons.Rounded.PhoneAndroid, "Use Your Phone", "We'll send a 6-digit code to your verified phone number.")
+            NeedRow(Icons.Rounded.Email, "Codes by Email", "We'll email a 6-digit code to your verified recovery email when you sign in.")
             RowDivider()
             NeedRow(Icons.Rounded.Lock, "Easy to Manage", "You can turn it off anytime from account security settings.")
         }
         Spacer(Modifier.height(14.dp))
-        InfoNoteCard(body = "You'll need a verified phone number to enable two-step verification.")
+        InfoNoteCard(body = "You'll need a verified recovery email to enable two-step verification.")
     }
 }
 
@@ -572,6 +572,165 @@ fun VerifyPhoneScreen(
                 error = null
                 scope.launch { runCatching { send(profile?.phone) }.onFailure { error = it.message } }
             })
+        }
+    }
+}
+
+/**
+ * 05 — the code goes to the verified recovery email, and the factor is switched
+ * on only after it is entered.
+ *
+ * GrapMail sends account codes by email only, so this replaces the texted code
+ * in the enable flow. It sends a fresh code to the address already on the
+ * account (POST /grapsee/auth/account/recovery-email/start), confirms it, and
+ * spends the proof that comes back together with the password proof from 04.
+ * An account with no verified recovery email is sent to add one first.
+ */
+@Composable
+fun TwoFactorEmailScreen(
+    onBack: () -> Unit,
+    onAddRecoveryEmail: () -> Unit,
+    onVerified: () -> Unit,
+) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val palette = LocalPalette.current
+    var address by remember { mutableStateOf<String?>(null) }
+    var verificationToken by remember { mutableStateOf<String?>(null) }
+    var maskedEmail by remember { mutableStateOf<String?>(null) }
+    var expiresAt by remember { mutableStateOf(0L) }
+    var code by remember { mutableStateOf("") }
+    var busy by remember { mutableStateOf(false) }
+    var loading by remember { mutableStateOf(true) }
+    var error by remember { mutableStateOf<String?>(null) }
+    var needsEmail by remember { mutableStateOf(false) }
+    var needsProof by remember { mutableStateOf(false) }
+
+    suspend fun send() {
+        val token = SessionStore.token(context) ?: throw IllegalStateException("Sign in again.")
+        val to = address ?: return
+        val sent = Api.startRecoveryEmail(token, to)
+        verificationToken = sent.token
+        maskedEmail = sent.maskedEmail ?: to
+        expiresAt = sent.expiresAt ?: 0L
+        code = ""
+    }
+
+    LaunchedEffect(Unit) {
+        runCatching {
+            val token = SessionStore.token(context) ?: throw IllegalStateException("Sign in again.")
+            val profile = Api.profile(token).profile
+            val email = profile?.recoveryEmail?.takeIf { it.isNotBlank() }
+            if (email == null || profile?.recoveryEmailVerified != true) {
+                needsEmail = true
+            } else {
+                address = email
+                send()
+            }
+        }.onFailure { error = it.message }
+        loading = false
+    }
+
+    AccountScreen(
+        onBack = onBack,
+        illustration = "ill_sec_phone",
+        illustrationWidth = 170,
+        title = if (needsEmail) "Add a Recovery Email" else "Check Your Email",
+        body = when {
+            needsEmail -> "Two-step verification emails your sign-in codes to a verified recovery email. Add one first."
+            maskedEmail != null -> "We've emailed a 6-digit code to $maskedEmail."
+            else -> "We'll email a code to the recovery email on this account."
+        },
+        footer = {
+            Column {
+                if (needsEmail) {
+                    GradientButton(
+                        "Add Recovery Email",
+                        trailing = { Icon(Icons.AutoMirrored.Rounded.ArrowForward, contentDescription = null, modifier = Modifier.padding(start = 6.dp)) },
+                        onClick = onAddRecoveryEmail,
+                    )
+                } else {
+                    GradientButton(
+                        "Turn On",
+                        trailing = { Icon(Icons.AutoMirrored.Rounded.ArrowForward, contentDescription = null, modifier = Modifier.padding(start = 6.dp)) },
+                        onClick = {
+                            val vt = verificationToken ?: return@GradientButton
+                            if (code.length < 6) { error = "Enter the 6-digit code."; return@GradientButton }
+                            busy = true; error = null
+                            scope.launch {
+                                try {
+                                    val token = SessionStore.token(context) ?: throw IllegalStateException("Sign in again.")
+                                    val confirmed = Api.confirmRecoveryEmail(token, vt, code)
+                                    Api.enableTwoFactor(token, SecurityFlow.enableProof, null, confirmed.emailProof)
+                                    SecurityFlow.enableProof = null
+                                    SecurityFlow.phoneProof = null
+                                    onVerified()
+                                } catch (e: com.grapsee.grapmail.data.ApiException) {
+                                    // The password proof is single use and checked
+                                    // first, so any refusal of the enable call has
+                                    // already spent it: send the person back for a
+                                    // fresh one rather than retrying a dead token.
+                                    if (e.code == "PROOF_REQUIRED" || e.code == "EMAIL_PROOF_REQUIRED") {
+                                        needsProof = true
+                                        SecurityFlow.enableProof = null
+                                        verificationToken = null
+                                        code = ""
+                                    }
+                                    if (e.code == "TWO_FACTOR_NEEDS_RECOVERY_EMAIL") needsEmail = true
+                                    error = e.message
+                                } catch (e: Exception) {
+                                    error = e.message
+                                } finally {
+                                    busy = false
+                                }
+                            }
+                        },
+                        enabled = code.length == 6 && verificationToken != null,
+                        busy = busy || loading,
+                    )
+                    Spacer(Modifier.height(4.dp))
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
+                        AccountLink("Resend code", {
+                            error = null
+                            scope.launch { runCatching { send() }.onFailure { error = it.message } }
+                        })
+                    }
+                }
+            }
+        },
+    ) {
+        if (!needsEmail) {
+            InfoCard {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Rounded.Email, contentDescription = null, tint = palette.primarySolid, modifier = Modifier.size(18.dp))
+                    Text(
+                        "  Recovery Email",
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = palette.textSecondary,
+                    )
+                    Spacer(Modifier.weight(1f))
+                    StatusChip("Verified", ChipTone.Success)
+                }
+                Spacer(Modifier.height(4.dp))
+                Text(address ?: "—", fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = palette.textPrimary)
+                Spacer(Modifier.height(16.dp))
+                Text("Verification Code", fontSize = 13.sp, fontWeight = FontWeight.Medium, color = palette.textSecondary)
+                Spacer(Modifier.height(8.dp))
+                CodeCells(length = 6, value = code, onValueChange = { code = it.filter(Char::isDigit).take(6); error = null })
+            }
+            Spacer(Modifier.height(10.dp))
+            if (expiresAt > 0) CodeExpiry(expiresAt)
+            Spacer(Modifier.height(10.dp))
+            InfoNoteCard(body = "Didn't get it? Check your spam folder. From now on, sign-in codes will go to this address.")
+        }
+        if (error != null) {
+            Spacer(Modifier.height(8.dp))
+            Text(error!!, fontSize = 12.sp, color = palette.error)
+        }
+        if (needsProof) {
+            Spacer(Modifier.height(6.dp))
+            AccountLink("Enter your password again", onBack)
         }
     }
 }

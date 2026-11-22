@@ -159,7 +159,7 @@ fun TwoFactorScreen(
                 resending = false
                 if (resp.secondFactorRequired && resp.challengeId != null) {
                     code = ""
-                    flow.update { copy(challengeId = resp.challengeId, expiresAt = resp.expiresAt ?: 0L) }
+                    flow.update { copy(challengeId = resp.challengeId, expiresAt = resp.expiresAt ?: 0L, factorDestination = resp.maskedEmail ?: factorDestination) }
                     notice = "A new code is on its way."
                 } else {
                     error = "That sign-in no longer needs a code. Start again."
@@ -182,7 +182,8 @@ fun TwoFactorScreen(
         body = if (emailChallenge != null)
             "Finish signing in by entering the 6-digit code that was sent to this address."
         else
-            "We've sent a verification code to your GrapMail account. Please enter the 6-digit code to continue.",
+            state.factorDestination?.let { "We've emailed a 6-digit code to $it. Enter it to finish signing in." }
+                ?: "We've sent you a verification code. Please enter the 6-digit code to continue.",
         footer = {
             GradientButton(
                 "Verify & Continue",
