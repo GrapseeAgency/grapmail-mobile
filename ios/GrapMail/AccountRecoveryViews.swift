@@ -38,11 +38,11 @@ struct ForgotPasswordView: View {
             illustration: "ill_account_forgot",
             eyebrow: "Forgot password",
             title: "Reset your password",
-            subtitle: "Enter your GrapMail address or phone number and we'll send you instructions to reset your password securely.",
+            subtitle: "Enter your GrapMail address and we'll email a reset link to the recovery email on your account.",
             content: {
                 AppTextField(
                     value: $identifier,
-                    hint: "GrapMail address or phone number",
+                    hint: "GrapMail address",
                     keyboardType: .emailAddress,
                     leadingIcon: "envelope"
                 )
@@ -91,9 +91,12 @@ struct ForgotPasswordView: View {
                 model.challengeId = resp.challengeId
                 model.expiresAt = resp.expiresAt.map { Date(timeIntervalSince1970: TimeInterval($0) / 1000) }
                 model.maskedPhone = resp.maskedPhone
+                model.resetChannel = resp.channel
                 model.code = ""
-                // No challenge means no code went out: the account has no
-                // number to text. That is the manual-review path, not an error.
+                // No challenge means no code went out. GrapMail recovers by
+                // email, so this is normally the reset link going to the
+                // verified recovery address (channel "email"); the pending
+                // screen says which.
                 if resp.challengeId != nil { onCodeSent() } else { onNeedsManualReview() }
             } catch {
                 self.error = apiMessage(error, fallback: "We could not start the reset. Try again.")
@@ -372,21 +375,26 @@ struct RecoveryPendingView: View {
         AccountScreen(
             illustration: "ill_account_pending",
             content: {
-                StatusChip(text: "Account Recovery Pending", tone: .warning)
-                Text("We're still working\non your recovery")
+                let emailed = model.resetChannel == "email"
+                StatusChip(text: emailed ? "Reset link sent" : "Account Recovery Pending", tone: emailed ? .success : .warning)
+                Text(emailed ? "Check your\nrecovery email" : "We're still working\non your recovery")
                     .font(.system(size: 28, weight: .bold))
                     .foregroundColor(GM.textPrimary)
                     .fixedSize(horizontal: false, vertical: true)
                     .padding(.top, 16)
-                Text("There might be a short delay while we verify your information. You'll get an update soon at your verified phone number or email.")
+                Text(emailed
+                     ? "We sent a password reset link to the recovery email on your account. Open it on any device to choose a new password."
+                     : "There might be a short delay while we verify your information. You'll get an update soon at your verified phone number or email.")
                     .font(.system(size: 15))
                     .lineSpacing(5)
                     .foregroundColor(GM.textSecondary)
                     .fixedSize(horizontal: false, vertical: true)
                     .padding(.top, 10)
                 InfoPanel(
-                    title: "What's happening?",
-                    body: "We're verifying your recovery request. This usually takes a few minutes, but can take up to 24 hours in some cases.",
+                    title: emailed ? "Didn't get it?" : "What's happening?",
+                    body: emailed
+                        ? "The link works for 1 hour. Check your spam folder, or tap Send again for a new one."
+                        : "We're verifying your recovery request. This usually takes a few minutes, but can take up to 24 hours in some cases.",
                     icon: {
                         Image(systemName: "clock")
                             .font(.system(size: 15, weight: .medium))
@@ -398,7 +406,7 @@ struct RecoveryPendingView: View {
             },
             footer: {
                 GradientButton(
-                    title: "Try Again",
+                    title: model.resetChannel == "email" ? "Send again" : "Try Again",
                     busy: busy,
                     trailing: AnyView(
                         Image(systemName: "arrow.right")
@@ -436,9 +444,14 @@ struct RecoveryPendingView: View {
             defer { busy = false }
             do {
                 let resp = try await ApiClient.forgotPassword(identifier: model.identifier)
-                notice = resp.challengeId != nil
-                    ? "A code is on its way. Check your phone."
-                    : "Still in review. We'll message you as soon as it clears."
+                model.resetChannel = resp.channel
+                if resp.challengeId != nil {
+                    notice = "A code is on its way. Check your phone."
+                } else if resp.channel == "email" {
+                    notice = "A new reset link is on its way. Check your recovery email."
+                } else {
+                    notice = "Still in review. We'll message you as soon as it clears."
+                }
             } catch {
                 notice = apiMessage(error, fallback: "We couldn't check again. Try in a minute.")
             }

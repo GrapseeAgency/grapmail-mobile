@@ -29,6 +29,8 @@ class AccountFlowViewModel : ViewModel() {
         val emailOtpAddress: String? = null,
         val expiresAt: Long = 0L,
         val maskedPhone: String? = null,
+        /** "email" when forgot-password emailed a reset link instead of sending a code. */
+        val resetChannel: String? = null,
         /** The 6-digit code, proven when the password screen submits. */
         val code: String = "",
         /** Address the backend reported after a completed reset. */

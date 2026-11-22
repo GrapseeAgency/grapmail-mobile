@@ -219,7 +219,12 @@ private fun apiErrorMessage(status: Int, code: String?): String = when (code) {
     "PHONE_IN_USE" -> "That phone number is already linked to another account."
     "PHONE_NOT_VERIFIED" -> "Verify your phone number to continue."
     "PHONE_PROOF_REQUIRED" -> "Verify your phone number to continue."
-    "NO_RECOVERY_CHANNEL" -> "There is no verified recovery method for this account."
+    "NO_RECOVERY_CHANNEL" -> "This account has no verified recovery email, so it can't be reset here. Contact support and we'll help."
+    "BAD_RECOVERY_EMAIL" -> "Check the email address and try again."
+    "RECOVERY_SAME_AS_PRIMARY" -> "Use an email address outside GrapMail, so you can still reach it if you lose access to this account."
+    "EMAIL_DELIVERY_UNAVAILABLE" -> "We couldn't send the email right now. Try again shortly."
+    "CODE_REJECTED" -> "That code is not correct."
+    "CODE_EXPIRED" -> "That code has expired. Request a new one."
     "SMS_DELIVERY_UNAVAILABLE" -> "The code could not be sent. Try again in a moment."
     "BAD_ADDRESS" -> "Check the email address and try again."
     "ADDRESS_REJECTED" -> "That email address is unavailable."
@@ -246,6 +251,34 @@ private fun apiErrorMessage(status: Int, code: String?): String = when (code) {
     }
 }
 
+// ── Recovery email ──────────────────────────────────────────────────────────
+// POST /grapsee/auth/account/recovery-email/start and /confirm. GrapMail recovers
+// accounts by email only: a password reset link goes to this address.
+
+@Serializable data class RecoveryEmailStartRequest(val email: String)
+
+@Serializable data class RecoveryEmailStartResponse(
+    val success: Boolean = false,
+    /** Signed by the server; ties the code to the address it was sent to. */
+    val token: String? = null,
+    val maskedEmail: String? = null,
+    val expiresAt: Long? = null,
+    val message: String? = null,
+    val error: String? = null,
+    val code: String? = null,
+)
+
+@Serializable data class RecoveryEmailConfirmRequest(val token: String, val code: String)
+
+@Serializable data class RecoveryEmailConfirmResponse(
+    val success: Boolean = false,
+    val recoveryEmail: String? = null,
+    val recoveryEmailVerified: Boolean = false,
+    val message: String? = null,
+    val error: String? = null,
+    val code: String? = null,
+)
+
 // ── Recovery & security ─────────────────────────────────────────────────────
 
 @Serializable data class ForgotPasswordRequest(val identifier: String)
@@ -257,6 +290,9 @@ private fun apiErrorMessage(status: Int, code: String?): String = when (code) {
     val expiresAt: Long? = null,
     val maskedPhone: String? = null,
     val provider: String? = null,
+    /** "email" when the backend emailed a reset link to the verified recovery
+     *  address instead of sending a code. There is no code to enter then. */
+    val channel: String? = null,
     val message: String? = null,
     val error: String? = null,
     val code: String? = null,
@@ -376,6 +412,9 @@ private fun apiErrorMessage(status: Int, code: String?): String = when (code) {
      *  to `name`, and the field says so rather than the client guessing. */
     val displayName: String? = null,
     val recoveryEmail: String? = null,
+    /** True only when the recovery email has been proven with a code. A reset
+     *  link is only ever sent to a verified address. */
+    val recoveryEmailVerified: Boolean? = null,
     val recoveryPhone: String? = null,
     val domain: String? = null,
     val fromHeader: String? = null,
@@ -1076,6 +1115,33 @@ object Api {
             .method("PATCH", postBody(jsonSparse.encodeToString(ProfilePatch.serializer(), patch)))
             .build()
         return read(req) { decodeResponse<ProfileResponse>(it) }
+    }
+
+    /**
+     * Step 1 of adding a recovery email: the backend emails a 6-digit code to
+     * [email] and answers with a signed token that ties the code to that address.
+     * Nothing is stored on the account until [confirmRecoveryEmail] succeeds.
+     */
+    suspend fun startRecoveryEmail(token: String, email: String): RecoveryEmailStartResponse {
+        val req = authed("$AUTH/account/recovery-email/start", token)
+            .post(postBody(json.encodeToString(RecoveryEmailStartRequest.serializer(), RecoveryEmailStartRequest(email))))
+            .build()
+        return read(req) { decodeResponse<RecoveryEmailStartResponse>(it) }
+    }
+
+    /** Step 2: the code proves the address, and only then is it saved as verified. */
+    suspend fun confirmRecoveryEmail(token: String, verificationToken: String, code: String): RecoveryEmailConfirmResponse {
+        val req = authed("$AUTH/account/recovery-email/confirm", token)
+            .post(
+                postBody(
+                    json.encodeToString(
+                        RecoveryEmailConfirmRequest.serializer(),
+                        RecoveryEmailConfirmRequest(verificationToken, code),
+                    ),
+                ),
+            )
+            .build()
+        return read(req) { decodeResponse<RecoveryEmailConfirmResponse>(it) }
     }
 
     /**

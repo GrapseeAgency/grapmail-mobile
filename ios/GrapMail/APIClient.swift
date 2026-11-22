@@ -80,7 +80,12 @@ enum ApiError: Error, LocalizedError {
             case "PHONE_IN_USE": return "That phone number is already linked to another account."
             case "PHONE_NOT_VERIFIED": return "Verify your phone number to continue."
             case "PHONE_PROOF_REQUIRED": return "Verify your phone number to continue."
-            case "NO_RECOVERY_CHANNEL": return "There is no verified recovery method for this account."
+            case "NO_RECOVERY_CHANNEL": return "This account has no verified recovery email, so it can't be reset here. Contact support and we'll help."
+            case "BAD_RECOVERY_EMAIL": return "Check the email address and try again."
+            case "RECOVERY_SAME_AS_PRIMARY": return "Use an email address outside GrapMail, so you can still reach it if you lose access to this account."
+            case "EMAIL_DELIVERY_UNAVAILABLE": return "We couldn't send the email right now. Try again shortly."
+            case "CODE_REJECTED": return "That code is not correct."
+            case "CODE_EXPIRED": return "That code has expired. Request a new one."
             case "SMS_DELIVERY_UNAVAILABLE": return "The code could not be sent. Try again in a moment."
             case "BAD_ADDRESS": return "Check the email address and try again."
             case "ADDRESS_REJECTED": return "That email address is unavailable."
@@ -376,6 +381,35 @@ struct TwoFactorResponse: Decodable {
 
 struct ForgotPasswordRequest: Codable { var identifier: String }
 
+// ── Recovery email ──────────────────────────────────────────────────────────
+// POST /grapsee/auth/account/recovery-email/start and /confirm. GrapMail recovers
+// accounts by email only: a password reset link goes to this address.
+
+struct RecoveryEmailStartRequest: Codable {
+    var email: String
+}
+
+struct RecoveryEmailStartResponse: Decodable {
+    var success: Bool?
+    /// Signed by the server; ties the code to the address it was sent to.
+    var token: String?
+    var maskedEmail: String?
+    var expiresAt: Double?
+    var message: String?
+}
+
+struct RecoveryEmailConfirmRequest: Codable {
+    var token: String
+    var code: String
+}
+
+struct RecoveryEmailConfirmResponse: Decodable {
+    var success: Bool?
+    var recoveryEmail: String?
+    var recoveryEmailVerified: Bool?
+    var message: String?
+}
+
 struct ForgotPasswordResponse: Codable {
     var success: Bool = false
     var sent: Bool = false
@@ -383,12 +417,15 @@ struct ForgotPasswordResponse: Codable {
     var expiresAt: Int?
     var maskedPhone: String?
     var provider: String?
+    /// "email" when the backend emailed a reset link to the verified recovery
+    /// address instead of sending a code. There is no code to enter then.
+    var channel: String?
     var message: String?
     var error: String?
     var code: String?
 
     private enum CodingKeys: String, CodingKey {
-        case success, sent, challengeId, expiresAt, maskedPhone, provider,
+        case success, sent, challengeId, expiresAt, maskedPhone, provider, channel,
              message, error, code
     }
     init(from decoder: Decoder) throws {
@@ -406,6 +443,7 @@ struct ForgotPasswordResponse: Codable {
         expiresAt = c.lenientOpt(.expiresAt)
         maskedPhone = c.lenientOpt(.maskedPhone)
         provider = c.lenientOpt(.provider)
+        channel = c.lenientOpt(.channel)
         message = c.lenientOpt(.message)
         error = c.lenientOpt(.error)
         code = c.lenientOpt(.code)
@@ -756,6 +794,9 @@ struct ProfileDto: Codable {
     /// back to `name`, and the field says so rather than the client guessing.
     var displayName: String?
     var recoveryEmail: String?
+    /// True only when the recovery email has been proven with a code. A reset
+    /// link is only ever sent to a verified address.
+    var recoveryEmailVerified: Bool?
     var recoveryPhone: String?
     var domain: String?
     var fromHeader: String?
@@ -785,7 +826,7 @@ struct ProfileDto: Codable {
     private enum CodingKeys: String, CodingKey {
         case id, name, address, handle, phone, twoFactor, twoFactorEnabled,
              twoFactorEnabledAt, backupCodesRemaining, passwordChangedAt, createdAt,
-             firstName, lastName, birthday, gender, displayName, recoveryEmail,
+             firstName, lastName, birthday, gender, displayName, recoveryEmail, recoveryEmailVerified,
              recoveryPhone, domain, fromHeader, avatarUrl, phoneVerified, settings,
              aliases, connections, termsAcceptedAt
     }
@@ -808,6 +849,7 @@ struct ProfileDto: Codable {
         gender = c.lenientOpt(.gender)
         displayName = c.lenientOpt(.displayName)
         recoveryEmail = c.lenientOpt(.recoveryEmail)
+        recoveryEmailVerified = c.lenientOpt(.recoveryEmailVerified)
         recoveryPhone = c.lenientOpt(.recoveryPhone)
         domain = c.lenientOpt(.domain)
         fromHeader = c.lenientOpt(.fromHeader)
@@ -833,6 +875,7 @@ struct ProfileDto: Codable {
         if let s = gender { try v.encodeIfPresent(s, forKey: .gender) }
         if let s = displayName { try v.encodeIfPresent(s, forKey: .displayName) }
         if let s = recoveryEmail { try v.encodeIfPresent(s, forKey: .recoveryEmail) }
+        if let b = recoveryEmailVerified { try v.encodeIfPresent(b, forKey: .recoveryEmailVerified) }
         if let s = recoveryPhone { try v.encodeIfPresent(s, forKey: .recoveryPhone) }
     }
 }
@@ -1477,6 +1520,20 @@ struct ApiClient {
     static func resetPassword(challengeId: String, code: String, password: String) async throws -> ResetPasswordResponse {
         let body = try encoder.encode(ResetPasswordRequest(challengeId: challengeId, code: code, password: password))
         return try await request("/grapsee/auth/reset-password", method: "POST", body: body)
+    }
+
+    /// Step 1 of adding a recovery email: a 6-digit code goes to `email`, and a
+    /// signed token comes back that ties the code to that address. Nothing is
+    /// stored on the account until `confirmRecoveryEmail` succeeds.
+    static func startRecoveryEmail(token: String, email: String) async throws -> RecoveryEmailStartResponse {
+        let body = try encoder.encode(RecoveryEmailStartRequest(email: email))
+        return try await request("/grapsee/auth/account/recovery-email/start", method: "POST", body: body, bearer: token)
+    }
+
+    /// Step 2: the code proves the address, and only then is it saved as verified.
+    static func confirmRecoveryEmail(token: String, verificationToken: String, code: String) async throws -> RecoveryEmailConfirmResponse {
+        let body = try encoder.encode(RecoveryEmailConfirmRequest(token: verificationToken, code: code))
+        return try await request("/grapsee/auth/account/recovery-email/confirm", method: "POST", body: body, bearer: token)
     }
 
     /// Phone -> partially hidden address. A full address only ever reaches the

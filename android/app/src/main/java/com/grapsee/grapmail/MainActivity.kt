@@ -86,6 +86,7 @@ import com.grapsee.grapmail.ui.screens.account.NewPasswordScreen
 import com.grapsee.grapmail.ui.screens.account.PhoneVerificationScreen
 import com.grapsee.grapmail.ui.screens.account.PhoneVerifiedScreen
 import com.grapsee.grapmail.ui.screens.account.RecoveryCodeScreen
+import com.grapsee.grapmail.ui.screens.account.RecoveryEmailScreen
 import com.grapsee.grapmail.ui.screens.account.RecoveryPendingScreen
 import com.grapsee.grapmail.ui.screens.account.ResetDoneScreen
 import com.grapsee.grapmail.ui.screens.account.SignInScreen
@@ -299,6 +300,8 @@ object Routes {
     const val NEW_PASSWORD = "account/new-password"
     const val RESET_DONE = "account/reset-done"
     const val RECOVERY_PENDING = "account/recovery-pending"
+    const val RECOVERY_EMAIL = "account/recovery-email"
+    const val RECOVERY_EMAIL_SIGNUP = "signup/recovery-email/{address}/{name}"
     const val FIND_ADDRESS = "account/find-address"
     const val ADDRESS_FOUND = "account/address-found"
     const val PHONE_VERIFY = "account/phone"
@@ -415,6 +418,7 @@ object Routes {
     fun created(address: String, name: String) = "signup/created/${encode(address)}/${encode(name)}"
     fun createdAlt(address: String, name: String) = "signup/created-alt/${encode(address)}/${encode(name)}"
     fun onboarding(address: String, name: String) = "signup/onboarding/${encode(address)}/${encode(name)}"
+    fun recoveryEmailSignup(address: String, name: String) = "signup/recovery-email/${encode(address)}/${encode(name)}"
     /** The device label rides the route beside the id: the confirmation names
      *  the session it is about, and the list the person tapped already knew it.
      *  Fetching the label a second time only added a way for the screen to open
@@ -972,6 +976,7 @@ fun GrapMailNav(
                 onTwoFactor = { nav.navigate(Routes.SEC_2FA_ENABLE) },
                 onDisableTwoFactor = { nav.navigate(Routes.SEC_2FA_OFF) },
                 onPhone = { nav.navigate(Routes.PHONE_VERIFY) },
+                onRecoveryEmail = { nav.navigate(Routes.RECOVERY_EMAIL) },
                 onSessions = { nav.navigate(Routes.SEC_SESSIONS) },
                 onActivity = { nav.navigate(Routes.SEC_ACTIVITY) },
                 onBackupCodes = { nav.navigate(Routes.SEC_BACKUP) },
@@ -1211,14 +1216,12 @@ fun GrapMailNav(
                 onCreated = { address, name ->
                     autoSignIn(address, name) { signedIn ->
                         if (signedIn) {
-                            // Account created and signed in — the wizard finishes
-                            // here now that verification runs before registration
-                            // (2026-11-18 reorder).
-                            if (com.grapsee.grapmail.ui.screens.OnboardingGate.isDone(nav.context)) {
-                                nav.navigate(Routes.HOME) { popUpTo(Routes.WELCOME) { inclusive = true } }
-                            } else {
-                                nav.navigate(Routes.onboarding(address, name)) { popUpTo(Routes.STEP_NAME) { inclusive = true } }
-                            }
+                            // Account created and signed in. The optional
+                            // recovery-email step comes next: GrapMail resets
+                            // passwords by email only, so this is the moment to
+                            // ask. Skipping is fine; Account Security keeps
+                            // reminding until an address is verified.
+                            nav.navigate(Routes.recoveryEmailSignup(address, name)) { popUpTo(Routes.STEP_NAME) { inclusive = true } }
                         } else {
                             // Account exists, session does not. Land on sign-in with
                             // the address filled in rather than in a flow that has no
@@ -1228,6 +1231,28 @@ fun GrapMailNav(
                         }
                     }
                 },
+            )
+        }
+        composable(Routes.RECOVERY_EMAIL_SIGNUP) { entry ->
+            val address = entry.arguments?.getString("address")?.let(android.net.Uri::decode) ?: ""
+            val name = entry.arguments?.getString("name")?.let(android.net.Uri::decode) ?: ""
+            val finish = {
+                if (com.grapsee.grapmail.ui.screens.OnboardingGate.isDone(nav.context)) {
+                    nav.navigate(Routes.HOME) { popUpTo(Routes.WELCOME) { inclusive = true } }
+                } else {
+                    nav.navigate(Routes.onboarding(address, name)) { popUpTo(Routes.RECOVERY_EMAIL_SIGNUP) { inclusive = true } }
+                }
+            }
+            RecoveryEmailScreen(
+                onBack = null,
+                onDone = finish,
+                onSkip = finish,
+            )
+        }
+        composable(Routes.RECOVERY_EMAIL) {
+            RecoveryEmailScreen(
+                onBack = { nav.popBackStack() },
+                onDone = { nav.popBackStack() },
             )
         }
         composable(Routes.HUMAN_VERIFY) {
