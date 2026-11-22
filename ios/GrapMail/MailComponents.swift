@@ -558,6 +558,7 @@ struct MailStateBlock<Content: View>: View {
                     title: "Couldn't load \(boxTitle)",
                     detail: "Your mailbox could not be reached. Nothing has been deleted.",
                     action: ("Try again", onRetry))
+                    .padding(.bottom, 142)
             } else if empty && boxTitle == "Inbox" && !filtered {
                 CenteredState(title: "Welcome home to GrapMail",
                               detail: "Your inbox is fresh, quiet, and completely protected.")
@@ -586,7 +587,7 @@ struct CenteredState: View {
                     .multilineTextAlignment(.center)
             }
             if let action {
-                GradientButton(title: action.0, action: action.1)
+                OutlineActionButton(title: action.0, action: action.1)
                     .padding(.top, 8)
             }
         }

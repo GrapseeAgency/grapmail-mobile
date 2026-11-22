@@ -742,7 +742,7 @@ private fun CenteredState(
     palette: com.grapsee.grapmail.ui.theme.Palette,
     action: Pair<String, () -> Unit>? = null,
 ) {
-    Box(Modifier.fillMaxSize().padding(horizontal = 20.dp, vertical = 12.dp), contentAlignment = Alignment.Center) {
+    Box(Modifier.fillMaxSize().padding(start = 20.dp, end = 20.dp, top = 12.dp, bottom = if (action != null) 146.dp else 12.dp), contentAlignment = Alignment.Center) {
         Column(Modifier.widthIn(max = 340.dp).verticalScroll(rememberScrollState()), horizontalAlignment = Alignment.CenterHorizontally) {
             Text(title, fontSize = 17.sp, fontWeight = FontWeight.SemiBold,
                 color = palette.textPrimary, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
@@ -752,7 +752,7 @@ private fun CenteredState(
             }
             if (action != null) {
                 Spacer(Modifier.height(16.dp))
-                GradientButton(action.first, action.second)
+                OutlineButton(action.first, action.second)
             }
         }
     }
