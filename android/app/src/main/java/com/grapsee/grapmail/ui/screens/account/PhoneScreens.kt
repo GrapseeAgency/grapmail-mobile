@@ -41,6 +41,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -116,6 +117,8 @@ fun PhoneVerificationScreen(
 ) {
     val palette = LocalPalette.current
     val context = LocalContext.current
+    val configuration = LocalConfiguration.current
+    val compact = configuration.screenHeightDp < 680 || configuration.fontScale > 1.15f
     val scope = rememberCoroutineScope()
     val state by flow.state.collectAsStateWithLifecycle()
 
@@ -208,13 +211,13 @@ fun PhoneVerificationScreen(
 
     AccountScreen(
         onBack = { if (step == 2) step = 1 else onBack() },
-        illustration = "account-phone",
+        illustration = "account-phone".takeUnless { compact },
         eyebrow = "Phone verification",
-        title = if (step == 1) "Add or verify your phone number" else "Enter the 6-digit code",
+        title = if (step == 1) "Verify your phone number" else "Enter the 6-digit code",
         body = if (step == 1) {
-            "We'll send a 6-digit verification code to your phone number. This helps you recover your account and enable two-step verification."
+            "We’ll send you a 6-digit code by SMS."
         } else {
-            "We've sent a verification code to your phone number ${prettyPhone(state.phone)}. The code will expire in 5 minutes."
+            "SMS sent to ${prettyPhone(state.phone)}. The code expires in five minutes."
         },
         footer = {
             if (step == 1) {

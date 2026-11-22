@@ -595,6 +595,8 @@ struct AddressFoundView: View {
 /// Phone verification, both steps: the artwork's two states share the artwork,
 /// the ribbon and the footer, and only the middle changes.
 struct PhoneVerifyView: View {
+    @Environment(\.dynamicTypeSize) private var textSize
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
     @ObservedObject var model: RecoveryModel
     let onBack: () -> Void
     let onVerified: (String) -> Void
@@ -612,12 +614,12 @@ struct PhoneVerifyView: View {
     var body: some View {
         AccountScreen(
             onBack: { if step == 2 { step = 1 } else { onBack() } },
-            illustration: "ill_account_phone",
+            illustration: textSize.isAccessibilitySize || verticalSizeClass == .compact ? nil : "ill_account_phone",
             eyebrow: "Phone verification",
-            title: step == 1 ? "Add or verify your phone number" : "Enter the 6-digit code",
+            title: step == 1 ? "Verify your phone number" : "Enter the 6-digit code",
             subtitle: step == 1
-                ? "We'll send a 6-digit verification code to your phone number. This helps you recover your account and enable two-step verification."
-                : "We've sent a verification code to your phone number \(PhoneFormat.pretty(model.phone)). The code will expire in 5 minutes.",
+                ? "We’ll send you a 6-digit code by SMS."
+                : "SMS sent to \(PhoneFormat.pretty(model.phone)). The code expires in five minutes.",
             content: {
                 TwoStepRibbon(current: step, labels: ["Phone number", "SMS code"])
                 Spacer().frame(height: 20)
