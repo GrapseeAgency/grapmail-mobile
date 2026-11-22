@@ -2,6 +2,7 @@ import SwiftUI
 import Combine
 import UIKit
 import UniformTypeIdentifiers
+import PhotosUI
 
 struct ThreadView: View {
     @ObservedObject var vm: MailboxModel
@@ -516,6 +517,7 @@ private struct ThreadMessageCard: View {
                         .font(.system(size: 15, weight: .semibold))
                         .foregroundColor(GM.textPrimary)
                         .lineLimit(1)
+                    SenderBadges(address: message.from?.address ?? "")
                     if let date = MailTime.short(message.createdAt) {
                         Text(date)
                             .font(.system(size: 11))
@@ -890,6 +892,14 @@ struct ComposeView: View {
     @State private var encryptOn = false
     @State private var preparingSend = false
     @State private var uploading = false
+    // "Image" in the formatting toolbar: a picture placed inside the message.
+    @State private var pickingInline = false
+    @State private var inlineSelection: PhotosPickerItem?
+    @State private var pendingImage: InlineImage?
+    // The compatibility report the person is reviewing, and the body version they
+    // chose to send past.
+    @State private var compatFindings: [ComposeFinding]?
+    @State private var acceptedHtml: String?
 
     private var signature: String {
         guard let s = account.state.profile?.settings else { return "" }
@@ -976,6 +986,25 @@ struct ComposeView: View {
                       allowedContentTypes: [.data, .image, .pdf],
                       allowsMultipleSelection: false) { result in
             pick(result)
+        }
+        .photosPicker(isPresented: $pickingInline, selection: $inlineSelection, matching: .images)
+        .onChange(of: inlineSelection) { item in
+            guard let item else { return }
+            inlineSelection = nil
+            placeInlineImage(item)
+        }
+        .alert("Check before sending", isPresented: Binding(
+            get: { compatFindings != nil },
+            set: { if !$0 { compatFindings = nil } }
+        )) {
+            Button("Send anyway") {
+                acceptedHtml = vm.compose.bodyHtml
+                compatFindings = nil
+                sendTapped()
+            }
+            Button("Keep editing", role: .cancel) { compatFindings = nil }
+        } message: {
+            Text(compatSummary)
         }
         .task(id: signature) {
             if !started {
@@ -1201,7 +1230,12 @@ struct ComposeView: View {
             }
             .font(.system(size: 13, weight: .medium))
             if formatting {
-                ComposeFormattingEditor(text: vm.compose.body, html: vm.compose.bodyHtml) { text, html in
+                ComposeFormattingEditor(
+                    text: vm.compose.body, html: vm.compose.bodyHtml,
+                    pendingImage: pendingImage,
+                    onImageInserted: { pendingImage = nil },
+                    onPickImage: encryptOn ? nil : { pickingInline = true }
+                ) { text, html in
                     vm.composeUpdate {
                         $0.body = text
                         $0.bodyHtml = html
@@ -1227,10 +1261,11 @@ struct ComposeView: View {
                         !signature.isEmpty && vm.compose.body.contains(signature)
                             ? "gm-signed-body" : "mail-body-field")
             }
-            if !attached.isEmpty {
+            // Images placed inside the message are shown there, not as file chips.
+            if attached.contains(where: { $0.contentId == nil }) {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 8) {
-                        ForEach(attached) { a in
+                        ForEach(attached.filter { $0.contentId == nil }) { a in
                             HStack(spacing: 6) {
                                 Image(systemName: "paperclip").font(.system(size: 11))
                                 Text(a.name ?? "file").font(.system(size: 12)).lineLimit(1)
@@ -1303,8 +1338,30 @@ struct ComposeView: View {
 
     private func sendTapped() {
         guard sendEnabled else { return }
+        // An image removed from the body after it was placed is not sent at all.
+        let html = vm.compose.bodyHtml
+        let attachmentIds = attached
+            .filter { a in a.contentId.map { html?.contains("cid:" + $0) == true } ?? true }
+            .map(\.id)
         if !encryptOn {
-            vm.send(attachmentIds: attached.map(\.id))
+            // Check designed HTML for what mail apps drop or break, once per
+            // version of the body; "Send anyway" accepts that version.
+            if let html, html != acceptedHtml, let token = SessionStore.token {
+                preparingSend = true
+                Task { @MainActor in
+                    let report = try? await ApiClient.composeCheck(token, html: html)
+                    preparingSend = false
+                    let problems = (report?.findings ?? []).filter { $0.severity != "info" }
+                    if problems.isEmpty {
+                        acceptedHtml = html
+                        vm.send(attachmentIds: attachmentIds)
+                    } else {
+                        compatFindings = report?.findings
+                    }
+                }
+                return
+            }
+            vm.send(attachmentIds: attachmentIds)
             return
         }
         guard attached.isEmpty else {
@@ -1351,6 +1408,82 @@ struct ComposeView: View {
              || p.name?.localizedCaseInsensitiveContains(needle) == true)
             && !already.contains { $0.caseInsensitiveCompare(p.address) == .orderedSame }
         }.prefix(5))
+    }
+
+    /// The report, one line per finding, for the alert.
+    private var compatSummary: String {
+        let lines = (compatFindings ?? []).map { f -> String in
+            let label = f.severity == "removed" ? "Removed" : f.severity == "warning" ? "May break" : "Note"
+            let clients = f.clients.isEmpty ? "" : " (" + f.clients.joined(separator: ", ") + ")"
+            return "\(label): \(f.message)\(clients)"
+        }
+        return "Some of this message's formatting won't arrive the way it looks here.\n\n" + lines.joined(separator: "\n\n")
+    }
+
+    /// Upload a picked photo to be placed inside the message (`inline`), then
+    /// hand the editor a preview no wider than 600 px. The photo is re-encoded as
+    /// JPEG (or PNG when it has transparency) at most 1600 px wide, so a 12 MP
+    /// camera image does not become a 6 MB email.
+    private func placeInlineImage(_ item: PhotosPickerItem) {
+        guard sendEnabled, !uploading else { return }
+        guard attached.count < 20 else {
+            notice = "A message can have up to 20 attachments and images."
+            return
+        }
+        uploading = true
+        let generation = SessionStore.generation
+        Task { @MainActor in
+            defer { uploading = false }
+            guard let data = try? await item.loadTransferable(type: Data.self),
+                  let image = UIImage(data: data) else {
+                notice = "That photo could not be read."
+                return
+            }
+            let hasAlpha: Bool = {
+                guard let alpha = image.cgImage?.alphaInfo else { return false }
+                return [.first, .last, .premultipliedFirst, .premultipliedLast].contains(alpha)
+            }()
+            func scaled(_ maxWidth: CGFloat) -> UIImage {
+                let width = min(maxWidth, image.size.width)
+                let size = CGSize(width: width, height: image.size.height * width / max(image.size.width, 1))
+                let format = UIGraphicsImageRendererFormat()
+                format.scale = 1
+                return UIGraphicsImageRenderer(size: size, format: format).image { _ in image.draw(in: CGRect(origin: .zero, size: size)) }
+            }
+            let full = scaled(1600)
+            guard let bytes = hasAlpha ? full.pngData() : full.jpegData(compressionQuality: 0.85),
+                  let previewBytes = hasAlpha ? scaled(600).pngData() : scaled(600).jpegData(compressionQuality: 0.8) else {
+                notice = "That photo could not be prepared."
+                return
+            }
+            guard bytes.count <= 10 * 1024 * 1024 else {
+                notice = "Images inside a message can be up to 10 MB."
+                return
+            }
+            guard let token = SessionStore.token, SessionStore.generation == generation else {
+                notice = "Sign in again to insert an image."
+                return
+            }
+            let name = "image." + (hasAlpha ? "png" : "jpg")
+            notice = "Uploading image…"
+            do {
+                let attachment = try await ApiClient.mailAttachmentUpload(
+                    token: token, bytes: bytes, filename: name,
+                    mimeType: hasAlpha ? "image/png" : "image/jpeg", inline: true)
+                guard SessionStore.generation == generation else { return }
+                attached.append(attachment)
+                guard let cid = attachment.contentId, !cid.isEmpty else {
+                    notice = "This server can't place images inside messages yet, so the image was attached instead."
+                    return
+                }
+                let preview = "data:image/" + (hasAlpha ? "png" : "jpeg") + ";base64," + previewBytes.base64EncodedString()
+                pendingImage = InlineImage(contentId: cid, preview: preview, alt: "Image",
+                                           width: Int(min(600, image.size.width)))
+                notice = "Image inserted."
+            } catch {
+                notice = apiMessage(error, fallback: "That image could not be inserted.")
+            }
+        }
     }
 
     private func pick(_ result: Result<[URL], Error>) {

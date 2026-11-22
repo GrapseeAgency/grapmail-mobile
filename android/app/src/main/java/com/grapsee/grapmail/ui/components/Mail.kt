@@ -853,3 +853,30 @@ fun labelSwatch(key: String?): Color {
         else -> if (dark) Color(0xFF9AA0A6) else Color(0xFF5F6368)   // slate
     }
 }
+
+/**
+ * "Subscriber" next to a sender's name when the server says their account pays
+ * for GrapMail. Deliberately not a check mark: paying is not verification.
+ */
+@Composable
+fun SenderBadges(address: String?, modifier: Modifier = Modifier) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val badges by androidx.compose.runtime.produceState(initialValue = emptyList<String>(), address) {
+        val wanted = address?.trim().orEmpty()
+        value = if (wanted.isEmpty()) emptyList() else com.grapsee.grapmail.data.SenderPhotos.badges(context, wanted)
+    }
+    if ("subscriber" !in badges) return
+    val palette = com.grapsee.grapmail.ui.theme.LocalPalette.current
+    Text(
+        "Subscriber",
+        fontSize = 10.sp,
+        fontWeight = FontWeight.SemiBold,
+        color = palette.primarySolid,
+        maxLines = 1,
+        modifier = modifier
+            .clip(RoundedCornerShape(50))
+            .border(1.dp, palette.primarySolid.copy(alpha = 0.5f), RoundedCornerShape(50))
+            .padding(horizontal = 6.dp, vertical = 1.dp)
+            .semantics { contentDescription = "Subscriber: this sender supports GrapMail with a paid plan" },
+    )
+}

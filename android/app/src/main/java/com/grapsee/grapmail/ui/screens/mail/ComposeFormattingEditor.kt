@@ -13,7 +13,11 @@ import androidx.compose.ui.viewinterop.AndroidView
 import org.json.JSONArray
 import org.json.JSONObject
 
+/** An uploaded image waiting to be placed in the editor (see insertImage in the HTML). */
+internal data class InlineImage(val contentId: String, val preview: String, val alt: String, val width: Int)
+
 private class DraftEditorState {
+    var insertedIds = mutableSetOf<String>()
     var ready = false
     var renderedText: String? = null
     var renderedHtml: String? = null
@@ -36,9 +40,14 @@ internal fun ComposeFormattingEditor(
     html: String?,
     onChange: (String, String?) -> Unit,
     modifier: Modifier = Modifier,
+    pendingImage: InlineImage? = null,
+    onImageInserted: () -> Unit = {},
+    onPickImage: (() -> Unit)? = null,
 ) {
     val state = remember { DraftEditorState() }
     val currentChange = rememberUpdatedState(onChange)
+    val currentPick = rememberUpdatedState(onPickImage)
+    val currentInserted = rememberUpdatedState(onImageInserted)
     AndroidView(
         modifier = modifier,
         factory = { context ->
@@ -61,6 +70,11 @@ internal fun ComposeFormattingEditor(
                         currentChange.value(plain, rich)
                     }
                 }
+
+                @JavascriptInterface
+                fun pickImage() {
+                    view.post { currentPick.value?.invoke() }
+                }
             }, "GrapMailDraft")
             view.webViewClient = object : WebViewClient() {
                 override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest) = true
@@ -77,6 +91,12 @@ internal fun ComposeFormattingEditor(
             state.text = text
             state.html = html
             state.sync(view)
+            val image = pendingImage
+            if (image != null && state.ready && state.insertedIds.add(image.contentId)) {
+                val arguments = JSONArray().put(image.contentId).put(image.preview).put(image.alt).put(image.width)
+                view.evaluateJavascript("window.insertImage.apply(null, $arguments)", null)
+                view.post { currentInserted.value() }
+            }
         },
         onRelease = { view ->
             state.ready = false

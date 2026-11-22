@@ -142,7 +142,10 @@ struct MailHtmlBodyView: UIViewRepresentable {
 private func mailDocument(html: String, allowImages: Bool, traits: UITraitCollection) -> String {
     // https only: the server upgrades http images, and a cleartext request
     // would show the network what was opened.
-    let imageSources = allowImages ? "https:" : "'none'"
+    // data: is only ever an inline image of this same message (the server draws
+    // cid: parts from the message's own attachments), so it shows without the
+    // remote-image opt-in and tells no sender anything.
+    let imageSources = allowImages ? "data: https:" : "data:"
     let authoredColors = html.contains(" style=\"") || html.contains(" bgcolor=\"")
     let canvas = authoredColors ? "#FFFFFF" : "transparent"
     let text = authoredColors ? "#1F2937" : UIColor(GM.textPrimary).resolvedColor(with: traits).hexString

@@ -1699,6 +1699,14 @@ object Api {
             resp.body?.bytes() ?: ByteArray(0)
         }
 
+    /** `POST /compose/check` — what in this HTML will be removed or will not work in common mail apps. */
+    suspend fun composeCheck(token: String, html: String): ComposeCheckDto {
+        val req = authed("$MAIL/compose/check", token)
+            .post(postBody(json.encodeToString(ComposeCheckRequest.serializer(), ComposeCheckRequest(html))))
+            .build()
+        return read(req) { decodeResponse(it) }
+    }
+
     /** `GET /billing/entitlement` — the account's plan, allowance and this month's usage. */
     suspend fun billingEntitlement(token: String): BillingEntitlementDto =
         read(authed("$MAIL/billing/entitlement", token).get().build()) { decodeResponse(it) }
@@ -1766,12 +1774,14 @@ object Api {
     }
 
     suspend fun mailAttachmentUploadFile(
-        token: String, file: java.io.File, filename: String, mimeType: String,
+        token: String, file: java.io.File, filename: String, mimeType: String, inline: Boolean = false,
     ): MailAttachmentDto {
-        val body = MultipartBody.Builder().setType(MultipartBody.FORM)
+        val builder = MultipartBody.Builder().setType(MultipartBody.FORM)
             .addFormDataPart("file", filename, file.asRequestBody(mimeType.toMediaType()))
             .addFormDataPart("messageId", "")
-            .build()
+        // An image placed inside the message: the server gives it a Content-ID.
+        if (inline) builder.addFormDataPart("inline", "1")
+        val body = builder.build()
         val req = authed("$MAIL/attachments", token).post(body).build()
         return read(req) { decodeResponse(MailAttachmentResponseJson.serializer(), it).attachment }
     }
@@ -1937,6 +1947,26 @@ data class MailScreenerEnableRequest(val enabled: Boolean)
 data class BillingVerifyRequest(val productId: String, val purchaseToken: String)
 
 @Serializable
+data class ComposeCheckRequest(val html: String)
+
+/** One compatibility finding: `removed`, `warning` or `info`. */
+@Serializable
+data class ComposeFindingDto(
+    val code: String = "",
+    val severity: String = "info",
+    val message: String = "",
+    val clients: List<String> = emptyList(),
+)
+
+@Serializable
+data class ComposeCheckDto(
+    val success: Boolean = false,
+    val sizeBytes: Int = 0,
+    val findings: List<ComposeFindingDto> = emptyList(),
+    val clean: Boolean = true,
+)
+
+@Serializable
 data class BillingAllowanceDto(
     val monthlyRecipients: Int = 0,
     val used: Int = 0,
@@ -1988,6 +2018,8 @@ data class MailAvatarDto(
     val path: String? = null,
     val revision: String? = null,
     val verifiedBrand: Boolean = false,
+    /** Facts about the account, each its own mark: `subscriber` = pays for GrapMail. Never "verified". */
+    val badges: List<String> = emptyList(),
 )
 
 @Serializable

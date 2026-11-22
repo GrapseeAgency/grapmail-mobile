@@ -72,7 +72,10 @@ private fun mailDocument(
 ): String {
     // https only: the server upgrades http images, and a cleartext request
     // would show the network what was opened.
-    val imageSources = if (allowImages) "https:" else "'none'"
+    // data: is only ever an inline image of this same message (the server draws
+    // cid: parts from the message's own attachments), so it shows without the
+    // remote-image opt-in and tells no sender anything.
+    val imageSources = if (allowImages) "data: https:" else "data:"
     val authoredColors = html.contains(" style=\"") || html.contains(" bgcolor=\"")
     val lightDesign = authoredColors && !dark
     val canvas = if (lightDesign) "#FFFFFF" else "transparent"

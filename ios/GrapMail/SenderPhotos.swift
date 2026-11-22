@@ -1,6 +1,7 @@
 import Foundation
 import CryptoKit
 import ImageIO
+import SwiftDraw
 import UIKit
 
 /// Sender photos for the list and the reader.
@@ -31,12 +32,14 @@ final class SenderPhotos: @unchecked Sendable {
     private static let missTTL: TimeInterval = 10 * 60
     private static let targetPixels: CGFloat = 160
 
-    private struct Answer { let revision: String?; let at: Date }
+    private struct Answer { let revision: String?; let badges: [String]; let at: Date }
+    /// Badges this app knows how to show. Anything else the server adds is ignored.
+    private static let knownBadges: Set<String> = ["subscriber"]
 
     private let lock = NSLock()
     private var answers: [String: Answer] = [:]
     private var lastKnown: [String: String] = [:]
-    private var pending: [String: [CheckedContinuation<String?, Never>]] = [:]
+    private var pending: [String: [CheckedContinuation<Answer?, Never>]] = [:]
     private var flushScheduled = false
     private let images: NSCache<NSString, UIImage> = {
         let cache = NSCache<NSString, UIImage>()
@@ -61,7 +64,7 @@ final class SenderPhotos: @unchecked Sendable {
         let key = Self.key(address)
         guard key.contains("@"), let token = SessionStore.token else { return nil }
         let viewer = (SessionStore.address ?? "").lowercased()
-        guard let revision = await revision(viewer: viewer, key: key) else { return nil }
+        guard let revision = await resolve(viewer: viewer, key: key)?.revision else { return nil }
         if let hit = images.object(forKey: "\(key)|\(revision)" as NSString) { return hit }
         var data = readDisk(key: key, revision: revision)
         if data == nil {
@@ -91,13 +94,22 @@ final class SenderPhotos: @unchecked Sendable {
 
     // MARK: - resolving, batched
 
-    private func revision(viewer: String, key: String) async -> String? {
+    /// The facts the server states about this sender's account, e.g.
+    /// `subscriber`. Empty when there are none or the lookup failed.
+    func badges(for address: String) async -> [String] {
+        let key = Self.key(address)
+        guard key.contains("@"), SessionStore.token != nil else { return [] }
+        let viewer = (SessionStore.address ?? "").lowercased()
+        return await resolve(viewer: viewer, key: key)?.badges ?? []
+    }
+
+    private func resolve(viewer: String, key: String) async -> Answer? {
         let now = Date()
         if let answer = lock.withLock({ answers["\(viewer)|\(key)"] }) {
             let ttl = answer.revision != nil ? Self.hitTTL : Self.missTTL
-            if now.timeIntervalSince(answer.at) < ttl { return answer.revision }
+            if now.timeIntervalSince(answer.at) < ttl { return answer }
         }
-        return await withCheckedContinuation { (waiter: CheckedContinuation<String?, Never>) in
+        return await withCheckedContinuation { (waiter: CheckedContinuation<Answer?, Never>) in
             let schedule: Bool = lock.withLock {
                 pending[key, default: []].append(waiter)
                 if flushScheduled { return false }
@@ -114,7 +126,7 @@ final class SenderPhotos: @unchecked Sendable {
     }
 
     private func flush(viewer: String) async {
-        let batch: [(String, [CheckedContinuation<String?, Never>])] = lock.withLock {
+        let batch: [(String, [CheckedContinuation<Answer?, Never>])] = lock.withLock {
             let taken = pending.prefix(Self.maxBatch).map { ($0.key, $0.value) }
             for (key, _) in taken { pending[key] = nil }
             flushScheduled = !pending.isEmpty
@@ -137,13 +149,17 @@ final class SenderPhotos: @unchecked Sendable {
                 revision = value
             }
             // Only a real answer is remembered; a failed call is asked again next time.
-            if resolved != nil {
+            var answer: Answer?
+            if let resolved {
+                let badges = (resolved[key]?.badges ?? []).filter { Self.knownBadges.contains($0) }
+                let made = Answer(revision: revision, badges: badges, at: now)
+                answer = made
                 lock.withLock {
-                    answers["\(viewer)|\(key)"] = Answer(revision: revision, at: now)
+                    answers["\(viewer)|\(key)"] = made
                     lastKnown[key] = revision
                 }
             }
-            for waiter in waiters { waiter.resume(returning: revision) }
+            for waiter in waiters { waiter.resume(returning: answer) }
         }
     }
 
@@ -178,6 +194,25 @@ final class SenderPhotos: @unchecked Sendable {
     }
 
     private static func downsample(_ data: Data) -> UIImage? {
+        // A brand logo (BIMI) arrives as SVG, already checked server-side to be
+        // self-contained. ImageIO cannot read vectors, so it is drawn here, on a
+        // white disc as mail apps show brand marks.
+        let head = String(decoding: data.prefix(256), as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
+        if head.hasPrefix("<svg") || head.hasPrefix("<?xml") {
+            guard let logo = UIImage(svgData: data) else { return nil }
+            let side = targetPixels
+            let format = UIGraphicsImageRendererFormat()
+            format.scale = 1
+            return UIGraphicsImageRenderer(size: CGSize(width: side, height: side), format: format).image { context in
+                UIColor.white.setFill()
+                context.fill(CGRect(x: 0, y: 0, width: side, height: side))
+                let size = logo.size
+                let scale = min(side / max(size.width, 1), side / max(size.height, 1))
+                let drawn = CGSize(width: size.width * scale, height: size.height * scale)
+                logo.draw(in: CGRect(x: (side - drawn.width) / 2, y: (side - drawn.height) / 2,
+                                     width: drawn.width, height: drawn.height))
+            }
+        }
         let options = [kCGImageSourceShouldCache: false] as CFDictionary
         guard let source = CGImageSourceCreateWithData(data as CFData, options) else { return nil }
         let thumb = [

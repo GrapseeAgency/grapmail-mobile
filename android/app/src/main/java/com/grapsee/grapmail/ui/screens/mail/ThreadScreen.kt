@@ -474,6 +474,7 @@ private fun ThreadMessageCard(
                     Text(sender, modifier = Modifier.weight(1f, fill = false), fontSize = 15.sp,
                         fontWeight = FontWeight.SemiBold, color = palette.textPrimary, maxLines = 1,
                         overflow = TextOverflow.Ellipsis)
+                    com.grapsee.grapmail.ui.components.SenderBadges(message.from?.address)
                     mailTime(message.createdAt)?.let { date ->
                         Text(date, fontSize = 11.sp, color = palette.textSecondary, maxLines = 1)
                     }

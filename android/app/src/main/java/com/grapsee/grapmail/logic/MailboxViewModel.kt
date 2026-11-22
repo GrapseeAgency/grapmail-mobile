@@ -2269,11 +2269,11 @@ class MailboxViewModel @JvmOverloads constructor(
      * it wrote, and the returned id is what a send carries — an attachment that
      * was never uploaded is a filename the recipient cannot open.
      */
-    suspend fun uploadAttachment(file: java.io.File, filename: String, mimeType: String, sessionId: String): MailAttachmentDto {
+    suspend fun uploadAttachment(file: java.io.File, filename: String, mimeType: String, sessionId: String, inline: Boolean = false): MailAttachmentDto {
         val app = getApplication<android.app.Application>()
         val session = SessionStore.snapshot(app) ?: throw IllegalStateException("Sign in again to attach a file.")
         check(session.id == sessionId) { "The account changed before this file could be attached." }
-        val attachment = Api.mailAttachmentUploadFile(session.token, file, filename, mimeType)
+        val attachment = Api.mailAttachmentUploadFile(session.token, file, filename, mimeType, inline)
         check(SessionStore.isCurrent(app, session.id)) { "The account changed before this file could be attached." }
         return attachment
     }
@@ -3272,4 +3272,3 @@ class MailboxViewModel @JvmOverloads constructor(
         }
     }
 }
-

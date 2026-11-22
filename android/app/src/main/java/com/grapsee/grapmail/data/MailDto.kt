@@ -230,6 +230,8 @@ data class MailAttachmentDto(
     @kotlinx.serialization.json.JsonNames("size")
     val sizeBytes: Int? = null,
     val createdAt: String? = null,
+    /** Set for an image placed inside the message body; the HTML refers to it as `cid:<id>`. */
+    val contentId: String? = null,
 )
 
 /** `GET /grapmail/inbox` — `grapmail.ts:729-737`. */
