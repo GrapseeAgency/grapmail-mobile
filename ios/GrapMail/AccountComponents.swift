@@ -12,6 +12,8 @@ final class RecoveryModel: ObservableObject {
     @Published var challengeId: String?
     @Published var expiresAt: Date?
     @Published var maskedPhone: String?
+    /// The masked address a two-step sign-in code was emailed to.
+    @Published var factorDestination: String?
     /// "email" when forgot-password emailed a reset link instead of sending a code.
     @Published var resetChannel: String?
     @Published var code = ""
@@ -31,6 +33,7 @@ final class RecoveryModel: ObservableObject {
         expiresAt = nil
         code = ""
         verificationEmail = nil
+        factorDestination = nil
     }
 }
 

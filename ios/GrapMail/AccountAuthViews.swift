@@ -146,6 +146,7 @@ struct SignInView: View {
                 // backend omits on ordinary sign-ins. Reading an absent flag as
                 // "no code needed" would sign a 2FA account in on the password.
                 if resp.secondFactorRequired, let cid = resp.challengeId {
+                    model.factorDestination = resp.maskedEmail
                     model.identifier = identifier.trimmingCharacters(in: .whitespaces)
                     model.password = password
                     password = ""
@@ -279,7 +280,8 @@ struct TwoFactorView: View {
             illustration: "ill_account_2fa",
             eyebrow: "Two-step verification",
             title: "Enter your 6-digit code",
-            subtitle: "We've sent a verification code to your GrapMail account. Please enter the 6-digit code to continue.",
+            subtitle: model.factorDestination.map { "We've emailed a 6-digit code to \($0). Enter it to finish signing in." }
+                ?? "We've sent you a verification code. Please enter the 6-digit code to continue.",
             content: {
                 CodeCells(length: 6, value: $code)
                 HStack {
@@ -385,6 +387,7 @@ struct TwoFactorView: View {
                 // "no code needed" would sign a 2FA account in on the password.
                 if resp.secondFactorRequired, let cid = resp.challengeId {
                     code = ""
+                    if let masked = resp.maskedEmail { model.factorDestination = masked }
                     model.challengeId = cid
                     // The CHALLENGE's expiry, for the code countdown — deliberately
                     // `expiresAt` and not `expiresAtDate`: the latter falls back to

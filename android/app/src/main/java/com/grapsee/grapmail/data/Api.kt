@@ -134,6 +134,10 @@ data class VerifyHumanResponse(
     val requireOtp: Boolean = false,
     val email: String? = null,
     val challengeId: String? = null,
+    /** Where a two-step code went: "email" with [maskedEmail] (the verified
+     *  recovery email), or the legacy "sms". */
+    val channel: String? = null,
+    val maskedEmail: String? = null,
     val backupCodesRemaining: Int? = null,
     val message: String? = null,
     val error: String? = null,
@@ -225,6 +229,9 @@ private fun apiErrorMessage(status: Int, code: String?): String = when (code) {
     "EMAIL_DELIVERY_UNAVAILABLE" -> "We couldn't send the email right now. Try again shortly."
     "CODE_REJECTED" -> "That code is not correct."
     "CODE_EXPIRED" -> "That code has expired. Request a new one."
+    "EMAIL_PROOF_REQUIRED" -> "Enter the code we emailed you to turn on two-step verification."
+    "TWO_FACTOR_NEEDS_RECOVERY_EMAIL" -> "Add and confirm a recovery email before turning on two-step verification."
+    "RECOVERY_EMAIL_IN_USE" -> "Two-step verification sends its codes to your recovery email. Confirm a new address with a code instead."
     "SMS_DELIVERY_UNAVAILABLE" -> "The code could not be sent. Try again in a moment."
     "BAD_ADDRESS" -> "Check the email address and try again."
     "ADDRESS_REJECTED" -> "That email address is unavailable."
@@ -274,6 +281,8 @@ private fun apiErrorMessage(status: Int, code: String?): String = when (code) {
     val success: Boolean = false,
     val recoveryEmail: String? = null,
     val recoveryEmailVerified: Boolean = false,
+    /** Proof the code just reached this mailbox; turning two-step on spends it. */
+    val emailProof: String? = null,
     val message: String? = null,
     val error: String? = null,
     val code: String? = null,
@@ -669,6 +678,7 @@ private fun apiErrorMessage(status: Int, code: String?): String = when (code) {
     val twoFactor: String,
     val proof: String,
     val phoneProof: String,
+    val emailProof: String = "",
 )
 @Serializable private data class TwoFactorDisableRequest(val twoFactor: String, val currentPassword: String)
 @Serializable private data class PasswordChangeRequest(val currentPassword: String, val newPassword: String)
@@ -1210,11 +1220,16 @@ object Api {
         return response to saved
     }
 
-    suspend fun enableTwoFactor(token: String, proof: String?, phoneProof: String?): ProfileResponse {
+    /**
+     * Turns two-step on. [emailProof] (from confirmRecoveryEmail) is the current
+     * route: sign-in codes go to the verified recovery email. [phoneProof] is the
+     * legacy one; the server takes whichever is sent, plus the password [proof].
+     */
+    suspend fun enableTwoFactor(token: String, proof: String?, phoneProof: String?, emailProof: String? = null): ProfileResponse {
         val req = authed("$AUTH/account/profile", token)
             .patch(postBody(json.encodeToString(
                 TwoFactorEnableRequest.serializer(),
-                TwoFactorEnableRequest("on", proof ?: "", phoneProof ?: ""),
+                TwoFactorEnableRequest("on", proof ?: "", phoneProof ?: "", emailProof ?: ""),
             )))
             .build()
         return read(req) { decodeResponse<ProfileResponse>(it) }

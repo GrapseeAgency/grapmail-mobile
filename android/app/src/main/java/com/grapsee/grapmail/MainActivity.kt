@@ -104,6 +104,7 @@ import com.grapsee.grapmail.ui.screens.security.RevokeSessionScreen
 import com.grapsee.grapmail.ui.screens.security.SecureMyAccountScreen
 import com.grapsee.grapmail.ui.screens.security.SecurityActivityScreen
 import com.grapsee.grapmail.ui.screens.security.SecurityFlow
+import com.grapsee.grapmail.ui.screens.security.TwoFactorEmailScreen
 import com.grapsee.grapmail.ui.screens.security.SessionRevokedScreen
 import com.grapsee.grapmail.ui.screens.security.SessionRevokedSuspiciousScreen
 import com.grapsee.grapmail.ui.screens.security.SignOutAllDevicesScreen
@@ -1000,9 +1001,12 @@ fun GrapMailNav(
             )
         }
         composable(Routes.SEC_VERIFY_PHONE) {
-            VerifyPhoneScreen(
+            // Sign-in codes go to the verified recovery email, so the enable flow
+            // confirms a code sent there (the route name is kept so existing
+            // links into the flow still land here).
+            TwoFactorEmailScreen(
                 onBack = { nav.popBackStack() },
-                onAddPhone = { nav.navigate(Routes.PHONE_VERIFY) },
+                onAddRecoveryEmail = { nav.navigate(Routes.RECOVERY_EMAIL) },
                 onVerified = { nav.navigate(Routes.SEC_2FA_ON) },
             )
         }

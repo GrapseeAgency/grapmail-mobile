@@ -86,6 +86,9 @@ enum ApiError: Error, LocalizedError {
             case "EMAIL_DELIVERY_UNAVAILABLE": return "We couldn't send the email right now. Try again shortly."
             case "CODE_REJECTED": return "That code is not correct."
             case "CODE_EXPIRED": return "That code has expired. Request a new one."
+            case "EMAIL_PROOF_REQUIRED": return "Enter the code we emailed you to turn on two-step verification."
+            case "TWO_FACTOR_NEEDS_RECOVERY_EMAIL": return "Add and confirm a recovery email before turning on two-step verification."
+            case "RECOVERY_EMAIL_IN_USE": return "Two-step verification sends its codes to your recovery email. Confirm a new address with a code instead."
             case "SMS_DELIVERY_UNAVAILABLE": return "The code could not be sent. Try again in a moment."
             case "BAD_ADDRESS": return "Check the email address and try again."
             case "ADDRESS_REJECTED": return "That email address is unavailable."
@@ -279,6 +282,10 @@ struct SignInResponse: Decodable {
     // is why only iOS broke.
     var requireOtp: Bool?
     var challengeId: String?
+    /// Where a two-step code went: "email" with `maskedEmail` (the verified
+    /// recovery email), or the legacy "sms".
+    var channel: String?
+    var maskedEmail: String?
     var backupCodesRemaining: Int?
     var message: String?
     var error: String?
@@ -286,7 +293,7 @@ struct SignInResponse: Decodable {
 
     private enum CodingKeys: String, CodingKey {
         case success, sessionToken, accessToken, token, refreshToken, expiresAt,
-             expiresIn, account, user, requireOtp, challengeId,
+             expiresIn, account, user, requireOtp, challengeId, channel, maskedEmail,
              backupCodesRemaining, message, error, code
     }
     init(from decoder: Decoder) throws {
@@ -306,6 +313,8 @@ struct SignInResponse: Decodable {
         account = accountField ?? userField
         requireOtp = c.lenientOpt(.requireOtp)
         challengeId = c.lenientOpt(.challengeId)
+        channel = c.lenientOpt(.channel)
+        maskedEmail = c.lenientOpt(.maskedEmail)
         backupCodesRemaining = c.lenientOpt(.backupCodesRemaining)
         message = c.lenientOpt(.message)
         error = c.lenientOpt(.error)
@@ -407,6 +416,8 @@ struct RecoveryEmailConfirmResponse: Decodable {
     var success: Bool?
     var recoveryEmail: String?
     var recoveryEmailVerified: Bool?
+    /// Proof the code just reached this mailbox; turning two-step on spends it.
+    var emailProof: String?
     var message: String?
 }
 
@@ -1025,7 +1036,7 @@ struct ActivityResponse: Codable {
     }
 }
 
-private struct TwoFactorEnableRequest: Codable { var twoFactor: String; var proof: String; var phoneProof: String }
+private struct TwoFactorEnableRequest: Codable { var twoFactor: String; var proof: String; var phoneProof: String; var emailProof: String }
 private struct TwoFactorDisableRequest: Codable { var twoFactor: String; var currentPassword: String }
 private struct PasswordChangeRequest: Codable { var currentPassword: String; var newPassword: String }
 private struct BackupCodesRequest: Codable { var generateBackupCodes: Bool }
@@ -1756,8 +1767,11 @@ struct ApiClient {
     // (`mailCreateAlias`, `mailDeleteAlias`) — one owner per call, the same as
     // every other `mail*` route, so the parity gate reads one pair of lists.
 
-    static func enableTwoFactor(token: String, proof: String?, phoneProof: String?) async throws -> ProfileResponse {
-        let body = try encoder.encode(TwoFactorEnableRequest(twoFactor: "on", proof: proof ?? "", phoneProof: phoneProof ?? ""))
+    /// Turns two-step on. `emailProof` (from `confirmRecoveryEmail`) is the
+    /// current route: sign-in codes go to the verified recovery email.
+    /// `phoneProof` is the legacy one; the server takes whichever is sent.
+    static func enableTwoFactor(token: String, proof: String?, phoneProof: String?, emailProof: String? = nil) async throws -> ProfileResponse {
+        let body = try encoder.encode(TwoFactorEnableRequest(twoFactor: "on", proof: proof ?? "", phoneProof: phoneProof ?? "", emailProof: emailProof ?? ""))
         return try await request("/grapsee/auth/account/profile", method: "PATCH", body: body, bearer: token)
     }
 

@@ -105,6 +105,7 @@ fun SignInScreen(
                             emailOtpAddress = if (resp.emailOtpRequired) resp.email else null,
                             challengeId = resp.challengeId,
                             expiresAt = resp.expiresAt ?: 0L,
+                            factorDestination = resp.maskedEmail,
                             prefillIdentifier = null,
                         )
                     }
