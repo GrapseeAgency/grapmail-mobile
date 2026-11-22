@@ -41,7 +41,9 @@ import androidx.compose.ui.unit.sp
 import com.grapsee.grapmail.data.Api
 import com.grapsee.grapmail.data.ApiException
 import com.grapsee.grapmail.data.SessionStore
+import com.grapsee.grapmail.findActivity
 import com.grapsee.grapmail.logic.AccountFlowViewModel
+import com.grapsee.grapmail.security.PasskeyManager
 import com.grapsee.grapmail.ui.components.AccountHeader
 import com.grapsee.grapmail.ui.components.AccountLink
 import com.grapsee.grapmail.ui.components.AppTextField
@@ -51,14 +53,14 @@ import com.grapsee.grapmail.ui.components.OrDivider
 import com.grapsee.grapmail.ui.theme.LocalPalette
 import kotlinx.coroutines.launch
 
-/**
- * Sign in — founder design verbatim: wordmark header, "Welcome back 👋", the
- * bordered card holding both fields, the reset link, the gradient CTA, OR, and
- * the create-account line.
- *
- * The second factor is its own designed screen now, so a challenged sign-in
- * hands the challenge to [onNeedSecondFactor] instead of unfolding in place.
- */
+    /**
+     * Sign in — founder design verbatim: wordmark header, "Welcome back 👋", the
+     * bordered card holding both fields, the reset link, the gradient CTA, OR, and
+     * the create-account line.
+     *
+     * The second factor is its own designed screen now, so a challenged sign-in
+     * hands the challenge to [onNeedSecondFactor] instead of unfolding in place.
+     */
 @Composable
 fun SignInScreen(
     flow: AccountFlowViewModel,
@@ -129,6 +131,65 @@ fun SignInScreen(
                 }
             } catch (_: Exception) {
                 busy = false
+                error = "Network error. Please try again."
+            } finally {
+                busy = false
+            }
+        }
+    }
+
+    /**
+     * The passkey door. Discoverable credentials carry no username, so this
+     * needs nothing from the fields above. On success the response is the
+     * same session envelope a password sign-in returns, so it is stored
+     * through the very same [SessionStore.save] path and lands on the same
+     * [onSignedIn] the password door uses — the two doors share everything
+     * after the server has said yes.
+     */
+    fun usePasskey() {
+        if (busy) return
+        // The ceremony draws a system sheet, which needs the FragmentActivity;
+        // MainActivity is one, and anything else fails visibly, not fatally.
+        val host = context.findActivity() as? androidx.fragment.app.FragmentActivity
+        if (host == null) {
+            error = "Passkeys need an app update."
+            return
+        }
+        busy = true; error = null
+        scope.launch {
+            try {
+                when (val result = PasskeyManager.signInWithPasskey(host)) {
+                    is PasskeyManager.SignInResult.Completed -> {
+                        val resp = result.response
+                        val token = resp.sessionToken ?: resp.accessToken ?: resp.token
+                        if (token.isNullOrBlank()) {
+                            error = "Sign-in succeeded but no session was returned. Please try again."
+                            return@launch
+                        }
+                        val address = resp.signedInAddress
+                        if (address.isNullOrBlank()) {
+                            error = "Sign-in succeeded but no account details were returned. Please try again."
+                            return@launch
+                        }
+                        SessionStore.save(
+                            context, token, resp.refreshToken, address,
+                            resp.accountOrNull?.name ?: "", resp.expiresAtMillis,
+                        )
+                        password = ""
+                        flow.clearSignIn()
+                        onSignedIn(address)
+                    }
+                    PasskeyManager.SignInResult.NoCredential ->
+                        error = "No passkey for this account is on this device. Sign in with your password, then add one from Account Security."
+                    PasskeyManager.SignInResult.Cancelled -> {
+                        // The person closed the sheet; nothing to report.
+                    }
+                    is PasskeyManager.SignInResult.Failed ->
+                        error = result.message ?: "The passkey could not be used. Sign in with your password."
+                }
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (_: Exception) {
                 error = "Network error. Please try again."
             } finally {
                 busy = false
@@ -229,6 +290,13 @@ fun SignInScreen(
             Spacer(Modifier.height(22.dp))
             OrDivider()
             Spacer(Modifier.height(14.dp))
+            // The passkey door stays visible whatever the fields hold: a
+            // discoverable credential needs neither of them, and a person
+            // with a passkey should never have to wonder where it is used.
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
+                AccountLink("Use a passkey", onClick = { usePasskey() })
+            }
+            Spacer(Modifier.height(10.dp))
             Row(
                 Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.Center,

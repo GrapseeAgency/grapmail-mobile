@@ -348,6 +348,7 @@ object Routes {
     const val SEC_REVOKED_ALERT = "security/alert/revoked/{device}"
     const val SEC_ACTIVITY = "security/activity"
     const val SEC_DEVICES = "security/devices"
+    const val SEC_PASSKEYS = "security/passkeys"
     const val SEC_RECOVERY_CODES = "security/recovery-codes"
     const val MAIL_NOTIFY_PREFS = "mail/settings/notifications"
     const val SEC_ALERT = "security/alert"
@@ -1029,6 +1030,7 @@ fun GrapMailNav(
                 onSessions = { nav.navigate(Routes.SEC_SESSIONS) },
                 onActivity = { nav.navigate(Routes.SEC_ACTIVITY) },
                 onTrustedDevices = { nav.navigate(Routes.SEC_DEVICES) },
+                onPasskeys = { nav.navigate(Routes.SEC_PASSKEYS) },
                 onRecoveryCodes = { nav.navigate(Routes.SEC_RECOVERY_CODES) },
                 onNotificationPrefs = { nav.navigate(Routes.MAIL_NOTIFY_PREFS) },
                 onBackupCodes = { nav.navigate(Routes.SEC_BACKUP) },
@@ -1040,6 +1042,11 @@ fun GrapMailNav(
         }
         composable(Routes.SEC_DEVICES) {
             com.grapsee.grapmail.ui.screens.security.TrustedDevicesScreen(
+                onBack = { nav.popBackStack() },
+            )
+        }
+        composable(Routes.SEC_PASSKEYS) {
+            com.grapsee.grapmail.ui.screens.security.PasskeysScreen(
                 onBack = { nav.popBackStack() },
             )
         }

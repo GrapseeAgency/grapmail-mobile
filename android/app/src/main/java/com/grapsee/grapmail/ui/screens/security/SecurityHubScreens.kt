@@ -19,6 +19,7 @@ import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.DeleteForever
 import androidx.compose.material.icons.rounded.Devices
 import androidx.compose.material.icons.rounded.DevicesOther
+import androidx.compose.material.icons.rounded.Fingerprint
 import androidx.compose.material.icons.rounded.HeadsetMic
 import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.Logout
@@ -85,6 +86,7 @@ fun AccountSecurityScreen(
     onSessions: () -> Unit,
     onActivity: () -> Unit,
     onTrustedDevices: () -> Unit,
+    onPasskeys: () -> Unit,
     onRecoveryCodes: () -> Unit,
     onNotificationPrefs: () -> Unit,
     onBackupCodes: () -> Unit,
@@ -267,6 +269,16 @@ fun AccountSecurityScreen(
             title = "Trusted Devices",
             subtitle = "Devices whose hardware key can prove this account.",
             onClick = onTrustedDevices,
+        )
+        RowDivider()
+        // Passkeys hang off the same account: created here (signed in, so the
+        // ceremony runs under the bearer), used at sign-in on any screen —
+        // this row is the only place a credential is offered or removed.
+        SecurityRow(
+            icon = Icons.Rounded.Fingerprint,
+            title = "Passkeys",
+            subtitle = "Sign in with a biometric credential instead of a password.",
+            onClick = onPasskeys,
         )
         RowDivider()
         SecurityRow(
@@ -754,6 +766,10 @@ fun TrustedDevicesScreen(onBack: () -> Unit) {
     // the kind of blocking the list screens here avoid.
     var ownRowId by remember { mutableStateOf<String?>(null) }
     var hasLocalKey by remember { mutableStateOf(false) }
+    // True when THIS install's key answers signatures with no biometric gate —
+    // generated on a device without strong biometrics, or minted before the
+    // gate existed. Surfaced below: security never silently weakens.
+    var keyWithoutBiometricLock by remember { mutableStateOf(false) }
 
     suspend fun load() {
         val session = SessionStore.snapshot(context) ?: run {
@@ -764,6 +780,7 @@ fun TrustedDevicesScreen(onBack: () -> Unit) {
         failed = false
         ownRowId = TrustedDeviceManager.enrolledDeviceRowId(context, session.address)
         hasLocalKey = com.grapsee.grapmail.security.DeviceKeyManager.hasKey()
+        keyWithoutBiometricLock = com.grapsee.grapmail.security.DeviceKeyManager.isUnlockedKey()
         try {
             val resp = Api.listDevices(session.token)
             if (!SessionStore.isCurrent(context, session.id)) return
@@ -825,7 +842,8 @@ fun TrustedDevicesScreen(onBack: () -> Unit) {
         illustration = "ill_sec_sessions",
         illustrationWidth = 150,
         title = "Trusted Devices",
-        body = "Devices whose hardware-backed key can prove this account and unlock password recovery.",
+        body = "Devices whose hardware-backed key can prove this account and unlock password recovery." +
+            if (keyWithoutBiometricLock) " Device key (no biometric lock)." else "",
         footer = {
             Column {
                 if (hasLocalKey && devices != null && devices?.none { it.id == ownRowId } == true) {

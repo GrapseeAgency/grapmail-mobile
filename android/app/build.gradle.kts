@@ -86,6 +86,17 @@ android {
         versionName = "0.0.1"
         // Real account API — same contract the website uses.
         buildConfigField("String", "API_BASE", "\"https://grapsee.com/api\"")
+        // Play Integrity's cloud project number, provisioned outside the repo
+        // the way the Firebase client config is: a blank value is an
+        // UNCONFIGURED deployment, and the integrity client treats it as a
+        // quiet no-op (the feature is absent, not failing) — the same
+        // discipline as push. Set it with -PplayIntegrityCloudProject=… or the
+        // PLAY_INTEGRITY_CLOUD_PROJECT environment variable once the project
+        // exists on the founder's Play console.
+        val integrityProject = System.getenv("PLAY_INTEGRITY_CLOUD_PROJECT")?.takeIf { it.isNotBlank() }
+            ?: project.findProperty("playIntegrityCloudProject")?.toString()?.takeIf { it.isNotBlank() }
+            ?: ""
+        buildConfigField("String", "PLAY_INTEGRITY_CLOUD_PROJECT", "\"$integrityProject\"")
     }
 
     buildTypes {
@@ -135,6 +146,13 @@ dependencies {
     implementation("com.google.android.play:review-ktx:2.0.2")
     implementation("com.google.android.play:app-update:2.1.0")
     implementation("com.google.android.play:app-update-ktx:2.1.0")
+    // Passkeys: androidx.credentials drives the WebAuthn sheet, its
+    // play-services backend talks to the password manager, and the integrity
+    // library is the device's verdict request after enrollment. The biometric
+    // dependency itself is already declared below (the app lock brought it).
+    implementation("androidx.credentials:credentials:1.3.0")
+    implementation("androidx.credentials:credentials-play-services-auth:1.3.0")
+    implementation("com.google.android.play:integrity:1.4.0")
 
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-graphics")

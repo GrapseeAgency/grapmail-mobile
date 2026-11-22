@@ -30,12 +30,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.grapsee.grapmail.data.Api
 import com.grapsee.grapmail.data.ApiException
+import com.grapsee.grapmail.findActivity
 import com.grapsee.grapmail.logic.AccountFlowViewModel
 import com.grapsee.grapmail.ui.components.AccountLink
 import com.grapsee.grapmail.ui.components.AccountScreen
@@ -51,6 +53,8 @@ import com.grapsee.grapmail.ui.components.RuleLine
 import com.grapsee.grapmail.ui.components.StatusChip
 import com.grapsee.grapmail.ui.theme.LocalPalette
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlin.coroutines.resume
 
 /**
  * Forgot password — founder design verbatim: envelope-and-lock artwork,
@@ -74,6 +78,7 @@ fun ForgotPasswordScreen(
     onTrustedDeviceVerified: () -> Unit,
 ) {
     val palette = LocalPalette.current
+    val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val state by flow.state.collectAsStateWithLifecycle()
 
@@ -126,6 +131,13 @@ fun ForgotPasswordScreen(
      * key signs the DECODED nonce bytes (signing the base64 text would sign a
      * different message and the verify would fail invisibly), and the grant
      * that comes back is spent by the password screen's reset-with-grant.
+     *
+     * The signature is biometric-gated: [DeviceKeyManager.signWithBiometricPrompt]
+     * shows the platform's prompt — "Confirm to sign the recovery challenge" —
+     * and only the Signature its result releases can complete the operation,
+     * so proving this device is something the person did, not something the
+     * app did. A device without strong biometrics holds a key with no gate
+     * (declared on the devices screen) and signs directly.
      */
     fun useTrustedDevice() {
         // AccountLink has no enabled flag, so the double-tap guard lives here:
@@ -134,6 +146,13 @@ fun ForgotPasswordScreen(
         if (trustedBusy) return
         if (identifier.isBlank()) {
             error = "Enter your GrapMail address first."
+            return
+        }
+        // Both ceremonies need a FragmentActivity; MainActivity is one, and a
+        // host that is not fails visibly rather than fatally.
+        val host = context.findActivity() as? androidx.fragment.app.FragmentActivity
+        if (host == null) {
+            error = "This device cannot confirm the signature right now."
             return
         }
         trustedBusy = true; error = null
@@ -147,8 +166,17 @@ fun ForgotPasswordScreen(
                     throw IllegalStateException("This device cannot prove this account right now.")
                 }
                 val nonceBytes = android.util.Base64.decode(nonceB64, android.util.Base64.NO_WRAP)
-                val signature = com.grapsee.grapmail.security.DeviceKeyManager.sign(nonceBytes)
-                    ?: throw IllegalStateException("The device key could not sign the challenge.")
+                val signature = suspendCancellableCoroutine { continuation ->
+                    com.grapsee.grapmail.security.DeviceKeyManager.signWithBiometricPrompt(
+                        host,
+                        nonceBytes,
+                    ) { signed ->
+                        // Leaving the screen while the prompt is up cancels this
+                        // scope, and resuming a cancelled continuation would
+                        // throw inside the prompt's own callback.
+                        if (continuation.isActive) continuation.resume(signed)
+                    }
+                } ?: throw IllegalStateException("The device key could not sign the challenge.")
                 val verified = Api.deviceVerify(
                     address, challengeId, nonceB64,
                     com.grapsee.grapmail.data.DeviceId.value, signature,

@@ -94,7 +94,10 @@ object TrustedDeviceManager {
         enrollLock.withLock {
             val preferences = prefs(context)
             if (preferences.getBoolean(enrolledKey(address), false)) return@withLock
-            val publicKey = DeviceKeyManager.ensurePublicKeyBase64()
+            // The context decides the key's biometric gate at generation time:
+            // a device with strong biometrics gets a per-operation-gated key,
+            // everything else the declared no-biometric fallback.
+            val publicKey = DeviceKeyManager.ensurePublicKeyBase64(context)
                 ?: throw IllegalStateException("The device key could not be created.")
             val response = Api.enrollDevice(
                 token,
@@ -108,6 +111,10 @@ object TrustedDeviceManager {
                 .putBoolean(enrolledKey(address), true)
                 .putString(deviceIdKey(address), response.device?.id ?: "")
                 .apply()
+            // Play Integrity's verdict for the row just written, whenever the
+            // deployment is configured for it; unconfigured, this is a quiet
+            // no-op — the same discipline as push without its Firebase config.
+            IntegrityClient.attestAfterEnrollmentAsync(context, token, response.device?.id)
         }
     }
 
