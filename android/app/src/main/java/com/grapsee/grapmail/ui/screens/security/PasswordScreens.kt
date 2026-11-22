@@ -165,13 +165,13 @@ fun ChangePasswordScreen(
             Spacer(Modifier.height(14.dp))
         }
 
-        AppTextField("Current Password", current, { current = it; error = null }, password = true, hint = "Enter your current password", leading = { Icon(Icons.Rounded.Lock, contentDescription = null) })
+        AppTextField("Current Password", current, { current = it; error = null }, password = true, leading = { Icon(Icons.Rounded.Lock, contentDescription = null) })
         Spacer(Modifier.height(12.dp))
-        AppTextField("New Password", next, { next = it; error = null }, password = true, hint = "Enter your new password", leading = { Icon(Icons.Rounded.Lock, contentDescription = null) })
+        AppTextField("New Password", next, { next = it; error = null }, password = true, leading = { Icon(Icons.Rounded.Lock, contentDescription = null) })
         Spacer(Modifier.height(12.dp))
         AppTextField(
             "Confirm New Password", confirm, { confirm = it; error = null },
-            password = true, hint = "Re-enter your new password", leading = { Icon(Icons.Rounded.Lock, contentDescription = null) },
+            password = true, leading = { Icon(Icons.Rounded.Lock, contentDescription = null) },
             error = if (confirm.isNotEmpty() && !matches) "Passwords do not match." else null,
         )
         Spacer(Modifier.height(14.dp))

@@ -870,14 +870,13 @@ struct ChangePasswordView: View {
                 .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(GM.error.opacity(0.35)))
                 .padding(.bottom, 14)
             }
-            AppTextField(title: "Current Password", value: $current, hint: "Enter your current password", isPassword: true, leadingIcon: "lock")
-            AppTextField(title: "New Password", value: $next, hint: "Enter your new password", isPassword: true, leadingIcon: "lock")
+            AppTextField(title: "Current Password", value: $current, isPassword: true, leadingIcon: "lock")
+            AppTextField(title: "New Password", value: $next, isPassword: true, leadingIcon: "lock")
                 .padding(.top, 12)
             AppTextField(
                 title: "Confirm New Password",
                 value: $confirm,
                 error: (!confirm.isEmpty && !matches) ? "Passwords do not match." : nil,
-                hint: "Re-enter your new password",
                 isPassword: true,
                 leadingIcon: "lock"
             )
