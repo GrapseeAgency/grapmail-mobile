@@ -205,6 +205,14 @@ final class ScreenshotWalkUITests: XCTestCase {
         snap("06-step5-terms-light")
         create.tap()
 
+        // The optional recovery-email step, when the build routes to it. The walk
+        // does not add one (it would mail a real code), so it skips it.
+        let skipRecovery = app.buttons["Skip for now"].firstMatch
+        if skipRecovery.waitForExistence(timeout: 8) {
+            snap("07b-recovery-email-light")
+            skipRecovery.tap()
+        }
+
         // After Create Account the app auto-signs-in to the created screens, or,
         // if the immediate session didn't take, routes to sign-in with the
         // address prefilled (RootView's documented fallback).
