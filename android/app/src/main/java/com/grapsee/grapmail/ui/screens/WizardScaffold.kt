@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -49,49 +50,47 @@ fun WizardScaffold(
     body: @Composable () -> Unit,
 ) {
     val palette = LocalPalette.current
-    Column(
-        Modifier
-            .fillMaxSize()
-            .background(palette.bg)
-            .imePadding(),
-    ) {
-        // Header: back + centered logo
-        Box(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp)) {
-            if (onBack != null) {
-                IconButton(onClick = onBack, modifier = Modifier.align(Alignment.CenterStart)) {
-                    Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Back", tint = palette.textPrimary)
-                }
-            }
-            Row(
-                Modifier.align(Alignment.Center),
-                verticalAlignment = Alignment.CenterVertically,
-            ) { GrapMailLogo(36.dp, wordmark = true) }
-        }
-
+    Box(Modifier.fillMaxSize().background(palette.bg).imePadding(), contentAlignment = Alignment.TopCenter) {
         Column(
             Modifier
+                .widthIn(max = 520.dp)
                 .fillMaxSize()
-                .padding(horizontal = 24.dp),
+                .verticalScroll(rememberScrollState()),
         ) {
-            Spacer(Modifier.height(10.dp))
-            Text("CREATE ACCOUNT", fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.6.sp, color = palette.textTertiary)
-            Spacer(Modifier.height(8.dp))
-            Text(title, style = H2, color = palette.textPrimary)
-            Spacer(Modifier.height(8.dp))
-            Text(subtitle.build(), fontSize = 14.sp, lineHeight = 21.sp, color = palette.textSecondary)
-            Spacer(Modifier.height(22.dp))
-            StepProgress(step = step)
-            Spacer(Modifier.height(22.dp))
+            // Header: back + centered logo
+            Box(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp)) {
+                if (onBack != null) {
+                    IconButton(onClick = onBack, modifier = Modifier.align(Alignment.CenterStart)) {
+                        Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Back", tint = palette.textPrimary)
+                    }
+                }
+                Row(
+                    Modifier.align(Alignment.Center),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) { GrapMailLogo(36.dp, wordmark = true) }
+            }
+
             Column(
                 Modifier
-                    .weight(1f)
-                    .verticalScroll(rememberScrollState()),
-            ) { body() }
-            Spacer(Modifier.height(14.dp))
-            bottomBar()
-            Spacer(Modifier.height(10.dp))
-            AlreadyHaveAccount(onSignIn = onSignIn)
-            Spacer(Modifier.height(20.dp))
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp),
+            ) {
+                Spacer(Modifier.height(10.dp))
+                Text("CREATE ACCOUNT", fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.6.sp, color = palette.textTertiary)
+                Spacer(Modifier.height(8.dp))
+                Text(title, style = H2, color = palette.textPrimary)
+                Spacer(Modifier.height(8.dp))
+                Text(subtitle.build(), fontSize = 14.sp, lineHeight = 21.sp, color = palette.textSecondary)
+                Spacer(Modifier.height(22.dp))
+                StepProgress(step = step)
+                Spacer(Modifier.height(22.dp))
+                body()
+                Spacer(Modifier.height(14.dp))
+                bottomBar()
+                Spacer(Modifier.height(10.dp))
+                AlreadyHaveAccount(onSignIn = onSignIn)
+                Spacer(Modifier.height(20.dp))
+            }
         }
     }
 }

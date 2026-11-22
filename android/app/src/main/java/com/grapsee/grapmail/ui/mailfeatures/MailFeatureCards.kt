@@ -1,6 +1,8 @@
 package com.grapsee.grapmail.ui.mailfeatures
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.background
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -485,13 +487,14 @@ fun MailFeatureSettingsSection() {
     var showFollowUps by remember { mutableStateOf(false) }
     var showImport by remember { mutableStateOf(false) }
 
+    val palette = LocalPalette.current
     Column(
-        Modifier.fillMaxWidth().padding(top = 18.dp),
+        Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 12.dp)
+            .background(palette.card, RoundedCornerShape(20.dp))
+            .padding(vertical = 8.dp),
         verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {
-        com.grapsee.grapmail.ui.screens.mail.SectionLabel(
-            "Privacy & intelligence", LocalPalette.current,
-        )
+        com.grapsee.grapmail.ui.screens.mail.SectionLabel("Privacy & intelligence", palette)
         MailFeatureSwitchRow(
             "On-device intelligence",
             "Categories, summaries and replies stay on this device",
@@ -560,7 +563,7 @@ private fun MailFeatureSwitchRow(
         Modifier.fillMaxWidth()
             .toggleable(value = checked, role = Role.Switch, onValueChange = onChange)
             .heightIn(min = 56.dp)
-            .padding(horizontal = 20.dp, vertical = 10.dp),
+            .padding(horizontal = 16.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(16.dp),
     ) {

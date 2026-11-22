@@ -829,13 +829,13 @@ private struct SettingRow: View {
             Image(systemName: icon).font(.system(size: 17))
                 .foregroundColor(GM.textSecondary).frame(width: 22)
             VStack(alignment: .leading, spacing: 2) {
-                Text(title).font(.system(size: 15)).foregroundColor(GM.textPrimary)
-                Text(value).font(.system(size: 12)).foregroundColor(GM.textSecondary)
-                    .lineLimit(1)
+                Text(title).font(.body).foregroundColor(GM.textPrimary)
+                Text(value).font(.footnote).foregroundColor(GM.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             Spacer()
             if let trailing {
-                Text(trailing).font(.system(size: 12)).foregroundColor(GM.warnInk)
+                Text(trailing).font(.caption).foregroundColor(GM.warnInk)
             }
         }
     }

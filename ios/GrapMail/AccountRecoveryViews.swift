@@ -619,18 +619,33 @@ struct PhoneVerifyView: View {
                 ? "We'll send a 6-digit verification code to your phone number. This helps you recover your account and enable two-step verification."
                 : "We've sent a verification code to your phone number \(PhoneFormat.pretty(model.phone)). The code will expire in 5 minutes.",
             content: {
-                TwoStepRibbon(current: step, labels: ["Enter Phone Number", "Verify Code"])
+                TwoStepRibbon(current: step, labels: ["Phone number", "SMS code"])
                 Spacer().frame(height: 20)
                 if step == 1 {
                     phoneField
                     Spacer().frame(height: 8)
                 } else {
-                    CodeCells(length: 6, value: $code)
-                    HStack {
+                    TextField("6-digit SMS code", text: $code)
+                        .font(.body.monospacedDigit())
+                        .keyboardType(.numberPad)
+                        .textContentType(.oneTimeCode)
+                        .accessibilityLabel("Verification code")
+                        .padding(14)
+                        .frame(maxWidth: .infinity, minHeight: 54, alignment: .leading)
+                        .background(GM.inputFill, in: RoundedRectangle(cornerRadius: GMShape.input))
+                        .overlay {
+                            RoundedRectangle(cornerRadius: GMShape.input).strokeBorder(GM.border)
+                        }
+                        .onChange(of: code) { entered in
+                            let digits = String(entered.filter { $0.isASCII && $0.isNumber }.prefix(6))
+                            if digits != code { code = digits }
+                            error = nil
+                        }
+                    VStack(alignment: .leading, spacing: 8) {
                         CodeExpiry(expiresAt: model.phoneExpiresAt)
-                        Spacer()
-                        AccountLink(title: resending ? "Sending…" : "Resend Code") { sendCode(resend: true) }
+                        AccountLink(title: resending ? "Sending…" : "Resend code") { sendCode(resend: true) }
                     }
+                    .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.top, 14)
                 }
             },
@@ -669,7 +684,7 @@ struct PhoneVerifyView: View {
                         Text(error).font(GMFont.caption).foregroundColor(GM.error).padding(.top, 10)
                     }
                     FooterNote(
-                        text: "Didn't receive the code? Check your spam folder or try resending after 1 minute.",
+                        text: "If the text message hasn’t arrived, you can request another code after one minute.",
                         divider: false
                     )
                     .padding(.top, 14)

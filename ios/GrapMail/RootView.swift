@@ -740,6 +740,7 @@ struct RootView: View {
     private func enterMailbox() {
         e2e.clearForSignOut()
         signedInModels.reset()
+        inlineMail = nil
         path = [.home]
     }
 
@@ -758,39 +759,73 @@ struct RootView: View {
         showRemainingAccount(or: [])
     }
 
+    @Environment(\.horizontalSizeClass) private var mailboxSizeClass
+    @State private var inlineMail: InlineMail?
+    private struct InlineMail {
+        let id: String
+        let isThread: Bool
+    }
+
     /// The signed-in world: mailbox, account record, encryption,
     /// subscriptions. `default:` above routes here.
     @ViewBuilder private func mailDestination(_ route: Route) -> some View {
         switch route {
 
                 case .home:
-                    MailboxView(
-                        vm: mail,
-                        onThread: { id, isThread in
-                            path.append(.mailThread(id: id, isThread: isThread))
-                        },
-                        // A draft is the person's own unfinished mail; the
-                        // only useful tap is the one that lets them finish it.
-                        // Declared before onCompose because Swift requires
-                        // call order to match the struct's property order.
-                        onDraft: { id in path.append(.mailCompose(reply: id, mode: "draft")) },
-                        onCompose: { path.append(.mailCompose(reply: "", mode: "reply")) },
-                        onLabels: { path.append(.mailLabels) },
-                        onScreener: { path.append(.mailScreener) },
-                        onSubscriptions: { path.append(.mailSubscriptions) },
-                        onProfile: { path.append(.accountProfile) },
-                        onSettings: { path.append(.mailSettings) },
-                        onSecurity: { path.append(.security) },
-                        onHelp: openSupport,
-                        onContacts: { path.append(.mailContacts) },
-                        onFiles: { path.append(.mailFiles) },
-                        onSignOut: signOutOfMailbox,
-                        onAddAccount: { path.append(.signIn) },
-                        onSwitchAccount: { address in
-                            if SessionStore.switchTo(address) { enterMailbox() }
-                        },
-                        accountPhoto: account.state.avatar
-                    )
+                    GeometryReader { geometry in
+                        let wide = mailboxSizeClass == .regular && geometry.size.width >= 760
+                        HStack(spacing: 0) {
+                            if wide || inlineMail == nil {
+                                MailboxView(
+                                    vm: mail,
+                                    onThread: { id, isThread in
+                                        if wide { inlineMail = InlineMail(id: id, isThread: isThread) }
+                                        else { path.append(.mailThread(id: id, isThread: isThread)) }
+                                    },
+                                    // A draft is the person's own unfinished mail; the
+                                    // only useful tap is the one that lets them finish it.
+                                    // Declared before onCompose because Swift requires
+                                    // call order to match the struct's property order.
+                                    onDraft: { id in path.append(.mailCompose(reply: id, mode: "draft")) },
+                                    onCompose: { path.append(.mailCompose(reply: "", mode: "reply")) },
+                                    onLabels: { path.append(.mailLabels) },
+                                    onScreener: { path.append(.mailScreener) },
+                                    onSubscriptions: { path.append(.mailSubscriptions) },
+                                    onProfile: { path.append(.accountProfile) },
+                                    onSettings: { path.append(.mailSettings) },
+                                    onSecurity: { path.append(.security) },
+                                    onHelp: openSupport,
+                                    onContacts: { path.append(.mailContacts) },
+                                    onFiles: { path.append(.mailFiles) },
+                                    onSignOut: signOutOfMailbox,
+                                    onAddAccount: { path.append(.signIn) },
+                                    onSwitchAccount: { address in
+                                        if SessionStore.switchTo(address) { enterMailbox() }
+                                    },
+                                    accountPhoto: account.state.avatar
+                                )
+                                .frame(width: wide ? min(420, geometry.size.width * 0.42) : nil)
+                            }
+                            if wide { Divider() }
+                            if let selection = inlineMail {
+                                ThreadView(
+                                    vm: mail, e2e: e2e, id: selection.id, isThread: selection.isThread,
+                                    onBack: { inlineMail = nil },
+                                    onReply: { id, mode in path.append(.mailCompose(reply: id, mode: mode)) },
+                                    onStepPrev: { inlineMail = InlineMail(id: $0.id, isThread: $0.isThread) },
+                                    onStepNext: { inlineMail = InlineMail(id: $0.id, isThread: $0.isThread) },
+                                    onContacts: { path.append(.mailContacts) },
+                                    initialMessageId: nil, openMessageActions: false
+                                )
+                                .id(selection.id)
+                                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            } else if wide {
+                                Text("Select a message to read")
+                                    .foregroundStyle(GM.textSecondary)
+                                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            }
+                        }
+                    }
                     .task(id: SessionStore.generation) {
                         if let address = model.state.createdAddress,
                            address.caseInsensitiveCompare(SessionStore.address ?? "") == .orderedSame,

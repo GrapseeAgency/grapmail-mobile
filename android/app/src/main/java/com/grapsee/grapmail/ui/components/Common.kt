@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
@@ -173,6 +174,8 @@ fun AppTextField(
     showLabel: Boolean = true,
     trailing: @Composable (() -> Unit)? = null,
     leading: @Composable (() -> Unit)? = null,
+    imeAction: androidx.compose.ui.text.input.ImeAction = androidx.compose.ui.text.input.ImeAction.Default,
+    keyboardActions: KeyboardActions = KeyboardActions.Default,
 ) {
     val palette = LocalPalette.current
     var focused by remember { mutableStateOf(false) }
@@ -200,7 +203,8 @@ fun AppTextField(
             shape = RoundedCornerShape(14.dp),
             singleLine = true,
             visualTransformation = if (visible) VisualTransformation.None else PasswordVisualTransformation(),
-            keyboardOptions = KeyboardOptions(keyboardType = keyboard),
+            keyboardOptions = KeyboardOptions(keyboardType = keyboard, imeAction = imeAction),
+            keyboardActions = keyboardActions,
             placeholder = hint?.let { { Text(it, color = palette.textTertiary, fontSize = 14.sp) } },
             leadingIcon = leading,
             trailingIcon = {

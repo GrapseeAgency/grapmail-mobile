@@ -1,5 +1,7 @@
 package com.grapsee.grapmail.ui.screens.account
 
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -53,7 +55,6 @@ import com.grapsee.grapmail.ui.components.AccountLink
 import com.grapsee.grapmail.ui.components.AccountScreen
 import com.grapsee.grapmail.ui.components.AppTextField
 import com.grapsee.grapmail.ui.components.ChipTone
-import com.grapsee.grapmail.ui.components.CodeCells
 import com.grapsee.grapmail.ui.components.CodeExpiry
 import com.grapsee.grapmail.ui.components.FooterNote
 import com.grapsee.grapmail.ui.components.GradientButton
@@ -253,14 +254,14 @@ fun PhoneVerificationScreen(
                 }
                 Spacer(Modifier.height(14.dp))
                 FooterNote(
-                    text = "Didn't receive the code? Check your spam folder or try resending after 1 minute.",
+                    text = "If the text message hasn’t arrived, you can request another code after one minute.",
                     divider = false,
                 )
             }
             Spacer(Modifier.height(4.dp))
         },
     ) {
-        TwoStepRibbon(current = step, labels = listOf("Enter Phone Number", "Verify Code"))
+        TwoStepRibbon(current = step, labels = listOf("Phone number", "SMS code"))
         Spacer(Modifier.height(20.dp))
 
         if (step == 1) {
@@ -314,19 +315,24 @@ fun PhoneVerificationScreen(
             }
             Spacer(Modifier.height(8.dp))
         } else {
-            CodeCells(
-                length = 6,
+            AppTextField(
+                label = "Verification code",
                 value = code,
+                hint = "6-digit SMS code",
+                keyboard = KeyboardType.NumberPassword,
+                imeAction = androidx.compose.ui.text.input.ImeAction.Done,
+                keyboardActions = androidx.compose.foundation.text.KeyboardActions(onDone = {
+                    if (code.length == 6 && !busy) verify()
+                }),
                 onValueChange = {
                     code = it.filter(Char::isDigit).take(6)
                     error = null
                 },
             )
-            Spacer(Modifier.height(14.dp))
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Spacer(Modifier.height(12.dp))
+            Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 CodeExpiry(expiresAt = state.phoneExpiresAt, onExpired = { })
-                Spacer(Modifier.weight(1f))
-                AccountLink(if (resending) "Sending…" else "Resend Code", onClick = { sendCode(true) })
+                AccountLink(if (resending) "Sending…" else "Resend code", onClick = { sendCode(true) })
             }
             Spacer(Modifier.height(8.dp))
         }
@@ -337,7 +343,7 @@ fun PhoneVerificationScreen(
             onDismissRequest = { pickerOpen = false },
             title = { Text("Country code", fontSize = 17.sp, fontWeight = FontWeight.SemiBold) },
             text = {
-                Column {
+                Column(Modifier.verticalScroll(rememberScrollState())) {
                     COUNTRIES.forEachIndexed { index, c ->
                         Row(
                             Modifier

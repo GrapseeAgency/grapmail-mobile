@@ -277,7 +277,8 @@ struct WizardScaffold<Body: View, Bottom: View>: View {
     @ViewBuilder let bottom: () -> Bottom
 
     var body: some View {
-        VStack(spacing: 0) {
+        ScrollView {
+          VStack(spacing: 0) {
             ZStack {
                 if let onBack {
                     HStack {
@@ -312,12 +313,10 @@ struct WizardScaffold<Body: View, Bottom: View>: View {
                     .padding(.top, 8)
                 StepProgress(step: step)
                     .padding(.top, 22)
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 0) {
-                        bodyContent()
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                VStack(alignment: .leading, spacing: 0) {
+                    bodyContent()
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.top, 22)
                 bottom()
                     .padding(.top, 14)
@@ -338,7 +337,8 @@ struct WizardScaffold<Body: View, Bottom: View>: View {
             }
             .padding(.horizontal, 24)
         }
-        .centeredForm()
+          .centeredForm()
+        }
         .background(GM.bg.ignoresSafeArea())
     }
 }

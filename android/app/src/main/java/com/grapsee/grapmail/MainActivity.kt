@@ -6,6 +6,12 @@ import android.os.Bundle
 import android.webkit.WebView
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.material3.VerticalDivider
+import androidx.compose.runtime.key
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.displayCutout
@@ -19,6 +25,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.testTagsAsResourceId
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.fragment.app.FragmentActivity
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
@@ -200,7 +207,6 @@ class MainActivity : FragmentActivity() {
                         Modifier
                             .windowInsetsPadding(WindowInsets.systemBars
                                 .union(WindowInsets.displayCutout).union(WindowInsets.waterfall))
-                            .widthIn(max = 520.dp)
                             .fillMaxSize()
                     ) {
                         GrapMailNav(
@@ -823,6 +829,7 @@ fun GrapMailNav(
     NavHost(
         navController = nav,
         startDestination = dest,
+        modifier = Modifier.widthIn(max = if (onHome) Dp.Unspecified else 520.dp),
         // The design's motion contract: 320ms slide + fade between wizard
         // steps (forward slides in from the right, back from the left).
         enterTransition = {
@@ -1308,35 +1315,88 @@ fun GrapMailNav(
             LaunchedEffect(personal.profile?.avatarUrl, personal.busy) {
                 if (!personal.busy) profile.loadAvatar()
             }
-            MailboxScreen(
-                vm = viewModel<MailboxViewModel>(entry),
-                accountPhoto = personal.avatar,
-                onOpenThread = { id, isThread, messageId ->
-                    nav.navigate(Routes.mailThread(id, isThread, focus = messageId.takeIf { isThread }))
-                },
-                onCompose = { nav.navigate(Routes.mailCompose("", "reply")) },
-                // A draft opens in the composer, not the reader: the row is
-                // the person's own unfinished mail, and the only useful tap
-                // is the one that lets them finish it.
-                onOpenDraft = { id -> nav.navigate(Routes.mailCompose(id, "draft")) },
-                onProfile = { nav.navigate(Routes.ACCOUNT_PROFILE) },
-                onSettings = { nav.navigate(Routes.MAIL_SETTINGS) },
-                onSecurity = { nav.navigate(Routes.SECURITY) },
-                onHelp = { openSupport() },
-                onLabels = { nav.navigate(Routes.MAIL_LABELS) },
-                onContacts = { nav.navigate(Routes.MAIL_CONTACTS) },
-                onFiles = { nav.navigate(Routes.MAIL_FILES) },
-                onScreener = { nav.navigate(Routes.MAIL_SCREENER) },
-                onSubscriptions = { nav.navigate(Routes.MAIL_SUBSCRIPTIONS) },
-                onScheduled = { nav.navigate(Routes.MAIL_SCHEDULED) },
-                onAddAccount = { nav.navigate(Routes.SIGN_IN) },
-                onAccountSwitched = {
-                    com.grapsee.grapmail.ui.screens.security.SecurityFlow.reset()
-                    e2e.clearForSignOut()
-                    nav.navigate(Routes.HOME) { popUpTo(Routes.HOME) { inclusive = true } }
-                },
-                onSignOut = ::signOutOfMailbox,
-            )
+            val mailbox: MailboxViewModel = viewModel(entry)
+            var selectedId by rememberSaveable { mutableStateOf<String?>(null) }
+            var selectedThread by rememberSaveable { mutableStateOf(false) }
+            var selectedFocus by rememberSaveable { mutableStateOf<String?>(null) }
+
+            fun selectMessage(id: String, isThread: Boolean, focus: String) {
+                selectedId = id
+                selectedThread = isThread
+                selectedFocus = focus.takeIf { isThread }
+            }
+
+            BoxWithConstraints(Modifier.fillMaxSize()) {
+                val expanded = maxWidth >= 840.dp
+                val id = selectedId
+                BackHandler(enabled = id != null) { selectedId = null }
+                Row(Modifier.fillMaxSize()) {
+                    if (expanded || id == null) {
+                        Box(
+                            if (expanded) Modifier.weight(0.42f).fillMaxHeight()
+                            else Modifier.fillMaxSize(),
+                        ) {
+                            MailboxScreen(
+                                vm = mailbox,
+                                accountPhoto = personal.avatar,
+                                onOpenThread = { id, isThread, messageId ->
+                                    if (expanded) selectMessage(id, isThread, messageId)
+                                    else nav.navigate(Routes.mailThread(id, isThread, focus = messageId.takeIf { isThread }))
+                                },
+                                onCompose = { nav.navigate(Routes.mailCompose("", "reply")) },
+                                // A draft opens in the composer, not the reader: the row is
+                                // the person's own unfinished mail, and the only useful tap
+                                // is the one that lets them finish it.
+                                onOpenDraft = { id -> nav.navigate(Routes.mailCompose(id, "draft")) },
+                                onProfile = { nav.navigate(Routes.ACCOUNT_PROFILE) },
+                                onSettings = { nav.navigate(Routes.MAIL_SETTINGS) },
+                                onSecurity = { nav.navigate(Routes.SECURITY) },
+                                onHelp = { openSupport() },
+                                onLabels = { nav.navigate(Routes.MAIL_LABELS) },
+                                onContacts = { nav.navigate(Routes.MAIL_CONTACTS) },
+                                onFiles = { nav.navigate(Routes.MAIL_FILES) },
+                                onScreener = { nav.navigate(Routes.MAIL_SCREENER) },
+                                onSubscriptions = { nav.navigate(Routes.MAIL_SUBSCRIPTIONS) },
+                                onScheduled = { nav.navigate(Routes.MAIL_SCHEDULED) },
+                                onAddAccount = { nav.navigate(Routes.SIGN_IN) },
+                                onAccountSwitched = {
+                                    com.grapsee.grapmail.ui.screens.security.SecurityFlow.reset()
+                                    e2e.clearForSignOut()
+                                    nav.navigate(Routes.HOME) { popUpTo(Routes.HOME) { inclusive = true } }
+                                },
+                                onSignOut = ::signOutOfMailbox,
+                            )
+                        }
+                    }
+                    if (expanded) VerticalDivider()
+                    if (id != null) {
+                        Box(Modifier.weight(0.58f).fillMaxHeight()) {
+                            key(id, selectedThread, selectedFocus) {
+                                ThreadScreen(
+                                    vm = mailbox,
+                                    e2e = e2e,
+                                    threadId = id,
+                                    isThread = selectedThread,
+                                    initialMessageId = selectedFocus,
+                                    openMessageActions = false,
+                                    onBack = { selectedId = null },
+                                    onContacts = { nav.navigate(Routes.MAIL_CONTACTS) },
+                                    onReply = { message, mode -> nav.navigate(Routes.mailCompose(message.id, mode)) },
+                                    onStepPrev = { step -> selectMessage(step.id, step.isThread, step.messageId) },
+                                    onStepNext = { step -> selectMessage(step.id, step.isThread, step.messageId) },
+                                )
+                            }
+                        }
+                    } else if (expanded) {
+                        Box(Modifier.weight(0.58f).fillMaxHeight(), contentAlignment = Alignment.Center) {
+                            androidx.compose.material3.Text(
+                                "Select a message to read",
+                                color = com.grapsee.grapmail.ui.theme.LocalPalette.current.textSecondary,
+                            )
+                        }
+                    }
+                }
+            }
         }
         composable(Routes.MAIL_THREAD, arguments = listOf(androidx.navigation.navArgument("focus") {
             type = androidx.navigation.NavType.StringType
