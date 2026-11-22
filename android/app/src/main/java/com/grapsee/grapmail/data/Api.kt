@@ -505,6 +505,9 @@ private fun apiErrorMessage(status: Int, code: String?): String = when (code) {
     val notes: List<String>? = null,
     val tasks: List<String>? = null,
     val locale: LocaleDto? = null,
+    /** Sent whole: the server checks the switch, the window and the message together. */
+    val vacation: VacationDto? = null,
+    val forwarding: ForwardingDto? = null,
 )
 
 /**
