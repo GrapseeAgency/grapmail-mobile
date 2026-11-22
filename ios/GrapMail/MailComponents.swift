@@ -376,13 +376,13 @@ struct BoxTab: View {
     let onClick: () -> Void
 
     @ScaledMetric(relativeTo: .caption) private var badgeWidth = 24.0
-    private let shape = RoundedRectangle(cornerRadius: 14, style: .continuous)
+    private let shape = RoundedRectangle(cornerRadius: 21, style: .continuous)
 
     var body: some View {
         Button(action: onClick) {
-            HStack(spacing: 8) {
+            HStack(spacing: 9) {
                 Image(systemName: icon)
-                    .font(.system(size: 16, weight: .medium))
+                    .font(.system(size: 19, weight: .medium))
                     .foregroundColor(tint)
                     .accessibilityHidden(true)
                 Text(title)
@@ -400,7 +400,7 @@ struct BoxTab: View {
                         .background(badgeColor, in: Capsule())
                 }
             }
-            .padding(.horizontal, 12)
+            .padding(.horizontal, 13)
             .padding(.vertical, 7)
             .frame(minHeight: 44)
             .background(active ? tint.opacity(0.14) : GM.card, in: shape)

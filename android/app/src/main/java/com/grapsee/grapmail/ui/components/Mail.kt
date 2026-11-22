@@ -548,7 +548,7 @@ fun BoxTab(
     onClick: () -> Unit,
 ) {
     val palette = LocalPalette.current
-    val shape = RoundedCornerShape(14.dp)
+    val shape = RoundedCornerShape(22.dp)
     Row(
         Modifier.testTag("mail-box-tab-$title")
             .clip(shape)
@@ -556,12 +556,12 @@ fun BoxTab(
             .border(1.dp, if (active) tint else palette.border, shape)
             .selectable(selected = active, role = Role.Tab, onClick = onClick)
             .heightIn(min = 48.dp)
-            .padding(horizontal = 12.dp, vertical = 7.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+            .padding(horizontal = 13.dp, vertical = 7.dp),
+        horizontalArrangement = Arrangement.spacedBy(9.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(icon, null, tint = tint, modifier = Modifier.size(17.dp))
-        Text(title, color = palette.textPrimary, fontSize = 13.sp,
+        Icon(icon, null, tint = tint, modifier = Modifier.size(20.dp))
+        Text(title, color = palette.textPrimary, fontSize = 14.sp,
             fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f, fill = false))
         if (count != null && count > 0) {
             Text(
