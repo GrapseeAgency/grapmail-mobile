@@ -39,6 +39,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.Send
 import androidx.compose.material.icons.outlined.Mail
+import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.outlined.StarBorder
 import androidx.compose.material.icons.rounded.Email
 import androidx.compose.material.icons.rounded.AllInbox
@@ -1142,19 +1143,15 @@ internal fun AccountPhoto(bytes: ByteArray?, name: String, address: String?, siz
 internal fun SearchField(query: String, onQuery: (String) -> Unit, onFilter: () -> Unit, filterActive: Boolean,
                         onAdvanced: () -> Unit, advActive: Boolean) {
     val palette = LocalPalette.current
+    val shape = RoundedCornerShape(20.dp)
     Row(
-        // The reference's search pill: a tinted, borderless, fully-rounded
-        // capsule — not a bordered card. The tint is the palette's own soft
-        // fill so it reads as a control, not a surface, in both themes.
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(26.dp)).background(palette.softFill)
-            .padding(horizontal = 16.dp, vertical = 13.dp),
+        Modifier.fillMaxWidth().clip(shape).background(palette.card)
+            .border(1.dp, palette.border, shape)
+            .padding(horizontal = 12.dp, vertical = 12.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        // A real value field: the reference's placeholder is not a hint that the
-        // box is empty, it is what an unfocused search looks like. The wording
-        // names what the server's term actually covers -- subject, body, sender
-        // (`grapmail-search.ts:110-118`) -- because a placeholder promising
-        // "people or files" would advertise a search the route does not run.
+        Icon(Icons.Rounded.Search, null, tint = palette.textSecondary, modifier = Modifier.size(18.dp))
         androidx.compose.foundation.text.BasicTextField(
             cursorBrush = androidx.compose.ui.graphics.SolidColor(LocalPalette.current.cursor),
             value = query,
@@ -1172,10 +1169,7 @@ internal fun SearchField(query: String, onQuery: (String) -> Unit, onFilter: () 
                 }
             },
         )
-        // No glyphs in the pill. Sort & filter and advanced search live in the
-        // drawer's Search section — the pill is the reference's own clean
-        // "Search in mail", and every tool stays one tap away where the other
-        // tools live.
+
     }
 }
 

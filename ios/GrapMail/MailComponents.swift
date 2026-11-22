@@ -267,14 +267,14 @@ struct MessageRow: View, Equatable {
                     // folds name-over-address — so the question is whether it
                     // said anything at all, not whether the field exists.
                     Text(message.from.flatMap { $0.display.nilIfBlank() } ?? "Unknown sender")
-                        .font(.system(size: 15, weight: unread ? .semibold : .regular))
+                        .font(.subheadline.weight(unread ? .semibold : .medium))
                         .foregroundColor(GM.textPrimary)
                         .lineLimit(1)
                     Spacer(minLength: 8)
                 }
                 Text(message.subjectOrNone)
-                    .font(.system(size: 14, weight: unread ? .medium : .regular))
-                    .foregroundColor(GM.textPrimary).lineLimit(1)
+                    .font(.subheadline.weight(unread ? .medium : .regular))
+                    .foregroundColor(GM.textPrimary).lineLimit(2)
                 HStack(spacing: 4) {
                     if let snippet = message.snippet, !snippet.isEmpty {
                         Text(snippet).font(.system(size: 13)).foregroundColor(GM.textSecondary)
@@ -293,7 +293,7 @@ struct MessageRow: View, Equatable {
                 // sender line, and right alignment keeps the stars in one line.
                 HStack(spacing: 5) {
                     if unread {
-                        Circle().fill(GM.primarySolid).frame(width: 8, height: 8)
+                        Circle().fill(GM.primarySolid).frame(width: 6, height: 6)
                     }
                     if let time = MailTime.short(message.createdAt) {
                         Text(time).font(.system(size: 12)).foregroundColor(GM.textTertiary)
@@ -305,19 +305,21 @@ struct MessageRow: View, Equatable {
                         Image(systemName: "paperclip").font(.system(size: 12))
                             .foregroundColor(GM.textTertiary)
                     }
-                    Image(systemName: message.isStarred ? "star.fill" : "star")
-                        .font(.system(size: 16))
-                        // The star token, not `GM.warning`: this is the row the dark
-                        // home screenshot photographs, and `warning` carries a single
-                        // value with no dark counterpart, so the list and the thread of
-                        // the same starred message showed two different ambers.
-                        .foregroundColor(message.isStarred ? GM.star : GM.textTertiary)
-                        .onTapGesture(perform: onStar)
+                    Button(action: onStar) {
+                        Image(systemName: message.isStarred ? "star.fill" : "star")
+                            .font(.system(size: 16))
+                            .foregroundColor(message.isStarred ? GM.star : GM.textSecondary)
+                            .frame(width: 44, height: 44)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(message.isStarred ? "Unstar" : "Star")
                 }
             }
             .frame(minWidth: 44, alignment: .trailing)
         }
         .padding(.horizontal, 16).padding(.vertical, 12)
+        .background(selected ? GM.softFill : Color.clear)
         .contentShape(Rectangle())
         .onTapGesture { selecting ? onSelect() : onOpen() }
         .onLongPressGesture(perform: onSelect)
@@ -577,10 +579,10 @@ struct CenteredState: View {
 
     var body: some View {
         VStack(spacing: 8) {
-            Text(title).font(.system(size: 17, weight: .semibold))
+            Text(title).font(.headline)
                 .foregroundColor(GM.textPrimary).multilineTextAlignment(.center)
             if let detail {
-                Text(detail).font(.system(size: 14)).foregroundColor(GM.textSecondary)
+                Text(detail).font(.subheadline).foregroundColor(GM.textSecondary)
                     .multilineTextAlignment(.center)
             }
             if let action {
@@ -588,7 +590,9 @@ struct CenteredState: View {
                     .padding(.top, 8)
             }
         }
-        .padding(32)
+        .frame(maxWidth: 340)
+        .padding(.horizontal, 20)
+        .padding(.vertical, 12)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }

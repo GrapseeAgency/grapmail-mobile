@@ -238,8 +238,8 @@ struct ThreadView: View {
             ReaderIconButton("Reply all", icon: "arrowshape.turn.up.left.2", tint: GM.primarySolid) {
                 onReply(message.id, "all")
             }
-            .frame(width: 46, height: 46)
-            .background(GM.softFill, in: Circle())
+            .frame(width: 48, height: 48)
+            .background(GM.softFill, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
@@ -249,13 +249,17 @@ struct ThreadView: View {
 
     private func replyButton(_ label: String, icon: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
+            let shape = RoundedRectangle(cornerRadius: 16, style: .continuous)
             Label(label, systemImage: icon)
-                .font(.system(size: 14, weight: .semibold))
+                .font(.subheadline.weight(.semibold))
                 .foregroundColor(GM.primarySolid)
-                .lineLimit(1)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 8)
                 .frame(maxWidth: .infinity, minHeight: 48)
-                .background(GM.softFill, in: Capsule())
-                .contentShape(Capsule())
+                .background(GM.card, in: shape)
+                .overlay(shape.strokeBorder(GM.border).allowsHitTesting(false))
+                .contentShape(shape)
         }
         .buttonStyle(.plain)
     }
