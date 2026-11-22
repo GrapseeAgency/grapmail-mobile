@@ -40,6 +40,9 @@ struct MailHtmlBodyView: UIViewRepresentable {
         configuration.websiteDataStore = .nonPersistent()
         let webView = WKWebView(frame: .zero, configuration: configuration)
         webView.navigationDelegate = context.coordinator
+        // A long-press preview loads the linked page inside the app, which is
+        // a fetch the sender can see and a page the person never chose to open.
+        webView.allowsLinkPreview = false
         webView.isOpaque = false
         webView.backgroundColor = .clear
         webView.scrollView.backgroundColor = .clear
@@ -111,14 +114,22 @@ struct MailHtmlBodyView: UIViewRepresentable {
             decisionHandler: @escaping (WKNavigationActionPolicy) -> Void,
         ) {
             // Everything is refused in here. A link tap goes to the person's
-            // own browser; a non-link load is the document itself and passes.
+            // own browser, and only for http(s) and mailto: a `tel:`, `sms:`,
+            // app-scheme or `file:` link in a stranger's mail is not something
+            // to hand to the system. The only load that passes is the document
+            // itself (`loadHTMLString` with no base URL is about:blank); a
+            // meta refresh, a form post or any other navigation goes nowhere.
+            let url = navigationAction.request.url
             if navigationAction.navigationType == .linkActivated {
-                if let url = navigationAction.request.url {
+                if let url, ["http", "https", "mailto"].contains(url.scheme?.lowercased() ?? "") {
                     parent.onOpenLink(url.absoluteString)
                 }
                 decisionHandler(.cancel)
-            } else {
+            } else if navigationAction.targetFrame?.isMainFrame == true,
+                      url == nil || url?.absoluteString == "about:blank" {
                 decisionHandler(.allow)
+            } else {
+                decisionHandler(.cancel)
             }
         }
     }
@@ -129,7 +140,9 @@ struct MailHtmlBodyView: UIViewRepresentable {
 /// App-authored, constant except for the palette colours interpolated into it —
 /// this is the island's own typography, not something a sender styled.
 private func mailDocument(html: String, allowImages: Bool, traits: UITraitCollection) -> String {
-    let imageSources = allowImages ? "https: http:" : "'none'"
+    // https only: the server upgrades http images, and a cleartext request
+    // would show the network what was opened.
+    let imageSources = allowImages ? "https:" : "'none'"
     let authoredColors = html.contains(" style=\"") || html.contains(" bgcolor=\"")
     let canvas = authoredColors ? "#FFFFFF" : "transparent"
     let text = authoredColors ? "#1F2937" : UIColor(GM.textPrimary).resolvedColor(with: traits).hexString
