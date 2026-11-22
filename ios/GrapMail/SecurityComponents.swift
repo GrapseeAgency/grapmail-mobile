@@ -29,6 +29,7 @@ enum SecurityFlow {
 /// taller on the sessions screen than on the hub reads as a mistake, not a
 /// variation.
 struct SecurityRowView: View {
+    @Environment(\.dynamicTypeSize) private var textSize
     let icon: String
     let title: String
     var subtitle: String? = nil
@@ -45,20 +46,23 @@ struct SecurityRowView: View {
                 .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(GM.softFill))
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
-                    .font(.system(size: 15, weight: .semibold))
+                    .font(.subheadline.weight(.semibold))
                     .foregroundColor(GM.textPrimary)
                 if let subtitle {
                     Text(subtitle)
-                        .font(.system(size: 12))
+                        .font(.footnote)
                         .foregroundColor(GM.textSecondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
+                if textSize.isAccessibilitySize, let chip {
+                    StatusChip(text: chip, tone: chipTone).padding(.top, 4)
+                }
             }
             Spacer(minLength: 0)
-            if let chip {
+            if !textSize.isAccessibilitySize, let chip {
                 StatusChip(text: chip, tone: chipTone)
             } else if action != nil {
-                Image(systemName: "chevron.right")
+                Image(systemName: "chevron.forward")
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundColor(GM.textTertiary)
             }

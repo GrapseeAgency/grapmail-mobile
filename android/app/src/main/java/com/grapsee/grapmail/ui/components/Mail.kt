@@ -8,7 +8,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -537,45 +536,6 @@ fun LabelChip(
         if (count != null) {
             Spacer(Modifier.width(6.dp))
             Text(count.toString(), fontSize = 12.sp, color = palette.textSecondary)
-        }
-    }
-}
-
-@Composable
-fun BoxTab(
-    title: String,
-    icon: ImageVector,
-    tint: Color,
-    badgeColor: Color,
-    count: Int?,
-    active: Boolean,
-    onClick: () -> Unit,
-) {
-    val palette = LocalPalette.current
-    val shape = RoundedCornerShape(22.dp)
-    Row(
-        Modifier.testTag("mail-box-tab-$title")
-            .clip(shape)
-            .background(if (active) tint.copy(alpha = 0.14f) else palette.card)
-            .border(1.dp, if (active) tint else palette.border, shape)
-            .selectable(selected = active, role = Role.Tab, onClick = onClick)
-            .heightIn(min = 48.dp)
-            .padding(horizontal = 13.dp, vertical = 7.dp),
-        horizontalArrangement = Arrangement.spacedBy(9.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Icon(icon, null, tint = tint, modifier = Modifier.size(20.dp))
-        Text(title, color = palette.textPrimary, fontSize = 14.sp,
-            fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f, fill = false))
-        if (count != null && count > 0) {
-            Text(
-                if (count > 99) "99+" else count.toString(),
-                color = Color.White, fontSize = 11.sp, lineHeight = 14.sp, fontWeight = FontWeight.SemiBold,
-                softWrap = false, maxLines = 1,
-                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                modifier = Modifier.background(badgeColor, RoundedCornerShape(percent = 50))
-                    .widthIn(min = 24.dp).padding(horizontal = 6.dp, vertical = 1.dp),
-            )
         }
     }
 }

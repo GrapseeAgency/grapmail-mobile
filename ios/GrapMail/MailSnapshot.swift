@@ -758,7 +758,6 @@ struct MailSnapshotView: View {
                         .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
                     }
                 )
-                BoxTabRow(activeBox: box, counts: [.others: 12, .starred: 3, .sent: 24], onSelect: { _ in })
                 MailStateBlock(
                     loading: loading, failed: failed, noMailbox: noMailbox,
                     empty: rows.isEmpty, boxTitle: box.title, onRetry: {}

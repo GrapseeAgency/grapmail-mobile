@@ -368,53 +368,6 @@ struct LabelChip: View {
     }
 }
 
-struct BoxTab: View {
-    let title: String
-    let icon: String
-    let tint: Color
-    let badgeColor: Color
-    let count: Int?
-    let active: Bool
-    let onClick: () -> Void
-
-    @ScaledMetric(relativeTo: .caption) private var badgeWidth = 24.0
-    private let shape = RoundedRectangle(cornerRadius: 21, style: .continuous)
-
-    var body: some View {
-        Button(action: onClick) {
-            HStack(spacing: 9) {
-                Image(systemName: icon)
-                    .font(.system(size: 19, weight: .medium))
-                    .foregroundColor(tint)
-                    .accessibilityHidden(true)
-                Text(title)
-                    .font(.subheadline.weight(.medium))
-                    .fixedSize(horizontal: false, vertical: true)
-                    .foregroundColor(GM.textPrimary)
-                if let count, count > 0 {
-                    Text(count > 99 ? "99+" : String(count))
-                        .font(.caption2.weight(.semibold).monospacedDigit())
-                        .fixedSize()
-                        .foregroundColor(.white)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 1)
-                        .frame(minWidth: badgeWidth)
-                        .background(badgeColor, in: Capsule())
-                }
-            }
-            .padding(.horizontal, 13)
-            .padding(.vertical, 7)
-            .frame(minHeight: 44)
-            .background(active ? tint.opacity(0.14) : GM.card, in: shape)
-            .overlay(shape.strokeBorder(active ? tint : GM.border).allowsHitTesting(false))
-            .contentShape(shape)
-        }
-        .buttonStyle(.plain)
-        .accessibilityAddTraits(active ? .isSelected : [])
-        .accessibilityIdentifier("mail-box-tab-\(title)")
-    }
-}
-
 /// The floating compose button. Its identifier is what the CI walk taps — a
 /// floating button found by coordinates is a walk that breaks whenever the list
 /// scrolls.

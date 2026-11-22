@@ -147,9 +147,16 @@ struct MailboxView: View {
             VStack(spacing: 0) {
                 header
                 if vm.state.selection.isEmpty {
-                    BoxTabRow(activeBox: vm.state.box, counts: drawerCounts(vm.state), onSelect: open)
+                    Text(vm.state.box.title)
+                        .font(.subheadline.weight(.medium))
+                        .foregroundStyle(GM.textSecondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, 16)
+                        .padding(.bottom, 6)
+                    if vm.state.box == .inbox {
+                        MailCategoryChipsRow(selected: $categoryFilter)
+                    }
                 }
-                MailCategoryChipsRow(selected: $categoryFilter)
                 offlineBanner
                 staleBanner
                 listArea
@@ -418,7 +425,7 @@ struct MailboxView: View {
     /// The list itself keeps a clear background and hides its separators, so
     /// the only corners on screen are the container's.
     private var shownRows: [MailMessage] {
-        guard let categoryFilter else { return vm.state.rows }
+        guard vm.state.box == .inbox, let categoryFilter else { return vm.state.rows }
         let priority = MailFeaturePrefs.shared.prioritySenders
         return vm.state.rows.filter { row in
             let decision = MailCategorizer.classify(

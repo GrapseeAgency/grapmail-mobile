@@ -72,11 +72,12 @@ fun SecurityRow(
     tint: Color? = null,
 ) {
     val palette = LocalPalette.current
+    val stackBadge = androidx.compose.ui.platform.LocalDensity.current.fontScale >= 1.3f
     Row(
         Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(14.dp))
-            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
+            .then(if (onClick != null) Modifier.clickable(role = androidx.compose.ui.semantics.Role.Button, onClick = onClick) else Modifier)
             .padding(vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -96,10 +97,14 @@ fun SecurityRow(
                 Spacer(Modifier.height(2.dp))
                 Text(subtitle, fontSize = 12.sp, lineHeight = 17.sp, color = palette.textSecondary)
             }
+            if (stackBadge && chip != null && trailing == null) {
+                Spacer(Modifier.height(6.dp))
+                StatusChip(chip, chipTone)
+            }
         }
         when {
             trailing != null -> trailing()
-            chip != null -> StatusChip(chip, chipTone)
+            chip != null && !stackBadge -> StatusChip(chip, chipTone)
             onClick != null -> Icon(
                 Icons.AutoMirrored.Rounded.KeyboardArrowRight,
                 contentDescription = null,

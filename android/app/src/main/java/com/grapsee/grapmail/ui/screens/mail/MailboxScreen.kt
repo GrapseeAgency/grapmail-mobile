@@ -11,8 +11,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.horizontalScroll
@@ -37,10 +35,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.Send
-import androidx.compose.material.icons.outlined.Mail
 import androidx.compose.material.icons.rounded.Search
-import androidx.compose.material.icons.outlined.StarBorder
 import androidx.compose.material.icons.rounded.Email
 import androidx.compose.material.icons.rounded.AllInbox
 import androidx.compose.material.icons.rounded.Archive
@@ -131,7 +126,6 @@ import com.grapsee.grapmail.data.MailSort
 import com.grapsee.grapmail.data.isServerSide
 import com.grapsee.grapmail.data.title
 import com.grapsee.grapmail.logic.MailboxViewModel
-import com.grapsee.grapmail.ui.components.BoxTab
 import com.grapsee.grapmail.ui.components.CountBadge
 import com.grapsee.grapmail.ui.components.GrapMailLogo
 import com.grapsee.grapmail.ui.components.LabelChip
@@ -427,7 +421,6 @@ fun MailboxScreen(
                         fontSize = 13.sp,
                         fontWeight = FontWeight.Medium,
                     )
-                    BoxTabRow(state.box, drawerCounts(state), vm::open)
                     if (state.box == com.grapsee.grapmail.data.MailBox.Inbox) {
                         // F07 split inbox: the categories are read here, on the
                         // device, from each row's sender and subject — and the
@@ -1184,26 +1177,6 @@ private fun LabelStrip(s: MailboxViewModel.MailboxUiState) {
         items(s.labels, key = { it.id }) { l ->
             LabelChip(l.name, l.unread, l.color, false)
         }
-    }
-}
-
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-internal fun BoxTabRow(activeBox: MailBox, counts: Map<MailBox, Int?>, onSelect: (MailBox) -> Unit) {
-    val palette = LocalPalette.current
-    FlowRow(
-        Modifier.fillMaxWidth()
-            .padding(start = 16.dp, end = 16.dp, bottom = 10.dp)
-            .testTag("mail-box-tabs"),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        BoxTab(MailBox.All.title, Icons.Outlined.Mail, palette.primarySolid, palette.tabBadgeAll,
-            counts[MailBox.All], activeBox == MailBox.All) { onSelect(MailBox.All) }
-        BoxTab(MailBox.Starred.title, Icons.Outlined.StarBorder, palette.star, palette.tabBadgeStarred,
-            counts[MailBox.Starred], activeBox == MailBox.Starred) { onSelect(MailBox.Starred) }
-        BoxTab(MailBox.Sent.title, Icons.AutoMirrored.Rounded.Send, palette.tabTintSent, palette.tabBadgeSent,
-            counts[MailBox.Sent], activeBox == MailBox.Sent) { onSelect(MailBox.Sent) }
     }
 }
 

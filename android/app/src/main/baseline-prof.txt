@@ -9868,7 +9868,6 @@ HSPLcom/grapsee/grapmail/ui/components/MailKt;->$r8$lambda$x4z4BVPndggfllQ6hFbtU
 HSPLcom/grapsee/grapmail/ui/components/MailKt;->$r8$lambda$yls9U1hnS79LaD_mR-O8tzpKPkE(Ljava/lang/Integer;ILandroidx/compose/ui/Modifier;IILandroidx/compose/runtime/Composer;I)Lkotlin/Unit;
 HSPLcom/grapsee/grapmail/ui/components/MailKt;-><clinit>()V
 HSPLcom/grapsee/grapmail/ui/components/MailKt;->BoxTab$lambda$49(Ljava/lang/String;Ljava/lang/Integer;ZLkotlin/jvm/functions/Function0;Landroidx/compose/ui/Modifier;IILandroidx/compose/runtime/Composer;I)Lkotlin/Unit;
-HSPLcom/grapsee/grapmail/ui/components/MailKt;->BoxTab(Ljava/lang/String;Ljava/lang/Integer;ZLkotlin/jvm/functions/Function0;Landroidx/compose/ui/Modifier;Landroidx/compose/runtime/Composer;II)V
 HSPLcom/grapsee/grapmail/ui/components/MailKt;->CenteredState$lambda$62(Ljava/lang/String;Ljava/lang/String;Lcom/grapsee/grapmail/ui/theme/Palette;Lkotlin/Pair;IILandroidx/compose/runtime/Composer;I)Lkotlin/Unit;
 HSPLcom/grapsee/grapmail/ui/components/MailKt;->CenteredState(Ljava/lang/String;Ljava/lang/String;Lcom/grapsee/grapmail/ui/theme/Palette;Lkotlin/Pair;Landroidx/compose/runtime/Composer;II)V
 HSPLcom/grapsee/grapmail/ui/components/MailKt;->CountBadge$lambda$0(Ljava/lang/Integer;ILandroidx/compose/ui/Modifier;IILandroidx/compose/runtime/Composer;I)Lkotlin/Unit;
@@ -14011,7 +14010,6 @@ HSPLcom/grapsee/grapmail/ui/screens/mail/MailboxScreenKt;->BoxCategoryRow-ww6aTO
 HSPLcom/grapsee/grapmail/ui/screens/mail/MailboxScreenKt;->BoxCategoryRow_ww6aTOc$lambda$92(Ljava/lang/String;Ljava/lang/Integer;Landroidx/compose/ui/graphics/vector/ImageVector;JLkotlin/jvm/functions/Function0;ILandroidx/compose/runtime/Composer;I)Lkotlin/Unit;
 HSPLcom/grapsee/grapmail/ui/screens/mail/MailboxScreenKt;->BoxTabRow$lambda$88$lambda$87$lambda$86$lambda$85(Lkotlin/jvm/functions/Function1;Lcom/grapsee/grapmail/data/MailBox;)Lkotlin/Unit;
 HSPLcom/grapsee/grapmail/ui/screens/mail/MailboxScreenKt;->BoxTabRow$lambda$89(Lcom/grapsee/grapmail/logic/MailboxViewModel$MailboxUiState;Lkotlin/jvm/functions/Function1;ILandroidx/compose/runtime/Composer;I)Lkotlin/Unit;
-HSPLcom/grapsee/grapmail/ui/screens/mail/MailboxScreenKt;->BoxTabRow(Lcom/grapsee/grapmail/logic/MailboxViewModel$MailboxUiState;Lkotlin/jvm/functions/Function1;Landroidx/compose/runtime/Composer;I)V
 HSPLcom/grapsee/grapmail/ui/screens/mail/MailboxScreenKt;->DrawerRow$lambda$136(Ljava/lang/String;Landroidx/compose/ui/graphics/vector/ImageVector;Ljava/lang/Integer;ZLkotlin/jvm/functions/Function0;ILandroidx/compose/runtime/Composer;I)Lkotlin/Unit;
 HSPLcom/grapsee/grapmail/ui/screens/mail/MailboxScreenKt;->DrawerRow(Ljava/lang/String;Landroidx/compose/ui/graphics/vector/ImageVector;Ljava/lang/Integer;ZLkotlin/jvm/functions/Function0;Landroidx/compose/runtime/Composer;I)V
 HSPLcom/grapsee/grapmail/ui/screens/mail/MailboxScreenKt;->DrawerSection$lambda$134(Ljava/lang/String;ILandroidx/compose/runtime/Composer;I)Lkotlin/Unit;
