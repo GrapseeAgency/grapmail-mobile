@@ -259,6 +259,10 @@ enum SessionStore {
         // person a live action proof.
         SecurityFlow.reset()
         AccountSecurityView.clearCachedVerdict()
+        // The device key's cached biometric unlock dies with the session that
+        // opened it — a gate left open across sign-out would hand the next
+        // person a key the previous session had already prompted for.
+        DeviceKeyManager.resetGate()
         // The mailbox's cached pages, bodies, labels and stats belong to the
         // account that just signed out. Leaving them behind would make the first
         // thing the next person on this device sees somebody else's mail — the

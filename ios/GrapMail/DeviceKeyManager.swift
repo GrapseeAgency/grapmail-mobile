@@ -1,5 +1,6 @@
 import CryptoKit
 import Foundation
+import LocalAuthentication
 
 /// The Ed25519 signing key that makes THIS install a trusted device.
 ///
@@ -22,6 +23,24 @@ import Foundation
 ///    here would produce a signature that verifies against the wrong message.
 ///    (Android's es256 path is the opposite: ECDSA needs SHA-256 named.)
 ///
+/// ── THE BIOMETRIC GATE ─────────────────────────────────────────────────────
+/// Signing goes through LocalAuthentication: one LAContext prompt
+/// (`deviceOwnerAuthenticationWithBiometrics`, falling back to the full
+/// `.deviceOwnerAuthentication` ladder) per 60-second window, cached so a
+/// recovery flow that signs once is not re-prompted for every retry. Every
+/// user-facing signature — the recovery challenge above included — MUST go
+/// through `sign(_:)`, which is where the gate lives; there is no ungated
+/// signing entry point for a screen to reach around it.
+///
+/// ── THE HONESTY RULE ───────────────────────────────────────────────────────
+/// A device with no passcode and no biometrics cannot be prompted, and a hard
+/// refusal there would lock recovery out of the one device class that most
+/// needs it. Such a device signs anyway, but the state is REPORTED — the
+/// outcome carries `.unlockedWithoutLock` and `keyGuardLabel` says
+/// "Device key (no biometric lock)" — so the UI records what this key is
+/// actually protected by instead of implying a lock that does not exist (the
+/// same honesty rule the Android side applies to its device-key states).
+///
 /// ── STORAGE ────────────────────────────────────────────────────────────────
 /// The raw 32-byte private representation, base64-encoded as a string, in the
 /// same generic-password Keychain the session token uses (`Keychain` in
@@ -34,6 +53,105 @@ enum DeviceKeyManager {
     /// The Keychain item's account attribute. Namespaced like the other
     /// `grapmail.*` keys so one Keychain never collides with itself.
     private static let keychainKey = "grapmail.device-key"
+
+    // ── the gate ─────────────────────────────────────────────────────────────
+    private static let unlockWindowSeconds: TimeInterval = 60
+    private static let gateLock = NSLock()
+    private static var unlockedUntil: Date = .distantPast
+    private static var unlockedWithoutLock = false
+
+    /// How one gated signing call turned out.
+    enum KeyGuardOutcome: Equatable {
+        /// The prompt succeeded; signing may proceed.
+        case unlocked
+        /// The device has no passcode or biometrics to prompt with. Signing
+        /// still proceeds — and the UI must say so (`keyGuardLabel`).
+        case unlockedWithoutLock
+        /// The person cancelled or the prompt failed. Signing is refused.
+        case refused
+    }
+
+    /// The outcome of one gated signing call: the signature when the key
+    /// produced one, plus the gate's own refusal sentence — present exactly
+    /// when the GATE (not the key) refused, so a screen can say "the prompt
+    /// was cancelled" rather than "the key is broken".
+    struct GatedSignature {
+        let signature: Data?
+        let guardMessage: String?
+    }
+
+    /// One LAContext round-trip, cached for `unlockWindowSeconds` so a flow
+    /// that signs more than once in a minute is prompted once. The prompt is
+    /// the biometrics-first policy — the same ladder AppLock climbs, with the
+    /// full `deviceOwnerAuthentication` fallback (passcode) for a device whose
+    /// biometrics are broken rather than absent.
+    static func ensureUnlocked() async -> KeyGuardOutcome {
+        gateLock.lock()
+        let cachedUntil = unlockedUntil
+        let cachedNoLock = unlockedWithoutLock
+        gateLock.unlock()
+        if Date() < cachedUntil {
+            return cachedNoLock ? .unlockedWithoutLock : .unlocked
+        }
+        let context = LAContext()
+        context.localizedCancelTitle = "Cancel"
+        var policyError: NSError?
+        let policy: LAPolicy
+        if context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &policyError) {
+            policy = .deviceOwnerAuthenticationWithBiometrics
+        } else if context.canEvaluatePolicy(.deviceOwnerAuthentication, error: &policyError) {
+            policy = .deviceOwnerAuthentication
+        } else {
+            // No lock exists to prompt with. Sign anyway, but mark it —
+            // `keyGuardLabel` is how the screen keeps this honest.
+            markUnlockWindow(withoutLock: true)
+            return .unlockedWithoutLock
+        }
+        do {
+            guard try await context.evaluatePolicy(policy, localizedReason: "Sign with this device's key") else {
+                return .refused
+            }
+        } catch {
+            return .refused
+        }
+        markUnlockWindow(withoutLock: false)
+        return .unlocked
+    }
+
+    /// The honest state of THIS install's key guard, for the UI to print.
+    /// Evaluated fresh each read on purpose: `canEvaluatePolicy` prompts
+    /// nobody, and a cached answer could call a device "locked" after the
+    /// owner turned the passcode off.
+    static var keyGuardLabel: String {
+        let context = LAContext()
+        var error: NSError?
+        if context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &error) {
+            return "Device key (biometric lock)"
+        }
+        if context.canEvaluatePolicy(.deviceOwnerAuthentication, error: &error) {
+            return "Device key (passcode lock)"
+        }
+        return "Device key (no biometric lock)"
+    }
+
+    /// Sign-out drops the cached unlock with the session it belonged to — the
+    /// next person on this phone must not inherit a gate the previous session
+    /// opened, the same rule that clears SecurityFlow's in-memory proof.
+    static func resetGate() {
+        gateLock.lock()
+        unlockedUntil = .distantPast
+        unlockedWithoutLock = false
+        gateLock.unlock()
+    }
+
+    private static func markUnlockWindow(withoutLock: Bool) {
+        gateLock.lock()
+        unlockedUntil = Date().addingTimeInterval(unlockWindowSeconds)
+        unlockedWithoutLock = withoutLock
+        gateLock.unlock()
+    }
+
+    // ── the key ───────────────────────────────────────────────────────────────
 
     /// Whether a key exists. The recovery entry point reads this to decide
     /// whether "Use a trusted device instead" is offered at all: a device that
@@ -78,15 +196,27 @@ enum DeviceKeyManager {
         return der.base64EncodedString()
     }
 
-    /// Sign raw bytes (the recovery nonce) with Ed25519 — no pre-hash. The
-    /// 64-byte signature comes back base64-encoded, the wire form the verify
-    /// route base64-decodes.
-    static func sign(_ data: Data) -> Data? {
-        guard let key = privateKey() else { return nil }
-        // `isValidSignature` on the server side reconstructs the message from
-        // the nonce string it issued; `signature(for:)` is the direct Ed25519
-        // over exactly these bytes.
-        return try? key.signature(for: data)
+    /// Sign raw bytes (the recovery nonce) with Ed25519 — no pre-hash — after
+    /// the biometric gate. The 64-byte signature comes back base64-encoded at
+    /// the call site, the wire form the verify route base64-decodes.
+    ///
+    /// This is the ONLY signing entry point: recovery-challenge signing and
+    /// every future user-facing signature go through the gate here, and the
+    /// gate's refusal is reported as `guardMessage` so the screen can say why
+    /// rather than blaming the key.
+    static func sign(_ data: Data) async -> GatedSignature {
+        switch await ensureUnlocked() {
+        case .refused:
+            return GatedSignature(signature: nil, guardMessage: "The device key stayed locked.")
+        case .unlocked, .unlockedWithoutLock:
+            guard let key = privateKey() else {
+                return GatedSignature(signature: nil, guardMessage: nil)
+            }
+            // `isValidSignature` on the server side reconstructs the message from
+            // the nonce string it issued; `signature(for:)` is the direct Ed25519
+            // over exactly these bytes.
+            return GatedSignature(signature: try? key.signature(for: data), guardMessage: nil)
+        }
     }
 
     /// Replace the keypair. Used only on the re-enroll path: the server

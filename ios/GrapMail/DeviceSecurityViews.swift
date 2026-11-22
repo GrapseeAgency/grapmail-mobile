@@ -55,6 +55,14 @@ struct TrustedDevicesView: View {
                         )
                     }
                 }
+                // The honesty rule for this phone's own key: say what it is
+                // actually protected by. "No biometric lock" is the recorded
+                // state on a device without a passcode — the key signs, and
+                // the label must not imply a prompt that cannot exist.
+                Text(DeviceKeyManager.keyGuardLabel)
+                    .font(.system(size: 11))
+                    .foregroundColor(GM.textTertiary)
+                    .padding(.top, 2)
                 HStack(alignment: .top, spacing: 9) {
                     Image(systemName: "info.circle").font(.system(size: 14)).foregroundColor(GM.primarySolid)
                     Text("If a device on this list is not yours, revoke it immediately — a trusted device can reset your password without a code.")
@@ -846,9 +854,16 @@ struct TrustedDeviceRecoveryView: View {
             if let expiresAt = challenge.expiresAt.flatMap(parseIsoDate) { nonceExpiresAt = expiresAt }
             // The server hashed the nonce it sent; the signature must cover
             // exactly those raw bytes — no pre-hash, per the verify route.
-            guard let nonceBytes = Data(base64Encoded: nonce),
-                  let signature = DeviceKeyManager.sign(nonceBytes)?.base64EncodedString() else {
-                error = "This device cannot prove custody of its key. Reset with a code instead."
+            // Signing goes through the biometric gate: a cancelled prompt is
+            // the gate's own sentence, not a broken key.
+            guard let nonceBytes = Data(base64Encoded: nonce) else {
+                error = "Recovery is not available for this account right now."
+                proving = false
+                return
+            }
+            let proof = await DeviceKeyManager.sign(nonceBytes)
+            guard let signature = proof.signature?.base64EncodedString() else {
+                error = proof.guardMessage ?? "This device cannot prove custody of its key. Reset with a code instead."
                 proving = false
                 return
             }

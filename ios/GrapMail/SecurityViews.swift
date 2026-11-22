@@ -18,10 +18,11 @@ struct AccountSecurityView: View {
     let onSignOutAll: () -> Void
     let onSupport: () -> Void
     // The device-security band: the one-time recovery codes the
-    // all-devices-lost path spends, and the trusted-device list the enrolled
-    // keys live on.
+    // all-devices-lost path spends, the trusted-device list the enrolled
+    // keys live on, and the passkey credentials the platform signs with.
     var onRecoveryCodes: (() -> Void)? = nil
     var onTrustedDevices: (() -> Void)? = nil
+    var onPasskeys: (() -> Void)? = nil
 
     private static var cachedVerdict: (generation: UUID, profile: ProfileDto)?
 
@@ -170,6 +171,13 @@ struct AccountSecurityView: View {
                 title: "Trusted Devices",
                 subtitle: "Devices that hold a key this account trusts.",
                 action: onTrustedDevices
+            )
+            SecurityDivider()
+            SecurityRowView(
+                icon: "key.viewfinder",
+                title: "Passkeys",
+                subtitle: "Sign in with your face, fingerprint or passcode instead of a password.",
+                action: onPasskeys
             )
             SecurityDivider()
             SecurityRowView(

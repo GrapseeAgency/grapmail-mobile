@@ -67,8 +67,9 @@ struct RootView: View {
         case secActivity, secAlert, secSecure
         // The device-security band: trusted-device list, and the recovery
         // codes the all-devices-lost path spends. Both hang off the hub like
-        // the sessions and activity screens do.
-        case secTrustedDevices, secRecoveryCodes
+        // the sessions and activity screens do. Passkeys sit on the same band:
+        // the platform credentials the sign-in and the hub's list share.
+        case secTrustedDevices, secRecoveryCodes, secPasskeys
         case created(address: String, name: String)
         case createdAlt(address: String, name: String)
         case onboarding(address: String, name: String)
@@ -420,7 +421,7 @@ struct RootView: View {
                  .secPasswordDone, .secPasswordAfter, .secPasswordUpdated, .secSignOutAll,
                  .secSignOutAllDone, .secSessions, .secRevoke, .secRevoked, .secRevokeAlert,
                  .secRevokedAlert, .secActivity, .secAlert, .secSecure,
-                 .secTrustedDevices, .secRecoveryCodes:
+                 .secTrustedDevices, .secRecoveryCodes, .secPasskeys:
                 securityDestination(route)
             case .stepName, .stepInfo, .stepAddress, .stepPassword, .stepTerms,
                  .humanVerify, .created, .createdAlt:
@@ -582,7 +583,8 @@ struct RootView: View {
                         onSignOutAll: { path.append(.secSignOutAll) },
                         onSupport: { openSupport() },
                         onRecoveryCodes: { path.append(.secRecoveryCodes) },
-                        onTrustedDevices: { path.append(.secTrustedDevices) }
+                        onTrustedDevices: { path.append(.secTrustedDevices) },
+                        onPasskeys: { path.append(.secPasskeys) }
                     )
                 case .secEnable:
                     TwoFactorEnableView(
@@ -705,6 +707,8 @@ struct RootView: View {
                     )
                 case .secTrustedDevices:
                     TrustedDevicesView(onBack: { path.removeLast() })
+                case .secPasskeys:
+                    PasskeysView(onBack: { path.removeLast() })
                 case .secRecoveryCodes:
                     // Done returns to the hub, whichever door opened this
                     // screen — the codes screen is a child of it, like the

@@ -121,6 +121,7 @@ final class TrustedDeviceManager {
             )
             guard response.success, let device = response.device else { return }
             recordInLedger(email: email, device: device)
+            attestAfterEnrollment(token: bearer, deviceId: device.id)
         } catch let error as ApiError {
             // A conflict for this installation id means the server's stored
             // public half cannot verify this device's signatures: rotate the
@@ -138,11 +139,26 @@ final class TrustedDeviceManager {
                 )
                 guard retried.success, let device = retried.device else { return }
                 recordInLedger(email: email, device: device)
+                attestAfterEnrollment(token: bearer, deviceId: device.id)
             } catch {
                 // Still refused after rotation: leave it to the next sign-in.
             }
         } catch {
             // Network failure: the next sign-in notification retries.
+        }
+    }
+
+    /// App Attest rides enrollment: the device row exists, the bearer is live,
+    /// and the route can now be told what this install can prove. Fire-and-
+    /// forget, silent on every outcome — attestation strengthens the row, it
+    /// never gates it. `.recorded` (the two-stage challenge contract is not
+    /// deployed server-side yet), `.unsupported` (no App Attest hardware) and
+    /// `.failed` (Apple or the route refused) all leave the device exactly as
+    /// trusted as before this call.
+    private func attestAfterEnrollment(token: String, deviceId: String) {
+        guard AppAttestClient.isSupported else { return }
+        Task {
+            _ = await AppAttestClient.attestForDevice(token: token, deviceId: deviceId)
         }
     }
 
