@@ -132,6 +132,9 @@ dependencies {
     // The Play review + in-app update flows: the rating ask and the
     // "a new version is available" overlay, both driven by the store itself.
     implementation("com.google.android.play:review:2.0.2")
+    // GrapMail plans. Purchases are verified by the server (routes/grapmail-billing.ts),
+    // never trusted on the device.
+    implementation("com.android.billingclient:billing-ktx:7.1.1")
     implementation("com.google.android.play:review-ktx:2.0.2")
     implementation("com.google.android.play:app-update:2.1.0")
     implementation("com.google.android.play:app-update-ktx:2.1.0")

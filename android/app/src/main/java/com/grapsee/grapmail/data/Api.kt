@@ -1685,6 +1685,22 @@ object Api {
             resp.body?.bytes() ?: ByteArray(0)
         }
 
+    /** `GET /billing/entitlement` — the account's plan, allowance and this month's usage. */
+    suspend fun billingEntitlement(token: String): BillingEntitlementDto =
+        read(authed("$MAIL/billing/entitlement", token).get().build()) { decodeResponse(it) }
+
+    /**
+     * `POST /billing/google/verify` — hand a Play purchase to the server, which
+     * asks Google about it, acknowledges it and answers with the new entitlement.
+     */
+    suspend fun billingVerifyGoogle(token: String, productId: String, purchaseToken: String): BillingEntitlementDto {
+        val req = authed("$MAIL/billing/google/verify", token)
+            .post(postBody(json.encodeToString(BillingVerifyRequest.serializer(),
+                BillingVerifyRequest(productId, purchaseToken))))
+            .build()
+        return read(req) { decodeResponse(it) }
+    }
+
     /**
      * `GET /attachments/:id` — the bytes, not JSON.
      *
@@ -1902,6 +1918,43 @@ data class MailLabelAssignRequest(val labelId: String)
 
 @Serializable
 data class MailScreenerEnableRequest(val enabled: Boolean)
+
+@Serializable
+data class BillingVerifyRequest(val productId: String, val purchaseToken: String)
+
+@Serializable
+data class BillingAllowanceDto(
+    val monthlyRecipients: Int = 0,
+    val used: Int = 0,
+    val month: String = "",
+    val resetsAt: String = "",
+    val enforced: Boolean = false,
+)
+
+@Serializable
+data class BillingPlanDto(
+    val id: String = "free",
+    val name: String = "",
+    val monthlyRecipients: Int = 0,
+    val playProducts: List<String> = emptyList(),
+)
+
+/** What the server says this account has. The app never decides this itself. */
+@Serializable
+data class BillingEntitlementDto(
+    val success: Boolean = false,
+    val plan: String = "free",
+    val planName: String = "Free",
+    val store: String = "none",
+    val state: String? = null,
+    val expiresAt: String? = null,
+    val autoRenewing: Boolean = false,
+    val productId: String? = null,
+    val allowance: BillingAllowanceDto = BillingAllowanceDto(),
+    val plans: List<BillingPlanDto> = emptyList(),
+    val playAccountReference: String = "",
+    val badges: List<String> = emptyList(),
+)
 
 /** `POST /avatars/resolve` body. */
 @Serializable

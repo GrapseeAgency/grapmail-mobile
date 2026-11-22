@@ -903,6 +903,40 @@ struct MailE2eAddressesRequest: Encodable {
     var addresses: [String]
 }
 
+/// What the server says this account has (`GET /billing/entitlement`).
+struct BillingEntitlement: Decodable {
+    struct Allowance: Decodable {
+        var monthlyRecipients = 0
+        var used = 0
+        var resetsAt = ""
+        private enum CodingKeys: String, CodingKey { case monthlyRecipients, used, resetsAt }
+        init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            monthlyRecipients = c.lenient(.monthlyRecipients, 0)
+            used = c.lenient(.used, 0)
+            resetsAt = c.lenient(.resetsAt, "")
+        }
+        init() {}
+    }
+    var plan = "free"
+    var planName = "Free"
+    var expiresAt: String?
+    var autoRenewing = false
+    var allowance = Allowance()
+    var badges: [String] = []
+
+    private enum CodingKeys: String, CodingKey { case plan, planName, expiresAt, autoRenewing, allowance, badges }
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        plan = c.lenient(.plan, "free")
+        planName = c.lenient(.planName, "Free")
+        expiresAt = c.lenientOpt(.expiresAt)
+        autoRenewing = c.lenient(.autoRenewing, false)
+        allowance = c.lenient(.allowance, Allowance())
+        badges = c.lenient(.badges, [])
+    }
+}
+
 /// `POST /avatars/resolve` body.
 struct MailAvatarsRequest: Encodable {
     var addresses: [String]
@@ -1679,6 +1713,12 @@ extension ApiClient {
             throw mailFailure(data: data, http: http)
         }
         return data
+    }
+
+    /// `GET /billing/entitlement` — the account's plan, allowance and this
+    /// month's usage, as the server has verified it.
+    static func billingEntitlement(_ token: String) async throws -> BillingEntitlement {
+        try await request("\(mailBase)/billing/entitlement", bearer: token)
     }
 
     /// `GET /attachments/:id` — the bytes, not JSON. Separate from `request`,
