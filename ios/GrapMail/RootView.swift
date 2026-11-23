@@ -45,6 +45,10 @@ struct RootView: View {
         case forgotPassword, recoveryCode, newPassword, resetDone, recoveryPending
         case findAddress, addressFound
         case phoneVerify, phoneVerified
+        // Recovery email: from Account Security, and the optional step right
+        // after sign-up (carries the new account so the wizard can finish).
+        case recoveryEmail
+        case recoveryEmailSignup(address: String, name: String)
         case stepName, stepInfo, stepAddress, stepPassword, stepTerms
         case humanVerify
         // The security sector — the 24-screen batch. Everything hangs off
@@ -384,10 +388,10 @@ struct RootView: View {
                  .secDisable, .secDisabled, .secBackup, .secBackupSaved, .secPassword,
                  .secPasswordDone, .secPasswordAfter, .secPasswordUpdated, .secSignOutAll,
                  .secSignOutAllDone, .secSessions, .secRevoke, .secRevoked, .secRevokeAlert,
-                 .secRevokedAlert, .secActivity, .secAlert, .secSecure:
+                 .secRevokedAlert, .secActivity, .secAlert, .secSecure, .recoveryEmail:
                 securityDestination(route)
             case .stepName, .stepInfo, .stepAddress, .stepPassword, .stepTerms,
-                 .humanVerify, .created, .createdAlt:
+                 .humanVerify, .created, .createdAlt, .recoveryEmailSignup:
                 wizardDestination(route)
             default:
                 // Everything signed-in: mailbox, account band, encryption
@@ -531,7 +535,13 @@ struct RootView: View {
                         onBackupCodes: { path.append(.secBackup) },
                         onPassword: { path.append(.secPassword) },
                         onSignOutAll: { path.append(.secSignOutAll) },
-                        onSupport: { openSupport() }
+                        onSupport: { openSupport() },
+                        onRecoveryEmail: { path.append(.recoveryEmail) }
+                    )
+                case .recoveryEmail:
+                    RecoveryEmailView(
+                        onBack: { path.removeLast() },
+                        onDone: { path.removeLast() }
                     )
                 case .secEnable:
                     TwoFactorEnableView(
@@ -545,9 +555,12 @@ struct RootView: View {
                         onVerified: { path.append(.secVerifyPhone) }
                     )
                 case .secVerifyPhone:
-                    VerifyPhoneView(
+                    // Step 05 of turning two-step on. Codes go to the verified
+                    // recovery email (GrapMail sends no SMS); the route name is
+                    // kept so existing links and the walk still land here.
+                    TwoFactorEmailView(
                         onBack: { path.removeLast() },
-                        onAddPhone: { path.append(.phoneVerify) },
+                        onAddRecoveryEmail: { path.append(.recoveryEmail) },
                         onVerified: { path.append(.secEnabled) }
                     )
                 case .secEnabled:
@@ -693,13 +706,25 @@ struct RootView: View {
                         // sign-in did not land, send the person to sign-in with
                         // the address filled in instead of into a dead flow.
                         if SessionStore.hasValidSession {
-                            guard !OnboardingGate.isDone else { return enterMailbox() }
-                            path.append(.onboarding(address: address, name: name))
+                            // Optional: add a recovery email now (Skip for now
+                            // continues). Account Security keeps reminding.
+                            path.append(.recoveryEmailSignup(address: address, name: name))
                         } else {
                             recovery.prefillIdentifier = address
                             path.append(.signIn)
                         }
                     }
+                case let .recoveryEmailSignup(address, name):
+                    RecoveryEmailView(
+                        onDone: {
+                            guard !OnboardingGate.isDone else { return enterMailbox() }
+                            path.append(.onboarding(address: address, name: name))
+                        },
+                        onSkip: {
+                            guard !OnboardingGate.isDone else { return enterMailbox() }
+                            path.append(.onboarding(address: address, name: name))
+                        }
+                    )
                 case .humanVerify:
                     HumanVerifyView(model: model, onBack: { path.removeLast() }) {
                         // Server-confirmed verdict only (Continue gates on it). Go
