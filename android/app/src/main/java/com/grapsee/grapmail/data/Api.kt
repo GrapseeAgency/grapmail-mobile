@@ -2118,6 +2118,16 @@ object Api {
     suspend fun e2eRecoveryRemove(token: String): E2eRecoveryResponse =
         read(authed("$MAIL/e2e-recovery", token).delete().build()) { decodeResponse(it) }
 
+    /** `GET /grapmail/app-config`: kill switches, minimum build, notice. No session needed. */
+    suspend fun appConfig(): AppConfigDto =
+        read(Request.Builder().url("$MAIL/app-config").get().build()) { decodeResponse(it) }
+
+    /** `POST /grapmail/client-reports`: crash, hang and session reports (logic/CrashReporter.kt). */
+    suspend fun clientReports(body: String) {
+        val (status, text) = execute(Request.Builder().url("$MAIL/client-reports").post(postBody(body)).build())
+        if (status >= 400) fail(status, text)
+    }
+
     /** `GET /grapmail/storage`: space used, the limit, and the warning level. */
     suspend fun mailStorage(token: String): MailStorageResponse =
         read(authed("$MAIL/storage", token).get().build()) { decodeResponse(it) }
@@ -2855,3 +2865,19 @@ private data class MailAttachmentResponseJson(val attachment: MailAttachmentDto)
     val kit: kotlinx.serialization.json.JsonObject? = null,
     val error: String? = null,
 )
+
+/** `GET /grapmail/app-config` (backend lib/app-config.ts). Defaults mean "nothing paused". */
+@Serializable data class AppConfigDto(
+    val success: Boolean = false,
+    val minVersion: MinVersionDto = MinVersionDto(),
+    val killSwitches: Map<String, Boolean> = emptyMap(),
+    val notice: AppNoticeDto? = null,
+    val flags: Map<String, Boolean> = emptyMap(),
+    val storeUrls: StoreUrlsDto = StoreUrlsDto(),
+)
+
+@Serializable data class StoreUrlsDto(val android: String = "", val ios: String = "")
+
+@Serializable data class MinVersionDto(val android: Int = 0, val ios: String = "0")
+
+@Serializable data class AppNoticeDto(val text: String = "", val level: String = "info")
