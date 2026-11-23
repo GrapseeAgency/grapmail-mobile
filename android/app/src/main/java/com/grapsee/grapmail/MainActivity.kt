@@ -416,6 +416,7 @@ object Routes {
     const val MAIL_NOTES = "mail/notes"
     const val MAIL_TASKS = "mail/tasks"
     const val MAIL_PREFS = "mail/settings/prefs"
+    const val MAIL_PLAN = "mail/settings/plan"
     const val MAIL_ADDRESSES = "mail/settings/addresses"
     const val MAIL_CONNECTIONS = "mail/settings/connections"
     const val MAIL_CONNECTION_DETAIL = "mail/settings/connections/{product}"
@@ -1624,12 +1625,16 @@ fun GrapMailNav(
                 onPerAccountNotifications = { nav.navigate(Routes.MAIL_PER_ACCOUNT_NOTIFY) },
                 onHelp = { nav.navigate(Routes.MAIL_SUPPORT) },
                 onSignOut = ::signOutOfMailbox,
+                onPlan = { nav.navigate(Routes.MAIL_PLAN) },
             )
         }
         composable(Routes.MAIL_PER_ACCOUNT_NOTIFY) {
             com.grapsee.grapmail.ui.screens.mail.PerAccountNotificationsScreen(
                 onBack = { nav.popBackStack() },
             )
+        }
+        composable(Routes.MAIL_PLAN) {
+            com.grapsee.grapmail.ui.screens.mail.PlanScreen(onBack = { nav.popBackStack() })
         }
         composable(Routes.MAIL_NOTES) { entry ->
             val profile: com.grapsee.grapmail.logic.ProfileViewModel = signedInViewModel(nav, entry)

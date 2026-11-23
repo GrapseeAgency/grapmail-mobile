@@ -631,6 +631,7 @@ fun MailSettingsScreen(
     onPerAccountNotifications: () -> Unit,
     onHelp: () -> Unit,
     onSignOut: () -> Unit,
+    onPlan: () -> Unit = {},
 ) {
     val palette = LocalPalette.current
     // The alias list is a read with a state, not a value that appears: `GET
@@ -695,6 +696,8 @@ fun MailSettingsScreen(
                 "Filters for the inbox", palette, onClick = onLabels)
             SettingRow(Icons.Rounded.MailOutline, "Mail settings",
                 "Signature, auto-reply, forwarding, dates, senders", palette, onClick = onPrefs)
+            SettingRow(Icons.Rounded.Star, "Your plan",
+                "Monthly sending allowance and upgrades", palette, onClick = onPlan)
             SettingRow(Icons.Rounded.PersonAddAlt1, "Addresses",
                 "Primary and aliases", palette, onClick = onAddresses)
             SettingRow(Icons.Rounded.Person, "Connected accounts",

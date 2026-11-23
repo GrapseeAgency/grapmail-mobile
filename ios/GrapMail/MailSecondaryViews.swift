@@ -658,6 +658,7 @@ struct MailSettingsView: View {
     /// The system's own answer about alerts for this app, read when the screen
     /// appears — never assumed, never remembered from a previous visit.
     @State private var notificationStatus: UNAuthorizationStatus? = nil
+    @State private var showPlan = false
 
     /// The row's words, straight from that reading. `nil` means the read has
     /// not landed, and "Checking…" is the only honest thing to print for it.
@@ -760,6 +761,9 @@ struct MailSettingsView: View {
                                value: "Filters for the inbox", onClick: onLabels)
                     SettingRow(icon: "envelope", title: "Mail settings",
                                value: "Signature, auto-reply, forwarding, dates, senders", onClick: onPrefs)
+                    SettingRow(icon: "star", title: "Your plan",
+                               value: "Monthly sending allowance", onClick: { showPlan = true })
+                        .sheet(isPresented: $showPlan) { PlanView(onClose: { showPlan = false }) }
                     SettingRow(icon: "person.badge.plus", title: "Addresses",
                                value: "Primary and aliases", onClick: onAddresses)
                     SettingRow(icon: "person", title: "Connected accounts",
