@@ -508,6 +508,8 @@ private fun apiErrorMessage(status: Int, code: String?): String = when (code) {
     /** Sent whole: the server checks the switch, the window and the message together. */
     val vacation: VacationDto? = null,
     val forwarding: ForwardingDto? = null,
+    /** Sent whole, every field encoded (see [NotificationSettingsDto]). */
+    val notifications: NotificationSettingsDto? = null,
 )
 
 /**
@@ -554,6 +556,52 @@ private fun apiErrorMessage(status: Int, code: String?): String = when (code) {
     val notes: List<String> = emptyList(),
     val tasks: List<String> = emptyList(),
     val locale: LocaleDto = LocaleDto(),
+    val notifications: NotificationSettingsDto = NotificationSettingsDto(),
+)
+
+/**
+ * `settings.notifications`: who may interrupt, and when. Enforced by the server
+ * where the push is sent (backend lib/notification-policy.ts) and mirrored on the
+ * device by logic/NotificationPolicy.kt for the alerts the app builds itself.
+ *
+ * Every field is always encoded: the profile PATCH is sent with a sparse encoder
+ * that drops default values, and a dropped `mode = "all"` would leave the stored
+ * "priority" in place, so switching back to all mail would silently do nothing.
+ */
+@OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
+@Serializable data class NotificationSettingsDto(
+    /** `all`, `priority` (VIP senders and watched conversations) or `none`. */
+    @kotlinx.serialization.EncodeDefault(kotlinx.serialization.EncodeDefault.Mode.ALWAYS)
+    val mode: String = "all",
+    /** Addresses or whole domains. */
+    @kotlinx.serialization.EncodeDefault(kotlinx.serialization.EncodeDefault.Mode.ALWAYS)
+    val vipSenders: List<String> = emptyList(),
+    @kotlinx.serialization.EncodeDefault(kotlinx.serialization.EncodeDefault.Mode.ALWAYS)
+    val mutedThreads: List<String> = emptyList(),
+    /** "Notify me": these conversations alert in every mode. */
+    @kotlinx.serialization.EncodeDefault(kotlinx.serialization.EncodeDefault.Mode.ALWAYS)
+    val watchedThreads: List<String> = emptyList(),
+    @kotlinx.serialization.EncodeDefault(kotlinx.serialization.EncodeDefault.Mode.ALWAYS)
+    val quietHours: QuietHoursDto = QuietHoursDto(),
+    @kotlinx.serialization.EncodeDefault(kotlinx.serialization.EncodeDefault.Mode.ALWAYS)
+    val showPreview: Boolean = true,
+)
+
+/** A daily no-alert window, in the zone of the device that saved it. */
+@OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
+@Serializable data class QuietHoursDto(
+    @kotlinx.serialization.EncodeDefault(kotlinx.serialization.EncodeDefault.Mode.ALWAYS)
+    val enabled: Boolean = false,
+    /** `HH:MM`, 24-hour; may cross midnight. */
+    @kotlinx.serialization.EncodeDefault(kotlinx.serialization.EncodeDefault.Mode.ALWAYS)
+    val start: String = "22:00",
+    @kotlinx.serialization.EncodeDefault(kotlinx.serialization.EncodeDefault.Mode.ALWAYS)
+    val end: String = "07:00",
+    @kotlinx.serialization.EncodeDefault(kotlinx.serialization.EncodeDefault.Mode.ALWAYS)
+    val timeZone: String = "",
+    /** VIP senders and watched conversations still alert inside the window. */
+    @kotlinx.serialization.EncodeDefault(kotlinx.serialization.EncodeDefault.Mode.ALWAYS)
+    val allowVip: Boolean = true,
 )
 
 /** `settings.vacation` — an on/off window with a message (`auth-account-profile.ts:75`). */

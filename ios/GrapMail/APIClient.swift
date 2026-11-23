@@ -693,10 +693,12 @@ struct ProfileSettings: Codable {
     var notes: [String] = []
     var tasks: [String] = []
     var locale = LocaleInfo()
+    /// Who may interrupt, and when (NotificationPolicy.swift).
+    var notifications = NotificationSettingsInfo()
 
     private enum CodingKeys: String, CodingKey {
         case signature, density, signatures, vacation, forwarding,
-             blockedSenders, safeSenders, notes, tasks, locale
+             blockedSenders, safeSenders, notes, tasks, locale, notifications
     }
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -710,6 +712,7 @@ struct ProfileSettings: Codable {
         notes = c.lenient(.notes, [])
         tasks = c.lenient(.tasks, [])
         locale = c.lenient(.locale, LocaleInfo())
+        notifications = c.lenient(.notifications, NotificationSettingsInfo())
     }
     init() {}
 }

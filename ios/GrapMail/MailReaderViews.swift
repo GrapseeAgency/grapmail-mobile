@@ -355,6 +355,13 @@ private struct ThreadMessageCard: View {
     /// handoff affordances do; a block files nothing, so without a line the
     /// button would look like it did nothing.
     @State private var decisionNote: String?
+    /// This conversation's and sender's notification rules (NotificationPolicy.swift),
+    /// read from this account's copy so the menu offers the right verb.
+    @State private var policyMuted = false
+    @State private var policyWatched = false
+    @State private var policyVip = false
+    private var threadKey: String { message.threadId?.nilIfBlank() ?? message.id }
+    private var senderKey: String? { message.from?.address?.nilIfBlank() }
     /// The images the sender's HTML part points at, and whether this message has
     /// asked for them. Both belong to the message, and the card is rebuilt per
     /// message -- an opt-in given for one mail must not travel to the next.
@@ -488,6 +495,11 @@ private struct ThreadMessageCard: View {
                 .strokeBorder(GM.border)
                 .allowsHitTesting(false)
         }
+        .onAppear {
+            policyMuted = NotificationPolicy.isMuted(threadKey)
+            policyWatched = NotificationPolicy.isWatched(threadKey)
+            policyVip = NotificationPolicy.isVip(senderKey)
+        }
         .task(id: showsBody ? detailsAttempt : nil) {
             guard showsBody else { return }
             let error = await vm.viewMessage(message.id)
@@ -588,6 +600,38 @@ private struct ThreadMessageCard: View {
                         vm.blockSender(sender) { decisionNote = $0 }
                     }
                     .accessibilityIdentifier("mail-block-sender")
+                    Divider()
+                    Button(policyMuted ? "Unmute this conversation" : "Mute this conversation") {
+                        let want = !policyMuted
+                        Task {
+                            if let error = await NotificationPolicy.setMuted(threadKey, want) { decisionNote = error; return }
+                            policyMuted = want
+                            if want { policyWatched = false }
+                            decisionNote = want ? "Muted: this conversation will not alert you." : "Unmuted."
+                        }
+                    }
+                    .accessibilityIdentifier("mail-mute-thread")
+                    Button(policyWatched ? "Stop notifying me" : "Notify me about replies") {
+                        let want = !policyWatched
+                        Task {
+                            if let error = await NotificationPolicy.setWatched(threadKey, want) { decisionNote = error; return }
+                            policyWatched = want
+                            if want { policyMuted = false }
+                            decisionNote = want ? "You will be alerted to replies, whatever your filters." : "Stopped following this conversation."
+                        }
+                    }
+                    .accessibilityIdentifier("mail-watch-thread")
+                    if let sender = senderKey {
+                        Button(policyVip ? "Remove sender from VIPs" : "Add sender to VIPs") {
+                            let want = !policyVip
+                            Task {
+                                if let error = await NotificationPolicy.setVip(sender, want) { decisionNote = error; return }
+                                policyVip = want
+                                decisionNote = want ? "\(sender) is a VIP." : "\(sender) is no longer a VIP."
+                            }
+                        }
+                        .accessibilityIdentifier("mail-vip-sender")
+                    }
                 } label: {
                     Image(systemName: "ellipsis")
                         .font(.system(size: 18, weight: .semibold))

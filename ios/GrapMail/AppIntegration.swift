@@ -209,6 +209,10 @@ enum MailPoll {
         WidgetBridge.update(unread: count, account: SessionStore.address, latest: recent?.first, recent: recent ?? [], signedIn: true)
         guard didSee, canNotify else { return false }
         guard announceArrivals, !UserDefaults.standard.bool(forKey: "gm.focusQuiet") else { return true }
+        // Keep this device's copy of the notification rules current (at most every
+        // six hours), so a rule changed on another device applies here too.
+        await NotificationPolicy.refreshIfStale(account: SessionStore.address, token: token)
+        guard !Task.isCancelled, generation == SessionStore.generation else { return false }
 
         let arrivals: [MailMessage]?
         if let priorHead, let recent, priorHead.isEmpty || recent.contains(where: { $0.id == priorHead }) {
@@ -243,8 +247,41 @@ enum MailPoll {
         return message
     }
 
+    /// Hidden previews: "New mail", no sender, subject, photo or inline reply. A tap still opens it.
+    @MainActor
+    private static func announceGeneric(message: MailMessage, account: String?, generation: UUID) async -> Bool {
+        let content = UNMutableNotificationContent()
+        content.title = "GrapMail"
+        content.body = "New mail"
+        content.sound = .default
+        if let account, !account.isEmpty {
+            content.subtitle = account
+            content.userInfo = ["messageId": message.id, "threadId": message.threadId ?? "", "account": account]
+        }
+        guard !Task.isCancelled, generation == SessionStore.generation else { return false }
+        do {
+            try await UNUserNotificationCenter.current().add(
+                UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil))
+            return true
+        } catch {
+            return false
+        }
+    }
+
     @MainActor
     private static func announce(grew: Int, total: Int, message: MailMessage?, previewFile: URL?, generation: UUID) async -> Bool {
+        // The account's notification rules (NotificationPolicy.swift): the same
+        // decision the server makes before it pushes, for the alert this app posts.
+        let account = SessionStore.address
+        if let message {
+            let decision = NotificationPolicy.decide(
+                account: account, fromAddress: message.from?.address,
+                threadKey: message.threadId?.nilIfBlank() ?? message.id)
+            guard decision.notify else { return false }
+            if decision.generic { return await announceGeneric(message: message, account: account, generation: generation) }
+        } else if !NotificationPolicy.allowsSummary(account: account) {
+            return false
+        }
         let content = UNMutableNotificationContent()
         content.title = "\(grew) new message\(grew == 1 ? "" : "s")"
         content.body = "\(total) unread in the inbox"

@@ -66,6 +66,9 @@ class PushService : FirebaseMessagingService() {
         }
         val id = message.data["messageId"]?.takeIf { it.isNotBlank() && it.length <= 300 }
         val mailbox = message.data["mailbox"]?.takeIf { it.length <= 320 }
+        // The server hid the preview (the account's rules): the alert this app
+        // draws for the message, after fetching it, must stay generic too.
+        if (id != null && message.data["preview"] == "0") NotificationPolicy.markGeneric(context, id)
         if (id != null && mailbox.isNullOrBlank()) return
         val request = OneTimeWorkRequestBuilder<MailPollWorker>()
             .setInputData(workDataOf(
