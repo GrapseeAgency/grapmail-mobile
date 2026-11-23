@@ -1505,9 +1505,26 @@ extension ApiClient {
             method: "DELETE", bearer: token) as MailSendResponse
     }
 
+    /// `POST /send`, with an `Idempotency-Key` (SendKeys.swift): if the answer
+    /// to a send is lost and the same message goes again, the server replays
+    /// the first answer instead of sending a second email.
     static func mailSend(token: String, _ req: MailSendRequest) async throws -> MailSendResponse {
-        try await request("\(mailBase)/send", method: "POST",
-                          body: try encoder.encode(req), bearer: token)
+        let body = try encoder.encode(req)
+        guard let url = URL(string: "\(base)\(mailBase)/send") else {
+            throw ApiError.http(status: -1, code: nil, message: "Bad URL")
+        }
+        var request = mailRequest(url: url, method: "POST", bearer: token)
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue(SendKeys.shared.key(for: body), forHTTPHeaderField: "Idempotency-Key")
+        request.httpBody = body
+        let (data, http) = try await authenticatedResponse(for: request, bearer: token)
+        // The server answered, so this send is finished either way; a 5xx was
+        // not remembered there and may be retried with the same key.
+        if http.statusCode < 500 { SendKeys.shared.settle(body) }
+        guard http.statusCode < 400 else {
+            throw mailFailure(data: data, http: http)
+        }
+        return try decoder.decode(MailSendResponse.self, from: data)
     }
 
     static func mailDraft(token: String, _ req: MailDraftRequest) async throws -> MailDraftResponse {
