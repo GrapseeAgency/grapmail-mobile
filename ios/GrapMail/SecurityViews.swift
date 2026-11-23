@@ -23,6 +23,9 @@ struct AccountSecurityView: View {
     var onRecoveryCodes: (() -> Void)? = nil
     var onTrustedDevices: (() -> Void)? = nil
     var onPasskeys: (() -> Void)? = nil
+    /// Recovery Email row. GrapMail recovers by email only, so this replaced the
+    /// phone row; `onPhone` stays for the legacy phone screens' callers.
+    var onRecoveryEmail: () -> Void = {}
 
     private static var cachedVerdict: (generation: UUID, profile: ProfileDto)?
 
@@ -55,7 +58,17 @@ struct AccountSecurityView: View {
     private var twoFactorOn: Bool { profile?.twoFactorState ?? false }
     private var hasPhone: Bool { profile?.phone?.nilIfBlank() != nil }
     private var phoneVerified: Bool { hasPhone && profile?.phoneVerified == true }
-    private var secure: Bool { twoFactorOn && phoneVerified }
+    private var recoveryEmail: String? { profile?.recoveryEmail?.nilIfBlank() }
+    private var recoveryVerified: Bool { recoveryEmail != nil && profile?.recoveryEmailVerified == true }
+    // Secure means: a verified way back in (the recovery email) and a second factor.
+    // It used to require a verified phone, which GrapMail no longer uses.
+    private var secure: Bool { twoFactorOn && recoveryVerified }
+
+    private var recoveryChip: String? {
+        guard !loading, !failed else { return nil }
+        if recoveryEmail == nil { return "Add" }
+        return recoveryVerified ? "Verified" : "Unverified"
+    }
 
     private var phoneChip: String? {
         guard !loading, !failed else { return nil }
@@ -91,6 +104,8 @@ struct AccountSecurityView: View {
                     )
                     Text(secure
                          ? "All essential security features are active and your account is protected."
+                         : !recoveryVerified
+                         ? "Add a recovery email. It is the only way back into your account if you forget your password."
                          : "Turn on two-step verification to protect your account even if your password is ever exposed.")
                         .font(.system(size: 12))
                         .foregroundColor(GM.textSecondary)
@@ -102,7 +117,7 @@ struct AccountSecurityView: View {
                     // count: an absent field is unknown, not zero, and a false
                     // "you have no codes" is its own kind of wrong warning.
                     if twoFactorOn, let remaining = profile?.backupCodesRemaining, remaining == 0 {
-                        Text("Add backup codes so losing your phone does not lock you out.")
+                        Text("Add backup codes so losing access to your recovery email does not lock you out.")
                             .font(.system(size: 12))
                             .foregroundColor(GM.warnInk)
                             .fixedSize(horizontal: false, vertical: true)
@@ -129,14 +144,13 @@ struct AccountSecurityView: View {
             )
             SecurityDivider()
             SecurityRowView(
-                icon: "iphone",
-                title: "Phone Number",
-                subtitle: (profile?.phone ?? "").isEmpty
-                    ? (loading ? nil : "Used for account recovery and two-step verification.")
-                    : profile?.phone,
-                chip: phoneChip,
-                chipTone: phoneVerified ? .success : .warning,
-                action: onPhone
+                icon: "envelope.badge.shield.half.filled",
+                title: "Recovery Email",
+                subtitle: recoveryEmail
+                    ?? (loading ? nil : "Where your password reset link and sign-in codes are sent."),
+                chip: recoveryChip,
+                chipTone: recoveryVerified ? .success : .warning,
+                action: onRecoveryEmail
             )
 
             sectionLabel("Account Management")
