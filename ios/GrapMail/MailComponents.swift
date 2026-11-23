@@ -1,5 +1,6 @@
 import Foundation
 import SwiftUI
+import UIKit
 
 /// Mailbox sector — the parts every mail screen is assembled from.
 ///
@@ -105,14 +106,37 @@ struct SenderAvatar: View, Equatable {
         return String(ch).uppercased()
     }
 
+    /// The sender's own photo when they are a GrapMail correspondent who set
+    /// one (SenderPhotos.swift). The initial is drawn until it arrives and
+    /// whenever there is none, so a slow or failed lookup looks exactly like
+    /// before.
+    @State private var photo: UIImage?
+
     var body: some View {
         ZStack {
             Circle().fill(MailUI.tint(address: address, display: display))
-            Text(initial)
-                .font(.system(size: size * 0.42, weight: .semibold))
-                .foregroundColor(.white)
+            if let photo {
+                Image(uiImage: photo)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: size, height: size)
+                    .clipShape(Circle())
+                    .accessibilityHidden(true)
+            } else {
+                Text(initial)
+                    .font(.system(size: size * 0.42, weight: .semibold))
+                    .foregroundColor(.white)
+            }
         }
         .frame(width: size, height: size)
+        .task(id: address) {
+            let wanted = address
+            photo = SenderPhotos.shared.cached(wanted)
+            guard photo == nil, !wanted.isEmpty else { return }
+            let loaded = await SenderPhotos.shared.photo(for: wanted)
+            guard !Task.isCancelled, wanted == address else { return }
+            photo = loaded
+        }
     }
 }
 

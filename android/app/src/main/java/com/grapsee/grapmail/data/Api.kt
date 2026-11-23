@@ -2341,6 +2341,32 @@ object Api {
     }
 
     /**
+     * `POST /avatars/resolve` — which of these senders have a photo.
+     *
+     * The server answers only for the mailbox's own correspondents and its own
+     * addresses; everyone else comes back as a monogram. At most 100 per call.
+     */
+    suspend fun mailAvatars(token: String, addresses: List<String>): MailAvatarsResponse {
+        val req = authed("$MAIL/avatars/resolve", token)
+            .post(postBody(json.encodeToString(
+                MailAvatarsRequest.serializer(), MailAvatarsRequest(addresses))))
+            .build()
+        return read(req) { decodeResponse(it) }
+    }
+
+    /**
+     * `GET /avatars/photo` — a sender's photo bytes for one revision. A 409 means
+     * the photo changed since it was resolved; the caller re-resolves.
+     */
+    suspend fun mailAvatarBytes(token: String, address: String, revision: String): ByteArray =
+        executeResponse(authed(
+            "$MAIL/avatars/photo?address=${java.net.URLEncoder.encode(address, "UTF-8")}" +
+                "&v=${java.net.URLEncoder.encode(revision, "UTF-8")}", token).get().build()) { resp ->
+            if (resp.code >= 400) fail(resp.code, resp.body?.string() ?: "")
+            resp.body?.bytes() ?: ByteArray(0)
+        }
+
+    /**
      * `GET /attachments/:id` — the bytes, not JSON.
      *
      * Separate from `read`, which assumes a String body and would corrupt binary
@@ -2557,6 +2583,32 @@ data class MailLabelAssignRequest(val labelId: String)
 
 @Serializable
 data class MailScreenerEnableRequest(val enabled: Boolean)
+
+/** `POST /avatars/resolve` body. */
+@Serializable
+data class MailAvatarsRequest(
+    val addresses: List<String>,
+)
+
+/**
+ * One sender's picture. `kind` is `person`, `brand` or `monogram`; `source` says
+ * which source answered (`grapmail`, `fallback`). `verifiedBrand` is only ever true
+ * for a brand logo that passed brand authentication, never for a person.
+ */
+@Serializable
+data class MailAvatarDto(
+    val kind: String = "monogram",
+    val source: String = "fallback",
+    val path: String? = null,
+    val revision: String? = null,
+    val verifiedBrand: Boolean = false,
+)
+
+@Serializable
+data class MailAvatarsResponse(
+    val success: Boolean = false,
+    val avatars: Map<String, MailAvatarDto> = emptyMap(),
+)
 
 /** The upload route answers with the row it wrote; this unwraps it. */
 @Serializable
