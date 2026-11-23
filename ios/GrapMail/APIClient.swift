@@ -1910,6 +1910,8 @@ struct ApiClient {
             req.setValue(DeviceId.value, forHTTPHeaderField: "x-device-id")
             req.setValue(userAgent, forHTTPHeaderField: "User-Agent")
             req.httpBody = try? encoder.encode(RefreshBody(refreshToken: refresh))
+            // Device-bound sessions (DeviceKey.swift): signed by a key that never leaves this phone.
+            DeviceKey.attach(to: &req)
             guard let (data, response) = try? await URLSession.shared.data(for: req),
                   let http = response as? HTTPURLResponse else { return .unavailable }
             if http.statusCode == 401 || http.statusCode == 403 { return .rejected }
@@ -2131,6 +2133,7 @@ struct ApiClient {
         req.setValue(userAgent, forHTTPHeaderField: "User-Agent")
         if let bearer { req.setValue("Bearer \(bearer)", forHTTPHeaderField: "Authorization") }
         req.httpBody = body
+        DeviceKey.attach(to: &req)
 
         let (data, http) = try await authenticatedResponse(for: req, bearer: bearer)
         if http.statusCode == 403, path == "/grapsee/auth/login", bearer == nil,

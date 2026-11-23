@@ -1163,9 +1163,17 @@ object Api {
         // ones: the label is captured at sign-in, and a request that arrives as
         // "okhttp/4.x" is recorded as "Unknown device" forever.
         .addInterceptor { chain ->
+            val original = chain.request()
             val response = chain.proceed(
-                chain.request().newBuilder()
+                original.newBuilder()
                     .header("user-agent", userAgent)
+                    // Device-bound sessions (data/DeviceKey.kt): token requests carry a
+                    // proof signed by a key that never leaves this phone.
+                    .apply {
+                        if (DeviceKey.wantsProof(original.method, original.url.encodedPath)) {
+                            DeviceKey.proof(original.method, original.url.toString())?.let { header("DPoP", it) }
+                        }
+                    }
                     .build(),
             )
             // A 401 on a call that carried our bearer means the server no longer
