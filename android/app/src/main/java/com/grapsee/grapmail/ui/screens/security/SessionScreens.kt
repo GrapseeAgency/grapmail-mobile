@@ -74,7 +74,7 @@ fun SignOutAllDevicesScreen(onBack: () -> Unit, onDone: () -> Unit) {
                                 if (active == null || active.id != session.id) return@launch
                                 resp.accessToken?.let { fresh ->
                                     SessionStore.updateTokens(
-                                        context, fresh, refreshToken = null,
+                                        context, fresh, refreshToken = resp.refreshToken,
                                         expiresAt = resp.tokenExpiresAtMillis,
                                         expectedToken = active.token,
                                     )

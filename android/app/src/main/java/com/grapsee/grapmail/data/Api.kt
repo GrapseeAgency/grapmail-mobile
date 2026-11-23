@@ -613,6 +613,13 @@ private fun apiErrorMessage(status: Int, code: String?): String = when (code) {
     val newBackupCodes: List<String> = emptyList(),
     /** Present only when the change revoked this device's own token too. */
     val accessToken: String? = null,
+    /**
+     * The refresh token of the session that replacement belongs to. The old
+     * session is closed by the same change, so its refresh token is dead: keeping
+     * it signed this device out at the next refresh, an hour after the screen
+     * said "you are still signed in here".
+     */
+    val refreshToken: String? = null,
     /** When that replacement expires. Stored, or the app believes it is signed in forever. */
     val tokenExpiresAt: Long? = null,
     /** The relative form the server may send instead. */
