@@ -59,6 +59,10 @@ class OutboxWorker(appContext: Context, params: WorkerParameters) : CoroutineWor
     override suspend fun doWork(): Result {
         val items = Outbox.items(applicationContext)
         if (items.isEmpty()) return Result.success()
+        // Paused by the server (logic/RemoteConfig.kt): the mail stays queued and
+        // the run comes back on the backoff, exactly as if the network were down.
+        RemoteConfig.refresh(applicationContext)
+        if (RemoteConfig.isPaused("outbox")) return Result.retry()
         var retry = false
         for (item in items) {
             when (deliver(item)) {

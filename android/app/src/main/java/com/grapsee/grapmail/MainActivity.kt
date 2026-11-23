@@ -158,6 +158,9 @@ class MainActivity : FragmentActivity() {
         lifecycleScope.launch {
             com.grapsee.grapmail.logic.AppUpdate.checkOnOpen(this@MainActivity)
         }
+        // The server's configuration: minimum build, paused features, notice.
+        com.grapsee.grapmail.logic.RemoteConfig.loadCached(this)
+        lifecycleScope.launch { com.grapsee.grapmail.logic.RemoteConfig.refresh(this@MainActivity, force = true) }
         setContent {
             GrapMailTheme {
                 // Edge-to-edge with the design's background behind the system
@@ -205,6 +208,12 @@ class MainActivity : FragmentActivity() {
                             .widthIn(max = 520.dp)
                             .fillMaxSize()
                     ) {
+                        val remote = com.grapsee.grapmail.logic.RemoteConfig.config
+                            .collectAsStateWithLifecycle().value
+                        // Below the server's minimum build, only the update screen.
+                        if (BuildConfig.VERSION_CODE < remote.minVersion.android) {
+                            com.grapsee.grapmail.ui.components.RequiredUpdateScreen()
+                        } else {
                         GrapMailNav(
                             composeRequest = composeRequest.value,
                             onComposeRequestConsumed = { composeRequest.value = false },
@@ -220,6 +229,14 @@ class MainActivity : FragmentActivity() {
                         // screen is up, offered only when the store itself says
                         // a compatible update exists, closed by the person and
                         // re-offered with tomorrow's daily check.
+                        // The server's notice, above whatever screen is up, until dismissed.
+                        var dismissedNotice by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf<String?>(null) }
+                        remote.notice?.takeIf { it.text.isNotBlank() && it.text != dismissedNotice }?.let { n ->
+                            com.grapsee.grapmail.ui.components.ServerNoticeBanner(
+                                text = n.text, warning = n.level == "warning",
+                                onDismiss = { dismissedNotice = n.text },
+                            )
+                        }
                         val updateBannerVisible = com.grapsee.grapmail.logic.AppUpdate.bannerVisible
                             .collectAsStateWithLifecycle().value
                         if (updateBannerVisible) {
@@ -228,6 +245,7 @@ class MainActivity : FragmentActivity() {
                                 onDismiss = { com.grapsee.grapmail.logic.AppUpdate.dismiss() },
                             )
                         }
+                        } // end: supported build
                     }
                 }
 
@@ -242,6 +260,9 @@ class MainActivity : FragmentActivity() {
 
     override fun onResume() {
         super.onResume()
+        // Coming back to the front re-reads the server's configuration (at most
+        // every 15 minutes), so a paused feature or a new notice shows promptly.
+        lifecycleScope.launch { com.grapsee.grapmail.logic.RemoteConfig.refresh(this@MainActivity) }
         // The review ask rides this moment: a person returning to the app
         // after their third send is exactly who the store's flow is for.
         com.grapsee.grapmail.logic.AppReview.maybeAsk(this)

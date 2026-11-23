@@ -648,6 +648,7 @@ struct MailSettingsView: View {
     @State private var notificationStatus: UNAuthorizationStatus? = nil
     @State private var showPlan = false
     @State private var showNotificationFilters = false
+    @State private var crashReports = CrashReporter.enabled
 
     /// The row's words, straight from that reading. `nil` means the read has
     /// not landed, and "Checking…" is the only honest thing to print for it.
@@ -786,6 +787,12 @@ struct MailSettingsView: View {
                         .accessibilityIdentifier("mail-notification-filters-row")
                     // App lock — Face ID in front of the whole mailbox (AppLock.swift).
                     AppLockRow()
+                    // Crash and hang reports to GrapMail's own server (RemoteConfig.swift).
+                    SettingRow(icon: "ladybug", title: "Send crash reports",
+                               value: crashReports ? "On — app version, device and the error, never your mail"
+                                                   : "Off — crashes are not reported",
+                               onClick: { crashReports.toggle(); CrashReporter.enabled = crashReports })
+                        .accessibilityIdentifier("mail-crash-reports-row")
                     SettingRow(icon: "person", title: "Personal info",
                                value: "Name, birthday, photo", onClick: onProfile)
                     SettingRow(icon: "checkmark.shield", title: "Data & privacy",

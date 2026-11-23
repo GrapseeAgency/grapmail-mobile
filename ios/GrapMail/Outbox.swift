@@ -92,6 +92,9 @@ actor Outbox {
         defer { flushing = false }
         let (address, token) = await MainActor.run { (SessionStore.address?.lowercased(), SessionStore.token) }
         guard let address, let token else { return }
+        // Paused by the server (RemoteConfig.swift): the mail stays queued for the next flush.
+        await RemoteConfig.shared.refresh()
+        if await MainActor.run(body: { RemoteConfig.shared.isPaused("outbox") }) { return }
         var done = Set<String>()
         var attempts: [String: Int] = [:]
         var sentAny = false

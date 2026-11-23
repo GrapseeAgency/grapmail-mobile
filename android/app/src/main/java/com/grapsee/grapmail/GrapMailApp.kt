@@ -10,10 +10,13 @@ import com.grapsee.grapmail.data.DeviceId
 import com.grapsee.grapmail.logic.MailPollWorker
 import com.grapsee.grapmail.logic.Notifications
 import java.util.concurrent.TimeUnit
+import kotlinx.coroutines.launch
 
 class GrapMailApp : Application() {
     override fun onCreate() {
         super.onCreate()
+        // First, so a crash anywhere after this is recorded (logic/CrashReporter.kt).
+        com.grapsee.grapmail.logic.CrashReporter.install(this)
         DeviceId.init(this)
         // The API layer needs one thing it cannot take from a screen: an
         // application context for the token authenticator, which rotates the
@@ -44,6 +47,10 @@ class GrapMailApp : Application() {
             // Anything left in the Outbox by an earlier process goes out as soon as
             // the device is online; a no-op when the Outbox is empty.
             com.grapsee.grapmail.logic.OutboxWorker.schedule(this)
+            // This launch, and the last crash or hang if there was one.
+            com.grapsee.grapmail.logic.PushSync.scope.launch {
+                com.grapsee.grapmail.logic.CrashReporter.sendAtLaunch(this@GrapMailApp)
+            }
         }, 1_000)
     }
 }

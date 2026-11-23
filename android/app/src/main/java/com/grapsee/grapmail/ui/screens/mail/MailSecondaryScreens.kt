@@ -796,6 +796,19 @@ fun MailSettingsScreen(
                 palette,
                 onClick = toggleAppLock.takeIf { appLockUsable },
             )
+            // Crash and hang reports to GrapMail's own server (logic/CrashReporter.kt):
+            // app version, device model and the stack trace, never the account or mail.
+            var crashReports by remember { mutableStateOf(com.grapsee.grapmail.logic.CrashReporter.enabled(notifyContext)) }
+            SettingRow(
+                Icons.Rounded.Shield, "Send crash reports",
+                if (crashReports) "On — app version, device and the error, never your mail"
+                else "Off — crashes are not reported",
+                palette,
+                onClick = {
+                    crashReports = !crashReports
+                    com.grapsee.grapmail.logic.CrashReporter.setEnabled(notifyContext, crashReports)
+                },
+            )
             // Android 13's per-app language: the system owns the picker; this
             // row opens its page for this app. The languages it lists are what
             // the app actually ships copy for — res/xml/locales_config.xml.
