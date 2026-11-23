@@ -749,6 +749,11 @@ fun MailSettingsScreen(
                         askNotifications.launch(android.Manifest.permission.POST_NOTIFICATIONS)
                     }
                 })
+            var showNotificationFilters by remember { mutableStateOf(false) }
+            SettingRow(Icons.Rounded.NotificationsActive, "Notification filters",
+                "Priority only, VIP senders, quiet hours, lock-screen previews",
+                palette, onClick = { showNotificationFilters = true })
+            if (showNotificationFilters) NotificationFiltersDialog(onDismiss = { showNotificationFilters = false })
             // The app lock is a preference on this handset, not an account
             // setting: it guards this device's copy of the mailbox. A device
             // that cannot keep the promise says so instead of offering a lock

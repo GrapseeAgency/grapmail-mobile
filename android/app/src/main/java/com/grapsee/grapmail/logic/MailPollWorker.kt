@@ -55,6 +55,9 @@ class MailPollWorker(
             report("silent signed-out")
             return Result.success()
         }
+        // Keep this device's copy of the notification rules current (at most every
+        // six hours); a rule changed on another device then applies here too.
+        NotificationPolicy.refreshIfStale(applicationContext, session.address, session.token)
         val pushedId = inputData.getString("messageId")
         if (pushedId != null && !inputData.getString("mailbox").equals(session.address, ignoreCase = true)) {
             val saved = SessionStore.snapshotAll(applicationContext).firstOrNull {

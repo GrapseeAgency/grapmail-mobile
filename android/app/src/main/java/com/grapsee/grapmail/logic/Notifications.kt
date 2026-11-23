@@ -129,6 +129,17 @@ object Notifications {
     fun newMail(context: Context, grew: Int, total: Int, message: MailMessageDto? = null,
                 account: String? = null, sessionId: String? = null, image: Bitmap? = null): Boolean {
         if (!allowed(context)) return false
+        // The account's notification rules (logic/NotificationPolicy.kt): the
+        // same decision the server makes before it pushes, applied to the alerts
+        // this app builds itself — the background check and the push's full alert.
+        val decision = message?.let {
+            NotificationPolicy.decide(context, account, it.from?.address, it.threadId?.takeIf(String::isNotBlank) ?: it.id)
+        }
+        if (decision != null && !decision.notify) return false
+        if (message == null && !NotificationPolicy.allowsSummary(context, account)) return false
+        // Hidden previews: "New mail", no sender, subject, photo or inline reply.
+        val generic = decision?.generic == true || NotificationPolicy.isGeneric(context, message?.id)
+        if (generic) return genericMail(context, message, account, sessionId)
         ensureChannel(context)
         val sender = message?.let { it.from?.display?.trim()?.takeIf(String::isNotEmpty) ?: "New sender" }
         val summary = "$total unread in the inbox"
@@ -186,6 +197,34 @@ object Notifications {
             // The grant can disappear between the check and the post. Said as a
             // failure, not swallowed: the poll's caller logs that nothing was
             // announced.
+            false
+        }
+    }
+
+    /** The alert for an account that hides previews: it says mail arrived, and opens it on a tap. */
+    private fun genericMail(context: Context, message: MailMessageDto?, account: String?, sessionId: String?): Boolean {
+        ensureChannel(context)
+        val target = if (message != null && sessionId != null) MailTarget(message.id, message.threadId, sessionId, "open") else null
+        val content = NotificationCompat.Builder(context, CHANNEL_NEW_MAIL)
+            .setSmallIcon(R.mipmap.ic_launcher_monochrome)
+            .setContentTitle("GrapMail")
+            .setContentText("New mail")
+            .setSubText(account?.takeIf { it.isNotBlank() })
+            .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
+            .addExtras(android.os.Bundle().apply { putString("grapmail.session", sessionId) })
+            .apply {
+                if (target != null) {
+                    addAction(0, "Archive", pendingUpdate(context, target.copy(action = "archive")))
+                    addAction(0, "Mark as read", pendingUpdate(context, target.copy(action = "read")))
+                }
+            }
+            .setContentIntent(pendingOpen(context, target))
+            .setAutoCancel(true)
+            .build()
+        return try {
+            NotificationManagerCompat.from(context).notify(message?.id, NOTIFICATION_ID, content)
+            true
+        } catch (e: SecurityException) {
             false
         }
     }

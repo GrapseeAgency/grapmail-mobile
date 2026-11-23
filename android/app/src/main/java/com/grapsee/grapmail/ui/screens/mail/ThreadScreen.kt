@@ -412,6 +412,19 @@ private fun ThreadMessageCard(
     var decisionNote by androidx.compose.runtime.remember(message.id) { mutableStateOf<String?>(null) }
     var showDetails by remember(message.id) { mutableStateOf(false) }
     var showActions by remember(message.id) { mutableStateOf(false) }
+    val notifyScope = androidx.compose.runtime.rememberCoroutineScope()
+    val threadKey = message.threadId?.takeIf { it.isNotBlank() } ?: message.id
+    val senderAddress = message.from?.address?.trim()?.takeIf { it.isNotBlank() }
+    var muted by remember(threadKey) { mutableStateOf(false) }
+    var watched by remember(threadKey) { mutableStateOf(false) }
+    var vip by remember(senderAddress) { mutableStateOf(false) }
+    LaunchedEffect(threadKey, senderAddress) {
+        // This account's copy of its rules, so the menu offers the right verb.
+        val account = com.grapsee.grapmail.data.SessionStore.address(context)
+        muted = com.grapsee.grapmail.logic.NotificationPolicy.isMuted(context, account, threadKey)
+        watched = com.grapsee.grapmail.logic.NotificationPolicy.isWatched(context, account, threadKey)
+        vip = com.grapsee.grapmail.logic.NotificationPolicy.isVip(context, account, senderAddress)
+    }
     LaunchedEffect(openActions, expanded) {
         if (openActions && expanded) {
             showActions = true
@@ -551,6 +564,49 @@ private fun ThreadMessageCard(
                             if (address == null) decisionNote = "This message does not name a sender to block."
                             else vm.blockSender(address) { decisionNote = it }
                         })
+                        // Notification rules for this conversation and sender, saved to
+                        // the account (logic/NotificationPolicy.kt), so every device
+                        // follows them.
+                        DropdownMenuItem(text = { Text(if (muted) "Unmute this conversation" else "Mute this conversation") },
+                            modifier = Modifier.testTag("mail-mute-thread"), onClick = {
+                            showActions = false
+                            val want = !muted
+                            notifyScope.launch {
+                                val error = com.grapsee.grapmail.logic.NotificationPolicy.setMuted(context, threadKey, want)
+                                if (error == null) {
+                                    muted = want
+                                    if (want) watched = false
+                                    decisionNote = if (want) "Muted: this conversation will not alert you." else "Unmuted."
+                                } else decisionNote = error
+                            }
+                        })
+                        DropdownMenuItem(text = { Text(if (watched) "Stop notifying me" else "Notify me about replies") },
+                            modifier = Modifier.testTag("mail-watch-thread"), onClick = {
+                            showActions = false
+                            val want = !watched
+                            notifyScope.launch {
+                                val error = com.grapsee.grapmail.logic.NotificationPolicy.setWatched(context, threadKey, want)
+                                if (error == null) {
+                                    watched = want
+                                    if (want) muted = false
+                                    decisionNote = if (want) "You will be alerted to replies, whatever your filters." else "Stopped following this conversation."
+                                } else decisionNote = error
+                            }
+                        })
+                        senderAddress?.let { address ->
+                            DropdownMenuItem(text = { Text(if (vip) "Remove sender from VIPs" else "Add sender to VIPs") },
+                                modifier = Modifier.testTag("mail-vip-sender"), onClick = {
+                                showActions = false
+                                val want = !vip
+                                notifyScope.launch {
+                                    val error = com.grapsee.grapmail.logic.NotificationPolicy.setVip(context, address, want)
+                                    if (error == null) {
+                                        vip = want
+                                        decisionNote = if (want) "$address is a VIP." else "$address is no longer a VIP."
+                                    } else decisionNote = error
+                                }
+                            })
+                        }
 
                     }
                 }

@@ -647,6 +647,7 @@ struct MailSettingsView: View {
     /// appears — never assumed, never remembered from a previous visit.
     @State private var notificationStatus: UNAuthorizationStatus? = nil
     @State private var showPlan = false
+    @State private var showNotificationFilters = false
 
     /// The row's words, straight from that reading. `nil` means the read has
     /// not landed, and "Checking…" is the only honest thing to print for it.
@@ -779,6 +780,10 @@ struct MailSettingsView: View {
                                value: notificationValue,
                                onClick: { askNotifications() })
                         .accessibilityIdentifier("mail-notifications-row")
+                    SettingRow(icon: "bell.badge", title: "Notification filters",
+                               value: "Priority only, VIP senders, quiet hours, lock-screen previews",
+                               onClick: { showNotificationFilters = true })
+                        .accessibilityIdentifier("mail-notification-filters-row")
                     // App lock — Face ID in front of the whole mailbox (AppLock.swift).
                     AppLockRow()
                     SettingRow(icon: "person", title: "Personal info",
@@ -803,6 +808,7 @@ struct MailSettingsView: View {
                 .padding(.bottom, 30)
             }
         }
+        .sheet(isPresented: $showNotificationFilters) { NotificationFiltersView() }
         .task {
             vm.loadAliases()
             // The notification row reports the system's answer, so it reads it
