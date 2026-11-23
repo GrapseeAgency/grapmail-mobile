@@ -2822,3 +2822,45 @@ struct ApiClient {
                           body: try encoder.encode(patch), bearer: token)
     }
 }
+
+/// `GET /auth/account/password-reset` and its cancel (backend lib/reset-hold.ts).
+/// `availableAt` is ISO-8601, or nil when the reset has no waiting period.
+struct PasswordResetStatus: Decodable {
+    var success = false
+    var pending = false
+    var availableAt: String?
+    var cancelled = false
+    var message: String?
+    var error: String?
+
+    private enum CodingKeys: String, CodingKey { case success, pending, availableAt, cancelled, message, error }
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        success = c.lenient(.success, false)
+        pending = c.lenient(.pending, false)
+        availableAt = c.lenientOpt(.availableAt)
+        cancelled = c.lenient(.cancelled, false)
+        message = c.lenientOpt(.message)
+        error = c.lenientOpt(.error)
+    }
+}
+
+extension ApiClient {
+    static func passwordResetStatus(token: String) async throws -> PasswordResetStatus {
+        try await request("/grapsee/auth/account/password-reset", bearer: token)
+    }
+
+    static func cancelPasswordReset(token: String) async throws -> PasswordResetStatus {
+        try await request("/grapsee/auth/account/password-reset/cancel", method: "POST",
+                          body: Data("{}".utf8), bearer: token)
+    }
+}
+
+/// The server's timestamps (`toISOString()`, with milliseconds) and the plain form.
+enum ServerDate {
+    static func parse(_ string: String) -> Date? {
+        let withFraction = ISO8601DateFormatter()
+        withFraction.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return withFraction.date(from: string) ?? ISO8601DateFormatter().date(from: string)
+    }
+}

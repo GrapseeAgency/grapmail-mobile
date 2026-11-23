@@ -1482,6 +1482,18 @@ object Api {
      * density and the sender lists on every save. Sparse on the wire is what
      * makes "only the keys that arrive are touched" true rather than intended.
      */
+    /**
+     * A pending password reset on this account (backend lib/reset-hold.ts). While
+     * the account is signed in somewhere, an emailed reset waits before it works;
+     * the security hub shows it and offers Cancel.
+     */
+    suspend fun passwordResetStatus(token: String): PasswordResetStatus =
+        read(authed("$AUTH/account/password-reset", token).get().build()) { decodeResponse(it) }
+
+    /** Cancel the pending reset: the emailed link stops working at once. */
+    suspend fun cancelPasswordReset(token: String): PasswordResetStatus =
+        read(authed("$AUTH/account/password-reset/cancel", token).post(postBody("{}")).build()) { decodeResponse(it) }
+
     suspend fun patchProfile(token: String, patch: ProfilePatch): ProfileResponse {
         val req = authed("$AUTH/account/profile", token)
             .method("PATCH", postBody(jsonSparse.encodeToString(ProfilePatch.serializer(), patch)))
@@ -2721,3 +2733,13 @@ data class MailAvatarsResponse(
 /** The upload route answers with the row it wrote; this unwraps it. */
 @Serializable
 private data class MailAttachmentResponseJson(val attachment: MailAttachmentDto)
+
+/** `GET /auth/account/password-reset` and its cancel. `availableAt` is ISO-8601, or null with no wait. */
+@Serializable data class PasswordResetStatus(
+    val success: Boolean = false,
+    val pending: Boolean = false,
+    val availableAt: String? = null,
+    val cancelled: Boolean = false,
+    val message: String? = null,
+    val error: String? = null,
+)

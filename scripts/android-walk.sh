@@ -516,7 +516,7 @@ case $? in
   1) adb shell input keyevent 4; sleep 1.5 ;;
   2) echo "FAIL: screen unreadable after the 2FA step" >&2; FAILURES=$((FAILURES + 1)) ;;
 esac
-sec_visit "Phone Number" 22-sec-phone-light
+sec_visit "Recovery Email" 22-sec-recovery-email-light
 sec_visit "Change Password" 23-sec-change-password-light
 sec_visit "Backup Codes" 24-sec-backup-codes-light
 sec_visit "Active Sessions" 25-sec-sessions-light
