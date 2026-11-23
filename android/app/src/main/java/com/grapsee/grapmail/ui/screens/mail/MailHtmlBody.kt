@@ -70,7 +70,9 @@ private fun mailDocument(
     link: String,
     chip: String,
 ): String {
-    val imageSources = if (allowImages) "https: http:" else "'none'"
+    // https only: the server upgrades http images, and a cleartext request
+    // would show the network what was opened.
+    val imageSources = if (allowImages) "https:" else "'none'"
     val authoredColors = html.contains(" style=\"") || html.contains(" bgcolor=\"")
     val lightDesign = authoredColors && !dark
     val canvas = if (lightDesign) "#FFFFFF" else "transparent"
@@ -156,6 +158,10 @@ internal fun HtmlMailBody(
                 settings.loadWithOverviewMode = true
                 settings.textZoom = textZoom
                 settings.javaScriptCanOpenWindowsAutomatically = false
+                settings.domStorageEnabled = false
+                settings.databaseEnabled = false
+                settings.setGeolocationEnabled(false)
+                settings.saveFormData = false
                 // No second window to open: the sanitizer forces target=_blank
                 // on links, and this makes that a hand-off, not a popup.
                 settings.setSupportMultipleWindows(false)
@@ -172,6 +178,18 @@ internal fun HtmlMailBody(
                         if (url.startsWith("http://") || url.startsWith("https://") || url.startsWith("mailto:")) {
                             onOpenLink(url)
                         }
+                        return true
+                    }
+
+                    // A message that crashes the renderer must not take the app
+                    // with it: the default answer to a dead renderer is to kill
+                    // the process. The dead view is hidden; onRelease still
+                    // destroys it when the card leaves.
+                    override fun onRenderProcessGone(
+                        view: WebView?,
+                        detail: android.webkit.RenderProcessGoneDetail?,
+                    ): Boolean {
+                        view?.visibility = android.view.View.GONE
                         return true
                     }
 
