@@ -97,6 +97,13 @@ android {
             ?: project.findProperty("playIntegrityCloudProject")?.toString()?.takeIf { it.isNotBlank() }
             ?: ""
         buildConfigField("String", "PLAY_INTEGRITY_CLOUD_PROJECT", "\"$integrityProject\"")
+        // Certificate pins for the API host (data/Api.kt apiPinner): comma-separated
+        // sha256/... values from scripts/print-api-pins.sh, passed as the Gradle
+        // property grapmailApiPins or the environment variable GRAPMAIL_API_PINS.
+        // Empty (the default) or a single pin means no pinning.
+        val apiPins = ((project.findProperty("grapmailApiPins") as String?)
+            ?: System.getenv("GRAPMAIL_API_PINS") ?: "").replace("\"", "").trim()
+        buildConfigField("String", "API_PINS", "\"$apiPins\"")
     }
 
     buildTypes {
