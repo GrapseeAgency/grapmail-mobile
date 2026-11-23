@@ -1,0 +1,39 @@
+name: GrapMail rich email iOS QA
+on:
+  push:
+    branches: ['codex/grapmail-rich-email-ios-qa']
+permissions:
+  contents: read
+jobs:
+  preview:
+    runs-on: macos-15
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Generate Xcode project
+        run: |
+          brew install xcodegen
+          cd ios
+          xcodegen generate
+      - name: Build for iPhone simulator
+        working-directory: ios
+        run: |
+          xcodebuild build -project GrapMail.xcodeproj -scheme GrapMail -configuration Debug -destination 'generic/platform=iOS Simulator' -derivedDataPath build CODE_SIGNING_ALLOWED=NO
+      - name: Capture the branded email reader
+        shell: bash
+        run: |
+          set -euo pipefail
+          line=$(xcrun simctl list devices available | grep -m1 -E 'iPhone (17|16|15)( Pro)? \(')
+          udid=$(echo "$line" | grep -oE '[0-9A-F-]{36}')
+          xcrun simctl boot "$udid"
+          xcrun simctl bootstatus "$udid" -b
+          xcrun simctl install "$udid" ios/build/Build/Products/Debug-iphonesimulator/GrapMail.app
+          xcrun simctl ui "$udid" appearance dark
+          xcrun simctl launch "$udid" com.grapsee.grapmail -gmSnapshot mail-thread-images
+          sleep 8
+          mkdir -p qa
+          xcrun simctl io "$udid" screenshot qa/branded-reader.png
+      - uses: actions/upload-artifact@v4
+        with:
+          name: grapmail-rich-email-ios
+          path: qa/branded-reader.png
