@@ -168,6 +168,8 @@ struct E2eStatusScreen: View {
     let onChangePassphrase: () -> Void
     let onRemove: () -> Void
     let onRecipients: () -> Void
+    @State private var showRestore = false
+    @State private var confirmRemoveKit = false
 
     var body: some View {
         MailScaffold(title: "Encryption", onBack: onBack) {
@@ -225,7 +227,39 @@ struct E2eStatusScreen: View {
                                           marker: "gm-e2e-lock", onClick: { vm.lock() })
                             }
                         }
+                        if vm.state.record == nil, vm.state.recoveryKitExists == true {
+                            Spacer().frame(height: 14)
+                            E2eCard("Restore your key from your recovery key", marker: "gm-e2e-restore-card") {
+                                E2eLede("A recovery kit for this account is stored, locked with your recovery key. "
+                                        + "Enter it to put your key back on this device and read your encrypted mail again.")
+                                Spacer().frame(height: 12)
+                                E2eButton(text: "Use my recovery key", enabled: !vm.state.busy,
+                                          marker: "gm-e2e-restore-open", onClick: { showRestore = true })
+                            }
+                        }
                         if vm.state.record != nil {
+                            Spacer().frame(height: 14)
+                            E2eCard("Recovery key", marker: "gm-e2e-recovery-card") {
+                                E2eLede(Self.recoveryLine(exists: vm.state.recoveryKitExists,
+                                                          createdAt: vm.state.recoveryKitCreatedAt))
+                                Spacer().frame(height: 12)
+                                if vm.state.recoveryKitExists != nil {
+                                    if vm.state.unlocked {
+                                        E2eButton(text: vm.state.recoveryKitExists == true ? "Replace the recovery key"
+                                                                                          : "Create a recovery key",
+                                                  enabled: !vm.state.busy, quiet: vm.state.recoveryKitExists == true,
+                                                  marker: "gm-e2e-recovery-create", onClick: { vm.createRecoveryKey() })
+                                    } else {
+                                        E2eLede("Unlock your key to " + (vm.state.recoveryKitExists == true ? "replace" : "create")
+                                                + " the recovery key.")
+                                    }
+                                }
+                                if vm.state.recoveryKitExists == true {
+                                    Spacer().frame(height: 8)
+                                    E2eButton(text: "Remove the recovery key", enabled: !vm.state.busy, quiet: true,
+                                              marker: "gm-e2e-recovery-remove", onClick: { confirmRemoveKit = true })
+                                }
+                            }
                             Spacer().frame(height: 14)
                             E2eRow(label: "Fingerprint", value: e2eFingerprintBlock(vm.state.fingerprint ?? "-"))
                             Spacer().frame(height: 8)
@@ -256,6 +290,38 @@ struct E2eStatusScreen: View {
             }
         }
         .task { vm.load() }
+        .sheet(isPresented: $showRestore) { E2eRestoreSheet(vm: vm) }
+        .alert("Your recovery key", isPresented: Binding(
+            get: { vm.state.newRecoveryKey != nil },
+            set: { if !$0 { vm.dismissRecoveryKey() } })) {
+            Button("Copy") {
+                UIPasteboard.general.setItems([[UIPasteboard.typeAutomatic: vm.state.newRecoveryKey ?? ""]],
+                                              options: [.expirationDate: Date().addingTimeInterval(120)])
+                vm.dismissRecoveryKey()
+            }
+            Button("I have saved it", role: .cancel) { vm.dismissRecoveryKey() }
+        } message: {
+            Text("\(vm.state.newRecoveryKey ?? "")\n\nWrite it down or keep it in a password manager. GrapMail cannot show it "
+                 + "again, and without it a lost device means lost encrypted mail. A copied key leaves the "
+                 + "clipboard after two minutes.")
+        }
+        .alert("Remove the recovery key?", isPresented: $confirmRemoveKit) {
+            Button("Remove", role: .destructive) { vm.removeRecoveryKit() }
+            Button("Keep it", role: .cancel) {}
+        } message: {
+            Text("If you then lose this device, your encrypted mail cannot be recovered anywhere.")
+        }
+    }
+
+    static func recoveryLine(exists: Bool?, createdAt: String?) -> String {
+        switch exists {
+        case .none: return "Checking whether a recovery key is set up…"
+        case .some(true):
+            let when = createdAt.flatMap { ServerDate.parse($0) }
+                .map { " on " + $0.formatted(date: .abbreviated, time: .shortened) } ?? ""
+            return "Set up" + when + ". If you lose this device, it restores your key on a new one."
+        case .some(false): return "Not set up. If you lose this device, your encrypted mail cannot be recovered."
+        }
     }
 
     /// The state's one true sentence, and its one true lede. Functions for
@@ -286,9 +352,9 @@ struct E2eStatusScreen: View {
 
 // ── 101 · setup ──────────────────────────────────────────────────────────────
 
-/// Create the key. The no-recovery warning sits above the fields, in the
-/// web's own words: a recovery route would mean a second copy of the key held
-/// somewhere else, which is the one thing this feature exists to prevent.
+/// Create the key. The no-recovery warning sits above the fields: a forgotten
+/// passphrase is never recoverable. The key itself can be, with a recovery key
+/// the person makes after setup (the server's kit cannot be opened without it).
 struct E2eSetupScreen: View {
     @ObservedObject var vm: E2eModel
     let onBack: () -> Void
@@ -312,8 +378,9 @@ struct E2eSetupScreen: View {
                         .foregroundColor(GM.textPrimary)
                         .fixedSize(horizontal: false, vertical: true)
                         .padding(.top, 10)
-                    E2eLede("Not by us, and not by you. A recovery route would mean a second copy of your "
-                            + "key held somewhere else, which is the one thing this feature exists to prevent.")
+                    E2eLede("Not by us, and not by you. After setup you can create a recovery key: it restores "
+                            + "your key on a new device with a new passphrase. Without the passphrase or the recovery "
+                            + "key, nobody can open your encrypted mail, us included.")
                     Spacer().frame(height: 14)
                     AppTextField(title: "Passphrase", value: $passphrase, isPassword: true)
                     Spacer().frame(height: 8)
@@ -667,5 +734,52 @@ struct E2eRecipientsScreen: View {
         case .noKeyPublished: return "This person has not published an encryption key yet."
         case .unknown: return e.reason ?? "The directory gave no reason."
         }
+    }
+}
+
+// ── recovery key: restore ────────────────────────────────────────────────────
+
+/// Restore the key from the stored kit: the recovery key, then a new passphrase for this device.
+struct E2eRestoreSheet: View {
+    @ObservedObject var vm: E2eModel
+    @Environment(\.dismiss) private var dismiss
+    @State private var recoveryKey = ""
+    @State private var passphrase = ""
+    @State private var confirm = ""
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 0) {
+                    if let note = vm.state.note {
+                        E2eNote(text: note, bad: vm.state.noteIsBad)
+                        Spacer().frame(height: 10)
+                    }
+                    E2eLede("Enter the recovery key you saved when you set it up. It has 28 letters and numbers; "
+                            + "dashes and spaces do not matter.")
+                    Spacer().frame(height: 12)
+                    AppTextField(title: "Recovery key", value: $recoveryKey)
+                    Spacer().frame(height: 14)
+                    E2eLede("Then choose a passphrase for this device. It protects the key here, like the one "
+                            + "you set the first time.")
+                    Spacer().frame(height: 8)
+                    AppTextField(title: "New passphrase", value: $passphrase, isPassword: true)
+                    Spacer().frame(height: 8)
+                    AppTextField(title: "Repeat passphrase", value: $confirm, isPassword: true)
+                    Spacer().frame(height: 16)
+                    E2eButton(text: vm.state.busy ? "Restoring…" : "Restore my key",
+                              enabled: !vm.state.busy && !recoveryKey.trimmingCharacters(in: .whitespaces).isEmpty
+                                  && !passphrase.isEmpty,
+                              marker: "gm-e2e-restore-submit",
+                              onClick: { vm.restoreWithRecoveryKey(recoveryKey, passphrase: passphrase, confirm: confirm) })
+                    Spacer().frame(height: 24)
+                }
+                .padding(.horizontal, 20)
+            }
+            .navigationTitle("Restore your key")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } } }
+        }
+        .onChange(of: vm.state.record != nil) { restored in if restored { dismiss() } }
     }
 }

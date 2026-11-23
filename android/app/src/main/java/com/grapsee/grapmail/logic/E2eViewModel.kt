@@ -66,6 +66,11 @@ class E2eViewModel @JvmOverloads constructor(
         val busy: Boolean = false,
         val note: String? = null,
         val noteIsBad: Boolean = false,
+        /** Whether a recovery kit is stored for this account; null until read. */
+        val recoveryKitExists: Boolean? = null,
+        val recoveryKitCreatedAt: String? = null,
+        /** A recovery key just made, shown ONCE and never stored on this device. */
+        val newRecoveryKey: String? = null,
     ) {
         val state3: String get() = when {
             record == null -> "none"
@@ -140,6 +145,140 @@ class E2eViewModel @JvmOverloads constructor(
             if (!ok) return@launch
             refreshLocal()
             if (includeDirectory) loadPublished()
+            if (includeDirectory) loadRecoveryStatus()
+        }
+    }
+
+    /** Whether a recovery kit is stored for this account. A failed read leaves it
+     *  unknown (null), never "no kit": that would push the person to make a new one. */
+    fun loadRecoveryStatus() {
+        if (snapshotMode) return
+        viewModelScope.launch {
+            val t = token() ?: return@launch
+            runCatching { Api.e2eRecoveryStatus(t) }
+                .onSuccess { r ->
+                    if (r.success) _state.update { it.copy(recoveryKitExists = r.exists, recoveryKitCreatedAt = r.createdAt) }
+                }
+                .onFailure { if (it is kotlinx.coroutines.CancellationException) throw it }
+        }
+    }
+
+    /**
+     * Make a recovery key and store the kit it locks. Needs the key unlocked: the
+     * kit is the private halves locked a second time, under the new recovery key.
+     * The recovery key itself is shown once and kept nowhere.
+     */
+    fun createRecoveryKey() {
+        if (snapshotMode) return
+        val unlocked = session ?: run {
+            note("Unlock your key first: the recovery kit is made from it.", true)
+            return
+        }
+        viewModelScope.launch {
+            val t = token() ?: return@launch
+            _state.update { it.copy(busy = true) }
+            val recoveryKey = MailE2e.generateRecoveryKey()
+            val kit = runCatching {
+                withContext(Dispatchers.Default) { MailE2e.buildRecoveryKit(unlocked, recoveryKey) }
+            }
+            if (kit.isFailure) {
+                _state.update { it.copy(busy = false) }
+                note(kit.exceptionOrNull()?.message ?: "The recovery kit could not be made.", true)
+                return@launch
+            }
+            runCatching { Api.e2eRecoverySave(t, kit.getOrNull()!!) }
+                .onSuccess { r ->
+                    if (r.success) {
+                        _state.update {
+                            it.copy(busy = false, recoveryKitExists = true, recoveryKitCreatedAt = r.createdAt,
+                                newRecoveryKey = recoveryKey)
+                        }
+                    } else {
+                        _state.update { it.copy(busy = false) }
+                        note(r.error ?: "The recovery kit was not saved.", true)
+                    }
+                }
+                .onFailure { e ->
+                    _state.update { it.copy(busy = false) }
+                    note(reason(e), true)
+                }
+        }
+    }
+
+    /** The person has written the recovery key down; it leaves memory now. */
+    fun dismissRecoveryKey() = _state.update { it.copy(newRecoveryKey = null) }
+
+    /** Remove the stored kit. Encrypted mail then cannot be recovered on a new device. */
+    fun removeRecoveryKit() {
+        if (snapshotMode) return
+        viewModelScope.launch {
+            val t = token() ?: return@launch
+            _state.update { it.copy(busy = true) }
+            runCatching { Api.e2eRecoveryRemove(t) }
+                .onSuccess { r ->
+                    _state.update { it.copy(busy = false, recoveryKitExists = if (r.success) false else it.recoveryKitExists) }
+                    note(if (r.success) "The recovery key was removed. Keep this device safe: it now holds the only copy of your key."
+                        else r.error ?: "The recovery kit was not removed.", !r.success)
+                }
+                .onFailure { e ->
+                    _state.update { it.copy(busy = false) }
+                    note(reason(e), true)
+                }
+        }
+    }
+
+    /**
+     * Put the key back on this device from the stored kit: the recovery key opens
+     * it, and the new passphrase protects it here. The same key comes back, so
+     * mail already encrypted to it opens again.
+     */
+    fun restoreWithRecoveryKey(recoveryKey: String, newPassphrase: String, confirm: String) {
+        if (snapshotMode) return
+        viewModelScope.launch {
+            val t = token() ?: return@launch
+            val k = identityKey() ?: return@launch
+            if (newPassphrase.length < MailE2e.MIN_PASSPHRASE_LENGTH) {
+                note("Use at least ${MailE2e.MIN_PASSPHRASE_LENGTH} characters for the passphrase.", true)
+                return@launch
+            }
+            if (newPassphrase != confirm) {
+                note("The two passphrases do not match.", true)
+                return@launch
+            }
+            if (MailE2e.normalizeRecoveryKey(recoveryKey) == null) {
+                note("That recovery key is not valid. It has 28 letters and numbers.", true)
+                return@launch
+            }
+            _state.update { it.copy(busy = true) }
+            val kit = runCatching { Api.e2eRecoveryStatus(t, includeKit = true) }.getOrElse { e ->
+                if (e is kotlinx.coroutines.CancellationException) throw e
+                _state.update { it.copy(busy = false) }
+                note(reason(e), true)
+                return@launch
+            }
+            val stored = kit.kit
+            if (!kit.success || stored == null) {
+                _state.update { it.copy(busy = false, recoveryKitExists = if (kit.success) false else it.recoveryKitExists) }
+                note(kit.error ?: "There is no recovery kit for this account.", true)
+                return@launch
+            }
+            val restored = runCatching {
+                withContext(Dispatchers.Default) {
+                    val identity = MailE2e.restoreFromRecoveryKit(getApplication(), k, stored, recoveryKey, newPassphrase)
+                    identity to MailE2e.unlock(identity, newPassphrase)
+                }
+            }
+            if (restored.isFailure) {
+                _state.update { it.copy(busy = false) }
+                note(restored.exceptionOrNull()?.message ?: "The key could not be restored.", true)
+                return@launch
+            }
+            val (identity, unlocked) = restored.getOrNull()!!
+            if (identityKey() != k) return@launch
+            session = unlocked
+            val fp = runCatching { withContext(Dispatchers.Default) { MailE2e.fingerprint(identity.encryption.publicKey) } }.getOrNull()
+            _state.update { it.copy(busy = false, record = identity, fingerprint = fp, unlocked = true) }
+            note("Your key is back on this device and unlocked. Encrypted mail opens here again.", false)
         }
     }
 

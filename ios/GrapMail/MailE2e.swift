@@ -628,6 +628,94 @@ enum MailE2e {
                         signingPrivateKey: sigPrivate,
                         signingPublicKey: identity.signing?.publicKey)
     }
+    // ── the recovery key ─────────────────────────────────────────────────────
+    //
+    // A passphrase still cannot be recovered. What can be is the KEY: both private
+    // halves locked with a recovery key only the person holds, kept on the server,
+    // which can never open it (routes/grapmail-e2e-recovery.ts). Byte-compatible
+    // with Android's MailE2e.kt: 28 symbols of Crockford base32 (no I, L, O or U),
+    // 140 random bits, and its normalised form goes through the same PBKDF2 /
+    // AES-GCM record the passphrase uses.
+
+    static let recoveryKitFormat = "grapmail-e2e-recovery-kit/1"
+    static let recoveryKeySymbols = 28
+    private static let recoveryAlphabet = Array("0123456789ABCDEFGHJKMNPQRSTVWXYZ")
+
+    /// A fresh recovery key, grouped for reading: XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX.
+    static func generateRecoveryKey() -> String {
+        // 256 is a multiple of 32, so masking a uniform byte gives a uniform symbol.
+        let symbols = (0..<recoveryKeySymbols).map { _ in recoveryAlphabet[Int(UInt8.random(in: 0...255) & 31)] }
+        return String(symbols).chunked(4).joined(separator: "-")
+    }
+
+    /// The canonical form of a typed recovery key, or nil if it is not one.
+    static func normalizeRecoveryKey(_ input: String) -> String? {
+        let mapped = input.uppercased().filter { $0.isLetter || $0.isNumber }.map { c -> Character in
+            switch c { case "O": return "0"; case "I", "L": return "1"; default: return c }
+        }
+        let key = String(mapped)
+        guard key.count == recoveryKeySymbols, key.allSatisfy({ recoveryAlphabet.contains($0) }) else { return nil }
+        return key
+    }
+
+    /// Lock both unlocked private halves under `recoveryKey`, in the kit the server stores.
+    static func buildRecoveryKit(_ unlocked: Unlocked, recoveryKey: String) throws -> [String: Any] {
+        guard let key = normalizeRecoveryKey(recoveryKey) else {
+            throw E2eError(text: "That recovery key is not valid. It has 28 letters and numbers.")
+        }
+        let encryption = try protectPrivateKey(privateKeyB64: unlocked.encryptionPrivateKey, passphrase: key,
+                                               kind: "X25519", publicKey: unlocked.encryptionPublicKey)
+        var kit: [String: Any] = [
+            "format": recoveryKitFormat,
+            "createdAt": ISO8601DateFormatter().string(from: Date()),
+            "encryption": protectedToJson(encryption),
+        ]
+        if let sigPrivate = unlocked.signingPrivateKey, let sigPublic = unlocked.signingPublicKey {
+            kit["signing"] = protectedToJson(try protectPrivateKey(privateKeyB64: sigPrivate, passphrase: key,
+                                                                   kind: "Ed25519", publicKey: sigPublic))
+        }
+        return kit
+    }
+
+    /// Open `kit` with `recoveryKey` and store the keys on this device under
+    /// `newPassphrase`. The same key comes back, so mail already sealed to it opens.
+    static func restoreFromRecoveryKit(accountKey: String, kit: [String: Any], recoveryKey: String,
+                                       newPassphrase: String) throws -> Identity {
+        if newPassphrase.utf16.count < minPassphraseLength {
+            throw E2eError(text: "Use at least \(minPassphraseLength) characters for the passphrase.")
+        }
+        guard let key = normalizeRecoveryKey(recoveryKey) else {
+            throw E2eError(text: "That recovery key is not valid. It has 28 letters and numbers.")
+        }
+        guard kit["format"] as? String == recoveryKitFormat else {
+            throw E2eError(text: "This recovery kit is not one GrapMail can read.")
+        }
+        guard let enc = protectedFrom(kit["encryption"] as? [String: Any]) else {
+            throw E2eError(text: "This recovery kit is damaged.")
+        }
+        let sig = protectedFrom(kit["signing"] as? [String: Any])
+        let wrong = E2eError(text: "That recovery key does not open this kit. Check it and try again.")
+        guard let encPrivate = try? unlockPrivateKey(enc, passphrase: key) else { throw wrong }
+        var sigPrivate: String? = nil
+        if let sig {
+            guard let opened = try? unlockPrivateKey(sig, passphrase: key) else { throw wrong }
+            sigPrivate = opened
+        }
+        var signing: ProtectedPrivateKey? = nil
+        if let sig, let sigPrivate {
+            signing = try protectPrivateKey(privateKeyB64: sigPrivate, passphrase: newPassphrase,
+                                            kind: "Ed25519", publicKey: sig.publicKey)
+        }
+        let identity = Identity(
+            encryption: try protectPrivateKey(privateKeyB64: encPrivate, passphrase: newPassphrase,
+                                              kind: "X25519", publicKey: enc.publicKey),
+            signing: signing,
+            createdAt: ISO8601DateFormatter().string(from: Date()))
+        guard saveIdentity(accountKey: accountKey, identity: identity) else {
+            throw E2eError(text: "This device would not store the key, so nothing was restored.")
+        }
+        return identity
+    }
 }
 
 private extension String {

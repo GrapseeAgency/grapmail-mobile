@@ -167,6 +167,25 @@ fun E2eStatusScreen(vm: E2eViewModel, onBack: () -> Unit, onSetup: () -> Unit,
     val palette = LocalPalette.current
     val state by vm.state.collectAsStateWithLifecycle()
     LaunchedEffect(Unit) { vm.load() }
+    var showRestore by remember { mutableStateOf(false) }
+    var confirmRemoveKit by remember { mutableStateOf(false) }
+    state.newRecoveryKey?.let { key -> RecoveryKeyShownOnce(key, onDone = { vm.dismissRecoveryKey() }) }
+    if (showRestore) RecoveryRestoreDialog(vm, onClose = { showRestore = false })
+    if (confirmRemoveKit) {
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { confirmRemoveKit = false },
+            title = { Text("Remove the recovery key?") },
+            text = { Text("If you then lose this device, your encrypted mail cannot be recovered anywhere.") },
+            confirmButton = {
+                androidx.compose.material3.TextButton(onClick = { confirmRemoveKit = false; vm.removeRecoveryKit() }) {
+                    Text("Remove", color = palette.error)
+                }
+            },
+            dismissButton = {
+                androidx.compose.material3.TextButton(onClick = { confirmRemoveKit = false }) { Text("Keep it") }
+            },
+        )
+    }
     MailScaffold("Encryption", onBack) {
         Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp),
             verticalArrangement = Arrangement.Center,
@@ -222,7 +241,41 @@ fun E2eStatusScreen(vm: E2eViewModel, onBack: () -> Unit, onSetup: () -> Unit,
                                 tag = "gm-e2e-lock", onClick = { vm.lock() })
                         }
                     }
+                    if (state.record == null && state.recoveryKitExists == true) {
+                        Spacer(Modifier.height(14.dp))
+                        E2eCard("Restore your key from your recovery key", tag = "gm-e2e-restore-card") {
+                            E2eLede("A recovery kit for this account is stored, locked with your recovery key. " +
+                                "Enter it to put your key back on this device and read your encrypted mail again.")
+                            Spacer(Modifier.height(12.dp))
+                            E2eButton("Use my recovery key", enabled = !state.busy,
+                                tag = "gm-e2e-restore-open", onClick = { showRestore = true })
+                        }
+                    }
                     if (state.record != null) {
+                        Spacer(Modifier.height(14.dp))
+                        E2eCard("Recovery key", tag = "gm-e2e-recovery-card") {
+                            E2eLede(when (state.recoveryKitExists) {
+                                null -> "Checking whether a recovery key is set up…"
+                                true -> "Set up" + (state.recoveryKitCreatedAt?.let { " on ${absoluteDateTimeOrRaw(it)}" } ?: "") +
+                                    ". If you lose this device, it restores your key on a new one."
+                                false -> "Not set up. If you lose this device, your encrypted mail cannot be recovered."
+                            })
+                            Spacer(Modifier.height(12.dp))
+                            when {
+                                state.recoveryKitExists == null -> Unit
+                                !state.unlocked -> E2eLede("Unlock your key to " +
+                                    (if (state.recoveryKitExists == true) "replace" else "create") + " the recovery key.")
+                                else -> E2eButton(
+                                    if (state.recoveryKitExists == true) "Replace the recovery key" else "Create a recovery key",
+                                    enabled = !state.busy, quiet = state.recoveryKitExists == true,
+                                    tag = "gm-e2e-recovery-create", onClick = { vm.createRecoveryKey() })
+                            }
+                            if (state.recoveryKitExists == true) {
+                                Spacer(Modifier.height(8.dp))
+                                E2eButton("Remove the recovery key", enabled = !state.busy, quiet = true,
+                                    tag = "gm-e2e-recovery-remove", onClick = { confirmRemoveKit = true })
+                            }
+                        }
                         Spacer(Modifier.height(14.dp))
                         E2eRow("Fingerprint", fingerprintBlock(state.fingerprint ?: "-"))
                         Spacer(Modifier.height(8.dp))
@@ -252,9 +305,10 @@ fun E2eStatusScreen(vm: E2eViewModel, onBack: () -> Unit, onSetup: () -> Unit,
 
 // ── 101 · setup ──────────────────────────────────────────────────────────────
 
-/** Create the key. The no-recovery warning sits above the fields, in the
- *  web's own words: a recovery route would mean a second copy of the key held
- *  somewhere else, which is the one thing this feature exists to prevent. */
+/** Create the key. The no-recovery warning sits above the fields: a forgotten
+ *  passphrase is never recoverable. The key itself can be, with a recovery key
+ *  the person makes after setup (the kit the server keeps cannot be opened
+ *  without it). */
 @Composable
 fun E2eSetupScreen(vm: E2eViewModel, onBack: () -> Unit) {
     val state by vm.state.collectAsStateWithLifecycle()
@@ -270,8 +324,9 @@ fun E2eSetupScreen(vm: E2eViewModel, onBack: () -> Unit) {
             Text("There is no way to recover a forgotten passphrase.", fontSize = 13.sp,
                 fontWeight = FontWeight.Medium, color = LocalPalette.current.textPrimary,
                 modifier = Modifier.padding(top = 10.dp))
-            E2eLede("Not by us, and not by you. A recovery route would mean a second copy of your " +
-                "key held somewhere else, which is the one thing this feature exists to prevent.")
+            E2eLede("Not by us, and not by you. After setup you can create a recovery key: it restores " +
+                "your key on a new device with a new passphrase. Without the passphrase or the recovery " +
+                "key, nobody can open your encrypted mail, us included.")
             Spacer(Modifier.height(14.dp))
             AppTextField("Passphrase", passphrase, { passphrase = it }, password = true)
             AppTextField("Repeat passphrase", confirm, { confirm = it }, password = true,
@@ -543,6 +598,83 @@ fun E2eRecipientsScreen(vm: E2eViewModel, onBack: () -> Unit, onCompose: () -> U
                     color = palette.textTertiary, modifier = Modifier.padding(vertical = 10.dp))
             }
             Spacer(Modifier.height(24.dp))
+        }
+    }
+}
+
+// ── recovery key ─────────────────────────────────────────────────────────────
+
+/** The new recovery key, shown once. It is kept nowhere on this device. */
+@Composable
+private fun RecoveryKeyShownOnce(key: String, onDone: () -> Unit) {
+    val palette = LocalPalette.current
+    val clipboard = androidx.compose.ui.platform.LocalClipboardManager.current
+    var copied by remember { mutableStateOf(false) }
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = {},
+        title = { Text("Your recovery key") },
+        text = {
+            Column {
+                Text("Write it down or keep it in a password manager. GrapMail cannot show it again, " +
+                    "and without it a lost device means lost encrypted mail.",
+                    fontSize = 13.sp, lineHeight = 19.sp, color = palette.textSecondary)
+                Spacer(Modifier.height(14.dp))
+                Text(key, fontSize = 16.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.SemiBold,
+                    color = palette.textPrimary, modifier = Modifier.testTag("gm-e2e-recovery-key"))
+                if (copied) {
+                    Spacer(Modifier.height(8.dp))
+                    Text("Copied. Paste it somewhere safe, then clear your clipboard.",
+                        fontSize = 12.sp, color = palette.textSecondary)
+                }
+            }
+        },
+        confirmButton = {
+            androidx.compose.material3.TextButton(onClick = onDone, modifier = Modifier.testTag("gm-e2e-recovery-saved")) {
+                Text("I have saved it")
+            }
+        },
+        dismissButton = {
+            androidx.compose.material3.TextButton(onClick = {
+                clipboard.setText(androidx.compose.ui.text.AnnotatedString(key))
+                copied = true
+            }) { Text("Copy") }
+        },
+    )
+}
+
+/** Restore the key from the stored kit: the recovery key, then a new passphrase for this device. */
+@Composable
+private fun RecoveryRestoreDialog(vm: E2eViewModel, onClose: () -> Unit) {
+    val state by vm.state.collectAsStateWithLifecycle()
+    var recoveryKey by remember { mutableStateOf("") }
+    var passphrase by remember { mutableStateOf("") }
+    var confirm by remember { mutableStateOf("") }
+    LaunchedEffect(state.record) { if (state.record != null) onClose() }
+    androidx.compose.ui.window.Dialog(
+        onDismissRequest = onClose,
+        properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false),
+    ) {
+        MailScaffold("Restore your key", onClose) {
+            Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp)) {
+                state.note?.let { E2eNote(it, state.noteIsBad); Spacer(Modifier.height(10.dp)) }
+                E2eLede("Enter the recovery key you saved when you set it up. It has 28 letters and numbers; " +
+                    "dashes and spaces do not matter.")
+                Spacer(Modifier.height(12.dp))
+                AppTextField("Recovery key", recoveryKey, { recoveryKey = it })
+                Spacer(Modifier.height(14.dp))
+                E2eLede("Then choose a passphrase for this device. It protects the key here, like the one " +
+                    "you set the first time.")
+                Spacer(Modifier.height(8.dp))
+                AppTextField("New passphrase", passphrase, { passphrase = it }, password = true)
+                AppTextField("Repeat passphrase", confirm, { confirm = it }, password = true,
+                    modifier = Modifier.padding(top = 8.dp))
+                Spacer(Modifier.height(16.dp))
+                E2eButton(if (state.busy) "Restoring…" else "Restore my key",
+                    enabled = !state.busy && recoveryKey.isNotBlank() && passphrase.isNotEmpty(),
+                    tag = "gm-e2e-restore-submit",
+                    onClick = { vm.restoreWithRecoveryKey(recoveryKey, passphrase, confirm) })
+                Spacer(Modifier.height(24.dp))
+            }
         }
     }
 }

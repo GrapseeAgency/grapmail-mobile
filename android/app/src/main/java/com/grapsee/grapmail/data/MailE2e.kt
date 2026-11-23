@@ -788,4 +788,89 @@ object MailE2e {
             signingPublicKey = identity.signing?.publicKey,
         )
     }
+
+    // ── the recovery key ─────────────────────────────────────────────────────
+    //
+    // A passphrase still cannot be recovered. What can be is the KEY: a copy of
+    // both private halves, locked with a recovery key only the person holds, and
+    // kept on the server, which can never open it (routes/grapmail-e2e-recovery.ts).
+    // On a new device: sign in, enter the recovery key, choose a new passphrase.
+    //
+    // The recovery key is 28 symbols of Crockford base32 (no I, L, O or U to
+    // misread), 140 random bits, shown in seven groups of four. Its normalised
+    // form is the input to the same PBKDF2 / AES-GCM record the passphrase uses,
+    // so the kit is byte-compatible with iOS's MailE2e.swift.
+
+    const val RECOVERY_KIT_FORMAT = "grapmail-e2e-recovery-kit/1"
+    const val RECOVERY_KEY_SYMBOLS = 28
+    private const val RECOVERY_ALPHABET = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
+
+    /** A fresh recovery key, grouped for reading: XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX. */
+    fun generateRecoveryKey(): String {
+        // 256 is a multiple of 32, so masking a uniform byte gives a uniform symbol.
+        val symbols = randomBytes(RECOVERY_KEY_SYMBOLS).map { RECOVERY_ALPHABET[it.toInt() and 31] }
+        return symbols.joinToString("").chunked(4).joinToString("-")
+    }
+
+    /** The canonical form of a typed recovery key, or null if it is not one. */
+    fun normalizeRecoveryKey(input: String): String? {
+        val cleaned = input.uppercase(java.util.Locale.ROOT)
+            .filter { it.isLetterOrDigit() }
+            .map { when (it) { 'O' -> '0'; 'I', 'L' -> '1'; else -> it } }
+            .joinToString("")
+        return cleaned.takeIf { it.length == RECOVERY_KEY_SYMBOLS && it.all { c -> c in RECOVERY_ALPHABET } }
+    }
+
+    /** Lock both unlocked private halves under [recoveryKey], in the kit the server stores. */
+    fun buildRecoveryKit(unlocked: Unlocked, recoveryKey: String): JsonObject {
+        val key = normalizeRecoveryKey(recoveryKey)
+            ?: throw IllegalArgumentException("That recovery key is not valid. It has 28 letters and numbers.")
+        val encryption = protectPrivateKey(unlocked.encryptionPrivateKey, key, "X25519", unlocked.encryptionPublicKey)
+        val signing = if (unlocked.signingPrivateKey != null && unlocked.signingPublicKey != null) {
+            protectPrivateKey(unlocked.signingPrivateKey, key, "Ed25519", unlocked.signingPublicKey)
+        } else null
+        return buildJsonObject {
+            put("format", RECOVERY_KIT_FORMAT)
+            put("createdAt", java.time.Instant.now().toString())
+            put("encryption", protectedToJson(encryption))
+            signing?.let { put("signing", protectedToJson(it)) }
+        }
+    }
+
+    /**
+     * Open [kit] with [recoveryKey] and store the keys on this device under
+     * [newPassphrase]. The same key comes back, so mail already sealed to it opens
+     * and the published key stays right.
+     */
+    fun restoreFromRecoveryKit(
+        context: Context,
+        accountKey: String,
+        kit: JsonObject,
+        recoveryKey: String,
+        newPassphrase: String,
+    ): Identity {
+        if (newPassphrase.length < MIN_PASSPHRASE_LENGTH) {
+            throw IllegalArgumentException("Use at least $MIN_PASSPHRASE_LENGTH characters for the passphrase.")
+        }
+        val key = normalizeRecoveryKey(recoveryKey)
+            ?: throw IllegalArgumentException("That recovery key is not valid. It has 28 letters and numbers.")
+        if ((kit["format"] as? JsonPrimitive)?.content != RECOVERY_KIT_FORMAT) {
+            throw IllegalStateException("This recovery kit is not one GrapMail can read.")
+        }
+        val enc = (kit["encryption"] as? JsonObject)?.let { protectedFrom(it) }
+            ?: throw IllegalStateException("This recovery kit is damaged.")
+        val sig = (kit["signing"] as? JsonObject)?.let { protectedFrom(it) }
+        val wrong = "That recovery key does not open this kit. Check it and try again."
+        val encPrivate = try { unlockPrivateKey(enc, key) } catch (e: Exception) { throw IllegalStateException(wrong, e) }
+        val sigPrivate = sig?.let { try { unlockPrivateKey(it, key) } catch (e: Exception) { throw IllegalStateException(wrong, e) } }
+        val identity = Identity(
+            encryption = protectPrivateKey(encPrivate, newPassphrase, "X25519", enc.publicKey),
+            signing = if (sig != null && sigPrivate != null) protectPrivateKey(sigPrivate, newPassphrase, "Ed25519", sig.publicKey) else null,
+            createdAt = java.time.Instant.now().toString(),
+        )
+        if (!saveIdentity(context, accountKey, identity)) {
+            throw IllegalStateException("This device would not store the key, so nothing was restored.")
+        }
+        return identity
+    }
 }
