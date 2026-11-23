@@ -41,6 +41,9 @@ class GrapMailApp : Application() {
             WorkManager.getInstance(this).enqueueUniquePeriodicWork(
                 MailPollWorker.NAME, ExistingPeriodicWorkPolicy.KEEP, request,
             )
+            // Anything left in the Outbox by an earlier process goes out as soon as
+            // the device is online; a no-op when the Outbox is empty.
+            com.grapsee.grapmail.logic.OutboxWorker.schedule(this)
         }, 1_000)
     }
 }

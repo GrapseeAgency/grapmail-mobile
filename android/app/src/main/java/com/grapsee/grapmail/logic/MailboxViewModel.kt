@@ -1537,7 +1537,10 @@ class MailboxViewModel @JvmOverloads constructor(
          *  nobody touched neither autosaves nor saves on close. */
         val userEdited: Boolean = false,
     ) {
-        val accepted: Boolean get() = resultStatus == "sent" || resultStatus == "queued" || resultStatus == "delivered"
+        /** "outbox": no connection at Send; the message is held encrypted on this
+         *  device and goes out on its own when the device is online (data/Outbox.kt).
+         *  Accepted, so the composer closes and Send cannot queue it twice. */
+        val accepted: Boolean get() = resultStatus == "sent" || resultStatus == "queued" || resultStatus == "delivered" || resultStatus == "outbox"
     }
 
     private val _compose = MutableStateFlow(ComposeState())
@@ -1949,8 +1952,7 @@ class MailboxViewModel @JvmOverloads constructor(
                 }
             }
             if (held.e2eEnvelope != null && envelope == null) return@launch
-            runCatching {
-                Api.mailSend(t, MailSendRequest(
+            val request = MailSendRequest(
                     to = splitAddresses(held.to), cc = splitAddresses(held.cc),
                     bcc = splitAddresses(held.bcc), subject = held.subject,
                     // With an envelope the plaintext does not travel: the
@@ -1962,7 +1964,9 @@ class MailboxViewModel @JvmOverloads constructor(
                     inReplyTo = held.inReplyTo,
                     e2eEnvelope = envelope,
                     attachmentIds = held.attachmentIds,
-                ))
+                )
+            runCatching {
+                Api.mailSend(t, request)
             }.onSuccess { r ->
                 val generation = held.generation
                 val accepted = r.status in listOf("sent", "queued", "delivered")
@@ -2018,6 +2022,27 @@ class MailboxViewModel @JvmOverloads constructor(
                 if (sent) GMHaptics.success() else GMHaptics.failure()
             }.onFailure { e ->
                 if (e is kotlinx.coroutines.CancellationException) throw e
+                // No answer at all (no connection, a timeout): the server never
+                // decided, so the message goes to the Outbox and is sent when the
+                // device is online. A refusal (ApiException) is the server's
+                // decision and stays an error in the composer.
+                if (e !is ApiException) {
+                    val app = getApplication<Application>()
+                    val sessionId = SessionStore.snapshot(app)?.id
+                    if (sessionId != null) {
+                        val queued = runCatching {
+                            com.grapsee.grapmail.data.Outbox.enqueue(app, sessionId, request, draftId)
+                        }.isSuccess
+                        if (queued) {
+                            com.grapsee.grapmail.logic.OutboxWorker.schedule(app)
+                            if (held.generation == composeGeneration) _compose.update { it.copy(sending = false,
+                                error = null, resultStatus = "outbox",
+                                result = "No connection. Saved in the Outbox: it sends by itself when you are back online.") }
+                            GMHaptics.success()
+                            return@onFailure
+                        }
+                    }
+                }
                 if (held.generation != composeGeneration) return@onFailure
                 _compose.update { it.copy(sending = false,
                     error = e.message ?: "The message could not be sent.") }
