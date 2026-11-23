@@ -853,7 +853,28 @@ object Api {
         .connectTimeout(15, TimeUnit.SECONDS)
         .readTimeout(20, TimeUnit.SECONDS)
         .writeTimeout(20, TimeUnit.SECONDS)
+        .apply { apiPinner()?.let { certificatePinner(it) } }
         .build()
+
+    /**
+     * Certificate pinning for the API host (OWASP MASVS-NETWORK-2), from the
+     * build's `API_PINS`: comma-separated `sha256/<base64 SPKI hash>` values,
+     * printed by `scripts/print-api-pins.sh`.
+     *
+     * Off when no pins are configured, and also when fewer than two are: a single
+     * pin with no backup is how an app locks every user out the day the server's
+     * certificate is replaced. Pin the issuing CA's key plus a backup (the next
+     * CA in the chain, or a second CA the server can move to), not the leaf.
+     */
+    private fun apiPinner(): okhttp3.CertificatePinner? {
+        val pins = com.grapsee.grapmail.BuildConfig.API_PINS.split(',')
+            .map { it.trim() }
+            .filter { Regex("^sha256/[A-Za-z0-9+/]{43}=$").matches(it) }
+            .distinct()
+        if (pins.size < 2) return null
+        val host = runCatching { java.net.URI(BASE).host }.getOrNull() ?: return null
+        return okhttp3.CertificatePinner.Builder().apply { pins.forEach { add(host, it) } }.build()
+    }
 
     // An authenticator can occupy all of the normal client's per-host slots.
     // Token rotation needs its own dispatcher so it can finish those calls.
