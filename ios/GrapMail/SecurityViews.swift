@@ -40,6 +40,10 @@ struct AccountSecurityView: View {
     // appearance is skipped because `.task(id: reload)` already fetches it, and
     // firing both would fetch twice on entry.
     @State private var didAppear = false
+    /// A password reset someone asked for by email, still pending (backend lib/reset-hold.ts).
+    @State private var resetPending: PasswordResetStatus?
+    @State private var resetNote: String?
+    @State private var cancellingReset = false
 
     private func sectionLabel(_ text: String) -> some View {
         Text(text)
@@ -79,6 +83,25 @@ struct AccountSecurityView: View {
             title: "Account Security",
             subtitle: "Manage your security settings to keep your account safe and secure."
         ) {
+            if let pending = resetPending {
+                InfoCard {
+                    StatusChip(text: "Password reset requested", tone: .warning)
+                    Text(Self.resetSentence(pending))
+                        .font(.system(size: 12))
+                        .foregroundColor(GM.textSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(.top, 10)
+                    AccountLink(title: cancellingReset ? "Cancelling…" : "Cancel the reset", action: cancelReset)
+                        .accessibilityIdentifier("sec-cancel-reset")
+                }
+                .padding(.bottom, 12)
+            }
+            if let resetNote {
+                Text(resetNote)
+                    .font(.system(size: 12))
+                    .foregroundColor(GM.textSecondary)
+                    .padding(.bottom, 12)
+            }
             // The reference puts the account's verdict above the feature list: it
             // answers "am I safe?" before the six rows that explain why.
             InfoCard {
@@ -225,6 +248,38 @@ struct AccountSecurityView: View {
         }
         .onAppear {
             if didAppear { reload += 1 } else { didAppear = true }
+        }
+        .task(id: reload) {
+            guard let token = SessionStore.token,
+                  let status = try? await ApiClient.passwordResetStatus(token: token) else { return }
+            resetPending = status.success && status.pending ? status : nil
+        }
+    }
+
+    private static func resetSentence(_ s: PasswordResetStatus) -> String {
+        var line = "A link to reset your password was sent to your recovery email. "
+        if let at = s.availableAt, let date = ServerDate.parse(at) {
+            line += "It works from \(date.formatted(date: .abbreviated, time: .shortened)). "
+        }
+        return line + "If this was not you, cancel it now and change your recovery email."
+    }
+
+    private func cancelReset() {
+        guard !cancellingReset, let token = SessionStore.token else { return }
+        cancellingReset = true
+        Task {
+            defer { cancellingReset = false }
+            do {
+                let result = try await ApiClient.cancelPasswordReset(token: token)
+                if result.success {
+                    resetPending = nil
+                    resetNote = result.message ?? "The password reset was cancelled."
+                } else {
+                    resetNote = result.error ?? "The reset could not be cancelled. Try again."
+                }
+            } catch {
+                resetNote = (error as? ApiError)?.userMessage ?? "The reset could not be cancelled. Try again."
+            }
         }
     }
 }

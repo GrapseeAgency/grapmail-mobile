@@ -85,6 +85,18 @@ fun AccountSecurityScreen(
     var loading by remember { mutableStateOf(true) }
     var failed by remember { mutableStateOf(false) }
     var reload by remember { mutableStateOf(0) }
+    // A password reset someone asked for by email, still pending (lib/reset-hold.ts).
+    var resetPending by remember { mutableStateOf<com.grapsee.grapmail.data.PasswordResetStatus?>(null) }
+    var resetNote by remember { mutableStateOf<String?>(null) }
+    var cancelling by remember { mutableStateOf(false) }
+
+    LaunchedEffect(reload) {
+        SessionStore.snapshot(context)?.let { s ->
+            resetPending = runCatching { Api.passwordResetStatus(s.token) }
+                .onFailure { if (it is kotlinx.coroutines.CancellationException) throw it }
+                .getOrNull()?.takeIf { it.success && it.pending }
+        }
+    }
 
     LaunchedEffect(reload) {
         val session = SessionStore.snapshot(context)
@@ -125,7 +137,9 @@ fun AccountSecurityScreen(
     // step at sign-up.
     val hasRecoveryEmail = !profile?.recoveryEmail.isNullOrBlank()
     val recoveryVerified = hasRecoveryEmail && profile?.recoveryEmailVerified == true
-    val secure = twoFactorOn && phoneVerified && recoveryVerified
+    // Secure means a verified way back in (the recovery email) and a second factor.
+    // It used to require a verified phone too, which GrapMail no longer uses.
+    val secure = twoFactorOn && recoveryVerified
 
     AccountScreen(
         onBack = onBack,
@@ -140,6 +154,49 @@ fun AccountSecurityScreen(
             )
         },
     ) {
+        resetPending?.let { pending ->
+            InfoCard {
+                StatusChip("Password reset requested", ChipTone.Warning)
+                Spacer(Modifier.height(10.dp))
+                Text(
+                    (pending.availableAt?.let { at ->
+                        val shown = runCatching {
+                            java.time.format.DateTimeFormatter.ofLocalizedDateTime(java.time.format.FormatStyle.MEDIUM)
+                                .format(java.time.Instant.parse(at).atZone(java.time.ZoneId.systemDefault()))
+                        }.getOrDefault(at)
+                        "A link to reset your password was sent to your recovery email. It works from $shown. "
+                    } ?: "A link to reset your password was sent to your recovery email. ") +
+                        "If this was not you, cancel it now and change your recovery email.",
+                    fontSize = 12.sp, lineHeight = 17.sp, color = LocalPalette.current.textSecondary,
+                )
+                Spacer(Modifier.height(4.dp))
+                AccountLink(if (cancelling) "Cancelling…" else "Cancel the reset", {
+                    if (!cancelling) {
+                        cancelling = true
+                        scope.launch {
+                            val token = SessionStore.token(context)
+                            val result = token?.let {
+                                runCatching { Api.cancelPasswordReset(it) }
+                                    .onFailure { e -> if (e is kotlinx.coroutines.CancellationException) throw e }
+                                    .getOrNull()
+                            }
+                            cancelling = false
+                            if (result?.success == true) {
+                                resetPending = null
+                                resetNote = result.message ?: "The password reset was cancelled."
+                            } else {
+                                resetNote = result?.error ?: "The reset could not be cancelled. Try again."
+                            }
+                        }
+                    }
+                })
+            }
+            Spacer(Modifier.height(12.dp))
+        }
+        resetNote?.let {
+            Text(it, fontSize = 12.sp, color = LocalPalette.current.textSecondary)
+            Spacer(Modifier.height(12.dp))
+        }
         // The reference puts the account's verdict above the feature list: it is
         // the answer to "am I safe?", and burying it under the switches makes
         // the person read six rows to learn one thing.
@@ -178,7 +235,7 @@ fun AccountSecurityScreen(
                     if (twoFactorOn && profile?.backupCodesRemaining == 0) {
                         Spacer(Modifier.height(8.dp))
                         Text(
-                            "Add backup codes so losing your phone does not lock you out.",
+                            "Add backup codes so losing access to your recovery email does not lock you out.",
                             fontSize = 12.sp,
                             lineHeight = 17.sp,
                             color = LocalPalette.current.warnInk,
@@ -203,21 +260,24 @@ fun AccountSecurityScreen(
             chipTone = if (twoFactorOn) ChipTone.Success else ChipTone.Warning,
             onToggle = { if (twoFactorOn) onDisableTwoFactor() else onTwoFactor() },
         )
-        RowDivider()
-        SecurityRow(
-            icon = Icons.Rounded.PhoneAndroid,
-            title = "Phone Number",
-            subtitle = profile?.phone ?: if (loading) null else "Used for account recovery and two-step verification.",
-            chip = when {
-                loading || failed -> null
-                !hasPhone -> "Add"
-                phoneVerified -> "Verified"
-                profile?.phoneVerified == false -> "Unverified"
-                else -> null
-            },
-            chipTone = if (phoneVerified) ChipTone.Success else ChipTone.Warning,
-            onClick = onPhone,
-        )
+        // GrapMail sends account codes by email only. A phone number is shown
+        // only on an older account that still has one, so it can be reviewed.
+        if (hasPhone) {
+            RowDivider()
+            SecurityRow(
+                icon = Icons.Rounded.PhoneAndroid,
+                title = "Phone Number",
+                subtitle = profile?.phone ?: "",
+                chip = when {
+                    loading || failed -> null
+                    phoneVerified -> "Verified"
+                    profile?.phoneVerified == false -> "Unverified"
+                    else -> null
+                },
+                chipTone = if (phoneVerified) ChipTone.Success else ChipTone.Warning,
+                onClick = onPhone,
+            )
+        }
         RowDivider()
         SecurityRow(
             icon = Icons.Rounded.Email,

@@ -337,7 +337,7 @@ final class ScreenshotWalkUITests: XCTestCase {
         require(app.staticTexts["Account Security"].firstMatch, "Security hub", timeout: 8)
         snap("20-sec-hub-light")
         openSecurityRow("Two-Step Verification", "21-sec-2fa-enable-light")
-        openSecurityRow("Phone Number", "22-sec-phone-light")
+        openSecurityRow("Recovery Email", "22-sec-recovery-email-light")
         openSecurityRow("Change Password", "23-sec-change-password-light")
         openSecurityRow("Backup Codes", "24-sec-backup-codes-light")
         openSecurityRow("Active Sessions", "25-sec-sessions-light")
