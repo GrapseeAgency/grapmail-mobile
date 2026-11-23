@@ -65,9 +65,16 @@ enum ApiError: Error, LocalizedError {
     /// `localizedDescription` at each call site so the mailbox sector's loaders
     /// and the account flows cannot drift into two different phrasings of the
     /// same rejection.
+    /// Codes whose server sentence is written for the person reading it (it names the
+    /// limit, the wait or the field). For these the server's words are shown; every
+    /// other code keeps the app's own phrasing.
+    static let serverWordedCodes: Set<String> = ["FEATURE_PAUSED", "DAILY_LIMIT_REACHED", "HOURLY_LIMIT_REACHED", "SEND_LIMIT_REACHED", "TOO_MANY_RECIPIENTS", "RESET_ON_HOLD", "REFRESH_TOKEN_REUSED", "DPOP_REQUIRED", "BAD_IMPORT", "IMPORT_RUNNING", "IMPORT_BUSY", "BAD_NOTIFICATIONS", "BAD_SENDER", "BAD_TIMEZONE", "BAD_RECOVERY_KIT", "BAD_SETTINGS", "BAD_VACATION", "BAD_FORWARDING", "SENDER_IN_BOTH_LISTS", "BAD_LOCALE", "BAD_DENSITY", "BAD_SIGNATURE"]
+
     var userMessage: String {
         switch self {
-        case let .http(status, code, _):
+        case let .http(status, code, message):
+            if let code, Self.serverWordedCodes.contains(code),
+               !message.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return message }
             switch code {
             case "TOO_MANY_ATTEMPTS": return "Too many failed attempts. Try again in about 15 minutes."
             case "RATE_LIMITED": return "Too many requests. Try again in a few minutes."
