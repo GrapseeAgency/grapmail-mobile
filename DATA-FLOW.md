@@ -254,6 +254,16 @@ account-wide row. Quiet hours (minutes-from-midnight + the device's UTC offset,
 mail only) are enforced server-side at claim time; security alerts bypass them.
 The apps write `deviceKey: "account"` and `eventType: ""` for scope rows.
 
+### Per-account mute (`PATCH /grapsee/grapmail/push/devices/:id/preferences`)
+
+Each account's registration is one push_devices row, and the row id is the
+mute handle. The Per-account notifications screen PATCHes that row with the
+account's own bearer: `enabled:false` silences that one account's mail and
+informational alerts on this device. The row id is stored per account at
+registration; a re-registration that keeps the row id carries the flag, a new
+row id resets to unmuted, and mandatory security alerts stay immune (the
+server's separate fanout enforces that).
+
 ### Recovery without a phone
 
 - Trusted device: `POST /grapsee/auth/recovery/device/challenge` returns a
@@ -268,10 +278,35 @@ The apps write `deviceKey: "account"` and `eventType: ""` for scope rows.
 - The reset paths are rate-limited, cooldown-gated after recent resets, and
   answer identical refusals for unknown identifiers.
 
-### Passkeys (server live, clients pending)
+### Passkeys (`security/PasskeyManager.kt`, `PasskeyManager.swift`)
 
 The backend mounts the full WebAuthn surface (`/grapsee/auth/passkeys/*`,
 usernameless discoverable sign-in, session-backed tokens, clone tripwire on
-the signature counter). The native clients do not call it yet: platform
-passkey APIs (Android Credential Manager, `ASAuthorization` on iOS) are the
-remaining client work, and this file will be updated when it lands.
+the signature counter), and the native clients now call it:
+
+- Android: `androidx.credentials` (Credential Manager). The server's
+  `options` JSON goes through `CreatePublicKeyCredentialRequest` verbatim;
+  the platform already serializes every byte field as unpadded base64url, so
+  the responses travel unchanged (shape-flattened only). "Use a passkey" sits
+  on the sign-in screen and lands in the same session flow as password login.
+- iOS: `AuthenticationServices` (`ASAuthorizationPlatformPublicKeyCredentialProvider`),
+  same contract.
+- Registration is offered from the security hub (Passkeys screen: list,
+  delete, add). `GET/DELETE /grapsee/auth/passkeys` back the list.
+- Deployment requirements (platform-enforced, founder-side):
+  - Android: the rp id must serve `/.well-known/assetlinks.json` naming
+    `com.grapsee.grapmail` + the signing cert SHA-256 (Digital Asset Links).
+  - iOS: the Associated Domains entitlement (`webcredentials:<rp id>`) plus
+    the `apple-app-site-association` file on the same host.
+
+### Device attestation (`security/IntegrityClient.kt`, `AppAttestClient.swift`)
+
+After device enrollment the apps attempt attestation and POST the evidence to
+`POST /grapsee/auth/devices/:id/attest`. Android: a standard Play Integrity
+verdict (free tier; silent no-op without the cloud-project build config
+field). iOS: App Attest in two stages — the server returns a one-time
+challenge (`stage: "challenge"`), the device runs `DCAppAttestService.attest`
+over it (`stage: "attest"`). The server-side verification is env-gated
+(`GOOGLE_PLAY_INTEGRITY_DECODER_KEY`, `APP_ATTEST_TEAM_ID`); attestation is
+one risk signal, never a universal block — an unverified level is recorded as
+self-reported and the account keeps working.

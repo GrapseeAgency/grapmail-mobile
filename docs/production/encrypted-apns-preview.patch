@@ -1,0 +1,45 @@
+--- a/services/shared/src/lib/push-dispatch.ts
++++ b/services/shared/src/lib/push-dispatch.ts
+@@ -13,9 +13,7 @@
+  * The title is the sender, the body is the subject, and the data map carries the
+  * message id and the mailbox address. No snippet, no body text. A push payload is
+  * stored by Google and Apple, rendered on a lock screen, and readable by anyone
+- * holding the phone. For an end-to-end encrypted message the subject is cleartext but
+- * the client asked for the generic string, so it gets that: a notification is not a
+- * reason to leak which of two sealed messages arrived.
++ * holding the phone. End-to-end encrypted mail uses a generic title and body.
+  *
+  * ── WHY AN UNREGISTERED DEVICE IS DELETED ───────────────────────────────────
+  * FCM `UNREGISTERED` and APNs `410 Unregistered` mean the token can never deliver
+@@ -74,8 +72,7 @@
+  *
+  * Exported and separate from the sending so the payload shape has a test that does not
+  * need a phone, a provider, or a network. The three rules it encodes are the policy:
+- * the sender is the title, the subject is the body, and an encrypted message says so
+- * instead of naming its subject.
++ * Ordinary mail uses the sender and subject. Encrypted mail uses generic text.
+  */
+ export function buildMailPushNotification(
+   message: PushMessageFacts,
+@@ -87,7 +84,7 @@
+     ? 'New encrypted message'
+     : ((message.subject ?? '').trim() || 'New message')
+   return {
+-    title: clamp(sender, TITLE_MAX),
++    title: message.isE2eeEncrypted ? 'GrapMail' : clamp(sender, TITLE_MAX),
+     body: clamp(body, BODY_MAX),
+     data: {
+       messageId: clamp(message.id, DATA_VALUE_MAX),
+--- a/services/shared/src/__tests__/grapmail-push.node-test.ts
++++ b/services/shared/src/__tests__/grapmail-push.node-test.ts
+@@ -207,8 +207,9 @@
+     assert.equal(buildMailPushNotification({ ...base, subject: '   ' }).body, 'New message')
+   })
+ 
+-  test('an encrypted message never names its subject', () => {
++  test('an encrypted message hides its sender and subject', () => {
+     const note = buildMailPushNotification({ ...base, subject: 'Acquisition terms', isE2eeEncrypted: true })
++    assert.equal(note.title, 'GrapMail')
+     assert.equal(note.body, 'New encrypted message')
+     assert.ok(!JSON.stringify(note).includes('Acquisition'))
+   })

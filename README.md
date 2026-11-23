@@ -145,9 +145,18 @@ contract suite server-side): `GET/POST /auth/devices(/...)`,
 `GET/POST /auth/recovery/codes/...`,
 `GET/PATCH /grapmail/push/notification-prefs`.
 
-Passkeys: the server surface is live (`/auth/passkeys/*`); the native clients
-call it in a later batch via the platform credential APIs. See DATA-FLOW.md
-for the full contract.
+Passkeys: live end to end. The server surface (`/auth/passkeys/*`) plus the
+native clients - Android Credential Manager (`security/PasskeyManager.kt`)
+and iOS AuthenticationServices (`PasskeyManager.swift`) - with usernameless
+discoverable sign-in on the login screen, a Passkeys management screen from
+the security hub, and the platform-enforced domain association requirements
+(`/.well-known/assetlinks.json` for Android, Associated Domains +
+apple-app-site-association for iOS) documented in DATA-FLOW.md.
+
+Device attestation ships with the device-security slice: Play Integrity
+standard verdicts on Android (`IntegrityClient.kt`), App Attest two-stage
+challenge/attestation on iOS (`AppAttestClient.swift`), server verification
+env-gated, attestation always a risk signal - never a universal block.
 
 > **Sign-in moved to the gateway (2026-11-08).** The app used to sign in against
 > the website's JSONL store (`/api/auth/account/*`), whose `st1` session ids the
