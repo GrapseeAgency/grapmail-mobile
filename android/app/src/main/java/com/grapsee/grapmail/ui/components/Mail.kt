@@ -3,10 +3,11 @@ package com.grapsee.grapmail.ui.components
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -15,10 +16,13 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Archive
@@ -398,6 +402,7 @@ fun MessageRow(
     Row(
         modifier
             .fillMaxWidth()
+            .background(if (selected) palette.infoFill else Color.Transparent)
             .combinedClickable(
                 onClick = { if (selecting) onSelect() else onOpen() },
                 onLongClick = onSelect,
@@ -430,7 +435,7 @@ fun MessageRow(
                 Text(
                     message.from?.display?.takeIf { it.isNotBlank() } ?: "Unknown sender",
                     fontSize = 15.sp,
-                    fontWeight = if (message.isRead) FontWeight.Normal else FontWeight.SemiBold,
+                    fontWeight = if (message.isRead) FontWeight.Medium else FontWeight.SemiBold,
                     color = palette.textPrimary,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -447,9 +452,9 @@ fun MessageRow(
                 fontSize = 14.sp,
                 fontWeight = if (message.isRead) FontWeight.Normal else FontWeight.Medium,
                 color = palette.textPrimary,
-                maxLines = 1,
+                maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.padding(top = 2.dp),
+                modifier = Modifier.padding(top = 3.dp),
             )
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 2.dp)) {
                 if (!compact && !message.snippet.isNullOrBlank()) {
@@ -472,7 +477,7 @@ fun MessageRow(
         Column(horizontalAlignment = Alignment.End) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 if (!message.isRead) {
-                    Box(Modifier.size(8.dp).clip(CircleShape).background(palette.primarySolid))
+                    Box(Modifier.size(6.dp).clip(CircleShape).background(palette.primarySolid))
                     Spacer(Modifier.width(5.dp))
                 }
                 val time = mailTime(message.createdAt)
@@ -487,16 +492,17 @@ fun MessageRow(
                         modifier = Modifier.size(15.dp))
                     Spacer(Modifier.width(5.dp))
                 }
-                Icon(
-                    if (message.isStarred) Icons.Rounded.Star else Icons.Rounded.StarBorder,
-                    if (message.isStarred) "Starred" else "Star",
-                    // The token, not a literal. This row is what the dark screenshot of
-                    // the home photographs, and a hardcoded light amber renders a
-                    // different star from the thread's for the very same message.
-                    tint = if (message.isStarred) palette.star else palette.textTertiary,
-                    modifier = Modifier.size(20.dp).clip(CircleShape)
-                        .clickable { onStar() }.padding(2.dp),
-                )
+                androidx.compose.material3.IconButton(
+                    onClick = onStar,
+                    modifier = Modifier.size(48.dp),
+                ) {
+                    Icon(
+                        if (message.isStarred) Icons.Rounded.Star else Icons.Rounded.StarBorder,
+                        if (message.isStarred) "Unstar" else "Star",
+                        tint = if (message.isStarred) palette.star else palette.textSecondary,
+                        modifier = Modifier.size(19.dp),
+                    )
+                }
             }
         }
     }
@@ -567,6 +573,8 @@ fun LabelChip(
     }
 }
 
+// ── compose affordance ───────────────────────────────────────────────────────
+
 @Composable
 fun BoxTab(
     title: String,
@@ -603,8 +611,6 @@ fun BoxTab(
         }
     }
 }
-
-// ── compose affordance ───────────────────────────────────────────────────────
 
 /**
  * The floating compose button.
@@ -766,17 +772,17 @@ private fun CenteredState(
     palette: com.grapsee.grapmail.ui.theme.Palette,
     action: Pair<String, () -> Unit>? = null,
 ) {
-    Box(Modifier.fillMaxSize().padding(32.dp), contentAlignment = Alignment.Center) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+    Box(Modifier.fillMaxSize().padding(start = 20.dp, end = 20.dp, top = 12.dp, bottom = if (action != null) 146.dp else 12.dp), contentAlignment = Alignment.Center) {
+        Column(Modifier.widthIn(max = 340.dp).verticalScroll(rememberScrollState()), horizontalAlignment = Alignment.CenterHorizontally) {
             Text(title, fontSize = 17.sp, fontWeight = FontWeight.SemiBold,
-                color = palette.textPrimary)
+                color = palette.textPrimary, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
             if (body != null) {
                 Spacer(Modifier.height(8.dp))
-                Text(body, fontSize = 14.sp, color = palette.textSecondary)
+                Text(body, fontSize = 14.sp, lineHeight = 21.sp, color = palette.textSecondary, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
             }
             if (action != null) {
                 Spacer(Modifier.height(16.dp))
-                GradientButton(action.first, action.second)
+                OutlineButton(action.first, action.second)
             }
         }
     }

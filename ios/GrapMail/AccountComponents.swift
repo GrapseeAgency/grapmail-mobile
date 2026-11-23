@@ -44,6 +44,7 @@ final class RecoveryModel: ObservableObject {
 /// footer. The body scrolls and the footer stays put, so the action is always
 /// reachable and never pushed off-screen by copy.
 struct AccountScreen<Content: View, Footer: View>: View {
+    @Environment(\.dynamicTypeSize) private var textSize
     var onBack: (() -> Void)? = nil
     var illustration: String? = nil
     var illustrationWidth: CGFloat = 200
@@ -58,7 +59,7 @@ struct AccountScreen<Content: View, Footer: View>: View {
         // gives way first and the action scrolls with the copy, so a field is
         // never left half-clipped under a pinned button.
         GeometryReader { geo in
-            let tight = geo.size.height < 660
+            let tight = geo.size.height < 660 || textSize.isAccessibilitySize
             VStack(spacing: 0) {
                 AccountHeader(onBack: onBack)
                 ScrollView {

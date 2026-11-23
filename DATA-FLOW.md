@@ -209,3 +209,104 @@ No new permission: the platform's push needs none beyond
 `android.permission.POST_NOTIFICATIONS`, which the app already asks for on
 its settings row, and both producers of the `grapmail-new-mail` channel check
 that grant before posting.
+
+## Device security: trusted devices, security events, and recovery
+
+The device-security slice (backend migrations 0040-0043) adds four surfaces the
+apps now call. The server holds only PUBLIC halves of device keys; nothing in
+this section sends a hardware identifier, a serial number, or an IMEI anywhere.
+
+### Device identity keys (`security/DeviceKeyManager.kt`, `DeviceKeyManager.swift`)
+
+| Platform | Key | Backing | Signature | Wire name |
+| --- | --- | --- | --- | --- |
+| iOS | Curve25519 (Ed25519), raw 32-byte key in the Keychain (`grapmail.device-key`, `AfterFirstUnlockThisDeviceOnly`) | CryptoKit | signs the raw nonce bytes, no pre-hash | `ed25519` |
+| Android | EC P-256 in AndroidKeyStore (`grapmail.device-key`, hardware/TEE-backed, `SHA256withECDSA`) | Keystore | signs the raw nonce bytes with SHA-256/ECDSA, DER-encoded | `es256` |
+
+Both export the public half as base64 SPKI DER, which is what the server stores
+and verifies. The private half never leaves the platform key store.
+
+### Enrollment (`security/TrustedDeviceManager.kt`, `.swift`)
+
+Enroll-once after sign-in: `POST /grapsee/auth/devices/enroll`
+`{installationId, platform, publicKey, displayName, keyAlgorithm}`. The ledger
+is per account email; the server upserts on (user, installation id), so a
+re-enroll refreshes the key, and revoking this device's own row re-arms the
+offer. A refusal never blocks sign-in.
+
+### Security events and alerts
+
+- Read: `GET /grapsee/auth/security/events`, acknowledge:
+  `POST /grapsee/auth/security/events/:id/ack` (single-use, "This was me").
+- Push: a server security event fans out to every OTHER device with a live
+  session. The payload is metadata only (`type: "security.alert"`, `eventId`,
+  `eventType`, `action`, `occurredAt`, `canAcknowledge`); no raw IP, no risk
+  internals. Android routes it to the `grapmail-security` channel
+  (IMPORTANCE_HIGH) with "This was me" / "Secure account" actions; iOS uses the
+  `grapmail.security` category with the same two actions, and the security
+  payload short-circuits the mail-poll wake. Security alerts are mandatory and
+  never suppressed by quiet hours; informational ones respect preferences.
+
+### Notification preferences (`GET`/`PATCH /grapsee/grapmail/push/notification-prefs`)
+
+Scopes: `mail`, `security`, `account`; a per-device row overrides the
+account-wide row. Quiet hours (minutes-from-midnight + the device's UTC offset,
+mail only) are enforced server-side at claim time; security alerts bypass them.
+The apps write `deviceKey: "account"` and `eventType: ""` for scope rows.
+
+### Per-account mute (`PATCH /grapsee/grapmail/push/devices/:id/preferences`)
+
+Each account's registration is one push_devices row, and the row id is the
+mute handle. The Per-account notifications screen PATCHes that row with the
+account's own bearer: `enabled:false` silences that one account's mail and
+informational alerts on this device. The row id is stored per account at
+registration; a re-registration that keeps the row id carries the flag, a new
+row id resets to unmuted, and mandatory security alerts stay immune (the
+server's separate fanout enforces that).
+
+### Recovery without a phone
+
+- Trusted device: `POST /grapsee/auth/recovery/device/challenge` returns a
+  nonce; the device signs it with its key;
+  `POST /grapsee/auth/recovery/device/verify` returns a one-time grant;
+  `POST /grapsee/auth/recovery/password/reset-with-grant` resets the password,
+  closes every session and retires every push registration.
+- All devices lost: `POST /grapsee/auth/recovery/password/reset-with-code`
+  consumes a single-use recovery code
+  (`POST /grapsee/auth/recovery/codes/generate`, displayed once, stored server-side
+  only as a hash).
+- The reset paths are rate-limited, cooldown-gated after recent resets, and
+  answer identical refusals for unknown identifiers.
+
+### Passkeys (`security/PasskeyManager.kt`, `PasskeyManager.swift`)
+
+The backend mounts the full WebAuthn surface (`/grapsee/auth/passkeys/*`,
+usernameless discoverable sign-in, session-backed tokens, clone tripwire on
+the signature counter), and the native clients now call it:
+
+- Android: `androidx.credentials` (Credential Manager). The server's
+  `options` JSON goes through `CreatePublicKeyCredentialRequest` verbatim;
+  the platform already serializes every byte field as unpadded base64url, so
+  the responses travel unchanged (shape-flattened only). "Use a passkey" sits
+  on the sign-in screen and lands in the same session flow as password login.
+- iOS: `AuthenticationServices` (`ASAuthorizationPlatformPublicKeyCredentialProvider`),
+  same contract.
+- Registration is offered from the security hub (Passkeys screen: list,
+  delete, add). `GET/DELETE /grapsee/auth/passkeys` back the list.
+- Deployment requirements (platform-enforced, founder-side):
+  - Android: the rp id must serve `/.well-known/assetlinks.json` naming
+    `com.grapsee.grapmail` + the signing cert SHA-256 (Digital Asset Links).
+  - iOS: the Associated Domains entitlement (`webcredentials:<rp id>`) plus
+    the `apple-app-site-association` file on the same host.
+
+### Device attestation (`security/IntegrityClient.kt`, `AppAttestClient.swift`)
+
+After device enrollment the apps attempt attestation and POST the evidence to
+`POST /grapsee/auth/devices/:id/attest`. Android: a standard Play Integrity
+verdict (free tier; silent no-op without the cloud-project build config
+field). iOS: App Attest in two stages — the server returns a one-time
+challenge (`stage: "challenge"`), the device runs `DCAppAttestService.attest`
+over it (`stage: "attest"`). The server-side verification is env-gated
+(`GOOGLE_PLAY_INTEGRITY_DECODER_KEY`, `APP_ATTEST_TEAM_ID`); attestation is
+one risk signal, never a universal block — an unverified level is recorded as
+self-reported and the account keeps working.

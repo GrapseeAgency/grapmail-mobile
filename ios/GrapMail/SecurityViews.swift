@@ -17,6 +17,12 @@ struct AccountSecurityView: View {
     let onPassword: () -> Void
     let onSignOutAll: () -> Void
     let onSupport: () -> Void
+    // The device-security band: the one-time recovery codes the
+    // all-devices-lost path spends, the trusted-device list the enrolled
+    // keys live on, and the passkey credentials the platform signs with.
+    var onRecoveryCodes: (() -> Void)? = nil
+    var onTrustedDevices: (() -> Void)? = nil
+    var onPasskeys: (() -> Void)? = nil
 
     private static var cachedVerdict: (generation: UUID, profile: ProfileDto)?
 
@@ -148,6 +154,30 @@ struct AccountSecurityView: View {
                     ? "\(profile?.backupCodesRemaining ?? 0) codes unused."
                     : "Generate and manage backup codes for 2FA.",
                 action: onBackupCodes
+            )
+            SecurityDivider()
+            // The 2FA backup codes above answer "lost phone"; these answer
+            // "lost everything" — ten one-time codes that sign you back in
+            // without a password at all.
+            SecurityRowView(
+                icon: "key.fill",
+                title: "Account Recovery Codes",
+                subtitle: "One-time codes for signing in if you lose your password.",
+                action: onRecoveryCodes
+            )
+            SecurityDivider()
+            SecurityRowView(
+                icon: "checkmark.seal",
+                title: "Trusted Devices",
+                subtitle: "Devices that hold a key this account trusts.",
+                action: onTrustedDevices
+            )
+            SecurityDivider()
+            SecurityRowView(
+                icon: "key.viewfinder",
+                title: "Passkeys",
+                subtitle: "Sign in with your face, fingerprint or passcode instead of a password.",
+                action: onPasskeys
             )
             SecurityDivider()
             SecurityRowView(
@@ -870,14 +900,13 @@ struct ChangePasswordView: View {
                 .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(GM.error.opacity(0.35)))
                 .padding(.bottom, 14)
             }
-            AppTextField(title: "Current Password", value: $current, hint: "Enter your current password", isPassword: true, leadingIcon: "lock")
-            AppTextField(title: "New Password", value: $next, hint: "Enter your new password", isPassword: true, leadingIcon: "lock")
+            AppTextField(title: "Current Password", value: $current, isPassword: true, leadingIcon: "lock")
+            AppTextField(title: "New Password", value: $next, isPassword: true, leadingIcon: "lock")
                 .padding(.top, 12)
             AppTextField(
                 title: "Confirm New Password",
                 value: $confirm,
                 error: (!confirm.isEmpty && !matches) ? "Passwords do not match." : nil,
-                hint: "Re-enter your new password",
                 isPassword: true,
                 leadingIcon: "lock"
             )

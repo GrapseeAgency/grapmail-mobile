@@ -505,6 +505,8 @@ struct MailPrefsView: View {
             .buttonStyle(.plain)
             .accessibilityIdentifier("gm-save-signatures")
 
+            MailNotificationPreviewSetting()
+
             MailFeatureSettingsSection()
 
             AccountSectionLabel(text: "List density")
@@ -1756,5 +1758,17 @@ extension Array where Element == String {
         var seen = Set<String>(); var out: [String] = []
         for e in self where seen.insert(e).inserted { out.append(e) }
         return out
+    }
+}
+
+
+private struct MailNotificationPreviewSetting: View {
+    @AppStorage("mailGenericPreviews") private var hidePreviews = false
+
+    var body: some View {
+        Toggle("Hide mail notification previews", isOn: $hidePreviews)
+            .onChange(of: hidePreviews) { _ in
+                NotificationRegistration.shared.refreshPreferences()
+            }
     }
 }

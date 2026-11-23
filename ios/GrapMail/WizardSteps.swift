@@ -10,6 +10,8 @@ struct NameStepView: View {
     var onSignIn: (() -> Void)? = nil
     let onNext: () -> Void
 
+    private enum NameField: Hashable { case first, last }
+    @FocusState private var activeField: NameField?
     @State private var showErrors = false
 
     private var firstError: String? { showErrors && model.state.firstName.isEmpty ? "First name is required" : nil }
@@ -19,25 +21,19 @@ struct NameStepView: View {
         WizardScaffold(
             step: 1,
             title: "What's your name?",
-            subtitle: Text("Let's get started. This will be used for your GrapMail account and profile."),
+            subtitle: Text("This name appears on your GrapMail profile."),
             onBack: onBack,
             onSignIn: onSignIn,
             bodyContent: {
-                Art.fill("step1_name")
-                    // The vector scene owns its proportions: the field is
-                    // declared, not inherited from a cropped raster's
-                    // intrinsic size.
-
                 VStack(alignment: .leading, spacing: 18) {
                     VStack(alignment: .leading, spacing: 8) {
                         (Text("First name").foregroundColor(GM.textPrimary)
                          + Text(" *").foregroundColor(GM.error))
                             .font(.system(size: 14, weight: .semibold))
-                        AppTextField(
-                            value: Binding(get: { model.state.firstName }, set: { newValue in model.update { $0.firstName = newValue } }),
-                            hint: "Enter your first name",
-                            leadingIcon: "person"
-                        )
+                        nameInput(.first, value: Binding(
+                            get: { model.state.firstName },
+                            set: { value in model.update { $0.firstName = value } }
+                        ))
                         if let firstError {
                             FieldErrorRow(text: firstError)
                                 .transition(.move(edge: .top).combined(with: .opacity))
@@ -47,19 +43,17 @@ struct NameStepView: View {
                         (Text("Last name").foregroundColor(GM.textPrimary)
                          + Text(" *").foregroundColor(GM.error))
                             .font(.system(size: 14, weight: .semibold))
-                        AppTextField(
-                            value: Binding(get: { model.state.lastName }, set: { newValue in model.update { $0.lastName = newValue } }),
-                            hint: "Enter your last name",
-                            leadingIcon: "person",
-                            dismissOnReturn: true
-                        )
+                        nameInput(.last, value: Binding(
+                            get: { model.state.lastName },
+                            set: { value in model.update { $0.lastName = value } }
+                        ))
                         if let lastError {
                             FieldErrorRow(text: lastError)
                                 .transition(.move(edge: .top).combined(with: .opacity))
                         }
                     }
                 }
-                .padding(.top, 24)
+                .padding(.top, 4)
             },
             bottom: {
                 GradientButton(
@@ -71,15 +65,45 @@ struct NameStepView: View {
                             .foregroundColor(.white)
                     )
                 ) {
-                    if model.state.firstName.isEmpty || model.state.lastName.isEmpty {
-                        withAnimation(.easeOut(duration: 0.2)) { showErrors = true }
-                    } else {
-                        onNext()
-                    }
+                    advance()
                 }
             }
         )
     }
+
+    private func nameInput(_ field: NameField, value: Binding<String>) -> some View {
+        TextField(field == .first ? "First name" : "Last name", text: value)
+            .font(.body)
+            .textContentType(field == .first ? .givenName : .familyName)
+            .textInputAutocapitalization(.words)
+            .submitLabel(field == .first ? .next : .done)
+            .focused($activeField, equals: field)
+            .onSubmit {
+                if field == .first { activeField = .last }
+                else { advance() }
+            }
+            .padding(14)
+            .frame(minHeight: 54)
+            .background(GM.inputFill, in: RoundedRectangle(cornerRadius: GMShape.input))
+            .overlay {
+                RoundedRectangle(cornerRadius: GMShape.input)
+                    .strokeBorder(activeField == field ? GM.primarySolid : GM.border)
+            }
+    }
+
+    private func advance() {
+        if model.state.firstName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            showErrors = true
+            activeField = .first
+        } else if model.state.lastName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            showErrors = true
+            activeField = .last
+        } else {
+            activeField = nil
+            onNext()
+        }
+    }
+
 }
 
 // MARK: - Step 2 · Basic Info — founder design verbatim

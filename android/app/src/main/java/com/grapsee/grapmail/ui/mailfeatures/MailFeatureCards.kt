@@ -1,6 +1,8 @@
 package com.grapsee.grapmail.ui.mailfeatures
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.background
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -444,6 +446,7 @@ fun ReadReceiptChip(sent: Boolean, modifier: Modifier = Modifier) {
     )
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun MailComposeTools(getBody: () -> String, setBody: (String) -> Unit) {
     val context = androidx.compose.ui.platform.LocalContext.current
@@ -452,10 +455,10 @@ fun MailComposeTools(getBody: () -> String, setBody: (String) -> Unit) {
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
         // On-device suggestions belong to the same switch as summaries.
         if (prefs.smartFeaturesEnabled) ComposeAssistRow(getBody = getBody, setBody = setBody)
-        Row(
+        FlowRow(
             Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically,
+            verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
             TemplatePickerChip(
                 prefs = prefs,
@@ -466,7 +469,7 @@ fun MailComposeTools(getBody: () -> String, setBody: (String) -> Unit) {
                     setBody(if (current.isBlank()) text else current + "\n\n" + text)
                 },
             )
-            Text("Assist runs fully on-device", fontSize = 11.sp)
+            Text("Assist runs fully on-device", fontSize = 11.sp, color = LocalPalette.current.textSecondary)
         }
     }
 }
@@ -486,13 +489,14 @@ fun MailFeatureSettingsSection() {
     var showFollowUps by remember { mutableStateOf(false) }
     var showImport by remember { mutableStateOf(false) }
 
+    val palette = LocalPalette.current
     Column(
-        Modifier.fillMaxWidth().padding(top = 18.dp),
+        Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 12.dp)
+            .background(palette.card, RoundedCornerShape(20.dp))
+            .padding(vertical = 8.dp),
         verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {
-        com.grapsee.grapmail.ui.screens.mail.SectionLabel(
-            "Privacy & intelligence", LocalPalette.current,
-        )
+        com.grapsee.grapmail.ui.screens.mail.SectionLabel("Privacy & intelligence", palette)
         MailFeatureSwitchRow(
             "On-device intelligence",
             "Categories, summaries and replies stay on this device",
@@ -561,7 +565,7 @@ private fun MailFeatureSwitchRow(
         Modifier.fillMaxWidth()
             .toggleable(value = checked, role = Role.Switch, onValueChange = onChange)
             .heightIn(min = 56.dp)
-            .padding(horizontal = 20.dp, vertical = 10.dp),
+            .padding(horizontal = 16.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(16.dp),
     ) {

@@ -147,9 +147,16 @@ struct MailboxView: View {
             VStack(spacing: 0) {
                 header
                 if vm.state.selection.isEmpty {
-                    BoxTabRow(activeBox: vm.state.box, counts: drawerCounts(vm.state), onSelect: open)
+                    Text(vm.state.box.title)
+                        .font(.subheadline.weight(.medium))
+                        .foregroundStyle(GM.textSecondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, 16)
+                        .padding(.bottom, 6)
+                    if vm.state.box == .inbox {
+                        MailCategoryChipsRow(selected: $categoryFilter)
+                    }
                 }
-                MailCategoryChipsRow(selected: $categoryFilter)
                 offlineBanner
                 staleBanner
                 listArea
@@ -211,10 +218,9 @@ struct MailboxView: View {
 
     private var searchField: some View {
         HStack(spacing: 10) {
-            // The wording names what the server's term actually covers --
-            // subject, body, sender (`grapmail-search.ts:110-118`) -- because
-            // a placeholder promising "people or files" would advertise a
-            // search the route does not run. Android's field says the same.
+            Image(systemName: "magnifyingglass")
+                .foregroundStyle(GM.textSecondary)
+                .accessibilityHidden(true)
             TextField("Search in mail", text: $searchDraft)
                 .onChange(of: searchDraft) { text in
                     searchTask?.cancel()
@@ -237,17 +243,15 @@ struct MailboxView: View {
                 .foregroundColor(GM.textPrimary)
                 .accessibilityLabel("Search subject, body or sender")
                 .accessibilityIdentifier("mail-search")
-            // No glyphs in the pill. Sort & filter and advanced search live in
-            // the drawer's Search section — the pill is the reference's own
-            // clean "Search in mail", and every tool stays one tap away where
-            // the other tools live.
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 13)
-        // The reference's search pill: tinted, fully rounded, and deliberately
-        // borderless — a control, not a boxed field.
-        .background(GM.softFill)
-        .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
+        .padding(.horizontal, 12)
+        .padding(.vertical, 12)
+        .background(GM.card, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .strokeBorder(GM.border)
+                .allowsHitTesting(false)
+        }
     }
 
     private var advActive: Bool {
@@ -421,7 +425,7 @@ struct MailboxView: View {
     /// The list itself keeps a clear background and hides its separators, so
     /// the only corners on screen are the container's.
     private var shownRows: [MailMessage] {
-        guard let categoryFilter else { return vm.state.rows }
+        guard vm.state.box == .inbox, let categoryFilter else { return vm.state.rows }
         let priority = MailFeaturePrefs.shared.prioritySenders
         return vm.state.rows.filter { row in
             let decision = MailCategorizer.classify(

@@ -259,6 +259,10 @@ enum SessionStore {
         // person a live action proof.
         SecurityFlow.reset()
         AccountSecurityView.clearCachedVerdict()
+        // The device key's cached biometric unlock dies with the session that
+        // opened it — a gate left open across sign-out would hand the next
+        // person a key the previous session had already prompted for.
+        DeviceKeyManager.resetGate()
         // The mailbox's cached pages, bodies, labels and stats belong to the
         // account that just signed out. Leaving them behind would make the first
         // thing the next person on this device sees somebody else's mail — the
@@ -303,5 +307,69 @@ enum Keychain {
             kSecAttrAccount as String: key,
         ]
         SecItemDelete(query as CFDictionary)
+    }
+}
+
+/// Per-account push registration state — the mute handle beside the sessions
+/// it belongs to.
+///
+/// The push register route mints one push_devices row per account per device
+/// and answers its `id`; that id is the handle the per-account preference
+/// write (PATCH devices/:id/preferences) addresses, so it is kept under the
+/// account email it was minted for — the same per-mailbox keying the shared
+/// preview credential uses. `muted` mirrors the server's stored
+/// `enabled = false` after a confirmed write; `preview` is the mode the
+/// registration carried, which the mute write must echo because the route
+/// replaces both columns in one strict body.
+enum AccountPushPrefs {
+    struct State: Codable {
+        var deviceRowId: String
+        var muted: Bool
+        var preview: String
+    }
+
+    private static func key(_ mailbox: String) -> String {
+        "grapmail.push-device.\(mailbox.lowercased())"
+    }
+
+    static func read(mailbox: String) -> State? {
+        guard let raw = Keychain.get(key(mailbox)),
+              let data = raw.data(using: .utf8) else { return nil }
+        return try? JSONDecoder().decode(State.self, from: data)
+    }
+
+    /// Record the row a successful registration minted. The muted flag
+    /// carries only when the row id is UNCHANGED — the route upserts on
+    /// (account, push token), so a same id means the server still holds the
+    /// mute it was set on; a NEW id is a row the server created with
+    /// notifications enabled, and the local flag must say so rather than
+    /// carry a mute across to a row that never had one. `preview` records the
+    /// mode the registration actually sent; nil keeps the previous answer.
+    @discardableResult
+    static func store(deviceRowId: String, preview: String?, mailbox: String) -> Bool {
+        let previous = read(mailbox: mailbox)
+        let state = State(
+            deviceRowId: deviceRowId,
+            muted: previous?.deviceRowId == deviceRowId && (previous?.muted ?? false),
+            preview: preview ?? previous?.preview ?? "full",
+        )
+        guard let data = try? JSONEncoder().encode(state),
+              let value = String(data: data, encoding: .utf8) else { return false }
+        return Keychain.set(value, for: key(mailbox))
+    }
+
+    /// Flip the stored mute once the server confirmed the same value.
+    @discardableResult
+    static func setMuted(_ muted: Bool, mailbox: String) -> Bool {
+        guard var state = read(mailbox: mailbox) else { return false }
+        state.muted = muted
+        guard let data = try? JSONEncoder().encode(state),
+              let value = String(data: data, encoding: .utf8) else { return false }
+        return Keychain.set(value, for: key(mailbox))
+    }
+
+    /// Drop the per-account record beside the registration teardown.
+    static func clear(mailbox: String) {
+        Keychain.delete(key(mailbox))
     }
 }

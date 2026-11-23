@@ -19,6 +19,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -50,6 +51,8 @@ fun WelcomeScreen(
     onLegal: (GrapMailLegalDocument) -> Unit,
 ) {
     val palette = LocalPalette.current
+    val configuration = LocalConfiguration.current
+    val compact = configuration.screenHeightDp < 700 || configuration.fontScale > 1.15f
     Column(
         Modifier
             .fillMaxSize()
@@ -58,13 +61,13 @@ fun WelcomeScreen(
             .padding(horizontal = 24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Spacer(Modifier.height(56.dp))
+        Spacer(Modifier.height(if (compact) 20.dp else 56.dp))
 
         Text("Welcome to", style = H1, color = palette.textPrimary, textAlign = TextAlign.Center)
         Text("GrapMail", style = H1, color = palette.primarySolid, textAlign = TextAlign.Center)
         Spacer(Modifier.height(12.dp))
         Text(
-            "A faster, safer and more private way\nto stay connected.",
+            "A faster, safer and more private way to stay connected.",
             fontSize = 14.sp,
             lineHeight = 21.sp,
             color = palette.textSecondary,
@@ -78,7 +81,7 @@ fun WelcomeScreen(
             WelcomeHero(
                 accent = palette.primarySolid,
                 backdrop = palette.bg,
-                modifier = Modifier.widthIn(max = 360.dp).fillMaxWidth().aspectRatio(400f / 440f),
+                modifier = Modifier.widthIn(max = if (compact) 200.dp else 360.dp).fillMaxWidth().aspectRatio(400f / 440f),
             )
         }
 

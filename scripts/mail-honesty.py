@@ -2605,16 +2605,14 @@ pin("the key record and the remove action read top-down, not centered",
     and "Spacer(minLength: 0)" not in body_of(code_only(SW_E2ES), "struct E2eRemoveScreen")
     and "Arrangement.Center" in body_of(code_only(KT_E2ES), "fun E2eStatusScreen"))
 
-# Frames 60 and 99, iOS artifact: the fixed tab row shared the phone width
-# between five labels and broke every word mid-spelling ("In/bo/x"), and
-# the scaffold-less undo frame drew its banner THROUGH the status bar. The
-# five boxes are doors that exist; they stay one-line, scrollable, and
-# below the clock at every width the walk runs.
-pin("the box tabs stay one-line and scrollable at every device width",
-    "ScrollView(.horizontal" in body_of(code_only(SW_CHROME), "struct BoxTabRow")
-    and ".fixedSize(horizontal: true, vertical: false)" in body_of(code_only(SW_COMPS), "struct BoxTab")
-    and "softWrap = false" in body_of(code_only(KT_MAIL_C2), "fun BoxTab(")
-    and "horizontalScroll" in body_of(code_only(KT_BOX), "fun BoxTabRow"))
+# Inbox categories complement the folder drawer. They never replace folder navigation.
+pin("the inbox uses categories and keeps folder selection in the drawer",
+    "BoxTabRow" not in code_only(SW_BOX)
+    and "BoxTabRow" not in code_only(KT_BOX)
+    and "MailCategoryChipsRow" in code_only(SW_BOX)
+    and "MailCategoryChipsRow" in code_only(KT_BOX)
+    and all(name in code_only(SW_BOX) for name in (".others", ".starred", ".sent"))
+    and all(name in code_only(KT_BOX) for name in ("MailBox.All", "MailBox.Starred", "MailBox.Sent")))
 pin("the undo frame sits below the status bar it once drew through",
     "ScrollView(.vertical" in body_of(code_only(ios("MailSnapshot.swift")), 'case "mail-undo"')
     and "GMUndoBanner" in body_of(code_only(ios("MailSnapshot.swift")), 'case "mail-undo"'))

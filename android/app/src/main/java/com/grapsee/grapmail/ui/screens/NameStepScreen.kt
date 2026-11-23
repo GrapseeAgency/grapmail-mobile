@@ -6,19 +6,16 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.ui.focus.FocusDirection
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ArrowForward
 import androidx.compose.material.icons.rounded.Error
@@ -31,8 +28,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -52,27 +47,33 @@ import com.grapsee.grapmail.ui.theme.LocalPalette
 fun NameStepScreen(vm: SignUpViewModel, onBack: () -> Unit, onSignIn: () -> Unit, onNext: () -> Unit) {
     val palette = LocalPalette.current
     val state by vm.state.collectAsStateWithLifecycle()
+    val focus = LocalFocusManager.current
     var firstError by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf<String?>(null) }
     var lastError by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf<String?>(null) }
     // Errors stay hidden until Next has been attempted once (mirrors iOS);
     // a fresh screen never opens with red "is required" rows.
     var attempted by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf(false) }
 
+    fun advance() {
+        attempted = true
+        firstError = Validators.firstName(state.firstName)
+        lastError = Validators.lastName(state.lastName)
+        if (firstError == null && lastError == null) {
+            focus.clearFocus()
+            onNext()
+        }
+    }
+
     WizardScaffold(
         step = 1,
         title = "What's your name?",
-        subtitle = AnnotatedSubtitle(boldLead = "Let's get started.", rest = "This will be used for your GrapMail account and profile."),
+        subtitle = AnnotatedSubtitle(rest = "This name appears on your GrapMail profile."),
         onBack = onBack,
         onSignIn = onSignIn,
         bottomBar = {
             GradientButton(
                 "Next",
-                onClick = {
-                    attempted = true
-                    firstError = Validators.firstName(state.firstName)
-                    lastError = Validators.lastName(state.lastName)
-                    if (firstError == null && lastError == null) onNext()
-                },
+                onClick = ::advance,
                 enabled = state.firstName.isNotBlank() && state.lastName.isNotBlank(),
                 trailing = {
                     Spacer(Modifier.size(10.dp))
@@ -81,39 +82,30 @@ fun NameStepScreen(vm: SignUpViewModel, onBack: () -> Unit, onSignIn: () -> Unit
             )
         },
     ) {
-        com.grapsee.grapmail.ui.artwork.Artwork(
-            "step1_name",
-            // Bounded, and the bound is load-bearing: at 0.92 of the screen
-            // width the 2:1 scene stood far taller than the PNG it replaced,
-            // and on the smallest walk device that pushed the screen's own
-            // action below the fold. A decorative illustration does not get
-            // to move a control out of reach.
-            modifier = Modifier.width(200.dp).aspectRatio(2f),
-        )
-        Spacer(Modifier.height(24.dp))
-
         FieldWithError(
             label = "First name",
             value = state.firstName,
-            hint = "Enter your first name",
             onValueChange = {
                 vm.update { copy(firstName = it) }
                 if (firstError != null) firstError = Validators.firstName(it)
             },
             error = firstError ?: "First name is required",
-            showError = attempted && state.firstName.isBlank(),
+            showError = attempted && firstError != null,
+            imeAction = ImeAction.Next,
+            keyboardActions = KeyboardActions(onNext = { focus.moveFocus(FocusDirection.Next) }),
         )
-        Spacer(Modifier.height(18.dp))
+        Spacer(Modifier.height(12.dp))
         FieldWithError(
             label = "Last name",
             value = state.lastName,
-            hint = "Enter your last name",
             onValueChange = {
                 vm.update { copy(lastName = it) }
                 if (lastError != null) lastError = Validators.lastName(it)
             },
             error = lastError ?: "Last name is required",
-            showError = attempted && state.lastName.isBlank(),
+            showError = attempted && lastError != null,
+            imeAction = ImeAction.Done,
+            keyboardActions = KeyboardActions(onDone = { advance() }),
         )
     }
 }
@@ -127,10 +119,11 @@ fun NameStepScreen(vm: SignUpViewModel, onBack: () -> Unit, onSignIn: () -> Unit
 private fun FieldWithError(
     label: String,
     value: String,
-    hint: String,
     onValueChange: (String) -> Unit,
     error: String?,
     showError: Boolean,
+    imeAction: ImeAction,
+    keyboardActions: KeyboardActions,
 ) {
     val palette = LocalPalette.current
     Column {
@@ -143,8 +136,9 @@ private fun FieldWithError(
             label = label,
             value = value,
             onValueChange = onValueChange,
-            hint = hint,
             showLabel = false,
+            imeAction = imeAction,
+            keyboardActions = keyboardActions,
             leading = {
                 Icon(
                     Icons.Rounded.Person,

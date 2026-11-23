@@ -1,5 +1,8 @@
 package com.grapsee.grapmail.ui.screens.security
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -8,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowForward
 import androidx.compose.material.icons.rounded.AlternateEmail
@@ -15,17 +19,23 @@ import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.DeleteForever
 import androidx.compose.material.icons.rounded.Devices
 import androidx.compose.material.icons.rounded.Email
+import androidx.compose.material.icons.rounded.DevicesOther
+import androidx.compose.material.icons.rounded.Fingerprint
 import androidx.compose.material.icons.rounded.HeadsetMic
 import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.Logout
 import androidx.compose.material.icons.rounded.Password
 import androidx.compose.material.icons.rounded.PhoneAndroid
+import androidx.compose.material.icons.rounded.PhoneIphone
+import androidx.compose.material.icons.rounded.PhonelinkLock
 import androidx.compose.material.icons.rounded.Security
 import androidx.compose.material.icons.rounded.Textsms
 import androidx.compose.material.icons.rounded.Timer
 import androidx.compose.material.icons.rounded.VerifiedUser
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -35,15 +45,19 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.grapsee.grapmail.data.Api
 import com.grapsee.grapmail.data.ProfileDto
 import com.grapsee.grapmail.data.SecurityProfileCache
 import com.grapsee.grapmail.data.SessionStore
+import com.grapsee.grapmail.data.TrustedDeviceDto
+import com.grapsee.grapmail.security.TrustedDeviceManager
 import com.grapsee.grapmail.ui.components.AccountLink
 import com.grapsee.grapmail.ui.components.AccountScreen
 import com.grapsee.grapmail.ui.components.ChipTone
@@ -73,6 +87,10 @@ fun AccountSecurityScreen(
     onRecoveryEmail: () -> Unit = {},
     onSessions: () -> Unit,
     onActivity: () -> Unit,
+    onTrustedDevices: () -> Unit,
+    onPasskeys: () -> Unit,
+    onRecoveryCodes: () -> Unit,
+    onNotificationPrefs: () -> Unit,
     onBackupCodes: () -> Unit,
     onPassword: () -> Unit,
     onSignOutAll: () -> Unit,
@@ -271,6 +289,41 @@ fun AccountSecurityScreen(
         SecurityRow(icon = Icons.Rounded.Devices, title = "Active Sessions", subtitle = "Devices signed in to this account.", onClick = onSessions)
         RowDivider()
         SecurityRow(icon = Icons.Rounded.VerifiedUser, title = "Recent Security Activity", subtitle = "Sign-ins and changes to this account.", onClick = onActivity)
+        RowDivider()
+        // The device-key sector's entries. Trusted devices are the rows the
+        // server holds public keys for; recovery codes and notification
+        // preferences hang off the same endpoints, and each gets its own
+        // screen rather than being crammed into a hub row.
+        SecurityRow(
+            icon = Icons.Rounded.PhonelinkLock,
+            title = "Trusted Devices",
+            subtitle = "Devices whose hardware key can prove this account.",
+            onClick = onTrustedDevices,
+        )
+        RowDivider()
+        // Passkeys hang off the same account: created here (signed in, so the
+        // ceremony runs under the bearer), used at sign-in on any screen —
+        // this row is the only place a credential is offered or removed.
+        SecurityRow(
+            icon = Icons.Rounded.Fingerprint,
+            title = "Passkeys",
+            subtitle = "Sign in with a biometric credential instead of a password.",
+            onClick = onPasskeys,
+        )
+        RowDivider()
+        SecurityRow(
+            icon = Icons.Rounded.Password,
+            title = "Recovery Codes",
+            subtitle = "One-time codes that unlock password recovery.",
+            onClick = onRecoveryCodes,
+        )
+        RowDivider()
+        SecurityRow(
+            icon = Icons.Rounded.Timer,
+            title = "Notification Preferences",
+            subtitle = "Which alerts this account sends, and when.",
+            onClick = onNotificationPrefs,
+        )
         RowDivider()
         SecurityRow(
             icon = Icons.Rounded.HeadsetMic,
@@ -866,4 +919,287 @@ fun TwoFactorDisabledScreen(onDone: () -> Unit, onSecureNow: () -> Unit) {
             divider = false,
         )
     }
+}
+
+/**
+ * The account's trusted devices — the rows the server holds a public key for.
+ *
+ * The list is read fresh on entry and after every revoke: a device that was
+ * revoked from another surface must not survive here as a cached row. Each row
+ * carries the name the enrollment sent, a platform icon, the server's own
+ * `trustState`, and the last time the device proved itself. Revoking needs a
+ * confirm dialog because the consequence is one-way: the key on that device
+ * stops being a credential, and the device cannot re-trust itself without
+ * being signed in again.
+ *
+ * This handset's own row is marked, from the row id the enrollment stored —
+ * so "Remove trust" on it says what it costs (the recovery path on THIS
+ * device goes dark too) and clears the local enrollment flag afterwards, so
+ * the next sign-in re-offers the key instead of assuming the old grant stands.
+ */
+@Composable
+fun TrustedDevicesScreen(onBack: () -> Unit) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val palette = LocalPalette.current
+    var devices by remember { mutableStateOf<List<TrustedDeviceDto>?>(null) }
+    var loading by remember { mutableStateOf(true) }
+    var failed by remember { mutableStateOf(false) }
+    var busyId by remember { mutableStateOf<String?>(null) }
+    var error by remember { mutableStateOf<String?>(null) }
+    var revokeTarget by remember { mutableStateOf<TrustedDeviceDto?>(null) }
+    var enrolling by remember { mutableStateOf(false) }
+    // This device's server row, known only after a completed enrollment on
+    // this install, and whether a local key exists at all — both read in the
+    // load below, never in composition: a keystore probe on the render path is
+    // the kind of blocking the list screens here avoid.
+    var ownRowId by remember { mutableStateOf<String?>(null) }
+    var hasLocalKey by remember { mutableStateOf(false) }
+    // True when THIS install's key answers signatures with no biometric gate —
+    // generated on a device without strong biometrics, or minted before the
+    // gate existed. Surfaced below: security never silently weakens.
+    var keyWithoutBiometricLock by remember { mutableStateOf(false) }
+
+    suspend fun load() {
+        val session = SessionStore.snapshot(context) ?: run {
+            failed = true; loading = false
+            return
+        }
+        loading = true
+        failed = false
+        ownRowId = TrustedDeviceManager.enrolledDeviceRowId(context, session.address)
+        hasLocalKey = com.grapsee.grapmail.security.DeviceKeyManager.hasKey()
+        keyWithoutBiometricLock = com.grapsee.grapmail.security.DeviceKeyManager.isUnlockedKey()
+        try {
+            val resp = Api.listDevices(session.token)
+            if (!SessionStore.isCurrent(context, session.id)) return
+            devices = resp.devices
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            if (SessionStore.isCurrent(context, session.id)) failed = true
+        } finally {
+            loading = false
+        }
+    }
+
+    LaunchedEffect(Unit) { load() }
+
+    fun revoke(device: TrustedDeviceDto) {
+        scope.launch {
+            busyId = device.id
+            try {
+                val active = SessionStore.snapshot(context) ?: throw IllegalStateException("Sign in again.")
+                Api.revokeDevice(active.token, device.id)
+                if (!SessionStore.isCurrent(context, active.id)) return@launch
+                if (device.id == ownRowId) {
+                    // Revoked ourselves: drop the local enrollment record, or
+                    // the next sign-in would assume the server still trusts a
+                    // row it just removed.
+                    TrustedDeviceManager.requestReEnroll(context, active.address)
+                }
+                devices = devices?.filterNot { it.id == device.id }
+                revokeTarget = null
+            } catch (e: Exception) {
+                error = e.message
+            } finally {
+                busyId = null
+            }
+        }
+    }
+
+    fun reEnroll() {
+        scope.launch {
+            enrolling = true
+            error = null
+            try {
+                val active = SessionStore.snapshot(context) ?: throw IllegalStateException("Sign in again.")
+                TrustedDeviceManager.enroll(context, active.token, active.address)
+                load()
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                error = e.message
+            } finally {
+                enrolling = false
+            }
+        }
+    }
+
+    AccountScreen(
+        onBack = onBack,
+        illustration = "ill_sec_sessions",
+        illustrationWidth = 150,
+        title = "Trusted Devices",
+        body = "Devices whose hardware-backed key can prove this account and unlock password recovery." +
+            if (keyWithoutBiometricLock) " Device key (no biometric lock)." else "",
+        footer = {
+            Column {
+                if (hasLocalKey && devices != null && devices?.none { it.id == ownRowId } == true) {
+                    GradientButton(
+                        "Trust this device",
+                        onClick = { reEnroll() },
+                        busy = enrolling,
+                    )
+                    Spacer(Modifier.height(4.dp))
+                }
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
+                    AccountLink("Back to Account Security", onBack)
+                }
+            }
+        },
+    ) {
+        LoadStateBlock(loading = loading, failed = failed, onRetry = { scope.launch { load() } }) {
+            val rows = devices ?: return@LoadStateBlock
+            if (rows.isEmpty()) {
+                Text(
+                    "No trusted devices yet. This device enrolls itself the next time you sign in.",
+                    fontSize = 13.sp,
+                    lineHeight = 18.sp,
+                    color = palette.textSecondary,
+                )
+            } else {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    rows.forEach { device ->
+                        TrustedDeviceCard(
+                            device = device,
+                            isThisDevice = device.id == ownRowId,
+                            busy = busyId == device.id,
+                            onRevoke = { revokeTarget = device },
+                        )
+                    }
+                }
+            }
+        }
+        if (error != null) {
+            Spacer(Modifier.height(8.dp))
+            Text(error!!, fontSize = 12.sp, color = palette.error)
+        }
+        Spacer(Modifier.height(12.dp))
+        InfoNoteCard(
+            title = "What trusted means",
+            body = "A trusted device can prove itself with a key stored in its hardware — it never sends the key, only a signature. Revoke a device the moment you stop holding it.",
+        )
+    }
+
+    revokeTarget?.let { device ->
+        AlertDialog(
+            onDismissRequest = { if (busyId == null) revokeTarget = null },
+            title = { Text("Remove trusted device?") },
+            text = {
+                Text(
+                    "“" + device.displayName.ifBlank { "This device" } + "” will lose its key as a credential. " +
+                        if (device.id == ownRowId) "This is the device you are holding — password recovery from it will stop working until you sign in again."
+                        else "It will need to sign in again before it can be trusted once more.",
+                    fontSize = 14.sp,
+                    lineHeight = 20.sp,
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    enabled = busyId == null,
+                    onClick = { revoke(device) },
+                ) { Text("Remove trust", color = palette.error) }
+            },
+            dismissButton = {
+                TextButton(enabled = busyId == null, onClick = { revokeTarget = null }) { Text("Keep") }
+            },
+        )
+    }
+}
+
+@Composable
+private fun TrustedDeviceCard(
+    device: TrustedDeviceDto,
+    isThisDevice: Boolean,
+    busy: Boolean,
+    onRevoke: () -> Unit,
+) {
+    val palette = LocalPalette.current
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .border(1.dp, palette.border, RoundedCornerShape(16.dp))
+            .background(palette.card)
+            .padding(16.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                device.displayName.ifBlank { "Unknown device" },
+                fontSize = 15.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = palette.textPrimary,
+                modifier = Modifier.weight(1f),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            if (isThisDevice) {
+                Text(
+                    "This device",
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = palette.successInk,
+                    modifier = Modifier
+                        .clip(androidx.compose.foundation.shape.CircleShape)
+                        .background(palette.successChipBg)
+                        .padding(horizontal = 10.dp, vertical = 4.dp),
+                )
+            }
+        }
+        Spacer(Modifier.height(6.dp))
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Icon(trustedDeviceIcon(device.platform), contentDescription = null, tint = palette.textTertiary, modifier = Modifier.size(13.dp))
+            Text(
+                trustedPlatformLabel(device.platform),
+                fontSize = 12.sp,
+                color = palette.textSecondary,
+            )
+            device.lastSeenAt?.takeIf { it.isNotBlank() }?.let {
+                Text("·  Last seen ${relativeTime(it)}", fontSize = 12.sp, color = palette.textSecondary)
+            }
+        }
+        Spacer(Modifier.height(3.dp))
+        Text(
+            listOfNotNull(
+                device.trustState.replaceFirstChar { it.uppercaseChar() }.takeIf { it.isNotBlank() },
+                device.createdAt?.takeIf(String::isNotBlank)?.let { "Added ${absoluteDateTime(it)}" },
+            ).joinToString(" · "),
+            fontSize = 11.sp,
+            color = palette.textTertiary,
+        )
+        if (!device.isRevoked) {
+            Spacer(Modifier.height(10.dp))
+            Row(
+                Modifier
+                    .clip(RoundedCornerShape(10.dp))
+                    .clickable(enabled = !busy, onClick = onRevoke)
+                    .padding(vertical = 6.dp, horizontal = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    if (busy) "Removing…" else "Remove trust",
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = if (busy) palette.textTertiary else palette.error,
+                )
+            }
+        } else {
+            Spacer(Modifier.height(10.dp))
+            StatusChip("Revoked", ChipTone.Warning)
+        }
+    }
+}
+
+/** The row's platform icon; an unknown platform is drawn as a generic device. */
+private fun trustedDeviceIcon(platform: String): ImageVector = when (platform.lowercase()) {
+    "android" -> Icons.Rounded.PhoneAndroid
+    "ios" -> Icons.Rounded.PhoneIphone
+    else -> Icons.Rounded.DevicesOther
+}
+
+private fun trustedPlatformLabel(platform: String): String = when (platform.lowercase()) {
+    "android" -> "Android"
+    "ios" -> "iPhone / iPad"
+    else -> platform.replaceFirstChar { it.uppercaseChar() }.ifBlank { "Unknown platform" }
 }

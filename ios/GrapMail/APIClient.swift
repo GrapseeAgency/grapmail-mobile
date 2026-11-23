@@ -9,6 +9,10 @@ extension Notification.Name {
     static let gmSessionExpired = Notification.Name("grapmail.session.expired")
     static let gmSessionChanged = Notification.Name("grapmail.session.changed")
     static let gmAccountDeleted = Notification.Name("grapmail.account.deleted")
+    /// Posted when a security push's "Secure account" action (or the banner
+    /// itself) is tapped: RootView routes into the security hub the same way a
+    /// mail push routes into its thread. Carries no payload — the hub refetches.
+    static let gmOpenAccountSecurity = Notification.Name("grapmail.open.accountSecurity")
 }
 
 /// Lenient decoding helpers.
@@ -1046,6 +1050,720 @@ struct ActivityResponse: Codable {
     }
 }
 
+// ── Device security sector (trusted devices, security events, recovery) ─────
+
+/// One row of `GET /grapsee/auth/devices` — a device the server would accept a
+/// recovery signature from while `trustState` reads "trusted" and `revokedAt`
+/// is empty. The enroll route answers the same shape minus the fields it has
+/// not learned yet (attestation, lastSeen, revocation), which is why every one
+/// of those decodes leniently.
+struct TrustedDeviceDto: Codable, Identifiable {
+    var id = ""
+    var displayName = ""
+    var platform = ""
+    var trustState = ""
+    var attestationLevel: String?
+    var createdAt = ""
+    var lastSeenAt: String?
+    var revokedAt: String?
+
+    private enum CodingKeys: String, CodingKey {
+        case id, displayName, platform, trustState, attestationLevel, createdAt, lastSeenAt, revokedAt
+    }
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = c.lenient(.id, "")
+        displayName = c.lenient(.displayName, "")
+        platform = c.lenient(.platform, "")
+        trustState = c.lenient(.trustState, "")
+        attestationLevel = c.lenientOpt(.attestationLevel)
+        createdAt = c.lenient(.createdAt, "")
+        lastSeenAt = c.lenientOpt(.lastSeenAt)
+        revokedAt = c.lenientOpt(.revokedAt)
+    }
+}
+
+struct DeviceEnrollResponse: Decodable {
+    var success = false
+    var device: TrustedDeviceDto?
+    var error: String?
+    var code: String?
+
+    private enum CodingKeys: String, CodingKey { case success, device, error, code }
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        success = c.lenient(.success, false)
+        device = c.lenientOpt(.device)
+        error = c.lenientOpt(.error)
+        code = c.lenientOpt(.code)
+    }
+}
+
+struct DeviceListResponse: Decodable {
+    var success = false
+    var devices: [TrustedDeviceDto] = []
+    var error: String?
+
+    private enum CodingKeys: String, CodingKey { case success, devices, error }
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        success = c.lenient(.success, false)
+        devices = c.lenient(.devices, [])
+        error = c.lenientOpt(.error)
+    }
+}
+
+struct DeviceRevokeResponse: Decodable {
+    var success = false
+    var revoked: String?
+    var error: String?
+    var code: String?
+
+    private enum CodingKeys: String, CodingKey { case success, revoked, error, code }
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        success = c.lenient(.success, false)
+        revoked = c.lenientOpt(.revoked)
+        error = c.lenientOpt(.error)
+        code = c.lenientOpt(.code)
+    }
+}
+
+struct DeviceAttestResponse: Decodable {
+    var success = false
+    var attestationLevel = ""
+    /// The one-time challenge the two-stage App Attest contract returns for
+    /// `stage: "challenge"` (base64 bytes — the client hashes exactly these).
+    /// nil on the plain level-only record and on a route that has not deployed
+    /// the two-stage contract yet; both absences are how the client learns to
+    /// degrade gracefully instead of probing twice.
+    var challenge: String?
+    var error: String?
+    var code: String?
+
+    private enum CodingKeys: String, CodingKey { case success, attestationLevel, challenge, error, code }
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        success = c.lenient(.success, false)
+        attestationLevel = c.lenient(.attestationLevel, "")
+        challenge = c.lenientOpt(.challenge)
+        error = c.lenientOpt(.error)
+        code = c.lenientOpt(.code)
+    }
+}
+
+/// One row of `GET /grapsee/auth/security/events` — the per-event record the
+/// security push notifications point back to. `riskScore` is the server's own
+/// 0-100 verdict and stays optional: an absent score is unknown, not zero, and
+/// a zero would read as "safe".
+struct SecurityEventDto: Codable, Identifiable {
+    var id = ""
+    var eventType = ""
+    var riskScore: Int?
+    var signals: [String] = []
+    var action = ""
+    var country: String?
+    var originLabel: String?
+    var occurredAt = ""
+    var acknowledgedAt: String?
+
+    private enum CodingKeys: String, CodingKey {
+        case id, eventType, riskScore, signals, action, country, originLabel, occurredAt, acknowledgedAt
+    }
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = c.lenient(.id, "")
+        eventType = c.lenient(.eventType, "")
+        riskScore = c.lenientOpt(.riskScore)
+        signals = c.lenient(.signals, [])
+        action = c.lenient(.action, "")
+        country = c.lenientOpt(.country)
+        originLabel = c.lenientOpt(.originLabel)
+        occurredAt = c.lenient(.occurredAt, "")
+        acknowledgedAt = c.lenientOpt(.acknowledgedAt)
+    }
+}
+
+struct SecurityEventsResponse: Decodable {
+    var success = false
+    var events: [SecurityEventDto] = []
+    var error: String?
+
+    private enum CodingKeys: String, CodingKey { case success, events, error }
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        success = c.lenient(.success, false)
+        events = c.lenient(.events, [])
+        error = c.lenientOpt(.error)
+    }
+}
+
+struct SecurityEventAckResponse: Decodable {
+    var success = false
+    var error: String?
+    var code: String?
+
+    private enum CodingKeys: String, CodingKey { case success, error, code }
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        success = c.lenient(.success, false)
+        error = c.lenientOpt(.error)
+        code = c.lenientOpt(.code)
+    }
+}
+
+/// Step 1 of trusted-device recovery: a 32-byte nonce the server hashed and
+/// stored, base64 on the wire. `expiresAt` is the challenge's own ISO stamp —
+/// five minutes out — not an epoch number like the SMS reset's.
+struct DeviceChallengeResponse: Decodable {
+    var success = false
+    var challengeId = ""
+    var nonce = ""
+    var expiresAt: String?
+    var error: String?
+    var code: String?
+
+    private enum CodingKeys: String, CodingKey { case success, challengeId, nonce, expiresAt, error, code }
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        success = c.lenient(.success, false)
+        challengeId = c.lenient(.challengeId, "")
+        nonce = c.lenient(.nonce, "")
+        expiresAt = c.lenientOpt(.expiresAt)
+        error = c.lenientOpt(.error)
+        code = c.lenientOpt(.code)
+    }
+}
+
+/// Step 2's answer: a 64-hex one-time grant, spendable for 15 minutes at
+/// `reset-with-grant`. Empty means the proof was refused; the route's refusal
+/// carries no grant rather than a reason, so recovery probing learns nothing.
+struct DeviceVerifyResponse: Decodable {
+    var success = false
+    var recoveryGrant: String?
+    var expiresInSeconds: Int?
+    var error: String?
+    var code: String?
+
+    private enum CodingKeys: String, CodingKey { case success, recoveryGrant, expiresInSeconds, error, code }
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        success = c.lenient(.success, false)
+        recoveryGrant = c.lenientOpt(.recoveryGrant)
+        expiresInSeconds = c.lenientOpt(.expiresInSeconds)
+        error = c.lenientOpt(.error)
+        code = c.lenientOpt(.code)
+    }
+}
+
+struct ResetWithGrantResponse: Decodable {
+    var success = false
+    var requiresSignIn: Bool?
+    var message: String?
+    var error: String?
+    var code: String?
+
+    private enum CodingKeys: String, CodingKey { case success, requiresSignIn, message, error, code }
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        success = c.lenient(.success, false)
+        requiresSignIn = c.lenientOpt(.requiresSignIn)
+        message = c.lenientOpt(.message)
+        error = c.lenientOpt(.error)
+        code = c.lenientOpt(.code)
+    }
+}
+
+/// The ten one-time codes from `POST /grapsee/auth/recovery/codes/generate`.
+/// Cross the wire exactly once — the server stores SHA-256 hashes and can
+/// never show them again, so the screen that receives this IS the only view.
+struct RecoveryCodesResponse: Decodable {
+    var success = false
+    var codes: [String] = []
+    var error: String?
+    var code: String?
+
+    private enum CodingKeys: String, CodingKey { case success, codes, error, code }
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        success = c.lenient(.success, false)
+        codes = c.lenient(.codes, [])
+        error = c.lenientOpt(.error)
+        code = c.lenientOpt(.code)
+    }
+}
+
+struct RecoveryCodesStatusResponse: Decodable {
+    var success = false
+    var usable = false
+    var error: String?
+
+    private enum CodingKeys: String, CodingKey { case success, usable, error }
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        success = c.lenient(.success, false)
+        usable = c.lenient(.usable, false)
+        error = c.lenientOpt(.error)
+    }
+}
+
+// ── Passkey sector (WebAuthn platform credentials) ──────────────────────────
+//
+// Every byte field on this wire is a base64url STRING (the WebAuthn JSON
+// shapes) — never raw base64, never a byte array. The passkey challenge in
+// particular must reach PasskeyManager byte-exact: the platform base64url-
+// encodes the bytes it is handed into clientDataJSON, and the server compares
+// that string with the challenge it stored.
+
+/// One row of `GET /grapsee/auth/passkeys` — a passkey credential the account
+/// holds. `lastUsedAt` is nil until the credential signs its first sign-in;
+/// an absent stamp reads as "never used", which is the honest state.
+struct PasskeyDto: Decodable, Identifiable {
+    var id = ""
+    var name = ""
+    var createdAt: String?
+    var lastUsedAt: String?
+
+    private enum CodingKeys: String, CodingKey { case id, name, createdAt, lastUsedAt }
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = c.lenient(.id, "")
+        name = c.lenient(.name, "")
+        createdAt = c.lenientOpt(.createdAt)
+        lastUsedAt = c.lenientOpt(.lastUsedAt)
+    }
+}
+
+/// `POST /grapsee/auth/passkeys/register/options`. The challenge rides twice —
+/// top level and inside `options` (the browser-facing
+/// PublicKeyCredentialCreationOptionsJSON) — and both are read: the top-level
+/// copy is the documented one, the nested copy is what a web client would
+/// consume. They carry the same bytes.
+struct PasskeyRegisterOptionsResponse: Decodable {
+    var success = false
+    var challengeId = ""
+    var challenge: String?
+    var expiresAt: String?
+    var options: PasskeyRegistrationOptions?
+    var error: String?
+    var code: String?
+
+    private enum CodingKeys: String, CodingKey {
+        case success, challengeId, challenge, expiresAt, options, error, code
+    }
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        success = c.lenient(.success, false)
+        challengeId = c.lenient(.challengeId, "")
+        challenge = c.lenientOpt(.challenge)
+        expiresAt = c.lenientOpt(.expiresAt)
+        options = c.lenientOpt(.options)
+        error = c.lenientOpt(.error)
+        code = c.lenientOpt(.code)
+    }
+
+    /// The challenge to sign, preferring the documented top-level copy.
+    var challengeBase64Url: String? { challenge?.nilIfBlank() ?? options?.challenge.nilIfBlank() }
+}
+
+/// The registration options object — the fields the platform request needs.
+/// `pubKeyCredParams` and `authenticatorSelection` ride along but are not
+/// read: the platform chooses its own algorithm (ES256) and the server's
+/// authenticatorSelection (`residentKey: preferred, userVerification:
+/// preferred`) is exactly what ASAuthorizationPlatformPublicKeyCredentialProvider
+/// does by default. A field the client cannot honor is not decoded into a
+/// promise the client would silently break.
+struct PasskeyRegistrationOptions: Decodable {
+    struct RelyingParty: Decodable {
+        var name = ""
+        var id = ""
+
+        /// The empty fallback `lenient` decodes against — an explicit init,
+        /// because a struct that defines `init(from:)` gets no implicit one.
+        init() {}
+
+        private enum CodingKeys: String, CodingKey { case name, id }
+        init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            name = c.lenient(.name, "")
+            id = c.lenient(.id, "")
+        }
+    }
+    struct User: Decodable {
+        var id = ""   // base64url of the account's user-id bytes
+        var name = ""
+        var displayName = ""
+
+        init() {}
+
+        private enum CodingKeys: String, CodingKey { case id, name, displayName }
+        init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            id = c.lenient(.id, "")
+            name = c.lenient(.name, "")
+            displayName = c.lenient(.displayName, "")
+        }
+    }
+    /// One credential the account already holds, offered back as
+    /// excludeCredentials so the platform refuses to mint a second key for the
+    /// same account instead of doing it silently.
+    struct ExistingCredential: Decodable {
+        var id = ""
+        var type = "public-key"
+
+        init() {}
+
+        private enum CodingKeys: String, CodingKey { case id, type }
+        init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            id = c.lenient(.id, "")
+            type = c.lenient(.type, "public-key")
+        }
+    }
+
+    var rp = RelyingParty()
+    var user = User()
+    var challenge = ""
+    var timeout: Int?
+    var excludeCredentials: [ExistingCredential] = []
+
+    private enum CodingKeys: String, CodingKey {
+        case rp, user, challenge, timeout, excludeCredentials
+    }
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        rp = c.lenient(.rp, RelyingParty())
+        user = c.lenient(.user, User())
+        challenge = c.lenient(.challenge, "")
+        timeout = c.lenientOpt(.timeout)
+        excludeCredentials = c.lenient(.excludeCredentials, [])
+    }
+}
+
+/// `POST /grapsee/auth/passkeys/authenticate/options` — a usernameless
+/// sign-in challenge. `allowCredentials` is empty by contract: the server
+/// looks the credential up by the id the assertion carries, so the platform
+/// is asked for whatever discoverable credential the person has.
+struct PasskeyAuthOptionsResponse: Decodable {
+    var success = false
+    var challengeId = ""
+    var challenge: String?
+    var expiresAt: String?
+    var options: PasskeyAuthenticationOptions?
+    var error: String?
+    var code: String?
+
+    private enum CodingKeys: String, CodingKey {
+        case success, challengeId, challenge, expiresAt, options, error, code
+    }
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        success = c.lenient(.success, false)
+        challengeId = c.lenient(.challengeId, "")
+        challenge = c.lenientOpt(.challenge)
+        expiresAt = c.lenientOpt(.expiresAt)
+        options = c.lenientOpt(.options)
+        error = c.lenientOpt(.error)
+        code = c.lenientOpt(.code)
+    }
+
+    /// The challenge to sign. The live route puts it inside `options` only;
+    /// the top-level copy is the registration route's shape, read here so one
+    /// decoder survives either placement.
+    var challengeBase64Url: String? { challenge?.nilIfBlank() ?? options?.challenge.nilIfBlank() }
+}
+
+struct PasskeyAuthenticationOptions: Decodable {
+    var challenge = ""
+    var rpId: String?
+    var userVerification: String?
+    var timeout: Int?
+
+    private enum CodingKeys: String, CodingKey { case challenge, rpId, userVerification, timeout }
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        challenge = c.lenient(.challenge, "")
+        rpId = c.lenientOpt(.rpId)
+        userVerification = c.lenientOpt(.userVerification)
+        timeout = c.lenientOpt(.timeout)
+    }
+}
+
+/// `POST /grapsee/auth/passkeys/register/verify` — the stored credential row.
+struct PasskeyRegisterVerifyResponse: Decodable {
+    var success = false
+    var passkey: PasskeyDto?
+    var error: String?
+    var code: String?
+
+    private enum CodingKeys: String, CodingKey { case success, passkey, error, code }
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        success = c.lenient(.success, false)
+        passkey = c.lenientOpt(.passkey)
+        error = c.lenientOpt(.error)
+        code = c.lenientOpt(.code)
+    }
+}
+
+struct PasskeyListResponse: Decodable {
+    var success = false
+    var passkeys: [PasskeyDto] = []
+    var error: String?
+
+    private enum CodingKeys: String, CodingKey { case success, passkeys, error }
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        success = c.lenient(.success, false)
+        passkeys = c.lenient(.passkeys, [])
+        error = c.lenientOpt(.error)
+    }
+}
+
+struct PasskeyDeleteResponse: Decodable {
+    var success = false
+    var error: String?
+    var code: String?
+
+    private enum CodingKeys: String, CodingKey { case success, error, code }
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        success = c.lenient(.success, false)
+        error = c.lenientOpt(.error)
+        code = c.lenientOpt(.code)
+    }
+}
+
+/// The passkey sign-in's account object. It arrives under `user` with `email`
+/// — the password-login envelope calls the same string `address` — so it has
+/// its own shape and the sign-in screen saves the session with the email as
+/// the address, the way every other sign-in path feeds SessionStore.
+struct PasskeyAccountDto: Decodable {
+    var id = ""
+    var email = ""
+    var name = ""
+    var accountType = "USER"
+
+    private enum CodingKeys: String, CodingKey { case id, email, name, accountType }
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = c.lenient(.id, "")
+        email = c.lenient(.email, "")
+        name = c.lenient(.name, "")
+        accountType = c.lenient(.accountType, "USER")
+    }
+}
+
+/// `POST /grapsee/auth/passkeys/authenticate/verify` — the minted session. The
+/// route answers no expiry fields (the password login's `expiresIn` is not
+/// here), so the session is stored without one and lives until a 401 renewal
+/// says otherwise — the same discipline SessionStore applies to any response
+/// that omits the stamp.
+struct PasskeyAuthVerifyResponse: Decodable {
+    var success = false
+    var accessToken: String?
+    var refreshToken: String?
+    var sessionId: String?
+    var user: PasskeyAccountDto?
+    var error: String?
+    var code: String?
+
+    private enum CodingKeys: String, CodingKey {
+        case success, accessToken, refreshToken, sessionId, user, error, code
+    }
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        success = c.lenient(.success, false)
+        accessToken = c.lenientOpt(.accessToken)
+        refreshToken = c.lenientOpt(.refreshToken)
+        sessionId = c.lenientOpt(.sessionId)
+        user = c.lenientOpt(.user)
+        error = c.lenientOpt(.error)
+        code = c.lenientOpt(.code)
+    }
+}
+
+/// The WebAuthn `RegistrationResponseJSON` the verify route forwards to
+/// @simplewebauthn/server. The nested `response` object is the standard shape —
+/// the server destructures `response.response.clientDataJSON` — so a body that
+/// flattens these fields would verify against nothing.
+struct PasskeyRegistrationResponseJson: Encodable {
+    let id: String
+    let rawId: String
+    let type: String
+    let clientExtensionResults: [String: String]
+    let response: Inner
+
+    struct Inner: Encodable {
+        let clientDataJSON: String
+        let attestationObject: String
+    }
+
+    /// `id` and `rawId` are the same base64url string by spec, and the server
+    /// refuses a pair that disagrees — build both from one value so they can
+    /// never drift.
+    init(id: String, clientDataJSON: String, attestationObject: String) {
+        self.id = id
+        self.rawId = id
+        self.type = "public-key"
+        self.clientExtensionResults = [:]
+        self.response = Inner(clientDataJSON: clientDataJSON, attestationObject: attestationObject)
+    }
+}
+
+/// The WebAuthn `AuthenticationResponseJSON` — same nesting rule as above.
+/// `userHandle` stays optional: an absent handle decodes to nil and the
+/// server matches the credential by `rawId` alone.
+struct PasskeyAuthenticationResponseJson: Encodable {
+    let id: String
+    let rawId: String
+    let type: String
+    let clientExtensionResults: [String: String]
+    let response: Inner
+
+    struct Inner: Encodable {
+        let clientDataJSON: String
+        let authenticatorData: String
+        let signature: String
+        let userHandle: String?
+    }
+
+    init(id: String, clientDataJSON: String, authenticatorData: String,
+         signature: String, userHandle: String?) {
+        self.id = id
+        self.rawId = id
+        self.type = "public-key"
+        self.clientExtensionResults = [:]
+        self.response = Inner(clientDataJSON: clientDataJSON, authenticatorData: authenticatorData,
+                              signature: signature, userHandle: userHandle)
+    }
+}
+
+/// One row of `GET /grapsee/grapmail/push/notification-prefs`. `deviceKey` is
+/// "account" for the account-wide row or a push-device id for a per-device
+/// override; `eventType` "" means the whole scope. Quiet hours ride on the
+/// same row (mail only — security alerts are mandatory by design and never
+/// consult them).
+struct NotificationPrefDto: Codable, Identifiable {
+    var deviceKey = ""
+    var scope = ""
+    var eventType = ""
+    var enabled = false
+    var quietStartMin: Int?
+    var quietEndMin: Int?
+    var quietTzOffsetMin: Int?
+    var updatedAt: String?
+    var id: String { "\(deviceKey)|\(scope)|\(eventType)" }
+
+    private enum CodingKeys: String, CodingKey {
+        case deviceKey, scope, eventType, enabled, quietStartMin, quietEndMin, quietTzOffsetMin, updatedAt
+    }
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        deviceKey = c.lenient(.deviceKey, "")
+        scope = c.lenient(.scope, "")
+        eventType = c.lenient(.eventType, "")
+        enabled = c.lenient(.enabled, false)
+        quietStartMin = c.lenientOpt(.quietStartMin)
+        quietEndMin = c.lenientOpt(.quietEndMin)
+        quietTzOffsetMin = c.lenientOpt(.quietTzOffsetMin)
+        updatedAt = c.lenientOpt(.updatedAt)
+    }
+}
+
+struct NotificationPrefsResponse: Decodable {
+    var success = false
+    var prefs: [NotificationPrefDto] = []
+    var error: String?
+
+    private enum CodingKeys: String, CodingKey { case success, prefs, error }
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        success = c.lenient(.success, false)
+        prefs = c.lenient(.prefs, [])
+        error = c.lenientOpt(.error)
+    }
+}
+
+/// One preference write. The patch schema on the route is STRICT — any key it
+/// does not name is a 400 — so the encoder below is hand-written and sparse:
+/// nils are ABSENT, and `tzOffsetMin` is encodeIfPresent because the nested
+/// schema accepts undefined but rejects JSON null.
+struct NotificationPrefPatch: Codable {
+    var deviceKey: String
+    var scope: String
+    var eventType: String
+    var enabled: Bool
+    var quiet: Quiet?
+    var clearQuiet: Bool = false
+
+    struct Quiet: Codable {
+        var startMin: Int
+        var endMin: Int
+        var tzOffsetMin: Int?
+
+        private enum CodingKeys: String, CodingKey { case startMin, endMin, tzOffsetMin }
+        func encode(to encoder: Encoder) throws {
+            var v = encoder.container(keyedBy: CodingKeys.self)
+            try v.encode(startMin, forKey: .startMin)
+            try v.encode(endMin, forKey: .endMin)
+            try v.encodeIfPresent(tzOffsetMin, forKey: .tzOffsetMin)
+        }
+    }
+
+    private enum CodingKeys: String, CodingKey { case deviceKey, scope, eventType, enabled, quiet }
+    func encode(to encoder: Encoder) throws {
+        var v = encoder.container(keyedBy: CodingKeys.self)
+        try v.encode(deviceKey, forKey: .deviceKey)
+        try v.encode(scope, forKey: .scope)
+        try v.encode(eventType, forKey: .eventType)
+        try v.encode(enabled, forKey: .enabled)
+        if let quiet {
+            try v.encode(quiet, forKey: .quiet)
+        } else if clearQuiet {
+            // An explicit null clears the stored quiet hours in one write,
+            // distinct from leaving the key out entirely (which the route
+            // treats exactly the same — both null the columns).
+            try v.encodeNil(forKey: .quiet)
+        }
+    }
+}
+
+struct NotificationPrefResponse: Decodable {
+    var success = false
+    var pref: NotificationPrefDto?
+    var error: String?
+
+    private enum CodingKeys: String, CodingKey { case success, pref, error }
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        success = c.lenient(.success, false)
+        pref = c.lenientOpt(.pref)
+        error = c.lenientOpt(.error)
+    }
+}
+
+/// One push_devices row as the register route answers it. `id` is the mute
+/// handle: the per-account preference write addresses THIS row, so the client
+/// keeps it beside the account the registration ran for.
+struct PushDeviceDto: Decodable {
+    var id = ""
+    var platform = ""
+    var deviceId = ""
+    var createdAt: String?
+    var lastSeenAt: String?
+
+    private enum CodingKeys: String, CodingKey { case id, platform, deviceId, createdAt, lastSeenAt }
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = c.lenient(.id, "")
+        platform = c.lenient(.platform, "")
+        deviceId = c.lenient(.deviceId, "")
+        createdAt = c.lenientOpt(.createdAt)
+        lastSeenAt = c.lenientOpt(.lastSeenAt)
+    }
+}
+
 private struct TwoFactorEnableRequest: Codable { var twoFactor: String; var proof: String; var phoneProof: String; var emailProof: String }
 private struct TwoFactorDisableRequest: Codable { var twoFactor: String; var currentPassword: String }
 private struct PasswordChangeRequest: Codable { var currentPassword: String; var newPassword: String }
@@ -1055,6 +1773,18 @@ private struct VerifyPasswordRequest: Codable { var password: String }
 
 struct ApiClient {
     static let base = "https://grapsee.com/api"
+
+    /// The relying-party id passkeys bind to: the deployment origin's host,
+    /// derived from the same base every call uses — one constant, no second
+    /// copy that could drift from the server's own rpId (the hostname of its
+    /// FRONTEND_URL). A credential registered under a different host would be
+    /// refused at the platform layer before the server ever saw it, and the
+    /// origin the platform writes into clientDataJSON must match the server's
+    /// expectedOrigin character for character.
+    static let rpId: String = {
+        guard let host = URL(string: base)?.host, !host.isEmpty else { return "grapsee.com" }
+        return host
+    }()
 
     /// The avatar bytes must be read and written straight at the API host.
     /// The Next.js origin proxy used by every other call converts a binary
@@ -1467,22 +2197,42 @@ struct ApiClient {
 
     /// The backend keeps this device's push token so it can wake the app when
     /// mail reaches the mailbox. `deviceId` is the same `x-device-id` the other
-    /// routes carry, so the server can tell one install from another.
-    static func registerPush(token: String, pushToken: String) async throws -> String? {
-        struct Body: Encodable { let token: String; let platform: String; let deviceId: String }
+    /// routes carry, so the server can tell one install from another. The 201
+    /// body also names the push_devices row the registration minted — the mute
+    /// handle — which is stored under the account the registration ran for.
+    static func registerPush(token: String, pushToken: String, genericPreview: Bool?, mailbox: String) async throws -> String? {
+        struct Body: Encodable {
+            let token: String
+            let platform: String
+            let deviceId: String
+            let preview: String?
+        }
         struct Registration: Decodable {
             let success: Bool
             let message: String?
             let previewSecret: String?
             let previewDevice: String?
+            let device: PushDeviceDto?
         }
         let response: Registration = try await request(
             "/grapsee/grapmail/push/register", method: "POST",
-            body: encoder.encode(Body(token: pushToken, platform: "ios", deviceId: DeviceId.value)),
+            body: encoder.encode(Body(token: pushToken, platform: "ios", deviceId: DeviceId.value,
+                                      preview: genericPreview.map { $0 ? "generic" : "full" })),
             bearer: token)
         guard response.success else {
             throw ApiError.http(status: 200, code: nil,
                                 message: response.message ?? "Push registration was not confirmed.")
+        }
+        // The row id is what the per-account mute addresses; keep it keyed to
+        // the account it was minted under, the same keying the preview
+        // credential uses. A registration whose row could not be stored still
+        // stands — only the mute handle is missing, and the mute screen says
+        // "not registered" rather than pretending one exists.
+        if let device = response.device, !device.id.isEmpty,
+           !AccountPushPrefs.store(deviceRowId: device.id,
+                                   preview: genericPreview.map { $0 ? "generic" : "full" },
+                                   mailbox: mailbox) {
+            print("Push device row could not be saved.")
         }
         guard let secret = response.previewSecret else { return nil }
         return response.previewDevice.map { "\($0).\(secret)" } ?? secret
@@ -1518,6 +2268,35 @@ struct ApiClient {
             throw ApiError.http(status: 200, code: nil,
                                 message: response.message ?? "Push deregistration was not confirmed.")
         }
+    }
+
+    /// PATCH devices/:id/preferences — mute or unmute ONE account's
+    /// notifications on THIS device. The bearer must be the muted account's
+    /// own: the route updates only a device row the bearer's account owns, so
+    /// a session for a different mailbox cannot silence another one's alerts.
+    /// Mandatory security alerts stay on regardless — the server keeps those.
+    /// The body is strict (`enabled` + `preview`), and the write replaces both
+    /// columns, so callers pass the preview mode the account was last
+    /// registered with instead of letting a mute rewrite it blind.
+    static func setAccountPushPreferences(token: String, deviceRowId: String, enabled: Bool,
+                                          preview: String = "full") async throws -> (enabled: Bool, preview: String) {
+        struct Body: Encodable { let enabled: Bool; let preview: String }
+        struct Preferences: Decodable {
+            var enabled: Bool?
+            var preview: String?
+
+            private enum CodingKeys: String, CodingKey { case enabled, preview }
+            init(from decoder: Decoder) throws {
+                let c = try decoder.container(keyedBy: CodingKeys.self)
+                enabled = c.lenientOpt(.enabled)
+                preview = c.lenientOpt(.preview)
+            }
+        }
+        let encodedId = deviceRowId.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? deviceRowId
+        let response: Preferences = try await request(
+            "\(mailBase)/push/devices/\(encodedId)/preferences", method: "PATCH",
+            body: encoder.encode(Body(enabled: enabled, preview: preview)), bearer: token)
+        return (response.enabled ?? enabled, response.preview ?? preview)
     }
 
     static func twoFactorCode(challengeId: String, code: String) async throws -> TwoFactorResponse {
@@ -1827,5 +2606,214 @@ struct ApiClient {
     /// honestly and the original row stays in the history.
     static func acknowledgeActivity(token: String) async throws -> ProfileResponse {
         try await request("/grapsee/auth/account/activity", method: "POST", body: Data("{}".utf8), bearer: token)
+    }
+
+    // ── Device security sector ──────────────────────────────────────────────
+
+    /// Make this install a trusted device. The public key is base64 SPKI DER
+    /// (DeviceKeyManager wraps the raw 32 bytes in the fixed Ed25519 prefix);
+    /// `keyAlgorithm: "ed25519"` is what tells the server to verify later
+    /// signatures over RAW bytes — Android's es256 keys verify with SHA-256
+    /// named, and the stored algorithm is the discriminator between the two.
+    static func enrollDevice(token: String, installationId: String, publicKey: String, displayName: String) async throws -> DeviceEnrollResponse {
+        struct Body: Encodable {
+            let installationId: String
+            let platform: String
+            let publicKey: String
+            let displayName: String
+            let keyAlgorithm: String
+        }
+        return try await request(
+            "/grapsee/auth/devices/enroll", method: "POST",
+            body: encoder.encode(Body(installationId: installationId, platform: "ios",
+                                      publicKey: publicKey, displayName: displayName,
+                                      keyAlgorithm: "ed25519")),
+            bearer: token)
+    }
+
+    static func listDevices(token: String) async throws -> DeviceListResponse {
+        try await request("/grapsee/auth/devices", bearer: token)
+    }
+
+    /// Cut a device off: no more recovery signatures from it, and the server
+    /// deletes its push registration in the same transaction, so a revoked
+    /// phone goes quiet immediately.
+    static func revokeDevice(token: String, id: String) async throws -> DeviceRevokeResponse {
+        let encoded = id.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? id
+        return try await request("/grapsee/auth/devices/\(encoded)/revoke", method: "POST", bearer: token)
+    }
+
+    /// Record this device's attestation level ("none", "app_attest",
+    /// "hardware"). A risk signal the server folds into security events — never
+    /// a universal block on its own.
+    ///
+    /// The App Attest call (AppAttestClient) extends the same route with the
+    /// two-stage material: `stage: "challenge"` asks for the one-time
+    /// challenge, `stage: "attest"` submits the attestation object, and a
+    /// later sensitive operation submits `stage: "assert"` with `assertion`
+    /// plus `prevAuthData` (the challenge bytes the previous proof hashed, so
+    /// the server can chain the counter). The optional fields are omitted from
+    /// the body when nil — the level-only request stays byte-identical to what
+    /// the route has always read, and a route without the two-stage contract
+    /// simply ignores what it does not know, answering without a `challenge`
+    /// for the caller to read as "unsupported".
+    static func attestDevice(token: String, id: String, level: String,
+                             stage: String? = nil, keyId: String? = nil,
+                             attestation: String? = nil, assertion: String? = nil,
+                             prevAuthData: String? = nil) async throws -> DeviceAttestResponse {
+        struct Body: Encodable {
+            let attestationLevel: String
+            let stage: String?
+            let keyId: String?
+            let attestation: String?
+            let assertion: String?
+            let prevAuthData: String?
+        }
+        let encoded = id.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? id
+        return try await request(
+            "/grapsee/auth/devices/\(encoded)/attest", method: "POST",
+            body: encoder.encode(Body(attestationLevel: level, stage: stage, keyId: keyId,
+                                      attestation: attestation, assertion: assertion,
+                                      prevAuthData: prevAuthData)), bearer: token)
+    }
+
+    /// The security trail the push notifications belong to: one row per
+    /// suspicious/blocked/recovery event, newest first, with the server's risk
+    /// verdict and the coarse origin it recorded.
+    static func securityEvents(token: String) async throws -> SecurityEventsResponse {
+        try await request("/grapsee/auth/security/events", bearer: token)
+    }
+
+    /// "This was me" for one event — recorded (the row stays, acknowledgedAt
+    /// set), matching the account-activity acknowledgement's honesty rule.
+    static func acknowledgeSecurityEvent(token: String, id: String) async throws -> SecurityEventAckResponse {
+        let encoded = id.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? id
+        return try await request("/grapsee/auth/security/events/\(encoded)/ack", method: "POST", bearer: token)
+    }
+
+    /// Ten one-time recovery codes, hashed server-side the moment they land.
+    /// Generating retires every previous set — this is the deliberate press.
+    static func generateRecoveryCodes(token: String) async throws -> RecoveryCodesResponse {
+        try await request("/grapsee/auth/recovery/codes/generate", method: "POST", bearer: token)
+    }
+
+    /// Whether the account still holds at least one unredeemed code. nil-less:
+    /// the screen treats a failed read as unknown rather than as "none".
+    static func recoveryCodesStatus(token: String) async throws -> RecoveryCodesStatusResponse {
+        try await request("/grapsee/auth/recovery/codes/status", bearer: token)
+    }
+
+    /// Trusted-device recovery, step 1 (unauthenticated — the password is the
+    /// thing being replaced): a 32-byte nonce bound to the account email,
+    /// spendable for five minutes.
+    static func deviceChallenge(identifier: String) async throws -> DeviceChallengeResponse {
+        struct Body: Encodable { let identifier: String }
+        return try await request("/grapsee/auth/recovery/device/challenge", method: "POST",
+                                 body: encoder.encode(Body(identifier: identifier)))
+    }
+
+    /// Step 2: prove custody by signing the nonce with the device's enrolled
+    /// Ed25519 key. `signature` is base64 over the RAW nonce bytes — no
+    /// pre-hash; the server verifies Ed25519 with a null digest. A grant comes
+    /// back only when nonce, installation id and signature all line up.
+    static func deviceVerify(identifier: String, challengeId: String, nonce: String,
+                             installationId: String, signature: String) async throws -> DeviceVerifyResponse {
+        struct Body: Encodable {
+            let identifier: String
+            let challengeId: String
+            let nonce: String
+            let installationId: String
+            let signature: String
+        }
+        return try await request("/grapsee/auth/recovery/device/verify", method: "POST",
+                                 body: encoder.encode(Body(identifier: identifier, challengeId: challengeId,
+                                                           nonce: nonce, installationId: installationId,
+                                                           signature: signature)))
+    }
+
+    /// Spend the grant: the new password is set, every session is closed and
+    /// every push registration is deleted. `requiresSignIn` is always true on
+    /// success — the response says so rather than the client assuming it.
+    static func resetWithGrant(identifier: String, grant: String, password: String) async throws -> ResetWithGrantResponse {
+        struct Body: Encodable {
+            let identifier: String
+            let grant: String
+            let password: String
+        }
+        return try await request("/grapsee/auth/recovery/password/reset-with-grant", method: "POST",
+                                 body: encoder.encode(Body(identifier: identifier, grant: grant, password: password)))
+    }
+
+    // ── Passkey sector (WebAuthn platform credentials) ───────────────────────
+
+    /// Step 1 of passkey registration (signed in): the creation options. The
+    /// challenge must reach PasskeyManager byte-exact — the platform
+    /// base64url-encodes whatever bytes it is handed, and the server compares
+    /// that string with the challenge it stored for the challengeId.
+    static func passkeyRegisterOptions(token: String) async throws -> PasskeyRegisterOptionsResponse {
+        try await request("/grapsee/auth/passkeys/register/options", method: "POST",
+                          body: Data("{}".utf8), bearer: token)
+    }
+
+    /// Step 2: hand the platform's attestation to the server inside the
+    /// standard nested `RegistrationResponseJSON`. `name` is the label the
+    /// security screens print for the credential (the server trims to 60).
+    static func passkeyRegisterVerify(token: String, challengeId: String, name: String,
+                                      response: PasskeyRegistrationResponseJson) async throws -> PasskeyRegisterVerifyResponse {
+        struct Body: Encodable {
+            let challengeId: String
+            let name: String
+            let response: PasskeyRegistrationResponseJson
+        }
+        return try await request("/grapsee/auth/passkeys/register/verify", method: "POST",
+                                 body: encoder.encode(Body(challengeId: challengeId, name: name, response: response)),
+                                 bearer: token)
+    }
+
+    /// Step 1 of passkey sign-in (public — the password is the thing being
+    /// replaced): a usernameless challenge, `allowCredentials` empty by
+    /// contract, so the platform offers whatever credential the person holds.
+    static func passkeyAuthOptions() async throws -> PasskeyAuthOptionsResponse {
+        try await request("/grapsee/auth/passkeys/authenticate/options", method: "POST", body: Data("{}".utf8))
+    }
+
+    /// Step 2: the assertion. The route mints the session exactly the way the
+    /// password login does — same token pair, same revocability, same
+    /// security-event stream.
+    static func passkeyAuthVerify(challengeId: String,
+                                  response: PasskeyAuthenticationResponseJson) async throws -> PasskeyAuthVerifyResponse {
+        struct Body: Encodable {
+            let challengeId: String
+            let response: PasskeyAuthenticationResponseJson
+        }
+        return try await request("/grapsee/auth/passkeys/authenticate/verify", method: "POST",
+                                 body: encoder.encode(Body(challengeId: challengeId, response: response)))
+    }
+
+    /// Every passkey credential on the account.
+    static func listPasskeys(token: String) async throws -> PasskeyListResponse {
+        try await request("/grapsee/auth/passkeys", bearer: token)
+    }
+
+    /// Delete one credential. 404 for a row that is not this account's — the
+    /// same one-way act revoking a device is, so the screen confirms first.
+    static func deletePasskey(token: String, id: String) async throws -> PasskeyDeleteResponse {
+        let encoded = id.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? id
+        return try await request("/grapsee/auth/passkeys/\(encoded)", method: "DELETE", bearer: token)
+    }
+
+    /// The account's notification-preference rows, keyed by scope
+    /// ("mail" | "security" | "account") with "" meaning the whole scope.
+    static func getNotificationPrefs(token: String) async throws -> NotificationPrefsResponse {
+        try await request("\(mailBase)/push/notification-prefs", bearer: token)
+    }
+
+    /// One preference write. The route's patch schema is strict, so the body
+    /// carries exactly the keys the caller touched (the encoder omits nils) —
+    /// and quiet hours are rewritten whole on every mail write, because the
+    /// route has no partial-column update.
+    static func patchNotificationPrefs(token: String, patch: NotificationPrefPatch) async throws -> NotificationPrefResponse {
+        try await request("\(mailBase)/push/notification-prefs", method: "PATCH",
+                          body: try encoder.encode(patch), bearer: token)
     }
 }

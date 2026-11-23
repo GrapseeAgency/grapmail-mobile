@@ -43,6 +43,9 @@ struct RootView: View {
         case welcome, signIn
         case twoFactor, backupCode, emailVerification
         case forgotPassword, recoveryCode, newPassword, resetDone, recoveryPending
+        // The Forgot Password screen's signature path: this device proves
+        // custody with its enrolled key instead of a texted code.
+        case trustedRecovery
         case findAddress, addressFound
         case phoneVerify, phoneVerified
         case stepName, stepInfo, stepAddress, stepPassword, stepTerms
@@ -62,6 +65,11 @@ struct RootView: View {
         case secRevokeAlert(id: String, device: String)
         case secRevokedAlert(device: String)
         case secActivity, secAlert, secSecure
+        // The device-security band: trusted-device list, and the recovery
+        // codes the all-devices-lost path spends. Both hang off the hub like
+        // the sessions and activity screens do. Passkeys sit on the same band:
+        // the platform credentials the sign-in and the hub's list share.
+        case secTrustedDevices, secRecoveryCodes, secPasskeys
         case created(address: String, name: String)
         case createdAlt(address: String, name: String)
         case onboarding(address: String, name: String)
@@ -82,6 +90,12 @@ struct RootView: View {
         // one has a parent, so a deep link can never strand somebody on a
         // child with no way back.
         case mailNotes, mailTasks, mailPrefs, mailAddresses, mailConnections
+        // Per-scope notification preferences (mail / security / account),
+        // edited on the account-wide preference row the push backend reads.
+        case mailNotifPrefs
+        // The per-account mute: one signed-in account's alerts silenced on
+        // this device. Hangs off mailSettings like the per-scope row beside it.
+        case perAccountNotifications
         case accountProfile, accountPrivacy, mailSupport
         // The web's `/mail/account/connections/<product>`: one linked app in
         // full. The product rides as a route payload, mirroring the encoded
@@ -255,6 +269,13 @@ struct RootView: View {
                 restoredSession = true
                 showRemainingAccount(or: [.signIn])
             }
+            // A security push's "Secure account" action, or a plain tap on the
+            // alert banner (SecurityPush.handle). The hub refetches on entry,
+            // so the alert that brought the person here is answered by the
+            // account's live state, not a copy.
+            .onReceive(NotificationCenter.default.publisher(for: .gmOpenAccountSecurity)) { _ in
+                openSecurityHub()
+            }
             // A long-press on the icon that says "Compose mail" has to land in
             // the composer. The delegate parks the request until a stack exists
             // that can act on it, and it is consumed here once -- a pending
@@ -322,6 +343,24 @@ struct RootView: View {
         path.append(.mailCompose(reply: "", mode: "reply"))
     }
 
+    /// The security push's landing: the account-security hub. Signed out, the
+    /// honest route is sign-in — the hub's every call would 401. The launch
+    /// restore may still be deciding the stack, so like the other openers this
+    /// waits for `restoredSession` rather than racing it.
+    private func openSecurityHub() {
+        guard restoredSession, !renewingSession else { return }
+        guard SessionStore.hasValidSession else {
+            path = [.signIn]
+            return
+        }
+        if path.contains(.security) {
+            backToSecurity()
+        } else {
+            if path.last != .home { path = [.home] }
+            path.append(.security)
+        }
+    }
+
     /// The launch screen: the test-only snapshot host when the walk named
     /// one, the signed-in-or-welcome root otherwise.
     @ViewBuilder private var rootContent: some View {
@@ -377,14 +416,15 @@ struct RootView: View {
         Group {
             switch route {
             case .welcome, .signIn, .twoFactor, .backupCode, .emailVerification, .forgotPassword,
-                 .recoveryCode, .newPassword, .resetDone, .recoveryPending,
+                 .recoveryCode, .newPassword, .resetDone, .recoveryPending, .trustedRecovery,
                  .findAddress, .addressFound, .phoneVerify, .phoneVerified:
                 authDestination(route)
             case .security, .secEnable, .secConfirmPassword, .secVerifyPhone, .secEnabled,
                  .secDisable, .secDisabled, .secBackup, .secBackupSaved, .secPassword,
                  .secPasswordDone, .secPasswordAfter, .secPasswordUpdated, .secSignOutAll,
                  .secSignOutAllDone, .secSessions, .secRevoke, .secRevoked, .secRevokeAlert,
-                 .secRevokedAlert, .secActivity, .secAlert, .secSecure:
+                 .secRevokedAlert, .secActivity, .secAlert, .secSecure,
+                 .secTrustedDevices, .secRecoveryCodes, .secPasskeys:
                 securityDestination(route)
             case .stepName, .stepInfo, .stepAddress, .stepPassword, .stepTerms,
                  .humanVerify, .created, .createdAlt:
@@ -447,7 +487,8 @@ struct RootView: View {
                         onCodeSent: { path.append(.recoveryCode) },
                         onNeedsManualReview: { path.append(.recoveryPending) },
                         onFindAddress: { path.append(.findAddress) },
-                        onSupport: { openSupport() }
+                        onSupport: { openSupport() },
+                        onTrustedDevice: { path.append(.trustedRecovery) }
                     )
                 case .recoveryCode:
                     RecoveryCodeView(
@@ -480,6 +521,18 @@ struct RootView: View {
                         model: recovery,
                         onBackToSignIn: { backToSignIn() },
                         onSupport: { openSupport() }
+                    )
+                case .trustedRecovery:
+                    TrustedDeviceRecoveryView(
+                        model: recovery,
+                        onBack: { path.removeLast() },
+                        onResetDone: {
+                            // The reset is spent and every session is closed,
+                            // so the trusted route is spent too: back must not
+                            // land on a grant screen whose proof is used up.
+                            path.removeAll { $0 == .trustedRecovery }
+                            path.append(.resetDone)
+                        }
                     )
                 case .findAddress:
                     FindAddressView(
@@ -531,7 +584,10 @@ struct RootView: View {
                         onBackupCodes: { path.append(.secBackup) },
                         onPassword: { path.append(.secPassword) },
                         onSignOutAll: { path.append(.secSignOutAll) },
-                        onSupport: { openSupport() }
+                        onSupport: { openSupport() },
+                        onRecoveryCodes: { path.append(.secRecoveryCodes) },
+                        onTrustedDevices: { path.append(.secTrustedDevices) },
+                        onPasskeys: { path.append(.secPasskeys) }
                     )
                 case .secEnable:
                     TwoFactorEnableView(
@@ -652,6 +708,15 @@ struct RootView: View {
                             }
                         }
                     )
+                case .secTrustedDevices:
+                    TrustedDevicesView(onBack: { path.removeLast() })
+                case .secPasskeys:
+                    PasskeysView(onBack: { path.removeLast() })
+                case .secRecoveryCodes:
+                    // Done returns to the hub, whichever door opened this
+                    // screen — the codes screen is a child of it, like the
+                    // 2FA confirmation screens above.
+                    RecoveryCodesView(onBack: { backToSecurity() })
             default:
                 mailDestination(route)
         }
@@ -740,6 +805,7 @@ struct RootView: View {
     private func enterMailbox() {
         e2e.clearForSignOut()
         signedInModels.reset()
+        inlineMail = nil
         path = [.home]
     }
 
@@ -758,39 +824,73 @@ struct RootView: View {
         showRemainingAccount(or: [])
     }
 
+    @Environment(\.horizontalSizeClass) private var mailboxSizeClass
+    @State private var inlineMail: InlineMail?
+    private struct InlineMail {
+        let id: String
+        let isThread: Bool
+    }
+
     /// The signed-in world: mailbox, account record, encryption,
     /// subscriptions. `default:` above routes here.
     @ViewBuilder private func mailDestination(_ route: Route) -> some View {
         switch route {
 
                 case .home:
-                    MailboxView(
-                        vm: mail,
-                        onThread: { id, isThread in
-                            path.append(.mailThread(id: id, isThread: isThread))
-                        },
-                        // A draft is the person's own unfinished mail; the
-                        // only useful tap is the one that lets them finish it.
-                        // Declared before onCompose because Swift requires
-                        // call order to match the struct's property order.
-                        onDraft: { id in path.append(.mailCompose(reply: id, mode: "draft")) },
-                        onCompose: { path.append(.mailCompose(reply: "", mode: "reply")) },
-                        onLabels: { path.append(.mailLabels) },
-                        onScreener: { path.append(.mailScreener) },
-                        onSubscriptions: { path.append(.mailSubscriptions) },
-                        onProfile: { path.append(.accountProfile) },
-                        onSettings: { path.append(.mailSettings) },
-                        onSecurity: { path.append(.security) },
-                        onHelp: openSupport,
-                        onContacts: { path.append(.mailContacts) },
-                        onFiles: { path.append(.mailFiles) },
-                        onSignOut: signOutOfMailbox,
-                        onAddAccount: { path.append(.signIn) },
-                        onSwitchAccount: { address in
-                            if SessionStore.switchTo(address) { enterMailbox() }
-                        },
-                        accountPhoto: account.state.avatar
-                    )
+                    GeometryReader { geometry in
+                        let wide = mailboxSizeClass == .regular && geometry.size.width >= 760
+                        HStack(spacing: 0) {
+                            if wide || inlineMail == nil {
+                                MailboxView(
+                                    vm: mail,
+                                    onThread: { id, isThread in
+                                        if wide { inlineMail = InlineMail(id: id, isThread: isThread) }
+                                        else { path.append(.mailThread(id: id, isThread: isThread)) }
+                                    },
+                                    // A draft is the person's own unfinished mail; the
+                                    // only useful tap is the one that lets them finish it.
+                                    // Declared before onCompose because Swift requires
+                                    // call order to match the struct's property order.
+                                    onDraft: { id in path.append(.mailCompose(reply: id, mode: "draft")) },
+                                    onCompose: { path.append(.mailCompose(reply: "", mode: "reply")) },
+                                    onLabels: { path.append(.mailLabels) },
+                                    onScreener: { path.append(.mailScreener) },
+                                    onSubscriptions: { path.append(.mailSubscriptions) },
+                                    onProfile: { path.append(.accountProfile) },
+                                    onSettings: { path.append(.mailSettings) },
+                                    onSecurity: { path.append(.security) },
+                                    onHelp: openSupport,
+                                    onContacts: { path.append(.mailContacts) },
+                                    onFiles: { path.append(.mailFiles) },
+                                    onSignOut: signOutOfMailbox,
+                                    onAddAccount: { path.append(.signIn) },
+                                    onSwitchAccount: { address in
+                                        if SessionStore.switchTo(address) { enterMailbox() }
+                                    },
+                                    accountPhoto: account.state.avatar
+                                )
+                                .frame(width: wide ? min(420, geometry.size.width * 0.42) : nil)
+                            }
+                            if wide { Divider() }
+                            if let selection = inlineMail {
+                                ThreadView(
+                                    vm: mail, e2e: e2e, id: selection.id, isThread: selection.isThread,
+                                    onBack: { inlineMail = nil },
+                                    onReply: { id, mode in path.append(.mailCompose(reply: id, mode: mode)) },
+                                    onStepPrev: { inlineMail = InlineMail(id: $0.id, isThread: $0.isThread) },
+                                    onStepNext: { inlineMail = InlineMail(id: $0.id, isThread: $0.isThread) },
+                                    onContacts: { path.append(.mailContacts) },
+                                    initialMessageId: nil, openMessageActions: false
+                                )
+                                .id(selection.id)
+                                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            } else if wide {
+                                Text("Select a message to read")
+                                    .foregroundStyle(GM.textSecondary)
+                                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            }
+                        }
+                    }
                     .task(id: SessionStore.generation) {
                         if let address = model.state.createdAddress,
                            address.caseInsensitiveCompare(SessionStore.address ?? "") == .orderedSame,
@@ -887,8 +987,14 @@ struct RootView: View {
                         onPrivacy: { path.append(.accountPrivacy) },
                         onEncryption: { path.append(.e2eStatus) },
                         onHelp: { path.append(.mailSupport) },
-                        onSignOut: signOutOfMailbox
+                        onSignOut: signOutOfMailbox,
+                        onNotificationPrefs: { path.append(.mailNotifPrefs) },
+                        onPerAccountNotifications: { path.append(.perAccountNotifications) }
                     )
+                case .mailNotifPrefs:
+                    NotificationPrefsView(onBack: { path.removeLast() })
+                case .perAccountNotifications:
+                    PerAccountNotificationsView(onBack: { path.removeLast() })
                 case .mailNotes:
                     NotesView(vm: account, onBack: { path.removeLast() })
                 case .mailTasks:

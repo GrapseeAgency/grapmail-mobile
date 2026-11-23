@@ -330,7 +330,7 @@ fun MailSnapshotScreen(name: String) {
                 onScreener = {}, onLabels = {}, onNotes = {}, onTasks = {}, onPrefs = {},
                 onAddresses = {}, onConnections = {}, onSubscriptions = {}, onProfile = {},
                 onPrivacy = {},
-                onEncryption = {}, onHelp = {}, onSignOut = {})
+                onEncryption = {}, onNotificationPrefs = {}, onHelp = {}, onSignOut = {})
             "mail-notes" -> NotesScreen(profileVm, onBack = {})
             "mail-tasks" -> TasksScreen(profileVm, onBack = {})
             "mail-settings-prefs" -> MailPrefsScreen(profileVm, onBack = {})
@@ -794,7 +794,6 @@ private fun listFrame(
                 fontSize = 13.sp,
                 fontWeight = androidx.compose.ui.text.font.FontWeight.Medium,
             )
-            BoxTabRow(box, mapOf(MailBox.All to 12, MailBox.Starred to 3, MailBox.Sent to 24), onSelect = {})
             Box(
                 Modifier.fillMaxWidth().weight(1f)
                     .mailListSurface(),

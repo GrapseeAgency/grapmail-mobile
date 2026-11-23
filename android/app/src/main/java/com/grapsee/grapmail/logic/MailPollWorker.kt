@@ -46,6 +46,8 @@ class MailPollWorker(
 
     override suspend fun doWork(): Result = activePoll.withLock { pollMailbox() }
 
+    private val privatePreview get() = inputData.getBoolean("privatePreview", false) || PushSync.genericPreviews(applicationContext)
+
     private suspend fun pollMailbox(): Result {
         val session = SessionStore.snapshot(applicationContext)
         if (session == null) {
@@ -62,20 +64,8 @@ class MailPollWorker(
             } ?: return Result.success()
             if (!Notifications.allowed(applicationContext)) return Result.success()
             val fresh = com.grapsee.grapmail.data.SessionRefresh.forAccount(applicationContext, saved.id)
-            if (fresh != null) {
-                val result = notifyExact(fresh, pushedId)
-                if (result != null) return result
-            }
-            val sender = inputData.getString("sender")?.takeIf { it.isNotBlank() } ?: return Result.success()
-            val row = MailMessageDto(
-                id = pushedId, threadId = inputData.getString("threadId"),
-                from = com.grapsee.grapmail.data.MailPersonDto(name = sender),
-                subject = inputData.getString("subject"), isE2eEncrypted = inputData.getString("encrypted") == "1",
-            )
-            if (SessionStore.snapshotAll(applicationContext).any { it.id == saved.id }) {
-                Notifications.newMail(applicationContext, 1, 0, row, saved.address, saved.id)
-            }
-            return Result.success()
+                ?: return Result.success()
+            return notifyExact(fresh, pushedId) ?: notifyFromInbox(fresh, pushedId)
         }
         if (pushedId != null && Notifications.allowed(applicationContext)) {
             notifyExact(session, pushedId)?.let { return it }
@@ -128,17 +118,16 @@ class MailPollWorker(
         com.grapsee.grapmail.widget.MailWidgetState.publish(
             applicationContext, unread,
             recent?.firstOrNull()?.let { head ->
-                (head.from?.name.orEmpty()).takeIf { it.isNotBlank() } ?: head.subject
+                if (head.isE2eEncrypted) "Encrypted message"
+                else (head.from?.name.orEmpty()).takeIf { it.isNotBlank() } ?: head.subject
             },
             recent = recent?.take(3)?.map { m ->
+                if (m.isE2eEncrypted) return@map "Encrypted message" to ""
                 val who = (m.from?.name.orEmpty()).takeIf { it.isNotBlank() } ?: "Unknown sender"
                 who to (m.subject ?: "(no subject)")
             },
         )
-        val announced = prefs.getString("announcedIds", null)
-            .takeIf { prefs.getString("announcedSessionId", null) == session.id }
-            ?.split(' ')?.filter { it.isNotEmpty() }.orEmpty() +
-            prefs.getString("pushed:${session.id}", "").orEmpty().split(' ').filter { it.isNotEmpty() }
+        val announced = announcedIds(prefs, session.id)
         val pushedMessage = recent?.firstOrNull {
             it.id == pushedId && it.id !in announced && !it.isRead && it.direction != "outbound"
         }
@@ -181,15 +170,15 @@ class MailPollWorker(
                 it.id.isNotBlank() && it.mimeType in setOf("image/jpeg", "image/png", "image/webp", "image/gif") &&
                     (it.sizeBytes ?: 0) in 1..2_097_152
             }
-        val thumbnail = image?.let { notificationImage(token, it.id) }
+        val thumbnail = if (privatePreview) null else image?.let { notificationImage(token, it.id) }
         if (!SessionStore.isCurrent(applicationContext, session.id)) return Result.success()
         val posted = Notifications.newMail(
             applicationContext, grew = grew, total = unread,
-            message = message, account = session.address, sessionId = session.id, image = thumbnail,
+            message = message, account = session.address, sessionId = session.id, image = thumbnail, hidePreview = privatePreview,
         )
         if (posted) {
             val announcedNow = if (pushedMessage != null) listOf(pushedMessage) else arrived.orEmpty()
-            prefs.edit().putString("announcedSessionId", session.id).putString("announcedIds",
+            prefs.edit().putString("pushed:${session.id}",
                 (announced + announcedNow.map { it.id }).distinct().takeLast(60).joinToString(" "),
             ).apply()
         }
@@ -197,11 +186,43 @@ class MailPollWorker(
         else "silent post-refused-by-permission +$grew of $unread")
         return Result.success()
     }
+
+    private suspend fun notifyFromInbox(session: SessionSnapshot, id: String): Result {
+        val prefs = applicationContext.getSharedPreferences("grapmail-poll", Context.MODE_PRIVATE)
+        val announced = announcedIds(prefs, session.id)
+        if (id in announced) return Result.success()
+
+        val messages = try {
+            Api.mailInbox(session.token, MailBox.Inbox, pageSize = 12).messages
+        } catch (error: kotlinx.coroutines.CancellationException) {
+            throw error
+        } catch (error: ApiException) {
+            return if (runAttemptCount < 3 && (error.status == 429 || error.status >= 500)) Result.retry()
+            else Result.success()
+        } catch (error: java.io.IOException) {
+            return if (runAttemptCount < 3) Result.retry() else Result.success()
+        }
+        val message = messages.firstOrNull { it.id == id && !it.isRead && it.direction != "outbound" }
+            ?: return Result.success()
+        if (SessionStore.snapshotAll(applicationContext).none { it.id == session.id }) return Result.success()
+        if (Notifications.newMail(applicationContext, 1, 0, message, session.address, session.id, hidePreview = privatePreview)) {
+            prefs.edit().putString("pushed:${session.id}", (announced + id).distinct().takeLast(60).joinToString(" ")).apply()
+        }
+        return Result.success()
+    }
+
+    private fun announcedIds(prefs: android.content.SharedPreferences, sessionId: String): List<String> {
+        return prefs.getString("announcedIds", null)
+            .takeIf { prefs.getString("announcedSessionId", null) == sessionId }
+            ?.split(' ')?.filter { it.isNotEmpty() }.orEmpty() +
+            prefs.getString("pushed:${sessionId}", "").orEmpty().split(' ').filter { it.isNotEmpty() }
+    }
+
     /** null allows the inbox polling fallback on older gateways. */
     private suspend fun notifyExact(session: SessionSnapshot, id: String): Result? {
         val prefs = applicationContext.getSharedPreferences("grapmail-poll", Context.MODE_PRIVATE)
         val dedup = "pushed:${session.id}"
-        val announced = prefs.getString(dedup, "").orEmpty().split(' ').filter { it.isNotBlank() }
+        val announced = announcedIds(prefs, session.id)
         if (id in announced) return Result.success()
         val message = try {
             Api.notificationMessage(session.token, id)
@@ -216,15 +237,15 @@ class MailPollWorker(
         } ?: return null
         if (message.id != id || message.isRead || message.direction != "inbound") return Result.success()
         MailStore.saveNotificationMessage(applicationContext, message, session.id)
-        val thumbnail = previewImage(session.token, message)
+        val thumbnail = if (privatePreview) null else previewImage(session.token, message)
         if (SessionStore.snapshotAll(applicationContext).none { it.id == session.id }) return Result.success()
         val row = MailMessageDto(
             id = message.id, threadId = message.threadId, from = message.from,
             subject = message.subject, snippet = message.snippet ?: message.bodyText?.trim()?.take(200),
             isE2eEncrypted = message.isE2eEncrypted,
         )
-        if (Notifications.newMail(applicationContext, 1, 0, row, session.address, session.id, thumbnail)) {
-            prefs.edit().putString(dedup, (announced + id).takeLast(60).joinToString(" ")).apply()
+        if (Notifications.newMail(applicationContext, 1, 0, row, session.address, session.id, thumbnail, hidePreview = privatePreview)) {
+            prefs.edit().putString(dedup, (announced + id).distinct().takeLast(60).joinToString(" ")).apply()
             if (!SessionStore.isCurrent(applicationContext, session.id)) return Result.success()
             runCatching { Api.mailStats(session.token) }
                 .onFailure { if (it is kotlinx.coroutines.CancellationException) throw it }
@@ -233,7 +254,8 @@ class MailPollWorker(
                         completedPolls.tryEmit(PollResult(session.id, stats))
                         com.grapsee.grapmail.widget.MailWidgetState.publish(
                             applicationContext, stats.inbox?.unread,
-                            (row.from?.name.orEmpty()).takeIf { it.isNotBlank() } ?: row.subject,
+                            if (row.isE2eEncrypted) "Encrypted message"
+                            else (row.from?.name.orEmpty()).takeIf { it.isNotBlank() } ?: row.subject,
                         )
                     }
                 }

@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -361,7 +362,7 @@ private fun ReaderReplyBar(onReply: (String) -> Unit) {
             ReaderReplyButton("Reply", Icons.AutoMirrored.Rounded.Reply, Modifier.weight(1f)) { onReply("reply") }
             ReaderReplyButton("Forward", Icons.AutoMirrored.Rounded.Forward, Modifier.weight(1f)) { onReply("forward") }
             ReaderIcon(Icons.AutoMirrored.Rounded.ReplyAll, "Reply all",
-                modifier = Modifier.size(46.dp).background(palette.softFill, CircleShape),
+                modifier = Modifier.size(48.dp).background(palette.softFill, RoundedCornerShape(16.dp)),
                 tint = palette.primarySolid) { onReply("all") }
         }
     }
@@ -370,13 +371,15 @@ private fun ReaderReplyBar(onReply: (String) -> Unit) {
 @Composable
 private fun ReaderReplyButton(label: String, icon: ImageVector, modifier: Modifier, onClick: () -> Unit) {
     val palette = LocalPalette.current
-    Row(modifier.height(48.dp).clip(CircleShape).background(palette.softFill)
-        .clickable(role = Role.Button, onClick = onClick).padding(horizontal = 6.dp),
+    val shape = RoundedCornerShape(16.dp)
+    Row(modifier.heightIn(min = 48.dp).clip(shape).background(palette.card)
+        .border(1.dp, palette.border, shape)
+        .clickable(role = Role.Button, onClick = onClick).padding(horizontal = 8.dp, vertical = 8.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
         verticalAlignment = Alignment.CenterVertically) {
         Icon(icon, null, tint = palette.primarySolid, modifier = Modifier.size(18.dp))
         Text(label, fontSize = 14.sp, fontWeight = FontWeight.SemiBold,
-            color = palette.primarySolid, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            color = palette.primarySolid, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
     }
 }
 

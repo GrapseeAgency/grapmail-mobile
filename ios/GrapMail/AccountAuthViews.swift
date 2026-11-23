@@ -16,6 +16,11 @@ struct SignInView: View {
     @State private var password = ""
     @State private var error: String?
     @State private var busy = false
+    // The passkey path keeps its own busy/error pair: a cancelled system sheet
+    // or a refused credential must never leave the password form's state
+    // dirty, and the Sign In button's enablement must not wait on the sheet.
+    @State private var passkeyBusy = false
+    @State private var passkeyError: String?
 
     var body: some View {
         ZStack(alignment: .topTrailing) {
@@ -84,6 +89,12 @@ struct SignInView: View {
                             .foregroundColor(GM.error)
                             .padding(.top, 10)
                     }
+                    if let passkeyError {
+                        Text(passkeyError)
+                            .font(GMFont.caption)
+                            .foregroundColor(GM.error)
+                            .padding(.top, 10)
+                    }
 
                     GradientButton(
                         title: "Sign In",
@@ -98,6 +109,18 @@ struct SignInView: View {
                         submit()
                     }
                     .padding(.top, 18)
+
+                    // The password-free door: a discoverable credential for
+                    // this account signs in without either field being typed.
+                    // Usernameless by contract — the identifier above does not
+                    // take part, so the link is live with the form empty.
+                    HStack {
+                        Spacer()
+                        AccountLink(title: passkeyBusy ? "Waiting for the passkey…" : "Use a passkey",
+                                    action: passkeySignIn)
+                        Spacer()
+                    }
+                    .padding(.top, 10)
 
                     OrDivider().padding(.top, 22)
 
@@ -125,7 +148,7 @@ struct SignInView: View {
             identifier = model.prefillIdentifier ?? identifier
             model.clearSignInChallenge()
         }
-        .disabled(busy)
+        .disabled(busy || passkeyBusy)
         .onChange(of: model.prefillIdentifier) { newValue in
             if let newValue { identifier = newValue }
         }
@@ -150,7 +173,7 @@ struct SignInView: View {
                     model.identifier = identifier.trimmingCharacters(in: .whitespaces)
                     model.password = password
                     password = ""
-                    model.challengeId = cid
+                    model.challengeId = resp.challengeId
                     // The CHALLENGE's expiry, for the code countdown — deliberately
                     // `expiresAt` and not `expiresAtDate`: the latter falls back to
                     // the session's `expiresIn`, and a countdown that claims the
@@ -183,6 +206,66 @@ struct SignInView: View {
                 onNeedEmailVerification()
             } catch {
                 self.error = apiMessage(error, fallback: "Could not complete the account request. Try again.")
+            }
+        }
+    }
+
+    /// Passkey sign-in: options → platform assertion → verify → the same
+    /// session store the password path fills, so everything downstream (the
+    /// mailbox, trusted-device enrollment, push re-registration) runs the
+    /// identical post-sign-in sequence. The challenge is single-use and
+    /// single-shot: one platform sheet per options response, and a refusal
+    /// means starting from a fresh options call.
+    private func passkeySignIn() {
+        passkeyBusy = true
+        passkeyError = nil
+        Task {
+            defer { passkeyBusy = false }
+            do {
+                let optionsResponse = try await ApiClient.passkeyAuthOptions()
+                guard optionsResponse.success, let challengeId = optionsResponse.challengeId.nilIfBlank(),
+                      let challenge = optionsResponse.challengeBase64Url,
+                      let options = optionsResponse.options else {
+                    passkeyError = "Passkey sign-in is not available right now. Use your password instead."
+                    return
+                }
+                let assertion = try await PasskeyManager.assertion(options: options)
+                let verified = try await ApiClient.passkeyAuthVerify(
+                    challengeId: challengeId,
+                    response: PasskeyAuthenticationResponseJson(
+                        id: assertion.credentialId,
+                        clientDataJSON: assertion.clientDataJSON,
+                        authenticatorData: assertion.authenticatorData,
+                        signature: assertion.signature,
+                        userHandle: assertion.userHandle))
+                guard verified.success, let token = verified.accessToken?.nilIfBlank() else {
+                    passkeyError = verified.error?.nilIfBlank() ?? "The passkey was not accepted. Use your password instead."
+                    return
+                }
+                // The passkey envelope names the account under `user` with
+                // `email`; the typed field is the fallback, and a sign-in that
+                // names neither has not returned a session worth storing.
+                let address = verified.user?.email.nilIfBlank() ?? identifier.trimmingCharacters(in: .whitespaces)
+                guard !address.isEmpty else {
+                    passkeyError = "Sign-in did not return a complete session. Please try again."
+                    return
+                }
+                // The route answers no expiry stamp (unlike the password
+                // login's `expiresIn`), so the session is stored without one —
+                // SessionStore keeps it until a 401 renewal says otherwise.
+                SessionStore.save(
+                    token: token,
+                    refreshToken: verified.refreshToken,
+                    address: address,
+                    name: verified.user?.name ?? "",
+                    expiresAtRaw: nil)
+                password = ""
+                model.clearSignInChallenge()
+                onSignedIn(address)
+            } catch PasskeyManager.PasskeyError.cancelled {
+                // The person closed the sheet — not a failure to report.
+            } catch {
+                passkeyError = apiMessage(error, fallback: "Could not sign in with the passkey. Try again.")
             }
         }
     }
@@ -279,9 +362,11 @@ struct TwoFactorView: View {
             onBack: onBack,
             illustration: "ill_account_2fa",
             eyebrow: "Two-step verification",
-            title: "Enter your 6-digit code",
-            subtitle: model.factorDestination.map { "We've emailed a 6-digit code to \($0). Enter it to finish signing in." }
-                ?? "We've sent you a verification code. Please enter the 6-digit code to continue.",
+            title: model.challengeId == nil ? "Use a backup code" : "Enter your 6-digit code",
+            subtitle: model.challengeId == nil
+                ? "A verification text is unavailable. Use one of your saved backup codes to continue."
+                : (model.factorDestination.map { "We've emailed a 6-digit code to \($0). Enter it to finish signing in." }
+                    ?? "We've sent you a verification code. Please enter the 6-digit code to continue."),
             content: {
                 CodeCells(length: 6, value: $code)
                 HStack {

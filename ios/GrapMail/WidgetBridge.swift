@@ -26,7 +26,9 @@ enum WidgetBridge {
         // stops at `from` and the result is String?. nilIfBlank() is declared
         // on String, not String?, so the optional is flattened first.
         let sender = (latest?.from?.display ?? "").nilIfBlank() ?? (latest?.from?.address ?? "").nilIfBlank()
-        if let sender {
+        if latest?.isE2eEncrypted == true {
+            defaults.set("Encrypted message", forKey: WidgetShared.Key.sender)
+        } else if let sender {
             defaults.set(sender, forKey: WidgetShared.Key.sender)
         } else {
             defaults.removeObject(forKey: WidgetShared.Key.sender)
@@ -39,8 +41,11 @@ enum WidgetBridge {
             defaults.removeObject(forKey: WidgetShared.Key.subject)
         }
         let items = recent.prefix(3).map { message -> WidgetShared.RecentItem in
+            if message.isE2eEncrypted {
+                return WidgetShared.RecentItem(sender: "Encrypted message", subject: "")
+            }
             let sender = (message.from?.display ?? "").nilIfBlank() ?? (message.from?.address ?? "").nilIfBlank() ?? "Unknown sender"
-            let subject = message.isE2eEncrypted ? "Encrypted message" : (message.subject?.nilIfBlank() ?? "No subject")
+            let subject = message.subject?.nilIfBlank() ?? "No subject"
             return WidgetShared.RecentItem(sender: sender, subject: subject)
         }
         if let data = try? JSONEncoder().encode(Array(items)) {

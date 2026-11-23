@@ -19,6 +19,7 @@ import androidx.compose.material.icons.rounded.Schedule
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -29,12 +30,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.grapsee.grapmail.data.Api
 import com.grapsee.grapmail.data.ApiException
+import com.grapsee.grapmail.findActivity
 import com.grapsee.grapmail.logic.AccountFlowViewModel
 import com.grapsee.grapmail.ui.components.AccountLink
 import com.grapsee.grapmail.ui.components.AccountScreen
@@ -50,6 +53,8 @@ import com.grapsee.grapmail.ui.components.RuleLine
 import com.grapsee.grapmail.ui.components.StatusChip
 import com.grapsee.grapmail.ui.theme.LocalPalette
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlin.coroutines.resume
 
 /**
  * Forgot password — founder design verbatim: envelope-and-lock artwork,
@@ -68,14 +73,26 @@ fun ForgotPasswordScreen(
     onNeedsManualReview: () -> Unit,
     onFindAddress: () -> Unit,
     onSupport: () -> Unit,
+    /** The trusted-device path's exit: fires once the server has accepted this
+     *  device's signature and the flow holds a recovery grant. */
+    onTrustedDeviceVerified: () -> Unit,
 ) {
     val palette = LocalPalette.current
+    val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val state by flow.state.collectAsStateWithLifecycle()
 
     var identifier by rememberSaveable { mutableStateOf(state.identifier) }
     var error by rememberSaveable { mutableStateOf<String?>(null) }
     var busy by remember { mutableStateOf(false) }
+    var trustedBusy by remember { mutableStateOf(false) }
+    // The option exists only when this installation actually holds a device
+    // key — an offer whose next step cannot work is a dead end, not a feature.
+    // The probe is keystore IO, so it happens off the first frame.
+    var hasDeviceKey by rememberSaveable { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        hasDeviceKey = com.grapsee.grapmail.security.DeviceKeyManager.hasKey()
+    }
 
     fun submit() {
         if (identifier.isBlank()) return
@@ -92,6 +109,7 @@ fun ForgotPasswordScreen(
                         maskedPhone = resp.maskedPhone,
                         resetChannel = resp.channel,
                         code = "",
+                        recoveryGrant = null,
                     )
                 }
                 // No challenge means no code went out. GrapMail recovers by
@@ -105,6 +123,91 @@ fun ForgotPasswordScreen(
             } catch (_: Exception) {
                 busy = false
                 error = "Network error. Please try again."
+            }
+        }
+    }
+
+    /**
+     * The trusted-device path: no texted code, no second factor — the device
+     * itself is the second factor. The server issues a nonce, the keystore
+     * key signs the DECODED nonce bytes (signing the base64 text would sign a
+     * different message and the verify would fail invisibly), and the grant
+     * that comes back is spent by the password screen's reset-with-grant.
+     *
+     * The signature is biometric-gated: [DeviceKeyManager.signWithBiometricPrompt]
+     * shows the platform's prompt — "Confirm to sign the recovery challenge" —
+     * and only the Signature its result releases can complete the operation,
+     * so proving this device is something the person did, not something the
+     * app did. A device without strong biometrics holds a key with no gate
+     * (declared on the devices screen) and signs directly.
+     */
+    fun useTrustedDevice() {
+        // AccountLink has no enabled flag, so the double-tap guard lives here:
+        // two challenges signed in one instant would spend the first nonce and
+        // strand the second verify.
+        if (trustedBusy) return
+        if (identifier.isBlank()) {
+            error = "Enter your GrapMail address first."
+            return
+        }
+        // Both ceremonies need a FragmentActivity; MainActivity is one, and a
+        // host that is not fails visibly rather than fatally.
+        val host = context.findActivity() as? androidx.fragment.app.FragmentActivity
+        if (host == null) {
+            error = "This device cannot confirm the signature right now."
+            return
+        }
+        trustedBusy = true; error = null
+        scope.launch {
+            try {
+                val address = identifier.trim()
+                val challenge = Api.deviceChallenge(address)
+                val challengeId = challenge.challengeId
+                val nonceB64 = challenge.nonce
+                if (challengeId == null || nonceB64 == null) {
+                    throw IllegalStateException("This device cannot prove this account right now.")
+                }
+                val nonceBytes = android.util.Base64.decode(nonceB64, android.util.Base64.NO_WRAP)
+                val signature = suspendCancellableCoroutine { continuation ->
+                    com.grapsee.grapmail.security.DeviceKeyManager.signWithBiometricPrompt(
+                        host,
+                        nonceBytes,
+                    ) { signed ->
+                        // Leaving the screen while the prompt is up cancels this
+                        // scope, and resuming a cancelled continuation would
+                        // throw inside the prompt's own callback.
+                        if (continuation.isActive) continuation.resume(signed)
+                    }
+                } ?: throw IllegalStateException("The device key could not sign the challenge.")
+                val verified = Api.deviceVerify(
+                    address, challengeId, nonceB64,
+                    com.grapsee.grapmail.data.DeviceId.value, signature,
+                )
+                val grant = verified.recoveryGrant
+                if (grant.isNullOrBlank()) {
+                    throw IllegalStateException("This device is not trusted for this account.")
+                }
+                flow.update {
+                    copy(
+                        identifier = address,
+                        recoveryGrant = grant,
+                        // The texted-code path's fields are dead weight here —
+                        // clearing them keeps the password screen honest about
+                        // which proof it is spending.
+                        challengeId = null,
+                        code = "",
+                    )
+                }
+                trustedBusy = false
+                onTrustedDeviceVerified()
+            } catch (e: ApiException) {
+                trustedBusy = false
+                error = e.message ?: "This device could not prove itself. Try the code instead."
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                trustedBusy = false
+                error = "This device could not prove itself. Try the code instead."
             }
         }
     }
@@ -129,6 +232,15 @@ fun ForgotPasswordScreen(
             if (error != null) {
                 Spacer(Modifier.height(10.dp))
                 Text(error ?: "", fontSize = 13.sp, color = palette.error)
+            }
+            if (hasDeviceKey) {
+                Spacer(Modifier.height(10.dp))
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
+                    AccountLink(
+                        if (trustedBusy) "Proving this device…" else "Use a trusted device instead",
+                        onClick = { useTrustedDevice() },
+                    )
+                }
             }
             Spacer(Modifier.height(10.dp))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
@@ -306,16 +418,30 @@ fun NewPasswordScreen(
     val filled = listOf(hasLength, hasLetter, hasDigit, hasSpecial).count { it }
 
     fun submit() {
-        val challenge = state.challengeId ?: run {
+        val grant = state.recoveryGrant
+        val challenge = state.challengeId
+        // Two proofs, two endpoints, one screen: the trusted-device grant and
+        // the texted code both buy the same password change. The grant path
+        // needs no challenge id and no code — the device already proved it.
+        if (grant.isNullOrBlank() && challenge == null) {
             error = "That reset link expired. Start again."
             return
         }
         busy = true; error = null
         scope.launch {
             try {
-                val resp = Api.resetPassword(challenge, state.code, password)
-                busy = false
-                onReset(resp.address)
+                if (!grant.isNullOrBlank()) {
+                    Api.resetWithGrant(state.identifier, grant, password)
+                    busy = false
+                    // The grant response carries no address of its own — the
+                    // identifier this flow has carried since forgot-password
+                    // is the one the grant was minted for.
+                    onReset(state.identifier)
+                } else {
+                    val resp = Api.resetPassword(challenge!!, state.code, password)
+                    busy = false
+                    onReset(resp.address)
+                }
             } catch (e: ApiException) {
                 busy = false
                 error = when (e.code) {
@@ -324,6 +450,8 @@ fun NewPasswordScreen(
                     // was wrong for every other rule the policy now enforces.
                     "WEAK_PASSWORD" -> e.message ?: "Use at least 8 characters with a letter, a number and a symbol."
                     "VERIFY_FAILED" -> "That code is not correct, or it has expired."
+                    "INVALID_GRANT", "GRANT_EXPIRED", "GRANT_USED" ->
+                        "This device's proof expired. Start again from forgot password."
                     else -> e.message ?: "We could not reset the password. Try again."
                 }
             } catch (_: Exception) {

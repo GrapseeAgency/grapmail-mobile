@@ -6,6 +6,12 @@ import android.os.Bundle
 import android.webkit.WebView
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.material3.VerticalDivider
+import androidx.compose.runtime.key
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.displayCutout
@@ -19,6 +25,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.testTagsAsResourceId
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.fragment.app.FragmentActivity
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
@@ -141,6 +148,9 @@ class MainActivity : FragmentActivity() {
     /** The shortcuts' route request for the subscriptions board, held the same
      *  way and for the same reason. */
     private val openSubscriptionsRequest = androidx.compose.runtime.mutableStateOf(false)
+    /** The security alert's "Secure account" tap: the hub route request, held
+     *  like the shortcuts' because a cold start may have no graph yet. */
+    private val openSecurityRequest = androidx.compose.runtime.mutableStateOf(false)
     private val notificationTarget = androidx.compose.runtime.mutableStateOf<com.grapsee.grapmail.logic.Notifications.MailTarget?>(null)
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -202,7 +212,6 @@ class MainActivity : FragmentActivity() {
                         Modifier
                             .windowInsetsPadding(WindowInsets.systemBars
                                 .union(WindowInsets.displayCutout).union(WindowInsets.waterfall))
-                            .widthIn(max = 520.dp)
                             .fillMaxSize()
                     ) {
                         GrapMailNav(
@@ -212,6 +221,8 @@ class MainActivity : FragmentActivity() {
                             onOpenScheduledConsumed = { openScheduledRequest.value = false },
                             openSubscriptions = openSubscriptionsRequest.value,
                             onOpenSubscriptionsConsumed = { openSubscriptionsRequest.value = false },
+                            openSecurity = openSecurityRequest.value,
+                            onOpenSecurityConsumed = { openSecurityRequest.value = false },
                             notificationTarget = notificationTarget.value,
                             onNotificationConsumed = { notificationTarget.value = null },
                         )
@@ -260,6 +271,14 @@ class MainActivity : FragmentActivity() {
         if (intent?.action == COMPOSE_ACTION) composeRequest.value = true
         if (intent?.action == SCHEDULED_ACTION) openScheduledRequest.value = true
         if (intent?.action == SUBSCRIPTIONS_ACTION) openSubscriptionsRequest.value = true
+        // The security notification's deep link. A signed-out cold start lands
+        // on sign-in (the graph decides), a signed-in one on the security hub.
+        // The action is cleared once consumed, the way the mail notification's
+        // target is: a configuration change must not replay the navigation.
+        if (intent?.action == com.grapsee.grapmail.logic.Notifications.OPEN_SECURITY) {
+            openSecurityRequest.value = true
+            intent.action = null
+        }
         // The home-screen widget and the send-later notice name their
         // destination as an extra rather than minting an intent action per
         // surface: an explicit intent needs no filter, so one extra is the
@@ -332,6 +351,13 @@ object Routes {
     const val SEC_REVOKE_ALERT = "security/alert/revoke/{id}/{device}"
     const val SEC_REVOKED_ALERT = "security/alert/revoked/{device}"
     const val SEC_ACTIVITY = "security/activity"
+    const val SEC_DEVICES = "security/devices"
+    const val SEC_PASSKEYS = "security/passkeys"
+    const val SEC_RECOVERY_CODES = "security/recovery-codes"
+    const val MAIL_NOTIFY_PREFS = "mail/settings/notifications"
+    // The per-account mute — one signed-in account's alerts silenced on this
+    // device. Hangs off the settings screen like the per-scope row beside it.
+    const val MAIL_PER_ACCOUNT_NOTIFY = "mail/settings/per-account-notifications"
     const val SEC_ALERT = "security/alert"
     const val SEC_SECURE = "security/secure"
     const val STEP_NAME = "signup/name"
@@ -443,6 +469,8 @@ fun GrapMailNav(
     onOpenScheduledConsumed: () -> Unit = {},
     openSubscriptions: Boolean = false,
     onOpenSubscriptionsConsumed: () -> Unit = {},
+    openSecurity: Boolean = false,
+    onOpenSecurityConsumed: () -> Unit = {},
     notificationTarget: com.grapsee.grapmail.logic.Notifications.MailTarget? = null,
     onNotificationConsumed: () -> Unit = {},
 ) {
@@ -512,6 +540,12 @@ fun GrapMailNav(
     // client config this is a quiet no-op and the poll remains the delivery.
     fun signedIn(address: String) {
         com.grapsee.grapmail.logic.PushSync.registerAsync(nav.context.applicationContext)
+        // The device key's enrollment, once per installation per account: a
+        // completed sign-in is the moment the server can bind this handset's
+        // public key to the account it just proved. Best-effort and
+        // asynchronous — a refused enroll never blocks the sign-in itself,
+        // and the next sign-in retries.
+        com.grapsee.grapmail.security.TrustedDeviceManager.enrollAfterSignInAsync(nav.context.applicationContext)
         maybeAskNotifications()
         val replacingAccount = runCatching { nav.getBackStackEntry(Routes.HOME) }.isSuccess
         if (replacingAccount) {
@@ -533,6 +567,10 @@ fun GrapMailNav(
         if (openSubscriptions) {
             onOpenSubscriptionsConsumed()
             nav.navigate(Routes.MAIL_SUBSCRIPTIONS)
+        }
+        if (openSecurity) {
+            onOpenSecurityConsumed()
+            nav.navigate(Routes.SECURITY) { launchSingleTop = true }
         }
     }
 
@@ -653,6 +691,24 @@ fun GrapMailNav(
         if (ready) {
             onOpenSubscriptionsConsumed()
             nav.navigate(Routes.MAIL_SUBSCRIPTIONS)
+        } else {
+            nav.navigate(Routes.SIGN_IN) { popUpTo(Routes.WELCOME) }
+        }
+    }
+
+    // The security alert's "Secure account" tap, consumed the same way as the
+    // shortcuts: the hub reads live account state, so it needs a session —
+    // signed out, the request stays pending and [signedIn] routes to the hub
+    // once the person has proved the account is theirs.
+    LaunchedEffect(openSecurity, dest) {
+        if (!openSecurity) return@LaunchedEffect
+        val ctx = nav.context.applicationContext
+        val stored = SessionStore.snapshot(ctx)
+        val ready = stored?.unexpired == true ||
+            (stored != null && com.grapsee.grapmail.data.SessionRefresh.refresh(ctx))
+        if (ready) {
+            onOpenSecurityConsumed()
+            nav.navigate(Routes.SECURITY) { launchSingleTop = true }
         } else {
             nav.navigate(Routes.SIGN_IN) { popUpTo(Routes.WELCOME) }
         }
@@ -828,6 +884,7 @@ fun GrapMailNav(
     NavHost(
         navController = nav,
         startDestination = dest,
+        modifier = Modifier.widthIn(max = if (onHome) Dp.Unspecified else 520.dp),
         // The design's motion contract: 320ms slide + fade between wizard
         // steps (forward slides in from the right, back from the left).
         enterTransition = {
@@ -900,6 +957,7 @@ fun GrapMailNav(
                 onNeedsManualReview = { nav.navigate(Routes.RECOVERY_PENDING) },
                 onFindAddress = { nav.navigate(Routes.FIND_ADDRESS) },
                 onSupport = { openSupport() },
+                onTrustedDeviceVerified = { nav.navigate(Routes.NEW_PASSWORD) },
             )
         }
         composable(Routes.RECOVERY_CODE) {
@@ -980,11 +1038,35 @@ fun GrapMailNav(
                 onRecoveryEmail = { nav.navigate(Routes.RECOVERY_EMAIL) },
                 onSessions = { nav.navigate(Routes.SEC_SESSIONS) },
                 onActivity = { nav.navigate(Routes.SEC_ACTIVITY) },
+                onTrustedDevices = { nav.navigate(Routes.SEC_DEVICES) },
+                onPasskeys = { nav.navigate(Routes.SEC_PASSKEYS) },
+                onRecoveryCodes = { nav.navigate(Routes.SEC_RECOVERY_CODES) },
+                onNotificationPrefs = { nav.navigate(Routes.MAIL_NOTIFY_PREFS) },
                 onBackupCodes = { nav.navigate(Routes.SEC_BACKUP) },
                 onPassword = { nav.navigate(Routes.SEC_PASSWORD) },
                 onSignOutAll = { nav.navigate(Routes.SEC_SIGNOUT_ALL) },
                 onDeleteAccount = { nav.navigate(Routes.SEC_DELETE_ACCOUNT) },
                 onSupport = { openSupport() },
+            )
+        }
+        composable(Routes.SEC_DEVICES) {
+            com.grapsee.grapmail.ui.screens.security.TrustedDevicesScreen(
+                onBack = { nav.popBackStack() },
+            )
+        }
+        composable(Routes.SEC_PASSKEYS) {
+            com.grapsee.grapmail.ui.screens.security.PasskeysScreen(
+                onBack = { nav.popBackStack() },
+            )
+        }
+        composable(Routes.SEC_RECOVERY_CODES) {
+            com.grapsee.grapmail.ui.screens.security.RecoveryCodesScreen(
+                onBack = { nav.popBackStack() },
+            )
+        }
+        composable(Routes.MAIL_NOTIFY_PREFS) {
+            com.grapsee.grapmail.ui.screens.security.NotificationPrefsScreen(
+                onBack = { nav.popBackStack() },
             )
         }
         composable(Routes.SEC_2FA_ENABLE) {
@@ -1337,35 +1419,88 @@ fun GrapMailNav(
             LaunchedEffect(personal.profile?.avatarUrl, personal.busy) {
                 if (!personal.busy) profile.loadAvatar()
             }
-            MailboxScreen(
-                vm = viewModel<MailboxViewModel>(entry),
-                accountPhoto = personal.avatar,
-                onOpenThread = { id, isThread, messageId ->
-                    nav.navigate(Routes.mailThread(id, isThread, focus = messageId.takeIf { isThread }))
-                },
-                onCompose = { nav.navigate(Routes.mailCompose("", "reply")) },
-                // A draft opens in the composer, not the reader: the row is
-                // the person's own unfinished mail, and the only useful tap
-                // is the one that lets them finish it.
-                onOpenDraft = { id -> nav.navigate(Routes.mailCompose(id, "draft")) },
-                onProfile = { nav.navigate(Routes.ACCOUNT_PROFILE) },
-                onSettings = { nav.navigate(Routes.MAIL_SETTINGS) },
-                onSecurity = { nav.navigate(Routes.SECURITY) },
-                onHelp = { openSupport() },
-                onLabels = { nav.navigate(Routes.MAIL_LABELS) },
-                onContacts = { nav.navigate(Routes.MAIL_CONTACTS) },
-                onFiles = { nav.navigate(Routes.MAIL_FILES) },
-                onScreener = { nav.navigate(Routes.MAIL_SCREENER) },
-                onSubscriptions = { nav.navigate(Routes.MAIL_SUBSCRIPTIONS) },
-                onScheduled = { nav.navigate(Routes.MAIL_SCHEDULED) },
-                onAddAccount = { nav.navigate(Routes.SIGN_IN) },
-                onAccountSwitched = {
-                    com.grapsee.grapmail.ui.screens.security.SecurityFlow.reset()
-                    e2e.clearForSignOut()
-                    nav.navigate(Routes.HOME) { popUpTo(Routes.HOME) { inclusive = true } }
-                },
-                onSignOut = ::signOutOfMailbox,
-            )
+            val mailbox: MailboxViewModel = viewModel(entry)
+            var selectedId by rememberSaveable { mutableStateOf<String?>(null) }
+            var selectedThread by rememberSaveable { mutableStateOf(false) }
+            var selectedFocus by rememberSaveable { mutableStateOf<String?>(null) }
+
+            fun selectMessage(id: String, isThread: Boolean, focus: String) {
+                selectedId = id
+                selectedThread = isThread
+                selectedFocus = focus.takeIf { isThread }
+            }
+
+            BoxWithConstraints(Modifier.fillMaxSize()) {
+                val expanded = maxWidth >= 840.dp
+                val id = selectedId
+                BackHandler(enabled = id != null) { selectedId = null }
+                Row(Modifier.fillMaxSize()) {
+                    if (expanded || id == null) {
+                        Box(
+                            if (expanded) Modifier.weight(0.42f).fillMaxHeight()
+                            else Modifier.fillMaxSize(),
+                        ) {
+                            MailboxScreen(
+                                vm = mailbox,
+                                accountPhoto = personal.avatar,
+                                onOpenThread = { id, isThread, messageId ->
+                                    if (expanded) selectMessage(id, isThread, messageId)
+                                    else nav.navigate(Routes.mailThread(id, isThread, focus = messageId.takeIf { isThread }))
+                                },
+                                onCompose = { nav.navigate(Routes.mailCompose("", "reply")) },
+                                // A draft opens in the composer, not the reader: the row is
+                                // the person's own unfinished mail, and the only useful tap
+                                // is the one that lets them finish it.
+                                onOpenDraft = { id -> nav.navigate(Routes.mailCompose(id, "draft")) },
+                                onProfile = { nav.navigate(Routes.ACCOUNT_PROFILE) },
+                                onSettings = { nav.navigate(Routes.MAIL_SETTINGS) },
+                                onSecurity = { nav.navigate(Routes.SECURITY) },
+                                onHelp = { openSupport() },
+                                onLabels = { nav.navigate(Routes.MAIL_LABELS) },
+                                onContacts = { nav.navigate(Routes.MAIL_CONTACTS) },
+                                onFiles = { nav.navigate(Routes.MAIL_FILES) },
+                                onScreener = { nav.navigate(Routes.MAIL_SCREENER) },
+                                onSubscriptions = { nav.navigate(Routes.MAIL_SUBSCRIPTIONS) },
+                                onScheduled = { nav.navigate(Routes.MAIL_SCHEDULED) },
+                                onAddAccount = { nav.navigate(Routes.SIGN_IN) },
+                                onAccountSwitched = {
+                                    com.grapsee.grapmail.ui.screens.security.SecurityFlow.reset()
+                                    e2e.clearForSignOut()
+                                    nav.navigate(Routes.HOME) { popUpTo(Routes.HOME) { inclusive = true } }
+                                },
+                                onSignOut = ::signOutOfMailbox,
+                            )
+                        }
+                    }
+                    if (expanded) VerticalDivider()
+                    if (id != null) {
+                        Box(Modifier.weight(0.58f).fillMaxHeight()) {
+                            key(id, selectedThread, selectedFocus) {
+                                ThreadScreen(
+                                    vm = mailbox,
+                                    e2e = e2e,
+                                    threadId = id,
+                                    isThread = selectedThread,
+                                    initialMessageId = selectedFocus,
+                                    openMessageActions = false,
+                                    onBack = { selectedId = null },
+                                    onContacts = { nav.navigate(Routes.MAIL_CONTACTS) },
+                                    onReply = { message, mode -> nav.navigate(Routes.mailCompose(message.id, mode)) },
+                                    onStepPrev = { step -> selectMessage(step.id, step.isThread, step.messageId) },
+                                    onStepNext = { step -> selectMessage(step.id, step.isThread, step.messageId) },
+                                )
+                            }
+                        }
+                    } else if (expanded) {
+                        Box(Modifier.weight(0.58f).fillMaxHeight(), contentAlignment = Alignment.Center) {
+                            androidx.compose.material3.Text(
+                                "Select a message to read",
+                                color = com.grapsee.grapmail.ui.theme.LocalPalette.current.textSecondary,
+                            )
+                        }
+                    }
+                }
+            }
         }
         composable(Routes.MAIL_THREAD, arguments = listOf(androidx.navigation.navArgument("focus") {
             type = androidx.navigation.NavType.StringType
@@ -1485,8 +1620,15 @@ fun GrapMailNav(
                 onProfile = { nav.navigate(Routes.ACCOUNT_PROFILE) },
                 onPrivacy = { nav.navigate(Routes.ACCOUNT_PRIVACY) },
                 onEncryption = { nav.navigate(Routes.E2E_STATUS) },
+                onNotificationPrefs = { nav.navigate(Routes.MAIL_NOTIFY_PREFS) },
+                onPerAccountNotifications = { nav.navigate(Routes.MAIL_PER_ACCOUNT_NOTIFY) },
                 onHelp = { nav.navigate(Routes.MAIL_SUPPORT) },
                 onSignOut = ::signOutOfMailbox,
+            )
+        }
+        composable(Routes.MAIL_PER_ACCOUNT_NOTIFY) {
+            com.grapsee.grapmail.ui.screens.mail.PerAccountNotificationsScreen(
+                onBack = { nav.popBackStack() },
             )
         }
         composable(Routes.MAIL_NOTES) { entry ->

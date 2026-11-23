@@ -115,28 +115,26 @@ struct GradientButton: View {
             guard enabled, !busy else { return }
             action()
         } label: {
-            ZStack {
-                RoundedRectangle(cornerRadius: GMShape.button, style: .continuous)
-                    .fill(enabled ? AnyShapeStyle(Color.brandGradient) : AnyShapeStyle(GM.buttonDisabled))
-                HStack(spacing: 10) {
-                    if busy {
-                        ProgressView().tint(.white)
-                    } else {
-                        Text(title)
-                            .font(.system(size: 16, weight: .semibold))
-                            .foregroundColor(.white)
-                        trailing
-                    }
+            HStack(spacing: 10) {
+                if busy {
+                    ProgressView().tint(enabled ? .white : GM.textSecondary)
+                } else {
+                    Text(title)
+                        .font(.body.weight(.semibold))
+                        .multilineTextAlignment(.center)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .foregroundColor(enabled ? .white : GM.textSecondary)
+                    if enabled { trailing }
+                    else { trailing?.opacity(0.5) }
                 }
             }
-            // Exact 54, not a floor: `minHeight` alone is a greedy frame --
-            // handed leftover height by a VStack (the compose action bar sits
-            // under a growing editor) it grew the Send button to a 700pt
-            // block, frame 76's re-photograph. Android's twin measures to
-            // exactly 54dp under the same parent; parity is now the number
-            // itself, not the wish.
-            .frame(height: 54)
-            .frame(maxWidth: .infinity)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 10)
+            .frame(maxWidth: .infinity, minHeight: 54)
+            .background {
+                RoundedRectangle(cornerRadius: GMShape.button, style: .continuous)
+                    .fill(enabled ? GM.primarySolid : GM.softFill)
+            }
         }
         .buttonStyle(PressScaleStyle())
         .disabled(!enabled || busy)
@@ -160,12 +158,15 @@ struct OutlineActionButton: View {
         Button(action: action) {
             HStack(spacing: 10) {
                 Text(title)
-                    .font(.system(size: 16, weight: .semibold))
+                    .font(.body.weight(.semibold))
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
                     .foregroundColor(GM.textPrimary)
                 trailing
             }
-            .frame(height: 54)
-            .frame(maxWidth: .infinity)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 10)
+            .frame(maxWidth: .infinity, minHeight: 54)
             .background(
                 RoundedRectangle(cornerRadius: GMShape.button, style: .continuous)
                     .strokeBorder(GM.border, lineWidth: 1.5)
@@ -199,7 +200,7 @@ struct AppTextField: View {
             // labels rendered nowhere. Show it like Android does.
             if let title {
                 Text(title)
-                    .font(.system(size: 13, weight: .medium))
+                    .font(.subheadline.weight(.medium))
                     .foregroundColor(GM.textSecondary)
             }
             HStack(spacing: 10) {
@@ -211,22 +212,27 @@ struct AppTextField: View {
             Group {
                 if isPassword && !visible {
                     SecureField(hint ?? "", text: $value)
-                        .font(.system(size: 15))
+                        .font(.body)
                 } else {
                     TextField(hint ?? "", text: $value)
-                        .font(.system(size: 15))
+                        .font(.body)
                         .keyboardType(keyboardType)
                         .autocorrectionDisabled()
                         .textInputAutocapitalization(.never)
                         .onSubmit { if dismissOnReturn { focused = false } }
                 }
             }
+            .focused($focused)
+            .accessibilityLabel(title ?? hint ?? "")
             if isPassword {
                 Button { visible.toggle() } label: {
                     Image(systemName: visible ? "eye.slash" : "eye")
                         .font(.system(size: 14))
-                        .foregroundColor(GM.textTertiary)
+                        .foregroundColor(GM.textSecondary)
+                        .frame(minWidth: 44, minHeight: 44)
                 }
+                .buttonStyle(.plain)
+                .accessibilityLabel(visible ? "Hide password" : "Show password")
             }
             }
             .padding(.horizontal, 14)
@@ -268,6 +274,8 @@ struct FieldErrorRow: View {
 /// Wizard chrome — back + centered logo, CREATE ACCOUNT eyebrow, title,
 /// subtitle, stepper, scrollable body, action, "Already have an account?".
 struct WizardScaffold<Body: View, Bottom: View>: View {
+    @Environment(\.dynamicTypeSize) private var textSize
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
     let step: Int
     let title: String
     let subtitle: Text
@@ -277,7 +285,8 @@ struct WizardScaffold<Body: View, Bottom: View>: View {
     @ViewBuilder let bottom: () -> Bottom
 
     var body: some View {
-        VStack(spacing: 0) {
+        ScrollView {
+            VStack(spacing: 0) {
             ZStack {
                 if let onBack {
                     HStack {
@@ -297,7 +306,7 @@ struct WizardScaffold<Body: View, Bottom: View>: View {
             .padding(.vertical, 6)
 
             VStack(alignment: .leading, spacing: 0) {
-                Text("CREATE ACCOUNT")
+                Text(textSize.isAccessibilitySize || verticalSizeClass == .compact ? "Step \(step) of 5" : "CREATE ACCOUNT")
                     .font(.system(size: 12, weight: .bold))
                     .kerning(1.6)
                     .foregroundColor(GM.textTertiary)
@@ -310,14 +319,13 @@ struct WizardScaffold<Body: View, Bottom: View>: View {
                     .font(.system(size: 14))
                     .foregroundColor(GM.textSecondary)
                     .padding(.top, 8)
-                StepProgress(step: step)
-                    .padding(.top, 22)
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 0) {
-                        bodyContent()
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                if !textSize.isAccessibilitySize && verticalSizeClass != .compact {
+                    StepProgress(step: step).padding(.top, 22)
                 }
+                VStack(alignment: .leading, spacing: 0) {
+                    bodyContent()
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.top, 22)
                 bottom()
                     .padding(.top, 14)
@@ -338,7 +346,8 @@ struct WizardScaffold<Body: View, Bottom: View>: View {
             }
             .padding(.horizontal, 24)
         }
-        .centeredForm()
+            .centeredForm()
+        }
         .background(GM.bg.ignoresSafeArea())
     }
 }

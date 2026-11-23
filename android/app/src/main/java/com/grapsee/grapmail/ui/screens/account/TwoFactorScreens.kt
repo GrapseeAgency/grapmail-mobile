@@ -68,6 +68,7 @@ fun TwoFactorScreen(
     val scope = rememberCoroutineScope()
     val state by flow.state.collectAsStateWithLifecycle()
     val emailChallenge = state.emailOtpAddress
+    val backupOnly = emailChallenge == null && state.challengeId == null
 
     var code by remember { mutableStateOf("") }
     var error by rememberSaveable { mutableStateOf<String?>(null) }
@@ -178,9 +179,11 @@ fun TwoFactorScreen(
         onBack = onBack,
         illustration = "account-2fa",
         eyebrow = if (emailChallenge != null) "Email verification" else "Two-step verification",
-        title = if (emailChallenge != null) "Enter the code sent to $emailChallenge" else "Enter your 6-digit code",
+        title = if (emailChallenge != null) "Enter the code sent to $emailChallenge" else if (backupOnly) "Use a backup code" else "Enter your 6-digit code",
         body = if (emailChallenge != null)
             "Finish signing in by entering the 6-digit code that was sent to this address."
+        else if (backupOnly)
+            "A verification text is unavailable. Use one of your saved backup codes to continue."
         else
             state.factorDestination?.let { "We've emailed a 6-digit code to $it. Enter it to finish signing in." }
                 ?: "We've sent you a verification code. Please enter the 6-digit code to continue.",
@@ -188,7 +191,7 @@ fun TwoFactorScreen(
             GradientButton(
                 "Verify & Continue",
                 onClick = { verify() },
-                enabled = code.length == 6,
+                enabled = !backupOnly && code.length == 6,
                 busy = busy,
                 trailing = {
                     Spacer(Modifier.size(10.dp))

@@ -182,31 +182,6 @@ private func drawerIcon(_ b: MailBox) -> String {
     }
 }
 
-struct BoxTabRow: View {
-    let activeBox: MailBox
-    let counts: [MailBox: Int?]
-    let onSelect: (MailBox) -> Void
-
-    var body: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
-                chip(.others, icon: "envelope", tint: GM.primarySolid, badge: Color(red: 0.08, green: 0.38, blue: 0.78))
-                chip(.starred, icon: "star", tint: GM.star, badge: Color(red: 0.59, green: 0.34, blue: 0.10))
-                chip(.sent, icon: "paperplane", tint: Color(red: 0.67, green: 0.39, blue: 1),
-                     badge: Color(red: 0.41, green: 0.16, blue: 0.80))
-            }
-            .padding(.horizontal, 16)
-        }
-        .padding(.bottom, 10)
-        .accessibilityIdentifier("mail-box-tabs")
-    }
-
-    private func chip(_ box: MailBox, icon: String, tint: Color, badge: Color) -> some View {
-        BoxTab(title: box.title, icon: icon, tint: tint, badgeColor: badge,
-               count: counts[box] ?? nil, active: activeBox == box) { onSelect(box) }
-    }
-}
-
 /// The real labels from `GET /grapmail/labels`. The reference's `All / Personal
 /// / Work / +2` chips are not rendered because that axis does not exist
 /// server-side; this row shows only what the account actually created, and

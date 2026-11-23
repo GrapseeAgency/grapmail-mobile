@@ -27,6 +27,11 @@ struct ForgotPasswordView: View {
     let onNeedsManualReview: () -> Void
     let onFindAddress: () -> Void
     let onSupport: () -> Void
+    /// The trusted-device path: this install holds an enrolled Ed25519 key the
+    /// account can verify, so a signature can stand in for the texted code.
+    /// Only offered when a key exists (DeviceKeyManager.hasKey) — offering it
+    /// from a device that never enrolled would route into a refusal.
+    let onTrustedDevice: () -> Void
 
     @State private var identifier = ""
     @State private var error: String?
@@ -69,6 +74,21 @@ struct ForgotPasswordView: View {
                     Spacer()
                 }
                 .padding(.top, 8)
+                // The device that signed in has a key the account enrolled:
+                // offer the path that needs no code at all. The typed address
+                // rides along in the model, so the verification screen does
+                // not ask for it a second time.
+                if DeviceKeyManager.hasKey() {
+                    HStack {
+                        Spacer()
+                        AccountLink(title: "Use a trusted device instead", action: {
+                            model.identifier = identifier.trimmingCharacters(in: .whitespaces)
+                            onTrustedDevice()
+                        })
+                        Spacer()
+                    }
+                    .padding(.top, 4)
+                }
                 FooterNote(
                     text: "Need help? Contact our support team.",
                     linkText: "support team",
@@ -608,6 +628,8 @@ struct AddressFoundView: View {
 /// Phone verification, both steps: the artwork's two states share the artwork,
 /// the ribbon and the footer, and only the middle changes.
 struct PhoneVerifyView: View {
+    @Environment(\.dynamicTypeSize) private var textSize
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
     @ObservedObject var model: RecoveryModel
     let onBack: () -> Void
     let onVerified: (String) -> Void
@@ -625,25 +647,40 @@ struct PhoneVerifyView: View {
     var body: some View {
         AccountScreen(
             onBack: { if step == 2 { step = 1 } else { onBack() } },
-            illustration: "ill_account_phone",
+            illustration: textSize.isAccessibilitySize || verticalSizeClass == .compact ? nil : "ill_account_phone",
             eyebrow: "Phone verification",
-            title: step == 1 ? "Add or verify your phone number" : "Enter the 6-digit code",
+            title: step == 1 ? "Verify your phone number" : "Enter the 6-digit code",
             subtitle: step == 1
-                ? "We'll send a 6-digit verification code to your phone number. This helps you recover your account and enable two-step verification."
-                : "We've sent a verification code to your phone number \(PhoneFormat.pretty(model.phone)). The code will expire in 5 minutes.",
+                ? "We’ll send you a 6-digit code by SMS."
+                : "SMS sent to \(PhoneFormat.pretty(model.phone)). The code expires in five minutes.",
             content: {
-                TwoStepRibbon(current: step, labels: ["Enter Phone Number", "Verify Code"])
+                TwoStepRibbon(current: step, labels: ["Phone number", "SMS code"])
                 Spacer().frame(height: 20)
                 if step == 1 {
                     phoneField
                     Spacer().frame(height: 8)
                 } else {
-                    CodeCells(length: 6, value: $code)
-                    HStack {
+                    TextField("6-digit SMS code", text: $code)
+                        .font(.body.monospacedDigit())
+                        .keyboardType(.numberPad)
+                        .textContentType(.oneTimeCode)
+                        .accessibilityLabel("Verification code")
+                        .padding(14)
+                        .frame(maxWidth: .infinity, minHeight: 54, alignment: .leading)
+                        .background(GM.inputFill, in: RoundedRectangle(cornerRadius: GMShape.input))
+                        .overlay {
+                            RoundedRectangle(cornerRadius: GMShape.input).strokeBorder(GM.border)
+                        }
+                        .onChange(of: code) { entered in
+                            let digits = String(entered.filter { $0.isASCII && $0.isNumber }.prefix(6))
+                            if digits != code { code = digits }
+                            error = nil
+                        }
+                    VStack(alignment: .leading, spacing: 8) {
                         CodeExpiry(expiresAt: model.phoneExpiresAt)
-                        Spacer()
-                        AccountLink(title: resending ? "Sending…" : "Resend Code") { sendCode(resend: true) }
+                        AccountLink(title: resending ? "Sending…" : "Resend code") { sendCode(resend: true) }
                     }
+                    .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.top, 14)
                 }
             },
@@ -682,7 +719,7 @@ struct PhoneVerifyView: View {
                         Text(error).font(GMFont.caption).foregroundColor(GM.error).padding(.top, 10)
                     }
                     FooterNote(
-                        text: "Didn't receive the code? Check your spam folder or try resending after 1 minute.",
+                        text: "If the text message hasn’t arrived, you can request another code after one minute.",
                         divider: false
                     )
                     .padding(.top, 14)

@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
@@ -47,7 +48,6 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -62,9 +62,7 @@ import androidx.compose.ui.unit.sp
 import com.grapsee.grapmail.ui.theme.LocalPalette
 
 /**
- * The primary CTA: full-width pill-adjacent button with the measured
- * #206BFD→#1560F5 gradient, pressed scale, and the exact disabled tint
- * (#C4DBFD light / #1E3A66 dark) from the terms screen.
+ * Shared primary action with a theme-matched fill and a wrapping label.
  */
 @Composable
 fun GradientButton(
@@ -79,10 +77,6 @@ fun GradientButton(
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
     val scale by animateFloatAsState(if (pressed) 0.97f else 1f, animationSpec = tween(120), label = "press")
-    val fill by animateColorAsState(
-        if (enabled) palette.primaryTop else palette.buttonDisabled,
-        tween(180), label = "fill"
-    )
     androidx.compose.material3.Button(
         onClick = onClick,
         enabled = enabled && !busy,
@@ -93,36 +87,26 @@ fun GradientButton(
         shape = RoundedCornerShape(16.dp),
         interactionSource = interaction,
         colors = androidx.compose.material3.ButtonDefaults.buttonColors(
-            containerColor = Color.Transparent,
+            containerColor = palette.primarySolid,
             contentColor = palette.onPrimary,
-            disabledContainerColor = palette.buttonDisabled,
-            disabledContentColor = palette.onPrimary,
+            disabledContainerColor = if (busy && enabled) palette.primarySolid else palette.softFill,
+            disabledContentColor = if (busy && enabled) palette.onPrimary else palette.textSecondary,
         ),
-        contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp),
+        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 16.dp, vertical = 10.dp),
     ) {
-        Box(
-            Modifier
-                .fillMaxWidth()
-                .heightIn(min = 54.dp)
-                .background(
-                    if (enabled) Brush.verticalGradient(listOf(palette.primaryTop, palette.primaryBottom))
-                    else Brush.verticalGradient(listOf(palette.buttonDisabled, palette.buttonDisabled)),
-                    RoundedCornerShape(16.dp)
-                ),
-            contentAlignment = Alignment.Center,
-        ) {
-            if (busy) {
-                androidx.compose.material3.CircularProgressIndicator(
-                    modifier = Modifier.size(22.dp),
-                    color = palette.onPrimary,
-                    strokeWidth = 2.5.dp,
-                )
-            } else {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(text, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
-                    trailing?.invoke()
-                }
-            }
+        if (busy) {
+            androidx.compose.material3.CircularProgressIndicator(
+                modifier = Modifier.size(20.dp),
+                color = if (enabled) palette.onPrimary else palette.textSecondary,
+                strokeWidth = 2.dp,
+            )
+        } else {
+            Text(
+                text, modifier = Modifier.weight(1f, fill = false),
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                fontSize = 16.sp, fontWeight = FontWeight.SemiBold,
+            )
+            trailing?.invoke()
         }
     }
 }
@@ -150,7 +134,9 @@ fun OutlineButton(
         border = androidx.compose.foundation.BorderStroke(1.5.dp, palette.border),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(text, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = palette.textPrimary)
+            Text(text, modifier = Modifier.weight(1f, fill = false),
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = palette.textPrimary)
             trailing?.invoke()
         }
     }
@@ -173,6 +159,8 @@ fun AppTextField(
     showLabel: Boolean = true,
     trailing: @Composable (() -> Unit)? = null,
     leading: @Composable (() -> Unit)? = null,
+    imeAction: androidx.compose.ui.text.input.ImeAction = androidx.compose.ui.text.input.ImeAction.Default,
+    keyboardActions: KeyboardActions = KeyboardActions.Default,
 ) {
     val palette = LocalPalette.current
     var focused by remember { mutableStateOf(false) }
@@ -200,7 +188,8 @@ fun AppTextField(
             shape = RoundedCornerShape(14.dp),
             singleLine = true,
             visualTransformation = if (visible) VisualTransformation.None else PasswordVisualTransformation(),
-            keyboardOptions = KeyboardOptions(keyboardType = keyboard),
+            keyboardOptions = KeyboardOptions(keyboardType = keyboard, imeAction = imeAction),
+            keyboardActions = keyboardActions,
             placeholder = hint?.let { { Text(it, color = palette.textTertiary, fontSize = 14.sp) } },
             leadingIcon = leading,
             trailingIcon = {
