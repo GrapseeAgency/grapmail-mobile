@@ -318,6 +318,20 @@ struct MessageRow: View, Equatable {
         lhs.selecting == rhs.selecting && lhs.selected == rhs.selected
     }
 
+    static func == (lhs: MessageRow, rhs: MessageRow) -> Bool {
+        lhs.message.id == rhs.message.id &&
+        lhs.message.isRead == rhs.message.isRead &&
+        lhs.message.isStarred == rhs.message.isStarred &&
+        lhs.message.hasAttachments == rhs.message.hasAttachments &&
+        lhs.message.isE2eEncrypted == rhs.message.isE2eEncrypted &&
+        lhs.message.from?.display == rhs.message.from?.display &&
+        lhs.message.from?.address == rhs.message.from?.address &&
+        lhs.message.subject == rhs.message.subject &&
+        lhs.message.snippet == rhs.message.snippet &&
+        lhs.message.createdAt == rhs.message.createdAt &&
+        lhs.selecting == rhs.selecting && lhs.selected == rhs.selected
+    }
+
     private var unread: Bool { !message.isRead }
 
     var body: some View {

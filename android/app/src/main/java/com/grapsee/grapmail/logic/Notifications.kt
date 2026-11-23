@@ -528,3 +528,40 @@ class SecurityNotificationActionReceiver : BroadcastReceiver() {
         }
     }
 }
+
+class MailNotificationActionReceiver : BroadcastReceiver() {
+    override fun onReceive(context: Context, intent: Intent) {
+        val target = Notifications.target(intent) ?: return
+        val action = when (target.action) {
+            "archive" -> MailAction.Archive
+            "read" -> MailAction.Read
+            else -> return
+        }
+        val pending = goAsync()
+        val app = context.applicationContext
+        PushSync.scope.launch {
+            try {
+                withTimeoutOrNull(8_000) {
+                    val session = com.grapsee.grapmail.data.SessionRefresh.forAccount(app, target.sessionId)
+                        ?: return@withTimeoutOrNull
+                    Api.mailAction(session.token, target.messageId, action)
+                    Notifications.dismiss(app, target.messageId)
+                    if (!SessionStore.isCurrent(app, session.id)) return@withTimeoutOrNull
+                    if (action == MailAction.Read) {
+                        MailStore.patchFlags(target.messageId, read = true, sessionContext = app, sessionId = session.id)
+                    } else {
+                        MailStore.remove(target.messageId, MailBox.Inbox, app, session.id)
+                        MailStore.invalidate(MailBox.Archive, app, session.id)
+                    }
+                    MailStore.invalidate(MailBox.Inbox, app, session.id)
+                    Notifications.dismiss(app, target.messageId)
+                }
+            } catch (error: Exception) {
+                if (error is kotlinx.coroutines.CancellationException) throw error
+                android.util.Log.w("GrapMailNotify", "Notification action failed: ${error.javaClass.simpleName}")
+            } finally {
+                pending.finish()
+            }
+        }
+    }
+}
