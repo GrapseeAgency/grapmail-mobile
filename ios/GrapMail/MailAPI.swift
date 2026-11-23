@@ -1605,6 +1605,28 @@ extension ApiClient {
         return try decoder.decode(MailSendResponse.self, from: data)
     }
 
+    /// The exact JSON body `mailSend` would post, for the Outbox to store.
+    static func encodedSendBody(_ req: MailSendRequest) throws -> Data {
+        try encoder.encode(req)
+    }
+
+    /// `POST /send` for an Outbox item: the stored body and the key minted with
+    /// it, so a retry from a later launch is the same send to the server.
+    static func mailSendQueued(token: String, body: Data, idempotencyKey: String) async throws -> MailSendResponse {
+        guard let url = URL(string: "\(base)\(mailBase)/send") else {
+            throw ApiError.http(status: -1, code: nil, message: "Bad URL")
+        }
+        var request = mailRequest(url: url, method: "POST", bearer: token)
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue(idempotencyKey, forHTTPHeaderField: "Idempotency-Key")
+        request.httpBody = body
+        let (data, http) = try await authenticatedResponse(for: request, bearer: token)
+        guard http.statusCode < 400 else {
+            throw mailFailure(data: data, http: http)
+        }
+        return try decoder.decode(MailSendResponse.self, from: data)
+    }
+
     static func mailDraft(token: String, _ req: MailDraftRequest) async throws -> MailDraftResponse {
         try await request("\(mailBase)/draft", method: "POST",
                           body: try encoder.encode(req), bearer: token)

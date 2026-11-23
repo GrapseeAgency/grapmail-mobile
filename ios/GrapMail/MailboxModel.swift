@@ -181,7 +181,10 @@ final class MailboxModel: ObservableObject {
         /// and a loaded draft fill fields without an edit, so a composer
         /// nobody touched neither autosaves nor saves on close.
         var userEdited = false
-        var accepted: Bool { resultStatus == "sent" || resultStatus == "queued" || resultStatus == "delivered" }
+        /// "outbox": no connection at Send; the message waits in Outbox.swift and
+        /// goes out by itself when the device is online. Accepted, so the
+        /// composer closes and Send cannot queue it twice.
+        var accepted: Bool { resultStatus == "sent" || resultStatus == "queued" || resultStatus == "delivered" || resultStatus == "outbox" }
     }
 
     struct LabelState {
@@ -2282,12 +2285,35 @@ final class MailboxModel: ObservableObject {
                 if sent { GMHaptics.success() }
                 else { GMHaptics.failure() }
             } catch {
+                // No answer at all (no connection, a timeout): the server never
+                // decided, so the message goes to the Outbox. A refusal
+                // (ApiError.http) is the server's decision and stays an error.
+                if Self.isOffline(error), let address = SessionStore.address,
+                   let body = try? ApiClient.encodedSendBody(held.request) {
+                    await Outbox.shared.enqueue(address: address, body: body, draftId: draft)
+                    guard self.composeGeneration == generation, self.sessionIsLive else { return }
+                    var updated = self.compose
+                    updated.sending = false
+                    updated.error = nil
+                    updated.resultStatus = "outbox"
+                    updated.result = "No connection. Saved in the Outbox: it sends by itself when you are back online."
+                    self.compose = updated
+                    GMHaptics.success()
+                    return
+                }
                 guard self.composeGeneration == generation, self.sessionIsLive else { return }
                 GMHaptics.failure()
                 self.compose.sending = false
                 self.compose.error = Self.describe(error)
             }
         }
+    }
+
+    /// A failure with no answer from the server: offline, unreachable, timed out.
+    nonisolated static func isOffline(_ error: Error) -> Bool {
+        if error is URLError { return true }
+        if case ApiError.network = error { return true }
+        return false
     }
 
     /// Save as a draft. Discarding a half-written message without asking is the

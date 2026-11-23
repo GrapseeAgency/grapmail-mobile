@@ -2147,17 +2147,19 @@ object Api {
      * to a send is lost and the same message goes again, the server replays the
      * first answer instead of sending a second email.
      */
-    suspend fun mailSend(token: String, req: MailSendRequest): MailSendResponse {
+    suspend fun mailSend(token: String, req: MailSendRequest, idempotencyKey: String? = null): MailSendResponse {
         val body = json.encodeToString(MailSendRequest.serializer(), req)
+        // The Outbox passes the key it stored with the message, so a retry from a
+        // later process or after a reboot is still the same send to the server.
         val r = authed("$MAIL/send", token)
-            .header("Idempotency-Key", SendKeys.keyFor(body))
+            .header("Idempotency-Key", idempotencyKey ?: SendKeys.keyFor(body))
             .post(postBody(body)).build()
         return try {
-            read(r) { decodeResponse<MailSendResponse>(it) }.also { SendKeys.settle(body) }
+            read(r) { decodeResponse<MailSendResponse>(it) }.also { if (idempotencyKey == null) SendKeys.settle(body) }
         } catch (e: ApiException) {
             // The server answered, so this send is finished either way; a 5xx was
             // not remembered there and may be retried with the same key.
-            if (e.status in 400..499) SendKeys.settle(body)
+            if (e.status in 400..499 && idempotencyKey == null) SendKeys.settle(body)
             throw e
         }
     }

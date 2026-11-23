@@ -14,6 +14,9 @@ struct GrapMailApp: App {
         // monitor's first callback, which is why the banner waits for a real
         // reading rather than announcing "offline" at launch.
         NetworkMonitor.shared.start()
+        // Unsent mail from an earlier launch goes out as soon as a network path
+        // exists; the monitor fires once at start, so this also covers launch.
+        Outbox.shared.start()
     }
 
     var body: some Scene {
