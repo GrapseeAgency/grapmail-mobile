@@ -2083,6 +2083,10 @@ object Api {
     suspend fun mailStats(token: String): MailStatsResponse =
         read(authed("$MAIL/stats", token).get().build()) { decodeResponse(it) }
 
+    /** `GET /grapmail/storage`: space used, the limit, and the warning level. */
+    suspend fun mailStorage(token: String): MailStorageResponse =
+        read(authed("$MAIL/storage", token).get().build()) { decodeResponse(it) }
+
     /**
      * `GET /inbox`. `box` is the API value from [MailBox]; `q` is only sent when
      * the term is at least 3 characters, because a one-character term scans the
@@ -2790,4 +2794,19 @@ private data class MailAttachmentResponseJson(val attachment: MailAttachmentDto)
     val cancelled: Boolean = false,
     val message: String? = null,
     val error: String? = null,
+)
+
+/**
+ * `GET /grapmail/storage` (backend routes/grapmail-storage.ts): how much of the
+ * mailbox's space is used. `level` is ok, warning (80%), critical (95%) or full;
+ * the labels are the server's own ("12 GB", "15 GB"), so both apps say the same.
+ */
+@Serializable data class MailStorageResponse(
+    val success: Boolean = false,
+    val usedBytes: Long = 0,
+    val limitBytes: Long = 0,
+    val percent: Double = 0.0,
+    val level: String = "ok",
+    val usedLabel: String = "",
+    val limitLabel: String = "",
 )

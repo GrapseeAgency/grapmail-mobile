@@ -500,6 +500,9 @@ fun MailboxScreen(
                 if (showFollowUps) {
                     com.grapsee.grapmail.ui.mailfeatures.FollowUpCenterScreen(onClose = { showFollowUps = false })
                 }
+                // Storage at 80% and above (StorageBanner.kt): what is used, and
+                // the way to free space.
+                StorageBanner(onOpenFiles = onFiles)
                 // The device's own path to the network, read before asking
                 // rather than after a failure. The chip below can only report a
                 // refresh that was refused; this says why, while the list is

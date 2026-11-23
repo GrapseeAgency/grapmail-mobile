@@ -158,6 +158,8 @@ struct MailboxView: View {
                     }
                 }
                 offlineBanner
+                // Storage at 80% and above (StorageBanner.swift).
+                StorageBanner(onOpenFiles: onFiles)
                 staleBanner
                 listArea
             }
