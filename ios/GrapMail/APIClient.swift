@@ -914,6 +914,10 @@ struct ProfileResponse: Decodable {
     var newBackupCodes: [String]?
     /// Present only when the change revoked this device's own token too.
     var accessToken: String?
+    /// The refresh token of that replacement's session. The old session is
+    /// closed by the same change, so keeping its refresh token signed this
+    /// device out at the next refresh.
+    var refreshToken: String?
     /// When that replacement expires. Stored, or the app believes it is signed in forever.
     var tokenExpiresAt: Double?
     /// The relative form the server may send instead.
@@ -923,7 +927,7 @@ struct ProfileResponse: Decodable {
     var code: String?
 
     private enum CodingKeys: String, CodingKey {
-        case success, profile, proof, newBackupCodes, accessToken, tokenExpiresAt,
+        case success, profile, proof, newBackupCodes, accessToken, refreshToken, tokenExpiresAt,
              tokenExpiresIn, expiresIn, message, error, code
     }
     init(from decoder: Decoder) throws {
@@ -933,6 +937,7 @@ struct ProfileResponse: Decodable {
         proof = c.lenientOpt(.proof)
         newBackupCodes = c.lenientOpt(.newBackupCodes)
         accessToken = c.lenientOpt(.accessToken)
+        refreshToken = c.lenientOpt(.refreshToken)
         tokenExpiresAt = c.lenientOpt(.tokenExpiresAt)
         let relativeA: Int? = c.lenientOpt(.tokenExpiresIn)
         let relativeB: Int? = c.lenientOpt(.expiresIn)

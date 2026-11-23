@@ -279,7 +279,17 @@ enum Keychain {
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrAccount as String: key,
         ]
-        let status = SecItemUpdate(query as CFDictionary, [kSecValueData as String: data] as CFDictionary)
+        // The accessibility class goes on the update too. Items written before it
+        // was set on the add path kept the default class, which an encrypted
+        // backup carries to another device; rewriting it here moves every existing
+        // token to this-device-only the next time it is saved (every refresh).
+        let status = SecItemUpdate(
+            query as CFDictionary,
+            [
+                kSecValueData as String: data,
+                kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly,
+            ] as CFDictionary
+        )
         if status == errSecSuccess { return true }
         guard status == errSecItemNotFound else { return false }
         var attrs = query

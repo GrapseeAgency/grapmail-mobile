@@ -944,7 +944,7 @@ struct ChangePasswordView: View {
                                 if let fresh = resp.accessToken {
                                     SessionStore.updateTokens(
                                         token: fresh,
-                                        refreshToken: nil,
+                                        refreshToken: resp.refreshToken,
                                         expiresAtRaw: resp.tokenExpiresAtMillis
                                     )
                                 }
@@ -1065,7 +1065,7 @@ struct SignOutAllDevicesView: View {
                                 if let fresh = resp.accessToken {
                                     SessionStore.updateTokens(
                                         token: fresh,
-                                        refreshToken: nil,
+                                        refreshToken: resp.refreshToken,
                                         expiresAtRaw: resp.tokenExpiresAtMillis
                                     )
                                 }
