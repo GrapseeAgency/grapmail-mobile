@@ -42,13 +42,15 @@ object SenderPhotos {
     private const val HIT_TTL_MS = 30 * 60 * 1000L
     private const val MISS_TTL_MS = 10 * 60 * 1000L
     private const val TARGET_PX = 160
+    /** Badges this app knows how to show. Anything else the server adds is ignored. */
+    private val KNOWN_BADGES = setOf("subscriber")
 
-    private class Answer(val revision: String?, val at: Long)
+    private class Answer(val revision: String?, val badges: List<String>, val brand: Boolean, val at: Long)
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val lock = Mutex()
     private val answers = HashMap<String, Answer>()
-    private val pending = LinkedHashMap<String, MutableList<CompletableDeferred<String?>>>()
+    private val pending = LinkedHashMap<String, MutableList<CompletableDeferred<Answer?>>>()
     private var flushScheduled = false
     /** The last revision seen per sender, so a recycled row can draw its photo on the first frame. */
     private val lastKnown = HashMap<String, String>()
@@ -69,7 +71,7 @@ object SenderPhotos {
         if (key.isEmpty() || !key.contains("@")) return null
         val token = SessionStore.token(context) ?: return null
         val viewer = SessionStore.address(context)?.lowercase() ?: ""
-        val revision = revisionFor(context, viewer, key) ?: return null
+        val revision = resolve(context, viewer, key)?.revision ?: return null
         bitmaps.get("$key|$revision")?.let { return it }
         val bytes = readDisk(context, key, revision) ?: run {
             val fetched = try {
@@ -94,15 +96,26 @@ object SenderPhotos {
         runCatching { dir(context).deleteRecursively() }
     }
 
-    private suspend fun revisionFor(context: Context, viewer: String, key: String): String? {
+    /**
+     * The facts the server states about this sender's account, e.g. `subscriber`.
+     * Empty when there are none or the lookup failed. Shares the batched lookup.
+     */
+    suspend fun badges(context: Context, address: String): List<String> = runCatching {
+        val key = address.trim().lowercase()
+        if (!key.contains("@")) return emptyList()
+        val viewer = SessionStore.address(context)?.lowercase() ?: ""
+        resolve(context, viewer, key)?.badges.orEmpty()
+    }.getOrDefault(emptyList())
+
+    private suspend fun resolve(context: Context, viewer: String, key: String): Answer? {
         val now = System.currentTimeMillis()
         synchronized(answers) {
             answers["$viewer|$key"]?.let { a ->
                 val ttl = if (a.revision != null) HIT_TTL_MS else MISS_TTL_MS
-                if (now - a.at < ttl) return a.revision
+                if (now - a.at < ttl) return a
             }
         }
-        val waiter = CompletableDeferred<String?>()
+        val waiter = CompletableDeferred<Answer?>()
         lock.withLock {
             pending.getOrPut(key) { mutableListOf() }.add(waiter)
             if (!flushScheduled) {
@@ -114,8 +127,8 @@ object SenderPhotos {
     }
 
     private suspend fun flush(context: Context, viewer: String) {
-        val batch: Map<String, List<CompletableDeferred<String?>>> = lock.withLock {
-            val taken = LinkedHashMap<String, List<CompletableDeferred<String?>>>()
+        val batch: Map<String, List<CompletableDeferred<Answer?>>> = lock.withLock {
+            val taken = LinkedHashMap<String, List<CompletableDeferred<Answer?>>>()
             val it = pending.entries.iterator()
             while (it.hasNext() && taken.size < MAX_BATCH) {
                 val e = it.next(); taken[e.key] = e.value.toList(); it.remove()
@@ -131,17 +144,36 @@ object SenderPhotos {
         }
         val now = System.currentTimeMillis()
         for ((key, waiters) in batch) {
-            val revision = result.getOrNull()?.get(key)
+            val dto = result.getOrNull()?.get(key)
+            val revision = dto
                 ?.takeIf { it.kind == "person" || it.kind == "brand" }
                 ?.revision?.takeIf { it.matches(Regex("^[a-f0-9]{32}$")) }
+            val answer = if (result.isSuccess) Answer(
+                revision,
+                dto?.badges.orEmpty().filter { it in KNOWN_BADGES },
+                dto?.kind == "brand",
+                now,
+            ) else null
             // Only a real answer is remembered; a failed call is asked again next time.
-            if (result.isSuccess) synchronized(answers) {
-                answers["$viewer|$key"] = Answer(revision, now)
+            if (answer != null) synchronized(answers) {
+                answers["$viewer|$key"] = answer
                 if (revision != null) lastKnown[key] = revision else lastKnown.remove(key)
             }
-            waiters.forEach { it.complete(revision) }
+            waiters.forEach { it.complete(answer) }
         }
     }
+
+    private fun decodeSvg(bytes: ByteArray): ImageBitmap? = runCatching {
+        val svg = com.caverock.androidsvg.SVG.getFromString(String(bytes, Charsets.UTF_8))
+        val bitmap = android.graphics.Bitmap.createBitmap(TARGET_PX, TARGET_PX, android.graphics.Bitmap.Config.ARGB_8888)
+        val canvas = android.graphics.Canvas(bitmap)
+        // A white disc behind the mark, as mail apps draw brand logos.
+        canvas.drawColor(android.graphics.Color.WHITE)
+        svg.setDocumentWidth("100%")
+        svg.setDocumentHeight("100%")
+        svg.renderToCanvas(canvas, android.graphics.RectF(0f, 0f, TARGET_PX.toFloat(), TARGET_PX.toFloat()))
+        bitmap.asImageBitmap()
+    }.getOrNull()
 
     private fun dir(context: Context) = File(context.cacheDir, "sender-photos")
 
@@ -167,6 +199,11 @@ object SenderPhotos {
     }
 
     private fun decode(bytes: ByteArray): ImageBitmap? {
+        // A brand logo (BIMI) arrives as SVG, already checked server-side to be
+        // self-contained; it is drawn to a bitmap here because BitmapFactory
+        // cannot read vectors.
+        val head = String(bytes, 0, minOf(bytes.size, 256), Charsets.UTF_8).trimStart()
+        if (head.startsWith("<svg") || head.startsWith("<?xml")) return decodeSvg(bytes)
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
         if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null

@@ -31,6 +31,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.AttachFile
 import androidx.compose.material.icons.rounded.Close
@@ -109,6 +110,11 @@ fun ComposeScreen(
     val profileState by profile.state.collectAsStateWithLifecycle()
     val e2eState by e2e.state.collectAsStateWithLifecycle()
     val attached = remember { mutableStateListOf<MailAttachmentDto>() }
+    // An uploaded image waiting for the editor to place it, and the last
+    // compatibility report the person chose to send past.
+    var pendingImage by remember { mutableStateOf<InlineImage?>(null) }
+    var compatFindings by remember { mutableStateOf<List<com.grapsee.grapmail.data.ComposeFindingDto>?>(null) }
+    var acceptedHtml by remember { mutableStateOf<String?>(null) }
     var notice by remember { mutableStateOf<String?>(null) }
     var uploading by remember { mutableStateOf(false) }
     var preparingSend by remember { mutableStateOf(false) }
@@ -214,11 +220,58 @@ fun ComposeScreen(
     val pickImage = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
         attachFile(uri)
     }
+    // "Image" in the formatting toolbar: the picture goes inside the message.
+    val pickInlineImage = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
+        if (uri == null || uploading || state.sending || state.accepted) return@rememberLauncherForActivityResult
+        if (attached.size >= 20) { notice = "A message can have up to 20 attachments and images."; return@rememberLauncherForActivityResult }
+        uploading = true
+        scope.launch {
+            try {
+                val placed = uploadInlineImage(vm, context, uri) { notice = it }
+                if (placed != null) {
+                    attached.add(placed.first)
+                    if (placed.second.contentId.isNotEmpty()) pendingImage = placed.second
+                }
+            } finally {
+                uploading = false
+            }
+        }
+    }
 
     val sendMessage: () -> Unit = sendMessage@{
         if (uploading || preparingSend || state.sending || state.accepted) return@sendMessage
-        val attachmentIds = attached.map { it.id }
+        // An image removed from the body after it was placed is not sent at all.
+        val html = state.bodyHtml
+        val attachmentIds = attached
+            .filter { a -> a.contentId == null || html?.contains("cid:${a.contentId}") == true }
+            .map { it.id }
         if (!encryptOn) {
+            // Check designed HTML for what mail apps drop or break, once per version
+            // of the body; "Send anyway" accepts that version.
+            if (html != null && html != acceptedHtml) {
+                preparingSend = true
+                scope.launch {
+                    val report = try {
+                        com.grapsee.grapmail.data.SessionStore.token(context)?.let {
+                            kotlinx.coroutines.withTimeoutOrNull(6000) { com.grapsee.grapmail.data.Api.composeCheck(it, html) }
+                        }
+                    } catch (e: kotlinx.coroutines.CancellationException) {
+                        throw e
+                    } catch (e: Exception) {
+                        null
+                    } finally {
+                        preparingSend = false
+                    }
+                    val problems = report?.findings.orEmpty().filter { it.severity != "info" }
+                    if (problems.isEmpty()) {
+                        acceptedHtml = html
+                        vm.send(attachmentIds = attachmentIds)
+                    } else {
+                        compatFindings = report?.findings.orEmpty()
+                    }
+                }
+                return@sendMessage
+            }
             vm.send(attachmentIds = attachmentIds)
             return@sendMessage
         }
@@ -251,6 +304,34 @@ fun ComposeScreen(
                 preparingSend = false
             }
         }
+    }
+    compatFindings?.let { findings ->
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { compatFindings = null },
+            title = { Text("Check before sending") },
+            text = {
+                Column(Modifier.heightIn(max = 360.dp).verticalScroll(androidx.compose.foundation.rememberScrollState())) {
+                    Text("Some of this message's formatting won't arrive the way it looks here.",
+                        fontSize = 14.sp, color = palette.textSecondary)
+                    findings.forEach { f ->
+                        val label = when (f.severity) { "removed" -> "Removed"; "warning" -> "May break"; else -> "Note" }
+                        Text("$label: ${f.message}" + if (f.clients.isNotEmpty()) " (${f.clients.joinToString()})" else "",
+                            fontSize = 13.sp, modifier = Modifier.padding(top = 8.dp),
+                            color = if (f.severity == "info") palette.textSecondary else palette.textPrimary)
+                    }
+                }
+            },
+            confirmButton = {
+                androidx.compose.material3.TextButton(onClick = {
+                    acceptedHtml = state.bodyHtml
+                    compatFindings = null
+                    sendMessage()
+                }) { Text("Send anyway") }
+            },
+            dismissButton = {
+                androidx.compose.material3.TextButton(onClick = { compatFindings = null }) { Text("Keep editing") }
+            },
+        )
     }
     val sendEnabled = !waitingForDraft && !state.sending && !state.accepted && !preparingSend && !uploading && !state.pendingSend
 
@@ -445,6 +526,9 @@ Spacer(Modifier.width(10.dp))
                         state.body, state.bodyHtml,
                         onChange = { text, html -> vm.composeUpdate { it.copy(body = text, bodyHtml = html) } },
                         modifier = Modifier.fillMaxSize().testTag("mail-body-field"),
+                        pendingImage = pendingImage,
+                        onImageInserted = { pendingImage = null },
+                        onPickImage = if (encryptOn) null else ({ pickInlineImage.launch("image/*") }),
                     )
                 } else BasicTextField(
                     cursorBrush = androidx.compose.ui.graphics.SolidColor(LocalPalette.current.cursor),
@@ -473,8 +557,10 @@ Spacer(Modifier.width(10.dp))
                 )
             }
 
-            if (attached.isNotEmpty()) {
-                attached.forEach { a ->
+            // Images placed inside the message are shown there, not as file chips.
+            val files = attached.filter { it.contentId == null }
+            if (files.isNotEmpty()) {
+                files.forEach { a ->
                     Row(
                         Modifier.fillMaxWidth().padding(vertical = 4.dp)
                             .clip(RoundedCornerShape(10.dp)).background(palette.softFill)
@@ -671,6 +757,75 @@ internal fun SendReceipt(status: String, detail: String?, error: String?) {
             Spacer(Modifier.height(6.dp))
             Text(error, fontSize = 13.sp, color = palette.error)
         }
+    }
+}
+
+/**
+ * Upload a picked image to be placed inside the message (`inline=1`), and build
+ * the editor's preview: the picture scaled to at most 600 px wide, as a data URL.
+ * The full image is what is uploaded and sent.
+ *
+ * Returns null when the image could not be used, with the reason reported. A
+ * server that gave no Content-ID keeps the upload as an ordinary attachment.
+ */
+private suspend fun uploadInlineImage(
+    vm: MailboxViewModel,
+    context: android.content.Context,
+    uri: Uri,
+    report: (String) -> Unit,
+): Pair<MailAttachmentDto, InlineImage>? {
+    val maxBytes = 10 * 1024 * 1024
+    val session = com.grapsee.grapmail.data.SessionStore.snapshot(context)
+        ?: run { report("Sign in again to insert an image."); return null }
+    val temporary = java.io.File(context.cacheDir, "inline-${java.util.UUID.randomUUID()}")
+    try {
+        val prepared = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            val resolver = context.contentResolver
+            val name = queryName(context, uri) ?: "image"
+            val mime = runCatching { resolver.getType(uri) }.getOrNull() ?: ""
+            if (mime !in setOf("image/png", "image/jpeg", "image/gif", "image/webp")) return@withContext null
+            val bytes = resolver.openInputStream(uri)?.use { it.readBytes() } ?: return@withContext null
+            if (bytes.isEmpty() || bytes.size > maxBytes) return@withContext Triple(name, mime, bytes)
+            temporary.writeBytes(bytes)
+            Triple(name, mime, bytes)
+        } ?: run { report("Insert a PNG, JPEG, GIF or WebP image."); return null }
+        val (name, mime, bytes) = prepared
+        if (bytes.isEmpty()) { report("That image is empty."); return null }
+        if (bytes.size > maxBytes) { report("Images inside a message can be up to 10 MB."); return null }
+        val preview = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+            val bounds = android.graphics.BitmapFactory.Options().apply { inJustDecodeBounds = true }
+            android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
+            if (bounds.outWidth <= 0) return@withContext null
+            var sample = 1
+            while (bounds.outWidth / (sample * 2) >= 600) sample *= 2
+            val bitmap = android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size,
+                android.graphics.BitmapFactory.Options().apply { inSampleSize = sample }) ?: return@withContext null
+            val scaled = if (bitmap.width > 600)
+                android.graphics.Bitmap.createScaledBitmap(bitmap, 600, (bitmap.height * 600f / bitmap.width).toInt().coerceAtLeast(1), true)
+            else bitmap
+            val out = java.io.ByteArrayOutputStream()
+            val png = mime == "image/png" || mime == "image/gif"
+            scaled.compress(if (png) android.graphics.Bitmap.CompressFormat.PNG else android.graphics.Bitmap.CompressFormat.JPEG, 82, out)
+            Pair("data:image/${if (png) "png" else "jpeg"};base64," +
+                android.util.Base64.encodeToString(out.toByteArray(), android.util.Base64.NO_WRAP),
+                minOf(bounds.outWidth, 600))
+        } ?: run { report("That image could not be read."); return null }
+        report("Uploading ${name}…")
+        val attachment = vm.uploadAttachment(temporary, name, mime, session.id, inline = true)
+        val cid = attachment.contentId
+        if (cid.isNullOrBlank()) {
+            report("This server can't place images inside messages yet, so ${name} was attached instead.")
+            return attachment to InlineImage("", "", "", 0)
+        }
+        report("Inserted ${name}.")
+        return attachment to InlineImage(cid, preview.first, name.substringBeforeLast('.'), preview.second)
+    } catch (error: kotlinx.coroutines.CancellationException) {
+        throw error
+    } catch (error: Exception) {
+        report(error.message ?: "That image could not be inserted.")
+        return null
+    } finally {
+        temporary.delete()
     }
 }
 

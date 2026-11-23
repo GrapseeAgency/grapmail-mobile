@@ -237,9 +237,11 @@ struct MailAttachment: Decodable, Identifiable {
     var mimeType: String?
     var sizeBytes: Int?
     var createdAt: String?
+    /// Set for an image placed inside the message body; the HTML refers to it as `cid:<id>`.
+    var contentId: String?
 
     private enum CodingKeys: String, CodingKey {
-        case id, messageId, name, mimeType, sizeBytes, size, createdAt
+        case id, messageId, name, mimeType, sizeBytes, size, createdAt, contentId
     }
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -249,6 +251,7 @@ struct MailAttachment: Decodable, Identifiable {
         mimeType = c.lenientOpt(.mimeType)
         sizeBytes = c.lenientOpt(.sizeBytes) ?? c.lenientOpt(.size)
         createdAt = c.lenientOpt(.createdAt)
+        contentId = c.lenientOpt(.contentId)
     }
 }
 
@@ -903,6 +906,44 @@ struct MailE2eAddressesRequest: Encodable {
     var addresses: [String]
 }
 
+struct ComposeCheckRequest: Encodable {
+    var html: String
+}
+
+/// One compatibility finding: `removed`, `warning` or `info`.
+struct ComposeFinding: Decodable, Identifiable {
+    var id: String { code + message }
+    var code = ""
+    var severity = "info"
+    var message = ""
+    var clients: [String] = []
+
+    private enum CodingKeys: String, CodingKey { case code, severity, message, clients }
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        code = c.lenient(.code, "")
+        severity = c.lenient(.severity, "info")
+        message = c.lenient(.message, "")
+        clients = c.lenient(.clients, [])
+    }
+}
+
+struct ComposeCheck: Decodable {
+    var success = false
+    var sizeBytes = 0
+    var findings: [ComposeFinding] = []
+    var clean = true
+
+    private enum CodingKeys: String, CodingKey { case success, sizeBytes, findings, clean }
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        success = c.lenient(.success, false)
+        sizeBytes = c.lenient(.sizeBytes, 0)
+        findings = c.lenient(.findings, [])
+        clean = c.lenient(.clean, true)
+    }
+}
+
 /// What the server says this account has (`GET /billing/entitlement`).
 struct BillingEntitlement: Decodable {
     struct Allowance: Decodable {
@@ -951,8 +992,10 @@ struct MailAvatar: Decodable {
     var path: String?
     var revision: String?
     var verifiedBrand = false
+    /// Facts about the account, each its own mark: `subscriber` = pays for GrapMail. Never "verified".
+    var badges: [String] = []
 
-    private enum CodingKeys: String, CodingKey { case kind, source, path, revision, verifiedBrand }
+    private enum CodingKeys: String, CodingKey { case kind, source, path, revision, verifiedBrand, badges }
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         kind = c.lenient(.kind, "monogram")
@@ -960,6 +1003,7 @@ struct MailAvatar: Decodable {
         path = c.lenientOpt(.path)
         revision = c.lenientOpt(.revision)
         verifiedBrand = c.lenient(.verifiedBrand, false)
+        badges = c.lenient(.badges, [])
     }
 }
 
@@ -1732,6 +1776,13 @@ extension ApiClient {
         return data
     }
 
+    /// `POST /compose/check` — what in this HTML will be removed or will not
+    /// work in common mail apps.
+    static func composeCheck(_ token: String, html: String) async throws -> ComposeCheck {
+        try await request("\(mailBase)/compose/check", method: "POST",
+                          body: try encoder.encode(ComposeCheckRequest(html: html)), bearer: token)
+    }
+
     /// `GET /billing/entitlement` — the account's plan, allowance and this
     /// month's usage, as the server has verified it.
     static func billingEntitlement(_ token: String) async throws -> BillingEntitlement {
@@ -1775,7 +1826,7 @@ extension ApiClient {
     /// attach them to.
     static func mailAttachmentUpload(
         token: String, bytes: Data, filename: String, mimeType: String,
-        messageId: String? = nil,
+        messageId: String? = nil, inline: Bool = false,
     ) async throws -> MailAttachment {
         let boundary = "----GrapMail\(UUID().uuidString)"
         let safeName = filename
@@ -1792,6 +1843,11 @@ extension ApiClient {
         text("--\(boundary)\r\n")
         text("Content-Disposition: form-data; name=\"messageId\"\r\n\r\n")
         text("\(messageId ?? "")\r\n")
+        if inline {
+            // An image placed inside the message: the server gives it a Content-ID.
+            text("--\(boundary)\r\n")
+            text("Content-Disposition: form-data; name=\"inline\"\r\n\r\n1\r\n")
+        }
         text("--\(boundary)--\r\n")
 
         let (data, http) = try await mailBinary(

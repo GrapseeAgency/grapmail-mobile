@@ -838,3 +838,28 @@ func humanBytes(_ n: Int) -> String {
     if n < 1024 * 1024 { return String(format: "%.0f KB", Double(n) / 1024.0) }
     return String(format: "%.1f MB", Double(n) / (1024.0 * 1024.0))
 }
+
+/// "Subscriber" next to a sender's name when the server says their account
+/// pays for GrapMail. Deliberately not a check mark: paying is not verification.
+struct SenderBadges: View {
+    let address: String
+    @State private var badges: [String] = []
+
+    var body: some View {
+        Group {
+            if badges.contains("subscriber") {
+                Text("Subscriber")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundColor(GM.primarySolid)
+                    .padding(.horizontal, 6).padding(.vertical, 1)
+                    .overlay(Capsule().strokeBorder(GM.primarySolid.opacity(0.5)))
+                    .lineLimit(1)
+                    .fixedSize()
+                    .accessibilityLabel("Subscriber: this sender supports GrapMail with a paid plan")
+            }
+        }
+        .task(id: address) {
+            badges = address.isEmpty ? [] : await SenderPhotos.shared.badges(for: address)
+        }
+    }
+}

@@ -15,6 +15,12 @@ packages:
   Crypto:
     url: https://github.com/apple/swift-crypto.git
     from: 3.0.0
+  # Brand logos (BIMI) arrive as SVG, which ImageIO cannot draw. SwiftDraw is a
+  # pure-Swift SVG renderer with no dependencies of its own; the server has
+  # already refused any SVG that could run or load anything.
+  SwiftDraw:
+    url: https://github.com/swhitty/SwiftDraw.git
+    from: 0.18.0
 settings:
   base:
     SWIFT_VERSION: "5.9"
@@ -46,6 +52,8 @@ targets:
         embed: true
       - package: Crypto
         product: Crypto
+      - package: SwiftDraw
+        product: SwiftDraw
     settings:
       base:
         GENERATE_INFOPLIST_FILE: YES
