@@ -204,8 +204,15 @@ data class VerifyHumanResponse(
         }
 }
 
+/**
+ * Error codes whose server sentence is written for the person reading it: it names
+ * the limit, the wait, or the field, which the generic line below cannot. For these
+ * the server's words are shown; every other code keeps the app's own phrasing.
+ */
+private val SERVER_WORDED_CODES = setOf("FEATURE_PAUSED", "DAILY_LIMIT_REACHED", "HOURLY_LIMIT_REACHED", "SEND_LIMIT_REACHED", "TOO_MANY_RECIPIENTS", "RESET_ON_HOLD", "REFRESH_TOKEN_REUSED", "DPOP_REQUIRED", "BAD_IMPORT", "IMPORT_RUNNING", "IMPORT_BUSY", "BAD_NOTIFICATIONS", "BAD_SENDER", "BAD_TIMEZONE", "BAD_RECOVERY_KIT", "BAD_SETTINGS", "BAD_VACATION", "BAD_FORWARDING", "SENDER_IN_BOTH_LISTS", "BAD_LOCALE", "BAD_DENSITY", "BAD_SIGNATURE")
+
 class ApiException(val status: Int, val code: String?, message: String) :
-    Exception(apiErrorMessage(status, code)) {
+    Exception(if (code in SERVER_WORDED_CODES && message.isNotBlank()) message else apiErrorMessage(status, code)) {
     init {
         android.util.Log.w("GrapMailApi", "HTTP $status; reason returned=${message.isNotBlank()}")
     }
@@ -2126,6 +2133,31 @@ object Api {
     suspend fun e2eRecoveryRemove(token: String): E2eRecoveryResponse =
         read(authed("$MAIL/e2e-recovery", token).delete().build()) { decodeResponse(it) }
 
+    /** The latest import from another provider, or null (backend lib/imap-import/job.ts). */
+    suspend fun importStatus(token: String): ImportJobResponse =
+        read(authed("$MAIL/import/imap", token).get().build()) { decodeResponse(it) }
+
+    /** Start importing. The password travels once, over TLS, and is never stored by the server. */
+    suspend fun importStart(token: String, host: String, username: String, password: String,
+                            inbox: Boolean, sent: Boolean, archive: Boolean, sinceMonths: Int): ImportJobResponse {
+        val body = kotlinx.serialization.json.buildJsonObject {
+            put("host", kotlinx.serialization.json.JsonPrimitive(host))
+            put("port", kotlinx.serialization.json.JsonPrimitive(993))
+            put("username", kotlinx.serialization.json.JsonPrimitive(username))
+            put("password", kotlinx.serialization.json.JsonPrimitive(password))
+            put("sinceMonths", kotlinx.serialization.json.JsonPrimitive(sinceMonths))
+            put("include", kotlinx.serialization.json.buildJsonObject {
+                put("inbox", kotlinx.serialization.json.JsonPrimitive(inbox))
+                put("sent", kotlinx.serialization.json.JsonPrimitive(sent))
+                put("archive", kotlinx.serialization.json.JsonPrimitive(archive))
+            })
+        }.toString()
+        return read(authed("$MAIL/import/imap", token).post(postBody(body)).build()) { decodeResponse(it) }
+    }
+
+    suspend fun importCancel(token: String): ImportJobResponse =
+        read(authed("$MAIL/import/imap/cancel", token).post(postBody("{}")).build()) { decodeResponse(it) }
+
     /** `GET /grapmail/app-config`: kill switches, minimum build, notice. No session needed. */
     suspend fun appConfig(): AppConfigDto =
         read(Request.Builder().url("$MAIL/app-config").get().build()) { decodeResponse(it) }
@@ -2889,3 +2921,29 @@ private data class MailAttachmentResponseJson(val attachment: MailAttachmentDto)
 @Serializable data class MinVersionDto(val android: Int = 0, val ios: String = "0")
 
 @Serializable data class AppNoticeDto(val text: String = "", val level: String = "info")
+
+/** `GET/POST /grapmail/import/imap` (backend lib/imap-import/job.ts). */
+@Serializable data class ImportJobResponse(
+    val success: Boolean = false,
+    val job: ImportJobDto? = null,
+    val cancelled: Boolean = false,
+    val error: String? = null,
+    val code: String? = null,
+)
+
+@Serializable data class ImportJobDto(
+    val id: String = "",
+    /** connecting, importing, done, failed, cancelled */
+    val state: String = "",
+    val host: String = "",
+    val username: String = "",
+    val startedAt: String = "",
+    val finishedAt: String? = null,
+    val folders: List<ImportFolderDto> = emptyList(),
+    val imported: Int = 0,
+    val skipped: Int = 0,
+    val failed: Int = 0,
+    val error: String? = null,
+)
+
+@Serializable data class ImportFolderDto(val name: String = "", val kind: String = "", val total: Int = 0, val done: Int = 0)

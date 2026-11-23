@@ -661,6 +661,7 @@ struct MailSettingsView: View {
     @State private var showPlan = false
     @State private var showNotificationFilters = false
     @State private var crashReports = CrashReporter.enabled
+    @State private var showImport = false
 
     /// The row's words, straight from that reading. `nil` means the read has
     /// not landed, and "Checking…" is the only honest thing to print for it.
@@ -772,6 +773,10 @@ struct MailSettingsView: View {
                                value: "Apps that can use this sign-in", onClick: onConnections)
                     SettingRow(icon: "envelope", title: "Subscriptions",
                                value: "Senders that mail you most", onClick: onSubscriptions)
+                    SettingRow(icon: "tray.and.arrow.down", title: "Import mail",
+                               value: "From Gmail, Yahoo, iCloud or another IMAP account",
+                               onClick: { showImport = true })
+                        .accessibilityIdentifier("mail-import-row")
                     SettingRow(icon: "note.text", title: "Notes",
                                value: "Kept on the account", onClick: onNotes)
                     SettingRow(icon: "checkmark", title: "Tasks",
@@ -847,6 +852,7 @@ struct MailSettingsView: View {
             }
         }
         .sheet(isPresented: $showNotificationFilters) { NotificationFiltersView() }
+        .sheet(isPresented: $showImport) { ImportMailView() }
         .task {
             vm.loadAliases()
             // The notification row reports the system's answer, so it reads it

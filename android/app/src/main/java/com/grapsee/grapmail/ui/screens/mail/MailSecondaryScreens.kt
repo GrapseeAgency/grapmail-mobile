@@ -704,6 +704,10 @@ fun MailSettingsScreen(
                 "Apps that can use this sign-in", palette, onClick = onConnections)
             SettingRow(Icons.Rounded.MailOutline, "Subscriptions",
                 "Senders that mail you most", palette, onClick = onSubscriptions)
+            var showImport by remember { mutableStateOf(false) }
+            SettingRow(Icons.Rounded.MailOutline, "Import mail",
+                "From Gmail, Yahoo, iCloud or another IMAP account", palette, onClick = { showImport = true })
+            if (showImport) ImportMailDialog(onDismiss = { showImport = false })
             SettingRow(Icons.Rounded.Star, "Notes",
                 "Kept on the account", palette, onClick = onNotes)
             SettingRow(Icons.Rounded.Check, "Tasks",
