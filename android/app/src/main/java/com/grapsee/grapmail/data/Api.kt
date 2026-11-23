@@ -1404,6 +1404,20 @@ object Api {
     suspend fun mailStats(token: String): MailStatsResponse =
         read(authed("$MAIL/stats", token).get().build()) { decodeResponse(it) }
 
+    /** `GET /grapmail/e2e-recovery`: whether a recovery kit is stored; the kit itself with [includeKit]. */
+    suspend fun e2eRecoveryStatus(token: String, includeKit: Boolean = false): E2eRecoveryResponse =
+        read(authed("$MAIL/e2e-recovery" + if (includeKit) "?include=kit" else "", token).get().build()) { decodeResponse(it) }
+
+    /** `PUT /grapmail/e2e-recovery { kit }`: store or replace the kit (ciphertext only). */
+    suspend fun e2eRecoverySave(token: String, kit: kotlinx.serialization.json.JsonObject): E2eRecoveryResponse {
+        val body = kotlinx.serialization.json.buildJsonObject { put("kit", kit) }.toString()
+        return read(authed("$MAIL/e2e-recovery", token).put(postBody(body)).build()) { decodeResponse(it) }
+    }
+
+    /** `DELETE /grapmail/e2e-recovery`. */
+    suspend fun e2eRecoveryRemove(token: String): E2eRecoveryResponse =
+        read(authed("$MAIL/e2e-recovery", token).delete().build()) { decodeResponse(it) }
+
     /** `GET /grapmail/storage`: space used, the limit, and the warning level. */
     suspend fun mailStorage(token: String): MailStorageResponse =
         read(authed("$MAIL/storage", token).get().build()) { decodeResponse(it) }
@@ -2120,4 +2134,14 @@ private data class MailAttachmentResponseJson(val attachment: MailAttachmentDto)
     val level: String = "ok",
     val usedLabel: String = "",
     val limitLabel: String = "",
+)
+
+/** `GET/PUT/DELETE /grapmail/e2e-recovery` (backend routes/grapmail-e2e-recovery.ts). */
+@Serializable data class E2eRecoveryResponse(
+    val success: Boolean = false,
+    val exists: Boolean = false,
+    val createdAt: String? = null,
+    /** Only with `?include=kit`: the locked kit, opened on the device. */
+    val kit: kotlinx.serialization.json.JsonObject? = null,
+    val error: String? = null,
 )

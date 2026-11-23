@@ -24,6 +24,11 @@ final class E2eModel: ObservableObject {
         var busy = false
         var note: String? = nil
         var noteIsBad = false
+        /// Whether a recovery kit is stored for this account; nil until read.
+        var recoveryKitExists: Bool? = nil
+        var recoveryKitCreatedAt: String? = nil
+        /// A recovery key just made, shown ONCE and never stored on this device.
+        var newRecoveryKey: String? = nil
         var state3: String {
             guard record != nil else { return "none" }
             return unlocked ? "unlocked" : "locked"
@@ -89,6 +94,136 @@ final class E2eModel: ObservableObject {
         guard state.available == true else { return }
         refreshLocal()
         if includeDirectory { loadPublished() }
+        if includeDirectory { loadRecoveryStatus() }
+    }
+
+    /// Whether a recovery kit is stored for this account. A failed read leaves it
+    /// unknown (nil), never "no kit": that would push the person to make a new one.
+    func loadRecoveryStatus() {
+        guard !snapshotSeeded, let t = token else { return }
+        let generation = SessionStore.generation
+        Task {
+            guard let status = try? await ApiClient.e2eRecoveryStatus(token: t),
+                  status.success, generation == SessionStore.generation else { return }
+            state.recoveryKitExists = status.exists
+            state.recoveryKitCreatedAt = status.createdAt
+        }
+    }
+
+    /// Make a recovery key and store the kit it locks. Needs the key unlocked: the
+    /// kit is the private halves locked a second time, under the new recovery key.
+    /// The recovery key itself is shown once and kept nowhere.
+    func createRecoveryKey() {
+        guard !snapshotSeeded, let t = token else { return }
+        guard let unlocked = session else {
+            note("Unlock your key first: the recovery kit is made from it.", bad: true)
+            return
+        }
+        state.busy = true
+        Task {
+            let recoveryKey = MailE2e.generateRecoveryKey()
+            // Two 600,000-round derivations: detached, like setup() and unlock().
+            let made = await Task.detached {
+                E2eModel.attempt { try MailE2e.buildRecoveryKit(unlocked, recoveryKey: recoveryKey) }
+            }.value
+            switch made {
+            case .failure(let error):
+                state.busy = false
+                note(Self.describe(error), bad: true)
+            case .success(let kit):
+                do {
+                    let saved = try await ApiClient.e2eRecoverySave(token: t, kit: kit)
+                    state.busy = false
+                    if saved.success {
+                        state.recoveryKitExists = true
+                        state.recoveryKitCreatedAt = saved.createdAt
+                        state.newRecoveryKey = recoveryKey
+                    } else {
+                        note(saved.error ?? "The recovery kit was not saved.", bad: true)
+                    }
+                } catch {
+                    state.busy = false
+                    note(Self.describe(error), bad: true)
+                }
+            }
+        }
+    }
+
+    /// The person has written the recovery key down; it leaves memory now.
+    func dismissRecoveryKey() { state.newRecoveryKey = nil }
+
+    /// Remove the stored kit. Encrypted mail then cannot be recovered on a new device.
+    func removeRecoveryKit() {
+        guard !snapshotSeeded, let t = token else { return }
+        state.busy = true
+        Task {
+            do {
+                let r = try await ApiClient.e2eRecoveryRemove(token: t)
+                state.busy = false
+                if r.success { state.recoveryKitExists = false }
+                note(r.success ? "The recovery key was removed. Keep this device safe: it now holds the only copy of your key."
+                               : (r.error ?? "The recovery kit was not removed."), bad: !r.success)
+            } catch {
+                state.busy = false
+                note(Self.describe(error), bad: true)
+            }
+        }
+    }
+
+    /// Put the key back on this device from the stored kit: the recovery key opens
+    /// it, and the new passphrase protects it here. The same key comes back, so
+    /// mail already encrypted to it opens again.
+    func restoreWithRecoveryKey(_ recoveryKey: String, passphrase: String, confirm: String) {
+        guard !snapshotSeeded, let t = token, let k = identityKey else { return }
+        if passphrase.utf16.count < MailE2e.minPassphraseLength {
+            note("Use at least \(MailE2e.minPassphraseLength) characters for the passphrase.", bad: true)
+            return
+        }
+        if passphrase != confirm {
+            note("The two passphrases do not match.", bad: true)
+            return
+        }
+        guard MailE2e.normalizeRecoveryKey(recoveryKey) != nil else {
+            note("That recovery key is not valid. It has 28 letters and numbers.", bad: true)
+            return
+        }
+        state.busy = true
+        Task {
+            let status: E2eRecoveryStatus
+            do {
+                status = try await ApiClient.e2eRecoveryStatus(token: t, includeKit: true)
+            } catch {
+                state.busy = false
+                note(Self.describe(error), bad: true)
+                return
+            }
+            guard status.success, let kit = status.kit else {
+                state.busy = false
+                if status.success { state.recoveryKitExists = false }
+                note(status.error ?? "There is no recovery kit for this account.", bad: true)
+                return
+            }
+            let restored = await Task.detached {
+                E2eModel.attempt {
+                    let identity = try MailE2e.restoreFromRecoveryKit(accountKey: k, kit: kit,
+                                                                      recoveryKey: recoveryKey,
+                                                                      newPassphrase: passphrase)
+                    return (identity, try MailE2e.unlock(identity, passphrase: passphrase))
+                }
+            }.value
+            state.busy = false
+            switch restored {
+            case .failure(let error):
+                note(Self.describe(error), bad: true)
+            case .success(let (identity, opened)):
+                guard identityKey == k else { return }
+                session = opened
+                state.record = identity
+                state.fingerprint = MailE2e.fingerprint(publicKeyB64: identity.encryption.publicKey)
+                state.unlocked = true
+                note("Your key is back on this device and unlocked. Encrypted mail opens here again.", bad: false)
+            }
+        }
     }
 
     func refreshLocal() {
