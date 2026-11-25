@@ -3,7 +3,7 @@ name: Android
 on:
   push:
     branches: [main]
-    tags: ["v0.7.0"]
+    tags: ["v0.0.1"]
   pull_request:
     branches: [main]
   workflow_dispatch:
@@ -424,13 +424,13 @@ jobs:
           head -2 /tmp/badging.txt
           grep -q "package: name='com.grapsee.grapmail'" /tmp/badging.txt \
             || { echo "::error::wrong applicationId in the release APK"; exit 1; }
-          WANT=0.7.0
+          WANT=0.0.1
           if [[ "$GITHUB_REF_TYPE" == tag && "${GITHUB_REF_NAME#v}" != "$WANT" ]]; then
             echo "::error::This release must use tag v$WANT"
             exit 1
           fi
-          grep -q "versionCode='13'" /tmp/badging.txt \
-            || { echo "::error::APK versionCode is not 13"; exit 1; }
+          grep -q "versionCode='1'" /tmp/badging.txt \
+            || { echo "::error::APK versionCode is not 1"; exit 1; }
           grep -q "versionName='$WANT'" /tmp/badging.txt \
             || { echo "::error::APK versionName is not $WANT — the tag and the build disagree"; exit 1; }
           if "$AAPT" dump xmltree "$APK" AndroidManifest.xml | grep -Ew "debuggable"; then
@@ -523,7 +523,7 @@ jobs:
         with:
           name: GrapMail ${{ github.ref_name }}
           body: |
-            GrapMail 0.7.0 (version code 13).
+            GrapMail 0.0.1 (version code 1).
 
             Use the AAB for Play Console and the APK for direct installation.
             Both artifacts are signed with the configured production upload key.

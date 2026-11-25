@@ -25,15 +25,10 @@ packages:
 settings:
   base:
     SWIFT_VERSION: "5.9"
-    # One release, one version: Android's release gate ties versionName to the
-    # tag (v0.3.0's first run refused a disagreeing build), and an iOS build of
-    # the same commit self-reporting 0.0.0.1 is the same disagreement kept
-    # quiet only because no iOS badging check exists yet.
-    # One version for both stores from 0.7.0 on: Android is 0.7.0 / 13,
-    # iOS is 0.7.0 / 14 (above 0.6.4 / 13, which is what this project used
-    # before). See RELEASING.md section 0.
-    MARKETING_VERSION: "0.7.0"
-    CURRENT_PROJECT_VERSION: "14"
+    # First public production release on both stores. Internal/sideload builds
+    # used later-looking identifiers, but the public line starts at 0.0.1 / 1.
+    MARKETING_VERSION: "0.0.1"
+    CURRENT_PROJECT_VERSION: "1"
     # Empty on purpose for local development: a simulator build needs no team.
     # CI's release job injects the team per invocation with
     # DEVELOPMENT_TEAM="$APPLE_TEAM_ID" on the xcodebuild command line —

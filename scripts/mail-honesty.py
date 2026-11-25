@@ -2118,7 +2118,8 @@ SW_SUBS_R = rendered(SW_SUBS)
 # class this repo has now caught twice, once per shape.
 pin("both clients decode the parsed unsubscribe record, not a header string",
     "class MailUnsubscribeDto" in KT_MDTO and "offers" in KT_MDTO
-    and "struct MailUnsubscribe: Decodable" in SW_COMPS
+    and ("struct MailUnsubscribe: Decodable" in SW_COMPS
+         or "struct MailUnsubscribe: Codable" in SW_COMPS)
     and "var unsubscribe: MailUnsubscribe?" in SW_MAPI
     and "val unsubscribe: MailUnsubscribeDto? = null" in KT_MDTO)
 pin("the web's offer URLs win over the legacy header, both platforms",
@@ -2584,15 +2585,17 @@ pin("the mailto strip is case-proof and its failure is spoken",
     'while (t.startsWith("mailto:", ignoreCase = true))' in code_only(KT_MAIL_C)
     and "could not be opened, so nothing was drafted" in code_only(SW_SUBS))
 
-# Android's first Play Store release has its own version and build number.
+# The first public production release uses one version and first-build numbers
+# on both platforms. Internal/sideload lineage does not define the store line.
 GRADLE = (ROOT / "android/app/build.gradle.kts").read_text(encoding="utf-8")
 PYML = (ROOT / "ios/project.yml").read_text(encoding="utf-8")
-pin("the store release uses one version on both platforms, above the last sideloaded build",
-    'versionName = "0.7.0"' in GRADLE
-    and re.search(r'^\s*versionCode = 13\s*$', GRADLE, re.MULTILINE) is not None
-    and 'WANT=0.7.0' in WF_TEXT
-    and "versionCode='13'" in WF_TEXT
-    and 'MARKETING_VERSION: "0.7.0"' in PYML)
+pin("the first public store release is 0.0.1 on both platforms",
+    'versionName = "0.0.1"' in GRADLE
+    and re.search(r'^\s*versionCode = 1\s*$', GRADLE, re.MULTILINE) is not None
+    and 'WANT=0.0.1' in WF_TEXT
+    and "versionCode='1'" in WF_TEXT
+    and 'MARKETING_VERSION: "0.0.1"' in PYML
+    and 'CURRENT_PROJECT_VERSION: "1"' in PYML)
 
 # ── 33. the second review round, pinned (§33) ───────────────────────────
 # Completeness, correctness and impact each re-read the session with fresh
@@ -3511,15 +3514,17 @@ pin("the poll uses the server's unread count and authenticated inbox listing",
     and "inbox?.unread" in code_only(SW_INT)
     and "stats.inbox?.unread" in code_only(KT_POLL)
     and "ApiClient.mailInbox(token: token, box: .inbox" in code_only(SW_INT)
-    and "Api.mailInbox(token, MailBox.Inbox" in code_only(KT_POLL))
+    and ("Api.mailInbox(token, MailBox.Inbox" in code_only(KT_POLL)
+         or "Api.mailInbox(session.token, MailBox.Inbox" in code_only(KT_POLL)))
 
 # The silence rules. A first read has no previous number, so no difference can
 # be named; a refused read saw nothing; and a count that did not rise saw no
-# arrivals. Announcing on any of those would tell the person the mailbox grew
-# when all that happened is that the app looked at it.
+# arrivals. The iOS Bool reports whether the background read refreshed data,
+# not whether a notification was posted, so these quiet branches may return
+# `recent != nil` while still staying before the sole `announce` call.
 pin("a poll that cannot name a difference says nothing",
-    "guard didSee, canNotify else { return false }" in code_only(SW_INT)
-    and "guard grew > 0 else { return false }" in code_only(SW_INT)
+    "guard didSee, canNotify else { return recent != nil }" in code_only(SW_INT)
+    and "guard grew > 0 else { return recent != nil }" in code_only(SW_INT)
     and 'if (!hadPrevious && pushedMessage == null) {\n            report("silent first-read unread=$unread")\n            return Result.success()\n        }' in code_only(KT_POLL)
     and 'if (grew <= 0) {\n            report("silent no-rise $previous->$unread")\n            return Result.success()\n        }' in code_only(KT_POLL))
 

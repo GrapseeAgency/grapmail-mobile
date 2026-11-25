@@ -32,18 +32,12 @@ The version gate refuses to ship unless:
 The Play upload also checks the version code against the highest one Play has ever seen. App Store Connect
 does the same check for build numbers itself.
 
-> **Current state (23 Nov 2026), not yet fixed. The founder decides:**
-> Android is **0.0.1 (versionCode 1)**. iOS is **0.6.4 (build 13)**. Also:
-> - `android.yml` releases only on the tag `v0.0.1`. Its gate hardcodes `WANT=0.0.1` and `versionCode='1'`, and
->   the release body says "GrapMail 0.0.1 (version code 1)". `ios.yml` releases on every `v*` tag **except**
->   `v0.0.1`. Right now no single tag can produce both store builds.
-> - Earlier tags shipped Android up to 0.6.3 / versionCode 12 (see the comment in `build.gradle.kts`). Any device
->   that sideloaded one of those refuses versionCode 1 as a downgrade. Play also refuses it if any of those
->   codes was ever uploaded to the Play app.
->
-> Suggested fix, applied by hand in one commit: choose the next version for both, e.g. **0.7.0**. Set Android
-> `versionCode` to at least **13** and iOS `CURRENT_PROJECT_VERSION` to **14**. In `android.yml`, update the tag
-> filter, `WANT`, the expected `versionCode` and the release body. Then tag `v0.7.0`.
+> **Current state (25 Nov 2026): first public release is fixed at 0.0.1.**
+> Android is **0.0.1 (versionCode 1)** and iOS is **0.0.1 (build 1)**.
+> Both release workflows accept the same tag, **`v0.0.1`**, and verify the built
+> artifact against it. Earlier 0.2.x–0.7.x identifiers were internal/sideload
+> lineage. A device with one of those higher test versionCodes must uninstall it
+> before installing the public 0.0.1 build.
 
 ## 1. The rollout, step by step
 
@@ -165,11 +159,11 @@ prefer those names. Set either set of names, not both.
 **Contract the backend route should implement.** The gate script accepts a few close variants.
 
 ```
-GET /api/grapsee/grapmail/client-reports/summary?platform=android&version=0.7.0&build=13&hours=24
+GET /api/grapsee/grapmail/client-reports/summary?platform=android&version=0.0.1&build=1&hours=24
 Authorization: Bearer <GRAPMAIL_REPORTS_SECRET>        (also sent as X-GrapMail-Reports-Secret)
 
 200 {"success": true, "windowHours": 24,
-     "versions": [{"platform": "android", "appVersion": "0.7.0 (13)",
+     "versions": [{"platform": "android", "appVersion": "0.0.1 (1)",
                    "sessions": 1830, "crashes": 2, "hangs": 1, "crashFreeSessions": 99.89}]}
 ```
 

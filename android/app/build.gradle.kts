@@ -47,52 +47,12 @@ android {
         applicationId = "com.grapsee.grapmail"
         minSdk = 26
         targetSdk = 36
-        // Bumped for the mailbox sector. `versionName` is what the release page
-        // and `aapt dump badging` are checked against, so the tag and the APK
-        // cannot quietly disagree about which build this is. 0.2.1 is the first
-        // tag whose release job actually signed: v0.2.0's run emitted
-        // `app-release-unsigned.apk` because the keystore variables were handed to
-        // `$GITHUB_ENV` in the same step that built, and the gate refused to
-        // publish it â€” that failed tag stays in history as the attempt.
-        // 0.3.0 carries the account-record band, the mailbox write sector, the
-        // E2E encryption sector, subscriptions and the store-compliance work.
-        // v0.3.0's first release-job run FAILED HERE ON PURPOSE: the tag said
-        // 0.3.0, this file still said 0.2.1, and the badging check refused to
-        // publish a release page describing a build it could not name. The
-        // disagreement was real; the tag was moved to the commit that fixes it.
-        // 0.3.2 is the design-and-behavior release: the frame-audit fixes (empty
-        // states, centering, destructive colours, toolbar pair), the compose
-        // parity, and the non-filling button inset that un-clipped "Check".
-        // 0.4.0 is the advanced-completion release, and it is the one the audit
-        // asked for by name: artwork drawn in code instead of cropped from the
-        // reference, drafts that open in the composer, attachments that actually
-        // open, a reader that steps / marks unread / asks before loading a
-        // sender's images / hands mail to share and print, and the platform
-        // rules that were missing entirely â€” an iOS icon that had no file, no
-        // splash on either platform, haptics tied to the write rather than the
-        // tap, a background new-mail read that says what it is evidence of, an
-        // offline fact read from the device, and a home-screen Compose shortcut.
-        // 0.5.0 is the gateway-auth release: sign-in, sign-up and every account
-        // call moved to the service that owns the mailbox, so the signed-in home
-        // reads real mail instead of "Couldn't load Inbox" (the seam and its
-        // proof are in FINDINGS.md). It also carries the Â§39 runtime leg with
-        // its walk-side fixes, and two iOS layout defects the frame audit found
-        // (a 520pt sign-in form on a 402pt screen; a stepper wrapping mid-word).
-        // v0.6.0 / versionCode 9: the first release that can be signed with the
-        // founder's distribution key (android.yml resolves CI_KEYSTORE_* secrets
-        // and refuses to label a test-signed file as founder-signed).
-        // 0.6.3 / versionCode 12: the photo fix. The founder's installed build
-        // is 0.6.2 / 11; shipping this as 1 would be refused as a downgrade even
-        // with the correct signature, which is another way to keep running the
-        // old app while believing the new one was installed.
-        // 0.7.0 / versionCode 13: the first release both stores can ship.
-        // Android had been 0.0.1 / 1 while iOS was 0.6.4 / 13, and android.yml
-        // released only on v0.0.1 while ios.yml released on every tag except
-        // it, so no single tag could produce both store builds. 13 is above
-        // every code this app has ever produced (0.6.3 was 12); see
-        // RELEASING.md.
-        versionCode = 13
-        versionName = "0.7.0"
+        // First public production release. Earlier 0.2.x–0.7.x identifiers were
+        // internal/sideload test lineage, not store releases. Testers with a higher
+        // sideloaded versionCode must uninstall it before installing 0.0.1; the
+        // production line intentionally starts at versionCode 1.
+        versionCode = 1
+        versionName = "0.0.1"
         // Real account API â€” same contract the website uses.
         buildConfigField("String", "API_BASE", "\"https://grapsee.com/api\"")
         // Play Integrity's cloud project number, provisioned outside the repo

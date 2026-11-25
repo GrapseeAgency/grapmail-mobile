@@ -11,17 +11,16 @@ recalled.
 
 | | Android | iOS |
 |---|---|---|
-| Version | **0.7.0** (`versionCode` 13) | **0.7.0** (build 14) |
+| Version | **0.0.1** (`versionCode` 1) | **0.0.1** (build 1) |
 | Min OS | Android 8.0 (API 26) | iOS 16.0 (widget/Live Activity 16.1) |
 | Target | API 36 | Xcode 16 / iOS 18 SDK |
 | Package / bundle | `com.grapsee.grapmail` | `com.grapsee.grapmail` |
-| Release tag | `v0.7.0` | `v0.7.0` |
+| Release tag | `v0.0.1` | `v0.0.1` |
 
-Both platforms now share one version and one tag. Before this change Android was
-`0.0.1/1` and iOS `0.6.4/13`, and `android.yml` released only on `v0.0.1` while
-`ios.yml` released on every tag *except* `v0.0.1` — no single tag could produce
-both store builds. The version was raised rather than lowered so a device that
-installed an earlier sideloaded build (0.6.3 / 12) is not asked to downgrade.
+Both platforms share the first public version and one tag. Earlier 0.2.x–0.7.x
+identifiers belonged to internal/sideload builds, not the public store line.
+A device carrying a higher sideloaded versionCode must uninstall that test build
+before installing production 0.0.1; the public line intentionally starts at 1.
 
 ## 2. What was verified on this machine (25 Nov)
 
@@ -147,7 +146,7 @@ compile errors; that is the honest state, not a claim of green.
 
 1. Push to GitHub. CI builds Android (debug + tests + signed release) and, on a
    macOS runner, archives iOS.
-2. Create tag **`v0.7.0`**. `android.yml` builds the signed APK/AAB and attaches
+2. Create tag **`v0.0.1`**. `android.yml` builds the signed APK/AAB and attaches
    them to the GitHub Release; `ios.yml` archives, verifies the version against
    the tag, and uploads to App Store Connect (TestFlight).
 3. Play: `play-rollout.yml` uploads the AAB to **internal** automatically after
