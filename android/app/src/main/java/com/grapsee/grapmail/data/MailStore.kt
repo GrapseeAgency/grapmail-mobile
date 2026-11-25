@@ -62,9 +62,7 @@ object MailStore {
     // what the FIRST paint shows, and every refetch rule that guards staleness
     // (reuseRecentFolder, refreshOnResume) keeps working on top of it.
     //
-    // Bodies are deliberately not persisted: they are payload-heavy, they
-    // warm through prefetch the moment a page lands, and a snapshot that grew
-    // unbounded would outlive its welcome on a 32GB device.
+    // Recent reader bodies use a separate, size-limited cache.
 
     private const val SNAPSHOT_VERSION = 2
 
@@ -149,6 +147,8 @@ object MailStore {
         }
     }
 
+    suspend fun flushSnapshot() = kotlinx.coroutines.withContext(Dispatchers.IO) { writeSnapshotNow() }
+
     private suspend fun writeSnapshotNow() = snapshotWriter.withLock writer@{
         val ctx = appContext ?: return@writer
         val session = SessionStore.snapshot(ctx) ?: return@writer
@@ -156,7 +156,9 @@ object MailStore {
             snapshotGeneration to DiskSnapshot(
                 version = SNAPSHOT_VERSION,
                 sessionId = session.id,
-                pages = pages,
+                pages = pages.filterValues { it.query == null }.mapValues { (_, page) ->
+                    page.copy(messages = page.messages.take(25), pages = minOf(page.pages, 1))
+                },
                 stats = stats,
                 labels = labels,
                 aliases = aliases,
@@ -216,6 +218,7 @@ object MailStore {
     // Thread metadata only. The payload remains in [bodies], whose byte-cost
     // limit controls memory. This bounded id index makes switching back to a
     // recent conversation a memory hit without duplicating message bodies.
+    @Serializable
     data class ThreadPage(
         val messages: List<MailMessageFullDto>,
         val nextCursor: String?,
@@ -269,8 +272,16 @@ object MailStore {
                 return@withLock false
             val k = key(box, query)
             if (refreshStartedAt != null && (pages[k]?.let {
-                it.loadedAtMillis >= refreshStartedAt || it.pages > 1
+                it.loadedAtMillis >= refreshStartedAt
             } == true)) return@withLock false
+            val existing = pages[k]
+            if (refreshStartedAt != null && existing != null && existing.pages > 1 &&
+                existing.total == resp.total && resp.messages.isNotEmpty() &&
+                existing.messages.take(resp.messages.size).map { it.id } == resp.messages.map { it.id }) {
+                pages = pages + (k to existing.copy(messages = resp.messages + existing.messages.drop(resp.messages.size),
+                    loadedAtMillis = System.currentTimeMillis()))
+                return@withLock true
+            }
             val prior = if (replace) null else pages[k]
             val merged = ((prior?.messages ?: emptyList()) + resp.messages).distinctBy { it.id }
             pages = pages + (k to PageCache(
@@ -400,7 +411,7 @@ object MailStore {
                     throw error
                 }
                 directory.listFiles()?.filter { it.isFile }?.sortedByDescending { it.lastModified() }
-                    ?.drop(12)?.forEach { it.delete() }
+                    ?.drop(64)?.forEach { it.delete() }
             }.onFailure { android.util.Log.w("GrapMailNotify", "Preview cache write failed: ${it.javaClass.simpleName}") }
         }
     }
@@ -457,9 +468,8 @@ object MailStore {
         }
     }
 
-    suspend fun thread(id: String): ThreadPage? = mutex.withLock {
+    private suspend fun memoryThread(id: String): ThreadPage? = mutex.withLock {
         val index = threadMessageIds.remove(id) ?: return@withLock null
-        if (System.currentTimeMillis() - index.loadedAtMillis > THREAD_FRESHNESS_MS) return@withLock null
         val messages = index.messageIds.mapNotNull(bodies::get)
         if (messages.size != index.messageIds.size) return@withLock null
         // LinkedHashMap insertion order is the recency order: remove/reinsert
@@ -468,6 +478,23 @@ object MailStore {
         ThreadPage(messages, index.nextCursor, index.hasMore)
     }
 
+    suspend fun thread(id: String): ThreadPage? {
+        memoryThread(id)?.let { return it }
+        val context = appContext ?: return null
+        val session = SessionStore.snapshot(context) ?: return null
+        return kotlinx.coroutines.withContext(Dispatchers.IO) {
+            mutex.withLock {
+                if (!SessionStore.isCurrent(context, session.id)) return@withLock null
+                val file = threadFile(context, id, session.id)
+                if (file.length() !in 1L..524288L) return@withLock null
+                runCatching { snapshotJson.decodeFromString(ThreadPage.serializer(), file.readText()) }.getOrNull()
+            }
+        }
+    }
+
+    private fun threadFile(context: android.content.Context, id: String, sessionId: String) =
+        java.io.File(java.io.File(context.noBackupFilesDir, "mail-threads"), notificationFile(context, id, sessionId).name)
+
     suspend fun putThread(
         id: String,
         messages: List<MailMessageFullDto>,
@@ -475,7 +502,7 @@ object MailStore {
         hasMore: Boolean,
         sessionContext: android.content.Context? = null,
         sessionId: String? = null,
-    ): ThreadPage = mutex.withLock {
+    ): ThreadPage = kotlinx.coroutines.withContext(Dispatchers.IO) { mutex.withLock {
             if (sessionId != null && (sessionContext == null || !SessionStore.isCurrent(sessionContext, sessionId)))
                 return@withLock ThreadPage(messages, nextCursor, hasMore)
             val merged = messages.map { message ->
@@ -493,14 +520,28 @@ object MailStore {
             while (threadMessageIds.size > MAX_CACHED_THREADS) {
                 threadMessageIds.remove(threadMessageIds.keys.first())
             }
-            ThreadPage(merged, nextCursor, hasMore)
-        }
+            val page = ThreadPage(merged, nextCursor, hasMore)
+            if (sessionContext != null && sessionId != null) runCatching {
+                val file = threadFile(sessionContext, id, sessionId)
+                val data = snapshotJson.encodeToString(ThreadPage.serializer(), page).toByteArray()
+                if (data.size <= 512 * 1024) {
+                    file.parentFile?.mkdirs()
+                    val atomic = android.util.AtomicFile(file)
+                    val stream = atomic.startWrite()
+                    try { stream.write(data); atomic.finishWrite(stream) }
+                    catch (error: java.io.IOException) { atomic.failWrite(stream); throw error }
+                    file.parentFile?.listFiles()?.sortedByDescending { it.lastModified() }?.drop(MAX_CACHED_THREADS)?.forEach { it.delete() }
+                } else file.delete()
+            }
+            page
+        } }
 
     suspend fun forgetBody(id: String) = kotlinx.coroutines.withContext(Dispatchers.IO) {
         mutex.withLock {
             bodies.remove(id)
             attachmentsByMessage.remove(id)
             appContext?.let { context ->
+                evictDiskEntries(context, { it.id == id }, includeBodies = false)
                 SessionStore.snapshot(context)?.let { session ->
                     android.util.AtomicFile(notificationFile(context, id, session.id)).delete()
                 }
@@ -508,7 +549,21 @@ object MailStore {
         }
     }
 
-    suspend fun forgetAttachment(attachmentId: String) = mutex.withLock {
+    private fun evictDiskEntries(context: android.content.Context, matches: (MailMessageFullDto) -> Boolean, includeBodies: Boolean) {
+        java.io.File(context.noBackupFilesDir, "mail-threads").listFiles()?.forEach { file ->
+            if (runCatching { snapshotJson.decodeFromString(ThreadPage.serializer(), file.readText()).messages.any(matches) }
+                    .getOrDefault(true)) file.delete()
+        }
+        if (includeBodies) notificationDirectory(context).listFiles()?.forEach { file ->
+            if (runCatching { matches(snapshotJson.decodeFromString(MailMessageFullDto.serializer(), file.readText())) }
+                    .getOrDefault(true)) file.delete()
+        }
+    }
+
+    suspend fun forgetAttachment(attachmentId: String) = kotlinx.coroutines.withContext(Dispatchers.IO) { mutex.withLock {
+        appContext?.let { context ->
+            evictDiskEntries(context, { message -> message.attachments.any { it.id == attachmentId } }, includeBodies = true)
+        }
         val messages = attachmentsByMessage.iterator()
         while (messages.hasNext()) {
             val entry = messages.next()
@@ -517,7 +572,7 @@ object MailStore {
             bodies.remove(entry.key)
             if (remaining.isEmpty()) messages.remove() else entry.setValue(remaining)
         }
-    }
+    } }
 
     /**
      * Forget the alias list so the next visit re-reads it.
@@ -624,6 +679,7 @@ object MailStore {
             try {
                 java.io.File(it.filesDir, SNAPSHOT_FILE).delete()
                 notificationDirectory(it).deleteRecursively()
+                java.io.File(it.noBackupFilesDir, "mail-threads").deleteRecursively()
             } catch (_: Exception) {}
         }
     }

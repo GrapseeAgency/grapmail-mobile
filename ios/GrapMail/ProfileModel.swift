@@ -196,7 +196,7 @@ final class ProfileModel: ObservableObject {
                     self.state.fatal = nil
                     MailDisplay.shared.apply(cached.settings)
                 }
-                if self.state.avatar == nil, self.state.avatar == nil,
+                if self.state.avatar == nil,
                    let cached = await AccountPhotoCache.read(token: token),
                    await AvatarThumbnail.decode(cached) != nil {
                     guard !Task.isCancelled, generation == SessionStore.generation else { return }

@@ -2486,6 +2486,7 @@ class MailboxViewModel @JvmOverloads constructor(
         val nextCursor: String? = null,
         val hasMore: Boolean = false,
         val error: String? = null,
+        val waitingForNetwork: Boolean = false,
     )
 
     private val _thread = MutableStateFlow(ThreadState())
@@ -2564,12 +2565,13 @@ class MailboxViewModel @JvmOverloads constructor(
                 return@loadReader
             }
             val cached = MailStore.thread(threadId)
-            val focused = focusedId?.let { MailStore.body(it) ?: MailStore.notificationMessage(context, it, session.id) }
+            val focused = focusedId?.let { id -> cached?.messages?.firstOrNull { it.id == id }
+                ?: MailStore.body(id) ?: MailStore.notificationMessage(context, id, session.id) }
             val initial = (cached?.messages.orEmpty() + listOfNotNull(focused))
                 .distinctBy { it.id }.sortedBy { it.createdAt.orEmpty() }
-            if (initial.isNotEmpty() && SessionStore.isCurrent(context, session.id)) {
-                _thread.value = ThreadState(messages = initial, loading = true)
-            }
+            kotlinx.coroutines.currentCoroutineContext().ensureActive()
+            if (!SessionStore.isCurrent(context, session.id)) return@loadReader
+            _thread.value = ThreadState(messages = initial, loading = true, waitingForNetwork = initial.isEmpty())
             runCatching { Api.mailThread(session.token, threadId) }
                 .onSuccess { r ->
                     if (!SessionStore.isCurrent(context, session.id)) return@loadReader
@@ -2782,6 +2784,9 @@ class MailboxViewModel @JvmOverloads constructor(
                 _thread.update { it.copy(messages = listOf(cached), loading = false) }
                 return@loadReader
             }
+            kotlinx.coroutines.currentCoroutineContext().ensureActive()
+            if (!SessionStore.isCurrent(context, session.id)) return@loadReader
+            _thread.update { it.copy(waitingForNetwork = true) }
             runCatching { Api.mailMessage(session.token, id) }
                 .onSuccess { r ->
                     if (!SessionStore.isCurrent(context, session.id)) return@loadReader
@@ -2798,6 +2803,9 @@ class MailboxViewModel @JvmOverloads constructor(
                         threadLoadedFor = id
                         _thread.update { s -> s.copy(messages = listOf(message), loading = false) }
                         MailStore.patchFlags(message.id, read = true, sessionContext = context, sessionId = session.id)
+                        viewModelScope.launch {
+                            MailStore.saveNotificationMessage(context, message, session.id)
+                        }
                     }
                     reproject()
                 }

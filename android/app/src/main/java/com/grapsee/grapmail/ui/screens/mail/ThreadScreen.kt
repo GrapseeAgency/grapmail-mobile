@@ -307,7 +307,7 @@ fun ThreadContent(
         com.grapsee.grapmail.ui.components.OfflineBanner(online = mailbox.online)
 
         if (thread.messages.isEmpty() && thread.error == null) {
-            com.grapsee.grapmail.ui.components.DetailSkeleton(
+            if (thread.waitingForNetwork) com.grapsee.grapmail.ui.components.DetailSkeleton(
                 Modifier.fillMaxSize(), label = stringResource(R.string.mail_thread_opening))
             return@Column
         }

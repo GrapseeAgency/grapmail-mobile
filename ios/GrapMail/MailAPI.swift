@@ -33,7 +33,7 @@ import Foundation
 // ── rows ─────────────────────────────────────────────────────────────────────
 
 /// `publicRow.from` — `grapmail.ts:583`. Both halves are separately optional.
-struct MailPerson: Decodable {
+struct MailPerson: Codable {
     var address: String?
     var name: String?
 
@@ -120,7 +120,7 @@ struct MailMessage: Decodable, Identifiable {
 
 /// `fullRow` — `grapmail.ts:609-623`, plus the attachment rows the single-
 /// message route bolts on (`grapmail.ts:769-774`).
-struct MailMessageFull: Decodable, Identifiable {
+struct MailMessageFull: Codable, Identifiable {
     var id = ""
 
     /// See `MailMessage.init()` — a hand-decoded type has no memberwise init,
@@ -236,7 +236,7 @@ struct MailMessageFull: Decodable, Identifiable {
 /// `grapmail_attachments` rows — metadata only. `storageKey` is deliberately
 /// **not** decoded: it is a server-side object key, and a field that can be
 /// turned into a path is a field that should never reach the UI.
-struct MailAttachment: Decodable, Identifiable {
+struct MailAttachment: Codable, Identifiable {
     var id = ""
     var messageId: String?
     var name: String?
@@ -247,15 +247,17 @@ struct MailAttachment: Decodable, Identifiable {
     var contentId: String?
 
     private enum CodingKeys: String, CodingKey {
-        case id, messageId, name, mimeType, sizeBytes, size, createdAt, contentId
+        case id, messageId, name, mimeType, sizeBytes, createdAt, contentId
     }
+    private enum LegacyKeys: String, CodingKey { case size }
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         id = c.lenient(.id, "")
         messageId = c.lenientOpt(.messageId)
         name = c.lenientOpt(.name)
         mimeType = c.lenientOpt(.mimeType)
-        sizeBytes = c.lenientOpt(.sizeBytes) ?? c.lenientOpt(.size)
+        let legacy = try decoder.container(keyedBy: LegacyKeys.self)
+        sizeBytes = c.lenientOpt(.sizeBytes) ?? legacy.lenientOpt(.size)
         createdAt = c.lenientOpt(.createdAt)
         contentId = c.lenientOpt(.contentId)
     }
@@ -1566,9 +1568,17 @@ extension ApiClient {
         try await mailGet("/message/\(id.percentEncodedPath())?native=1", bearer: token)
     }
 
+    static func readerMessage(token: String, id: String) async throws -> (MailMessageFull, Data)? {
+        try await cacheableMessage(token: token, id: id, suffix: "?native=1")
+    }
+
     static func notificationMessage(token: String, id: String) async throws -> (MailMessageFull, Data)? {
+        try await cacheableMessage(token: token, id: id, suffix: "/notification-preview")
+    }
+
+    private static func cacheableMessage(token: String, id: String, suffix: String) async throws -> (MailMessageFull, Data)? {
         let (data, response) = try await mailBinary(
-            url: URL(string: "\(base)\(mailBase)/message/\(id.percentEncodedPath())/notification-preview"),
+            url: URL(string: "\(base)\(mailBase)/message/\(id.percentEncodedPath())\(suffix)"),
             method: "GET", bearer: token, body: nil, contentType: nil)
         guard (200..<300).contains(response.statusCode) else { throw mailFailure(data: data, http: response) }
         guard let message = try decoder.decode(MailMessageResponse.self, from: data).message,

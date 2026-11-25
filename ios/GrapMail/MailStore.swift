@@ -148,7 +148,7 @@ actor MailStore {
     // this only remembers which ids make one conversation and its recent order.
     // Re-opening a thread after reading another message can therefore be a memory
     // hit without a second body store or an unbounded [threadId: payload] map.
-    struct ThreadPage {
+    struct ThreadPage: Codable {
         let messages: [MailMessageFull]
         let nextCursor: String?
         let hasMore: Bool
@@ -232,35 +232,33 @@ actor MailStore {
         let generation = cacheGeneration
         snapshotWriteTask = Task {
             try? await Task.sleep(nanoseconds: 1_500_000_000)
-            guard !Task.isCancelled, revision == snapshotRevision,
-                  generation == SessionStore.generation,
-                  let account = SessionStore.address?.lowercased(),
-                  let url = Self.snapshotURL else { return }
-            // Capture AFTER the debounce, not before it. Every cache mutation
-            // schedules/cancels this task, and the revision check prevents an
-            // older detached write from committing over newer state.
-            let snapshotPages = pages.compactMapValues { page -> PageCache? in
-                guard page.query == nil else { return nil }
-                var first = page
-                first.messages = Array(page.messages.prefix(25))
-                first.pages = first.messages.isEmpty ? 0 : 1
-                return first
-            }
-            let snapshot = DiskSnapshot(
-                version: Self.snapshotVersion,
-                account: account,
-                pages: snapshotPages.mapValues(DiskPage.init),
-                profileData: profileValue.flatMap { try? JSONEncoder().encode($0) }
-            )
-            let data = try? JSONEncoder().encode(snapshot)
-            guard !Task.isCancelled, revision == snapshotRevision,
-                  generation == SessionStore.generation, let data else { return }
-            // MailStore's actor serializes this bounded atomic write with _clear.
-            // A detached writer could outlive cancellation and recreate a deleted
-            // snapshot after sign-out; keeping the commit on this actor means a
-            // queued clear always runs after an in-progress write and deletes it.
-            try? data.write(to: url, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
+            guard !Task.isCancelled, revision == snapshotRevision else { return }
+            flushSnapshot(generation: generation)
         }
+    }
+
+    func flushSnapshot(generation: UUID) {
+        guard generation == cacheGeneration, generation == SessionStore.generation,
+              snapshotWriteTask != nil,
+              let account = SessionStore.address?.lowercased(), let url = Self.snapshotURL else { return }
+        snapshotWriteTask?.cancel()
+        snapshotWriteTask = nil
+        let snapshotPages = pages.compactMapValues { page -> PageCache? in
+            guard page.query == nil else { return nil }
+            var first = page
+            first.messages = Array(page.messages.prefix(25))
+            first.pages = first.messages.isEmpty ? 0 : 1
+            return first
+        }
+        let snapshot = DiskSnapshot(
+            version: Self.snapshotVersion,
+            account: account,
+            pages: snapshotPages.mapValues(DiskPage.init),
+            profileData: profileValue.flatMap { try? JSONEncoder().encode($0) }
+        )
+        guard let data = try? JSONEncoder().encode(snapshot), generation == SessionStore.generation else { return }
+        // Serialize the atomic write with clearing this account's local data.
+        try? data.write(to: url, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
     }
 
     private func ensureSession() {
@@ -290,10 +288,21 @@ actor MailStore {
     /// Merge a fetched page. `replace` is true for page 1 (a refresh or a new
     /// search), false for a later page appended to what is already shown.
     @discardableResult
-    func putPage(_ box: MailBox, _ query: String?, _ resp: MailInboxResponse, replace: Bool, generation: UUID? = nil) -> Bool {
+    func putPage(_ box: MailBox, _ query: String?, _ resp: MailInboxResponse, replace: Bool, generation: UUID? = nil, refreshStartedAt: Date? = nil) -> Bool {
         ensureSession()
         if let generation, generation != cacheGeneration { return false }
         let k = key(box, query)
+        if let refreshStartedAt, let existing = pages[k],
+           existing.loadedAt >= refreshStartedAt { return false }
+        if refreshStartedAt != nil, var existing = pages[k], existing.pages > 1,
+           existing.total == resp.total, !resp.messages.isEmpty,
+           existing.messages.prefix(resp.messages.count).map(\.id) == resp.messages.map(\.id) {
+            existing.messages = resp.messages + Array(existing.messages.dropFirst(resp.messages.count))
+            existing.loadedAt = Date()
+            pages[k] = existing
+            scheduleSnapshotWrite()
+            return true
+        }
         let prior = replace ? nil : pages[k]
         let merged = (prior?.messages ?? []) + resp.messages
         var seen = Set<String>()
@@ -435,7 +444,7 @@ actor MailStore {
                 let date = (try? file.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate
                 return (file, date ?? .distantPast)
             }.sorted { $0.1 > $1.1 }
-            for (file, _) in byDate.dropFirst(12) { try? files.removeItem(at: file) }
+            for (file, _) in byDate.dropFirst(64) { try? files.removeItem(at: file) }
         } catch {
             // Storage pressure or device protection can leave only the memory copy.
         }
@@ -482,14 +491,26 @@ actor MailStore {
         }
     }
 
+    private static var threadDirectory: URL? {
+        notificationDirectory?.deletingLastPathComponent().appendingPathComponent("grapmail-threads", isDirectory: true)
+    }
+
+    private static func threadURL(_ id: String) -> URL? {
+        guard let name = notificationURL(id)?.lastPathComponent else { return nil }
+        return threadDirectory?.appendingPathComponent(name)
+    }
+
     func thread(_ id: String) -> ThreadPage? {
         ensureSession()
+        if let cached = memoryThread(id) { return cached }
+        guard let url = Self.threadURL(id),
+              let size = try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize,
+              size <= 512 * 1024, let bytes = try? Data(contentsOf: url) else { return nil }
+        return try? JSONDecoder().decode(ThreadPage.self, from: bytes)
+    }
+
+    private func memoryThread(_ id: String) -> ThreadPage? {
         guard let index = threadMessageIds[id], !index.messageIds.isEmpty else { return nil }
-        guard Date().timeIntervalSince(index.loadedAt) <= Self.threadFreshness else {
-            threadMessageIds[id] = nil
-            threadOrder.removeAll { $0 == id }
-            return nil
-        }
         let messages = index.messageIds.compactMap { body($0) }
         guard messages.count == index.messageIds.count else {
             // One body was evicted by the cost-limited cache; this thread is no
@@ -523,20 +544,55 @@ actor MailStore {
         while threadOrder.count > Self.maxCachedThreads {
             threadMessageIds[threadOrder.removeFirst()] = nil
         }
-        return ThreadPage(messages: merged, nextCursor: nextCursor, hasMore: hasMore)
+        let page = ThreadPage(messages: merged, nextCursor: nextCursor, hasMore: hasMore)
+        if let directory = Self.threadDirectory, let url = Self.threadURL(id),
+           let data = try? JSONEncoder().encode(page) {
+            let files = FileManager.default
+            if data.count <= 512 * 1024 {
+                try? files.createDirectory(at: directory, withIntermediateDirectories: true)
+                try? data.write(to: url, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
+                let entries = (try? files.contentsOfDirectory(at: directory, includingPropertiesForKeys: [.contentModificationDateKey])) ?? []
+                let dated = entries.map { ($0, (try? $0.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .distantPast) }
+                for entry in dated.sorted(by: { $0.1 > $1.1 }).dropFirst(Self.maxCachedThreads) {
+                    try? files.removeItem(at: entry.0)
+                }
+            } else { try? files.removeItem(at: url) }
+        }
+        return page
     }
 
     func forgetBody(_ id: String, generation: UUID? = nil) {
         ensureSession()
         if let generation, generation != cacheGeneration { return }
         bodies.removeObject(forKey: id as NSString)
+        evictDiskEntries(includeBodies: false) { $0.id == id }
         if let url = Self.notificationURL(id) { try? FileManager.default.removeItem(at: url) }
         attachmentsByMessage[id] = nil
+    }
+
+    private func evictDiskEntries(includeBodies: Bool, matching: (MailMessageFull) -> Bool) {
+        let files = FileManager.default
+        let decoder = JSONDecoder()
+        for (directory, isThread) in [(Self.threadDirectory, true), (Self.notificationDirectory, false)] {
+            guard let directory, isThread || includeBodies,
+                  let entries = try? files.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil) else { continue }
+            for entry in entries {
+                guard let data = try? Data(contentsOf: entry) else { continue }
+                let remove: Bool
+                if isThread {
+                    remove = (try? decoder.decode(ThreadPage.self, from: data).messages.contains(where: matching)) ?? true
+                } else {
+                    remove = (try? decoder.decode(MailMessageResponse.self, from: data))?.message.map(matching) ?? true
+                }
+                if remove { try? files.removeItem(at: entry) }
+            }
+        }
     }
 
     func forgetAttachment(_ attachmentId: String, generation: UUID? = nil) {
         ensureSession()
         if let generation, generation != cacheGeneration { return }
+        evictDiskEntries(includeBodies: true) { $0.attachments.contains { $0.id == attachmentId } }
         for (id, entries) in attachmentsByMessage {
             let remaining = entries.filter { $0.attachment.id != attachmentId }
             guard remaining.count != entries.count else { continue }
@@ -619,6 +675,7 @@ actor MailStore {
         snapshotRevision &+= 1
         if let url = Self.snapshotURL { try? FileManager.default.removeItem(at: url) }
         if let url = Self.notificationDirectory { try? FileManager.default.removeItem(at: url) }
+        if let url = Self.threadDirectory { try? FileManager.default.removeItem(at: url) }
         diskRead?.cancel()
         diskRead = nil
         pages = [:]

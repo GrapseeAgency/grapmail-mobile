@@ -72,8 +72,18 @@ class MailPollWorker(
                 ?: return Result.success()
             return notifyExact(fresh, pushedId) ?: notifyFromInbox(fresh, pushedId)
         }
-        if (pushedId != null && Notifications.allowed(applicationContext)) {
-            notifyExact(session, pushedId)?.let { return it }
+        if (pushedId != null) {
+            notifyExact(session, pushedId)?.let { result ->
+                if (result == Result.retry()) return result
+                try {
+                    refreshCachedInbox(session)
+                } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                    throw cancelled
+                } catch (_: Exception) {
+                    // The exact message may already be saved. The next sync can update the list.
+                }
+                return result
+            }
         }
         val token = session.token
         val stats = runCatching { Api.mailStats(token) }
@@ -97,6 +107,8 @@ class MailPollWorker(
             report("silent session changed")
             return Result.success()
         }
+        MailStore.awaitDiskReady()
+        MailStore.putStats(stats, applicationContext, session.id)
         completedPolls.tryEmit(PollResult(session.id, stats))
         val unread = stats.inbox?.unread
         if (unread == null) {
@@ -109,8 +121,10 @@ class MailPollWorker(
         val hadPrevious = prefs.getString("sessionId", null) == session.id && prefs.contains(sawKey)
         val previous = prefs.getInt(sawKey, 0)
         val priorHead = prefs.getString("inboxHead", null).takeIf { hadPrevious }
-        val recent = if (Notifications.allowed(applicationContext)) {
-            runCatching { Api.mailInbox(token, MailBox.Inbox, pageSize = 12).messages.filter { it.id.isNotBlank() } }
+        val canNotify = Notifications.allowed(applicationContext)
+        val recent = if (canNotify || !hadPrevious || unread != previous || pushedId != null ||
+            MailStore.page(MailBox.Inbox)?.let { System.currentTimeMillis() - it.loadedAtMillis > 15 * 60_000 } != false) {
+            runCatching { refreshCachedInbox(session).filter { it.id.isNotBlank() } }
                 .onFailure {
                     if (it is kotlinx.coroutines.CancellationException) throw it
                     if (pushedId != null && runAttemptCount < 3) return Result.retry()
@@ -132,6 +146,7 @@ class MailPollWorker(
                 who to (m.subject ?: CoreStrings.get(R.string.core_notif_no_subject) { "(no subject)" })
             },
         )
+        if (!canNotify) return Result.success()
         val announced = announcedIds(prefs, session.id)
         val pushedMessage = recent?.firstOrNull {
             it.id == pushedId && it.id !in announced && !it.isRead && it.direction != "outbound"
@@ -192,6 +207,32 @@ class MailPollWorker(
         return Result.success()
     }
 
+    private suspend fun refreshCachedInbox(session: SessionSnapshot): List<MailMessageDto> {
+        MailStore.awaitDiskReady()
+        val started = System.currentTimeMillis()
+        val previousHead = MailStore.page(MailBox.Inbox)?.messages?.firstOrNull()?.id
+        val inbox = Api.mailInbox(session.token, MailBox.Inbox, pageSize = 25)
+        MailStore.putPage(MailBox.Inbox, null, inbox, replace = true,
+            sessionContext = applicationContext, sessionId = session.id, refreshStartedAt = started)
+        MailStore.flushSnapshot()
+        val pushedId = inputData.getString("messageId")
+        val arrivals = inbox.messages.takeWhile { it.id != previousHead }
+            .filter { it.id.isNotBlank() && it.id != pushedId && !it.isRead && it.direction == "inbound" }
+            .take(3)
+        kotlinx.coroutines.withTimeoutOrNull(3_000) {
+            for (arrival in arrivals) {
+                if (!SessionStore.isCurrent(applicationContext, session.id)) break
+                val message = runCatching { Api.notificationMessage(session.token, arrival.id) }
+                    .onFailure { if (it is kotlinx.coroutines.CancellationException) throw it }
+                    .getOrNull()
+                if (message != null && message.id == arrival.id) {
+                    MailStore.saveNotificationMessage(applicationContext, message, session.id)
+                }
+            }
+        }
+        return inbox.messages
+    }
+
     private suspend fun notifyFromInbox(session: SessionSnapshot, id: String): Result {
         val prefs = applicationContext.getSharedPreferences("grapmail-poll", Context.MODE_PRIVATE)
         val announced = announcedIds(prefs, session.id)
@@ -242,7 +283,8 @@ class MailPollWorker(
         } ?: return null
         if (message.id != id || message.isRead || message.direction != "inbound") return Result.success()
         MailStore.saveNotificationMessage(applicationContext, message, session.id)
-        val thumbnail = if (privatePreview) null else previewImage(session.token, message)
+        val thumbnail = if (privatePreview || !Notifications.allowed(applicationContext)) null
+            else previewImage(session.token, message)
         if (SessionStore.snapshotAll(applicationContext).none { it.id == session.id }) return Result.success()
         // A sealed envelope is encryption whatever the flag says: the row is
         // drawn as encrypted, and its text never reaches the sign-in code search.
@@ -260,6 +302,7 @@ class MailPollWorker(
                 .onFailure { if (it is kotlinx.coroutines.CancellationException) throw it }
                 .getOrNull()?.let { stats ->
                     if (SessionStore.isCurrent(applicationContext, session.id)) {
+                        MailStore.putStats(stats, applicationContext, session.id)
                         completedPolls.tryEmit(PollResult(session.id, stats))
                         com.grapsee.grapmail.widget.MailWidgetState.publish(
                             applicationContext, stats.inbox?.unread,

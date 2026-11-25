@@ -139,8 +139,10 @@ struct ThreadView: View {
             // Offline: whatever was already opened stays readable under this.
             GMOfflineBanner()
             if vm.thread.messages.isEmpty && vm.thread.error == nil {
-                GMSkeletonBlock(lines: 6)
-                    .padding(.horizontal, 20)
+                if vm.thread.waitingForNetwork {
+                    GMSkeletonBlock(lines: 6)
+                        .padding(.horizontal, 20)
+                }
                 Spacer(minLength: 0)
             } else if vm.thread.error != nil, vm.thread.messages.isEmpty {
                 failedBody

@@ -130,7 +130,7 @@ enum MailPoll {
     }
 
     @MainActor
-    static func runOnce(announceArrivals: Bool = true) async -> Bool {
+    static func runOnce(announceArrivals: Bool = true, prefetchedID: String? = nil) async -> Bool {
         guard let token = SessionStore.token else { return false }
         let generation = SessionStore.generation
         guard activeGeneration != generation else { return false }
@@ -161,9 +161,27 @@ enum MailPoll {
         guard !Task.isCancelled, generation == SessionStore.generation else { return false }
         let canNotify = settings.authorizationStatus == .authorized || settings.authorizationStatus == .provisional
         let recent: [MailMessage]?
-        if canNotify {
-            recent = (try? await ApiClient.mailInbox(token: token, box: .inbox, pageSize: 12))?
-                .messages.filter { !$0.id.isEmpty }
+        var warmedMessage: MailMessageFull?
+        await MailStore.shared.awaitDiskReady()
+        let savedPage = await MailStore.shared.page(.inbox)
+        let inboxIsStale = savedPage.map { Date().timeIntervalSince($0.loadedAt) > 15 * 60 } ?? true
+        if canNotify || !didSee || count != previous || !announceArrivals || inboxIsStale {
+            let started = Date()
+            if let page = try? await ApiClient.mailInbox(token: token, box: .inbox, pageSize: 25) {
+                await MailStore.shared.putPage(.inbox, nil, page, replace: true,
+                                               generation: generation, refreshStartedAt: started)
+                await MailStore.shared.flushSnapshot(generation: generation)
+                let rows = page.messages.filter { !$0.id.isEmpty }
+                recent = rows
+                let previousHead = savedPage?.messages.first?.id
+                if let arrival = rows.prefix(while: { $0.id != previousHead }).first(where: {
+                    $0.id != prefetchedID && !$0.isRead && $0.direction == "inbound"
+                }) {
+                    warmedMessage = await cacheNotificationMessage(id: arrival.id, token: token, generation: generation)
+                }
+            } else {
+                recent = nil
+            }
         } else {
             recent = nil
         }
@@ -175,7 +193,7 @@ enum MailPoll {
         // the same numbers, at the moment they were true. Written before any
         // early return so a read that announces nothing still corrects it.
         WidgetBridge.update(unread: count, account: SessionStore.address, latest: recent?.first, recent: recent ?? [], signedIn: true)
-        guard didSee, canNotify else { return false }
+        guard didSee, canNotify else { return recent != nil }
         guard announceArrivals, !UserDefaults.standard.bool(forKey: "gm.focusQuiet") else { return true }
         // Keep this device's copy of the notification rules current (at most every
         // six hours), so a rule changed on another device applies here too.
@@ -189,18 +207,20 @@ enum MailPoll {
             arrivals = nil
         }
         let grew = arrivals?.count ?? (count - previous)
-        guard grew > 0 else { return false }
+        guard grew > 0 else { return recent != nil }
         let message = grew == 1 ? arrivals?.first : nil
         var previewFile: URL?
-        if !UserDefaults.standard.bool(forKey: "mailGenericPreviews"),
-           let id = message?.id,
-           let details = await cacheNotificationMessage(id: id, token: token, generation: generation),
-           !details.isE2eEncrypted,
-           let item = details.attachments.first(where: {
-               !$0.id.isEmpty && ["image/jpeg", "image/png", "image/webp", "image/gif"].contains($0.mimeType ?? "") &&
-               (1...2_097_152).contains($0.sizeBytes ?? 0)
-           }) {
-            previewFile = await notificationImage(token: token, id: item.id)
+        if !UserDefaults.standard.bool(forKey: "mailGenericPreviews"), let id = message?.id {
+            let details: MailMessageFull?
+            if warmedMessage?.id == id { details = warmedMessage }
+            else { details = await cacheNotificationMessage(id: id, token: token, generation: generation) }
+            if let details, !details.isE2eEncrypted,
+               let item = details.attachments.first(where: {
+                   !$0.id.isEmpty && ["image/jpeg", "image/png", "image/webp", "image/gif"].contains($0.mimeType ?? "") &&
+                   (1...2_097_152).contains($0.sizeBytes ?? 0)
+               }) {
+                previewFile = await notificationImage(token: token, id: item.id)
+            }
         }
         defer { if let previewFile { try? FileManager.default.removeItem(at: previewFile) } }
         guard !Task.isCancelled, generation == SessionStore.generation else { return false }
@@ -210,7 +230,7 @@ enum MailPoll {
     @MainActor
     static func cacheNotificationMessage(id: String, token: String, generation: UUID) async -> MailMessageFull? {
         guard let (message, payload) = try? await ApiClient.notificationMessage(token: token, id: id),
-              !Task.isCancelled, generation == SessionStore.generation else { return nil }
+              message.id == id, !Task.isCancelled, generation == SessionStore.generation else { return nil }
         await MailStore.shared.saveNotificationMessage(message, payload: payload, generation: generation)
         return message
     }
@@ -760,11 +780,14 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
         let account = userInfo["mailbox"] as? String
         let id = userInfo["messageId"] as? String
         Task {
+            var prefetchedID: String?
             if let account, account.caseInsensitiveCompare(SessionStore.address ?? "") == .orderedSame,
-               let id, !id.isEmpty, let token = SessionStore.token {
-                _ = await MailPoll.cacheNotificationMessage(id: id, token: token, generation: SessionStore.generation)
+               let id, !id.isEmpty, let token = SessionStore.token,
+               await MailPoll.cacheNotificationMessage(id: id, token: token, generation: SessionStore.generation) != nil {
+                prefetchedID = id
             }
-            completionHandler(await MailPoll.runOnce(announceArrivals: !hasAlert) ? .newData : .noData)
+            let updated = await MailPoll.runOnce(announceArrivals: !hasAlert, prefetchedID: prefetchedID)
+            completionHandler(updated || prefetchedID != nil ? .newData : .noData)
         }
     }
 

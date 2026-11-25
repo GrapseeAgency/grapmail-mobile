@@ -889,7 +889,7 @@ func labelSwatch(_ key: String?) -> Color {
 /// message — the `e2eEnvelope` defect class again, one shape-drift and the
 /// door silently never appears. The bare-string legacy shape is kept in
 /// `raw` so the header parser below still has something to read.
-struct MailUnsubscribeOffer: Decodable {
+struct MailUnsubscribeOffer: Codable {
     var url = ""
     var oneClick = false
 
@@ -902,7 +902,7 @@ struct MailUnsubscribeOffer: Decodable {
     init(url: String, oneClick: Bool) { self.url = url; self.oneClick = oneClick }
 }
 
-struct MailUnsubscribe: Decodable {
+struct MailUnsubscribe: Codable {
     var offers: [MailUnsubscribeOffer] = []
     var oneClickAdvertised = false
     /// The parsed record's mailto door. The server filters `offers` to HTTPS

@@ -1373,7 +1373,7 @@ struct RootView: View {
                         if !account.state.busy { account.loadAvatar() }
                     }
                     .onChange(of: scenePhase) { phase in
-                        if phase == .active { account.load(force: true) }
+                        if phase == .active { account.load() }
                     }
                     .id(SessionStore.generation)
                 case let .mailThread(id, isThread, focus, more, zoomSource):

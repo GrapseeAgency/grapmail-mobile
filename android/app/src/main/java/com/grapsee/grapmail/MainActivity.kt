@@ -1914,7 +1914,7 @@ fun GrapMailNav(
                 }
             }
             LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
-                profile.load(force = true)
+                profile.load()
             }
             LaunchedEffect(personal.profile?.avatarUrl, personal.busy) {
                 if (!personal.busy) profile.loadAvatar()

@@ -147,6 +147,7 @@ final class MailboxModel: ObservableObject {
         var nextCursor: String?
         var hasMore = false
         var error: String?
+        var waitingForNetwork = false
     }
 
     struct ComposeState {
@@ -1595,12 +1596,13 @@ final class MailboxModel: ObservableObject {
             guard let self else { return }
             let cached = await MailStore.shared.thread(threadId)
             let focused: MailMessageFull?
-            if let focusedID { focused = await MailStore.shared.notificationMessage(focusedID) }
+            if let hit = cached?.messages.first(where: { $0.id == focusedID }) { focused = hit }
+            else if let focusedID { focused = await MailStore.shared.notificationMessage(focusedID) }
             else { focused = nil }
             var initial = cached?.messages ?? []
             if let focused, !initial.contains(where: { $0.id == focused.id }) { initial.append(focused) }
             guard !Task.isCancelled, self.sessionIsLive else { return }
-            if !initial.isEmpty { self.thread = ThreadState(messages: initial, loading: true) }
+            self.thread = ThreadState(messages: initial, loading: true, waitingForNetwork: initial.isEmpty)
             do {
                 let resp = try await ApiClient.mailThread(token: token, threadId: threadId)
                 guard !Task.isCancelled, self.sessionIsLive else { return }
@@ -1861,14 +1863,17 @@ final class MailboxModel: ObservableObject {
                 return
             }
             do {
-                let resp = try await ApiClient.mailMessage(token: token, id: id)
                 guard !Task.isCancelled, self.sessionIsLive else { return }
-                if let m = resp.message {
+                self.thread.waitingForNetwork = true
+                let result = try await ApiClient.readerMessage(token: token, id: id)
+                guard !Task.isCancelled, self.sessionIsLive else { return }
+                if let (m, payload) = result {
                     await MailStore.shared.putBody(m, generation: self.sessionGeneration)
                     guard !Task.isCancelled, self.sessionIsLive else { return }
                     self.threadLoadedFor = id
                     self.thread = ThreadState(messages: [m])
                     await MailStore.shared.patchFlags(id: m.id, read: true, generation: self.sessionGeneration)
+                    await MailStore.shared.saveNotificationMessage(m, payload: payload, generation: self.sessionGeneration)
                 } else {
                     self.thread = ThreadState(error: String(localized: "This message could not be opened."))
                 }
