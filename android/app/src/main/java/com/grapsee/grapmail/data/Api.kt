@@ -1561,7 +1561,13 @@ object Api {
      */
     suspend fun verifyHuman(token: String): VerifyHumanResponse {
         val request = Request.Builder()
-            .url("$AUTH/verify-human-mobile")
+            // The route the backend actually registers is `/auth/verify-human`
+            // (services/shared/src/routes/auth.ts). This called
+            // `/auth/verify-human-mobile`, which has never existed. The 404 is
+            // neither a 5xx nor a 429, so every signup fell into the generic
+            // branch and showed "Verification failed. Get a new challenge and
+            // try again." while the server was healthy the whole time.
+            .url("$AUTH/verify-human")
             .header("x-device-id", DeviceId.value)
             .post(postBody(json.encodeToString(VerifyHumanRequest.serializer(), VerifyHumanRequest(token))))
             .build()
