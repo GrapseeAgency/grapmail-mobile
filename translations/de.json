@@ -1,0 +1,73 @@
+{
+ "android": {
+  "strings_r9_reader.xml": {
+   "reader_earlier_messages": {"one": "%d ältere Nachricht", "other": "%d ältere Nachrichten"},
+   "reader_participants": {"one": "%d Person", "other": "%d Personen"},
+   "reader_message_count": {"one": "%d Nachricht", "other": "%d Nachrichten"},
+   "reader_you": "Du",
+   "reader_unread": "Ungelesen",
+   "reader_earlier_action": "die eingeklappten Nachrichten anzeigen",
+   "reader_open_message_action": "diese Nachricht öffnen",
+   "reader_quoted_show": "Zitierten Text anzeigen",
+   "reader_quoted_hide": "Zitierten Text ausblenden",
+   "reader_state_expanded": "Geöffnet",
+   "reader_state_collapsed": "Zugeklappt",
+   "reader_reply_to": "Antworten an %1$s…",
+   "reader_reply_fallback": "Antworten…",
+   "reader_reply_options": "Antwortoptionen",
+   "reader_quick_reply": "Schnellantwort",
+   "reader_attach_share_chooser": "Anhang teilen",
+   "reader_attach_view_image": "das Bild ansehen",
+   "reader_attach_save_named": "%1$s speichern",
+   "reader_attach_share_named": "%1$s teilen",
+   "reader_attach_share_nothing": "Keine App auf diesem Gerät kann diese Datei teilen.",
+   "reader_viewer_position": "%1$d von %2$d",
+   "reader_viewer_too_large": "Dieses Bild kann hier nicht angezeigt werden.",
+   "compose_r9_leave_title": "Diese Nachricht verlassen?",
+   "compose_r9_leave_attachments": "Entwürfe können noch keine Anhänge behalten. Speichere den Text ohne sie als Entwurf oder bearbeite weiter.",
+   "compose_r9_save_text_only": "Nur Text speichern",
+   "compose_r9_draft_failed_title": "Dieser Entwurf wurde nicht gespeichert",
+   "compose_r9_leave_without_saving": "Ohne Speichern verlassen",
+   "compose_r9_encrypt_failed": "Diese Nachricht konnte nicht verschlüsselt werden, deshalb wurde nichts gesendet.",
+   "compose_editor_toolbar": "Textformatierung",
+   "compose_editor_bold": "Fett",
+   "compose_editor_italic": "Kursiv",
+   "compose_editor_underline": "Unterstrichen",
+   "compose_editor_strike": "Durchgestrichen",
+   "compose_editor_bullets": "Aufzählung",
+   "compose_editor_numbered": "Nummeriert",
+   "compose_editor_text_colour": "Textfarbe",
+   "compose_editor_black": "Schwarz",
+   "compose_editor_blue": "Blau",
+   "compose_editor_red": "Rot",
+   "compose_editor_green": "Grün",
+   "compose_editor_highlight": "Hervorheben",
+   "compose_editor_highlight_colour": "Hervorhebungsfarbe",
+   "compose_editor_yellow": "Gelb",
+   "compose_editor_pink": "Rosa",
+   "compose_editor_font": "Schriftart",
+   "compose_editor_sans": "Serifenlos",
+   "compose_editor_larger": "Größer",
+   "compose_editor_clear": "Zurücksetzen",
+   "compose_editor_image": "Bild",
+   "compose_editor_insert_image": "Bild einfügen"
+  },
+  "strings_r9_platform.xml": {
+   "r9_platform_notif_channel_new_mail_desc": "Meldet, wenn neue Nachrichten in deinem Posteingang ankommen.",
+   "r9_platform_price_per_week": "%1$s/Woche",
+   "r9_platform_price_per_month": "%1$s/Monat",
+   "r9_platform_price_per_3_months": "%1$s alle 3 Monate",
+   "r9_platform_price_per_6_months": "%1$s alle 6 Monate",
+   "r9_platform_price_per_year": "%1$s/Jahr"
+  },
+  "strings_r9_mailbox.xml": {
+   "mail_sendlater_channel_name": "Geplante Sendungen",
+   "mail_sendlater_channel_desc": "Countdown für Nachrichten, die auf das Senden warten"
+  },
+  "strings_identity.xml": {
+   "identity_settings_appearance": "Darstellung",
+   "identity_match_wallpaper_title": "An Hintergrund anpassen",
+   "identity_match_wallpaper_subtitle": "Verwende die Farben deines Hintergrundbilds für Schaltflächen und Hervorhebungen. Avatare, Statusfarben und Text bleiben wie bei GrapMail."
+  }
+ }
+}

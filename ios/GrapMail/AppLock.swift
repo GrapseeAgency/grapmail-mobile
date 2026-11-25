@@ -16,7 +16,7 @@ import SwiftUI
 /// enough to glance at a notification, short enough that a phone left on a
 /// café table is covered. The window is a constant, not a setting.
 ///
-/// ── THREADING ─────────────────────────────────────────────────────────────
+/// ── THREADING ──────────────────────────────────────────────────────────────
 /// Deliberately a plain ObservableObject, not main-actor-isolated: every
 /// published mutation goes through the main queue, so no call site — scene
 /// hooks, button tasks, settings rows — has to carry actor annotations to
@@ -68,7 +68,9 @@ final class AppLock: ObservableObject {
     @discardableResult
     func setEnabled(_ on: Bool) async -> Bool {
         guard on != enabled else { return true }
-        let ok = await authenticate(reason: on ? "Turn on app lock" : "Turn off app lock")
+        let ok = await authenticate(reason: on
+            ? String(localized: "Turn on app lock", comment: "Face ID / passcode prompt reason when enabling app lock")
+            : String(localized: "Turn off app lock", comment: "Face ID / passcode prompt reason when disabling app lock"))
         if ok {
             await MainActor.run {
                 UserDefaults.standard.set(on, forKey: Prefs.enabled)
@@ -79,7 +81,7 @@ final class AppLock: ObservableObject {
     }
 
     func unlock() async {
-        let ok = await authenticate(reason: "Unlock GrapMail")
+        let ok = await authenticate(reason: String(localized: "Unlock GrapMail", comment: "Face ID / passcode prompt reason when unlocking the app"))
         if ok {
             await MainActor.run {
                 self.authenticatedThisLaunch = true
@@ -106,11 +108,11 @@ final class AppLock: ObservableObject {
     /// state write above happens in one place, on the main queue.
     private func evaluate(reason: String) async -> (ok: Bool, error: String?) {
         let context = LAContext()
-        context.localizedCancelTitle = "Cancel"
+        context.localizedCancelTitle = String(localized: "Cancel", comment: "Cancel button on the Face ID / passcode prompt")
         var error: NSError?
         let policy = LAPolicy.deviceOwnerAuthentication
         guard context.canEvaluatePolicy(policy, error: &error) else {
-            return (false, error?.localizedDescription ?? "Set a device passcode to use app lock.")
+            return (false, error?.localizedDescription ?? String(localized: "Set a device passcode to use app lock.", comment: "App lock error when the device has no passcode"))
         }
         do {
             let ok = try await context.evaluatePolicy(policy, localizedReason: reason)
@@ -130,38 +132,57 @@ struct AppLockOverlay: View {
     var body: some View {
         ZStack {
             Rectangle().fill(.ultraThinMaterial).ignoresSafeArea()
-            VStack(spacing: 12) {
-                Image(systemName: "lock.fill")
-                    .font(.system(size: 34, weight: .semibold))
-                    .foregroundColor(Color.primary)
-                Text("GrapMail is locked")
-                    .font(.system(size: 17, weight: .semibold))
-                    .foregroundColor(Color.primary)
-                Text("Unlock to see your mailbox.")
-                    .font(.system(size: 14))
-                    .foregroundColor(Color.secondary)
-                Button {
-                    Task { await lock.unlock() }
-                } label: {
-                    Text("Unlock")
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundColor(.white)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 12)
-                        .background(RoundedRectangle(cornerRadius: 12).fill(Color.accentColor))
-                }
-                .padding(.horizontal, 44)
-                .padding(.top, 6)
-                if let error = lock.lastError {
-                    Text(error)
-                        .font(.system(size: 12))
-                        .foregroundColor(Color.secondary)
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal, 36)
-                }
+            // Centred when it fits; scrolls in a short window (landscape
+            // phone, small Stage Manager window) or at the largest text sizes.
+            ViewThatFits(in: .vertical) {
+                content
+                ScrollView { content.padding(.vertical, 24) }
             }
         }
         .task { await lock.unlock() }
+    }
+
+    private var content: some View {
+        VStack(spacing: 12) {
+            Image(systemName: "lock.fill")
+                .gmFont(34, .semibold, maxSize: 60)
+                .foregroundColor(Color.primary)
+            Text("GrapMail is locked")
+                .gmFont(17, .semibold)
+                .foregroundColor(Color.primary)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+            Text("Unlock to see your mailbox.")
+                .gmFont(14)
+                .foregroundColor(Color.secondary)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+            Button {
+                Task { await lock.unlock() }
+            } label: {
+                Text("Unlock")
+                    .gmFont(16, .semibold)
+                    .foregroundColor(.white)
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 12)
+                    .background(RoundedRectangle(cornerRadius: 12).fill(Color.accentColor))
+            }
+            // Phone-width button; on iPad / Mac it stops at a comfortable width.
+            .frame(maxWidth: 360)
+            .padding(.horizontal, 44)
+            .padding(.top, 6)
+            if let error = lock.lastError {
+                Text(error)
+                    .gmFont(12)
+                    .foregroundColor(Color.secondary)
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: GMLayout.form)
+                    .padding(.horizontal, 36)
+            }
+        }
+        .frame(maxWidth: .infinity)
     }
 }
 
@@ -172,21 +193,24 @@ struct AppLockOverlay: View {
 struct AppLockRow: View {
     @ObservedObject private var lock = AppLock.shared
     @State private var note: String?
+    @ScaledMetric(relativeTo: .body) private var iconWidth: CGFloat = 22
 
     var body: some View {
         HStack(spacing: 14) {
             Image(systemName: "faceid")
-                .font(.system(size: 17))
+                .gmFont(17)
                 .foregroundColor(Color.secondary)
-                .frame(width: 22)
+                .frame(width: iconWidth)
             VStack(alignment: .leading, spacing: 2) {
                 Text("App lock")
-                    .font(.system(size: 15))
+                    .gmFont(15)
                     .foregroundColor(Color.primary)
+                    .fixedSize(horizontal: false, vertical: true)
                 Text(value)
-                    .font(.system(size: 12))
+                    .gmFont(12)
                     .foregroundColor(Color.secondary)
-                    .lineLimit(1)
+                    .lineLimit(3)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             Spacer()
             if lock.authenticating {
@@ -203,14 +227,14 @@ struct AppLockRow: View {
     private var value: String {
         if let note { return note }
         return lock.enabled
-            ? "On — the mailbox needs Face ID when locked"
-            : "Off — tap to require Face ID or passcode"
+            ? String(localized: "On — the mailbox needs Face ID when locked", comment: "App lock settings row status when on")
+            : String(localized: "Off — tap to require Face ID or passcode", comment: "App lock settings row status when off")
     }
 
     private func toggle() {
         Task {
             let ok = await lock.setEnabled(!lock.enabled)
-            note = ok ? nil : (lock.lastError ?? "Could not change app lock.")
+            note = ok ? nil : (lock.lastError ?? String(localized: "Could not change app lock.", comment: "App lock settings row error"))
         }
     }
 }

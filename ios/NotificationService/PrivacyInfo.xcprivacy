@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  GrapMailNotificationService privacy manifest. Apple reads every bundle's
+  manifest, extensions included.
+
+  The extension rewrites an incoming mail push before it is shown: it fetches
+  the preview text and sender image from GrapMail's own API
+  (NotificationService.swift, pinned through PinnedSessionDelegate.swift) using
+  a per-device secret from the shared Keychain group (PreviewCredential.swift).
+  It calls no required-reason API (no UserDefaults, no file timestamps, no
+  disk-space or boot-time reads), and the data it touches is the mail the app
+  manifest (GrapMail/PrivacyInfo.xcprivacy) already declares, so both lists
+  below are empty on purpose.
+-->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>NSPrivacyTracking</key>
+	<false/>
+	<key>NSPrivacyTrackingDomains</key>
+	<array/>
+	<key>NSPrivacyCollectedDataTypes</key>
+	<array/>
+	<key>NSPrivacyAccessedAPITypes</key>
+	<array/>
+</dict>
+</plist>

@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="mail_receipt_read_at">Lu %1$s</string>
+    <string name="mail_receipt_requested_pending">Accusé de lecture demandé · pas encore lu</string>
+    <string name="mail_receipt_server_sent">Accusé de lecture envoyé</string>
+    <string name="mail_receipt_ask_title">L\'expéditeur demande un accusé de lecture</string>
+    <string name="mail_receipt_ask_body">Envoyer un accusé à %1$s pour indiquer que vous avez ouvert ce message ? Il saura seulement quand vous l\'avez ouvert, rien de plus.</string>
+    <string name="mail_receipt_ask_send">Envoyer l\'accusé</string>
+    <string name="mail_receipt_ask_decline">Ne pas envoyer</string>
+    <string name="mail_receipt_mode_title">Envoyer des accusés de lecture</string>
+    <string name="mail_receipt_mode_body">Lorsqu\'un message demande un accusé de lecture. Aucun accusé n\'est envoyé pour le spam, les expéditeurs bloqués ou les e-mails chiffrés, sauf si vous choisissez Toujours.</string>
+    <string name="mail_receipt_mode_never">Jamais</string>
+    <string name="mail_receipt_mode_ask">Demander</string>
+    <string name="mail_receipt_mode_always">Toujours</string>
+    <string name="mail_receipt_mode_always_note">Toujours envoie aussi des accusés pour le spam, les expéditeurs bloqués et les e-mails chiffrés.</string>
+    <string name="mail_receipt_mode_unavailable">Impossible de charger ce paramètre. Vérifiez votre connexion.</string>
+    <string name="mail_compose_request_receipt">Demander un accusé de lecture</string>
+</resources>

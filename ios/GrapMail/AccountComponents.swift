@@ -37,14 +37,27 @@ final class RecoveryModel: ObservableObject {
     }
 }
 
+// Round 8 colour note (docs/design/round8-spec.md §1.2): cobalt `GM.primarySolid`
+// is a FILL. Text, links and icons drawn on a surface in this sector use
+// `GM.primaryText`, which is the same cobalt in light and lifts to #8EA8FF in
+// dark — cobalt text on the near-black canvas is under 4.5:1. Focused strokes
+// use `GM.focusRing`.
+
 /// The recovery/security screen shell — founder design verbatim.
 ///
 /// Back arrow and centred wordmark, the screen's own artwork, the blue eyebrow,
 /// the 28pt title, the body paragraph, whatever the screen adds, then the
 /// footer. The body scrolls and the footer stays put, so the action is always
 /// reachable and never pushed off-screen by copy.
+///
+/// Adaptive: the column is capped at `GMLayout.form` and centred on wide
+/// windows (iPad, Stage Manager, Mac); in short windows (SE, landscape, large
+/// text) the artwork shrinks and the footer scrolls with the copy; in a
+/// landscape phone (compact height) the artwork is left out so the fields and
+/// the action stay on screen.
 struct AccountScreen<Content: View, Footer: View>: View {
     @Environment(\.dynamicTypeSize) private var textSize
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
     var onBack: (() -> Void)? = nil
     var illustration: String? = nil
     var illustrationWidth: CGFloat = 200
@@ -60,18 +73,23 @@ struct AccountScreen<Content: View, Footer: View>: View {
         // never left half-clipped under a pinned button.
         GeometryReader { geo in
             let tight = geo.size.height < 660 || textSize.isAccessibilitySize
+            let showArt = verticalSizeClass != .compact && geo.size.height >= 480
+            let artWidth = min(tight ? illustrationWidth * 0.75 : illustrationWidth,
+                               max(0, geo.size.width - 48))
             VStack(spacing: 0) {
                 AccountHeader(onBack: onBack)
+                // Screen states: offline notice above the unchanged content.
+                GMOfflineBanner()
                 ScrollView {
                     VStack(alignment: .leading, spacing: 0) {
-                        if let illustration {
+                        if let illustration, showArt {
                             HStack {
                                 Spacer()
                                 // Code-drawn vector scene, not a cropped PNG:
                                 // it scales with the width it is given and
                                 // dark mode is the same code, not a second
                                 // `_dark` image.
-                                Art.view(illustration, width: tight ? illustrationWidth * 0.75 : illustrationWidth)
+                                Art.view(illustration, width: artWidth)
                                 Spacer()
                             }
                             .padding(.top, tight ? 2 : 4)
@@ -81,21 +99,22 @@ struct AccountScreen<Content: View, Footer: View>: View {
                         }
                         if let eyebrow {
                             Text(eyebrow.uppercased())
-                                .font(.system(size: 11, weight: .bold))
+                                .gmFont(11, .bold)
                                 .kerning(1.6)
-                                .foregroundColor(GM.primarySolid)
+                                .foregroundColor(GM.primaryText)
+                                .fixedSize(horizontal: false, vertical: true)
                                 .padding(.bottom, 8)
                         }
                         if let title {
                             Text(title)
-                                .font(.system(size: 28, weight: .bold))
+                                .gmFont(28, .bold, maxSize: 44)
                                 .foregroundColor(GM.textPrimary)
                                 .fixedSize(horizontal: false, vertical: true)
                                 .padding(.bottom, tight ? 8 : 10)
                         }
                         if let subtitle {
                             Text(subtitle)
-                                .font(.system(size: 15))
+                                .gmFont(15)
                                 .lineSpacing(5)
                                 .foregroundColor(GM.textSecondary)
                                 .fixedSize(horizontal: false, vertical: true)
@@ -118,7 +137,7 @@ struct AccountScreen<Content: View, Footer: View>: View {
                     Spacer().frame(height: 12)
                 }
             }
-            .centeredForm()
+            .gmMaxWidth(GMLayout.form)
             .background(GM.bg.ignoresSafeArea())
         }
     }
@@ -126,6 +145,7 @@ struct AccountScreen<Content: View, Footer: View>: View {
 
 struct AccountHeader: View {
     var onBack: (() -> Void)? = nil
+    @ScaledMetric(relativeTo: .body) private var barHeight: CGFloat = 56
 
     var body: some View {
         ZStack {
@@ -133,20 +153,27 @@ struct AccountHeader: View {
                 HStack {
                     Button(action: onBack) {
                         Image(systemName: "chevron.left")
-                            .font(.system(size: 17, weight: .semibold))
+                            .gmFont(17, .semibold, maxSize: 28)
                             .foregroundColor(GM.textPrimary)
+                            .flipsForRightToLeftLayoutDirection(true)
+                            // A 44 pt target, not just the 17 pt glyph.
+                            .frame(minWidth: 44, minHeight: 44)
+                            .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
+                    // A word for VoiceOver instead of the symbol's name.
+                    .accessibilityLabel(Text("Back"))
                     // The CI security walk navigates back by name; an
                     // unlabeled image button is unqueryable in XCUITest.
                     .accessibilityIdentifier("back")
                     Spacer()
                 }
-                .padding(.leading, 12)
+                .padding(.leading, 2)
             }
             Wordmark()
         }
-        .frame(height: 56)
+        // A bar, so it grows a little with the text size but is capped.
+        .frame(minHeight: min(barHeight, 72))
         .padding(.horizontal, 8)
     }
 }
@@ -179,22 +206,28 @@ struct StatusChip: View {
     let tone: ChipTone
 
     var body: some View {
-        let bg = tone == .success ? GM.successChipBg : GM.warnChipBg
-        let ink = tone == .success ? GM.successInk : GM.warnInk
+        let bg = tone == .success ? GM.successContainer : GM.warningContainer
+        let ink = tone == .success ? GM.success : GM.warning
         HStack(spacing: 8) {
             Image(systemName: tone == .success ? "checkmark.circle.fill" : "exclamationmark.circle.fill")
-                .font(.system(size: 14, weight: .semibold))
-            Text(text).font(.system(size: 13, weight: .semibold))
+                .gmFont(14, .semibold)
+            Text(text)
+                .gmFont(13, .semibold)
+                .fixedSize(horizontal: false, vertical: true)
         }
         .foregroundColor(ink)
         .padding(.horizontal, 14)
         .padding(.vertical, 8)
-        .background(Capsule().fill(bg))
+        // A capsule on one line; stays a pill (not a lens) if large text wraps.
+        .background(RoundedRectangle(cornerRadius: GMShape.pill, style: .continuous).fill(bg))
     }
 }
 
 /// The design's code cells. One invisible field sits over the row so a pasted
 /// code lands in one piece; the cells are the drawing, the field is the input.
+///
+/// The cells share the row's width (they are sized by it, not by text), so the
+/// character inside scales with the text size but is capped to stay in a cell.
 struct CodeCells: View {
     let length: Int
     @Binding var value: String
@@ -221,12 +254,18 @@ struct CodeCells: View {
                 .foregroundColor(.clear)
                 .tint(.clear)
                 .opacity(0.02)
+                // The real input under the drawn cells: VoiceOver otherwise
+                // meets an unnamed text field.
+                .accessibilityLabel(Text("Verification code"))
                 .onChange(of: value) { newValue in
                     let allowed = newValue.filter { alphanumeric ? $0.isLetter || $0.isNumber : $0.isNumber }
                     let capped = String((alphanumeric ? allowed.uppercased() : allowed).prefix(length))
                     if capped != value { value = capped }
                 }
         }
+        // On a wide window the cells would otherwise grow into huge squares.
+        .frame(maxWidth: GMLayout.form)
+        .frame(maxWidth: .infinity)
         .contentShape(Rectangle())
         .onTapGesture { focused = true }
         .onAppear {
@@ -242,9 +281,11 @@ struct CodeCells: View {
             RoundedRectangle(cornerRadius: GMShape.input, style: .continuous)
                 .fill(GM.otpFill)
             RoundedRectangle(cornerRadius: GMShape.input, style: .continuous)
-                .strokeBorder(isFocused ? GM.primarySolid : GM.border, lineWidth: isFocused ? 1.5 : 1)
+                .strokeBorder(isFocused ? GM.focusRing : GM.border, lineWidth: isFocused ? 1.5 : 1)
             Text(char)
-                .font(.system(size: length > 8 ? 17 : 20, weight: .semibold))
+                .gmFont(length > 8 ? 17 : 20, .semibold, maxSize: length > 8 ? 24 : 30)
+                .lineLimit(1)
+                .minimumScaleFactor(0.6)
                 .foregroundColor(GM.textPrimary)
         }
         .aspectRatio(0.94, contentMode: .fit)
@@ -254,21 +295,25 @@ struct CodeCells: View {
 /// "Code expires in 04:52" — ticking without a timer object to leak.
 struct CodeExpiry: View {
     let expiresAt: Date?
+    @Environment(\.dynamicTypeSize) private var dts
 
     var body: some View {
         if let expiresAt {
             TimelineView(.periodic(from: .now, by: 1)) { context in
                 let remaining = max(0, Int(expiresAt.timeIntervalSince(context.date)))
+                let countdown = remaining > 0
+                    ? String(format: "%02d:%02d", remaining / 60, remaining % 60)
+                    : String(localized: "expired", comment: "Verification code countdown once the code has run out")
                 HStack(spacing: 7) {
                     Image(systemName: "clock")
-                        .font(.system(size: 13))
+                        .gmFont(13)
                         .foregroundColor(GM.textTertiary)
-                    Text("Code expires in ")
-                        .font(.system(size: 13))
+                    // One sentence with the countdown inside it, so a translation
+                    // can put the time wherever its grammar needs it.
+                    Text("Code expires in \(Text(countdown).font(.gm(13, .bold, scaledFor: dts)).foregroundColor(remaining > 0 ? GM.primaryText : GM.error))")
+                        .gmFont(13)
                         .foregroundColor(GM.textSecondary)
-                    Text(remaining > 0 ? String(format: "%02d:%02d", remaining / 60, remaining % 60) : "expired")
-                        .font(.system(size: 13, weight: .bold))
-                        .foregroundColor(remaining > 0 ? GM.primarySolid : GM.error)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
             }
         }
@@ -280,8 +325,9 @@ struct OrDivider: View {
         HStack(spacing: 8) {
             Rectangle().fill(GM.border).frame(height: 1)
             Text(" OR ")
-                .font(.system(size: 12, weight: .medium))
+                .gmFont(12, .medium)
                 .foregroundColor(GM.textTertiary)
+                .fixedSize()
             Rectangle().fill(GM.border).frame(height: 1)
         }
     }
@@ -295,8 +341,10 @@ struct AccountLink: View {
     var body: some View {
         Button(action: action) {
             Text(title)
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundColor(GM.primarySolid)
+                .gmFont(13, .semibold)
+                .foregroundColor(GM.primaryText)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
                 .padding(.horizontal, 8)
                 .padding(.vertical, 6)
         }
@@ -311,6 +359,7 @@ struct FooterNote: View {
     var linkText: String? = nil
     var onLink: (() -> Void)? = nil
     var divider: Bool = true
+    @Environment(\.dynamicTypeSize) private var dts
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -320,10 +369,10 @@ struct FooterNote: View {
             }
             HStack(alignment: .top, spacing: 10) {
                 Image(systemName: "checkmark.shield.fill")
-                    .font(.system(size: 15))
-                    .foregroundColor(GM.primarySolid)
+                    .gmFont(15)
+                    .foregroundColor(GM.primaryText)
                 Text(attributed)
-                    .font(.system(size: 12))
+                    .gmFont(12)
                     .foregroundColor(GM.textSecondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -340,8 +389,8 @@ struct FooterNote: View {
     private var attributed: AttributedString {
         var s = AttributedString(text)
         if let linkText, let range = s.range(of: linkText), onLink != nil {
-            s[range].foregroundColor = GM.primarySolid
-            s[range].font = .system(size: 12, weight: .semibold)
+            s[range].foregroundColor = GM.primaryText
+            s[range].font = .gm(12, .semibold, scaledFor: dts)
             s[range].link = URL(string: "grapmail://footer")
         }
         return s
@@ -353,6 +402,7 @@ struct InfoPanel<Icon: View>: View {
     let title: String
     let detail: String
     let icon: () -> Icon
+    @ScaledMetric(relativeTo: .body) private var disc: CGFloat = 36
     // The stored line is `detail`, not `body`: a `body` property collides with
     // SwiftUI's required `var body`. The initializer keeps the external `body:`
     // label (and the trailing-closure `icon:`) so every call site is unchanged.
@@ -365,14 +415,15 @@ struct InfoPanel<Icon: View>: View {
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
             icon()
-                .frame(width: 36, height: 36)
+                .frame(width: min(disc, 56), height: min(disc, 56))
                 .background(Circle().fill(GM.softFill))
             VStack(alignment: .leading, spacing: 4) {
                 Text(title)
-                    .font(.system(size: 14, weight: .semibold))
+                    .gmFont(14, .semibold)
                     .foregroundColor(GM.textPrimary)
+                    .fixedSize(horizontal: false, vertical: true)
                 Text(detail)
-                    .font(.system(size: 13))
+                    .gmFont(13)
                     .lineSpacing(3)
                     .foregroundColor(GM.textSecondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -388,43 +439,63 @@ struct InfoPanel<Icon: View>: View {
 }
 
 /// The two-step ribbon on the phone screens.
+///
+/// At the accessibility text sizes the steps are listed one under the other —
+/// two numbered labels and a connector no longer fit across a phone.
 struct TwoStepRibbon: View {
     let current: Int
     let labels: [String]
+    @Environment(\.dynamicTypeSize) private var dts
+    @ScaledMetric(relativeTo: .body) private var dot: CGFloat = 24
 
     var body: some View {
-        HStack(spacing: 0) {
-            ForEach(0..<labels.count, id: \.self) { index in
-                let label = labels[index]
-                let n = index + 1
-                let done = n < current
-                let active = n == current
-                HStack(spacing: 8) {
-                    ZStack {
-                        Circle()
-                            .fill(done ? GM.primaryTop.opacity(0.45) : (active ? GM.primarySolid : GM.stepInactive))
-                            .frame(width: 24, height: 24)
-                        if done {
-                            Image(systemName: "checkmark")
-                                .font(.system(size: 11, weight: .bold))
-                                .foregroundColor(.white)
-                        } else {
-                            Text("\(n)")
-                                .font(.system(size: 12, weight: .semibold))
-                                .foregroundColor(active ? .white : GM.textSecondary)
-                        }
-                    }
-                    Text(label)
-                        .font(.system(size: 13, weight: active ? .semibold : .regular))
-                        .foregroundColor(active ? GM.primarySolid : GM.textTertiary)
-                }
-                if n < labels.count {
-                    Rectangle()
-                        .fill(done ? GM.primarySolid : GM.border)
-                        .frame(height: 1.5)
-                        .padding(.horizontal, 10)
+        if dts.isAccessibilitySize {
+            VStack(alignment: .leading, spacing: 10) {
+                ForEach(0..<labels.count, id: \.self) { index in
+                    step(index)
                 }
             }
+        } else {
+            HStack(spacing: 0) {
+                ForEach(0..<labels.count, id: \.self) { index in
+                    let n = index + 1
+                    let done = n < current
+                    step(index)
+                    if n < labels.count {
+                        Rectangle()
+                            .fill(done ? GM.primarySolid : GM.border)
+                            .frame(height: 1.5)
+                            .padding(.horizontal, 10)
+                    }
+                }
+            }
+        }
+    }
+
+    private func step(_ index: Int) -> some View {
+        let label = labels[index]
+        let n = index + 1
+        let done = n < current
+        let active = n == current
+        return HStack(spacing: 8) {
+            ZStack {
+                Circle()
+                    .fill(done ? GM.primaryTop.opacity(0.45) : (active ? GM.primarySolid : GM.stepInactive))
+                    .frame(width: min(dot, 40), height: min(dot, 40))
+                if done {
+                    Image(systemName: "checkmark")
+                        .gmFont(11, .bold, maxSize: 18)
+                        .foregroundColor(GM.onPrimary)
+                } else {
+                    Text("\(n)")
+                        .gmFont(12, .semibold, maxSize: 20)
+                        .foregroundColor(active ? GM.onPrimary : GM.textSecondary)
+                }
+            }
+            Text(label)
+                .gmFont(13, active ? .semibold : .regular)
+                .foregroundColor(active ? GM.primaryText : GM.textTertiary)
+                .fixedSize(horizontal: false, vertical: true)
         }
     }
 }
@@ -438,10 +509,12 @@ struct CopyButton: View {
         Button(action: action) {
             HStack(spacing: 6) {
                 Image(systemName: "doc.on.doc")
-                    .font(.system(size: 12, weight: .semibold))
-                Text(title).font(.system(size: 13, weight: .semibold))
+                    .gmFont(12, .semibold)
+                Text(title)
+                    .gmFont(13, .semibold)
+                    .lineLimit(2)
             }
-            .foregroundColor(GM.primarySolid)
+            .foregroundColor(GM.primaryText)
             .padding(.horizontal, 12)
             .padding(.vertical, 9)
             .overlay(
@@ -461,11 +534,12 @@ struct RuleLine: View {
     var body: some View {
         HStack(spacing: 10) {
             Image(systemName: "checkmark.circle.fill")
-                .font(.system(size: 15))
-                .foregroundColor(met ? GM.primarySolid : GM.textTertiary)
+                .gmFont(15)
+                .foregroundColor(met ? GM.primaryText : GM.textTertiary)
             Text(label)
-                .font(.system(size: 13))
+                .gmFont(13)
                 .foregroundColor(met ? GM.textSecondary : GM.textTertiary)
+                .fixedSize(horizontal: false, vertical: true)
         }
         .padding(.vertical, 5)
     }
@@ -489,27 +563,28 @@ struct InfoCard<Content: View>: View {
 /// Soft-fill icon tile used by the summary cards.
 struct IconTile: View {
     let systemName: String
+    @ScaledMetric(relativeTo: .body) private var tile: CGFloat = 40
 
     var body: some View {
         Image(systemName: systemName)
-            .font(.system(size: 17, weight: .medium))
-            .foregroundColor(GM.primarySolid)
-            .frame(width: 40, height: 40)
-            .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(GM.softFill))
+            .gmFont(17, .medium, maxSize: 30)
+            .foregroundColor(GM.primaryText)
+            .frame(width: min(tile, 60), height: min(tile, 60))
+            .background(RoundedRectangle(cornerRadius: GMShape.thumb, style: .continuous).fill(GM.softFill))
     }
 }
 
 /// "+880 1XXXXXXXXX" — how a number is shown once it is known.
 enum PhoneFormat {
     static let countries: [(flag: String, dial: String, name: String)] = [
-        ("🇧🇩", "+880", "Bangladesh"),
-        ("🇮🇳", "+91", "India"),
-        ("🇵🇰", "+92", "Pakistan"),
-        ("🇺🇸", "+1", "United States"),
-        ("🇬🇧", "+44", "United Kingdom"),
-        ("🇦🇪", "+971", "United Arab Emirates"),
-        ("🇸🇦", "+966", "Saudi Arabia"),
-        ("🇲🇾", "+60", "Malaysia"),
+        ("🇧🇩", "+880", String(localized: "Bangladesh", comment: "Country name in the phone number picker")),
+        ("🇮🇳", "+91", String(localized: "India", comment: "Country name in the phone number picker")),
+        ("🇵🇰", "+92", String(localized: "Pakistan", comment: "Country name in the phone number picker")),
+        ("🇺🇸", "+1", String(localized: "United States", comment: "Country name in the phone number picker")),
+        ("🇬🇧", "+44", String(localized: "United Kingdom", comment: "Country name in the phone number picker")),
+        ("🇦🇪", "+971", String(localized: "United Arab Emirates", comment: "Country name in the phone number picker")),
+        ("🇸🇦", "+966", String(localized: "Saudi Arabia", comment: "Country name in the phone number picker")),
+        ("🇲🇾", "+60", String(localized: "Malaysia", comment: "Country name in the phone number picker")),
     ]
 
     /// E.164 from the dial code and what the person typed.

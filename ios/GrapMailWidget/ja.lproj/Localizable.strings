@@ -1,0 +1,29 @@
+/* GrapMailWidget — Japanese. */
+
+"Unread mail" = "未読メール";
+"The unread count your app last saw, and the newest message." = "アプリが最後に確認した未読数と最新のメッセージ。";
+"GrapMail — not signed in" = "GrapMail — 未ログイン";
+"GrapMail — no read yet" = "GrapMail — 未確認";
+"%lld unread · %@" = "未読 %lld 件 · %@";
+"%lld unread" = "未読 %lld 件";
+"unread" = "未読";
+"No subject" = "件名なし";
+"No read yet" = "未確認";
+"Open the app to sign in" = "アプリを開いてログイン";
+"Scheduled send" = "送信予定";
+"(no subject)" = "(件名なし)";
+"Scheduled" = "送信予定";
+"To %@" = "宛先: %@";
+"Sending…" = "送信中…";
+
+/* Home Screen widget row buttons (iOS 17+), read by VoiceOver */
+"Mark as read" = "既読にする";
+"Archive" = "アーカイブ";
+"Star" = "スターを付ける";
+"Unstar" = "スターを外す";
+/* The widget row buttons' App Intent and its parameters (hidden from Shortcuts) */
+"Update message" = "メッセージを更新";
+"Message" = "メッセージ";
+"Action" = "操作";
+/* Widget placeholder when no account is signed in */
+"Open GrapMail to sign in" = "GrapMail を開いてサインイン";

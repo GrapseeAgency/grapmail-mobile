@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Loading / empty / error / offline states (ui/components/ScreenStates.kt and the
+     screens wired to it). Kept in its own file so the other string files, edited in
+     parallel, are untouched; prefix states_. English only: translations come later. -->
+<resources>
+    <!-- Shared -->
+    <string name="states_loading">Loading…</string>
+    <string name="states_offline_banner">You’re offline. Showing what was last loaded — anything that needs the network will wait until you reconnect.</string>
+    <string name="states_error_title">Something went wrong</string>
+    <string name="states_error_body">This couldn’t be loaded right now. Check your connection and try again.</string>
+    <string name="states_error_offline_body">You’re offline. Connect to Wi-Fi or mobile data, then try again.</string>
+    <string name="states_retry">Try again</string>
+
+    <!-- Labels -->
+    <string name="states_labels_loading">Loading labels…</string>
+    <string name="states_labels_failed_title">Labels couldn’t be loaded</string>
+
+    <!-- Scheduled -->
+    <string name="states_scheduled_loading">Loading scheduled mail…</string>
+    <string name="states_scheduled_failed_title">Scheduled mail couldn’t be loaded</string>
+    <string name="states_scheduled_empty_title">Nothing scheduled</string>
+
+    <!-- Contacts and files (read from mail already on this device) -->
+    <string name="states_contacts_loading">Gathering people from your mail…</string>
+    <string name="states_files_loading">Gathering attachments…</string>
+
+    <!-- Connected mailboxes -->
+    <string name="states_providers_loading">Loading connected mailboxes…</string>
+
+    <!-- Reader -->
+    <string name="states_thread_loading">Opening this conversation…</string>
+
+    <!-- Security -->
+    <string name="states_activity_failed_title">Activity couldn’t be loaded</string>
+    <string name="states_sessions_failed_title">Sessions couldn’t be loaded</string>
+</resources>

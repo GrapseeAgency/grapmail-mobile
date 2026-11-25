@@ -1,0 +1,34 @@
+# MobSF findings accepted on purpose. Read by scripts/mobsf-gate.py in
+# .github/workflows/security-scan.yml (job mobsf-android).
+#
+# The gate fails the build on any MobSF finding at severity `high` that is not
+# listed here. Every entry needs all four fields:
+#
+#   id         the finding id the gate prints (run
+#              `python3 scripts/mobsf-gate.py --report mobsf-report.json --list`
+#              against the report artifact to see every id), e.g.
+#              code:android_insecure_random, manifest:<rule>, network:<slug>,
+#              certificate:<slug>, binary:<check>
+#   reason     why the finding is acceptable or a false positive, specific
+#              enough that a reviewer can check it without asking you
+#   owner      the person who answers for it (GitHub handle)
+#   review_by  YYYY-MM-DD. Once this date has passed the entry is EXPIRED and
+#              the build fails until someone re-reviews it and renews or
+#              removes the entry. Keep it short (90 days or less).
+#
+# Do not allowlist things that are only "expected in debug builds"
+# (debuggable, debug certificate): the gate already handles those with
+# --debug-build, and android.yml's release job proves the release artifact.
+#
+# Example (commented out, not active; the reason text is illustrative only):
+#
+# entries:
+#   - id: code:android_logging
+#     reason: >-
+#       Log calls are stripped from release builds by proguard-rules.pro
+#       (-assumenosideeffects android.util.Log); only the debug APK keeps them.
+#     owner: "@grapsee-security"
+#     review_by: 2027-02-28
+
+version: 1
+entries: []

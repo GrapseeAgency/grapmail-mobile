@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Loading / empty / error / offline states (ui/components/ScreenStates.kt and the
+     screens wired to it). Kept in its own file so the other string files, edited in
+     parallel, are untouched; prefix states_. Translated from values/strings_states.xml. -->
+<resources>
+    <string name="states_loading">正在加载…</string>
+    <string name="states_offline_banner">你已离线。正在显示上次加载的内容，需要联网的操作将在重新连接后进行。</string>
+    <string name="states_error_title">出了点问题</string>
+    <string name="states_error_body">暂时无法加载。请检查网络连接后重试。</string>
+    <string name="states_error_offline_body">你已离线。请连接 Wi-Fi 或移动数据后重试。</string>
+    <string name="states_retry">重试</string>
+    <string name="states_labels_loading">正在加载标签…</string>
+    <string name="states_labels_failed_title">无法加载标签</string>
+    <string name="states_scheduled_loading">正在加载定时邮件…</string>
+    <string name="states_scheduled_failed_title">无法加载定时邮件</string>
+    <string name="states_scheduled_empty_title">没有定时邮件</string>
+    <string name="states_contacts_loading">正在从你的邮件中收集联系人…</string>
+    <string name="states_files_loading">正在收集附件…</string>
+    <string name="states_providers_loading">正在加载已连接的邮箱…</string>
+    <string name="states_thread_loading">正在打开此会话…</string>
+    <string name="states_activity_failed_title">无法加载活动记录</string>
+    <string name="states_sessions_failed_title">无法加载会话</string>
+</resources>

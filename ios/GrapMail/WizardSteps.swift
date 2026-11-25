@@ -14,13 +14,13 @@ struct NameStepView: View {
     @FocusState private var activeField: NameField?
     @State private var showErrors = false
 
-    private var firstError: String? { showErrors && model.state.firstName.isEmpty ? "First name is required" : nil }
-    private var lastError: String? { showErrors && model.state.lastName.isEmpty ? "Last name is required" : nil }
+    private var firstError: String? { showErrors && model.state.firstName.isEmpty ? String(localized: "First name is required", comment: "Sign-up name step: field error") : nil }
+    private var lastError: String? { showErrors && model.state.lastName.isEmpty ? String(localized: "Last name is required", comment: "Sign-up name step: field error") : nil }
 
     var body: some View {
         WizardScaffold(
             step: 1,
-            title: "What's your name?",
+            title: String(localized: "What's your name?", comment: "Title (sign-up name step)"),
             subtitle: Text("This name appears on your GrapMail profile."),
             onBack: onBack,
             onSignIn: onSignIn,
@@ -29,7 +29,7 @@ struct NameStepView: View {
                     VStack(alignment: .leading, spacing: 8) {
                         (Text("First name").foregroundColor(GM.textPrimary)
                          + Text(" *").foregroundColor(GM.error))
-                            .font(.system(size: 14, weight: .semibold))
+                            .gmFont(14, .semibold)
                         nameInput(.first, value: Binding(
                             get: { model.state.firstName },
                             set: { value in model.update { $0.firstName = value } }
@@ -42,7 +42,7 @@ struct NameStepView: View {
                     VStack(alignment: .leading, spacing: 8) {
                         (Text("Last name").foregroundColor(GM.textPrimary)
                          + Text(" *").foregroundColor(GM.error))
-                            .font(.system(size: 14, weight: .semibold))
+                            .gmFont(14, .semibold)
                         nameInput(.last, value: Binding(
                             get: { model.state.lastName },
                             set: { value in model.update { $0.lastName = value } }
@@ -57,11 +57,11 @@ struct NameStepView: View {
             },
             bottom: {
                 GradientButton(
-                    title: "Next",
+                    title: String(localized: "Next", comment: "Button title (sign-up name step)"),
                     enabled: !model.state.firstName.isEmpty && !model.state.lastName.isEmpty,
                     trailing: AnyView(
-                        Image(systemName: "arrow.right")
-                            .font(.system(size: 15, weight: .semibold))
+                        Image(systemName: "arrow.right").flipsForRightToLeftLayoutDirection(true)
+                            .gmFont(15, .semibold, maxSize: 24)
                             .foregroundColor(.white)
                     )
                 ) {
@@ -72,7 +72,9 @@ struct NameStepView: View {
     }
 
     private func nameInput(_ field: NameField, value: Binding<String>) -> some View {
-        TextField(field == .first ? "First name" : "Last name", text: value)
+        TextField(field == .first
+                  ? String(localized: "First name", comment: "Sign-up name step: field placeholder")
+                  : String(localized: "Last name", comment: "Sign-up name step: field placeholder"), text: value)
             .font(.body)
             .textContentType(field == .first ? .givenName : .familyName)
             .textInputAutocapitalization(.words)
@@ -114,12 +116,27 @@ struct BasicInfoView: View {
     var onSignIn: (() -> Void)? = nil
     let onNext: () -> Void
 
+    @Environment(\.dynamicTypeSize) private var dts
     @State private var photoItem: PhotosPickerItem?
     @State private var photoError = false
     private var photoPreview: UIImage? { model.state.photo.flatMap(UIImage.init(data:)) }
 
-    private let months = ["January", "February", "March", "April", "May", "June",
-                          "July", "August", "September", "October", "November", "December"]
+    // Shown in the picker and matched back to a month number by position, so
+    // the stored value never leaves this screen; only the ISO date is sent.
+    private let months = [
+        String(localized: "January", comment: "Month name in the birthday picker"),
+        String(localized: "February", comment: "Month name in the birthday picker"),
+        String(localized: "March", comment: "Month name in the birthday picker"),
+        String(localized: "April", comment: "Month name in the birthday picker"),
+        String(localized: "May", comment: "Month name in the birthday picker"),
+        String(localized: "June", comment: "Month name in the birthday picker"),
+        String(localized: "July", comment: "Month name in the birthday picker"),
+        String(localized: "August", comment: "Month name in the birthday picker"),
+        String(localized: "September", comment: "Month name in the birthday picker"),
+        String(localized: "October", comment: "Month name in the birthday picker"),
+        String(localized: "November", comment: "Month name in the birthday picker"),
+        String(localized: "December", comment: "Month name in the birthday picker"),
+    ]
     private let days = Array(1...31).map(String.init)
     private var years: [String] {
         // Same rule as Android: under-13 years are not offered at all, and
@@ -139,7 +156,7 @@ struct BasicInfoView: View {
     var body: some View {
         WizardScaffold(
             step: 2,
-            title: "Basic Info",
+            title: String(localized: "Basic Info", comment: "Title (sign-up details step)"),
             subtitle: Text("Tell us a little more about yourself. This helps us make your experience more personal."),
             onBack: onBack,
             onSignIn: onSignIn,
@@ -159,7 +176,7 @@ struct BasicInfoView: View {
     }
 
     @ViewBuilder private var photoCard: some View {
-                HStack(alignment: .top, spacing: 16) {
+                GMAdaptiveStack(spacing: 16, verticalAlignment: .top) {
                     photoAvatar
                     photoCopy
                 }
@@ -181,7 +198,7 @@ struct BasicInfoView: View {
                                 .aspectRatio(contentMode: .fill)
                         } else {
                             Image(systemName: "person.fill")
-                                .font(.system(size: 30))
+                                .gmFont(30, maxSize: 44)
                                 .foregroundColor(Color(0x8FA8E8))
                         }
                     }
@@ -192,7 +209,7 @@ struct BasicInfoView: View {
                 .frame(width: 26, height: 26)
                 .overlay(
                     Image(systemName: "camera.fill")
-                        .font(.system(size: 11))
+                        .gmFont(11, maxSize: 16)
                         .foregroundColor(.white)
                 )
         }
@@ -201,19 +218,19 @@ struct BasicInfoView: View {
     // The `Text + Text` concatenation is its own typed property: inline in the
     // VStack it is the expression the type-checker cannot resolve in time.
     private var photoTitle: Text {
-        Text("Profile Photo ").font(.system(size: 15, weight: .semibold)).foregroundColor(GM.textPrimary)
-        + Text("(Optional)").font(.system(size: 13)).foregroundColor(GM.textTertiary)
+        Text("Profile Photo ").font(.gm(15, .semibold, scaledFor: dts)).foregroundColor(GM.textPrimary)
+        + Text("(Optional)").font(.gm(13, scaledFor: dts)).foregroundColor(GM.textTertiary)
     }
 
     @ViewBuilder private var photoCopy: some View {
         VStack(alignment: .leading, spacing: 4) {
             photoTitle
             Text("Add a photo to make your account more personal. You can change this later in settings.")
-                .font(GMFont.caption)
+                .gmFont(.caption)
                 .foregroundColor(GM.textSecondary)
             PhotosPicker(selection: $photoItem, matching: .images) {
-                Text(photoPreview == nil ? "Choose Photo" : "Change Photo")
-                    .font(GMFont.captionMedium)
+                (photoPreview == nil ? Text("Choose Photo") : Text("Change Photo"))
+                    .gmFont(.captionMedium)
                     .foregroundColor(GM.primarySolid)
                     .padding(.horizontal, 14)
                     .padding(.vertical, 8)
@@ -231,7 +248,7 @@ struct BasicInfoView: View {
             .padding(.top, 8)
             if photoError {
                 Text("Couldn’t open that photo. Choose another image.")
-                    .font(.system(size: 12)).foregroundStyle(GM.error)
+                    .gmFont(12).foregroundStyle(GM.error)
             }
         }
     }
@@ -240,30 +257,32 @@ struct BasicInfoView: View {
                 // Birthday
                 HStack(spacing: 8) {
                     Image(systemName: "calendar")
-                        .font(.system(size: 15))
+                        .gmFont(15)
                         .foregroundColor(GM.textPrimary)
-                    Text("Birthday ").font(.system(size: 14, weight: .semibold)).foregroundColor(GM.textPrimary)
-                    Text("(Required)").font(.system(size: 13)).foregroundColor(GM.textTertiary)
+                    Text("Birthday ").gmFont(14, .semibold).foregroundColor(GM.textPrimary)
+                    Text("(Required)").gmFont(13).foregroundColor(GM.textTertiary)
                 }
                 .padding(.top, 22)
 
-                HStack(alignment: .top, spacing: 10) {
+                // Month, day and year side by side; stacked at the
+                // accessibility sizes, where "September" no longer fits a third.
+                GMAdaptiveStack(spacing: 10, verticalAlignment: .top) {
                     InlinePicker(
-                        placeholder: "Month",
+                        placeholder: String(localized: "Month", comment: "Birthday picker placeholder"),
                         value: model.state.bMonth,
                         options: months
                     ) { pick in model.update { $0.bMonth = pick } }
                     .frame(maxWidth: .infinity)
 
                     InlinePicker(
-                        placeholder: "Day",
+                        placeholder: String(localized: "Day", comment: "Birthday picker placeholder"),
                         value: model.state.bDay,
                         options: days
                     ) { pick in model.update { $0.bDay = pick } }
                     .frame(maxWidth: .infinity)
 
                     InlinePicker(
-                        placeholder: "Year",
+                        placeholder: String(localized: "Year", comment: "Birthday picker placeholder"),
                         value: model.state.bYear,
                         options: years
                     ) { pick in model.update { $0.bYear = pick } }
@@ -271,14 +290,14 @@ struct BasicInfoView: View {
                 }
 
                 if let err = birthday.error {
-                    Text(err).font(GMFont.caption).foregroundColor(GM.error).padding(.top, 8)
+                    Text(err).gmFont(.caption).foregroundColor(GM.error).padding(.top, 8)
                 } else {
                     HStack(spacing: 6) {
                         Image(systemName: "info.circle.fill")
-                            .font(.system(size: 12))
+                            .gmFont(12)
                             .foregroundColor(GM.primarySolid)
                         Text("You must be 13 or older to create an account.")
-                            .font(.system(size: 12))
+                            .gmFont(12)
                             .foregroundColor(GM.textTertiary)
                     }
                     .padding(.top, 8)
@@ -289,21 +308,24 @@ struct BasicInfoView: View {
                 // Gender
                 HStack(spacing: 8) {
                     Image(systemName: "figure.dress.line.vertical.figure")
-                        .font(.system(size: 15))
+                        .gmFont(15)
                         .foregroundColor(GM.textPrimary)
-                    Text("Gender ").font(.system(size: 14, weight: .semibold)).foregroundColor(GM.textPrimary)
-                    Text("(Optional)").font(.system(size: 13)).foregroundColor(GM.textTertiary)
+                    Text("Gender ").gmFont(14, .semibold).foregroundColor(GM.textPrimary)
+                    Text("(Optional)").gmFont(13).foregroundColor(GM.textTertiary)
                 }
                 .padding(.top, 22)
 
-                let genders = ["Female", "Male", "Rather not say", "Custom"]
+                // The account stores the code (GenderOption, ProfileOptions.swift);
+                // only the label is translated.
+                let genders = GenderOption.all
+                let genderLabels: [String] = genders.map { GenderOption.label($0) }
                 let icons = ["figure.arms.open", "figure.stand", "person", "person.badge.plus"]
                 VStack(spacing: 10) {
                     ForEach(0..<2, id: \.self) { row in
-                        HStack(spacing: 10) {
+                        GMAdaptiveStack(spacing: 10) {
                             ForEach(0..<2, id: \.self) { col in
                                 let idx = row * 2 + col
-                                genderCard(genders[idx], icons[idx])
+                                genderCard(genders[idx], genderLabels[idx], icons[idx])
                             }
                         }
                     }
@@ -313,11 +335,11 @@ struct BasicInfoView: View {
 
     private var basicInfoBottom: some View {
                 GradientButton(
-                    title: "Next",
+                    title: String(localized: "Next", comment: "Button title (sign-up details step)"),
                     enabled: birthday.iso != nil && birthday.error == nil && photoItem == nil,
                     trailing: AnyView(
-                        Image(systemName: "arrow.right")
-                            .font(.system(size: 15, weight: .semibold))
+                        Image(systemName: "arrow.right").flipsForRightToLeftLayoutDirection(true)
+                            .gmFont(15, .semibold, maxSize: 24)
                             .foregroundColor(.white)
                     )
                 ) {
@@ -327,22 +349,23 @@ struct BasicInfoView: View {
                 }
     }
 
-    private func genderCard(_ label: String, _ icon: String) -> some View {
-        let selected = model.state.gender == label
+    private func genderCard(_ code: String, _ title: String, _ icon: String) -> some View {
+        let selected = GenderOption.normalize(model.state.gender) == code
         return Button {
-            model.update { $0.gender = selected ? nil : label }
+            model.update { $0.gender = selected ? nil : code }
         } label: {
             HStack(spacing: 8) {
                 Image(systemName: icon)
-                    .font(.system(size: 14))
+                    .gmFont(14)
                     .foregroundColor(selected ? GM.primarySolid : GM.textTertiary)
-                Text(label)
-                    .font(.system(size: 13, weight: selected ? .semibold : .regular))
+                Text(title)
+                    .gmFont(13, selected ? .semibold : .regular)
                     .foregroundColor(selected ? GM.primarySolid : GM.textPrimary)
                 Spacer(minLength: 0)
             }
             .padding(.horizontal, 12)
-            .frame(height: 46)
+            .padding(.vertical, 6)
+            .frame(minHeight: 46)
             .background(
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
                     .fill(selected ? GM.primarySolid.opacity(0.06) : GM.card)
@@ -359,6 +382,7 @@ struct BasicInfoView: View {
 // MARK: - Step 3 · Address — founder design verbatim
 
 struct AddressStepView: View {
+    @Environment(\.dynamicTypeSize) private var dts
     @ObservedObject var model: SignUpModel
     let onBack: () -> Void
     var onSignIn: (() -> Void)? = nil
@@ -367,7 +391,7 @@ struct AddressStepView: View {
     var body: some View {
         WizardScaffold(
             step: 3,
-            title: "Choose your GrapMail address",
+            title: String(localized: "Choose your GrapMail address", comment: "Title (sign-up address step)"),
             subtitle: Text("Pick an available address or create your own. You'll use this to sign in and receive emails."),
             onBack: onBack,
             onSignIn: onSignIn,
@@ -376,16 +400,16 @@ struct AddressStepView: View {
                 VStack(alignment: .leading, spacing: 12) {
                     HStack(spacing: 8) {
                         Image(systemName: "sparkles")
-                            .font(.system(size: 15))
+                            .gmFont(15)
                             .foregroundColor(GM.primarySolid)
                         VStack(alignment: .leading, spacing: 1) {
-                            Text("Suggested for you").font(.system(size: 15, weight: .semibold)).foregroundColor(GM.textPrimary)
+                            Text("Suggested for you").gmFont(15, .semibold).foregroundColor(GM.textPrimary)
                             Text("Based on your name. You can change it later.")
-                                .font(.system(size: 12)).foregroundColor(GM.textTertiary)
+                                .gmFont(12).foregroundColor(GM.textTertiary)
                         }
                     }
                     if model.state.suggestionsLoading {
-                        Text("Finding available addresses…").font(GMFont.caption).foregroundColor(GM.textTertiary)
+                        Text("Finding available addresses…").gmFont(.caption).foregroundColor(GM.textTertiary)
                     } else {
                         ForEach(model.state.suggestions, id: \.self) { handle in
                             radioRow("\(handle)@grapsee.com", selected: model.state.chosenHandle == handle && !model.state.customOpen) {
@@ -394,7 +418,7 @@ struct AddressStepView: View {
                         }
                         if model.state.suggestions.isEmpty {
                             Text("No suggestions from your name — create your own below.")
-                                .font(GMFont.caption).foregroundColor(GM.textTertiary)
+                                .gmFont(.caption).foregroundColor(GM.textTertiary)
                         }
                     }
                 }
@@ -406,18 +430,18 @@ struct AddressStepView: View {
                 VStack(alignment: .leading, spacing: 12) {
                     HStack(spacing: 8) {
                         Image(systemName: "pencil")
-                            .font(.system(size: 14))
+                            .gmFont(14)
                             .foregroundColor(GM.primarySolid)
                         VStack(alignment: .leading, spacing: 1) {
-                            Text("Create your own").font(.system(size: 15, weight: .semibold)).foregroundColor(GM.textPrimary)
+                            Text("Create your own").gmFont(15, .semibold).foregroundColor(GM.textPrimary)
                             Text("Choose a unique address (3-30 characters).")
-                                .font(.system(size: 12)).foregroundColor(GM.textTertiary)
+                                .gmFont(12).foregroundColor(GM.textTertiary)
                         }
                     }
-                    HStack(spacing: 8) {
+                    GMAdaptiveStack(spacing: 8) {
                         AppTextField(
                             value: Binding(get: { model.state.customHandle }, set: model.onCustomHandleChange),
-                            hint: "yourname",
+                            hint: String(localized: "yourname", comment: "Sign-up address step: placeholder for the part before @grapsee.com"),
                             dismissOnReturn: true
                         )
                         // The design's bordered domain chip with a chevron —
@@ -428,14 +452,14 @@ struct AddressStepView: View {
                         } label: {
                             HStack(spacing: 6) {
                                 Text("@grapsee.com")
-                                    .font(.system(size: 14))
+                                    .gmFont(14)
                                     .foregroundColor(GM.textSecondary)
                                 Image(systemName: "chevron.down")
-                                    .font(.system(size: 11))
+                                    .gmFont(11, maxSize: 24)
                                     .foregroundColor(GM.textTertiary)
                             }
                             .padding(.horizontal, 12)
-                            .frame(height: 54)
+                            .frame(minHeight: 54)
                             .background(
                                 RoundedRectangle(cornerRadius: GMShape.input, style: .continuous)
                                     .fill(GM.inputFill)
@@ -448,7 +472,7 @@ struct AddressStepView: View {
                     }
                     statusText
                     Text("Use letters, numbers, dots (.), dashes (-) or underscores (_).\nAvoid reserved names like admin, support, postmaster, etc.")
-                        .font(.system(size: 12))
+                        .gmFont(12)
                         .foregroundColor(GM.textTertiary)
                         .lineSpacing(3)
                 }
@@ -458,11 +482,11 @@ struct AddressStepView: View {
             },
             bottom: {
                 GradientButton(
-                    title: "Next",
+                    title: String(localized: "Next", comment: "Button title (sign-up address step)"),
                     enabled: !model.state.chosenHandle.isEmpty,
                     trailing: AnyView(
-                        Image(systemName: "arrow.right")
-                            .font(.system(size: 15, weight: .semibold))
+                        Image(systemName: "arrow.right").flipsForRightToLeftLayoutDirection(true)
+                            .gmFont(15, .semibold, maxSize: 24)
                             .foregroundColor(.white)
                     )
                 ) { onNext() }
@@ -478,24 +502,24 @@ struct AddressStepView: View {
         switch model.state.handleStatus {
         case .idle: EmptyView()
         case .checking:
-            Text("Checking…").font(GMFont.caption).foregroundColor(GM.textTertiary)
+            Text("Checking…").gmFont(.caption).foregroundColor(GM.textTertiary)
         case .available:
             HStack(spacing: 8) {
                 Image(systemName: "checkmark.circle.fill")
-                    .font(.system(size: 15))
+                    .gmFont(15)
                     .foregroundColor(GM.success)
                 Text("This address is available!")
-                    .font(GMFont.captionMedium).foregroundColor(GM.success)
+                    .gmFont(.captionMedium).foregroundColor(GM.success)
             }
         case .taken:
             Text("That address is taken. Try \(model.state.customHandle)1@grapsee.com")
-                .font(GMFont.caption).foregroundColor(GM.error)
+                .gmFont(.caption).foregroundColor(GM.error)
         case .invalid(let reason):
-            Text(reason ?? "That address cannot be used.")
-                .font(GMFont.caption).foregroundColor(GM.error)
+            Text(reason ?? String(localized: "That address cannot be used.", comment: "Sign-up address step: the chosen address is not allowed"))
+                .gmFont(.caption).foregroundColor(GM.error)
         case .unknown:
             Text("Could not check right now — confirmed when the account is created.")
-                .font(GMFont.caption).foregroundColor(GM.textTertiary)
+                .gmFont(.caption).foregroundColor(GM.textTertiary)
         }
     }
 
@@ -505,16 +529,21 @@ struct AddressStepView: View {
                 Circle()
                     .strokeBorder(GM.primarySolid, lineWidth: selected ? 6 : 1.5)
                     .frame(width: 20, height: 20)
-                Text(address)
-                    .font(.system(size: 14))
-                    .foregroundColor(GM.textPrimary)
-                Spacer()
-                Text("Available")
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundColor(GM.success)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 4)
-                    .background(Capsule().fill(GM.success.opacity(0.1)))
+                // The badge moves under the address at the accessibility
+                // sizes, so the address is never squeezed into a sliver.
+                GMAdaptiveStack(spacing: 8) {
+                    Text(address)
+                        .gmFont(14)
+                        .foregroundColor(GM.textPrimary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    if !dts.isAccessibilitySize { Spacer() }
+                    Text("Available")
+                        .gmFont(12, .medium)
+                        .foregroundColor(GM.success)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 4)
+                        .background(Capsule().fill(GM.success.opacity(0.1)))
+                }
             }
             .padding(.vertical, 4)
         }
@@ -552,25 +581,25 @@ struct PasswordStepView: View {
     var body: some View {
         WizardScaffold(
             step: 4,
-            title: "Create a strong password",
+            title: String(localized: "Create a strong password", comment: "Title (sign-up password step)"),
             subtitle: Text("Your password keeps your account safe. Make it unique, strong and easy for you to remember."),
             onBack: onBack,
             onSignIn: onSignIn,
             bodyContent: {
                 // Address summary card
-                HStack(spacing: 12) {
+                GMAdaptiveStack(spacing: 12) {
                     RoundedRectangle(cornerRadius: 12, style: .continuous)
                         .fill(GM.softFill)
                         .frame(width: 44, height: 44)
-                        .overlay(Image(systemName: "envelope.fill").font(.system(size: 17)).foregroundColor(GM.primarySolid))
+                        .overlay(Image(systemName: "envelope.fill").gmFont(17, maxSize: 26).foregroundColor(GM.primarySolid))
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("Your GrapMail address").font(GMFont.caption).foregroundColor(GM.textSecondary)
+                        Text("Your GrapMail address").gmFont(.caption).foregroundColor(GM.textSecondary)
                         Text("\(model.state.chosenHandle)@grapsee.com")
-                            .font(.system(size: 14, weight: .semibold)).foregroundColor(GM.textPrimary)
+                            .gmFont(14, .semibold).foregroundColor(GM.textPrimary)
                     }
                     Spacer()
                     Button(action: onBack) {
-                        Text("Edit").font(GMFont.captionMedium).foregroundColor(GM.primarySolid)
+                        Text("Edit").gmFont(.captionMedium).foregroundColor(GM.primarySolid)
                     }
                     .buttonStyle(.plain)
                 }
@@ -578,14 +607,19 @@ struct PasswordStepView: View {
                 .overlay(RoundedRectangle(cornerRadius: GMShape.card).strokeBorder(GM.border))
                 .padding(.top, 4)
 
-                (Text("Password ").font(.system(size: 14, weight: .semibold)).foregroundColor(GM.textPrimary)
-                 + Text("*").font(.system(size: 14, weight: .semibold)).foregroundColor(GM.error))
+                (Text("Password ").foregroundColor(GM.textPrimary)
+                 + Text("*").foregroundColor(GM.error))
+                    .gmFont(14, .semibold)
                     .padding(.top, 20)
 
+                // Round 8 — B: the new account's address, so the password
+                // manager saves this password under it.
+                CredentialUsernameField(username: "\(model.state.chosenHandle)@grapsee.com")
                 AppTextField(
                     value: Binding(get: { model.state.password }, set: { newValue in model.update { $0.password = newValue } }),
-                    hint: "Create a strong password",
-                    isPassword: true
+                    hint: String(localized: "Create a strong password", comment: "Text field placeholder (sign-up password step)"),
+                    isPassword: true,
+                    contentType: .newPassword
                 )
                 .padding(.top, 8)
 
@@ -599,27 +633,29 @@ struct PasswordStepView: View {
                         }
                     }
                     Text(strengthLabel)
-                        .font(.system(size: 13, weight: .semibold))
+                        .gmFont(13, .semibold)
                         .foregroundColor(strength >= 0.75 ? GM.success : GM.textTertiary)
                 }
                 .padding(.top, 10)
 
-                (Text("Confirm password ").font(.system(size: 14, weight: .semibold)).foregroundColor(GM.textPrimary)
-                 + Text("*").font(.system(size: 14, weight: .semibold)).foregroundColor(GM.error))
+                (Text("Confirm password ").foregroundColor(GM.textPrimary)
+                 + Text("*").foregroundColor(GM.error))
+                    .gmFont(14, .semibold)
                     .padding(.top, 16)
 
                 AppTextField(
                     value: Binding(get: { model.state.confirm }, set: { newValue in model.update { $0.confirm = newValue } }),
-                    hint: "Re-enter your password",
-                    isPassword: true
+                    hint: String(localized: "Re-enter your password", comment: "Text field placeholder (sign-up password step)"),
+                    isPassword: true,
+                    contentType: .newPassword
                 )
                 .padding(.top, 8)
 
                 // Requirements card
                 VStack(alignment: .leading, spacing: 10) {
                     HStack(spacing: 8) {
-                        Image(systemName: "lock").font(.system(size: 14)).foregroundColor(GM.textPrimary)
-                        Text("Password requirements").font(.system(size: 14, weight: .semibold)).foregroundColor(GM.textPrimary)
+                        Image(systemName: "lock").gmFont(14).foregroundColor(GM.textPrimary)
+                        Text("Password requirements").gmFont(14, .semibold).foregroundColor(GM.textPrimary)
                     }
                     req("At least 8 characters", model.state.password.count >= 8)
                     req("A mix of letters, numbers and symbols", mixed)
@@ -631,11 +667,11 @@ struct PasswordStepView: View {
             },
             bottom: {
                 GradientButton(
-                    title: "Next",
+                    title: String(localized: "Next", comment: "Button title (sign-up password step)"),
                     enabled: allMet,
                     trailing: AnyView(
-                        Image(systemName: "arrow.right")
-                            .font(.system(size: 15, weight: .semibold))
+                        Image(systemName: "arrow.right").flipsForRightToLeftLayoutDirection(true)
+                            .gmFont(15, .semibold, maxSize: 24)
                             .foregroundColor(.white)
                     )
                 ) { onNext() }
@@ -645,20 +681,20 @@ struct PasswordStepView: View {
 
     private var strengthLabel: String {
         switch strength {
-        case 1.0...: return "Strong"
-        case 0.75...: return "Good"
-        case 0.5..<0.75: return "Fair"
-        default: return model.state.password.isEmpty ? "" : "Weak"
+        case 1.0...: return String(localized: "Strong", comment: "Password strength")
+        case 0.75...: return String(localized: "Good", comment: "Password strength")
+        case 0.5..<0.75: return String(localized: "Fair", comment: "Password strength")
+        default: return model.state.password.isEmpty ? "" : String(localized: "Weak", comment: "Password strength")
         }
     }
 
-    private func req(_ label: String, _ met: Bool) -> some View {
+    private func req(_ label: LocalizedStringKey, _ met: Bool) -> some View {
         HStack(spacing: 10) {
             Image(systemName: "checkmark")
-                .font(.system(size: 12, weight: .semibold))
+                .gmFont(12, .semibold)
                 .foregroundColor(met ? GM.success : GM.textTertiary)
             Text(label)
-                .font(GMFont.caption)
+                .gmFont(.caption)
                 .foregroundColor(met ? GM.textPrimary : GM.textSecondary)
         }
     }
@@ -673,6 +709,7 @@ struct TermsStepView: View {
     let onCreated: (String, String) -> Void
 
     @State private var scrolledToEnd = false
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
 
     // Real scroll detection: the content's bottom edge in the document's own
     // coordinate space, compared against the viewport height. The old timer
@@ -685,7 +722,7 @@ struct TermsStepView: View {
     var body: some View {
         WizardScaffold(
             step: 5,
-            title: "Terms & Privacy",
+            title: String(localized: "Terms & Privacy", comment: "Title (sign-up terms step)"),
             subtitle: Text("Please read and agree to our Terms of Service and Privacy Policy to continue."),
             onBack: onBack,
             onSignIn: onSignIn,
@@ -694,24 +731,24 @@ struct TermsStepView: View {
                     ScrollView {
                         VStack(alignment: .leading, spacing: 14) {
                         Text("GrapMail Terms of Service")
-                            .font(.system(size: 15, weight: .semibold))
+                            .gmFont(15, .semibold)
                             .foregroundColor(GM.textPrimary)
                         Text("1.  Your Account")
-                            .font(.system(size: 14, weight: .semibold))
+                            .gmFont(14, .semibold)
                             .foregroundColor(GM.textPrimary)
                         (Text("By creating an account, you agree to our ")
                          + Text("Terms of Service").foregroundColor(GM.primarySolid)
                          + Text(" and confirm that you are at least 13 years old. You are responsible for keeping your account secure and for all activity that happens under your account."))
-                            .font(GMFont.caption)
+                            .gmFont(.caption)
                             .foregroundColor(GM.textSecondary)
                             .lineSpacing(4)
                         Text("2.  Privacy Policy")
-                            .font(.system(size: 14, weight: .semibold))
+                            .gmFont(14, .semibold)
                             .foregroundColor(GM.textPrimary)
                         (Text("We collect and process your data to provide and improve GrapMail services. Your information will not be shared with third parties without your consent, except as required by law. You can read the full details in our ")
                          + Text("Privacy Policy").foregroundColor(GM.primarySolid)
                          + Text("."))
-                            .font(GMFont.caption)
+                            .gmFont(.caption)
                             .foregroundColor(GM.textSecondary)
                             .lineSpacing(4)
                         }
@@ -731,16 +768,17 @@ struct TermsStepView: View {
                         }
                     }
                 }
-                .frame(height: 300)
+                // A landscape phone has no room for a 300-point document box.
+                .frame(height: verticalSizeClass == .compact ? 200 : 300)
                 .background(RoundedRectangle(cornerRadius: GMShape.card, style: .continuous).fill(GM.card))
                 .overlay(RoundedRectangle(cornerRadius: GMShape.card, style: .continuous).strokeBorder(GM.border))
                 .padding(.top, 4)
 
                 Link("Read our Terms of Service ↗", destination: URL(string: "https://grapsee.com/legal/terms-of-service")!)
-                    .font(GMFont.captionMedium).foregroundColor(GM.primarySolid)
+                    .gmFont(.captionMedium).foregroundColor(GM.primarySolid)
                     .padding(.top, 12)
                 Link("Read our Privacy Policy ↗", destination: URL(string: "https://grapsee.com/legal/privacy-policy")!)
-                    .font(GMFont.captionMedium).foregroundColor(GM.primarySolid)
+                    .gmFont(.captionMedium).foregroundColor(GM.primarySolid)
                     .padding(.top, 8)
 
                 // Agree card
@@ -755,19 +793,18 @@ struct TermsStepView: View {
                             )
                         if model.state.termsAgreed {
                             Image(systemName: "checkmark")
-                                .font(.system(size: 13, weight: .bold))
+                                .gmFont(13, .bold, maxSize: 18)
                                 .foregroundColor(.white)
                         }
                     }
                     VStack(alignment: .leading, spacing: 4) {
-                        (Text("I agree to the ")
-                         + Text("Terms of Service").foregroundColor(GM.primarySolid)
-                         + Text(" and ")
-                         + Text("Privacy Policy").foregroundColor(GM.primarySolid))
-                            .font(GMFont.caption)
+                        // One sentence with the two document names inside it, so a
+                        // translation can reorder them; the names keep their colour.
+                        Text("I agree to the \(Text("Terms of Service").foregroundColor(GM.primarySolid)) and \(Text("Privacy Policy").foregroundColor(GM.primarySolid))")
+                            .gmFont(.caption)
                             .foregroundColor(GM.textPrimary)
                         Text("You must scroll to the bottom of this document to enable the checkbox.")
-                            .font(.system(size: 11))
+                            .gmFont(11)
                             .foregroundColor(GM.textTertiary)
                     }
                 }
@@ -782,12 +819,12 @@ struct TermsStepView: View {
                 }
 
                 if let error = model.state.error {
-                    Text(error).font(GMFont.caption).foregroundColor(GM.error).padding(.top, 12)
+                    Text(error).gmFont(.caption).foregroundColor(GM.error).padding(.top, 12)
                 }
             },
             bottom: {
                 GradientButton(
-                    title: "Create Account",
+                    title: String(localized: "Create Account", comment: "Button title (sign-up terms step)"),
                     enabled: model.state.termsAgreed && scrolledToEnd && !model.state.creating,
                     busy: model.state.creating
                 ) {
@@ -819,15 +856,16 @@ struct InlinePicker: View {
             } label: {
                 HStack {
                     Text(value.isEmpty ? placeholder : value)
-                        .font(.system(size: 13))
+                        .gmFont(13)
                         .foregroundColor(value.isEmpty ? GM.textTertiary : GM.textPrimary)
                         .frame(maxWidth: .infinity, alignment: .leading)
                     Image(systemName: open ? "chevron.up" : "chevron.down")
-                        .font(.system(size: 11))
+                        .gmFont(11, maxSize: 24)
                         .foregroundColor(GM.textTertiary)
                 }
                 .padding(.horizontal, 12)
-                .frame(height: 46)
+                .padding(.vertical, 6)
+                .frame(minHeight: 46)
                 .background(
                     RoundedRectangle(cornerRadius: 12, style: .continuous)
                         .fill(GM.inputFill)
@@ -848,7 +886,7 @@ struct InlinePicker: View {
                                 withAnimation { open = false }
                             } label: {
                                 Text(opt)
-                                    .font(.system(size: 13, weight: opt == value ? .semibold : .regular))
+                                    .gmFont(13, opt == value ? .semibold : .regular)
                                     .foregroundColor(opt == value ? GM.primarySolid : GM.textPrimary)
                                     .frame(maxWidth: .infinity, alignment: .leading)
                                     .padding(.horizontal, 14)

@@ -116,7 +116,7 @@ final class E2eModel: ObservableObject {
     func createRecoveryKey() {
         guard !snapshotSeeded, let t = token else { return }
         guard let unlocked = session else {
-            note("Unlock your key first: the recovery kit is made from it.", bad: true)
+            note(String(localized: "Unlock your key first: the recovery kit is made from it.", comment: "End-to-end encryption status note"), bad: true)
             return
         }
         state.busy = true
@@ -139,7 +139,7 @@ final class E2eModel: ObservableObject {
                         state.recoveryKitCreatedAt = saved.createdAt
                         state.newRecoveryKey = recoveryKey
                     } else {
-                        note(saved.error ?? "The recovery kit was not saved.", bad: true)
+                        note(saved.error ?? String(localized: "The recovery kit was not saved.", comment: "End-to-end encryption status note"), bad: true)
                     }
                 } catch {
                     state.busy = false
@@ -161,8 +161,8 @@ final class E2eModel: ObservableObject {
                 let r = try await ApiClient.e2eRecoveryRemove(token: t)
                 state.busy = false
                 if r.success { state.recoveryKitExists = false }
-                note(r.success ? "The recovery key was removed. Keep this device safe: it now holds the only copy of your key."
-                               : (r.error ?? "The recovery kit was not removed."), bad: !r.success)
+                note(r.success ? String(localized: "The recovery key was removed. Keep this device safe: it now holds the only copy of your key.", comment: "End-to-end encryption status note")
+                               : (r.error ?? String(localized: "The recovery kit was not removed.", comment: "End-to-end encryption status note")), bad: !r.success)
             } catch {
                 state.busy = false
                 note(Self.describe(error), bad: true)
@@ -176,15 +176,15 @@ final class E2eModel: ObservableObject {
     func restoreWithRecoveryKey(_ recoveryKey: String, passphrase: String, confirm: String) {
         guard !snapshotSeeded, let t = token, let k = identityKey else { return }
         if passphrase.utf16.count < MailE2e.minPassphraseLength {
-            note("Use at least \(MailE2e.minPassphraseLength) characters for the passphrase.", bad: true)
+            note(String(localized: "Use at least \(MailE2e.minPassphraseLength) characters for the passphrase.", comment: "End-to-end encryption status note"), bad: true)
             return
         }
         if passphrase != confirm {
-            note("The two passphrases do not match.", bad: true)
+            note(String(localized: "The two passphrases do not match.", comment: "End-to-end encryption status note"), bad: true)
             return
         }
         guard MailE2e.normalizeRecoveryKey(recoveryKey) != nil else {
-            note("That recovery key is not valid. It has 28 letters and numbers.", bad: true)
+            note(String(localized: "That recovery key is not valid. It has 28 letters and numbers.", comment: "End-to-end encryption status note"), bad: true)
             return
         }
         state.busy = true
@@ -200,7 +200,7 @@ final class E2eModel: ObservableObject {
             guard status.success, let kit = status.kit else {
                 state.busy = false
                 if status.success { state.recoveryKitExists = false }
-                note(status.error ?? "There is no recovery kit for this account.", bad: true)
+                note(status.error ?? String(localized: "There is no recovery kit for this account.", comment: "End-to-end encryption status note"), bad: true)
                 return
             }
             let restored = await Task.detached {
@@ -221,7 +221,7 @@ final class E2eModel: ObservableObject {
                 state.record = identity
                 state.fingerprint = MailE2e.fingerprint(publicKeyB64: identity.encryption.publicKey)
                 state.unlocked = true
-                note("Your key is back on this device and unlocked. Encrypted mail opens here again.", bad: false)
+                note(String(localized: "Your key is back on this device and unlocked. Encrypted mail opens here again.", comment: "End-to-end encryption status note"), bad: false)
             }
         }
     }
@@ -261,7 +261,7 @@ final class E2eModel: ObservableObject {
                     state.published = r.published ? r.keys : nil
                     state.publishedError = nil
                 } else {
-                    state.publishedError = r.error ?? "The key directory did not answer."
+                    state.publishedError = r.error ?? String(localized: "The key directory did not answer.", comment: "End-to-end encryption: error reading the published key")
                 }
             } catch {
                 state.publishedLoaded = true
@@ -273,11 +273,11 @@ final class E2eModel: ObservableObject {
     func setup(passphrase: String, confirm: String, publishOnSetup: Bool) {
         guard !snapshotSeeded, let t = identityKey else { return }
         if passphrase.utf16.count < MailE2e.minPassphraseLength {
-            note("Use at least \(MailE2e.minPassphraseLength) characters for the passphrase.", bad: true)
+            note(String(localized: "Use at least \(MailE2e.minPassphraseLength) characters for the passphrase.", comment: "End-to-end encryption status note"), bad: true)
             return
         }
         if passphrase != confirm {
-            note("The two passphrases do not match.", bad: true)
+            note(String(localized: "The two passphrases do not match.", comment: "End-to-end encryption status note"), bad: true)
             return
         }
         state.busy = true
@@ -312,7 +312,7 @@ final class E2eModel: ObservableObject {
                     await publishNow()
                 } else {
                     state.busy = false
-                    note("Encryption is on. Your key is private to this device until you publish it.",
+                    note(String(localized: "Encryption is on. Your key is private to this device until you publish it.", comment: "End-to-end encryption status note"),
                          bad: false)
                 }
             }
@@ -335,13 +335,11 @@ final class E2eModel: ObservableObject {
             if r.success {
                 loadPublished()
                 note(r.discoverable
-                    ? "Encryption is on, and your key is published so others can find it."
-                    : "Your key is saved on this device and stored on the server, but it is not "
-                      + "findable by senders yet. That happens when the mailbox is not active. "
-                      + "Mail sent to you stays unencrypted until that is fixed.",
+                    ? String(localized: "Encryption is on, and your key is published so others can find it.", comment: "End-to-end encryption status note")
+                    : String(localized: "Your key is saved on this device and stored on the server, but it is not findable by senders yet. That happens when the mailbox is not active. Mail sent to you stays unencrypted until that is fixed.", comment: "End-to-end encryption status note"),
                     bad: !r.discoverable)
             } else {
-                note(r.error ?? "The directory refused those keys.", bad: true)
+                note(r.error ?? String(localized: "The directory refused those keys.", comment: "End-to-end encryption status note"), bad: true)
             }
         } catch {
             state.busy = false
@@ -358,9 +356,8 @@ final class E2eModel: ObservableObject {
                 state.busy = false
                 loadPublished()
                 note(r.success
-                    ? "Unpublished. New mail to you will not be encrypted. Messages already "
-                      + "encrypted stay readable on this device."
-                    : r.error ?? "The directory did not remove the key.",
+                    ? String(localized: "Unpublished. New mail to you will not be encrypted. Messages already encrypted stay readable on this device.", comment: "End-to-end encryption status note")
+                    : r.error ?? String(localized: "The directory did not remove the key.", comment: "End-to-end encryption status note"),
                     bad: !r.success)
             } catch {
                 state.busy = false
@@ -383,9 +380,49 @@ final class E2eModel: ObservableObject {
             case .success(let s):
                 session = s
                 state.unlocked = true
-                note("Unlocked for this session. It locks again when the app is closed.", bad: false)
+                note(String(localized: "Unlocked for this session. It locks again when the app is closed.", comment: "End-to-end encryption status note"), bad: false)
+                bindAfterPassphraseUnlock(s)
             case .failure(let error):
                 note(Self.describe(error), bad: true)
+            }
+        }
+    }
+
+    // ── biometric-bound unlock (BiometricKeyWrap.swift) ────────────────────
+    // Additive: the passphrase record is never touched. With app lock on, a
+    // passphrase unlock is followed by a re-wrap into a .biometryCurrentSet
+    // Keychain item; later unlocks can use Face ID / Touch ID.
+
+    var canBiometricUnlock: Bool {
+        guard !snapshotSeeded, state.record != nil, !state.unlocked,
+              AppLock.shared.enabled, let k = identityKey else { return false }
+        return BiometricKeyWrap.hasBoundCopy(accountKey: k)
+    }
+
+    private func bindAfterPassphraseUnlock(_ unlocked: MailE2e.Unlocked) {
+        guard AppLock.shared.enabled, let k = identityKey,
+              !BiometricKeyWrap.hasBoundCopy(accountKey: k) else { return }
+        // Failure is silent by design: the passphrase path keeps working.
+        Task.detached { BiometricKeyWrap.bind(accountKey: k, unlocked: unlocked) }
+    }
+
+    func unlockWithBiometrics() {
+        guard !snapshotSeeded, let record = state.record, let k = identityKey else { return }
+        let expected = record.encryption.publicKey
+        let reason = String(localized: "Unlock your encryption key", comment: "Face ID prompt reason for the end-to-end encryption key")
+        Task {
+            let outcome = await Task.detached {
+                BiometricKeyWrap.open(accountKey: k, expectedPublicKey: expected, reason: reason)
+            }.value
+            switch outcome {
+            case .opened(let s):
+                session = s
+                state.unlocked = true
+                note(String(localized: "Unlocked for this session. It locks again when the app is closed.", comment: "End-to-end encryption status note"), bad: false)
+            case .invalidated:
+                note(String(localized: "Your Face ID or Touch ID settings changed, so biometric unlock was turned off for this key. Unlock with your passphrase. If you have forgotten it, use your recovery key.", comment: "End-to-end encryption status note"), bad: true)
+            case .unavailable:
+                break
             }
         }
     }
@@ -394,7 +431,7 @@ final class E2eModel: ObservableObject {
         guard !snapshotSeeded else { return }
         session = nil
         state.unlocked = false
-        note("Locked.", bad: false)
+        note(String(localized: "Locked.", comment: "End-to-end encryption status note"), bad: false)
     }
 
     /// Sign-out and session expiry go through this. The file's own contract —
@@ -415,7 +452,7 @@ final class E2eModel: ObservableObject {
     func changePassphrase(oldPhrase: String, newPhrase: String) {
         guard !snapshotSeeded, let t = identityKey, let record = state.record else { return }
         if newPhrase.utf16.count < MailE2e.minPassphraseLength {
-            note("Use at least \(MailE2e.minPassphraseLength) characters for the new passphrase.",
+            note(String(localized: "Use at least \(MailE2e.minPassphraseLength) characters for the new passphrase.", comment: "End-to-end encryption status note"),
                  bad: true)
             return
         }
@@ -434,7 +471,7 @@ final class E2eModel: ObservableObject {
                     guard MailE2e.saveIdentity(accountKey: t,
                           identity: MailE2e.Identity(encryption: reEnc, signing: reSign,
                                                     createdAt: record.createdAt)) else {
-                        throw MailE2e.E2eError(text: "This device would not store the updated key.")
+                        throw MailE2e.E2eError(text: String(localized: "This device would not store the updated key.", comment: "End-to-end encryption error when saving the re-encrypted key fails"))
                     }
                 }
             }.value
@@ -442,7 +479,7 @@ final class E2eModel: ObservableObject {
             switch done {
             case .success:
                 refreshLocal()
-                note("Passphrase changed. The key itself is unchanged, so old messages still open.",
+                note(String(localized: "Passphrase changed. The key itself is unchanged, so old messages still open.", comment: "End-to-end encryption status note"),
                      bad: false)
             case .failure(let error):
                 note(Self.describe(error), bad: true)
@@ -457,15 +494,14 @@ final class E2eModel: ObservableObject {
         // Both names: the stable one, and the token-keyed one a v0.3.0 build
         // may still have on disk. "Remove the key from this device" that left
         // a copy for the migration to resurrect would be a lie.
-        if let k = identityKey { MailE2e.clearIdentity(accountKey: k) }
+        if let k = identityKey { MailE2e.clearIdentity(accountKey: k); BiometricKeyWrap.forget(accountKey: k) }
         if let t = token { MailE2e.clearIdentity(accountKey: t) }
         session = nil
         state.record = nil
         state.unlocked = false
         state.fingerprint = nil
         state.busy = false
-        note("The key has been removed from this device. Any message encrypted to it can "
-             + "no longer be read here.", bad: false)
+        note(String(localized: "The key has been removed from this device. Any message encrypted to it can no longer be read here.", comment: "End-to-end encryption status note"), bad: false)
     }
 
     func lookup(addresses: [String]) {
@@ -477,7 +513,7 @@ final class E2eModel: ObservableObject {
                 state.busy = false
                 state.lookup = r.success ? r.results : []
                 state.lookupFor = addresses
-                if !r.success { note(r.error ?? "The directory did not answer.", bad: true) }
+                if !r.success { note(r.error ?? String(localized: "The directory did not answer.", comment: "End-to-end encryption status note"), bad: true) }
             } catch {
                 state.busy = false
                 note(Self.describe(error), bad: true)
@@ -490,7 +526,7 @@ final class E2eModel: ObservableObject {
     /// reason in the note — a locked key says so instead of failing silently.
     func seal(plaintext: String, recipientKeys: [String]) async -> String? {
         guard let s = session else {
-            note("Your key is locked — unlock it before sending encrypted mail.", bad: true)
+            note(String(localized: "Your key is locked — unlock it before sending encrypted mail.", comment: "End-to-end encryption status note"), bad: true)
             return nil
         }
         let signing: MailE2e.KeyPairB64? = s.signingPrivateKey.map {
@@ -521,7 +557,7 @@ final class E2eModel: ObservableObject {
         await localRead?.value
         guard !Task.isCancelled, generation == SessionStore.generation else { return nil }
         guard let record = state.record else {
-            note("This device has no key to open messages with.", bad: true)
+            note(String(localized: "This device has no key to open messages with.", comment: "End-to-end encryption status note"), bad: true)
             return nil
         }
         let result = await Task.detached {
@@ -542,9 +578,7 @@ final class E2eModel: ObservableObject {
     func canSealWithThisDevice() -> Bool { session != nil }
 
     var openpgpExportNote: String {
-        "OpenPGP export lives on the web client — this device holds the key, but "
-        + "the gpg-shaped file is built in the browser. Nothing here is missing "
-        + "from your key; it is one action the phone does not offer."
+        String(localized: "OpenPGP export lives on the web client — this device holds the key, but the gpg-shaped file is built in the browser. Nothing here is missing from your key; it is one action the phone does not offer.", comment: "End-to-end encryption: why there is no OpenPGP export on the phone")
     }
 
     func clearNote() { state.note = nil }
@@ -562,7 +596,7 @@ final class E2eModel: ObservableObject {
         // screen, where the generic line below is only for errors with no
         // message of their own.
         if let e2e = error as? MailE2e.E2eError { return e2e.text }
-        return "That did not go through."
+        return String(localized: "That did not go through.", comment: "End-to-end encryption status note")
     }
 }
 

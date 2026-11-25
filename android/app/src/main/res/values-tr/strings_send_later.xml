@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    values-tr/strings_send_later.xml: translation of values/strings_send_later.xml (same keys, same order).
+    Comments below are kept from the English source for context.
+-->
+<resources>
+    <!-- The clock button next to Send (TalkBack label and click action). -->
+    <string name="compose_send_later_button">Gönderimi planla</string>
+    <string name="compose_send_later_button_action">ne zaman gönderileceğini seçin</string>
+
+    <!-- The sheet. -->
+    <string name="compose_send_later_title">Daha sonra gönder</string>
+    <string name="compose_send_later_later_today">Bugün daha sonra</string>
+    <string name="compose_send_later_tomorrow_morning">Yarın sabah</string>
+    <string name="compose_send_later_monday_morning">Pazartesi sabah</string>
+    <string name="compose_send_later_pick">Tarih ve saat seçin</string>
+    <string name="compose_send_later_pick_hint">En fazla 30 gün sonrası</string>
+    <!-- %1$s: the device time zone's name, e.g. "Bangladesh Standard Time". -->
+    <string name="compose_send_later_zone_note">Saatler sizin saat diliminizdedir: %1$s</string>
+    <!-- TalkBack for one option row. %1$s: option name, %2$s: its day and time. -->
+    <string name="compose_send_later_option_description">%1$s, %2$s</string>
+
+    <!-- Date and time dialogs. -->
+    <string name="compose_send_later_date_title">Tarih seçin</string>
+    <string name="compose_send_later_time_title">Saat seçin</string>
+    <string name="compose_send_later_next">İleri</string>
+    <string name="compose_send_later_schedule">Planla</string>
+    <string name="compose_send_later_cancel">İptal</string>
+    <string name="compose_send_later_type_time">Saati yazın</string>
+    <string name="compose_send_later_use_clock">Saati kadrandan seçin</string>
+    <string name="compose_send_later_too_soon">Şu andan en az bir dakika sonrası için bir saat seçin.</string>
+    <string name="compose_send_later_too_far">En fazla 30 gün sonrası için bir saat seçin.</string>
+
+    <!-- In-flight and failure lines in the composer. -->
+    <string name="compose_send_later_scheduling">Planlanıyor…</string>
+    <string name="compose_send_later_offline">Bağlantı yok, bu nedenle hiçbir şey planlanmadı. İletiniz hâlâ burada.</string>
+
+    <!-- The receipt snackbar shown after compose closes. %1$s: e.g. "Tue 8:00 AM". -->
+    <string name="compose_send_later_scheduled_for">Planlandı: %1$s</string>
+    <string name="compose_send_later_undo">Geri al</string>
+    <string name="compose_send_later_view">Görüntüle</string>
+    <string name="compose_send_later_undoing">İptal ediliyor…</string>
+    <string name="compose_send_later_undone">Artık planlı değil. İleti Taslaklar klasörüne geri döndü.</string>
+    <!-- %1$s: the server's reason. -->
+    <string name="compose_send_later_undo_failed">İptal edilemedi: %1$s</string>
+    <string name="compose_send_later_dismiss">Kapat</string>
+</resources>

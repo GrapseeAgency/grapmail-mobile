@@ -1,0 +1,18 @@
+{
+  "applinks": {
+    "details": [
+      {
+        "appIDs": ["TEAMID.com.grapsee.grapmail"],
+        "components": [
+          {
+            "/": "/mail/thread/*",
+            "comment": "A GrapMail conversation: https://grapsee.com/mail/thread/<threadId> opens the thread in the app (ios/GrapMail/DeepLinks.swift)."
+          }
+        ]
+      }
+    ]
+  },
+  "webcredentials": {
+    "apps": ["TEAMID.com.grapsee.grapmail"]
+  }
+}

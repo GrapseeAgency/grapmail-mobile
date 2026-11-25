@@ -1,0 +1,31 @@
+/* GrapMailWidget — German table. */
+
+"Unread mail" = "Ungelesene E-Mails";
+"The unread count your app last saw, and the newest message." = "Die zuletzt von der App gesehene Anzahl ungelesener E-Mails und die neueste Nachricht.";
+"GrapMail — not signed in" = "GrapMail – nicht angemeldet";
+"GrapMail — no read yet" = "GrapMail – noch nicht abgerufen";
+/* Lock Screen inline widget: unread count, newest sender */
+"%lld unread · %@" = "%lld ungelesen · %@";
+/* Lock Screen inline widget: unread count */
+"%lld unread" = "%lld ungelesen";
+"unread" = "ungelesen";
+"No subject" = "Kein Betreff";
+"No read yet" = "Noch nicht abgerufen";
+"Open the app to sign in" = "App öffnen, um sich anzumelden";
+"Scheduled send" = "Geplantes Senden";
+"(no subject)" = "(kein Betreff)";
+"Scheduled" = "Geplant";
+"To %@" = "An %@";
+"Sending…" = "Wird gesendet…";
+
+/* Home Screen widget row buttons (iOS 17+), read by VoiceOver */
+"Mark as read" = "Als gelesen markieren";
+"Archive" = "Archivieren";
+"Star" = "Markieren";
+"Unstar" = "Markierung entfernen";
+/* The widget row buttons' App Intent and its parameters (hidden from Shortcuts) */
+"Update message" = "Nachricht aktualisieren";
+"Message" = "Nachricht";
+"Action" = "Aktion";
+/* Widget placeholder when no account is signed in */
+"Open GrapMail to sign in" = "Öffne GrapMail, um dich anzumelden";

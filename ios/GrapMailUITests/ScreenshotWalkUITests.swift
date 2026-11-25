@@ -636,7 +636,9 @@ final class ScreenshotWalkUITests: XCTestCase {
         // snapshot argument has to be cleared first, or the restore opens a
         // stub screen instead of the flow.
         app.terminate()
-        app.launchArguments = []
+        // -gmNoTips: a first-time feature tip (FeatureTips.swift) may appear
+        // from the second launch on, and its popover would take the next tap.
+        app.launchArguments = ["-gmNoTips"]
         app.launch()
         XCTAssertTrue(app.descendants(matching: .any)["mail-home"].firstMatch
                         .waitForExistence(timeout: 20)

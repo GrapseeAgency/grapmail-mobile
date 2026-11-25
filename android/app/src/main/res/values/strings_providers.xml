@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Connected accounts (ui/screens/mail/ConnectedAccountsScreen.kt). Kept in its own
+     file so strings_mail.xml, edited in parallel, is untouched; prefix mail_providers_. -->
+<resources>
+    <string name="mail_providers_title">Connected mailboxes</string>
+    <string name="mail_providers_settings_subtitle">Outlook, Yahoo, iCloud and other IMAP</string>
+    <string name="mail_providers_intro">Bring mail from Outlook or another IMAP account into GrapMail. New mail from a connected account arrives in your Inbox.</string>
+    <string name="mail_providers_empty">No mailboxes connected yet.</string>
+    <string name="mail_providers_add">ADD AN ACCOUNT</string>
+    <string name="mail_providers_add_outlook">Connect Outlook</string>
+    <string name="mail_providers_add_imap">Connect Yahoo, iCloud, AOL or another IMAP account</string>
+    <string name="mail_providers_kind_imap">IMAP</string>
+    <string name="mail_providers_status_syncing">Syncing for the first time…</string>
+    <string name="mail_providers_status_ok">Connected</string>
+    <string name="mail_providers_status_reauth">Needs you to sign in again</string>
+    <string name="mail_providers_status_error">Sync problem</string>
+    <string name="mail_providers_status_removed">Disconnected</string>
+    <string name="mail_providers_last_sync">Last synced %1$s</string>
+    <string name="mail_providers_never_synced">Not synced yet</string>
+    <string name="mail_providers_sync_now">Sync now</string>
+    <string name="mail_providers_reconnect">Reconnect</string>
+    <string name="mail_providers_remove">Disconnect</string>
+    <string name="mail_providers_remove_title">Disconnect %1$s?</string>
+    <string name="mail_providers_remove_body">GrapMail stops syncing this account. Mail already in GrapMail stays, and nothing changes in the other account.</string>
+    <string name="mail_providers_cancel">Cancel</string>
+    <string name="mail_providers_continue">Continue</string>
+    <string name="mail_providers_retry">Try again</string>
+    <string name="mail_providers_offline">You are offline. Connect to the internet and try again.</string>
+    <string name="mail_providers_error">Connected accounts could not be loaded.</string>
+    <string name="mail_providers_outlook_title">Connect Outlook</string>
+    <string name="mail_providers_outlook_body">Enter the Outlook or Microsoft 365 address you will sign in with. Microsoft\'s sign-in page opens in your browser.</string>
+    <string name="mail_providers_outlook_unavailable">Outlook can\'t be connected on this server right now.</string>
+    <string name="mail_providers_oauth_state">That sign-in did not match the one this app started. Start again.</string>
+    <string name="mail_providers_oauth_denied">Microsoft did not grant access. Nothing was connected.</string>
+    <string name="mail_providers_imap_title">Connect an IMAP account</string>
+    <string name="mail_providers_imap_intro">Choose your provider. Most providers need an app password rather than your normal password.</string>
+    <string name="mail_providers_preset_custom">Custom</string>
+    <string name="mail_providers_help_app_password">Create an app password in your provider\'s security settings and paste it here. Your normal password usually will not work.</string>
+    <string name="mail_providers_help_custom">Enter the IMAP and SMTP servers from your provider\'s help pages.</string>
+    <string name="mail_providers_email">Email address</string>
+    <string name="mail_providers_incoming">Incoming (IMAP)</string>
+    <string name="mail_providers_outgoing">Outgoing (SMTP)</string>
+    <string name="mail_providers_host">Server</string>
+    <string name="mail_providers_port">Port</string>
+    <string name="mail_providers_tls">TLS</string>
+    <string name="mail_providers_err_email">Enter a full email address.</string>
+    <string name="mail_providers_err_host">Enter a server name such as imap.example.com.</string>
+    <string name="mail_providers_err_port">Use a port from 1 to 65535.</string>
+    <string name="mail_providers_connect">Connect</string>
+    <string name="mail_providers_connecting">Connecting…</string>
+    <string name="mail_providers_no_probe_note">GrapMail checks the details during the first sync. If they are wrong, this account will show a sync problem. Your password is not kept on this phone.</string>
+</resources>

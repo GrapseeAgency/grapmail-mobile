@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">GrapMail</string>
+    <string name="shortcut_compose_short">Posta oluştur</string>
+    <string name="shortcut_compose_long">Yeni bir GrapMail iletisi yazın</string>
+    <string name="shortcut_scheduled_short">Planlanan gönderimler</string>
+    <string name="shortcut_scheduled_long">Gönderilmeyi bekleyen postaları görün ve iptal edin</string>
+    <string name="shortcut_subscriptions_short">Abonelikler</string>
+    <string name="shortcut_subscriptions_long">Gönderenleri inceleyin ve tek yerden abonelikten çıkın</string>
+    <string name="notif_channel_new_mail">Yeni posta</string>
+    <string name="notif_channel_new_mail_desc">
+        Arka plan denetimi henüz okumadığınız iletiler bulduğunda size bildirir.
+        GrapMail\'in anlık bildirim hizmeti yoktur; bunlar, sistem uygulamayı
+        uyandırdığında uygulamanın sunucuyu kendisinin sorgulamasından gelir.
+    </string>
+    <string name="notif_channel_security">Güvenlik uyarıları</string>
+    <string name="notif_channel_security_desc">
+        Hesabınızda bir şey olduğu anda size bildirir: yeni bir cihazdan oturum
+        açma, parola değişikliği, güvenilir cihaz değişikliği. Bunlar sessiz
+        saatlerde asla susturulmaz.
+    </string>
+    <string name="widget_description">Okunmamış postalara hızlı bakış: GrapMail arka plan denetimlerinden sayılar</string>
+</resources>

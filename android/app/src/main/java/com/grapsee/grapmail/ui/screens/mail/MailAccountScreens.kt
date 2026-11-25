@@ -24,6 +24,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Check
@@ -65,9 +66,15 @@ import com.grapsee.grapmail.data.LocaleDto
 import com.grapsee.grapmail.data.ProfileConnectionDto
 import com.grapsee.grapmail.data.ProfilePatch
 import com.grapsee.grapmail.data.ProfileSettingsPatch
+import com.grapsee.grapmail.logic.GenderOption
 import com.grapsee.grapmail.logic.ProfileViewModel
 import com.grapsee.grapmail.ui.components.AppTextField
+import com.grapsee.grapmail.ui.components.GMLayout
+import com.grapsee.grapmail.ui.components.gmMaxWidth
 import com.grapsee.grapmail.ui.theme.LocalPalette
+import androidx.compose.ui.res.stringResource
+import com.grapsee.grapmail.R
+import com.grapsee.grapmail.ui.i18n.CoreStrings
 
 /**
  * The account-record screens — the mobile form of the web client's
@@ -103,7 +110,7 @@ private fun ListRow(text: String, onRemove: () -> Unit, testTag: String) {
     ) {
         Text(text, fontSize = 15.sp, color = palette.textPrimary,
             modifier = Modifier.weight(1f))
-        Icon(Icons.Rounded.Delete, "Remove", tint = palette.textTertiary,
+        Icon(Icons.Rounded.Delete, stringResource(R.string.mail_common_remove), tint = palette.textTertiary,
             modifier = Modifier.size(20.dp).clickable(onClick = onRemove))
     }
 }
@@ -113,7 +120,8 @@ private fun ListRow(text: String, onRemove: () -> Unit, testTag: String) {
 private fun RadioRow(title: String, selected: Boolean, onClick: () -> Unit) {
     val palette = LocalPalette.current
     Row(
-        Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = 12.dp),
+        Modifier.fillMaxWidth().heightIn(min = 48.dp)
+            .clickable(onClick = onClick).padding(vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(Modifier.size(20.dp).clip(CircleShape)
@@ -125,7 +133,7 @@ private fun RadioRow(title: String, selected: Boolean, onClick: () -> Unit) {
                 modifier = Modifier.size(13.dp))
         }
         Spacer(Modifier.width(12.dp))
-        Text(title, fontSize = 15.sp, color = palette.textPrimary)
+        Text(title, fontSize = 15.sp, color = palette.textPrimary, modifier = Modifier.weight(1f))
     }
 }
 
@@ -154,7 +162,7 @@ private fun AddRow(
         ) {
             if (busy) CircularProgressIndicator(Modifier.size(18.dp), color = palette.onPrimary,
                 strokeWidth = 2.dp)
-            else Icon(Icons.Rounded.Add, "Add", tint = palette.onPrimary)
+            else Icon(Icons.Rounded.Add, stringResource(R.string.mail_common_add), tint = palette.onPrimary)
         }
     }
 }
@@ -171,28 +179,37 @@ fun NotesScreen(vm: ProfileViewModel, onBack: () -> Unit) {
     val state by vm.state.collectAsStateWithLifecycle()
     var draft by remember { mutableStateOf("") }
     LaunchedEffect(Unit) { vm.load() }
-    MailScaffold("Notes", onBack) {
+    MailScaffold(stringResource(R.string.mail_notes_notes), onBack) {
         Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())
+            // Phones: no change. Tablets, foldables and desktop windows: the
+            // form keeps a readable width, centred (ui/components/Adaptive.kt).
+            .gmMaxWidth(GMLayout.Form)
             .padding(horizontal = 20.dp)) {
             state.note?.let { NoteLine(it, state.noteIsBad) }
-            AddRow("Write a note", draft, { draft = it }, {
+            AddRow(stringResource(R.string.mail_notes_write_note), draft, { draft = it }, {
                 val list = state.profile?.settings?.notes ?: return@AddRow
                 vm.saveSettings(ProfileSettingsPatch(notes = listOf(draft.trim()) + list))
                 draft = ""
             }, state.busy, "gm-add-note")
-            Text("Notes are stored on the account, not on this phone, so they follow you to any " +
-                "machine you sign in from.", fontSize = 12.sp, color = palette.textTertiary,
+            Text(stringResource(R.string.mail_notes_notes_stored_account_not), fontSize = 12.sp, color = palette.textTertiary,
                 modifier = Modifier.padding(vertical = 6.dp))
             val notes = state.profile?.settings?.notes
             when {
                 state.profile == null && state.loading ->
-                    Text("Loading…", fontSize = 14.sp, color = palette.textTertiary,
-                        modifier = Modifier.padding(vertical = 16.dp))
-                state.profile == null && state.fatal != null ->
-                    Text("Notes could not be read. ${state.fatal}", fontSize = 14.sp,
-                        color = palette.textSecondary, modifier = Modifier.padding(vertical = 16.dp))
+                    com.grapsee.grapmail.ui.components.ListSkeleton(rows = 3, avatar = false,
+                        label = stringResource(R.string.mail_common_loading))
+                state.profile == null && state.fatal != null -> Column {
+                    // `fatal` is a delegated property, so it cannot be smart-cast;
+                    // the branch already proved it is non-null.
+                    Text(stringResource(R.string.mail_notes_notes_could_not_read, state.fatal ?: ""), fontSize = 14.sp,
+                        color = palette.textSecondary, modifier = Modifier.padding(top = 16.dp))
+                    // The read that failed, asked again.
+                    androidx.compose.material3.TextButton(onClick = { vm.load(force = true) }) {
+                        Text(stringResource(R.string.states_retry))
+                    }
+                }
                 notes != null && notes.isEmpty() ->
-                    Text("Nothing kept here yet.", fontSize = 14.sp, color = palette.textTertiary,
+                    Text(stringResource(R.string.mail_notes_nothing_kept_here_yet), fontSize = 14.sp, color = palette.textTertiary,
                         modifier = Modifier.padding(vertical = 16.dp))
                 notes != null -> notes.forEach { note ->
                     ListRow(note, {
@@ -219,28 +236,36 @@ fun TasksScreen(vm: ProfileViewModel, onBack: () -> Unit) {
     val state by vm.state.collectAsStateWithLifecycle()
     var draft by remember { mutableStateOf("") }
     LaunchedEffect(Unit) { vm.load() }
-    MailScaffold("Tasks", onBack) {
+    MailScaffold(stringResource(R.string.mail_tasks_tasks), onBack) {
         Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())
+            // Phones: no change. Tablets, foldables and desktop windows: the
+            // form keeps a readable width, centred (ui/components/Adaptive.kt).
+            .gmMaxWidth(GMLayout.Form)
             .padding(horizontal = 20.dp)) {
             state.note?.let { NoteLine(it, state.noteIsBad) }
-            AddRow("Add a task", draft, { draft = it }, {
+            AddRow(stringResource(R.string.mail_tasks_add_task), draft, { draft = it }, {
                 val list = state.profile?.settings?.tasks ?: return@AddRow
                 vm.saveSettings(ProfileSettingsPatch(tasks = list + draft.trim()))
                 draft = ""
             }, state.busy, "gm-add-task")
-            Text("Ticking a task removes it. This list has no archive.",
+            Text(stringResource(R.string.mail_tasks_ticking_task_removes_list),
                 fontSize = 12.sp, color = palette.textTertiary,
                 modifier = Modifier.padding(vertical = 6.dp))
             val tasks = state.profile?.settings?.tasks
             when {
                 state.profile == null && state.loading ->
-                    Text("Loading…", fontSize = 14.sp, color = palette.textTertiary,
-                        modifier = Modifier.padding(vertical = 16.dp))
-                state.profile == null && state.fatal != null ->
-                    Text("Tasks could not be read. ${state.fatal}", fontSize = 14.sp,
-                        color = palette.textSecondary, modifier = Modifier.padding(vertical = 16.dp))
+                    com.grapsee.grapmail.ui.components.ListSkeleton(rows = 3, avatar = false,
+                        label = stringResource(R.string.mail_common_loading))
+                state.profile == null && state.fatal != null -> Column {
+                    Text(stringResource(R.string.mail_tasks_tasks_could_not_read, state.fatal ?: ""), fontSize = 14.sp,
+                        color = palette.textSecondary, modifier = Modifier.padding(top = 16.dp))
+                    // The read that failed, asked again.
+                    androidx.compose.material3.TextButton(onClick = { vm.load(force = true) }) {
+                        Text(stringResource(R.string.states_retry))
+                    }
+                }
                 tasks != null && tasks.isEmpty() ->
-                    Text("No tasks on this account.", fontSize = 14.sp, color = palette.textTertiary,
+                    Text(stringResource(R.string.mail_tasks_no_tasks_account), fontSize = 14.sp, color = palette.textTertiary,
                         modifier = Modifier.padding(vertical = 16.dp))
                 tasks != null -> tasks.forEach { task ->
                     Row(Modifier.fillMaxWidth().testTag("gm-task-row")
@@ -300,24 +325,26 @@ fun MailPrefsScreen(vm: ProfileViewModel, onBack: () -> Unit) {
     // address compose can send as, empty means "use the main one".
     var overrides by remember(s?.signatures) { mutableStateOf(s?.signatures ?: emptyMap()) }
     LaunchedEffect(Unit) { vm.load() }
-    MailScaffold("Mail settings", onBack) {
+    MailScaffold(stringResource(R.string.mail_prefs_mail_settings), onBack) {
         Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())
+            // Phones: no change. Tablets, foldables and desktop windows: the
+            // form keeps a readable width, centred (ui/components/Adaptive.kt).
+            .gmMaxWidth(GMLayout.Form)
             .padding(horizontal = 20.dp)) {
             state.note?.let { NoteLine(it, state.noteIsBad) }
             if (s == null && state.fatal != null) {
-                Text("These settings could not be read. ${state.fatal}", fontSize = 14.sp,
+                Text(stringResource(R.string.mail_prefs_these_settings_could_not, state.fatal ?: ""), fontSize = 14.sp,
                     color = palette.textSecondary, modifier = Modifier.padding(vertical = 16.dp))
                 return@Column
             }
             if (s == null) {
-                Text("Loading…", fontSize = 14.sp, color = palette.textTertiary,
+                Text(stringResource(R.string.mail_common_loading), fontSize = 14.sp, color = palette.textTertiary,
                     modifier = Modifier.padding(vertical = 16.dp))
                 return@Column
             }
 
-            SectionLabel("Signature", palette)
-            Text("Appended to what you send, on every address you write from unless an override " +
-                "says otherwise.", fontSize = 12.sp, color = palette.textTertiary)
+            SectionLabel(stringResource(R.string.mail_prefs_signature), palette)
+            Text(stringResource(R.string.mail_prefs_appended_what_send_every), fontSize = 12.sp, color = palette.textTertiary)
             Box(Modifier.fillMaxWidth().heightIn(min = 80.dp)
                 .border(1.dp, palette.border, RoundedCornerShape(12.dp))
                 .padding(12.dp)
@@ -328,12 +355,12 @@ fun MailPrefsScreen(vm: ProfileViewModel, onBack: () -> Unit) {
                     cursorBrush = androidx.compose.ui.graphics.SolidColor(LocalPalette.current.cursor),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
                     decorationBox = { inner ->
-                        if (signature.isEmpty()) Text("— none —", fontSize = 15.sp,
+                        if (signature.isEmpty()) Text(stringResource(R.string.mail_prefs_none), fontSize = 15.sp,
                             color = palette.textTertiary)
                         inner()
                     })
             }
-            Text("Save signature", fontSize = 14.sp, fontWeight = FontWeight.SemiBold,
+            Text(stringResource(R.string.mail_prefs_save_signature), fontSize = 14.sp, fontWeight = FontWeight.SemiBold,
                 color = if (signature != s.signature) palette.primarySolid else palette.textTertiary,
                 modifier = Modifier.clickable(enabled = signature != s.signature && !state.busy) {
                     vm.saveSettings(ProfileSettingsPatch(signature = signature))
@@ -345,10 +372,8 @@ fun MailPrefsScreen(vm: ProfileViewModel, onBack: () -> Unit) {
             // disagreed until this section landed. The address list is the
             // profile's own (primary + aliases), the same source the Addresses
             // screen renders, so the two can never disagree about the account.
-            SectionLabel("Signature per address", palette)
-            Text("When you send as an alias, this is what gets added, so an alias does " +
-                "not sign like your personal address. Leave one empty and that address " +
-                "uses the main signature above.", fontSize = 12.sp, color = palette.textTertiary)
+            SectionLabel(stringResource(R.string.mail_prefs_signature_per_address), palette)
+            Text(stringResource(R.string.mail_prefs_when_send_alias_what), fontSize = 12.sp, color = palette.textTertiary)
             val signatureAddresses =
                 listOfNotNull(state.profile?.address?.takeIf { it.isNotBlank() }) +
                     (state.profile?.aliases ?: emptyList()).map { it.address }
@@ -358,7 +383,7 @@ fun MailPrefsScreen(vm: ProfileViewModel, onBack: () -> Unit) {
                 Box(Modifier.fillMaxWidth().heightIn(min = 60.dp).padding(top = 4.dp)
                     .border(1.dp, palette.border, RoundedCornerShape(12.dp))
                     .padding(12.dp)
-                    .semantics { contentDescription = "Signature for $address" }
+                    .semantics { contentDescription = CoreStrings.get(R.string.mail_prefs_signature_for, address) { "Signature for $address" } }
                     .testTag("gm-sig-override-field")) {
                     BasicTextField(overrides[address] ?: "",
                         { v -> overrides = overrides + (address to v) },
@@ -367,7 +392,7 @@ fun MailPrefsScreen(vm: ProfileViewModel, onBack: () -> Unit) {
                         cursorBrush = androidx.compose.ui.graphics.SolidColor(LocalPalette.current.cursor),
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
                         decorationBox = { inner ->
-                            if (overrides[address].isNullOrEmpty()) Text("Uses the main signature",
+                            if (overrides[address].isNullOrEmpty()) Text(stringResource(R.string.mail_prefs_uses_main_signature),
                                 fontSize = 14.sp, color = palette.textTertiary)
                             inner()
                         })
@@ -378,46 +403,45 @@ fun MailPrefsScreen(vm: ProfileViewModel, onBack: () -> Unit) {
             // for nothing.
             val toSave = overrides.filterValues { it.isNotBlank() }
             val dirty = toSave != s.signatures
-            Text("Save per-address signatures", fontSize = 14.sp, fontWeight = FontWeight.SemiBold,
+            Text(stringResource(R.string.mail_prefs_save_per_address_signatures), fontSize = 14.sp, fontWeight = FontWeight.SemiBold,
                 color = if (dirty) palette.primarySolid else palette.textTertiary,
                 modifier = Modifier.clickable(enabled = dirty && !state.busy) {
                     vm.saveSettings(ProfileSettingsPatch(signatures = toSave))
                 }.padding(vertical = 8.dp))
 
-            SectionLabel("Auto-reply", palette)
-            Text("While it's on, people who write to you get this message once every 4 days. " +
-                "Mailing lists and no-reply senders never get one.",
+            SectionLabel(stringResource(R.string.mail_prefs_auto_reply), palette)
+            Text(stringResource(R.string.mail_prefs_while_people_who_write),
                 fontSize = 12.sp, color = palette.textTertiary)
             Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text("Send auto-replies", fontSize = 15.sp, color = palette.textPrimary, modifier = Modifier.weight(1f))
+                Text(stringResource(R.string.mail_prefs_send_auto_replies), fontSize = 15.sp, color = palette.textPrimary, modifier = Modifier.weight(1f))
                 androidx.compose.material3.Switch(checked = awayOn, onCheckedChange = { awayOn = it; awayError = null })
             }
             Box(Modifier.fillMaxWidth().heightIn(min = 80.dp)
                 .border(1.dp, if (awayError != null) palette.error else palette.border, RoundedCornerShape(12.dp))
                 .padding(12.dp)
-                .semantics { contentDescription = "Auto-reply message" }) {
+                .semantics { contentDescription = CoreStrings.get(R.string.mail_prefs_auto_reply_message) { "Auto-reply message" } }) {
                 BasicTextField(awayMessage, { awayMessage = it; awayError = null },
                     textStyle = TextStyle(fontSize = 15.sp, color = palette.textPrimary, lineHeight = 22.sp),
                     cursorBrush = androidx.compose.ui.graphics.SolidColor(LocalPalette.current.cursor),
                     decorationBox = { inner ->
-                        if (awayMessage.isEmpty()) Text("I'm away until Monday and will reply when I'm back.",
+                        if (awayMessage.isEmpty()) Text(stringResource(R.string.mail_prefs_im_away_until_monday),
                             fontSize = 15.sp, color = palette.textTertiary)
                         inner()
                     })
             }
             Row(Modifier.fillMaxWidth().padding(top = 8.dp)) {
                 Box(Modifier.weight(1f)) {
-                    AppTextField("First day", awayFrom, { awayFrom = it.trim(); awayError = null }, hint = "YYYY-MM-DD (optional)")
+                    AppTextField(stringResource(R.string.mail_prefs_first_day), awayFrom, { awayFrom = it.trim(); awayError = null }, hint = stringResource(R.string.mail_prefs_yyyy_mm_dd_optional))
                 }
                 Spacer(Modifier.width(10.dp))
                 Box(Modifier.weight(1f)) {
-                    AppTextField("Last day", awayTo, { awayTo = it.trim(); awayError = null }, hint = "YYYY-MM-DD (optional)")
+                    AppTextField(stringResource(R.string.mail_prefs_last_day), awayTo, { awayTo = it.trim(); awayError = null }, hint = stringResource(R.string.mail_prefs_yyyy_mm_dd_optional))
                 }
             }
             awayError?.let { Text(it, fontSize = 12.sp, color = palette.error, modifier = Modifier.padding(top = 4.dp)) }
             val awayDirty = s.vacation.enabled != awayOn || s.vacation.message != awayMessage ||
                 s.vacation.from != awayFrom || s.vacation.to != awayTo
-            Text("Save auto-reply", fontSize = 14.sp, fontWeight = FontWeight.SemiBold,
+            Text(stringResource(R.string.mail_prefs_save_auto_reply), fontSize = 14.sp, fontWeight = FontWeight.SemiBold,
                 color = if (awayDirty && !state.busy) palette.primarySolid else palette.textTertiary,
                 modifier = Modifier.clickable(enabled = awayDirty && !state.busy) {
                     awayError = vacationProblem(awayOn, awayMessage, awayFrom, awayTo)
@@ -425,72 +449,74 @@ fun MailPrefsScreen(vm: ProfileViewModel, onBack: () -> Unit) {
                         com.grapsee.grapmail.data.VacationDto(awayOn, awayFrom, awayTo, awayMessage)))
                 }.padding(vertical = 8.dp))
 
-            SectionLabel("Forwarding", palette)
-            Text("Send a copy of every message you receive to another address. The original always " +
-                "stays in GrapMail, and the copy is plain text. Turning it on also puts a security " +
-                "notice in your inbox, so you'd notice if someone else did.",
+            SectionLabel(stringResource(R.string.mail_prefs_forwarding), palette)
+            Text(stringResource(R.string.mail_prefs_send_copy_every_message),
                 fontSize = 12.sp, color = palette.textTertiary)
             Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text("Forward my mail", fontSize = 15.sp, color = palette.textPrimary, modifier = Modifier.weight(1f))
+                Text(stringResource(R.string.mail_prefs_forward_my_mail), fontSize = 15.sp, color = palette.textPrimary, modifier = Modifier.weight(1f))
                 androidx.compose.material3.Switch(checked = forwardOn, onCheckedChange = { forwardOn = it; forwardError = null })
             }
-            AppTextField("Forward to", forwardTo, { forwardTo = it.trim(); forwardError = null },
+            AppTextField(stringResource(R.string.mail_prefs_forward), forwardTo, { forwardTo = it.trim(); forwardError = null },
                 hint = "name@example.com", keyboard = KeyboardType.Email, error = forwardError)
             val ownAddresses = (listOfNotNull(state.profile?.address) + (state.profile?.aliases ?: emptyList()).map { it.address })
                 .map { it.lowercase() }.toSet()
             val forwardDirty = s.forwarding.enabled != forwardOn || s.forwarding.address != forwardTo
-            Text("Save forwarding", fontSize = 14.sp, fontWeight = FontWeight.SemiBold,
+            Text(stringResource(R.string.mail_prefs_save_forwarding), fontSize = 14.sp, fontWeight = FontWeight.SemiBold,
                 color = if (forwardDirty && !state.busy) palette.primarySolid else palette.textTertiary,
                 modifier = Modifier.clickable(enabled = forwardDirty && !state.busy) {
                     val address = forwardTo.lowercase()
                     forwardError = when {
-                        forwardOn && address.isEmpty() -> "Add the address to forward to."
+                        forwardOn && address.isEmpty() -> CoreStrings.get(R.string.mail_prefs_add_address_forward) { "Add the address to forward to." }
                         address.isNotEmpty() && !Regex("^[^\\s@]+@[^\\s@]+\\.[^\\s@]{2,}$").matches(address) ->
-                            "Forward to a full email address."
-                        address in ownAddresses -> "Forwarding to your own address would loop."
+                            CoreStrings.get(R.string.mail_prefs_forward_full_email_address) { "Forward to a full email address." }
+                        address in ownAddresses -> CoreStrings.get(R.string.mail_prefs_forwarding_own_address_would) { "Forwarding to your own address would loop." }
                         else -> null
                     }
                     if (forwardError == null) vm.saveSettings(ProfileSettingsPatch(forwarding =
                         com.grapsee.grapmail.data.ForwardingDto(forwardOn, address, true)))
                 }.padding(vertical = 8.dp))
 
-            SectionLabel("List density", palette)
-            RadioRow("Comfortable — the roomier list", s.density != "compact", {
+            SectionLabel(stringResource(R.string.mail_prefs_list_density), palette)
+            RadioRow(stringResource(R.string.mail_prefs_comfortable_roomier_list), s.density != "compact", {
                 if (s.density != "comfortable") vm.saveSettings(ProfileSettingsPatch(density = "comfortable"))
             })
-            RadioRow("Compact — more messages per screen", s.density == "compact", {
+            RadioRow(stringResource(R.string.mail_prefs_compact_more_messages_per), s.density == "compact", {
                 if (s.density != "compact") vm.saveSettings(ProfileSettingsPatch(density = "compact"))
             })
+
+            // Choose your swipes: kept on this device (logic/MailSwipePrefs.kt),
+            // so it applies at once and needs no save.
+            SwipeActionsSetting()
 
             // The app's own language is the system's per-app setting (Settings →
             // App language), so it is not repeated here as a free-text field that
             // nothing on this device read.
-            SectionLabel("Time zone and dates", palette)
-            Text("How times and dates appear in your mailbox list.", fontSize = 12.sp,
+            SectionLabel(stringResource(R.string.mail_prefs_time_zone_dates), palette)
+            Text(stringResource(R.string.mail_prefs_how_times_dates_appear), fontSize = 12.sp,
                 color = palette.textTertiary)
             val deviceZone = java.time.ZoneId.systemDefault().id
-            RadioRow("This device's time zone ($deviceZone)", s.locale.timezone.isBlank(), {
+            RadioRow(stringResource(R.string.mail_prefs_devices_time_zone, deviceZone), s.locale.timezone.isBlank(), {
                 zoneError = null
                 if (s.locale.timezone.isNotBlank()) vm.saveSettings(ProfileSettingsPatch(
                     locale = s.locale.copy(timezone = "")))
             })
-            AppTextField("Another time zone", timezone, { timezone = it.trim(); zoneError = null },
-                hint = "e.g. Europe/London", error = zoneError, modifier = Modifier.padding(top = 4.dp))
+            AppTextField(stringResource(R.string.mail_prefs_another_time_zone), timezone, { timezone = it.trim(); zoneError = null },
+                hint = stringResource(R.string.mail_prefs_e_g_europe_london), error = zoneError, modifier = Modifier.padding(top = 4.dp))
             val zoneDirty = timezone.isNotBlank() && timezone != s.locale.timezone
-            Text("Use this time zone", fontSize = 14.sp, fontWeight = FontWeight.SemiBold,
+            Text(stringResource(R.string.mail_prefs_use_time_zone), fontSize = 14.sp, fontWeight = FontWeight.SemiBold,
                 color = if (zoneDirty && !state.busy) palette.primarySolid else palette.textTertiary,
                 modifier = Modifier.clickable(enabled = zoneDirty && !state.busy) {
                     val zone = com.grapsee.grapmail.data.MailDisplayPrefs.zoneOrNull(timezone)
                     if (zone == null) {
-                        zoneError = "That isn't a time zone. Use a name like Europe/London or America/New_York."
+                        zoneError = CoreStrings.get(R.string.mail_prefs_isnt_time_zone_use) { "That isn't a time zone. Use a name like Europe/London or America/New_York." }
                     } else {
                         vm.saveSettings(ProfileSettingsPatch(locale = s.locale.copy(timezone = zone.id)))
                     }
                 }.padding(vertical = 8.dp))
-            Text("Dates in the mailbox list:", fontSize = 13.sp,
+            Text(stringResource(R.string.mail_prefs_dates_mailbox_list), fontSize = 13.sp,
                 color = palette.textSecondary)
-            listOf("" to "Automatic — follows this device", "dmy" to "day first (25/10/26)",
-                "mdy" to "month first (10/25/26)", "ymd" to "year first (2026-10-25)").forEach { (code, label) ->
+            listOf("" to stringResource(R.string.mail_prefs_automatic_follows_device), "dmy" to stringResource(R.string.mail_prefs_day_first_25_10),
+                "mdy" to stringResource(R.string.mail_prefs_month_first_10_25), "ymd" to stringResource(R.string.mail_prefs_year_first_2026_10)).forEach { (code, label) ->
                 RadioRow(label, s.locale.dateFormat == code, {
                     if (s.locale.dateFormat != code) vm.saveSettings(ProfileSettingsPatch(
                         locale = s.locale.copy(dateFormat = code)))
@@ -501,14 +527,13 @@ fun MailPrefsScreen(vm: ProfileViewModel, onBack: () -> Unit) {
             // into a Screener decision (safe = approved, blocked = blocked), and a
             // block applies whether or not the Screener is on. A sender can be on
             // one list only, so adding to one takes it off the other.
-            SectionLabel("Senders you always accept", palette)
-            Text("Mail from these senders always lands in your inbox, even when the Screener is on. " +
-                "Use an address (name@example.com) or a whole domain (example.com).",
+            SectionLabel(stringResource(R.string.mail_prefs_senders_always_accept), palette)
+            Text(stringResource(R.string.mail_prefs_mail_from_these_senders),
                 fontSize = 12.sp, color = palette.textTertiary)
-            AddRow("name@example.com or example.com", safeDraft, { safeDraft = it; safeError = null }, {
+            AddRow(stringResource(R.string.mail_prefs_name_example_com_example), safeDraft, { safeDraft = it; safeError = null }, {
                 val sender = normalizedSender(safeDraft)
                 if (sender == null) {
-                    safeError = "Enter an address like name@example.com, or a domain like example.com."
+                    safeError = CoreStrings.get(R.string.mail_prefs_enter_address_like_name) { "Enter an address like name@example.com, or a domain like example.com." }
                 } else {
                     vm.saveSettings(ProfileSettingsPatch(
                         safeSenders = (s.safeSenders + sender).distinct(),
@@ -522,14 +547,13 @@ fun MailPrefsScreen(vm: ProfileViewModel, onBack: () -> Unit) {
                     safeSenders = s.safeSenders.filter { it != e })) }, "gm-safe-row")
             }
 
-            SectionLabel("Senders you block", palette)
-            Text("Mail from blocked senders goes straight to Trash. " +
-                "Use an address (name@example.com) or a whole domain (example.com).",
+            SectionLabel(stringResource(R.string.mail_prefs_senders_block), palette)
+            Text(stringResource(R.string.mail_prefs_mail_from_blocked_senders),
                 fontSize = 12.sp, color = palette.textTertiary)
-            AddRow("name@example.com or example.com", blockedDraft, { blockedDraft = it; blockedError = null }, {
+            AddRow(stringResource(R.string.mail_prefs_name_example_com_example), blockedDraft, { blockedDraft = it; blockedError = null }, {
                 val sender = normalizedSender(blockedDraft)
                 if (sender == null) {
-                    blockedError = "Enter an address like name@example.com, or a domain like example.com."
+                    blockedError = CoreStrings.get(R.string.mail_prefs_enter_address_like_name) { "Enter an address like name@example.com, or a domain like example.com." }
                 } else {
                     vm.saveSettings(ProfileSettingsPatch(
                         blockedSenders = (s.blockedSenders + sender).distinct(),
@@ -558,11 +582,11 @@ private fun normalizedSender(raw: String): String? {
 /** The rules the server and the delivery path apply to an auto-reply. */
 private fun vacationProblem(on: Boolean, message: String, from: String, to: String): String? {
     fun date(v: String) = if (v.isEmpty()) null else runCatching { java.time.LocalDate.parse(v) }.getOrNull()
-    if (from.isNotEmpty() && date(from) == null) return "Write the first day as YYYY-MM-DD."
-    if (to.isNotEmpty() && date(to) == null) return "Write the last day as YYYY-MM-DD."
+    if (from.isNotEmpty() && date(from) == null) return CoreStrings.get(R.string.mail_prefs_write_first_day_yyyy) { "Write the first day as YYYY-MM-DD." }
+    if (to.isNotEmpty() && date(to) == null) return CoreStrings.get(R.string.mail_prefs_write_last_day_yyyy) { "Write the last day as YYYY-MM-DD." }
     val start = date(from); val end = date(to)
-    if (start != null && end != null && end.isBefore(start)) return "The last day is before the first day."
-    if (on && message.isBlank()) return "Write the auto-reply before turning it on."
+    if (start != null && end != null && end.isBefore(start)) return CoreStrings.get(R.string.mail_prefs_last_day_before_first) { "The last day is before the first day." }
+    if (on && message.isBlank()) return CoreStrings.get(R.string.mail_prefs_write_auto_reply_before) { "Write the auto-reply before turning it on." }
     return null
 }
 
@@ -571,10 +595,10 @@ private fun birthdayProblem(value: String): String? {
     val text = value.trim()
     if (text.isEmpty()) return null
     val date = runCatching { java.time.LocalDate.parse(text) }.getOrNull()
-        ?: return "Enter your birthday as YYYY-MM-DD."
+        ?: return CoreStrings.get(R.string.mail_profile_enter_birthday_yyyy_mm) { "Enter your birthday as YYYY-MM-DD." }
     val today = java.time.LocalDate.now()
-    if (date.isAfter(today) || date.year < 1900) return "Enter a real birthday."
-    if (java.time.Period.between(date, today).years < 13) return "A GrapMail account needs you to be at least 13."
+    if (date.isAfter(today) || date.year < 1900) return CoreStrings.get(R.string.mail_profile_enter_real_birthday) { "Enter a real birthday." }
+    if (java.time.Period.between(date, today).years < 13) return CoreStrings.get(R.string.mail_profile_grapmail_account_needs_least) { "A GrapMail account needs you to be at least 13." }
     return null
 }
 
@@ -594,20 +618,22 @@ fun AddressesScreen(vm: ProfileViewModel, onBack: () -> Unit) {
     var label by remember { mutableStateOf("") }
     var pendingDelete by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(Unit) { vm.load() }
-    MailScaffold("Addresses", onBack) {
+    MailScaffold(stringResource(R.string.mail_addr_addresses), onBack) {
         Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())
+            // Phones: no change. Tablets, foldables and desktop windows: the
+            // form keeps a readable width, centred (ui/components/Adaptive.kt).
+            .gmMaxWidth(GMLayout.Form)
             .padding(horizontal = 20.dp)) {
             state.note?.let { NoteLine(it, state.noteIsBad) }
-            SectionLabel("Your GrapMail address", palette)
-            Text(state.profile?.address ?: (if (state.fatal != null) "Could not be read" else "Loading…"),
+            SectionLabel(stringResource(R.string.mail_addr_grapmail_address), palette)
+            Text(state.profile?.address ?: (if (state.fatal != null) stringResource(R.string.mail_addr_could_not_read) else stringResource(R.string.mail_common_loading)),
                 fontSize = 16.sp, fontWeight = FontWeight.Medium, color = palette.textPrimary,
                 modifier = Modifier.fillMaxWidth().testTag("gm-primary-address")
                     .background(palette.bgTinted, RoundedCornerShape(10.dp))
                     .padding(horizontal = 14.dp, vertical = 12.dp))
-            SectionLabel("Email aliases", palette)
-            Text("An alias delivers into the same mailbox under a second address, and you can " +
-                "choose it as the sender.", fontSize = 12.sp, color = palette.textTertiary)
-            AddRow("A label — business, family…", label, { label = it }, {
+            SectionLabel(stringResource(R.string.mail_addr_email_aliases), palette)
+            Text(stringResource(R.string.mail_addr_alias_delivers_into_same), fontSize = 12.sp, color = palette.textTertiary)
+            AddRow(stringResource(R.string.mail_addr_label_business_family), label, { label = it }, {
                 // `POST /aliases` mints the address itself; the label is what the
                 // person calls it by. The screen reloads from the profile after.
                 vmAliasCreate(vm, label) { label = "" }
@@ -615,10 +641,10 @@ fun AddressesScreen(vm: ProfileViewModel, onBack: () -> Unit) {
             val aliases = state.profile?.aliases
             when {
                 aliases == null && state.fatal != null ->
-                    Text("Aliases could not be read.", fontSize = 14.sp,
+                    Text(stringResource(R.string.mail_addr_aliases_could_not_read), fontSize = 14.sp,
                         color = palette.textSecondary, modifier = Modifier.padding(vertical = 12.dp))
                 aliases != null && aliases.isEmpty() ->
-                    Text("No aliases yet.", fontSize = 14.sp, color = palette.textTertiary,
+                    Text(stringResource(R.string.mail_addr_no_aliases_yet), fontSize = 14.sp, color = palette.textTertiary,
                         modifier = Modifier.padding(vertical = 12.dp))
                 aliases != null -> aliases.forEach { a ->
                     Row(Modifier.fillMaxWidth().testTag("gm-alias-row").padding(vertical = 12.dp),
@@ -627,10 +653,10 @@ fun AddressesScreen(vm: ProfileViewModel, onBack: () -> Unit) {
                             Text(a.label.ifBlank { a.address }, fontSize = 15.sp,
                                 fontWeight = FontWeight.Medium, color = palette.textPrimary)
                             Text(a.address, fontSize = 13.sp, color = palette.textSecondary)
-                            if (!a.isActive) Text("Paused — nothing new arrives here.",
+                            if (!a.isActive) Text(stringResource(R.string.mail_addr_paused_nothing_new_arrives),
                                 fontSize = 12.sp, color = palette.warnInk)
                         }
-                        Icon(Icons.Rounded.Delete, "Remove ${a.address}",
+                        Icon(Icons.Rounded.Delete, stringResource(R.string.mail_addr_remove, a.address),
                             tint = palette.error,
                             modifier = Modifier.size(20.dp)
                                 .clickable { pendingDelete = a.address })
@@ -640,16 +666,15 @@ fun AddressesScreen(vm: ProfileViewModel, onBack: () -> Unit) {
             pendingDelete?.let { address ->
                 Column(Modifier.fillMaxWidth().background(palette.warnChipBg, RoundedCornerShape(12.dp))
                     .padding(16.dp).testTag("gm-alias-confirm")) {
-                    Text("Stop receiving at $address? Mail already delivered stays in the " +
-                        "mailbox; nothing new arrives at this address.",
+                    Text(stringResource(R.string.mail_addr_stop_receiving_mail_already, address),
                         fontSize = 13.sp, color = palette.textPrimary)
                     Row(Modifier.padding(top = 12.dp)) {
-                        Text("Cancel", fontSize = 14.sp, color = palette.textSecondary,
-                            modifier = Modifier.clickable { pendingDelete = null })
+                        Text(stringResource(R.string.mail_common_cancel), fontSize = 14.sp, color = palette.textSecondary,
+                            modifier = Modifier.weight(1f, fill = false).clickable { pendingDelete = null })
                         Spacer(Modifier.width(24.dp))
-                        Text("Remove address", fontSize = 14.sp, fontWeight = FontWeight.SemiBold,
+                        Text(stringResource(R.string.mail_addr_remove_address), fontSize = 14.sp, fontWeight = FontWeight.SemiBold,
                             color = palette.error,
-                            modifier = Modifier.clickable {
+                            modifier = Modifier.weight(1f, fill = false).clickable {
                                 pendingDelete = null
                                 vmAliasDelete(vm, address)
                             })
@@ -696,18 +721,20 @@ fun ConnectionsScreen(vm: ProfileViewModel, onBack: () -> Unit, onOpen: (String)
         (query.isBlank() || c.product.lowercase().contains(query.trim().lowercase()) ||
             (c.host ?: "").contains(query.trim().lowercase()))
     }
-    MailScaffold("Connected accounts", onBack) {
+    MailScaffold(stringResource(R.string.mail_conn_connected_accounts), onBack) {
         Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())
+            // Phones: no change. Tablets, foldables and desktop windows: the
+            // form keeps a readable width, centred (ui/components/Adaptive.kt).
+            .gmMaxWidth(GMLayout.Form)
             .padding(horizontal = 20.dp)) {
             state.note?.let { NoteLine(it, state.noteIsBad) }
-            Text("When you use this account to sign in somewhere, that app appears here with " +
-                "what it can reach, and you can remove it at any time.",
+            Text(stringResource(R.string.mail_conn_when_use_account_sign),
                 fontSize = 13.sp, color = palette.textSecondary,
                 modifier = Modifier.padding(vertical = 8.dp))
-            AppTextField("", query, { query = it }, hint = "Search connected apps by name",
+            AppTextField("", query, { query = it }, hint = stringResource(R.string.mail_conn_search_connected_apps_name),
                 showLabel = false, modifier = Modifier.testTag("gm-connections-search"))
-            Row(Modifier.padding(vertical = 10.dp)) {
-                listOf("all" to "All", "mailbox" to "With mail", "products" to "Grapsee apps")
+            Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(vertical = 10.dp)) {
+                listOf("all" to stringResource(R.string.mail_conn_all), "mailbox" to stringResource(R.string.mail_conn_mail), "products" to stringResource(R.string.mail_conn_grapsee_apps))
                     .forEach { (key, label) ->
                         val count = connected.count { c ->
                             when (key) {
@@ -725,8 +752,8 @@ fun ConnectionsScreen(vm: ProfileViewModel, onBack: () -> Unit, onOpen: (String)
                     }
             }
             if (shown.isEmpty()) {
-                Text(if (connected.isEmpty()) "No app has access to this account."
-                    else "Nothing matches that.",
+                Text(if (connected.isEmpty()) stringResource(R.string.mail_conn_no_app_has_access)
+                    else stringResource(R.string.mail_conn_nothing_matches),
                     fontSize = 14.sp, color = palette.textTertiary,
                     modifier = Modifier.padding(vertical = 16.dp))
             }
@@ -753,10 +780,10 @@ fun ConnectionsScreen(vm: ProfileViewModel, onBack: () -> Unit, onOpen: (String)
                         Text(c.product, fontSize = 15.sp, fontWeight = FontWeight.Medium,
                             color = palette.textPrimary)
                         val scopes = c.scopes.joinToString(", ") { scopeWord(it) }
-                        Text(if (scopes.isBlank()) "Signed in here" else "Sees: $scopes",
+                        Text(if (scopes.isBlank()) stringResource(R.string.mail_conn_signed_here) else stringResource(R.string.mail_conn_sees, scopes),
                             fontSize = 12.sp, color = palette.textSecondary)
                     }
-                    Text("Remove", fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
+                    Text(stringResource(R.string.mail_common_remove), fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
                         color = palette.error,
                         modifier = Modifier.clickable { pendingRemove = c })
                 }
@@ -764,16 +791,15 @@ fun ConnectionsScreen(vm: ProfileViewModel, onBack: () -> Unit, onOpen: (String)
             pendingRemove?.let { c ->
                 Column(Modifier.fillMaxWidth().background(palette.warnChipBg, RoundedCornerShape(12.dp))
                     .padding(16.dp).testTag("gm-connection-confirm")) {
-                    Text("Cut ${c.product} off? It loses access to what is listed beside it, " +
-                        "and has to sign in again to get back in.",
+                    Text(stringResource(R.string.mail_conn_cut_off_loses_access, c.product),
                         fontSize = 13.sp, color = palette.textPrimary)
                     Row(Modifier.padding(top = 12.dp)) {
-                        Text("Cancel", fontSize = 14.sp, color = palette.textSecondary,
-                            modifier = Modifier.clickable { pendingRemove = null })
+                        Text(stringResource(R.string.mail_common_cancel), fontSize = 14.sp, color = palette.textSecondary,
+                            modifier = Modifier.weight(1f, fill = false).clickable { pendingRemove = null })
                         Spacer(Modifier.width(24.dp))
-                        Text("Remove access", fontSize = 14.sp, fontWeight = FontWeight.SemiBold,
+                        Text(stringResource(R.string.mail_conn_remove_access), fontSize = 14.sp, fontWeight = FontWeight.SemiBold,
                             color = palette.error,
-                            modifier = Modifier.clickable {
+                            modifier = Modifier.weight(1f, fill = false).clickable {
                                 pendingRemove = null
                                 vm.saveConnections(connected.filter { it.product != c.product })
                             })
@@ -788,10 +814,10 @@ fun ConnectionsScreen(vm: ProfileViewModel, onBack: () -> Unit, onOpen: (String)
 /** The web's own scope words (`connections/page.tsx` SHARED map), copied rather
  *  than re-invented so the two clients describe one scope with one phrase. */
 private fun scopeWord(scope: String): String = when (scope) {
-    "profile" -> "name, address and photo"
-    "mailbox" -> "your mailbox"
-    "projects" -> "your projects"
-    "contacts" -> "your contacts"
+    "profile" -> CoreStrings.get(R.string.mail_conn_name_address_photo) { "name, address and photo" }
+    "mailbox" -> CoreStrings.get(R.string.mail_conn_mailbox) { "your mailbox" }
+    "projects" -> CoreStrings.get(R.string.mail_conn_projects) { "your projects" }
+    "contacts" -> CoreStrings.get(R.string.mail_conn_contacts) { "your contacts" }
     else -> scope
 }
 
@@ -800,10 +826,10 @@ private fun scopeWord(scope: String): String = when (scope) {
  *  The list row uses the short words; the detail uses these, exactly as the
  *  web splits the two. */
 fun sharedWord(scope: String): String = when (scope) {
-    "profile" -> "Your name, GrapMail address and profile photo"
-    "mailbox" -> "Read and send mail in your GrapMail mailbox"
-    "projects" -> "Projects and client records you own on Grapsee products"
-    "contacts" -> "The people you have exchanged mail with"
+    "profile" -> CoreStrings.get(R.string.mail_conn_name_grapmail_address_profile) { "Your name, GrapMail address and profile photo" }
+    "mailbox" -> CoreStrings.get(R.string.mail_conn_read_send_mail_grapmail) { "Read and send mail in your GrapMail mailbox" }
+    "projects" -> CoreStrings.get(R.string.mail_conn_projects_client_records_own) { "Projects and client records you own on Grapsee products" }
+    "contacts" -> CoreStrings.get(R.string.mail_conn_people_have_exchanged_mail) { "The people you have exchanged mail with" }
     else -> scope
 }
 
@@ -830,15 +856,17 @@ fun ConnectionDetailScreen(vm: ProfileViewModel, product: String, onBack: () -> 
     val entry = connected.firstOrNull { it.product.lowercase() == product.lowercase() }
     MailScaffold(product, onBack) {
         Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())
+            // Phones: no change. Tablets, foldables and desktop windows: the
+            // form keeps a readable width, centred (ui/components/Adaptive.kt).
+            .gmMaxWidth(GMLayout.Form)
             .padding(horizontal = 20.dp)) {
             // The unread shape FIRST: an entry missing because the profile has
             // not been read is not an entry that is absent. Showing "not
             // connected" during the read would be the invention this whole
             // screen exists to avoid.
             if (state.profile == null) {
-                Text(if (state.loading) "Loading…"
-                     else "The account could not be read, so this screen cannot " +
-                             "say what the app can reach.",
+                Text(if (state.loading) stringResource(R.string.mail_common_loading)
+                     else stringResource(R.string.mail_conn_account_could_not_read),
                     fontSize = 14.sp, color = palette.textTertiary,
                     modifier = Modifier.padding(vertical = 16.dp)
                         .testTag("gm-connection-detail-read"))
@@ -858,11 +886,12 @@ fun ConnectionDetailScreen(vm: ProfileViewModel, product: String, onBack: () -> 
                 }
                 Spacer(Modifier.width(14.dp))
                 Column(Modifier.weight(1f)) {
-                    Text(product, fontSize = 20.sp, color = palette.textPrimary, maxLines = 1,
+                    Text(product, fontSize = 20.sp, color = palette.textPrimary, maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.testTag("gm-connection-detail-name"))
-                    val who = entry?.let { (it.host ?: "Grapsee product") + " · connected " +
-                        (it.connectedAt ?: "").take(10) }
-                    Text(who ?: "Not connected to this account",
+                    val who = entry?.let { stringResource(R.string.mail_conn_host_connected,
+                        it.host ?: stringResource(R.string.mail_conn_grapsee_product), (it.connectedAt ?: "").take(10)) }
+                    Text(who ?: stringResource(R.string.mail_conn_not_connected_account),
                         fontSize = 13.sp, color = palette.textSecondary,
                         maxLines = 2)
                 }
@@ -870,8 +899,7 @@ fun ConnectionDetailScreen(vm: ProfileViewModel, product: String, onBack: () -> 
             if (entry == null) {
                 // The web's exact stance: a link to an app that is not linked
                 // is answered, not redirected and not fabricated.
-                Text("This app does not have access to this account. Nothing is " +
-                        "being shared with it, and there is nothing to remove.",
+                Text(stringResource(R.string.mail_conn_app_does_not_have),
                     fontSize = 14.sp, lineHeight = 20.sp, color = palette.textSecondary,
                     modifier = Modifier.fillMaxWidth().padding(vertical = 20.dp)
                         .background(palette.softFill, RoundedCornerShape(12.dp))
@@ -884,19 +912,17 @@ fun ConnectionDetailScreen(vm: ProfileViewModel, product: String, onBack: () -> 
                 .clip(RoundedCornerShape(16.dp)).background(palette.card)
                 .border(1.dp, palette.border, RoundedCornerShape(16.dp))
                 .padding(18.dp)) {
-                Text("How GrapMail helps you sign in to $product",
+                Text(stringResource(R.string.mail_conn_how_grapmail_helps_sign, product),
                     fontSize = 15.sp, color = palette.textPrimary)
-                Text("When you use your Grapsee account to sign in to $product, this " +
-                        "account proves who you are and hands over only what is listed " +
-                        "below. Your password is never shared with $product.",
+                Text(stringResource(R.string.mail_conn_when_use_grapsee_account, product),
                     fontSize = 13.sp, lineHeight = 20.sp, color = palette.textSecondary,
                     modifier = Modifier.padding(top = 8.dp))
-                Text(product.uppercase() + " CAN REACH",
+                Text(stringResource(R.string.mail_conn_can_reach, product.uppercase()),
                     fontSize = 12.sp, fontWeight = FontWeight.Medium,
                     color = palette.textSecondary,
                     modifier = Modifier.padding(top = 14.dp))
                 if (entry.scopes.isEmpty()) {
-                    Text("No access was recorded when this was connected.",
+                    Text(stringResource(R.string.mail_conn_no_access_was_recorded),
                         fontSize = 13.sp, color = palette.textSecondary,
                         modifier = Modifier.padding(top = 6.dp))
                 }
@@ -918,9 +944,9 @@ fun ConnectionDetailScreen(vm: ProfileViewModel, product: String, onBack: () -> 
                 .padding(horizontal = 18.dp, vertical = 16.dp),
                 verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
-                    Text(if (state.busy) "Removing…" else "Remove access",
+                    Text(if (state.busy) stringResource(R.string.mail_conn_removing) else stringResource(R.string.mail_conn_remove_access),
                         fontSize = 15.sp, fontWeight = FontWeight.Medium, color = palette.error)
-                    Text("Remove all links and stop sharing this account's data with $product.",
+                    Text(stringResource(R.string.mail_conn_remove_all_links_stop, product),
                         fontSize = 12.sp, lineHeight = 17.sp, color = palette.textSecondary)
                 }
             }
@@ -928,16 +954,15 @@ fun ConnectionDetailScreen(vm: ProfileViewModel, product: String, onBack: () -> 
                 Column(Modifier.fillMaxWidth().padding(top = 10.dp)
                     .background(palette.warnChipBg, RoundedCornerShape(12.dp))
                     .padding(16.dp).testTag("gm-connection-confirm")) {
-                    Text("Cut $product off? It loses access to everything listed above " +
-                            "and has to sign in again to get back in.",
+                    Text(stringResource(R.string.mail_conn_cut_off_everything, product),
                         fontSize = 13.sp, color = palette.textPrimary)
                     Row(Modifier.padding(top = 12.dp)) {
-                        Text("Cancel", fontSize = 14.sp, color = palette.textSecondary,
-                            modifier = Modifier.clickable { confirmRemove = false })
+                        Text(stringResource(R.string.mail_common_cancel), fontSize = 14.sp, color = palette.textSecondary,
+                            modifier = Modifier.weight(1f, fill = false).clickable { confirmRemove = false })
                         Spacer(Modifier.width(24.dp))
-                        Text("Remove access", fontSize = 14.sp, fontWeight = FontWeight.SemiBold,
+                        Text(stringResource(R.string.mail_conn_remove_access), fontSize = 14.sp, fontWeight = FontWeight.SemiBold,
                             color = palette.error,
-                            modifier = Modifier.clickable {
+                            modifier = Modifier.weight(1f, fill = false).clickable {
                                 confirmRemove = false
                                 vm.saveConnections(connected.filter {
                                     it.product.lowercase() != product.lowercase()
@@ -947,8 +972,8 @@ fun ConnectionDetailScreen(vm: ProfileViewModel, product: String, onBack: () -> 
                 }
             }
             Spacer(Modifier.height(16.dp))
-            Text("Something wrong with this app?", fontSize = 12.sp, color = palette.textSecondary)
-            Text("Report this app", fontSize = 13.sp, fontWeight = FontWeight.Medium,
+            Text(stringResource(R.string.mail_conn_something_wrong_app), fontSize = 12.sp, color = palette.textSecondary)
+            Text(stringResource(R.string.mail_conn_report_app), fontSize = 13.sp, fontWeight = FontWeight.Medium,
                 color = palette.primarySolid,
                 modifier = Modifier.padding(top = 4.dp).clickable { onSupport() })
             Spacer(Modifier.height(24.dp))
@@ -973,7 +998,9 @@ fun ProfileEditScreen(vm: ProfileViewModel, onBack: () -> Unit, onRecoveryEmail:
     var display by remember(p?.displayName) { mutableStateOf(p?.displayName ?: "") }
     var formError by remember { mutableStateOf<String?>(null) }
     var birthday by remember(p?.birthday) { mutableStateOf(p?.birthday ?: "") }
-    var gender by remember(p?.gender) { mutableStateOf(p?.gender ?: "") }
+    // Held as the code; a profile still holding the legacy English word
+    // ("Female") is read as its code so the right row is selected.
+    var gender by remember(p?.gender) { mutableStateOf(GenderOption.normalize(p?.gender) ?: "") }
     var photoError by remember { mutableStateOf<String?>(null) }
     val photoScope = rememberCoroutineScope()
 
@@ -984,7 +1011,7 @@ fun ProfileEditScreen(vm: ProfileViewModel, onBack: () -> Unit, onRecoveryEmail:
             val ctx = vm.getApplication<android.app.Application>()
             val bytes = com.grapsee.grapmail.data.AvatarPhoto.encode(ctx, uri)
             if (bytes == null || bytes.isEmpty()) {
-                photoError = "Couldn’t open that photo. Choose another image."
+                photoError = CoreStrings.get(R.string.mail_profile_couldn_t_open_photo) { "Couldn’t open that photo. Choose another image." }
             } else {
                 photoError = null
                 vm.uploadAvatar(bytes, "profile.png", "image/png")
@@ -1009,14 +1036,17 @@ fun ProfileEditScreen(vm: ProfileViewModel, onBack: () -> Unit, onRecoveryEmail:
     LaunchedEffect(p?.avatarUrl, state.busy) {
         if (!state.busy) vm.loadAvatar()
     }
-    MailScaffold("Personal info", onBack) {
+    MailScaffold(stringResource(R.string.mail_profile_personal_info), onBack) {
         Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())
+            // Phones: no change. Tablets, foldables and desktop windows: the
+            // form keeps a readable width, centred (ui/components/Adaptive.kt).
+            .gmMaxWidth(GMLayout.Form)
             .padding(horizontal = 20.dp)) {
             state.note?.let { NoteLine(it, state.noteIsBad) }
             photoError?.let { NoteLine(it, true) }
             if (p == null) {
-                Text(if (state.fatal != null) "Your account record could not be read. ${state.fatal}"
-                    else "Loading…",
+                Text(if (state.fatal != null) stringResource(R.string.mail_profile_account_record_could_not, state.fatal ?: "")
+                    else stringResource(R.string.mail_common_loading),
                     fontSize = 14.sp, color = palette.textTertiary,
                     modifier = Modifier.padding(vertical = 16.dp))
                 return@Column
@@ -1029,58 +1059,58 @@ fun ProfileEditScreen(vm: ProfileViewModel, onBack: () -> Unit, onRecoveryEmail:
                 }
                 Spacer(Modifier.width(14.dp))
                 Column {
-                    Text(if (p.avatarUrl.isNullOrBlank() && state.avatar == null) "Add a photo" else "Change photo",
+                    Text(if (p.avatarUrl.isNullOrBlank() && state.avatar == null) stringResource(R.string.mail_profile_add_photo) else stringResource(R.string.mail_profile_change_photo),
                         fontSize = 14.sp, fontWeight = FontWeight.SemiBold,
                         color = palette.primarySolid,
                         modifier = Modifier.clickable { picker.launch("image/*") })
                     if (!p.avatarUrl.isNullOrBlank() || state.avatar != null) {
-                        Text("Remove", fontSize = 13.sp, color = palette.error,
+                        Text(stringResource(R.string.mail_common_remove), fontSize = 13.sp, color = palette.error,
                             modifier = Modifier.padding(top = 4.dp).clickable { vm.removeAvatar() })
                     }
                 }
             }
-            SectionLabel("Your name", palette)
-            AppTextField("First name", first, { first = it })
-            AppTextField("Last name", last, { last = it },
+            SectionLabel(stringResource(R.string.mail_profile_name), palette)
+            AppTextField(stringResource(R.string.mail_profile_first_name), first, { first = it })
+            AppTextField(stringResource(R.string.mail_profile_last_name), last, { last = it },
                 modifier = Modifier.padding(top = 8.dp))
-            SectionLabel("Birthday", palette)
-            Text("A GrapMail address can receive mail from anyone, so the account requires an " +
-                "age of at least 13 — the same rule signup enforces.",
+            SectionLabel(stringResource(R.string.mail_profile_birthday), palette)
+            Text(stringResource(R.string.mail_profile_grapmail_address_can_receive),
                 fontSize = 12.sp, color = palette.textTertiary)
-            AppTextField("Birthday", birthday, { birthday = it },
+            AppTextField(stringResource(R.string.mail_profile_birthday), birthday, { birthday = it },
                 hint = "YYYY-MM-DD",
                 // KeyboardType.Text, not a date keyboard: Compose has no Date
                 // keyboard type (the enum stops at ASCII/Percent), and the
                 // field takes the route's own `YYYY-MM-DD` free text.
                 keyboard = KeyboardType.Text, modifier = Modifier.padding(top = 6.dp))
-            SectionLabel("Gender", palette)
-            listOf("Female", "Male", "Rather not say", "Custom").forEach { g ->
-                RadioRow(g, gender == g, { gender = if (gender == g) "" else g })
+            SectionLabel(stringResource(R.string.mail_profile_gender), palette)
+            GenderOption.ALL.forEach { g ->
+                val label = GenderOption.labelRes(g)?.let { stringResource(it) } ?: g
+                RadioRow(label, gender == g, { gender = if (gender == g) "" else g })
             }
-            SectionLabel("How you appear", palette)
-            AppTextField("Display name", display, { display = it },
-                hint = "What recipients see")
+            SectionLabel(stringResource(R.string.mail_profile_how_appear), palette)
+            AppTextField(stringResource(R.string.mail_profile_display_name), display, { display = it },
+                hint = stringResource(R.string.mail_profile_what_recipients_see))
             // The recovery email is proven with a code before it counts, so it is
             // changed through that flow rather than typed here: a plain save
             // would store the address unverified, and reset links are only ever
             // sent to a verified one. The recovery phone field is gone because
             // GrapMail recovers by email only and nothing read it.
-            SectionLabel("Recovery", palette)
+            SectionLabel(stringResource(R.string.mail_profile_recovery), palette)
             val recovery = p.recoveryEmail?.takeIf { it.isNotBlank() }
             Text(
                 when {
-                    recovery == null -> "No recovery email yet. Without one, a forgotten password can't be reset."
-                    p.recoveryEmailVerified == true -> "$recovery · verified"
-                    else -> "$recovery · not verified yet"
+                    recovery == null -> stringResource(R.string.mail_profile_no_recovery_email_yet)
+                    p.recoveryEmailVerified == true -> stringResource(R.string.mail_profile_verified, recovery)
+                    else -> stringResource(R.string.mail_profile_not_verified_yet, recovery)
                 },
                 fontSize = 14.sp, color = palette.textSecondary, modifier = Modifier.padding(top = 4.dp))
-            Text(if (recovery == null) "Add recovery email" else "Change recovery email",
+            Text(if (recovery == null) stringResource(R.string.mail_profile_add_recovery_email) else stringResource(R.string.mail_profile_change_recovery_email),
                 fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = palette.primarySolid,
                 modifier = Modifier.clickable(onClick = onRecoveryEmail).padding(vertical = 8.dp))
             formError?.let {
                 Text(it, fontSize = 13.sp, color = palette.error, modifier = Modifier.padding(vertical = 6.dp))
             }
-            Text("Save", fontSize = 15.sp, fontWeight = FontWeight.SemiBold,
+            Text(stringResource(R.string.mail_profile_save), fontSize = 15.sp, fontWeight = FontWeight.SemiBold,
                 color = palette.onPrimary, textAlign = TextAlign.Center,
                 modifier = Modifier.fillMaxWidth().testTag("gm-profile-save")
                     .background(if (state.busy) palette.buttonDisabled else palette.primarySolid,
@@ -1089,12 +1119,12 @@ fun ProfileEditScreen(vm: ProfileViewModel, onBack: () -> Unit, onRecoveryEmail:
                         // The same rules sign-up applies, checked before the
                         // request so the person sees which field is wrong.
                         formError = when {
-                            first.trim().length < 2 -> "Enter your first name (2+ characters)."
-                            last.trim().length < 2 -> "Enter your last name (2+ characters)."
-                            display.trim().length > 60 -> "Keep the display name to 60 characters."
+                            first.trim().length < 2 -> CoreStrings.get(R.string.mail_profile_enter_first_name_2) { "Enter your first name (2+ characters)." }
+                            last.trim().length < 2 -> CoreStrings.get(R.string.mail_profile_enter_last_name_2) { "Enter your last name (2+ characters)." }
+                            display.trim().length > 60 -> CoreStrings.get(R.string.mail_profile_keep_display_name_60) { "Keep the display name to 60 characters." }
                             else -> birthdayProblem(birthday)
                         }
-                        if (formError == null) vm.save("Saved.", ProfilePatch(
+                        if (formError == null) vm.save(CoreStrings.get(R.string.mail_profile_saved) { "Saved." }, ProfilePatch(
                             firstName = first.trim(), lastName = last.trim(), birthday = birthday.trim(),
                             gender = gender, displayName = display.trim()))
                     }.padding(vertical = 14.dp))
@@ -1128,54 +1158,50 @@ fun PrivacyScreen(
     val state by vm.state.collectAsStateWithLifecycle()
     val p = state.profile
     LaunchedEffect(Unit) { vm.load() }
-    MailScaffold("Data & privacy", onBack) {
+    MailScaffold(stringResource(R.string.mail_privacy_data_privacy), onBack) {
         Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())
+            // Phones: no change. Tablets, foldables and desktop windows: the
+            // form keeps a readable width, centred (ui/components/Adaptive.kt).
+            .gmMaxWidth(GMLayout.Form)
             .padding(horizontal = 20.dp)) {
-            SectionLabel("What is kept", palette)
+            SectionLabel(stringResource(R.string.mail_privacy_what_kept), palette)
             listOf(
-                "GrapMail address and aliases: the identity of the account and any extra " +
-                    "addresses that deliver into it.",
-                "Your messages: stored for your account only. Nobody at Grapsee reads " +
-                    "message contents to build profiles, and addresses are not sold.",
-                "When you agreed to the terms: a timestamp, so the record can answer " +
-                    "\u201cdid they agree, and when?\u201d",
+                stringResource(R.string.mail_privacy_grapmail_address_aliases_identity),
+                stringResource(R.string.mail_privacy_messages_stored_account_only),
+                stringResource(R.string.mail_privacy_when_agreed_terms_timestamp),
             ).forEach {
                 Text("• $it", fontSize = 13.sp, color = palette.textSecondary,
                     modifier = Modifier.padding(vertical = 4.dp))
             }
-            SectionLabel("Your controls", palette)
-            SettingRow(Icons.Rounded.Person, "Edit personal info", "Name, birthday, photo",
+            SectionLabel(stringResource(R.string.mail_privacy_controls), palette)
+            SettingRow(Icons.Rounded.Person, stringResource(R.string.mail_privacy_edit_personal_info), stringResource(R.string.mail_privacy_name_birthday_photo),
                 palette, onClick = onProfile)
-            SettingRow(Icons.Rounded.Person, "Change phone number", "Proven with a code",
+            SettingRow(Icons.Rounded.Person, stringResource(R.string.mail_privacy_change_phone_number), stringResource(R.string.mail_privacy_proven_code),
                 palette, onClick = onPhone)
-            SettingRow(Icons.Rounded.MailOutline, "Manage addresses", "Primary and aliases",
+            SettingRow(Icons.Rounded.MailOutline, stringResource(R.string.mail_privacy_manage_addresses), stringResource(R.string.mail_privacy_primary_aliases),
                 palette, onClick = onAddresses)
-            SettingRow(Icons.Rounded.Settings, "Mail settings", "Signature, density, locale",
+            SettingRow(Icons.Rounded.Settings, stringResource(R.string.mail_privacy_mail_settings), stringResource(R.string.mail_privacy_signature_density_locale),
                 palette, onClick = onPrefs)
-            SectionLabel("This account", palette)
-            DetailLine("Address", p?.address
-                ?: if (state.fatal != null) "Could not be read" else "Loading…", palette)
-            DetailLine("Created", p?.createdAt?.take(10)
-                ?: if (p == null) "Could not be read" else "Not reported", palette)
-            DetailLine("Terms accepted", p?.termsAcceptedAt?.take(10)
-                ?: if (p == null) "Could not be read" else "not recorded", palette)
-            DetailLine("2-step verification", when (p?.twoFactorState) {
-                true -> "On"
-                false -> "Off"
-                null -> if (p == null) "Could not be read" else "Not reported"
+            SectionLabel(stringResource(R.string.mail_privacy_account), palette)
+            DetailLine(stringResource(R.string.mail_privacy_address), p?.address
+                ?: if (state.fatal != null) stringResource(R.string.mail_privacy_could_not_read) else stringResource(R.string.mail_common_loading), palette)
+            DetailLine(stringResource(R.string.mail_privacy_created), p?.createdAt?.take(10)
+                ?: if (p == null) stringResource(R.string.mail_privacy_could_not_read) else stringResource(R.string.mail_privacy_not_reported), palette)
+            DetailLine(stringResource(R.string.mail_privacy_terms_accepted), p?.termsAcceptedAt?.take(10)
+                ?: if (p == null) stringResource(R.string.mail_privacy_could_not_read) else stringResource(R.string.mail_privacy_not_recorded), palette)
+            DetailLine(stringResource(R.string.mail_privacy_2_step_verification), when (p?.twoFactorState) {
+                true -> stringResource(R.string.mail_privacy_on)
+                false -> stringResource(R.string.mail_common_off)
+                null -> if (p == null) stringResource(R.string.mail_privacy_could_not_read) else stringResource(R.string.mail_privacy_not_reported)
             }, palette)
-            SectionLabel("Deleting the account", palette)
-            Text("Deleting is self-serve and permanent: it removes the mailbox, every " +
-                "message, the aliases and the address itself, and it cannot be undone. " +
-                "The flow asks for the account password and the server confirms it; " +
-                "this page does not carry the confirmation itself, so the destructive " +
-                "step exists in exactly one place.",
+            SectionLabel(stringResource(R.string.mail_privacy_deleting_account), palette)
+            Text(stringResource(R.string.mail_privacy_deleting_self_serve_permanent),
                 fontSize = 13.sp, color = palette.textSecondary,
                 modifier = Modifier.padding(vertical = 6.dp))
-            Text("Delete this account…", fontSize = 14.sp, fontWeight = FontWeight.SemiBold,
+            Text(stringResource(R.string.mail_privacy_delete_account), fontSize = 14.sp, fontWeight = FontWeight.SemiBold,
                 color = palette.primarySolid, modifier = Modifier.clickable(onClick = onDeleteAccount)
                     .padding(vertical = 6.dp))
-            SectionLabel("The documents", palette)
+            SectionLabel(stringResource(R.string.mail_privacy_documents), palette)
             for (document in com.grapsee.grapmail.ui.screens.GrapMailLegalDocument.entries) {
                 Text(document.title, fontSize = 14.sp, color = palette.primarySolid,
                     modifier = Modifier.fillMaxWidth().clickable { onLegal(document) }.padding(vertical = 12.dp))
@@ -1189,8 +1215,11 @@ fun PrivacyScreen(
 @Composable
 private fun DetailLine(label: String, value: String, palette: com.grapsee.grapmail.ui.theme.Palette) {
     Row(Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
-        Text(label, fontSize = 13.sp, color = palette.textSecondary, modifier = Modifier.width(150.dp))
-        Text(value, fontSize = 14.sp, color = palette.textPrimary, modifier = Modifier.weight(1f))
+        // Proportional, not a fixed 150dp: at 200% text a fixed label column
+        // left the value a sliver on a narrow phone.
+        Text(label, fontSize = 13.sp, color = palette.textSecondary, modifier = Modifier.weight(0.4f))
+        Spacer(Modifier.width(8.dp))
+        Text(value, fontSize = 14.sp, color = palette.textPrimary, modifier = Modifier.weight(0.6f))
     }
 }
 
@@ -1214,40 +1243,42 @@ fun SupportScreen(
     val palette = LocalPalette.current
     val faq = remember {
         listOf(
-            "I forgot my password. What now?" to
-                "Tap Forgot password on the sign-in screen. GrapMail emails a reset link to the " +
+            CoreStrings.get(R.string.mail_support_i_forgot_my_password) { "I forgot my password. What now?" } to
+                CoreStrings.get(R.string.mail_support_tap_forgot_password_sign) { "Tap Forgot password on the sign-in screen. GrapMail emails a reset link to the " +
                 "recovery email on your account, so add and verify one in Personal info before " +
-                "you need it.",
-            "Can I sign in with my phone number?" to
-                "Yes. The sign-in page accepts either the GrapMail address or the phone " +
+                "you need it." },
+            CoreStrings.get(R.string.mail_support_can_i_sign_my) { "Can I sign in with my phone number?" } to
+                CoreStrings.get(R.string.mail_support_yes_sign_page_accepts) { "Yes. The sign-in page accepts either the GrapMail address or the phone " +
                 "number you verified, but the number is never the identity of the account, " +
-                "and mail is never addressed to it.",
-            "I changed my number. Will I lose the account?" to
-                "No, if you change it before losing access. The new number is proven with a " +
-                "code before it replaces the old one.",
-            "Why can I not create an account for someone under 13?" to
-                "GrapMail holds an address that can receive mail from anyone, so the account " +
+                "and mail is never addressed to it." },
+            CoreStrings.get(R.string.mail_support_i_changed_my_number) { "I changed my number. Will I lose the account?" } to
+                CoreStrings.get(R.string.mail_support_no_if_change_before) { "No, if you change it before losing access. The new number is proven with a " +
+                "code before it replaces the old one." },
+            CoreStrings.get(R.string.mail_support_why_can_i_not) { "Why can I not create an account for someone under 13?" } to
+                CoreStrings.get(R.string.mail_support_grapmail_holds_address_can) { "GrapMail holds an address that can receive mail from anyone, so the account " +
                 "requires an age of at least 13. The birthday you enter is checked against " +
-                "that rule.",
-            "What is an alias for?" to
-                "An alias delivers into the same mailbox under a second address, and can be " +
+                "that rule." },
+            CoreStrings.get(R.string.mail_support_what_alias) { "What is an alias for?" } to
+                CoreStrings.get(R.string.mail_support_alias_delivers_into_same) { "An alias delivers into the same mailbox under a second address, and can be " +
                 "chosen as the sender. Useful when you want to write as \u201cbusiness\u201d " +
-                "without a second account.",
-            "Mail I was expecting never arrived." to
-                "In order: check the sending address was spelled exactly, look in Spam and " +
+                "without a second account." },
+            CoreStrings.get(R.string.mail_support_mail_i_was_expecting) { "Mail I was expecting never arrived." } to
+                CoreStrings.get(R.string.mail_support_order_check_sending_address) { "In order: check the sending address was spelled exactly, look in Spam and " +
                 "Trash under \u201cOthers\u201d, then check that the sender is not on the " +
                 "suppression list because they unsubscribed earlier. If the mailbox is " +
                 "connected and the message is still missing, the mail server has to be " +
-                "involved. That is a support matter.",
+                "involved. That is a support matter." },
         )
     }
     var open by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(Unit) { vm.load() }
-    MailScaffold("Help & support", onBack) {
+    MailScaffold(stringResource(R.string.mail_support_help_support), onBack) {
         Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())
+            // Phones: no change. Tablets, foldables and desktop windows: the
+            // form keeps a readable width, centred (ui/components/Adaptive.kt).
+            .gmMaxWidth(GMLayout.Form)
             .padding(horizontal = 20.dp)) {
-            Text("Answers to the questions this product actually raises, and how to reach a " +
-                "person.", fontSize = 13.sp, color = palette.textTertiary,
+            Text(stringResource(R.string.mail_support_answers_questions_product_actually), fontSize = 13.sp, color = palette.textTertiary,
                 modifier = Modifier.padding(vertical = 8.dp))
             faq.forEach { (q, a) ->
                 Column(Modifier.fillMaxWidth().testTag("gm-faq-item")
@@ -1263,16 +1294,16 @@ fun SupportScreen(
                         lineHeight = 20.sp, modifier = Modifier.padding(top = 6.dp))
                 }
             }
-            SectionLabel("Where a person answers", palette)
+            SectionLabel(stringResource(R.string.mail_support_where_person_answers), palette)
             Text("grapsee.com/contact", fontSize = 14.sp, fontWeight = FontWeight.SemiBold,
                 color = palette.primarySolid,
                 modifier = Modifier.clickable {
                     openExternal(vm.getApplication(), "https://grapsee.com/contact")
                 }.padding(vertical = 6.dp))
-            Text("Recovery screens, in the order that fixes things:", fontSize = 13.sp,
+            Text(stringResource(R.string.mail_support_recovery_screens_order_fixes), fontSize = 13.sp,
                 color = palette.textSecondary, modifier = Modifier.padding(top = 6.dp))
-            listOf("Forgot password" to onForgot, "Change my phone" to onPhone,
-                "Manage addresses" to onAddresses).forEach { (label, go) ->
+            listOf(stringResource(R.string.mail_support_forgot_password) to onForgot, stringResource(R.string.mail_support_change_my_phone) to onPhone,
+                stringResource(R.string.mail_support_manage_addresses) to onAddresses).forEach { (label, go) ->
                 Text(label, fontSize = 14.sp, color = palette.primarySolid,
                     modifier = Modifier.clickable(onClick = go).padding(vertical = 6.dp))
             }

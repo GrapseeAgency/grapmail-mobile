@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    values-zh-rCN/strings_reader.xml: translation of values/strings_reader.xml (same keys, same order).
+    Comments below are kept from the English source for context.
+-->
+<resources>
+    <!-- The inline pill above an HTML body in a dark reader. It names what a tap switches TO. -->
+    <string name="reader_colours_original">原始颜色</string>
+    <string name="reader_colours_dark">深色</string>
+
+    <!-- The message overflow menu items (same toggle as the pill). -->
+    <string name="reader_colours_menu_original">显示原始颜色</string>
+    <string name="reader_colours_menu_dark">以深色显示</string>
+
+    <!-- TalkBack: the pill's click action ("double-tap to …") and its current state. -->
+    <string name="reader_colours_action_original">显示此发件人的原始颜色</string>
+    <string name="reader_colours_action_dark">以深色显示</string>
+    <string name="reader_colours_state_original">正在显示原始颜色</string>
+    <string name="reader_colours_state_dark">正在以深色显示</string>
+
+    <!-- The note under the message after a change, so the per-sender memory is not a surprise later. -->
+    <string name="reader_colours_remembered_original">在此设备上，来自 %1$s 的邮件将以原始颜色打开。</string>
+    <string name="reader_colours_remembered_dark">在此设备上，来自 %1$s 的邮件将以深色打开。</string>
+</resources>

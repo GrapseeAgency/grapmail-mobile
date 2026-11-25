@@ -4,6 +4,14 @@ import UserNotifications
 /// The shared shell for the eight screens that hang off the mailbox: labels,
 /// label create, contacts, contact detail, files, attachment preview, settings,
 /// screener.
+///
+/// Text size: every screen in this file follows Dynamic Type (ScaledFont.swift).
+/// At the design's sizes nothing moves; above them rows wrap instead of cutting
+/// their text, label/value pairs stack at the accessibility sizes, and screens
+/// whose content can outgrow the window scroll. On wide windows (iPad, Split
+/// View, Stage Manager, Mac, Vision Pro) each screen's content keeps a
+/// readable or form width (`GMLayout`), decided by the space it is given —
+/// never by the device.
 struct MailScaffold<Content: View>: View {
     let title: String
     let onBack: () -> Void
@@ -14,7 +22,7 @@ struct MailScaffold<Content: View>: View {
             HStack(spacing: 12) {
                 Button(action: onBack) {
                     Image(systemName: "chevron.backward")
-                        .font(.system(size: 17, weight: .semibold))
+                        .gmFont(17, .semibold, maxSize: 28)
                         .foregroundColor(GM.textPrimary)
                         .frame(minWidth: 44, minHeight: 44)
                         .contentShape(Rectangle())
@@ -29,6 +37,9 @@ struct MailScaffold<Content: View>: View {
                 Spacer()
             }
             .padding(.horizontal, 12).padding(.vertical, 4)
+            // Screen states: every screen on this shell keeps its content when
+            // the network goes, and says so here (ScreenStates.swift).
+            GMOfflineBanner()
             content
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
@@ -38,21 +49,25 @@ struct MailScaffold<Content: View>: View {
 }
 
 private struct SectionLabel: View {
-    let text: String
+    /// A resource: every caller passes a literal, which the String Catalog
+    /// extracts; uppercased in the device locale after lookup.
+    let text: LocalizedStringResource
     var body: some View {
-        Text(text.uppercased())
-            .font(.system(size: 11, weight: .bold)).kerning(1)
+        Text(String(localized: text).uppercased())
+            .gmFont(11, .bold).kerning(1)
             .foregroundColor(GM.textTertiary)
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, 20).padding(.vertical, 10)
+            .accessibilityAddTraits(.isHeader)
     }
 }
 
 private struct NoteBar: View {
-    let text: String
+    /// A key: every caller passes one literal sentence.
+    let text: LocalizedStringKey
     var body: some View {
         Text(text)
-            .font(.system(size: 13)).foregroundColor(GM.textSecondary)
+            .gmFont(13).foregroundColor(GM.textSecondary)
             .fixedSize(horizontal: false, vertical: true)
             .padding(12)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -63,16 +78,83 @@ private struct NoteBar: View {
 }
 
 private struct DetailLine: View {
-    let label: String
+    /// The label is a literal at every call site; the value is data.
+    let label: LocalizedStringKey
     let value: String
+    @Environment(\.dynamicTypeSize) private var dts
+    /// The label column grows with its text, so a translated "Messages seen"
+    /// is not cut off at large sizes.
+    @ScaledMetric(relativeTo: .footnote) private var labelColumn: CGFloat = 92
+
     var body: some View {
-        HStack(alignment: .top, spacing: 10) {
-            Text(label).font(.system(size: 13)).foregroundColor(GM.textTertiary)
-                .frame(width: 92, alignment: .leading)
-            Text(value).font(.system(size: 14)).foregroundColor(GM.textPrimary)
-                .frame(maxWidth: .infinity, alignment: .leading)
+        Group {
+            if dts.isAccessibilitySize {
+                // A fixed label column cannot hold accessibility-size text
+                // beside its value on a phone: the label sits above instead.
+                VStack(alignment: .leading, spacing: 2) {
+                    labelText.frame(maxWidth: .infinity, alignment: .leading)
+                    valueText
+                }
+            } else {
+                HStack(alignment: .top, spacing: 10) {
+                    labelText.frame(width: labelColumn, alignment: .leading)
+                    valueText
+                }
+            }
         }
         .padding(.vertical, 3)
+    }
+
+    private var labelText: some View {
+        Text(label).gmFont(13).foregroundColor(GM.textTertiary)
+    }
+
+    private var valueText: some View {
+        Text(value).gmFont(14).foregroundColor(GM.textPrimary)
+            .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+/// A row of label + value (+ control) laid out exactly as designed at the
+/// default size; above it the row stays on one line while it fits and stacks
+/// when it does not, and at the accessibility sizes it always stacks.
+private struct SecondaryFlowRow<Content: View>: View {
+    @Environment(\.dynamicTypeSize) private var dts
+    var spacing: CGFloat? = nil
+    @ViewBuilder var content: () -> Content
+
+    var body: some View {
+        if dts <= .large {
+            HStack(spacing: spacing, content: content)
+        } else if dts.isAccessibilitySize {
+            VStack(alignment: .leading, spacing: 6, content: content)
+        } else {
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: spacing, content: content)
+                VStack(alignment: .leading, spacing: 6, content: content)
+            }
+        }
+    }
+}
+
+/// Content exactly where it was while it fits; the same content scrolling once
+/// larger text or a short window makes it taller than the space it has.
+private struct SecondaryFitOrScroll<Content: View>: View {
+    @ViewBuilder var content: () -> Content
+
+    var body: some View {
+        ViewThatFits(in: .vertical) {
+            content()
+            ScrollView(.vertical) { content() }
+        }
+    }
+}
+
+private extension View {
+    /// The column a secondary screen's content keeps on a wide window: filled
+    /// leading-aligned on a phone (as before), capped and centred past `max`.
+    func secondaryColumn(_ max: CGFloat) -> some View {
+        frame(maxWidth: .infinity, alignment: .leading).gmMaxWidth(max)
     }
 }
 
@@ -86,31 +168,37 @@ struct LabelsView: View {
     /// nothing, which is the one thing this sector was told not to ship.
     let onEdit: (MailLabel) -> Void
     @State private var notice: String?
+    @Environment(\.dynamicTypeSize) private var dts
+    @ScaledMetric(relativeTo: .body) private var swatchDot: CGFloat = 12
 
     var body: some View {
-        MailScaffold(title: "Labels", onBack: onBack) {
+        MailScaffold(title: String(localized: "Labels"), onBack: onBack) {
             VStack(alignment: .leading, spacing: 0) {
-                NoteBar(text: "Labels are the real filter: the reference's Personal " +
-                            "and Work chips have no backing in the API, so these are " +
-                            "what the chip row is built from.")
-                HStack {
-                    Text("\(vm.labelState.labels.count) label" +
-                         (vm.labelState.labels.count == 1 ? "" : "s"))
-                        .font(.system(size: 13)).foregroundColor(GM.textSecondary)
-                    Spacer()
+                NoteBar(text: "Labels are the real filter: the reference's Personal and Work chips have no backing in the API, so these are what the chip row is built from.")
+                // No Spacer here: at the accessibility sizes this row stacks,
+                // and a Spacer in a column would take the list's height.
+                GMAdaptiveStack(spacing: dts.isAccessibilitySize ? 6 : nil) {
+                    Text(vm.labelState.labels.count == 1 ? LocalizedStringKey("1 label") : LocalizedStringKey("\(vm.labelState.labels.count) labels"))
+                        .gmFont(13).foregroundColor(GM.textSecondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                     Button("New label", action: onCreate)
-                        .font(.system(size: 14, weight: .medium))
+                        .gmFont(14, .medium)
                         .foregroundColor(GM.primarySolid)
                 }
                 .padding(.horizontal, 16).padding(.vertical, 10)
 
                 if let notice {
-                    Text(notice).font(.system(size: 12)).foregroundColor(GM.textSecondary)
+                    Text(notice).gmFont(12).foregroundColor(GM.textSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
                         .padding(.horizontal, 16).padding(.bottom, 4)
                 }
 
                 if vm.labelState.loading && vm.labelState.labels.isEmpty {
-                    Spacer(); ProgressView().padding(); Spacer()
+                    GMSkeletonList(rows: 5, avatar: false)
+                } else if let error = vm.labelState.error, vm.labelState.labels.isEmpty {
+                    // A refused read is not "no labels": say it failed, offer Retry.
+                    GMErrorState(title: "Couldn't load your labels", message: error,
+                                 onRetry: { vm.refreshLabels(force: true) })
                 } else if vm.labelState.labels.isEmpty {
                     // Not “becomes a filter on the inbox”, which is what this said
                     // on both platforms: the listing returns no label field per row
@@ -126,16 +214,18 @@ struct LabelsView: View {
                             HStack(spacing: 12) {
                                 Circle()
                                     .fill(labelSwatch(label.color))
-                                    .frame(width: 12, height: 12)
+                                    .frame(width: min(swatchDot, 22), height: min(swatchDot, 22))
                                 Text(label.name)
-                                    .font(.system(size: 15)).foregroundColor(GM.textPrimary)
-                                    .lineLimit(1)
+                                    .gmFont(15).foregroundColor(GM.textPrimary)
+                                    // A label's name is the row: it wraps at the
+                                    // accessibility sizes rather than losing its end.
+                                    .lineLimit(dts.isAccessibilitySize ? nil : 1)
                                 Spacer()
                                 Button {
                                     vm.deleteLabel(id: label.id) { notice = $0 }
                                 } label: {
                                     Image(systemName: "trash")
-                                        .font(.system(size: 15)).foregroundColor(GM.textTertiary)
+                                        .gmFont(15, maxSize: 28).foregroundColor(GM.textTertiary)
                                 }
                                 .buttonStyle(.plain)
                                 .accessibilityLabel("Remove label \(label.name)")
@@ -154,6 +244,7 @@ struct LabelsView: View {
                     .scrollContentBackground(.hidden)
                 }
             }
+            .secondaryColumn(GMLayout.readable)
         }
         .task { vm.refreshLabels() }
     }
@@ -173,6 +264,9 @@ struct LabelCreateView: View {
     /// whatever the user had picked. Holding the key makes the round trip verifiable.
     @State private var colour: String
     @State private var notice: String?
+    /// Swatches grow with the text, capped so a row of four still fits an
+    /// iPhone SE at the largest accessibility size (4 × 44 + 3 × 12 < 280).
+    @ScaledMetric(relativeTo: .body) private var swatchSide: CGFloat = 28
 
     init(vm: MailboxModel, onDone: @escaping () -> Void, editing: MailLabel? = nil) {
         self.vm = vm
@@ -213,68 +307,80 @@ struct LabelCreateView: View {
     @State private var saving = false
 
     var body: some View {
-        MailScaffold(title: editing == nil ? "New label" : "Edit label", onBack: onDone) {
-            VStack(alignment: .leading, spacing: 16) {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("Name").font(.system(size: 12, weight: .bold))
-                        .foregroundColor(GM.textTertiary)
-                    TextField("Work", text: $name)
-                        .font(.system(size: 15)).foregroundColor(GM.textPrimary)
-                        .padding(12)
-                        .background(RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .fill(GM.inputFill))
-                        .accessibilityIdentifier("label-name")
-                }
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("Colour").font(.system(size: 12, weight: .bold))
-                        .foregroundColor(GM.textTertiary)
-                    // Two rows of four: eight swatches on one line does not fit a
-                    // small phone once the screen's own padding is taken off, and a
-                    // clipped last swatch is an option that cannot be chosen.
-                    ForEach(Array(rampRows.enumerated()), id: \.offset) { _, row in
-                        HStack(spacing: 12) {
-                            ForEach(row) { swatch in
-                                Circle().fill(labelSwatch(swatch.key)).frame(width: 28, height: 28)
-                                    .overlay(Circle().stroke(
-                                        colour == swatch.key ? GM.textPrimary : Color.clear,
-                                        lineWidth: 2))
-                                    .onTapGesture { colour = swatch.key }
-                                    .accessibilityLabel(swatch.key)
-                                    .accessibilityIdentifier("label-colour-\(swatch.key)")
+        MailScaffold(title: editing == nil ? String(localized: "New label") : String(localized: "Edit label"), onBack: onDone) {
+            // Scrolls once large text or a landscape phone with the keyboard up
+            // makes the form taller than the window; content stays at the top,
+            // where the trailing Spacer used to hold it.
+            ScrollView(.vertical) {
+                VStack(alignment: .leading, spacing: 16) {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Name").gmFont(12, .bold)
+                            .foregroundColor(GM.textTertiary)
+                        TextField("Work", text: $name)
+                            .gmFont(15).foregroundColor(GM.textPrimary)
+                            .padding(12)
+                            .background(RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                .fill(GM.inputFill))
+                            .accessibilityIdentifier("label-name")
+                    }
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Colour").gmFont(12, .bold)
+                            .foregroundColor(GM.textTertiary)
+                        // Two rows of four: eight swatches on one line does not fit a
+                        // small phone once the screen's own padding is taken off, and a
+                        // clipped last swatch is an option that cannot be chosen.
+                        ForEach(Array(rampRows.enumerated()), id: \.offset) { _, row in
+                            HStack(spacing: 12) {
+                                ForEach(row) { swatch in
+                                    Circle().fill(labelSwatch(swatch.key))
+                                        .frame(width: min(swatchSide, 44), height: min(swatchSide, 44))
+                                        .overlay(Circle().stroke(
+                                            colour == swatch.key ? GM.textPrimary : Color.clear,
+                                            lineWidth: 2))
+                                        .onTapGesture { colour = swatch.key }
+                                        // The palette key is a server word ("slate"); VoiceOver
+                                        // reads its translation, looked up by that key. The
+                                        // eight keys are listed in the String Catalog inventory.
+                                        .accessibilityLabel(Text(LocalizedStringKey(swatch.key)))
+                                        .accessibilityIdentifier("label-colour-\(swatch.key)")
+                                }
                             }
                         }
                     }
-                }
-                if let notice {
-                    Text(notice).font(.system(size: 13)).foregroundColor(GM.error)
-                }
-                GradientButton(title: editing == nil ? "Create label" : "Save changes",
-                               enabled: !saving && !name.trimmingCharacters(in: .whitespaces).isEmpty) {
-                    let trimmed = name.trimmingCharacters(in: .whitespaces)
-                    guard !trimmed.isEmpty else { notice = "A label needs a name."; return }
-                    // The key is sent as it stands.
-                    //
-                    // The server's own words either way: a create that hit the label
-                    // cap and a rename the route refused both say why, and that text
-                    // is what the person sees. A create is only dismissed when the
-                    // route accepted it — this used to call `onDone()` unconditionally
-                    // after setting `notice`, so a rejected label (duplicate name, or
-                    // the 200 cap) navigated away with the reason never readable and
-                    // the user left believing the label existed.
-                    saving = true
-                    let complete: (Bool, String) -> Void = { saved, result in
-                        saving = false
-                        if saved { onDone() } else { notice = result }
+                    if let notice {
+                        Text(notice).gmFont(13).foregroundColor(GM.error)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
-                    if let label = editing {
-                        vm.renameLabel(id: label.id, name: trimmed, colour: colour, then: complete)
-                    } else {
-                        vm.createLabel(name: trimmed, colour: colour, then: complete)
+                    GradientButton(title: editing == nil ? String(localized: "Create label") : String(localized: "Save changes"),
+                                   enabled: !saving && !name.trimmingCharacters(in: .whitespaces).isEmpty) {
+                        let trimmed = name.trimmingCharacters(in: .whitespaces)
+                        guard !trimmed.isEmpty else { notice = String(localized: "A label needs a name."); return }
+                        // The key is sent as it stands.
+                        //
+                        // The server's own words either way: a create that hit the label
+                        // cap and a rename the route refused both say why, and that text
+                        // is what the person sees. A create is only dismissed when the
+                        // route accepted it — this used to call `onDone()` unconditionally
+                        // after setting `notice`, so a rejected label (duplicate name, or
+                        // the 200 cap) navigated away with the reason never readable and
+                        // the user left believing the label existed.
+                        saving = true
+                        let complete: (Bool, String) -> Void = { saved, result in
+                            saving = false
+                            if saved { onDone() } else { notice = result }
+                        }
+                        if let label = editing {
+                            vm.renameLabel(id: label.id, name: trimmed, colour: colour, then: complete)
+                        } else {
+                            vm.createLabel(name: trimmed, colour: colour, then: complete)
+                        }
                     }
+                    Spacer()
                 }
-                Spacer()
+                .padding(20)
+                .secondaryColumn(GMLayout.form)
             }
-            .padding(20)
+            .scrollDismissesKeyboard(.interactively)
         }
     }
 }
@@ -289,6 +395,12 @@ struct ContactsView: View {
     @State private var query = ""
     @State private var matches: [MailboxModel.Person]?
     @State private var sourceVersion = 0
+    /// False until the first read of the cache answers, so the empty state is
+    /// never drawn before anything was asked.
+    @State private var peopleLoaded = false
+    @Environment(\.dynamicTypeSize) private var dts
+    /// The avatar grows with the name beside it, capped so the text keeps the row.
+    @ScaledMetric(relativeTo: .body) private var avatarSide: CGFloat = 34
 
     private var needle: String { query.trimmingCharacters(in: .whitespacesAndNewlines) }
 
@@ -298,13 +410,11 @@ struct ContactsView: View {
     }
 
     var body: some View {
-        MailScaffold(title: "Contacts", onBack: onBack) {
+        MailScaffold(title: String(localized: "Contacts"), onBack: onBack) {
             VStack(alignment: .leading, spacing: 0) {
-                NoteBar(text: "People are read out of the mail you have received and " +
-                            "sent. GrapMail has no contacts endpoint, so this list " +
-                            "grows with your mailbox rather than being edited by hand.")
+                NoteBar(text: "People are read out of the mail you have received and sent. GrapMail has no contacts endpoint, so this list grows with your mailbox rather than being edited by hand.")
                 TextField("Search people", text: $query)
-                    .font(.system(size: 14))
+                    .gmFont(14)
                     .padding(10)
                     .background(RoundedRectangle(cornerRadius: 10, style: .continuous)
                         .fill(GM.inputFill))
@@ -312,7 +422,9 @@ struct ContactsView: View {
                     .accessibilityIdentifier("contacts-search")
 
                 let shown = needle.isEmpty ? people : (matches ?? [])
-                if people.isEmpty {
+                if !peopleLoaded {
+                    GMSkeletonList(rows: 6)
+                } else if people.isEmpty {
                     CenteredState(title: "No people yet",
                                   detail: "Contacts appear here as mail arrives from or to them.")
                 } else if !needle.isEmpty && matches == nil {
@@ -324,21 +436,22 @@ struct ContactsView: View {
                         ForEach(shown, id: \.address) { p in
                             Button { onOpen(p.address) } label: {
                                 HStack(spacing: 12) {
-                                    SenderAvatar(display: p.name ?? "", address: p.address, size: 34)
+                                    SenderAvatar(display: p.name ?? "", address: p.address,
+                                                 size: min(avatarSide, 56))
                                     VStack(alignment: .leading, spacing: 2) {
                                         Text(p.name ?? p.address)
-                                            .font(.system(size: 15)).foregroundColor(GM.textPrimary)
-                                            .lineLimit(1)
+                                            .gmFont(15).foregroundColor(GM.textPrimary)
+                                            .lineLimit(dts.isAccessibilitySize ? 3 : 1)
                                         if p.name != nil {
                                             Text(p.address)
-                                                .font(.system(size: 12)).foregroundColor(GM.textTertiary)
-                                                .lineLimit(1)
+                                                .gmFont(12).foregroundColor(GM.textTertiary)
+                                                .lineLimit(dts.isAccessibilitySize ? 3 : 1)
                                         }
                                     }
                                     Spacer()
                                     if p.seen > 0 {
                                         Text("\(p.seen)")
-                                            .font(.system(size: 12)).foregroundColor(GM.textTertiary)
+                                            .gmFont(12).foregroundColor(GM.textTertiary)
                                     }
                                 }
                                 .contentShape(Rectangle())
@@ -351,11 +464,13 @@ struct ContactsView: View {
                     .scrollContentBackground(.hidden)
                 }
             }
+            .secondaryColumn(GMLayout.readable)
         }
         .task {
             let loaded = await vm.people()
             guard !Task.isCancelled else { return }
             people = loaded
+            peopleLoaded = true
             sourceVersion += 1
         }
         .task(id: SearchKey(term: needle, sourceVersion: sourceVersion)) {
@@ -383,31 +498,41 @@ struct ContactDetailView: View {
     let onBack: () -> Void
     let onWrite: () -> Void
     @State private var person: MailboxModel.Person?
+    @Environment(\.dynamicTypeSize) private var dts
+    @ScaledMetric(relativeTo: .title3) private var avatarSide: CGFloat = 52
 
     var body: some View {
-        MailScaffold(title: "Contact", onBack: onBack) {
-            VStack(alignment: .leading, spacing: 14) {
-                HStack(spacing: 12) {
-                    SenderAvatar(display: person?.name ?? "", address: address, size: 52)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(person?.name ?? address)
-                            .font(.system(size: 18, weight: .semibold))
-                            .foregroundColor(GM.textPrimary)
-                        if person?.name != nil {
-                            Text(address).font(.system(size: 13))
-                                .foregroundColor(GM.textSecondary)
+        MailScaffold(title: String(localized: "Contact"), onBack: onBack) {
+            ScrollView(.vertical) {
+                VStack(alignment: .leading, spacing: 14) {
+                    // Avatar beside the name; at the accessibility sizes the
+                    // name and address take the full width under the avatar.
+                    GMAdaptiveStack(spacing: 12) {
+                        SenderAvatar(display: person?.name ?? "", address: address,
+                                     size: min(avatarSide, 80))
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(person?.name ?? address)
+                                .gmFont(18, .semibold)
+                                .foregroundColor(GM.textPrimary)
+                                .fixedSize(horizontal: false, vertical: true)
+                            if person?.name != nil {
+                                Text(address).gmFont(13)
+                                    .foregroundColor(GM.textSecondary)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
                         }
+                        .frame(maxWidth: .infinity, alignment: .leading)
                     }
+                    DetailLine(label: "Messages seen",
+                               value: person.map { "\($0.seen)" } ?? String(localized: "Not loaded"))
+                    Text("Derived from loaded mail")
+                        .gmFont(12).foregroundColor(GM.textTertiary)
+                    GradientButton(title: String(localized: "Write", comment: "Button: write a message to this contact"), action: onWrite)
                     Spacer()
                 }
-                DetailLine(label: "Messages seen",
-                           value: person.map { "\($0.seen)" } ?? "Not loaded")
-                Text("Derived from loaded mail")
-                    .font(.system(size: 12)).foregroundColor(GM.textTertiary)
-                GradientButton(title: "Write", action: onWrite)
-                Spacer()
+                .padding(20)
+                .secondaryColumn(GMLayout.form)
             }
-            .padding(20)
         }
         .task { person = await vm.people().first { $0.address == address } }
     }
@@ -420,15 +545,17 @@ struct FilesView: View {
     let onBack: () -> Void
     let onOpen: (String) -> Void
     @State private var entries: [MailboxModel.FileEntry] = []
+    /// False until the first read answers (skeleton, not "No files yet").
+    @State private var filesLoaded = false
+    @Environment(\.dynamicTypeSize) private var dts
 
     var body: some View {
-        MailScaffold(title: "Files", onBack: onBack) {
+        MailScaffold(title: String(localized: "Files"), onBack: onBack) {
             VStack(alignment: .leading, spacing: 0) {
-                NoteBar(text: "GrapMail has no endpoint that lists every file in a " +
-                            "mailbox, so this is the attachments inside messages you " +
-                            "have opened — a file inside mail you have not read is " +
-                            "not shown here.")
-                if entries.isEmpty {
+                NoteBar(text: "GrapMail has no endpoint that lists every file in a mailbox, so this is the attachments inside messages you have opened — a file inside mail you have not read is not shown here.")
+                if !filesLoaded {
+                    GMSkeletonList(rows: 5)
+                } else if entries.isEmpty {
                     CenteredState(title: "No files yet",
                                   detail: "Open a message with an attachment and it appears here.")
                 } else {
@@ -439,23 +566,34 @@ struct FilesView: View {
                                     Image(systemName: "paperclip")
                                         .foregroundColor(GM.primarySolid)
                                     VStack(alignment: .leading, spacing: 2) {
-                                        Text(entry.attachment.name ?? "Attachment")
-                                            .font(.system(size: 15)).foregroundColor(GM.textPrimary)
-                                            .lineLimit(1)
+                                        Text(entry.attachment.name ?? String(localized: "Attachment"))
+                                            .gmFont(15).foregroundColor(GM.textPrimary)
+                                            .lineLimit(dts.isAccessibilitySize ? 3 : 1)
                                         if let from = entry.fromMessage {
-                                            Text(from).font(.system(size: 12))
-                                                .foregroundColor(GM.textTertiary).lineLimit(1)
+                                            Text(from).gmFont(12)
+                                                .foregroundColor(GM.textTertiary)
+                                                .lineLimit(dts.isAccessibilitySize ? 3 : 1)
+                                        }
+                                        // At the accessibility sizes the size moves
+                                        // under the name, so the name keeps the width.
+                                        if dts.isAccessibilitySize, let n = entry.attachment.sizeBytes {
+                                            Text(humanBytes(n)).gmFont(12)
+                                                .foregroundColor(GM.textTertiary)
                                         }
                                     }
                                     Spacer()
-                                    if let n = entry.attachment.sizeBytes {
-                                        Text(humanBytes(n)).font(.system(size: 12))
+                                    if !dts.isAccessibilitySize, let n = entry.attachment.sizeBytes {
+                                        Text(humanBytes(n)).gmFont(12)
                                             .foregroundColor(GM.textTertiary)
                                     }
                                 }
                                 .contentShape(Rectangle())
                             }
                             .buttonStyle(.plain)
+                            // Long-press to drag the file out, once this device
+                            // holds it (AttachmentDrag.swift); the tap still opens it.
+                            .attachmentDrag(vm.localAttachmentFile(entry.attachment.id),
+                                            name: entry.attachment.name, mimeType: entry.attachment.mimeType)
                             .listRowInsets(EdgeInsets(top: 8, leading: 20, bottom: 8, trailing: 16))
                         }
                     }
@@ -463,10 +601,11 @@ struct FilesView: View {
                     .scrollContentBackground(.hidden)
                 }
             }
+            .secondaryColumn(GMLayout.readable)
         }
         .task(id: vm.filesRevision) {
             let loaded = await vm.files()
-            if !Task.isCancelled { entries = loaded }
+            if !Task.isCancelled { entries = loaded; filesLoaded = true }
         }
     }
 }
@@ -491,118 +630,28 @@ struct AttachmentPreviewView: View {
     @State private var confirmDelete = false
     @State private var deleting = false
     @State private var deleted = false
+    @Environment(\.dynamicTypeSize) private var dts
+    /// The file tile grows with the text, capped so the card's buttons stay on
+    /// screen without scrolling as long as possible.
+    @ScaledMetric(relativeTo: .title2) private var tileSide: CGFloat = 84
 
     var body: some View {
-        MailScaffold(title: "Attachment", onBack: onBack) {
+        MailScaffold(title: String(localized: "Attachment"), onBack: onBack) {
             VStack(alignment: .leading, spacing: 0) {
                 if let a = entry?.attachment, !deleted {
-                    VStack(alignment: .leading, spacing: 12) {
-                        Spacer().frame(height: 16)
-                        ZStack {
-                            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                                .fill(GM.softFill).frame(width: 84, height: 84)
-                            Image(systemName: "paperclip")
-                                .font(.system(size: 32)).foregroundColor(GM.primarySolid)
-                        }
-                        Text(a.name ?? "Attachment")
-                            .font(.system(size: 19, weight: .bold))
-                            .foregroundColor(GM.textPrimary)
-                        // Each field says "Not recorded" when the server did not
-                        // name it. A guessed mime type would tell the user a file
-                        // is an image when nothing said so.
-                        DetailLine(label: "Type",
-                                   value: a.mimeType?.nilIfBlank() ?? "Not recorded")
-                        DetailLine(label: "Size",
-                                   value: a.sizeBytes.map { humanBytes($0) } ?? "Not recorded")
-                        if let from = entry?.fromMessage {
-                            DetailLine(label: "From message", value: from)
-                        }
-                        if let outcome {
-                            Text(outcome).font(.system(size: 12))
-                                .foregroundColor(GM.textSecondary).lineLimit(3)
-                        }
-                        GradientButton(title: saving ? "Saving…" : "Save to this device",
-                                       enabled: !saving && !opening && !deleting) {
-                            saving = true
-                            vm.downloadAttachment(a) { r in
-                                saving = false
-                                outcome = r
-                            }
-                        }
-                        .padding(.top, 10)
-                        // The other half of the affordance. Saving to a path
-                        // the person cannot reach from inside the app is only
-                        // useful if they can then open the file — reading it
-                        // is the point of an attachment. QuickLook's own
-                        // toolbar carries the share button, so handing the
-                        // file to another app arrives with the preview rather
-                        // than as a second half-wired path.
-                        Button {
-                            opening = true
-                            vm.prepareAttachment(a) { url, error in
-                                opening = false
-                                if let url { previewURL = IdentifiableURL(url: url) }
-                                else { outcome = error ?? "This attachment could not be opened." }
-                            }
-                        } label: {
-                            Text(opening ? "Opening…" : "Open in another app")
-                                .font(.system(size: 15, weight: .medium))
-                                .foregroundColor(GM.primarySolid)
-                                .padding(.vertical, 14).padding(.horizontal, 18)
-                                .frame(maxWidth: .infinity)
-                                .background(Capsule().stroke(GM.border, lineWidth: 1.5))
-                        }
-                        .disabled(opening || saving || deleting)
-                        .accessibilityIdentifier("mail-attachment-open")
-                        .padding(.top, 10)
-                        if !confirmDelete {
-                            Button {
-                                confirmDelete = true
-                            } label: {
-                                Text("Remove from this message")
-                                    .font(.system(size: 14, weight: .semibold))
-                                    .foregroundColor(GM.error)
-                                    .frame(maxWidth: .infinity).padding(.vertical, 12)
-                                    .overlay(RoundedRectangle(cornerRadius: 24)
-                                        .stroke(GM.error, lineWidth: 1))
-                            }
-                            .disabled(deleting)
-                            .accessibilityIdentifier("mail-attachment-delete")
-                        } else {
-                            VStack(alignment: .leading, spacing: 12) {
-                                Text("Remove \(a.name ?? "this file") from the message? " +
-                                     "The message keeps everything else; this file is " +
-                                     "gone from it for good.")
-                                    .font(.system(size: 13)).foregroundColor(GM.textPrimary)
-                                HStack(spacing: 24) {
-                                    Button("Cancel") { confirmDelete = false }
-                                        .foregroundColor(GM.textSecondary)
-                                    Button(deleting ? "Removing…" : "Remove") {
-                                        deleting = true
-                                        vm.deleteAttachment(a.id) { removed, message in
-                                            deleting = false; confirmDelete = false
-                                            deleted = removed; outcome = message
-                                        }
-                                    }
-                                    .foregroundColor(GM.error)
-                                    .fontWeight(.semibold)
-                                    .disabled(deleting)
-                                }
-                                .font(.system(size: 14))
-                            }
-                            .padding(16)
-                            .background(RoundedRectangle(cornerRadius: 12).fill(GM.warnChipBg))
-                            .accessibilityIdentifier("mail-attachment-confirm")
-                        }
+                    // Drawn where it always was while it fits; scrolls once large
+                    // text or a landscape phone makes the card taller than the
+                    // screen (the card has no text field, so the swap is safe).
+                    SecondaryFitOrScroll {
+                        card(a)
                     }
-                    .padding(.horizontal, 20)
                 } else if !loaded {
-                    CenteredState(title: "Loading attachment…")
+                    GMSkeletonBlock(lines: 4)
+                        .padding(.horizontal, 20)
                 } else {
                     CenteredState(
                         title: deleted
-                            ? "This attachment has been removed from the message. "
-                              + "The message itself is unchanged."
+                            ? "This attachment has been removed from the message. The message itself is unchanged."
                             : "This attachment is no longer listed.",
                         detail: deleted ? nil : "Open its message again.")
                 }
@@ -622,6 +671,123 @@ struct AttachmentPreviewView: View {
             QuickLookPresenter(url: item.url)
                 .ignoresSafeArea()
         }
+    }
+
+    private func card(_ a: MailAttachment) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Spacer().frame(height: 16)
+            ZStack {
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .fill(GM.softFill).frame(width: min(tileSide, 124), height: min(tileSide, 124))
+                Image(systemName: "paperclip")
+                    .gmFont(32, maxSize: 48).foregroundColor(GM.primarySolid)
+            }
+            // The tile drags the file out once it is on this device
+            // (AttachmentDrag.swift). Only the tile: QuickLook stays
+            // on its own button below, so a long press here never
+            // competes with that tap.
+            .attachmentDrag(vm.localAttachmentFile(a.id), name: a.name, mimeType: a.mimeType)
+            Text(a.name ?? String(localized: "Attachment"))
+                .gmFont(19, .bold)
+                .foregroundColor(GM.textPrimary)
+                .fixedSize(horizontal: false, vertical: true)
+            // Each field says "Not recorded" when the server did not
+            // name it. A guessed mime type would tell the user a file
+            // is an image when nothing said so.
+            DetailLine(label: "Type",
+                       value: a.mimeType?.nilIfBlank() ?? String(localized: "Not recorded"))
+            DetailLine(label: "Size",
+                       value: a.sizeBytes.map { humanBytes($0) } ?? String(localized: "Not recorded"))
+            if let from = entry?.fromMessage {
+                DetailLine(label: "From message", value: from)
+            }
+            if let outcome {
+                Text(outcome).gmFont(12)
+                    .foregroundColor(GM.textSecondary)
+                    .lineLimit(dts.isAccessibilitySize ? nil : 3)
+            }
+            GradientButton(title: saving ? String(localized: "Saving…") : String(localized: "Save to this device"),
+                           enabled: !saving && !opening && !deleting) {
+                saving = true
+                vm.downloadAttachment(a) { r in
+                    saving = false
+                    outcome = r
+                }
+            }
+            .padding(.top, 10)
+            // The other half of the affordance. Saving to a path
+            // the person cannot reach from inside the app is only
+            // useful if they can then open the file — reading it
+            // is the point of an attachment. QuickLook's own
+            // toolbar carries the share button, so handing the
+            // file to another app arrives with the preview rather
+            // than as a second half-wired path.
+            Button {
+                opening = true
+                vm.prepareAttachment(a) { url, error in
+                    opening = false
+                    if let url { previewURL = IdentifiableURL(url: url) }
+                    else { outcome = error ?? String(localized: "This attachment could not be opened.") }
+                }
+            } label: {
+                Text(opening ? "Opening…" : "Open in another app")
+                    .gmFont(15, .medium)
+                    .foregroundColor(GM.primarySolid)
+                    .multilineTextAlignment(.center)
+                    .padding(.vertical, 14).padding(.horizontal, 18)
+                    .frame(maxWidth: .infinity)
+                    .background(Capsule().stroke(GM.border, lineWidth: 1.5))
+            }
+            .disabled(opening || saving || deleting)
+            .accessibilityIdentifier("mail-attachment-open")
+            .padding(.top, 10)
+            if !confirmDelete {
+                Button {
+                    confirmDelete = true
+                } label: {
+                    Text("Remove from this message")
+                        .gmFont(14, .semibold)
+                        .foregroundColor(GM.error)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 12)
+                        .frame(maxWidth: .infinity).padding(.vertical, 12)
+                        .overlay(RoundedRectangle(cornerRadius: 24)
+                            .stroke(GM.error, lineWidth: 1))
+                }
+                .disabled(deleting)
+                .accessibilityIdentifier("mail-attachment-delete")
+            } else {
+                VStack(alignment: .leading, spacing: 12) {
+                    // Two whole sentences (named / unnamed file) rather than a
+                    // translated "this file" spliced into a translated sentence.
+                    Text(a.name.map {
+                        String(localized: "Remove \($0) from the message? The message keeps everything else; this file is gone from it for good.")
+                    } ?? String(localized: "Remove this file from the message? The message keeps everything else; this file is gone from it for good."))
+                        .gmFont(13).foregroundColor(GM.textPrimary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    GMAdaptiveStack(spacing: dts.isAccessibilitySize ? 12 : 24) {
+                        Button("Cancel") { confirmDelete = false }
+                            .foregroundColor(GM.textSecondary)
+                        Button(deleting ? "Removing…" : "Remove") {
+                            deleting = true
+                            vm.deleteAttachment(a.id) { removed, message in
+                                deleting = false; confirmDelete = false
+                                deleted = removed; outcome = message
+                            }
+                        }
+                        .foregroundColor(GM.error)
+                        .fontWeight(.semibold)
+                        .disabled(deleting)
+                    }
+                    .gmFont(14)
+                }
+                .padding(16)
+                .background(RoundedRectangle(cornerRadius: 12).fill(GM.warnChipBg))
+                .accessibilityIdentifier("mail-attachment-confirm")
+            }
+        }
+        .padding(.horizontal, 20)
+        .secondaryColumn(GMLayout.form)
     }
 }
 
@@ -654,6 +820,9 @@ struct MailSettingsView: View {
     // Same contract as the row above: the per-account mute screen, reached
     // only where the route was wired.
     var onPerAccountNotifications: (() -> Void)? = nil
+    // Connected mailboxes (Outlook / IMAP). Optional for the same reason:
+    // the snapshot host does not wire it.
+    var onProviders: (() -> Void)? = nil
 
     /// The system's own answer about alerts for this app, read when the screen
     /// appears — never assumed, never remembered from a previous visit.
@@ -667,15 +836,15 @@ struct MailSettingsView: View {
     /// not landed, and "Checking…" is the only honest thing to print for it.
     private var notificationValue: String {
         switch notificationStatus {
-        case nil: return "Checking this device's setting"
+        case nil: return String(localized: "Checking this device's setting")
         case .authorized, .provisional:
-            return "On — GrapMail checks for new mail when iOS wakes it"
+            return String(localized: "On — GrapMail checks for new mail when iOS wakes it")
         case .denied:
-            return "Off — turn it on in Settings › GrapMail › Notifications"
+            return String(localized: "Off — turn it on in Settings › GrapMail › Notifications")
         case .notDetermined:
-            return "Not asked yet — tap to allow new-mail alerts"
+            return String(localized: "Not asked yet — tap to allow new-mail alerts")
         default:
-            return "Not allowed to alert from this device"
+            return String(localized: "Not allowed to alert from this device")
         }
     }
 
@@ -708,19 +877,19 @@ struct MailSettingsView: View {
     }
 
     var body: some View {
-        MailScaffold(title: "Settings", onBack: onBack) {
+        MailScaffold(title: String(localized: "Settings"), onBack: onBack) {
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
                     SectionLabel(text: "Account")
                     // Every unanswered field says so. "Not reported" is the
                     // truth; a blank or a default would read as a fact about
                     // the account.
-                    SettingRow(icon: "envelope", title: "GrapMail address",
-                               value: vm.state.accountAddress ?? "Not loaded")
-                    SettingRow(icon: "star", title: "Mailbox status",
-                               value: vm.state.accountStatus ?? "Not reported")
-                    SettingRow(icon: "lock", title: "Member since",
-                               value: vm.state.memberSince ?? "Not reported")
+                    SettingRow(icon: "envelope", title: String(localized: "GrapMail address"),
+                               value: vm.state.accountAddress ?? String(localized: "Not loaded"))
+                    SettingRow(icon: "star", title: String(localized: "Mailbox status"),
+                               value: vm.state.accountStatus ?? String(localized: "Not reported"))
+                    SettingRow(icon: "lock", title: String(localized: "Member since"),
+                               value: vm.state.memberSince ?? String(localized: "Not reported"))
 
                     SectionLabel(text: "Sending as")
                     // Three answers, not two: while the read is outstanding the
@@ -728,17 +897,18 @@ struct MailSettingsView: View {
                     switch vm.aliasesState.read {
                     case .notRead, .reading:
                         Text("Checking…")
-                            .font(.system(size: 13)).foregroundColor(GM.textTertiary)
+                            .gmFont(13).foregroundColor(GM.textTertiary)
                             .padding(.horizontal, 20).padding(.vertical, 8)
                     case .failed where vm.aliasesState.list.isEmpty:
-                        Text(vm.aliasesState.error ?? "The alias list did not load.")
-                            .font(.system(size: 13)).foregroundColor(GM.textSecondary)
+                        Text(vm.aliasesState.error ?? String(localized: "The alias list did not load."))
+                            .gmFont(13).foregroundColor(GM.textSecondary)
+                            .fixedSize(horizontal: false, vertical: true)
                             .padding(.horizontal, 20).padding(.vertical, 8)
                     default:
                         if vm.aliasesState.list.isEmpty {
-                            Text("No aliases on this mailbox. An alias is a second address " +
-                                 "that delivers into the same inbox.")
-                                .font(.system(size: 13)).foregroundColor(GM.textSecondary)
+                            Text("No aliases on this mailbox. An alias is a second address that delivers into the same inbox.")
+                                .gmFont(13).foregroundColor(GM.textSecondary)
+                                .fixedSize(horizontal: false, vertical: true)
                                 .padding(.horizontal, 20).padding(.vertical, 8)
                         } else {
                             ForEach(vm.aliasesState.list) { a in
@@ -754,33 +924,35 @@ struct MailSettingsView: View {
                     }
 
                     SectionLabel(text: "Mailbox")
-                    SettingRow(icon: "checkmark.shield", title: "Account security",
-                               value: "Password, two-step, sessions", onClick: onSecurity)
-                    SettingRow(icon: "lock", title: "Screener",
-                               value: "Approval for unknown senders", onClick: onScreener)
-                    SettingRow(icon: "clock", title: "Scheduled",
-                               value: "Sends queued on the server", onClick: onScheduled)
-                    SettingRow(icon: "tag", title: "Labels",
-                               value: "Filters for the inbox", onClick: onLabels)
-                    SettingRow(icon: "envelope", title: "Mail settings",
-                               value: "Signature, auto-reply, forwarding, dates, senders", onClick: onPrefs)
-                    SettingRow(icon: "star", title: "Your plan",
-                               value: "Monthly sending allowance", onClick: { showPlan = true })
+                    SettingRow(icon: "checkmark.shield", title: String(localized: "Account security"),
+                               value: String(localized: "Password, two-step, sessions"), onClick: onSecurity)
+                    SettingRow(icon: "lock", title: String(localized: "Screener"),
+                               value: String(localized: "Approval for unknown senders"), onClick: onScreener)
+                    SettingRow(icon: "clock", title: String(localized: "Scheduled"),
+                               value: String(localized: "Sends queued on the server"), onClick: onScheduled)
+                    SettingRow(icon: "tag", title: String(localized: "Labels"),
+                               value: String(localized: "Filters for the inbox"), onClick: onLabels)
+                    SettingRow(icon: "envelope", title: String(localized: "Mail settings"),
+                               value: String(localized: "Signature, auto-reply, forwarding, dates, senders"), onClick: onPrefs)
+                    SettingRow(icon: "star", title: String(localized: "Your plan"),
+                               value: String(localized: "Monthly sending allowance"), onClick: { showPlan = true })
                         .sheet(isPresented: $showPlan) { PlanView(onClose: { showPlan = false }) }
-                    SettingRow(icon: "person.badge.plus", title: "Addresses",
-                               value: "Primary and aliases", onClick: onAddresses)
-                    SettingRow(icon: "person", title: "Connected accounts",
-                               value: "Apps that can use this sign-in", onClick: onConnections)
-                    SettingRow(icon: "envelope", title: "Subscriptions",
-                               value: "Senders that mail you most", onClick: onSubscriptions)
-                    SettingRow(icon: "tray.and.arrow.down", title: "Import mail",
-                               value: "From Gmail, Yahoo, iCloud or another IMAP account",
+                    SettingRow(icon: "person.badge.plus", title: String(localized: "Addresses"),
+                               value: String(localized: "Primary and aliases"), onClick: onAddresses)
+                    SettingRow(icon: "person", title: String(localized: "Connected accounts"),
+                               value: String(localized: "Apps that can use this sign-in"), onClick: onConnections)
+                    SettingRow(icon: "tray.2", title: String(localized: "Connected mailboxes"),
+                               value: String(localized: "Outlook, Yahoo, iCloud and other IMAP"), onClick: onProviders)
+                    SettingRow(icon: "envelope", title: String(localized: "Subscriptions"),
+                               value: String(localized: "Senders that mail you most"), onClick: onSubscriptions)
+                    SettingRow(icon: "tray.and.arrow.down", title: String(localized: "Import mail"),
+                               value: String(localized: "From Gmail, Yahoo, iCloud or another IMAP account"),
                                onClick: { showImport = true })
                         .accessibilityIdentifier("mail-import-row")
-                    SettingRow(icon: "note.text", title: "Notes",
-                               value: "Kept on the account", onClick: onNotes)
-                    SettingRow(icon: "checkmark", title: "Tasks",
-                               value: "The list beside the mailbox", onClick: onTasks)
+                    SettingRow(icon: "note.text", title: String(localized: "Notes"),
+                               value: String(localized: "Kept on the account"), onClick: onNotes)
+                    SettingRow(icon: "checkmark", title: String(localized: "Tasks"),
+                               value: String(localized: "The list beside the mailbox"), onClick: onTasks)
 
                     SectionLabel(text: "This account")
                     // New-mail alerts are local polling, not push: there is no
@@ -794,7 +966,7 @@ struct MailSettingsView: View {
                     // wired to nothing — and the ask is here rather than at
                     // launch, so nobody is interrupted by an app they have not
                     // used yet.
-                    SettingRow(icon: "bell", title: "New mail notifications",
+                    SettingRow(icon: "bell", title: String(localized: "New mail notifications"),
                                value: notificationValue,
                                onClick: { askNotifications() })
                         .accessibilityIdentifier("mail-notifications-row")
@@ -802,53 +974,54 @@ struct MailSettingsView: View {
                     // account) and the mail quiet-hours window. The system
                     // authorization row above answers "may the app alert at
                     // all"; this one answers "which alerts".
-                    SettingRow(icon: "bell.badge", title: "Notification preferences",
-                               value: "Mail, security and account alerts",
+                    SettingRow(icon: "bell.badge", title: String(localized: "Notification preferences"),
+                               value: String(localized: "Mail, security and account alerts"),
                                onClick: onNotificationPrefs)
                         .accessibilityIdentifier("mail-notification-prefs-row")
                     // The per-account mute: which signed-in account may alert
                     // at all on this device. The row above shapes the alerts
                     // one account sends; this one is the off switch per
                     // account.
-                    SettingRow(icon: "bell.slash", title: "Per-account notifications",
-                               value: "Silence one signed-in account on this device",
+                    SettingRow(icon: "bell.slash", title: String(localized: "Per-account notifications"),
+                               value: String(localized: "Silence one signed-in account on this device"),
                                onClick: onPerAccountNotifications)
                         .accessibilityIdentifier("mail-per-account-notifications-row")
                     // Client-side filtering (priority only, VIP senders,
                     // lock-screen previews) — a different layer from the
                     // server's per-scope alerts above.
-                    SettingRow(icon: "bell.badge", title: "Notification filters",
-                               value: "Priority only, VIP senders, quiet hours, lock-screen previews",
+                    SettingRow(icon: "bell.badge", title: String(localized: "Notification filters"),
+                               value: String(localized: "Priority only, VIP senders, quiet hours, lock-screen previews"),
                                onClick: { showNotificationFilters = true })
                         .accessibilityIdentifier("mail-notification-filters-row")
                     // App lock — Face ID in front of the whole mailbox (AppLock.swift).
                     AppLockRow()
                     // Crash and hang reports to GrapMail's own server (RemoteConfig.swift).
-                    SettingRow(icon: "ladybug", title: "Send crash reports",
-                               value: crashReports ? "On — app version, device and the error, never your mail"
-                                                   : "Off — crashes are not reported",
+                    SettingRow(icon: "ladybug", title: String(localized: "Send crash reports"),
+                               value: crashReports ? String(localized: "On — app version, device and the error, never your mail")
+                                                   : String(localized: "Off — crashes are not reported"),
                                onClick: { crashReports.toggle(); CrashReporter.enabled = crashReports })
                         .accessibilityIdentifier("mail-crash-reports-row")
-                    SettingRow(icon: "person", title: "Personal info",
-                               value: "Name, birthday, photo", onClick: onProfile)
-                    SettingRow(icon: "checkmark.shield", title: "Data & privacy",
-                               value: "What is kept, what you control", onClick: onPrivacy)
-                    SettingRow(icon: "lock", title: "Encryption",
-                               value: "Your end-to-end key, on this device", onClick: onEncryption)
+                    SettingRow(icon: "person", title: String(localized: "Personal info"),
+                               value: String(localized: "Name, birthday, photo"), onClick: onProfile)
+                    SettingRow(icon: "checkmark.shield", title: String(localized: "Data & privacy"),
+                               value: String(localized: "What is kept, what you control"), onClick: onPrivacy)
+                    SettingRow(icon: "lock", title: String(localized: "Encryption"),
+                               value: String(localized: "Your end-to-end key, on this device"), onClick: onEncryption)
 
                     SectionLabel(text: "Support")
-                    SettingRow(icon: "questionmark.circle", title: "Help & Support",
-                               value: "Questions this product actually raises", onClick: onHelp)
+                    SettingRow(icon: "questionmark.circle", title: String(localized: "Help & Support"),
+                               value: String(localized: "Questions this product actually raises"), onClick: onHelp)
 
                     Button(action: onSignOut) {
                         Text("Sign out")
-                            .font(.system(size: 15, weight: .semibold))
+                            .gmFont(15, .semibold)
                             .foregroundColor(GM.error)
                             .padding(.horizontal, 20).padding(.vertical, 14)
                     }
                     .accessibilityIdentifier("mail-sign-out")
                 }
                 .padding(.bottom, 30)
+                .secondaryColumn(GMLayout.form)
             }
         }
         .sheet(isPresented: $showNotificationFilters) { NotificationFiltersView() }
@@ -889,65 +1062,89 @@ struct PerAccountNotificationsView: View {
     @State private var loaded = false
     @State private var saving: String?
     @State private var error: String?
+    @Environment(\.dynamicTypeSize) private var dts
 
     var body: some View {
-        MailScaffold(title: "Per-account notifications", onBack: onBack) {
+        MailScaffold(title: String(localized: "Per-account notifications"), onBack: onBack) {
             ScrollView {
                 VStack(alignment: .leading, spacing: 14) {
                     if !loaded {
                         Text("Checking…")
-                            .font(.system(size: 13)).foregroundColor(GM.textTertiary)
+                            .gmFont(13).foregroundColor(GM.textTertiary)
                     } else if rows.isEmpty {
                         Text("No accounts are signed in on this device.")
-                            .font(.system(size: 13)).foregroundColor(GM.textSecondary)
+                            .gmFont(13).foregroundColor(GM.textSecondary)
+                            .fixedSize(horizontal: false, vertical: true)
                     } else {
                         ForEach(rows) { row in
                             rowView(row)
                         }
                     }
                     if let error {
-                        Text(error).font(.system(size: 12)).foregroundColor(GM.error)
+                        Text(error).gmFont(12).foregroundColor(GM.error)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
-                    Text("Silencing one account stops its mail alerts on this device. " +
-                         "Mandatory security alerts still arrive — the server keeps those " +
-                         "on for every account.")
-                        .font(.system(size: 12)).foregroundColor(GM.textSecondary)
+                    Text("Silencing one account stops its mail alerts on this device. Mandatory security alerts still arrive — the server keeps those on for every account.")
+                        .gmFont(12).foregroundColor(GM.textSecondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 .padding(20)
+                .secondaryColumn(GMLayout.form)
             }
         }
         .task { load() }
     }
 
+    @ViewBuilder
     private func rowView(_ row: Row) -> some View {
-        HStack(spacing: 12) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(row.address)
-                    .font(.system(size: 15)).foregroundColor(GM.textPrimary)
-                    .lineLimit(1).truncationMode(.middle)
-                Text(row.deviceRowId == nil
-                     ? "Not registered for push on this device"
-                     : row.muted ? "Muted — this account's alerts are silenced"
-                     : "Alerts arrive normally")
-                    .font(.system(size: 12)).foregroundColor(GM.textSecondary)
-                    .fixedSize(horizontal: false, vertical: true)
+        if dts.isAccessibilitySize {
+            // The switch under the address: beside it, accessibility-size text
+            // would leave the address a few characters wide.
+            VStack(alignment: .leading, spacing: 8) {
+                rowText(row)
+                rowControl(row)
             }
-            Spacer(minLength: 8)
-            if saving == row.address {
-                ProgressView()
-            } else {
-                Toggle("Muted", isOn: Binding(
-                    get: { rows.first { $0.address == row.address }?.muted ?? row.muted },
-                    set: { setMuted(row, muted: $0) }
-                ))
-                .labelsHidden()
-                .tint(GM.primarySolid)
-                .disabled(row.deviceRowId == nil)
-                .accessibilityIdentifier("per-account-mute-\(row.id)")
+            .padding(.vertical, 6)
+        } else {
+            HStack(spacing: 12) {
+                rowText(row)
+                Spacer(minLength: 8)
+                rowControl(row)
             }
+            .padding(.vertical, 6)
         }
-        .padding(.vertical, 6)
+    }
+
+    private func rowText(_ row: Row) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(row.address)
+                .gmFont(15).foregroundColor(GM.textPrimary)
+                // The address is what tells one account from another: at the
+                // accessibility sizes it wraps rather than losing its middle.
+                .lineLimit(dts.isAccessibilitySize ? nil : 1).truncationMode(.middle)
+            Text(row.deviceRowId == nil
+                 ? "Not registered for push on this device"
+                 : row.muted ? "Muted — this account's alerts are silenced"
+                 : "Alerts arrive normally")
+                .gmFont(12).foregroundColor(GM.textSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    @ViewBuilder
+    private func rowControl(_ row: Row) -> some View {
+        if saving == row.address {
+            ProgressView()
+        } else {
+            Toggle("Muted", isOn: Binding(
+                get: { rows.first { $0.address == row.address }?.muted ?? row.muted },
+                set: { setMuted(row, muted: $0) }
+            ))
+            .labelsHidden()
+            .tint(GM.primarySolid)
+            .disabled(row.deviceRowId == nil)
+            .accessibilityIdentifier("per-account-mute-\(row.id)")
+        }
     }
 
     // ── reads and writes ─────────────────────────────────────────────────────
@@ -986,7 +1183,7 @@ struct PerAccountNotificationsView: View {
                 // The mute must be authenticated AS the muted account, so the
                 // bearer is that account's own — not the mailbox's active one.
                 guard let bearer = await ApiClient.pushBearer(for: row.address) else {
-                    throw ApiError.http(status: 401, code: nil, message: "Sign in again.")
+                    throw ApiError.http(status: 401, code: nil, message: String(localized: "Sign in again."))
                 }
                 let answer = try await ApiClient.setAccountPushPreferences(
                     token: bearer, deviceRowId: deviceRowId,
@@ -1000,7 +1197,7 @@ struct PerAccountNotificationsView: View {
                 }
             } catch {
                 rows = previous
-                self.error = apiMessage(error, fallback: "The change did not save. Try again.")
+                self.error = apiMessage(error, fallback: String(localized: "The change did not save. Try again."))
             }
             saving = nil
         }
@@ -1014,6 +1211,9 @@ private struct SettingRow: View {
     var trailing: String? = nil
     var onClick: (() -> Void)? = nil
 
+    /// The icon column grows with the icon, which grows with the title.
+    @ScaledMetric(relativeTo: .body) private var iconColumn: CGFloat = 22
+
     var body: some View {
         if let onClick {
             Button(action: onClick) { content }
@@ -1025,14 +1225,17 @@ private struct SettingRow: View {
 
     private var content: some View {
         HStack(spacing: 14) {
-            Image(systemName: icon).font(.system(size: 17))
-                .foregroundColor(GM.textSecondary).frame(width: 22)
+            Image(systemName: icon).gmFont(17, maxSize: 30)
+                .foregroundColor(GM.textSecondary).frame(width: min(iconColumn, 34))
+                .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 2) {
                 Text(title).font(.body.weight(.medium)).foregroundColor(GM.textPrimary)
+                    .fixedSize(horizontal: false, vertical: true)
                 Text(value).font(.footnote).foregroundColor(GM.textSecondary)
                     .fixedSize(horizontal: false, vertical: true)
                 if let trailing {
                     Text(trailing).font(.caption).foregroundColor(GM.warnInk)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -1063,52 +1266,61 @@ struct ScreenerView: View {
     let onOpenQueue: () -> Void
 
     var body: some View {
-        MailScaffold(title: "Screener", onBack: onBack) {
-            VStack(alignment: .leading, spacing: 14) {
-                Text("Mail from senders you have not approved waits in a queue instead " +
-                     "of reaching the inbox. The queue is a real folder, so a mail in it " +
-                     "is not lost — it is held.")
-                    .font(.system(size: 14)).foregroundColor(GM.textSecondary)
+        MailScaffold(title: String(localized: "Screener"), onBack: onBack) {
+            // Scrolls once large text makes the screen taller than the window;
+            // content stays at the top, where the trailing Spacer held it.
+            ScrollView(.vertical) {
+                VStack(alignment: .leading, spacing: 14) {
+                    Text("Mail from senders you have not approved waits in a queue instead of reaching the inbox. The queue is a real folder, so a mail in it is not lost — it is held.")
+                        .gmFont(14).foregroundColor(GM.textSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
 
-                HStack {
-                    Text("Screener").font(.system(size: 15)).foregroundColor(GM.textPrimary)
-                    Spacer()
-                    if !vm.screener.loaded {
-                        Text("Checking…").font(.system(size: 13)).foregroundColor(GM.textTertiary)
-                    } else if let enabled = vm.screener.enabled {
-                        Toggle("", isOn: Binding(
-                            get: { enabled },
-                            set: { vm.setScreener(enabled: $0) }))
-                            .labelsHidden()
-                            .disabled(vm.screener.busy)
-                        Text(enabled ? "On — unknown senders wait" : "Off — all senders reach the inbox")
-                            .font(.system(size: 12)).foregroundColor(GM.textTertiary)
-                    } else {
-                        Text("Not reported").font(.system(size: 13)).foregroundColor(GM.warnInk)
+                    // On one line as designed; stacked once the switch and its
+                    // status no longer fit beside the title.
+                    SecondaryFlowRow {
+                        Text("Screener").gmFont(15).foregroundColor(GM.textPrimary)
+                        Spacer()
+                        if !vm.screener.loaded {
+                            Text("Checking…").gmFont(13).foregroundColor(GM.textTertiary)
+                        } else if let enabled = vm.screener.enabled {
+                            Toggle("", isOn: Binding(
+                                get: { enabled },
+                                set: { vm.setScreener(enabled: $0) }))
+                                .labelsHidden()
+                                .disabled(vm.screener.busy)
+                                .accessibilityLabel(Text("Screener"))
+                            Text(enabled ? "On — unknown senders wait" : "Off — all senders reach the inbox")
+                                .gmFont(12).foregroundColor(GM.textTertiary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        } else {
+                            Text("Not reported").gmFont(13).foregroundColor(GM.warnInk)
+                        }
                     }
-                }
 
-                HStack {
-                    // Same words as the Android row: two platforms naming one
-                    // thing differently is how a screen stops being the same
-                    // screen, and the walk marker has to match both.
-                    Text("Waiting in the queue")
-                        .font(.system(size: 15)).foregroundColor(GM.textPrimary)
+                    SecondaryFlowRow {
+                        // Same words as the Android row: two platforms naming one
+                        // thing differently is how a screen stops being the same
+                        // screen, and the walk marker has to match both.
+                        Text("Waiting in the queue")
+                            .gmFont(15).foregroundColor(GM.textPrimary)
+                        Spacer()
+                        Text(vm.screener.pending.map { "\($0)" } ?? String(localized: "Not reported"))
+                            .gmFont(15, .semibold)
+                            .foregroundColor(GM.primarySolid)
+                    }
+
+                    if let error = vm.screener.error {
+                        Text(error).gmFont(13).foregroundColor(GM.error)
+                            .fixedSize(horizontal: false, vertical: true)
+                        if !vm.screener.busy { Button("Retry") { vm.loadScreener() } }
+                    }
+
+                    GradientButton(title: String(localized: "Open the queue"), action: onOpenQueue)
                     Spacer()
-                    Text(vm.screener.pending.map { "\($0)" } ?? "Not reported")
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundColor(GM.primarySolid)
                 }
-
-                if let error = vm.screener.error {
-                    Text(error).font(.system(size: 13)).foregroundColor(GM.error)
-                    if !vm.screener.busy { Button("Retry") { vm.loadScreener() } }
-                }
-
-                GradientButton(title: "Open the queue", action: onOpenQueue)
-                Spacer()
+                .padding(20)
+                .secondaryColumn(GMLayout.form)
             }
-            .padding(20)
         }
         .task { vm.loadScreener() }
     }

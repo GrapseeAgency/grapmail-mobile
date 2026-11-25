@@ -161,11 +161,11 @@ enum NotificationPolicy {
     /// Change the rules: read the server's current copy, apply `change`, save, keep
     /// what the server stored. nil on success, otherwise the sentence to show.
     static func update(_ change: (inout NotificationSettingsInfo) -> Void) async -> String? {
-        guard let token = SessionStore.token else { return "Sign in again." }
+        guard let token = SessionStore.token else { return String(localized: "Sign in again.") }
         let account = SessionStore.address
         do {
             guard var next = try await ApiClient.profile(token: token).profile?.settings?.notifications else {
-                return "Your notification settings could not be read. Try again."
+                return String(localized: "Your notification settings could not be read. Try again.")
             }
             change(&next)
             let saved = try await ApiClient.patchProfile(token: token, settings: ["notifications": next.dictionary])

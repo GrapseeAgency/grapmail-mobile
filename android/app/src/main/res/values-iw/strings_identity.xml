@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="identity_settings_appearance">מראה</string>
+    <string name="identity_match_wallpaper_title">התאמה לטפט</string>
+    <string name="identity_match_wallpaper_subtitle">שימוש בצבעי הטפט לכפתורים ולהדגשות. האווטרים, צבעי המצב והטקסט נשארים בצבעי GrapMail.</string>
+</resources>

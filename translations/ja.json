@@ -1,0 +1,73 @@
+{
+ "android": {
+  "strings_r9_reader.xml": {
+   "reader_earlier_messages": {"one": "以前のメッセージ %d 件", "other": "以前のメッセージ %d 件"},
+   "reader_participants": {"one": "%d 人", "other": "%d 人"},
+   "reader_message_count": {"one": "%d 件のメッセージ", "other": "%d 件のメッセージ"},
+   "reader_you": "自分",
+   "reader_unread": "未読",
+   "reader_earlier_action": "折りたたまれたメッセージを表示",
+   "reader_open_message_action": "このメッセージを開く",
+   "reader_quoted_show": "引用テキストを表示",
+   "reader_quoted_hide": "引用テキストを隠す",
+   "reader_state_expanded": "展開中",
+   "reader_state_collapsed": "折りたたみ",
+   "reader_reply_to": "%1$s に返信…",
+   "reader_reply_fallback": "返信…",
+   "reader_reply_options": "返信のオプション",
+   "reader_quick_reply": "クイック返信",
+   "reader_attach_share_chooser": "添付ファイルを共有",
+   "reader_attach_view_image": "画像を表示",
+   "reader_attach_save_named": "%1$s を保存",
+   "reader_attach_share_named": "%1$s を共有",
+   "reader_attach_share_nothing": "この端末にはこのファイルを共有できるアプリがありません。",
+   "reader_viewer_position": "%1$d / %2$d",
+   "reader_viewer_too_large": "この画像はここではプレビューできません。",
+   "compose_r9_leave_title": "このメッセージを閉じますか？",
+   "compose_r9_leave_attachments": "下書きはまだ添付ファイルを保持できません。添付なしで本文だけを下書き保存するか、編集を続けてください。",
+   "compose_r9_save_text_only": "本文だけ保存",
+   "compose_r9_draft_failed_title": "この下書きは保存されませんでした",
+   "compose_r9_leave_without_saving": "保存せずに閉じる",
+   "compose_r9_encrypt_failed": "このメッセージを暗号化できなかったため、送信されていません。",
+   "compose_editor_toolbar": "テキストの書式",
+   "compose_editor_bold": "太字",
+   "compose_editor_italic": "斜体",
+   "compose_editor_underline": "下線",
+   "compose_editor_strike": "取り消し線",
+   "compose_editor_bullets": "箇条書き",
+   "compose_editor_numbered": "番号付き",
+   "compose_editor_text_colour": "文字色",
+   "compose_editor_black": "黒",
+   "compose_editor_blue": "青",
+   "compose_editor_red": "赤",
+   "compose_editor_green": "緑",
+   "compose_editor_highlight": "ハイライト",
+   "compose_editor_highlight_colour": "ハイライトの色",
+   "compose_editor_yellow": "黄",
+   "compose_editor_pink": "ピンク",
+   "compose_editor_font": "フォント",
+   "compose_editor_sans": "サンセリフ",
+   "compose_editor_larger": "大きく",
+   "compose_editor_clear": "書式を解除",
+   "compose_editor_image": "画像",
+   "compose_editor_insert_image": "画像を挿入"
+  },
+  "strings_r9_platform.xml": {
+   "r9_platform_notif_channel_new_mail_desc": "受信トレイに新しいメッセージが届いたときに知らせます。",
+   "r9_platform_price_per_week": "%1$s / 週",
+   "r9_platform_price_per_month": "%1$s / 月",
+   "r9_platform_price_per_3_months": "3 か月ごとに %1$s",
+   "r9_platform_price_per_6_months": "6 か月ごとに %1$s",
+   "r9_platform_price_per_year": "%1$s / 年"
+  },
+  "strings_r9_mailbox.xml": {
+   "mail_sendlater_channel_name": "予約送信",
+   "mail_sendlater_channel_desc": "送信待ちのメッセージのカウントダウン"
+  },
+  "strings_identity.xml": {
+   "identity_settings_appearance": "外観",
+   "identity_match_wallpaper_title": "壁紙に合わせる",
+   "identity_match_wallpaper_subtitle": "ボタンとハイライトに壁紙の色を使います。アバター、状態の色、テキストは GrapMail の色のままです。"
+  }
+ }
+}

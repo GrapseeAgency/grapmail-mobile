@@ -15,6 +15,9 @@ import kotlinx.coroutines.launch
 class GrapMailApp : Application() {
     override fun onCreate() {
         super.onCreate()
+        // Text built off-screen (workers, notifications, ViewModels) resolves
+        // against the application context from here on (ui/i18n/UiText.kt).
+        com.grapsee.grapmail.ui.i18n.CoreStrings.install(this)
         // First, so a crash anywhere after this is recorded (logic/CrashReporter.kt).
         com.grapsee.grapmail.logic.CrashReporter.install(this)
         DeviceId.init(this)

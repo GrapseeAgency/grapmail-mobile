@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Loading / empty / error / offline states (translated from values/strings_states.xml). -->
+<resources>
+    <string name="states_loading">Memuat…</string>
+    <string name="states_offline_banner">Anda sedang offline. Menampilkan data yang terakhir dimuat — apa pun yang memerlukan jaringan akan menunggu hingga Anda terhubung kembali.</string>
+    <string name="states_error_title">Terjadi kesalahan</string>
+    <string name="states_error_body">Ini tidak dapat dimuat sekarang. Periksa koneksi Anda dan coba lagi.</string>
+    <string name="states_error_offline_body">Anda sedang offline. Hubungkan ke Wi-Fi atau data seluler, lalu coba lagi.</string>
+    <string name="states_retry">Coba lagi</string>
+    <string name="states_labels_loading">Memuat label…</string>
+    <string name="states_labels_failed_title">Label tidak dapat dimuat</string>
+    <string name="states_scheduled_loading">Memuat email terjadwal…</string>
+    <string name="states_scheduled_failed_title">Email terjadwal tidak dapat dimuat</string>
+    <string name="states_scheduled_empty_title">Tidak ada yang dijadwalkan</string>
+    <string name="states_contacts_loading">Mengumpulkan orang dari email Anda…</string>
+    <string name="states_files_loading">Mengumpulkan lampiran…</string>
+    <string name="states_providers_loading">Memuat kotak surat yang terhubung…</string>
+    <string name="states_thread_loading">Membuka percakapan ini…</string>
+    <string name="states_activity_failed_title">Aktivitas tidak dapat dimuat</string>
+    <string name="states_sessions_failed_title">Sesi tidak dapat dimuat</string>
+</resources>

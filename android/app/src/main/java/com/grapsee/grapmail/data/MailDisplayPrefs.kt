@@ -21,12 +21,18 @@ import java.time.ZoneId
  *
  * An empty date format or time zone means "automatic": the device's own locale
  * and time zone, which is also what the app did before these were applied.
+ *
+ * One setting here is the device's own, not the account's: "Match wallpaper"
+ * (Settings → Appearance, round8-spec §1.11). It is never sent to the server
+ * and an account switch does not change it.
  */
 object MailDisplayPrefs {
     private const val PREFS = "grapmail-display"
     private const val K_DENSITY = "density"
     private const val K_DATE = "dateFormat"
     private const val K_ZONE = "timezone"
+    /** Boolean, default false. The key name is shared with the spec (§1.11). */
+    const val K_MATCH_WALLPAPER = "gm.appearance.matchWallpaper"
 
     var compact by mutableStateOf(false)
         private set
@@ -36,8 +42,17 @@ object MailDisplayPrefs {
     /** "" for the device's zone, otherwise an IANA id such as "Europe/Berlin". */
     var timezone by mutableStateOf("")
         private set
+    /**
+     * Material You on Android 12+: when true, buttons and highlights follow the
+     * wallpaper. Off by default, so the GrapMail palette is what everyone sees
+     * until they opt in. `GrapMailTheme` reads this as snapshot state, so the
+     * whole app repaints as soon as it changes.
+     */
+    var matchWallpaper by mutableStateOf(false)
+        private set
 
     @Volatile private var loaded = false
+    @Volatile private var appearanceLoaded = false
 
     fun ensureLoaded(context: Context) {
         if (loaded) return
@@ -46,6 +61,24 @@ object MailDisplayPrefs {
         dateFormat = normalizeDateFormat(prefs.getString(K_DATE, "") ?: "")
         timezone = prefs.getString(K_ZONE, "") ?: ""
         loaded = true
+        ensureAppearanceLoaded(context)
+    }
+
+    /** Reads only the device-local appearance setting. Cheap, and safe to call from the theme. */
+    fun ensureAppearanceLoaded(context: Context) {
+        if (appearanceLoaded) return
+        val prefs = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        matchWallpaper = prefs.getBoolean(K_MATCH_WALLPAPER, false)
+        appearanceLoaded = true
+    }
+
+    /** Settings → Appearance → Match wallpaper. */
+    fun setMatchWallpaper(context: Context, on: Boolean) {
+        matchWallpaper = on
+        appearanceLoaded = true
+        context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+            .putBoolean(K_MATCH_WALLPAPER, on)
+            .apply()
     }
 
     /** Take the account's settings as the new truth and remember them. */

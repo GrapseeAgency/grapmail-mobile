@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">GrapMail</string>
+    <string name="shortcut_compose_short">Tulis email</string>
+    <string name="shortcut_compose_long">Tulis pesan GrapMail baru</string>
+    <string name="shortcut_scheduled_short">Kiriman terjadwal</string>
+    <string name="shortcut_scheduled_long">Lihat dan batalkan email yang menunggu dikirim</string>
+    <string name="shortcut_subscriptions_short">Langganan</string>
+    <string name="shortcut_subscriptions_long">Tinjau pengirim dan berhenti berlangganan di satu tempat</string>
+    <string name="notif_channel_new_mail">Email baru</string>
+    <string name="notif_channel_new_mail_desc">Memberi tahu Anda saat pemeriksaan di latar belakang menemukan pesan yang belum Anda baca. GrapMail tidak memiliki layanan push, jadi notifikasi ini berasal dari aplikasi yang memeriksa server sendiri saat sistem membangunkannya.</string>
+    <string name="notif_channel_security">Peringatan keamanan</string>
+    <string name="notif_channel_security_desc">Memberi tahu Anda saat sesuatu terjadi pada akun Anda: login dari perangkat baru, perubahan sandi, atau perubahan perangkat tepercaya. Peringatan ini tidak pernah dibisukan oleh jam tenang.</string>
+    <string name="widget_description">Email belum dibaca sekilas: jumlah dari pemeriksaan latar belakang GrapMail</string>
+</resources>

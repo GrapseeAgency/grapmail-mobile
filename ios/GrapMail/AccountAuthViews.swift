@@ -11,6 +11,10 @@ struct SignInView: View {
     let onForgotPassword: () -> Void
     let onNeedSecondFactor: () -> Void
     var onNeedEmailVerification: () -> Void = {}
+    // MARK: Round 8 — B (welcome-back)
+    /// A line to show above the form on arrival — the server's reason when a
+    /// welcome-back account turned out to be blocked (spec §2.3).
+    var notice: String? = nil
 
     @State private var identifier = ""
     @State private var password = ""
@@ -41,11 +45,11 @@ struct SignInView: View {
                 VStack(alignment: .leading, spacing: 0) {
                     AccountHeader(onBack: onBack)
                     Text("Welcome back 👋")
-                        .font(.system(size: 28, weight: .bold))
+                        .gmFont(28, .bold, maxSize: 44)
                         .foregroundColor(GM.textPrimary)
                         .padding(.top, 6)
                     Text("Sign in to your GrapMail account and get back to what matters.")
-                        .font(.system(size: 15))
+                        .gmFont(15)
                         .lineSpacing(5)
                         .foregroundColor(GM.textSecondary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -53,19 +57,27 @@ struct SignInView: View {
 
                     VStack(spacing: 16) {
                         AppTextField(
-                            title: "Email address or phone number",
+                            title: String(localized: "Email address or phone number", comment: "Text field label (sign in screen)"),
                             value: $identifier,
-                            hint: "you@grapsee.com or +8801XXXXXXXX",
+                            hint: String(localized: "you@grapsee.com or +8801XXXXXXXX", comment: "Sign-in field placeholder; keep the example email address and phone number unchanged"),
                             keyboardType: .emailAddress,
-                            leadingIcon: "envelope"
+                            leadingIcon: "envelope",
+                            contentType: .username
                         )
                         AppTextField(
-                            title: "Password",
+                            title: String(localized: "Password", comment: "Text field label (sign in screen)"),
                             value: $password,
-                            hint: "Enter your password",
+                            hint: String(localized: "Enter your password", comment: "Text field placeholder (sign in screen)"),
                             isPassword: true,
-                            leadingIcon: "lock"
+                            leadingIcon: "lock",
+                            contentType: .password
                         )
+                        // Return on the password field signs in, the way every
+                        // sign-in form on iOS behaves.
+                        .submitLabel(.go)
+                        .onSubmit {
+                            if !identifier.isEmpty && !password.isEmpty && !busy && !passkeyBusy { submit() }
+                        }
                     }
                     .padding(16)
                     .background(RoundedRectangle(cornerRadius: GMShape.card, style: .continuous).fill(GM.card))
@@ -76,33 +88,35 @@ struct SignInView: View {
                         Spacer()
                         Button(action: onForgotPassword) {
                             Text("Forgot password?")
-                                .font(GMFont.captionMedium)
-                                .foregroundColor(GM.primarySolid)
+                                .gmFont(.captionMedium)
+                                .foregroundColor(GM.primaryText)
+                                .frame(minHeight: 44)
+                                .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
-                        .padding(.top, 8)
+                        .padding(.top, 2)
                     }
 
                     if let error {
                         Text(error)
-                            .font(GMFont.caption)
+                            .gmFont(.caption)
                             .foregroundColor(GM.error)
                             .padding(.top, 10)
                     }
                     if let passkeyError {
                         Text(passkeyError)
-                            .font(GMFont.caption)
+                            .gmFont(.caption)
                             .foregroundColor(GM.error)
                             .padding(.top, 10)
                     }
 
                     GradientButton(
-                        title: "Sign In",
+                        title: String(localized: "Sign In", comment: "Button title (sign in screen)"),
                         enabled: !identifier.isEmpty && !password.isEmpty,
                         busy: busy,
                         trailing: AnyView(
-                            Image(systemName: "arrow.right")
-                                .font(.system(size: 15, weight: .semibold))
+                            Image(systemName: "arrow.right").flipsForRightToLeftLayoutDirection(true)
+                                .gmFont(15, .semibold, maxSize: 24)
                                 .foregroundColor(.white)
                         )
                     ) {
@@ -116,7 +130,7 @@ struct SignInView: View {
                     // take part, so the link is live with the form empty.
                     HStack {
                         Spacer()
-                        AccountLink(title: passkeyBusy ? "Waiting for the passkey…" : "Use a passkey",
+                        AccountLink(title: passkeyBusy ? String(localized: "Waiting for the passkey…", comment: "Link-style button (sign in screen)") : String(localized: "Use a passkey", comment: "Link-style button (sign in screen)"),
                                     action: passkeySignIn)
                         Spacer()
                     }
@@ -124,14 +138,16 @@ struct SignInView: View {
 
                     OrDivider().padding(.top, 22)
 
-                    HStack(spacing: 4) {
+                    GMAdaptiveStack(spacing: 4, horizontalAlignment: .center) {
                         Text("Don't have an account?  ")
-                            .font(GMFont.caption)
+                            .gmFont(.caption)
                             .foregroundColor(GM.textSecondary)
                         Button(action: onSignUp) {
                             Text("Create one")
-                                .font(GMFont.captionMedium)
-                                .foregroundColor(GM.primarySolid)
+                                .gmFont(.captionMedium)
+                                .foregroundColor(GM.primaryText)
+                                .frame(minHeight: 44)
+                                .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
                     }
@@ -146,6 +162,7 @@ struct SignInView: View {
         .centeredForm()
         .onAppear {
             identifier = model.prefillIdentifier ?? identifier
+            if error == nil, let notice = notice?.nilIfBlank() { error = notice }
             model.clearSignInChallenge()
         }
         .disabled(busy || passkeyBusy)
@@ -185,7 +202,7 @@ struct SignInView: View {
                 }
                 guard !resp.secondFactorRequired, resp.success,
                       let token = resp.sessionToken ?? resp.accessToken ?? resp.token, !token.isEmpty else {
-                    error = "Sign-in did not return a complete session. Please try again."
+                    error = String(localized: "Sign-in did not return a complete session. Please try again.", comment: "Sign-in error")
                     return
                 }
                 let address = resp.account?.address ?? identifier
@@ -204,8 +221,15 @@ struct SignInView: View {
                 model.clearSignInChallenge()
                 model.verificationEmail = email
                 onNeedEmailVerification()
+            } catch let apiError as ApiError {
+                // A suspended/blocked account (the login route's 403 without a
+                // code) must not stay remembered on this device (spec §2.4).
+                if case let .http(status, code, _) = apiError, status == 403, code == nil {
+                    RememberedAccounts.forget(identifier)
+                }
+                self.error = apiMessage(apiError, fallback: String(localized: "Could not complete the account request. Try again.", comment: "Error message shown when the server gives no reason (sign in screen)"))
             } catch {
-                self.error = apiMessage(error, fallback: "Could not complete the account request. Try again.")
+                self.error = apiMessage(error, fallback: String(localized: "Could not complete the account request. Try again.", comment: "Error message shown when the server gives no reason (sign in screen)"))
             }
         }
     }
@@ -226,7 +250,7 @@ struct SignInView: View {
                 guard optionsResponse.success, let challengeId = optionsResponse.challengeId.nilIfBlank(),
                       let challenge = optionsResponse.challengeBase64Url,
                       let options = optionsResponse.options else {
-                    passkeyError = "Passkey sign-in is not available right now. Use your password instead."
+                    passkeyError = String(localized: "Passkey sign-in is not available right now. Use your password instead.", comment: "Passkey sign-in error")
                     return
                 }
                 let assertion = try await PasskeyManager.assertion(options: options)
@@ -239,7 +263,7 @@ struct SignInView: View {
                         signature: assertion.signature,
                         userHandle: assertion.userHandle))
                 guard verified.success, let token = verified.accessToken?.nilIfBlank() else {
-                    passkeyError = verified.error?.nilIfBlank() ?? "The passkey was not accepted. Use your password instead."
+                    passkeyError = verified.error?.nilIfBlank() ?? String(localized: "The passkey was not accepted. Use your password instead.", comment: "Passkey sign-in error")
                     return
                 }
                 // The passkey envelope names the account under `user` with
@@ -247,7 +271,7 @@ struct SignInView: View {
                 // names neither has not returned a session worth storing.
                 let address = verified.user?.email.nilIfBlank() ?? identifier.trimmingCharacters(in: .whitespaces)
                 guard !address.isEmpty else {
-                    passkeyError = "Sign-in did not return a complete session. Please try again."
+                    passkeyError = String(localized: "Sign-in did not return a complete session. Please try again.", comment: "Sign-in error")
                     return
                 }
                 // The route answers no expiry stamp (unlike the password
@@ -265,7 +289,7 @@ struct SignInView: View {
             } catch PasskeyManager.PasskeyError.cancelled {
                 // The person closed the sheet — not a failure to report.
             } catch {
-                passkeyError = apiMessage(error, fallback: "Could not sign in with the passkey. Try again.")
+                passkeyError = apiMessage(error, fallback: String(localized: "Could not sign in with the passkey. Try again.", comment: "Passkey sign-in error when the server gives no reason"))
             }
         }
     }
@@ -283,19 +307,21 @@ struct EmailVerificationView: View {
 
     var body: some View {
         AccountScreen(onBack: { model.clearSignInChallenge(); onBack() },
-                      eyebrow: "Email verification", title: "Enter the email code",
+                      eyebrow: String(localized: "Email verification", comment: "Small label above the screen title (email verification screen)"), title: String(localized: "Enter the email code", comment: "Screen title (email verification screen)"),
                       subtitle: model.verificationEmail,
                       content: {
             CodeCells(length: 6, value: $otp)
-            if let error { Text(error).font(GMFont.caption).foregroundColor(GM.error) }
-            if let notice { Text(notice).font(GMFont.caption).foregroundColor(GM.textSecondary) }
+                // Round 8 — B: the code from Mail/Messages is offered above the keyboard.
+                .textContentType(.oneTimeCode)
+            if let error { Text(error).gmFont(.caption).foregroundColor(GM.error) }
+            if let notice { Text(notice).gmFont(.caption).foregroundColor(GM.textSecondary) }
         }, footer: {
-            GradientButton(title: "Verify & Continue", enabled: otp.count == 6, busy: busy) {
+            GradientButton(title: String(localized: "Verify & Continue", comment: "Button title (email verification screen)"), enabled: otp.count == 6, busy: busy) {
                 verify()
             }
-            AccountLink(title: "Resend code") { resend() }
+            AccountLink(title: String(localized: "Resend code", comment: "Link-style button (email verification screen)")) { resend() }
             Text("A pending code stays valid. A resend request does not confirm a new delivery.")
-                .font(GMFont.caption).foregroundColor(GM.textSecondary)
+                .gmFont(.caption).foregroundColor(GM.textSecondary)
         })
         .disabled(busy)
         .onDisappear { otp = "" }
@@ -310,7 +336,7 @@ struct EmailVerificationView: View {
                 let resp = try await ApiClient.verifyEmailOTP(email: email, otp: otp)
                 guard resp.success, !resp.secondFactorRequired,
                       let token = resp.accessToken ?? resp.sessionToken ?? resp.token, !token.isEmpty else {
-                    error = "Verification did not return a complete session. Sign in again."
+                    error = String(localized: "Verification did not return a complete session. Sign in again.", comment: "Email verification error")
                     return
                 }
                 let address = resp.account?.address.isEmpty == false ? resp.account!.address : email
@@ -319,7 +345,7 @@ struct EmailVerificationView: View {
                 otp = ""
                 model.clearSignInChallenge()
                 onSignedIn(address)
-            } catch { self.error = apiMessage(error, fallback: "Could not complete the account request. Try again.") }
+            } catch { self.error = apiMessage(error, fallback: String(localized: "Could not complete the account request. Try again.", comment: "Error message shown when the server gives no reason (email verification screen)")) }
         }
     }
 
@@ -330,11 +356,11 @@ struct EmailVerificationView: View {
             defer { busy = false }
             do {
                 let resp = try await ApiClient.resendEmailOTP(email: email)
-                guard resp.success else { error = "The request was not accepted."; return }
+                guard resp.success else { error = String(localized: "The request was not accepted.", comment: "Error when the server refused to resend a code"); return }
                 // The endpoint deliberately returns the same answer on cooldown,
                 // existing codes, unknown accounts and provider failure. No countdown.
-                notice = "Request accepted. Check for an existing code; a new delivery is not confirmed."
-            } catch { self.error = apiMessage(error, fallback: "Could not complete the account request. Try again.") }
+                notice = String(localized: "Request accepted. Check for an existing code; a new delivery is not confirmed.", comment: "Notice after asking for a code to be resent")
+            } catch { self.error = apiMessage(error, fallback: String(localized: "Could not complete the account request. Try again.", comment: "Error message shown when the server gives no reason (email verification screen)")) }
         }
     }
 }
@@ -361,14 +387,16 @@ struct TwoFactorView: View {
         AccountScreen(
             onBack: onBack,
             illustration: "ill_account_2fa",
-            eyebrow: "Two-step verification",
-            title: model.challengeId == nil ? "Use a backup code" : "Enter your 6-digit code",
+            eyebrow: String(localized: "Two-step verification", comment: "Small label above the screen title (two factor screen)"),
+            title: model.challengeId == nil ? String(localized: "Use a backup code", comment: "Screen title (two factor screen)") : String(localized: "Enter your 6-digit code", comment: "Screen title (two factor screen)"),
             subtitle: model.challengeId == nil
-                ? "A verification text is unavailable. Use one of your saved backup codes to continue."
-                : (model.factorDestination.map { "We've emailed a 6-digit code to \($0). Enter it to finish signing in." }
-                    ?? "We've sent you a verification code. Please enter the 6-digit code to continue."),
+                ? String(localized: "A verification text is unavailable. Use one of your saved backup codes to continue.", comment: "Screen description under the title (two factor screen)")
+                : (model.factorDestination.map { String(localized: "We've emailed a 6-digit code to \($0). Enter it to finish signing in.", comment: "Screen description under the title (two factor screen)") }
+                    ?? String(localized: "We've sent you a verification code. Please enter the 6-digit code to continue.", comment: "Screen description under the title (two factor screen)")),
             content: {
                 CodeCells(length: 6, value: $code)
+                    // Round 8 — B: the emailed sign-in code is offered above the keyboard.
+                    .textContentType(.oneTimeCode)
                 HStack {
                     Spacer()
                     CodeExpiry(expiresAt: model.expiresAt)
@@ -376,40 +404,40 @@ struct TwoFactorView: View {
                 }
                 .padding(.top, 14)
                 if let notice {
-                    Text(notice).font(GMFont.caption).foregroundColor(GM.success)
+                    Text(notice).gmFont(.caption).foregroundColor(GM.success)
                         .padding(.top, 10)
                 }
                 if let error {
-                    Text(error).font(GMFont.caption).foregroundColor(GM.error)
+                    Text(error).gmFont(.caption).foregroundColor(GM.error)
                         .padding(.top, 10)
                 }
             },
             footer: {
                 GradientButton(
-                    title: "Verify & Continue",
+                    title: String(localized: "Verify & Continue", comment: "Button title (two factor screen)"),
                     enabled: code.count == 6,
                     busy: busy,
                     trailing: AnyView(
-                        Image(systemName: "arrow.right")
-                            .font(.system(size: 15, weight: .semibold))
+                        Image(systemName: "arrow.right").flipsForRightToLeftLayoutDirection(true)
+                            .gmFont(15, .semibold, maxSize: 24)
                             .foregroundColor(.white)
                     )
                 ) { verify() }
                 HStack {
                     Spacer()
-                    AccountLink(title: resending ? "Sending…" : "Resend code") { resend() }
+                    AccountLink(title: resending ? String(localized: "Sending…", comment: "Link-style button (two factor screen)") : String(localized: "Resend code", comment: "Link-style button (two factor screen)")) { resend() }
                     Spacer()
                 }
                 .padding(.top, 10)
                 HStack {
                     Spacer()
-                    AccountLink(title: "Use a backup code", action: onUseBackupCode)
+                    AccountLink(title: String(localized: "Use a backup code", comment: "Link-style button (two factor screen)"), action: onUseBackupCode)
                     Spacer()
                 }
                 OrDivider().padding(.top, 12)
                 HStack {
                     Spacer()
-                    AccountLink(title: "Back to sign in", action: onBackToSignIn)
+                    AccountLink(title: String(localized: "Back to sign in", comment: "Link-style button (two factor screen)"), action: onBackToSignIn)
                     Spacer()
                 }
                 .padding(.top, 12)
@@ -426,7 +454,7 @@ struct TwoFactorView: View {
             do {
                 let resp = try await ApiClient.twoFactorCode(challengeId: challenge, code: code)
                 guard let token = resp.sessionToken ?? resp.accessToken ?? resp.token else {
-                    error = "That code is not correct."
+                    error = String(localized: "That code is not correct.", comment: "Verification code error")
                     return
                 }
                 let address = resp.user?.address ?? model.identifier
@@ -437,11 +465,16 @@ struct TwoFactorView: View {
                     name: resp.user?.name ?? "",
                     expiresAtRaw: resp.expiresAtMillis
                 )
+                code = ""
                 onSignedIn(address)
+                // The password this challenge was opened with is no longer
+                // needed once the session exists: it must not outlive the
+                // sign-in in memory.
+                model.clearSignInChallenge()
             } catch let apiError as ApiError {
                 error = message(for: apiError, code: code)
             } catch {
-                self.error = apiMessage(error, fallback: "Could not complete the account request. Try again.")
+                self.error = apiMessage(error, fallback: String(localized: "Could not complete the account request. Try again.", comment: "Error message shown when the server gives no reason (two factor screen)"))
             }
         }
     }
@@ -449,12 +482,12 @@ struct TwoFactorView: View {
     private func message(for error: ApiError, code: String) -> String {
         if case let .http(_, apiCode, message) = error {
             switch apiCode {
-            case "CHALLENGE_EXPIRED": return "That code has expired. Resend it to get a new one."
-            case "BAD_CODE": return "That code is not correct."
-            default: return message.isEmpty ? "That code is not correct." : message
+            case "CHALLENGE_EXPIRED": return String(localized: "That code has expired. Resend it to get a new one.", comment: "Verification code error")
+            case "BAD_CODE": return String(localized: "That code is not correct.", comment: "Verification code error")
+            default: return message.isEmpty ? String(localized: "That code is not correct.", comment: "Verification code error") : message
             }
         }
-        return "Network error. Please try again."
+        return String(localized: "Network error. Please try again.", comment: "Verification code error when the server could not be reached")
     }
 
     /// Resending is signing in again: the server issues a fresh challenge and
@@ -479,14 +512,14 @@ struct TwoFactorView: View {
                     // the session's `expiresIn`, and a countdown that claims the
                     // code lives as long as the session would be a lie.
                     model.expiresAt = resp.expiresAt.map { Date(timeIntervalSince1970: TimeInterval($0) / 1000) }
-                    notice = "A new code is on its way."
+                    notice = String(localized: "A new code is on its way.", comment: "Notice after a verification code was resent")
                 } else {
-                    error = "That sign-in no longer needs a code. Start again."
+                    error = String(localized: "That sign-in no longer needs a code. Start again.", comment: "Two-step sign-in error")
                 }
             } catch let apiError as ApiError {
                 error = message(for: apiError, code: "")
             } catch {
-                self.error = apiMessage(error, fallback: "Could not complete the account request. Try again.")
+                self.error = apiMessage(error, fallback: String(localized: "Could not complete the account request. Try again.", comment: "Error message shown when the server gives no reason (two factor screen)"))
             }
         }
     }
@@ -510,47 +543,47 @@ struct BackupCodeView: View {
         AccountScreen(
             onBack: onBack,
             illustration: "ill_account_backup",
-            eyebrow: "Use a backup code",
-            title: "Enter your backup code",
-            subtitle: "If you don't have access to your 2-step verification method, you can use a backup code to get back into your account.",
+            eyebrow: String(localized: "Use a backup code", comment: "Small label above the screen title (backup code screen)"),
+            title: String(localized: "Enter your backup code", comment: "Screen title (backup code screen)"),
+            subtitle: String(localized: "If you don't have access to your 2-step verification method, you can use a backup code to get back into your account.", comment: "Screen description under the title (backup code screen)"),
             content: {
                 CodeCells(length: 10, value: $code, alphanumeric: true, groupGap: true)
                 HStack(alignment: .top, spacing: 8) {
                     Image(systemName: "info.circle")
-                        .font(.system(size: 13))
+                        .gmFont(13)
                         .foregroundColor(GM.textTertiary)
                     Text("Backup codes are 10 characters long and can only be used once.")
-                        .font(.system(size: 13))
+                        .gmFont(13)
                         .lineSpacing(3)
                         .foregroundColor(GM.textSecondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 .padding(.top, 16)
                 if let error {
-                    Text(error).font(GMFont.caption).foregroundColor(GM.error).padding(.top, 12)
+                    Text(error).gmFont(.caption).foregroundColor(GM.error).padding(.top, 12)
                 }
             },
             footer: {
                 GradientButton(
-                    title: "Continue",
+                    title: String(localized: "Continue", comment: "Button title (backup code screen)"),
                     enabled: code.count == 10,
                     busy: busy,
                     trailing: AnyView(
-                        Image(systemName: "arrow.right")
-                            .font(.system(size: 15, weight: .semibold))
+                        Image(systemName: "arrow.right").flipsForRightToLeftLayoutDirection(true)
+                            .gmFont(15, .semibold, maxSize: 24)
                             .foregroundColor(.white)
                     )
                 ) { submit() }
                 HStack {
                     Spacer()
-                    AccountLink(title: "Try another method", action: onTryAnotherMethod)
+                    AccountLink(title: String(localized: "Try another method", comment: "Link-style button (backup code screen)"), action: onTryAnotherMethod)
                     Spacer()
                 }
                 .padding(.top, 10)
                 OrDivider().padding(.top, 12)
                 HStack {
                     Spacer()
-                    AccountLink(title: "Back to sign in", action: onBackToSignIn)
+                    AccountLink(title: String(localized: "Back to sign in", comment: "Link-style button (backup code screen)"), action: onBackToSignIn)
                     Spacer()
                 }
                 .padding(.top, 12)
@@ -561,7 +594,7 @@ struct BackupCodeView: View {
 
     private func submit() {
         guard !model.identifier.isEmpty, !model.password.isEmpty else {
-            error = "Sign in again to use a backup code."
+            error = String(localized: "Sign in again to use a backup code.", comment: "Backup code error")
             return
         }
         busy = true; error = nil
@@ -580,7 +613,7 @@ struct BackupCodeView: View {
                     backupCode: normalized
                 )
                 guard let token = resp.sessionToken ?? resp.accessToken ?? resp.token else {
-                    error = "That backup code is not valid, or it has already been used."
+                    error = String(localized: "That backup code is not valid, or it has already been used.", comment: "Backup code error")
                     return
                 }
                 let address = resp.user?.address ?? model.identifier
@@ -591,19 +624,22 @@ struct BackupCodeView: View {
                     name: resp.user?.name ?? "",
                     expiresAtRaw: resp.expiresAtMillis
                 )
+                code = ""
                 onSignedIn(address)
+                // As after a two-step code: the held password goes with the challenge.
+                model.clearSignInChallenge()
             } catch let apiError as ApiError {
                 if case let .http(_, apiCode, message) = apiError {
                     switch apiCode {
-                    case "BAD_BACKUP_CODE": error = "That backup code is not valid, or it has already been used."
-                    case "TWO_FACTOR_NOT_ENABLED": error = "This account does not use two-step verification."
-                    default: error = message.isEmpty ? "That backup code is not valid." : message
+                    case "BAD_BACKUP_CODE": error = String(localized: "That backup code is not valid, or it has already been used.", comment: "Backup code error")
+                    case "TWO_FACTOR_NOT_ENABLED": error = String(localized: "This account does not use two-step verification.", comment: "Backup code error")
+                    default: error = message.isEmpty ? String(localized: "That backup code is not valid.", comment: "Backup code error") : message
                     }
                 } else {
                     error = apiError.localizedDescription
                 }
             } catch {
-                self.error = apiMessage(error, fallback: "Could not complete the account request. Try again.")
+                self.error = apiMessage(error, fallback: String(localized: "Could not complete the account request. Try again.", comment: "Error message shown when the server gives no reason (backup code screen)"))
             }
         }
     }

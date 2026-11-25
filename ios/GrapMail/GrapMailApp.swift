@@ -22,6 +22,9 @@ struct GrapMailApp: App {
         Outbox.shared.start()
         // Crash, hang and session reports (RemoteConfig.swift).
         CrashReporter.shared.start()
+        // First-time feature tips: TipKit, iOS 17+, once per launch; skipped
+        // under -gmSnapshot / -gmNoTips (FeatureTips.swift).
+        FeatureTips.configure()
     }
 
     var body: some Scene {
@@ -44,9 +47,22 @@ struct GrapMailApp: App {
                         }
                 }
             }
+            // App-switcher privacy (DeviceIntegrityCheck.swift): the snapshot iOS
+            // takes when the scene goes inactive/background shows this cover,
+            // not mail. Only while signed in. iOS cannot block screenshots.
+            .overlay {
+                if scenePhase != .active, SessionStore.token != nil {
+                    PrivacyCover()
+                }
+            }
             .task { await remote.refresh(force: true) }
             .onChange(of: scenePhase) { phase in
-                if phase == .active { Task { await remote.refresh() } }
+                if phase == .active {
+                    Task { await remote.refresh() }
+                    // Widget taps made while the app sat in the background
+                    // (launch is covered by the Outbox's first flush).
+                    Task { await WidgetActionSync.shared.drain() }
+                }
             }
         }
     }

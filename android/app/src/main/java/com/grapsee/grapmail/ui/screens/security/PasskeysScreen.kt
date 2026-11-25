@@ -39,10 +39,11 @@ import com.grapsee.grapmail.security.PasskeyManager
 import com.grapsee.grapmail.ui.components.AccountLink
 import com.grapsee.grapmail.ui.components.AccountScreen
 import com.grapsee.grapmail.ui.components.GradientButton
-import com.grapsee.grapmail.ui.components.InfoNoteCard
 import com.grapsee.grapmail.ui.theme.LocalPalette
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
+import androidx.compose.ui.res.stringResource
+import com.grapsee.grapmail.R
 
 /**
  * The account's passkeys — WebAuthn credentials created here (signed in, so
@@ -92,6 +93,8 @@ fun PasskeysScreen(onBack: () -> Unit) {
             val resp = Api.listPasskeys(session.token)
             if (!SessionStore.isCurrent(context, session.id)) return
             passkeys = resp.passkeys
+            // Round 8 — B: the welcome-back passkey hint follows the list.
+            rememberPasskeyHint(context, session.address, resp.passkeys.isNotEmpty())
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
@@ -106,7 +109,7 @@ fun PasskeysScreen(onBack: () -> Unit) {
     fun addPasskey() {
         val host = activity
         if (host == null) {
-            error = "Passkeys need an app update."
+            error = context.getString(R.string.acct_passkeys_need_app_update)
             return
         }
         // The ceremony cannot run twice at once: a second sheet over the
@@ -119,20 +122,20 @@ fun PasskeysScreen(onBack: () -> Unit) {
             try {
                 val result = PasskeyManager.createPasskey(
                     host,
-                    "GrapMail on " + DeviceKeyManager.deviceDisplayName(),
+                    context.getString(R.string.acct_passkey_name_on_device, DeviceKeyManager.deviceDisplayName()),
                 )
                 when (result) {
                     is PasskeyManager.RegistrationResult.Completed -> {
-                        notice = "Passkey added. Use it the next time you sign in."
+                        notice = context.getString(R.string.acct_passkey_added_use_it_the_next_time)
                         load()
                     }
                     PasskeyManager.RegistrationResult.NoCredential ->
-                        error = "No passkey was created on this device. Make sure a screen lock is set up."
+                        error = context.getString(R.string.acct_no_passkey_was_created_on_this)
                     PasskeyManager.RegistrationResult.Cancelled -> {
                         // The person closed the sheet; nothing to report.
                     }
                     is PasskeyManager.RegistrationResult.Failed ->
-                        error = result.message ?: "The passkey could not be added. Try again."
+                        error = result.message ?: context.getString(R.string.acct_the_passkey_could_not_be_added_try)
                 }
             } finally {
                 creating = false
@@ -144,11 +147,13 @@ fun PasskeysScreen(onBack: () -> Unit) {
         scope.launch {
             busyId = passkey.id
             try {
-                val session = SessionStore.snapshot(context) ?: throw IllegalStateException("Sign in again.")
+                val session = SessionStore.snapshot(context) ?: throw IllegalStateException(context.getString(R.string.acct_sign_in_again))
                 Api.deletePasskey(session.token, passkey.id)
                 if (!SessionStore.isCurrent(context, session.id)) return@launch
                 passkeys = passkeys?.filterNot { it.id == passkey.id }
                 deleteTarget = null
+                // Round 8 — B: the welcome-back passkey hint follows the list.
+                rememberPasskeyHint(context, session.address, passkeys?.isNotEmpty() == true)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -163,25 +168,25 @@ fun PasskeysScreen(onBack: () -> Unit) {
         onBack = onBack,
         illustration = "ill_sec_sessions",
         illustrationWidth = 150,
-        title = "Passkeys",
-        body = "Sign in with a biometric credential instead of a password. A passkey stays on the device that created it.",
+        title = stringResource(R.string.acct_passkeys),
+        body = stringResource(R.string.acct_sign_in_with_a_biometric_credential),
         footer = {
             Column {
                 GradientButton(
-                    if (creating) "Creating…" else "Add passkey",
+                    if (creating) stringResource(R.string.acct_creating) else stringResource(R.string.acct_add_passkey),
                     onClick = { addPasskey() },
                     busy = creating,
                 )
                 Spacer(Modifier.height(4.dp))
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
-                    AccountLink("Back to Account Security", onBack)
+                    AccountLink(stringResource(R.string.acct_back_to_account_security), onBack)
                 }
             }
         },
     ) {
         if (activity == null) {
             Text(
-                "Passkeys need an app update.",
+                stringResource(R.string.acct_passkeys_need_app_update),
                 fontSize = 13.sp,
                 color = palette.textSecondary,
             )
@@ -190,7 +195,7 @@ fun PasskeysScreen(onBack: () -> Unit) {
                 val rows = passkeys ?: return@LoadStateBlock
                 if (rows.isEmpty()) {
                     Text(
-                        "No passkeys yet. Add one and you can sign in without your password.",
+                        stringResource(R.string.acct_no_passkeys_yet_add_one_and_you_can),
                         fontSize = 13.sp,
                         lineHeight = 18.sp,
                         color = palette.textSecondary,
@@ -218,18 +223,18 @@ fun PasskeysScreen(onBack: () -> Unit) {
         }
         Spacer(Modifier.height(12.dp))
         InfoNoteCard(
-            title = "What a passkey is",
-            body = "A passkey is a credential this device holds in its hardware and proves with your fingerprint or face. Removing it here stops it signing in to this account — the copy on this device itself is removed through the device's own settings.",
+            title = stringResource(R.string.acct_what_a_passkey_is),
+            body = stringResource(R.string.acct_a_passkey_is_a_credential_this),
         )
     }
 
     deleteTarget?.let { passkey ->
         AlertDialog(
             onDismissRequest = { if (busyId == null) deleteTarget = null },
-            title = { Text("Remove passkey?") },
+            title = { Text(stringResource(R.string.acct_remove_passkey)) },
             text = {
                 Text(
-                    "“" + passkey.name.ifBlank { "This passkey" } + "” will stop signing you in to this account.",
+                    stringResource(R.string.acct_remove_passkey_body, passkey.name.ifBlank { stringResource(R.string.acct_this_passkey) }),
                     fontSize = 14.sp,
                     lineHeight = 20.sp,
                 )
@@ -238,10 +243,10 @@ fun PasskeysScreen(onBack: () -> Unit) {
                 TextButton(
                     enabled = busyId == null,
                     onClick = { delete(passkey) },
-                ) { Text("Remove", color = palette.error) }
+                ) { Text(stringResource(R.string.acct_remove), color = palette.error) }
             },
             dismissButton = {
-                TextButton(enabled = busyId == null, onClick = { deleteTarget = null }) { Text("Keep") }
+                TextButton(enabled = busyId == null, onClick = { deleteTarget = null }) { Text(stringResource(R.string.acct_keep)) }
             },
         )
     }
@@ -264,7 +269,7 @@ private fun PasskeyCard(
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
-                passkey.name.ifBlank { "Passkey" },
+                passkey.name.ifBlank { stringResource(R.string.acct_passkey) },
                 fontSize = 15.sp,
                 fontWeight = FontWeight.SemiBold,
                 color = palette.textPrimary,
@@ -276,9 +281,9 @@ private fun PasskeyCard(
         Spacer(Modifier.height(3.dp))
         Text(
             listOfNotNull(
-                passkey.createdAt?.takeIf(String::isNotBlank)?.let { "Added ${absoluteDateTime(it)}" },
-                passkey.lastUsedAt?.takeIf(String::isNotBlank)?.let { "Last used ${relativeTime(it)}" },
-            ).joinToString(" · ").ifBlank { "This credential signs you in without a password." },
+                passkey.createdAt?.takeIf(String::isNotBlank)?.let { stringResource(R.string.acct_added_at, absoluteDateTime(it)) },
+                passkey.lastUsedAt?.takeIf(String::isNotBlank)?.let { stringResource(R.string.acct_last_used_at, relativeTime(it)) },
+            ).joinToString(" · ").ifBlank { stringResource(R.string.acct_this_credential_signs_you_in_without) },
             fontSize = 11.sp,
             color = palette.textTertiary,
         )
@@ -291,11 +296,26 @@ private fun PasskeyCard(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
-                if (busy) "Removing…" else "Remove passkey",
+                if (busy) stringResource(R.string.acct_removing) else stringResource(R.string.acct_remove_passkey_2),
                 fontSize = 13.sp,
                 fontWeight = FontWeight.SemiBold,
                 color = if (busy) palette.textTertiary else palette.error,
             )
         }
+    }
+}
+
+/**
+ * Round 8 — B (round8-spec §2.4): the remembered account's `hasPasskey` hint
+ * is set "whenever the Passkeys screen changes the list". A hint only — it
+ * decides whether welcome-back offers a passkey first, never who signs in.
+ * Best-effort: the list on screen is the truth either way.
+ */
+private suspend fun rememberPasskeyHint(context: android.content.Context, address: String, hasPasskey: Boolean) {
+    try {
+        com.grapsee.grapmail.data.RememberedAccounts.setHasPasskey(context, address, hasPasskey)
+    } catch (e: CancellationException) {
+        throw e
+    } catch (_: Exception) {
     }
 }

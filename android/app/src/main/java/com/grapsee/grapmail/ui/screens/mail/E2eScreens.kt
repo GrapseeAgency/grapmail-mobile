@@ -1,5 +1,9 @@
 package com.grapsee.grapmail.ui.screens.mail
 
+import com.grapsee.grapmail.ui.components.gmIsNarrowWindow
+import com.grapsee.grapmail.ui.components.gmPrefersStackedRows
+import com.grapsee.grapmail.ui.components.GMLayout
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -45,6 +49,8 @@ import com.grapsee.grapmail.logic.E2eViewModel
 import com.grapsee.grapmail.ui.components.AppTextField
 import com.grapsee.grapmail.ui.components.absoluteDateTimeOrRaw
 import com.grapsee.grapmail.ui.theme.LocalPalette
+import androidx.compose.ui.res.stringResource
+import com.grapsee.grapmail.R
 
 /**
  * The encryption sector — the mobile form of the web's
@@ -96,6 +102,16 @@ private fun E2eNote(text: String, bad: Boolean) {
 @Composable
 private fun E2eRow(label: String, value: String, mono: Boolean = true) {
     val palette = LocalPalette.current
+    // A 150dp label column leaves a fingerprint too little room at large text
+    // or on a cover screen: there the value goes under its label instead.
+    if (gmPrefersStackedRows() || gmIsNarrowWindow()) {
+        Column(Modifier.fillMaxWidth().padding(vertical = 7.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(label, fontSize = 13.sp, color = palette.textSecondary)
+            Text(value, fontSize = 13.sp, color = palette.textPrimary,
+                fontFamily = if (mono) FontFamily.Monospace else FontFamily.Default)
+        }
+        return
+    }
     Row(Modifier.fillMaxWidth().padding(vertical = 7.dp)) {
         Text(label, fontSize = 13.sp, color = palette.textSecondary, modifier = Modifier.width(150.dp))
         Text(value, fontSize = 13.sp, color = palette.textPrimary,
@@ -136,8 +152,9 @@ private fun E2eButton(text: String, enabled: Boolean, quiet: Boolean = false,
                         else if (quiet) palette.card
                         else if (enabled) palette.primarySolid else palette.buttonDisabled)
             .border(1.dp, if (destructive) palette.error else if (quiet) palette.border else palette.primarySolid, RoundedCornerShape(24.dp))
-            .clickable(enabled = enabled, onClick = onClick)
-            .padding(vertical = 13.dp)
+            .clickable(enabled = enabled, role = androidx.compose.ui.semantics.Role.Button, onClick = onClick)
+            // 14dp + a 20dp line = the 48dp minimum target.
+            .padding(vertical = 14.dp)
             // A non-filling button has no intrinsic horizontal padding, so a
             // short label like "Check" was clipped to a circle by the 24dp
             // corner shape. The iOS twin carries the same conditional inset.
@@ -174,35 +191,35 @@ fun E2eStatusScreen(vm: E2eViewModel, onBack: () -> Unit, onSetup: () -> Unit,
     if (confirmRemoveKit) {
         androidx.compose.material3.AlertDialog(
             onDismissRequest = { confirmRemoveKit = false },
-            title = { Text("Remove the recovery key?") },
-            text = { Text("If you then lose this device, your encrypted mail cannot be recovered anywhere.") },
+            title = { Text(stringResource(R.string.mail_e2e_remove_recovery_key)) },
+            text = { Text(stringResource(R.string.mail_e2e_if_then_lose_device),
+                modifier = Modifier.verticalScroll(rememberScrollState())) },
             confirmButton = {
                 androidx.compose.material3.TextButton(onClick = { confirmRemoveKit = false; vm.removeRecoveryKit() }) {
-                    Text("Remove", color = palette.error)
+                    Text(stringResource(R.string.mail_common_remove), color = palette.error)
                 }
             },
             dismissButton = {
-                androidx.compose.material3.TextButton(onClick = { confirmRemoveKit = false }) { Text("Keep it") }
+                androidx.compose.material3.TextButton(onClick = { confirmRemoveKit = false }) { Text(stringResource(R.string.mail_e2e_keep)) }
             },
         )
     }
-    MailScaffold("Encryption", onBack) {
+    MailScaffold(stringResource(R.string.mail_e2e_encryption), onBack, maxContentWidth = GMLayout.Form) {
         Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp),
             verticalArrangement = Arrangement.Center,
         ) {
             Spacer(Modifier.height(8.dp))
             when (state.available) {
-                null -> Text("Checking this device…", fontSize = 14.sp, color = palette.textTertiary,
+                null -> Text(stringResource(R.string.mail_e2e_checking_device), fontSize = 14.sp, color = palette.textTertiary,
                     modifier = Modifier.padding(vertical = 16.dp).testTag("gm-e2e-probing"))
-                false -> E2eCard("Encryption is not available on this device") {
+                false -> E2eCard(stringResource(R.string.mail_e2e_encryption_not_available_device)) {
                     Row {
                         Icon(Icons.Rounded.Warning, null, tint = palette.error,
                             modifier = Modifier.size(20.dp))
                         Spacer(Modifier.width(12.dp))
                         Column(Modifier.weight(1f)) {
                             E2eLede(state.unavailableReason ?: "")
-                            E2eLede("Nothing is wrong with your account. Your mail is unaffected; " +
-                                "it simply cannot be encrypted from here.")
+                            E2eLede(stringResource(R.string.mail_e2e_nothing_wrong_account_mail))
                         }
                     }
                 }
@@ -210,17 +227,14 @@ fun E2eStatusScreen(vm: E2eViewModel, onBack: () -> Unit, onSetup: () -> Unit,
                     state.note?.let { E2eNote(it, state.noteIsBad); Spacer(Modifier.height(10.dp)) }
                     // The state card: one sentence, and the sentence is true.
                     val headline = when (state.state3) {
-                        "unlocked" -> "Your key is unlocked for this session"
-                        "locked" -> "Your key is locked"
-                        else -> "Encryption is not set up on this device"
+                        "unlocked" -> stringResource(R.string.mail_e2e_key_unlocked_session)
+                        "locked" -> stringResource(R.string.mail_e2e_key_locked)
+                        else -> stringResource(R.string.mail_e2e_encryption_not_set_up)
                     }
                     val lede = when (state.state3) {
-                        "unlocked" -> "It is held in memory only and is never written down. " +
-                            "Closing the app locks it."
-                        "locked" -> "It locks again whenever the app is closed. Unlock it to send " +
-                            "or read encrypted mail."
-                        else -> "Without a key, mail to you cannot be encrypted and encrypted mail " +
-                            "cannot be read here."
+                        "unlocked" -> stringResource(R.string.mail_e2e_held_memory_only_never)
+                        "locked" -> stringResource(R.string.mail_e2e_locks_again_whenever_app)
+                        else -> stringResource(R.string.mail_e2e_without_key_mail_cannot)
                     }
                     E2eCard(headline, tag = "gm-e2e-state-${state.state3}") {
                         Row {
@@ -233,67 +247,66 @@ fun E2eStatusScreen(vm: E2eViewModel, onBack: () -> Unit, onSetup: () -> Unit,
                         }
                         Spacer(Modifier.height(12.dp))
                         when (state.state3) {
-                            "none" -> E2eButton("Create my key", enabled = !state.busy,
+                            "none" -> E2eButton(stringResource(R.string.mail_e2e_create_my_key), enabled = !state.busy,
                                 tag = "gm-e2e-setup-open", onClick = onSetup)
-                            "locked" -> E2eButton("Unlock", enabled = !state.busy,
+                            "locked" -> E2eButton(stringResource(R.string.mail_e2e_unlock), enabled = !state.busy,
                                 tag = "gm-e2e-unlock-open", onClick = onUnlock)
-                            else -> E2eButton("Lock now", enabled = true, quiet = true,
+                            else -> E2eButton(stringResource(R.string.mail_e2e_lock_now), enabled = true, quiet = true,
                                 tag = "gm-e2e-lock", onClick = { vm.lock() })
                         }
                     }
                     if (state.record == null && state.recoveryKitExists == true) {
                         Spacer(Modifier.height(14.dp))
-                        E2eCard("Restore your key from your recovery key", tag = "gm-e2e-restore-card") {
-                            E2eLede("A recovery kit for this account is stored, locked with your recovery key. " +
-                                "Enter it to put your key back on this device and read your encrypted mail again.")
+                        E2eCard(stringResource(R.string.mail_e2e_restore_key_from_recovery), tag = "gm-e2e-restore-card") {
+                            E2eLede(stringResource(R.string.mail_e2e_recovery_kit_account_stored))
                             Spacer(Modifier.height(12.dp))
-                            E2eButton("Use my recovery key", enabled = !state.busy,
+                            E2eButton(stringResource(R.string.mail_e2e_use_my_recovery_key), enabled = !state.busy,
                                 tag = "gm-e2e-restore-open", onClick = { showRestore = true })
                         }
                     }
                     if (state.record != null) {
                         Spacer(Modifier.height(14.dp))
-                        E2eCard("Recovery key", tag = "gm-e2e-recovery-card") {
+                        E2eCard(stringResource(R.string.mail_e2e_recovery_key), tag = "gm-e2e-recovery-card") {
                             E2eLede(when (state.recoveryKitExists) {
-                                null -> "Checking whether a recovery key is set up…"
-                                true -> "Set up" + (state.recoveryKitCreatedAt?.let { " on ${absoluteDateTimeOrRaw(it)}" } ?: "") +
-                                    ". If you lose this device, it restores your key on a new one."
-                                false -> "Not set up. If you lose this device, your encrypted mail cannot be recovered."
+                                null -> stringResource(R.string.mail_e2e_checking_whether_recovery_key)
+                                true -> state.recoveryKitCreatedAt?.let { stringResource(R.string.mail_e2e_recovery_set_up_on, absoluteDateTimeOrRaw(it)) }
+                                    ?: stringResource(R.string.mail_e2e_recovery_set_up)
+                                false -> stringResource(R.string.mail_e2e_not_set_up_if)
                             })
                             Spacer(Modifier.height(12.dp))
                             when {
                                 state.recoveryKitExists == null -> Unit
-                                !state.unlocked -> E2eLede("Unlock your key to " +
-                                    (if (state.recoveryKitExists == true) "replace" else "create") + " the recovery key.")
+                                !state.unlocked -> E2eLede(if (state.recoveryKitExists == true) stringResource(R.string.mail_e2e_unlock_to_replace_recovery)
+                                    else stringResource(R.string.mail_e2e_unlock_to_create_recovery))
                                 else -> E2eButton(
-                                    if (state.recoveryKitExists == true) "Replace the recovery key" else "Create a recovery key",
+                                    if (state.recoveryKitExists == true) stringResource(R.string.mail_e2e_replace_recovery_key) else stringResource(R.string.mail_e2e_create_recovery_key),
                                     enabled = !state.busy, quiet = state.recoveryKitExists == true,
                                     tag = "gm-e2e-recovery-create", onClick = { vm.createRecoveryKey() })
                             }
                             if (state.recoveryKitExists == true) {
                                 Spacer(Modifier.height(8.dp))
-                                E2eButton("Remove the recovery key", enabled = !state.busy, quiet = true,
+                                E2eButton(stringResource(R.string.mail_e2e_remove_recovery_key_button), enabled = !state.busy, quiet = true,
                                     tag = "gm-e2e-recovery-remove", onClick = { confirmRemoveKit = true })
                             }
                         }
                         Spacer(Modifier.height(14.dp))
-                        E2eRow("Fingerprint", fingerprintBlock(state.fingerprint ?: "-"))
+                        E2eRow(stringResource(R.string.mail_e2e_fingerprint), fingerprintBlock(state.fingerprint ?: "-"))
                         Spacer(Modifier.height(8.dp))
-                        E2eButton("Key details", enabled = true, quiet = true,
+                        E2eButton(stringResource(R.string.mail_e2e_key_details), enabled = true, quiet = true,
                             tag = "gm-e2e-details-open", onClick = onDetails)
                         Spacer(Modifier.height(8.dp))
-                        E2eButton("Who can find your key", enabled = true, quiet = true,
+                        E2eButton(stringResource(R.string.mail_e2e_who_can_find_key), enabled = true, quiet = true,
                             tag = "gm-e2e-publish-open", onClick = onPublish)
                         if (state.unlocked) {
                             Spacer(Modifier.height(8.dp))
-                            E2eButton("Change passphrase", enabled = true, quiet = true,
+                            E2eButton(stringResource(R.string.mail_e2e_change_passphrase), enabled = true, quiet = true,
                                 tag = "gm-e2e-change-open", onClick = onChangePassphrase)
                         }
                         Spacer(Modifier.height(8.dp))
-                        E2eButton("Recipient keys", enabled = true, quiet = true,
+                        E2eButton(stringResource(R.string.mail_e2e_recipient_keys), enabled = true, quiet = true,
                             tag = "gm-e2e-recipients-open", onClick = onRecipients)
                         Spacer(Modifier.height(8.dp))
-                        E2eButton("Remove the key from this device", enabled = true, quiet = true,
+                        E2eButton(stringResource(R.string.mail_e2e_remove_key_from_device), enabled = true, quiet = true,
                             tag = "gm-e2e-remove-open", onClick = onRemove)
                     }
                 }
@@ -315,23 +328,20 @@ fun E2eSetupScreen(vm: E2eViewModel, onBack: () -> Unit) {
     var passphrase by remember { mutableStateOf("") }
     var confirm by remember { mutableStateOf("") }
     var publishOnSetup by remember { mutableStateOf(true) }
-    MailScaffold("Create your key", onBack) {
+    MailScaffold(stringResource(R.string.mail_e2e_create_key), onBack, maxContentWidth = GMLayout.Form) {
         Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp)) {
             state.note?.let { E2eNote(it, state.noteIsBad); Spacer(Modifier.height(10.dp)) }
-            E2eLede("The key is made here, on this device. The private half never leaves it: that is " +
-                "what makes this end-to-end rather than a promise. It is stored encrypted under a " +
-                "passphrase you choose.")
-            Text("There is no way to recover a forgotten passphrase.", fontSize = 13.sp,
+            E2eLede(stringResource(R.string.mail_e2e_key_made_here_device))
+            Text(stringResource(R.string.mail_e2e_there_no_way_recover), fontSize = 13.sp,
                 fontWeight = FontWeight.Medium, color = LocalPalette.current.textPrimary,
                 modifier = Modifier.padding(top = 10.dp))
-            E2eLede("Not by us, and not by you. After setup you can create a recovery key: it restores " +
-                "your key on a new device with a new passphrase. Without the passphrase or the recovery " +
-                "key, nobody can open your encrypted mail, us included.")
+            E2eLede(stringResource(R.string.mail_e2e_not_us_not_after))
             Spacer(Modifier.height(14.dp))
-            AppTextField("Passphrase", passphrase, { passphrase = it }, password = true)
-            AppTextField("Repeat passphrase", confirm, { confirm = it }, password = true,
+            AppTextField(stringResource(R.string.mail_e2e_passphrase), passphrase, { passphrase = it }, password = true)
+            AppTextField(stringResource(R.string.mail_e2e_repeat_passphrase), confirm, { confirm = it }, password = true,
                 modifier = Modifier.padding(top = 8.dp))
-            Row(Modifier.padding(top = 12.dp).clickable { publishOnSetup = !publishOnSetup },
+            Row(Modifier.padding(top = 12.dp).fillMaxWidth().heightIn(min = 48.dp)
+                .clickable(role = androidx.compose.ui.semantics.Role.Checkbox) { publishOnSetup = !publishOnSetup },
                 verticalAlignment = Alignment.Top) {
                 Box(Modifier.size(20.dp).clip(CircleShape)
                     .border(1.5.dp, if (publishOnSetup) LocalPalette.current.primarySolid
@@ -343,15 +353,14 @@ fun E2eSetupScreen(vm: E2eViewModel, onBack: () -> Unit) {
                 }
                 Spacer(Modifier.width(12.dp))
                 Column(Modifier.weight(1f)) {
-                    Text("Publish the public half, so other people can send me encrypted mail.",
+                    Text(stringResource(R.string.mail_e2e_publish_public_half_other),
                         fontSize = 13.sp, color = LocalPalette.current.textPrimary)
-                    Text("This shares your public key. Your private key is not shared, and never " +
-                        "leaves this device.", fontSize = 12.sp,
+                    Text(stringResource(R.string.mail_e2e_shares_public_key_private), fontSize = 12.sp,
                         color = LocalPalette.current.textTertiary)
                 }
             }
             Spacer(Modifier.height(16.dp))
-            E2eButton(if (state.busy) "Creating…" else "Create my key",
+            E2eButton(if (state.busy) stringResource(R.string.mail_e2e_creating) else stringResource(R.string.mail_e2e_create_my_key),
                 enabled = !state.busy, tag = "gm-e2e-setup-submit",
                 onClick = { vm.setup(passphrase, confirm, publishOnSetup) })
             Spacer(Modifier.height(24.dp))
@@ -365,16 +374,35 @@ fun E2eSetupScreen(vm: E2eViewModel, onBack: () -> Unit) {
 fun E2eUnlockScreen(vm: E2eViewModel, onBack: () -> Unit) {
     val state by vm.state.collectAsStateWithLifecycle()
     var phrase by remember { mutableStateOf("") }
-    MailScaffold("Unlock your key", onBack) {
-        Column(Modifier.fillMaxSize().padding(horizontal = 20.dp)) {
+    MailScaffold(stringResource(R.string.mail_e2e_unlock_key), onBack, maxContentWidth = GMLayout.Form) {
+        // Scrolls, so Unlock stays reachable above the keyboard in a short window.
+        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp)) {
             state.note?.let { E2eNote(it, state.noteIsBad); Spacer(Modifier.height(10.dp)) }
-            E2eLede("Your passphrase decrypts the key on this device. It is never sent anywhere.")
+            E2eLede(stringResource(R.string.mail_e2e_passphrase_decrypts_key_device))
             Spacer(Modifier.height(14.dp))
-            AppTextField("Passphrase", phrase, { phrase = it }, password = true)
+            AppTextField(stringResource(R.string.mail_e2e_passphrase), phrase, { phrase = it }, password = true)
             Spacer(Modifier.height(16.dp))
-            E2eButton(if (state.busy) "Unlocking…" else "Unlock",
+            E2eButton(if (state.busy) stringResource(R.string.mail_e2e_unlocking) else stringResource(R.string.mail_e2e_unlock),
                 enabled = !state.busy && phrase.isNotEmpty(), tag = "gm-e2e-unlock-submit",
                 onClick = { vm.unlock(phrase); phrase = "" })
+            // Biometric-bound unlock (security/BiometricKeyWrap.kt): offered only
+            // when app lock is on and a bound copy exists. A passphrase unlock
+            // while app lock is on creates that copy (the safe re-wrap).
+            val unlockContext = androidx.compose.ui.platform.LocalContext.current
+            val unlockActivity = remember(unlockContext) {
+                generateSequence(unlockContext) { (it as? android.content.ContextWrapper)?.baseContext }
+                    .filterIsInstance<androidx.fragment.app.FragmentActivity>().firstOrNull()
+            }
+            LaunchedEffect(state.unlocked) {
+                if (state.unlocked) unlockActivity?.let { vm.bindAfterPassphraseUnlock(it) }
+            }
+            if (!state.unlocked && unlockActivity != null && vm.canBiometricUnlock()) {
+                Spacer(Modifier.height(10.dp))
+                E2eButton(androidx.compose.ui.res.stringResource(com.grapsee.grapmail.R.string.core_e2e_bio_unlock_button),
+                    enabled = !state.busy, tag = "gm-e2e-unlock-biometric",
+                    onClick = { vm.unlockWithBiometrics(unlockActivity) })
+            }
+            Spacer(Modifier.height(24.dp))
         }
     }
 }
@@ -385,7 +413,7 @@ fun E2eUnlockScreen(vm: E2eViewModel, onBack: () -> Unit) {
 fun E2eDetailsScreen(vm: E2eViewModel, onBack: () -> Unit) {
     val palette = LocalPalette.current
     val state by vm.state.collectAsStateWithLifecycle()
-    MailScaffold("This device's key", onBack) {
+    MailScaffold(stringResource(R.string.mail_e2e_devices_key), onBack, maxContentWidth = GMLayout.Form) {
         // Top-anchored like every other detail screen (subscriptions, the
         // connection page): Arrangement.Center stranded the whole record in
         // the screen's middle with a dead band under the toolbar -- frame
@@ -393,13 +421,12 @@ fun E2eDetailsScreen(vm: E2eViewModel, onBack: () -> Unit) {
         Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())
             .padding(horizontal = 20.dp),
         ) {
-            E2eLede("Read the fingerprint aloud, or send it through another channel, and have the " +
-                "other person confirm it. If the two do not match, the key you have is not theirs.")
+            E2eLede(stringResource(R.string.mail_e2e_read_fingerprint_aloud_send))
             Spacer(Modifier.height(10.dp))
-            E2eRow("Fingerprint", fingerprintBlock(state.fingerprint ?: "-"))
-            E2eRow("Created", state.record?.createdAt?.let { absoluteDateTimeOrRaw(it) } ?: "-")
-            E2eRow("Signing key", if (state.record?.signing != null)
-                "Yes: recipients can verify it was you" else "None", mono = false)
+            E2eRow(stringResource(R.string.mail_e2e_fingerprint), fingerprintBlock(state.fingerprint ?: "-"))
+            E2eRow(stringResource(R.string.mail_e2e_created), state.record?.createdAt?.let { absoluteDateTimeOrRaw(it) } ?: "-")
+            E2eRow(stringResource(R.string.mail_e2e_signing_key), if (state.record?.signing != null)
+                stringResource(R.string.mail_e2e_yes_recipients_can_verify) else stringResource(R.string.mail_e2e_none), mono = false)
             Spacer(Modifier.height(12.dp))
             Text(vm.openpgpExportNote(), fontSize = 12.sp, lineHeight = 18.sp,
                 color = palette.textTertiary)
@@ -414,13 +441,27 @@ fun E2ePublishScreen(vm: E2eViewModel, onBack: () -> Unit) {
     val palette = LocalPalette.current
     val state by vm.state.collectAsStateWithLifecycle()
     LaunchedEffect(Unit) { vm.loadPublished() }
-    MailScaffold("Who can find your key", onBack) {
+    MailScaffold(stringResource(R.string.mail_e2e_who_can_find_key), onBack, maxContentWidth = GMLayout.Form) {
+        com.grapsee.grapmail.ui.components.OfflineBanner()
+        // First read and a failed read use the shared states; the failure
+        // keeps the server's own sentence and adds the way back.
+        if (!state.publishedLoaded) {
+            com.grapsee.grapmail.ui.components.DetailSkeleton(
+                Modifier.testTag("gm-e2e-publish-checking"),
+                label = stringResource(R.string.mail_e2e_checking))
+            return@MailScaffold
+        }
+        if (state.publishedError != null && state.published == null) {
+            com.grapsee.grapmail.ui.components.ErrorState(onRetry = { vm.loadPublished() },
+                message = state.publishedError)
+            return@MailScaffold
+        }
         Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp),
             verticalArrangement = Arrangement.Center,
         ) {
             state.note?.let { E2eNote(it, state.noteIsBad); Spacer(Modifier.height(10.dp)) }
             if (!state.publishedLoaded) {
-                Text("Checking…", fontSize = 13.sp, color = palette.textTertiary,
+                Text(stringResource(R.string.mail_e2e_checking), fontSize = 13.sp, color = palette.textTertiary,
                     modifier = Modifier.padding(vertical = 10.dp).testTag("gm-e2e-publish-checking"))
             } else if (state.publishedError != null) {
                 // The failed read says so. "Nothing is published" would be a
@@ -429,34 +470,28 @@ fun E2ePublishScreen(vm: E2eViewModel, onBack: () -> Unit) {
             } else {
                 val p = state.published
                 if (p != null) {
-                    E2eLede("Your public key is published, so anyone sending you mail can encrypt to " +
-                        "it. Your private key is not published and never will be.")
+                    E2eLede(stringResource(R.string.mail_e2e_public_key_published_anyone))
                     Spacer(Modifier.height(8.dp))
-                    E2eRow("Published fingerprint", fingerprintBlock(p.encryption?.fingerprint ?: "-"))
-                    E2eRow("Updated", (p.updatedAt ?: p.publishedAt)?.let { absoluteDateTimeOrRaw(it) } ?: "-")
+                    E2eRow(stringResource(R.string.mail_e2e_published_fingerprint), fingerprintBlock(p.encryption?.fingerprint ?: "-"))
+                    E2eRow(stringResource(R.string.mail_e2e_updated), (p.updatedAt ?: p.publishedAt)?.let { absoluteDateTimeOrRaw(it) } ?: "-")
                     val mismatch = state.fingerprint != null && p.encryption?.fingerprint != null &&
                         p.encryption?.fingerprint != state.fingerprint
                     if (mismatch) {
                         Spacer(Modifier.height(10.dp))
-                        E2eNote("The key published for your account is NOT the key on this device. " +
-                            "Anyone encrypting to you right now is encrypting to a key this device " +
-                            "cannot open. If you did not expect this — for example if you set " +
-                            "encryption up on another device — publish from this one, or restore " +
-                            "that device's key.", true)
+                        E2eNote(stringResource(R.string.mail_e2e_key_published_account_not), true)
                     }
                     Spacer(Modifier.height(14.dp))
-                    E2eButton("Unpublish", enabled = !state.busy, quiet = true,
+                    E2eButton(stringResource(R.string.mail_e2e_unpublish), enabled = !state.busy, quiet = true,
                         tag = "gm-e2e-unpublish", onClick = { vm.unpublish() })
                 } else {
-                    E2eLede("Nothing is published for this account, so senders cannot encrypt to " +
-                        "you yet. Publishing shares only the public half.")
+                    E2eLede(stringResource(R.string.mail_e2e_nothing_published_account_senders))
                     Spacer(Modifier.height(14.dp))
-                    E2eButton(if (state.busy) "Publishing…" else "Publish my public key",
+                    E2eButton(if (state.busy) stringResource(R.string.mail_e2e_publishing) else stringResource(R.string.mail_e2e_publish_my_public_key),
                         enabled = !state.busy && state.record != null,
                         tag = "gm-e2e-publish-submit", onClick = { vm.publish() })
                     if (state.record == null) {
                         Spacer(Modifier.height(8.dp))
-                        Text("A key on this device comes first — create one from the Encryption screen.",
+                        Text(stringResource(R.string.mail_e2e_key_device_comes_first),
                             fontSize = 12.sp, color = palette.textTertiary)
                     }
                 }
@@ -473,24 +508,25 @@ fun E2ePassphraseScreen(vm: E2eViewModel, onBack: () -> Unit) {
     val state by vm.state.collectAsStateWithLifecycle()
     var oldPhrase by remember { mutableStateOf("") }
     var newPhrase by remember { mutableStateOf("") }
-    MailScaffold("Change your passphrase", onBack) {
-        Column(Modifier.fillMaxSize().padding(horizontal = 20.dp)) {
+    MailScaffold(stringResource(R.string.mail_e2e_change_your_passphrase), onBack, maxContentWidth = GMLayout.Form) {
+        // Scrolls, so the button stays reachable above the keyboard in a short window.
+        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp)) {
             state.note?.let { E2eNote(it, state.noteIsBad); Spacer(Modifier.height(10.dp)) }
-            E2eLede("This re-locks the same key under a new passphrase. It does not change the key, " +
-                "so messages already encrypted to you stay readable.")
+            E2eLede(stringResource(R.string.mail_e2e_re_locks_same_key))
             Spacer(Modifier.height(14.dp))
-            AppTextField("Current passphrase", oldPhrase, { oldPhrase = it }, password = true)
-            AppTextField("New passphrase", newPhrase, { newPhrase = it }, password = true,
+            AppTextField(stringResource(R.string.mail_e2e_current_passphrase), oldPhrase, { oldPhrase = it }, password = true)
+            AppTextField(stringResource(R.string.mail_e2e_new_passphrase), newPhrase, { newPhrase = it }, password = true,
                 modifier = Modifier.padding(top = 8.dp))
             Spacer(Modifier.height(16.dp))
-            E2eButton(if (state.busy) "Changing…" else "Change passphrase",
+            E2eButton(if (state.busy) stringResource(R.string.mail_e2e_changing) else stringResource(R.string.mail_e2e_change_passphrase),
                 enabled = !state.busy && state.unlocked, tag = "gm-e2e-change-submit",
                 onClick = { vm.changePassphrase(oldPhrase, newPhrase); oldPhrase = ""; newPhrase = "" })
             if (!state.unlocked) {
                 Spacer(Modifier.height(8.dp))
-                Text("Unlocking the key comes first — the re-wrap needs the old passphrase to open it.",
+                Text(stringResource(R.string.mail_e2e_unlocking_key_comes_first),
                     fontSize = 12.sp, color = LocalPalette.current.textTertiary)
             }
+            Spacer(Modifier.height(24.dp))
         }
     }
 }
@@ -502,26 +538,24 @@ fun E2eRemoveScreen(vm: E2eViewModel, onBack: () -> Unit) {
     val palette = LocalPalette.current
     val state by vm.state.collectAsStateWithLifecycle()
     var confirmRemove by remember { mutableStateOf(false) }
-    MailScaffold("Remove the key from this device", onBack) {
+    MailScaffold(stringResource(R.string.mail_e2e_remove_key_from_device), onBack, maxContentWidth = GMLayout.Form) {
         Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())
             .padding(horizontal = 20.dp),
         ) {
             state.note?.let { E2eNote(it, state.noteIsBad); Spacer(Modifier.height(10.dp)) }
             // The warning is the consequence, stated before the tap, in the
             // web's own words. Not a scare line: permanent and everywhere.
-            E2eLede("This deletes the private key here. Every message already encrypted to it " +
-                "becomes unreadable — here and anywhere else, permanently. Do this only if you " +
-                "have the key somewhere else, or you accept losing access to that mail.")
+            E2eLede(stringResource(R.string.mail_e2e_deletes_private_key_here))
             Spacer(Modifier.height(16.dp))
             if (!confirmRemove) {
-                E2eButton("Remove from this device", enabled = state.record != null, quiet = true,
+                E2eButton(stringResource(R.string.mail_e2e_remove_from_device), enabled = state.record != null, quiet = true,
                     tag = "gm-e2e-remove-start", onClick = { confirmRemove = true })
             } else {
-                E2eButton(if (state.busy) "Removing…" else "Yes, delete the key from this device",
+                E2eButton(if (state.busy) stringResource(R.string.mail_e2e_removing) else stringResource(R.string.mail_e2e_yes_delete_key_from),
                     enabled = !state.busy, destructive = true, tag = "gm-e2e-remove-confirm",
                     onClick = { vm.removeKey(); confirmRemove = false; onBack() })
                 Spacer(Modifier.height(8.dp))
-                E2eButton("Keep it", enabled = true, quiet = true,
+                E2eButton(stringResource(R.string.mail_e2e_keep), enabled = true, quiet = true,
                     tag = "gm-e2e-remove-keep", onClick = { confirmRemove = false })
             }
         }
@@ -542,18 +576,24 @@ fun E2eRecipientsScreen(vm: E2eViewModel, onBack: () -> Unit, onCompose: () -> U
     val palette = LocalPalette.current
     val state by vm.state.collectAsStateWithLifecycle()
     var draft by remember { mutableStateOf("") }
-    MailScaffold("Recipient keys", onBack) {
+    val stacked = gmPrefersStackedRows()
+    MailScaffold(stringResource(R.string.mail_e2e_recipient_keys), onBack, maxContentWidth = GMLayout.Form) {
         Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp)) {
-            E2eLede("Check that the people you are about to write to have published keys. A found " +
-                "entry shows the fingerprint to compare; an unavailable one says why, in the " +
-                "directory's own words.")
+            E2eLede(stringResource(R.string.mail_e2e_check_people_about_write))
             Spacer(Modifier.height(8.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            // At large text the field gets the full width and Check goes under it.
+            if (stacked) {
+                AppTextField("", draft, { draft = it }, hint = stringResource(R.string.mail_e2e_someone_example_com))
+                Spacer(Modifier.height(8.dp))
+                E2eButton(stringResource(R.string.mail_e2e_check), enabled = !state.busy && draft.isNotBlank(),
+                    tag = "gm-e2e-lookup-submit",
+                    onClick = { vm.lookup(listOf(draft.trim())); draft = "" })
+            } else Row(verticalAlignment = Alignment.CenterVertically) {
                 Box(Modifier.weight(1f)) {
-                    AppTextField("", draft, { draft = it }, hint = "someone@example.com")
+                    AppTextField("", draft, { draft = it }, hint = stringResource(R.string.mail_e2e_someone_example_com))
                 }
                 Spacer(Modifier.width(10.dp))
-                E2eButton("Check", enabled = !state.busy && draft.isNotBlank(), fill = false,
+                E2eButton(stringResource(R.string.mail_e2e_check), enabled = !state.busy && draft.isNotBlank(), fill = false,
                     tag = "gm-e2e-lookup-submit",
                     onClick = { vm.lookup(listOf(draft.trim())); draft = "" })
             }
@@ -563,38 +603,44 @@ fun E2eRecipientsScreen(vm: E2eViewModel, onBack: () -> Unit, onCompose: () -> U
                 state.lookup.forEach { e ->
                     Column(Modifier.fillMaxWidth().padding(vertical = 10.dp)
                         .testTag("gm-e2e-lookup-row")) {
-                        Row {
+                        val verdict = if (e.status == "found") stringResource(R.string.mail_e2e_found) else stringResource(R.string.mail_e2e_cannot_encrypt)
+                        if (stacked) {
+                            Text(e.address, fontSize = 14.sp, fontWeight = FontWeight.Medium, color = palette.textPrimary)
+                            Text(verdict, fontSize = 12.sp, fontWeight = FontWeight.SemiBold,
+                                color = if (e.status == "found") palette.success else palette.warnInk)
+                        } else Row {
                             Text(e.address, fontSize = 14.sp, fontWeight = FontWeight.Medium,
                                 color = palette.textPrimary, modifier = Modifier.weight(1f))
-                            Text(if (e.status == "found") "Found" else "Cannot encrypt",
+                            Spacer(Modifier.width(8.dp))
+                            Text(if (e.status == "found") stringResource(R.string.mail_e2e_found) else stringResource(R.string.mail_e2e_cannot_encrypt),
                                 fontSize = 12.sp, fontWeight = FontWeight.SemiBold,
                                 color = if (e.status == "found") palette.success else palette.warnInk)
                         }
                         if (e.status == "found" && e.signing != null) {
-                            Text("Signing fingerprint ${fingerprintBlock(e.signing?.fingerprint ?: "-")}",
+                            Text(stringResource(R.string.mail_e2e_signing_fingerprint, fingerprintBlock(e.signing?.fingerprint ?: "-")),
                                 fontSize = 12.sp, fontFamily = FontFamily.Monospace,
                                 color = palette.textSecondary)
                         } else if (e.status != "found") {
                             Text(when (e.why) {
                                 com.grapsee.grapmail.data.MailE2eBlockReason.NotAnAddress ->
-                                    "That is not an address the directory can look up."
+                                    stringResource(R.string.mail_e2e_not_address_directory_can)
                                 com.grapsee.grapmail.data.MailE2eBlockReason.RemoteDomain ->
-                                    "Not a GrapMail address — the directory only knows GrapMail keys."
+                                    stringResource(R.string.mail_e2e_not_grapmail_address_directory)
                                 com.grapsee.grapmail.data.MailE2eBlockReason.NoSuchAccount ->
-                                    "There is no GrapMail account at that address."
+                                    stringResource(R.string.mail_e2e_there_no_grapmail_account)
                                 com.grapsee.grapmail.data.MailE2eBlockReason.NoKeyPublished ->
-                                    "This person has not published an encryption key yet."
+                                    stringResource(R.string.mail_e2e_person_has_not_published)
                                 com.grapsee.grapmail.data.MailE2eBlockReason.Unknown ->
-                                    e.reason ?: "The directory gave no reason."
+                                    e.reason ?: stringResource(R.string.mail_e2e_directory_gave_no_reason)
                             }, fontSize = 12.sp, color = palette.textTertiary)
                         }
                     }
                 }
                 Spacer(Modifier.height(10.dp))
-                E2eButton("Back to compose", enabled = true, quiet = true,
+                E2eButton(stringResource(R.string.mail_e2e_back_compose), enabled = true, quiet = true,
                     tag = "gm-e2e-lookup-compose", onClick = onCompose)
             } else if (state.lookupFor.isNotEmpty() && !state.busy) {
-                Text("The directory answered nothing for that check.", fontSize = 13.sp,
+                Text(stringResource(R.string.mail_e2e_directory_answered_nothing_check), fontSize = 13.sp,
                     color = palette.textTertiary, modifier = Modifier.padding(vertical = 10.dp))
             }
             Spacer(Modifier.height(24.dp))
@@ -612,32 +658,32 @@ private fun RecoveryKeyShownOnce(key: String, onDone: () -> Unit) {
     var copied by remember { mutableStateOf(false) }
     androidx.compose.material3.AlertDialog(
         onDismissRequest = {},
-        title = { Text("Your recovery key") },
+        title = { Text(stringResource(R.string.mail_e2e_your_recovery_key)) },
         text = {
-            Column {
-                Text("Write it down or keep it in a password manager. GrapMail cannot show it again, " +
-                    "and without it a lost device means lost encrypted mail.",
+            // Scrolls, so the key and both buttons fit a landscape window.
+            Column(Modifier.verticalScroll(rememberScrollState())) {
+                Text(stringResource(R.string.mail_e2e_write_down_keep_password),
                     fontSize = 13.sp, lineHeight = 19.sp, color = palette.textSecondary)
                 Spacer(Modifier.height(14.dp))
                 Text(key, fontSize = 16.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.SemiBold,
                     color = palette.textPrimary, modifier = Modifier.testTag("gm-e2e-recovery-key"))
                 if (copied) {
                     Spacer(Modifier.height(8.dp))
-                    Text("Copied. Paste it somewhere safe, then clear your clipboard.",
+                    Text(stringResource(R.string.mail_e2e_copied_paste_somewhere_safe),
                         fontSize = 12.sp, color = palette.textSecondary)
                 }
             }
         },
         confirmButton = {
             androidx.compose.material3.TextButton(onClick = onDone, modifier = Modifier.testTag("gm-e2e-recovery-saved")) {
-                Text("I have saved it")
+                Text(stringResource(R.string.mail_e2e_i_have_saved))
             }
         },
         dismissButton = {
             androidx.compose.material3.TextButton(onClick = {
                 clipboard.setText(androidx.compose.ui.text.AnnotatedString(key))
                 copied = true
-            }) { Text("Copy") }
+            }) { Text(stringResource(R.string.mail_e2e_copy)) }
         },
     )
 }
@@ -654,22 +700,20 @@ private fun RecoveryRestoreDialog(vm: E2eViewModel, onClose: () -> Unit) {
         onDismissRequest = onClose,
         properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false),
     ) {
-        MailScaffold("Restore your key", onClose) {
+        MailScaffold(stringResource(R.string.mail_e2e_restore_key), onClose, maxContentWidth = GMLayout.Form) {
             Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp)) {
                 state.note?.let { E2eNote(it, state.noteIsBad); Spacer(Modifier.height(10.dp)) }
-                E2eLede("Enter the recovery key you saved when you set it up. It has 28 letters and numbers; " +
-                    "dashes and spaces do not matter.")
+                E2eLede(stringResource(R.string.mail_e2e_enter_recovery_key_saved))
                 Spacer(Modifier.height(12.dp))
-                AppTextField("Recovery key", recoveryKey, { recoveryKey = it })
+                AppTextField(stringResource(R.string.mail_e2e_recovery_key), recoveryKey, { recoveryKey = it })
                 Spacer(Modifier.height(14.dp))
-                E2eLede("Then choose a passphrase for this device. It protects the key here, like the one " +
-                    "you set the first time.")
+                E2eLede(stringResource(R.string.mail_e2e_then_choose_passphrase_device))
                 Spacer(Modifier.height(8.dp))
-                AppTextField("New passphrase", passphrase, { passphrase = it }, password = true)
-                AppTextField("Repeat passphrase", confirm, { confirm = it }, password = true,
+                AppTextField(stringResource(R.string.mail_e2e_new_passphrase), passphrase, { passphrase = it }, password = true)
+                AppTextField(stringResource(R.string.mail_e2e_repeat_passphrase), confirm, { confirm = it }, password = true,
                     modifier = Modifier.padding(top = 8.dp))
                 Spacer(Modifier.height(16.dp))
-                E2eButton(if (state.busy) "Restoring…" else "Restore my key",
+                E2eButton(if (state.busy) stringResource(R.string.mail_e2e_restoring) else stringResource(R.string.mail_e2e_restore_my_key),
                     enabled = !state.busy && recoveryKey.isNotBlank() && passphrase.isNotEmpty(),
                     tag = "gm-e2e-restore-submit",
                     onClick = { vm.restoreWithRecoveryKey(recoveryKey, passphrase, confirm) })

@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    values-ur/strings_mailbox_features.xml: translation of values/strings_mailbox_features.xml (same keys, same order).
+    Comments below are kept from the English source for context.
+-->
+<resources>
+    <!-- ui/mailfeatures/MorningCard.kt — greeting by local time; %1$s is the mailbox's first name. -->
+    <string name="mailbox_feat_greeting_morning">صبح بخیر</string>
+    <string name="mailbox_feat_greeting_morning_name">صبح بخیر، %1$s</string>
+    <string name="mailbox_feat_greeting_afternoon">سہ پہر بخیر</string>
+    <string name="mailbox_feat_greeting_afternoon_name">سہ پہر بخیر، %1$s</string>
+    <string name="mailbox_feat_greeting_evening">شام بخیر</string>
+    <string name="mailbox_feat_greeting_evening_name">شام بخیر، %1$s</string>
+    <!-- Summary parts; only non-zero parts are shown, joined by a middle dot. -->
+    <plurals name="mailbox_feat_digest_reply">
+        <item quantity="one">%1$d پیغام جواب کا منتظر</item>
+        <item quantity="other">%1$d پیغامات جواب کے منتظر</item>
+    </plurals>
+    <plurals name="mailbox_feat_digest_package">
+        <item quantity="one">%1$d پیکج آ رہا ہے</item>
+        <item quantity="other">%1$d پیکج آ رہے ہیں</item>
+    </plurals>
+    <plurals name="mailbox_feat_digest_code">
+        <item quantity="one">%1$d سائن اِن کوڈ</item>
+        <item quantity="other">%1$d سائن اِن کوڈز</item>
+    </plurals>
+    <string name="mailbox_feat_digest_caught_up">آپ سب کچھ دیکھ چکے ہیں</string>
+    <!-- TalkBack reads the card as one sentence: %1$s greeting, %2$s the parts joined. -->
+    <string name="mailbox_feat_digest_a11y">%1$s. %2$s.</string>
+    <string name="mailbox_feat_digest_a11y_join">،\u0020</string>
+    <!-- TalkBack actions on the card. -->
+    <string name="mailbox_feat_action_show_reply">جواب کے منتظر پیغامات دکھائیں</string>
+    <string name="mailbox_feat_action_show_packages">پیکج کی اپ ڈیٹس دکھائیں</string>
+    <string name="mailbox_feat_action_show_codes">سائن اِن کوڈز دکھائیں</string>
+    <string name="mailbox_feat_action_show_all">تمام پیغامات دکھائیں</string>
+    <string name="mailbox_feat_dismiss">برخاست کریں</string>
+    <!-- The active filter chip under the card; %1$s is the filter's name. -->
+    <string name="mailbox_feat_filter_reply">جواب درکار</string>
+    <string name="mailbox_feat_filter_packages">پیکجز</string>
+    <string name="mailbox_feat_filter_codes">سائن اِن کوڈز</string>
+    <string name="mailbox_feat_filter_clear">فلٹر صاف کریں: %1$s</string>
+
+    <!-- ui/components/Mail.kt — the code chip on an inbox row; %1$s is the code. -->
+    <string name="mailbox_feat_code_copy">%1$s کاپی کریں</string>
+    <!-- The chip's spoken name; the code itself is not read out. -->
+    <string name="mailbox_feat_code_copy_a11y">سائن اِن کوڈ کاپی کریں</string>
+    <!-- Shown on the chip after a copy. The code is not repeated. -->
+    <string name="mailbox_feat_code_copied">کوڈ کاپی ہو گیا</string>
+    <!-- Clipboard label (shown by some keyboards/clipboard UIs). -->
+    <string name="mailbox_feat_code_clip_label">سائن اِن کوڈ</string>
+
+    <!-- ui/mailfeatures/InboxZero.kt -->
+    <string name="mailbox_feat_zero_title">سب صاف</string>
+    <plurals name="mailbox_feat_zero_handled">
+        <item quantity="one">آپ نے آج %1$d ای میل نمٹائی۔</item>
+        <item quantity="other">آپ نے آج %1$d ای میلز نمٹائیں۔</item>
+    </plurals>
+    <string name="mailbox_feat_zero_nothing">آپ کے لیے کچھ بھی منتظر نہیں۔</string>
+
+    <!-- ui/screens/mail/SwipeActionsSetting.kt and the row actions in MailboxScreen.kt -->
+    <string name="mailbox_feat_swipe_title">سوائپ کارروائیاں</string>
+    <string name="mailbox_feat_swipe_body">فہرست میں کسی پیغام پر سوائپ کرنے سے کیا ہوتا ہے۔ صرف اس ڈیوائس پر محفوظ ہوتا ہے۔</string>
+    <string name="mailbox_feat_swipe_right">دائیں سوائپ</string>
+    <string name="mailbox_feat_swipe_left">بائیں سوائپ</string>
+    <!-- %1$s is "Swipe right" or "Swipe left". -->
+    <string name="mailbox_feat_swipe_change">%1$s تبدیل کریں</string>
+    <string name="mailbox_feat_swipe_archive">آرکائیو کریں</string>
+    <string name="mailbox_feat_swipe_trash">ردی</string>
+    <string name="mailbox_feat_swipe_read">پڑھا/غیر پڑھا نشان زد کریں</string>
+    <string name="mailbox_feat_swipe_star">ستارہ لگائیں</string>
+    <string name="mailbox_feat_swipe_snooze">اسنوز کریں</string>
+    <string name="mailbox_feat_swipe_move">منتقل کریں…</string>
+    <string name="mailbox_feat_swipe_none">کوئی نہیں</string>
+</resources>

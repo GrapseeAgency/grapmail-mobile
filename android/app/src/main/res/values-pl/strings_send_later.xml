@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    values-pl/strings_send_later.xml: translation of values/strings_send_later.xml (same keys, same order).
+    Comments below are kept from the English source for context.
+-->
+<resources>
+    <!-- The clock button next to Send (TalkBack label and click action). -->
+    <string name="compose_send_later_button">Zaplanuj wysłanie</string>
+    <string name="compose_send_later_button_action">wybierz, kiedy wysłać</string>
+
+    <!-- The sheet. -->
+    <string name="compose_send_later_title">Wyślij później</string>
+    <string name="compose_send_later_later_today">Później dzisiaj</string>
+    <string name="compose_send_later_tomorrow_morning">Jutro rano</string>
+    <string name="compose_send_later_monday_morning">W poniedziałek rano</string>
+    <string name="compose_send_later_pick">Wybierz datę i godzinę</string>
+    <string name="compose_send_later_pick_hint">Do 30 dni naprzód</string>
+    <!-- %1$s: the device time zone's name, e.g. "Bangladesh Standard Time". -->
+    <string name="compose_send_later_zone_note">Godziny w Twojej strefie czasowej: %1$s</string>
+    <!-- TalkBack for one option row. %1$s: option name, %2$s: its day and time. -->
+    <string name="compose_send_later_option_description">%1$s, %2$s</string>
+
+    <!-- Date and time dialogs. -->
+    <string name="compose_send_later_date_title">Wybierz datę</string>
+    <string name="compose_send_later_time_title">Wybierz godzinę</string>
+    <string name="compose_send_later_next">Dalej</string>
+    <string name="compose_send_later_schedule">Zaplanuj</string>
+    <string name="compose_send_later_cancel">Anuluj</string>
+    <string name="compose_send_later_type_time">Wpisz godzinę</string>
+    <string name="compose_send_later_use_clock">Użyj zegara</string>
+    <string name="compose_send_later_too_soon">Wybierz godzinę co najmniej minutę od teraz.</string>
+    <string name="compose_send_later_too_far">Wybierz godzinę nie później niż 30 dni naprzód.</string>
+
+    <!-- In-flight and failure lines in the composer. -->
+    <string name="compose_send_later_scheduling">Planowanie…</string>
+    <string name="compose_send_later_offline">Brak połączenia, więc nic nie zaplanowano. Twoja wiadomość nadal tu jest.</string>
+
+    <!-- The receipt snackbar shown after compose closes. %1$s: e.g. "Tue 8:00 AM". -->
+    <string name="compose_send_later_scheduled_for">Zaplanowano na %1$s</string>
+    <string name="compose_send_later_undo">Cofnij</string>
+    <string name="compose_send_later_view">Pokaż</string>
+    <string name="compose_send_later_undoing">Anulowanie…</string>
+    <string name="compose_send_later_undone">Wysyłka nie jest już zaplanowana. Wiadomość wróciła do wersji roboczych.</string>
+    <!-- %1$s: the server's reason. -->
+    <string name="compose_send_later_undo_failed">Nie udało się anulować: %1$s</string>
+    <string name="compose_send_later_dismiss">Zamknij</string>
+</resources>

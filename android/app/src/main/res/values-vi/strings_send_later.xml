@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    values-vi/strings_send_later.xml: translation of values/strings_send_later.xml (same keys, same order).
+    Comments below are kept from the English source for context.
+-->
+<resources>
+    <!-- The clock button next to Send (TalkBack label and click action). -->
+    <string name="compose_send_later_button">Lên lịch gửi</string>
+    <string name="compose_send_later_button_action">chọn thời điểm gửi</string>
+
+    <!-- The sheet. -->
+    <string name="compose_send_later_title">Gửi sau</string>
+    <string name="compose_send_later_later_today">Cuối ngày hôm nay</string>
+    <string name="compose_send_later_tomorrow_morning">Sáng mai</string>
+    <string name="compose_send_later_monday_morning">Sáng thứ Hai</string>
+    <string name="compose_send_later_pick">Chọn ngày và giờ</string>
+    <string name="compose_send_later_pick_hint">Tối đa 30 ngày tới</string>
+    <!-- %1$s: the device time zone's name, e.g. "Bangladesh Standard Time". -->
+    <string name="compose_send_later_zone_note">Thời gian theo múi giờ của bạn: %1$s</string>
+    <!-- TalkBack for one option row. %1$s: option name, %2$s: its day and time. -->
+    <string name="compose_send_later_option_description">%1$s, %2$s</string>
+
+    <!-- Date and time dialogs. -->
+    <string name="compose_send_later_date_title">Chọn ngày</string>
+    <string name="compose_send_later_time_title">Chọn giờ</string>
+    <string name="compose_send_later_next">Tiếp</string>
+    <string name="compose_send_later_schedule">Lên lịch</string>
+    <string name="compose_send_later_cancel">Hủy</string>
+    <string name="compose_send_later_type_time">Nhập giờ</string>
+    <string name="compose_send_later_use_clock">Dùng đồng hồ</string>
+    <string name="compose_send_later_too_soon">Hãy chọn thời điểm cách hiện tại ít nhất một phút.</string>
+    <string name="compose_send_later_too_far">Hãy chọn thời điểm không quá 30 ngày tới.</string>
+
+    <!-- In-flight and failure lines in the composer. -->
+    <string name="compose_send_later_scheduling">Đang lên lịch…</string>
+    <string name="compose_send_later_offline">Không có kết nối nên chưa lên lịch gì. Thư của bạn vẫn còn đây.</string>
+
+    <!-- The receipt snackbar shown after compose closes. %1$s: e.g. "Tue 8:00 AM". -->
+    <string name="compose_send_later_scheduled_for">Đã lên lịch vào %1$s</string>
+    <string name="compose_send_later_undo">Hoàn tác</string>
+    <string name="compose_send_later_view">Xem</string>
+    <string name="compose_send_later_undoing">Đang hủy…</string>
+    <string name="compose_send_later_undone">Đã hủy lịch gửi. Thư đã quay lại Thư nháp.</string>
+    <!-- %1$s: the server's reason. -->
+    <string name="compose_send_later_undo_failed">Không thể hủy: %1$s</string>
+    <string name="compose_send_later_dismiss">Bỏ qua</string>
+</resources>

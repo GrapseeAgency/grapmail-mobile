@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="mail_receipt_read_at">已于 %1$s 阅读</string>
+    <string name="mail_receipt_requested_pending">已请求已读回执 · 尚未阅读</string>
+    <string name="mail_receipt_server_sent">已发送已读回执</string>
+    <string name="mail_receipt_ask_title">发件人请求已读回执</string>
+    <string name="mail_receipt_ask_body">要向 %1$s 发送回执，告知您已打开此邮件吗？回执只会告诉对方您打开邮件的时间，不含其他信息。</string>
+    <string name="mail_receipt_ask_send">发送回执</string>
+    <string name="mail_receipt_ask_decline">不发送</string>
+    <string name="mail_receipt_mode_title">发送已读回执</string>
+    <string name="mail_receipt_mode_body">当邮件请求已读回执时。除非您选择“始终”，否则不会为垃圾邮件、已屏蔽发件人或加密邮件发送回执。</string>
+    <string name="mail_receipt_mode_never">从不</string>
+    <string name="mail_receipt_mode_ask">询问</string>
+    <string name="mail_receipt_mode_always">始终</string>
+    <string name="mail_receipt_mode_always_note">选择“始终”也会为垃圾邮件、已屏蔽发件人和加密邮件发送回执。</string>
+    <string name="mail_receipt_mode_unavailable">无法加载此设置。请检查网络连接。</string>
+    <string name="mail_compose_request_receipt">请求已读回执</string>
+</resources>

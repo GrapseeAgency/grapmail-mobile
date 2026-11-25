@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <plurals name="reader_earlier_messages">
+        <item quantity="one">%d پچھلا پیغام</item>
+        <item quantity="other">%d پچھلے پیغامات</item>
+    </plurals>
+    <plurals name="reader_participants">
+        <item quantity="one">%d شخص</item>
+        <item quantity="other">%d افراد</item>
+    </plurals>
+    <plurals name="reader_message_count">
+        <item quantity="one">%d پیغام</item>
+        <item quantity="other">%d پیغامات</item>
+    </plurals>
+    <string name="reader_you">آپ</string>
+    <string name="reader_unread">نہ پڑھا گیا</string>
+    <string name="reader_earlier_action">تہہ شدہ پیغامات دکھائیں</string>
+    <string name="reader_open_message_action">یہ پیغام کھولیں</string>
+    <string name="reader_quoted_show">نقل شدہ متن دکھائیں</string>
+    <string name="reader_quoted_hide">نقل شدہ متن چھپائیں</string>
+    <string name="reader_state_expanded">کھلا</string>
+    <string name="reader_state_collapsed">تہہ شدہ</string>
+    <string name="reader_reply_to">%1$s کو جواب دیں…</string>
+    <string name="reader_reply_fallback">جواب دیں…</string>
+    <string name="reader_reply_options">جواب کے اختیارات</string>
+    <string name="reader_quick_reply">فوری جواب</string>
+    <string name="reader_attach_share_chooser">منسلکہ شیئر کریں</string>
+    <string name="reader_attach_view_image">تصویر دیکھیں</string>
+    <string name="reader_attach_save_named">%1$s محفوظ کریں</string>
+    <string name="reader_attach_share_named">%1$s شیئر کریں</string>
+    <string name="reader_attach_share_nothing">اس ڈیوائس پر کوئی ایپ یہ فائل شیئر نہیں کر سکتی۔</string>
+    <string name="reader_viewer_position">%1$d از %2$d</string>
+    <string name="reader_viewer_too_large">یہ تصویر یہاں نہیں دکھائی جا سکتی۔</string>
+    <string name="compose_r9_leave_title">یہ پیغام چھوڑ دیں؟</string>
+    <string name="compose_r9_leave_attachments">ڈرافٹ ابھی منسلکات محفوظ نہیں رکھتے۔ متن کو بغیر منسلکات کے ڈرافٹ میں محفوظ کریں، یا ترمیم جاری رکھیں۔</string>
+    <string name="compose_r9_save_text_only">صرف متن محفوظ کریں</string>
+    <string name="compose_r9_draft_failed_title">یہ ڈرافٹ محفوظ نہیں ہوا</string>
+    <string name="compose_r9_leave_without_saving">محفوظ کیے بغیر نکلیں</string>
+    <string name="compose_r9_encrypt_failed">یہ پیغام خفیہ نہیں کیا جا سکا، اس لیے کچھ نہیں بھیجا گیا۔</string>
+    <string name="compose_editor_toolbar">متن کی فارمیٹنگ</string>
+    <string name="compose_editor_bold">موٹا</string>
+    <string name="compose_editor_italic">ترچھا</string>
+    <string name="compose_editor_underline">زیرِ خط</string>
+    <string name="compose_editor_strike">کاٹا ہوا</string>
+    <string name="compose_editor_bullets">بلٹس</string>
+    <string name="compose_editor_numbered">نمبر وار</string>
+    <string name="compose_editor_text_colour">متن کا رنگ</string>
+    <string name="compose_editor_black">سیاہ</string>
+    <string name="compose_editor_blue">نیلا</string>
+    <string name="compose_editor_red">سرخ</string>
+    <string name="compose_editor_green">سبز</string>
+    <string name="compose_editor_highlight">نمایاں کریں</string>
+    <string name="compose_editor_highlight_colour">نمایاں کرنے کا رنگ</string>
+    <string name="compose_editor_yellow">پیلا</string>
+    <string name="compose_editor_pink">گلابی</string>
+    <string name="compose_editor_font">فونٹ</string>
+    <string name="compose_editor_sans">بغیر سیرف</string>
+    <string name="compose_editor_serif">Serif</string>
+    <string name="compose_editor_mono">Monospace</string>
+    <string name="compose_editor_larger">بڑا</string>
+    <string name="compose_editor_clear">فارمیٹنگ صاف کریں</string>
+    <string name="compose_editor_image">تصویر</string>
+    <string name="compose_editor_insert_image">تصویر شامل کریں</string>
+</resources>

@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Round 9: reader (conversation cards, quoted text, attachments, quick reply)
+    and compose (leave dialogs, formatting editor labels).
+    English only; the translation pass adds these to the values-<lang> folders.
+    Code: ui/screens/mail/ThreadScreen.kt, ReaderConversation.kt, ReaderBody.kt,
+    ReaderAttachments.kt, ComposeScreen.kt, ComposeFormattingEditor.kt.
+    Texts match the iOS "Reader" table (ios/GrapMail/en.lproj/Reader.strings).
+-->
+<resources>
+    <!-- Conversation: the bar that stands in for folded messages in a long thread. -->
+    <plurals name="reader_earlier_messages">
+        <item quantity="one">%d earlier message</item>
+        <item quantity="other">%d earlier messages</item>
+    </plurals>
+    <!-- Conversation: chip under the subject, people in the conversation. -->
+    <plurals name="reader_participants">
+        <item quantity="one">%d person</item>
+        <item quantity="other">%d people</item>
+    </plurals>
+    <!-- Conversation: chip under the subject, messages in the conversation. -->
+    <plurals name="reader_message_count">
+        <item quantity="one">%d message</item>
+        <item quantity="other">%d messages</item>
+    </plurals>
+    <!-- Conversation: sender name on the person's own message. -->
+    <string name="reader_you">You</string>
+    <!-- Conversation: TalkBack state of a folded card whose message is unread. -->
+    <string name="reader_unread">Unread</string>
+    <!-- Conversation: TalkBack action on the earlier-messages bar ("double-tap to …"). -->
+    <string name="reader_earlier_action">show the folded messages</string>
+    <!-- Conversation: TalkBack action on a folded card ("double-tap to …"). -->
+    <string name="reader_open_message_action">open this message</string>
+
+    <!-- Quoted history: the chip that shows / folds the earlier text, and its TalkBack state. -->
+    <string name="reader_quoted_show">Show quoted text</string>
+    <string name="reader_quoted_hide">Hide quoted text</string>
+    <string name="reader_state_expanded">Expanded</string>
+    <string name="reader_state_collapsed">Collapsed</string>
+
+    <!-- Quick reply bar. %1$s is the first name of the person the reply goes to. -->
+    <string name="reader_reply_to">Reply to %1$s…</string>
+    <!-- Quick reply bar when nobody can be named. -->
+    <string name="reader_reply_fallback">Reply…</string>
+    <!-- Quick reply bar: TalkBack label of the menu with Reply all and Forward. -->
+    <string name="reader_reply_options">Reply options</string>
+    <!-- Quick reply bar: TalkBack name of the region. -->
+    <string name="reader_quick_reply">Quick reply</string>
+
+    <!-- Attachments: system share sheet title. -->
+    <string name="reader_attach_share_chooser">Share attachment</string>
+    <!-- Attachments: TalkBack action on a picture tile ("double-tap to …"). -->
+    <string name="reader_attach_view_image">view the picture</string>
+    <!-- Attachments: TalkBack labels of the Save / Share buttons. %1$s is the file name. -->
+    <string name="reader_attach_save_named">Save %1$s</string>
+    <string name="reader_attach_share_named">Share %1$s</string>
+    <!-- Attachments: shown when no app on the device can receive a shared file. -->
+    <string name="reader_attach_share_nothing">No app on this device can share this file.</string>
+    <!-- Picture viewer: position, e.g. "2 of 5". -->
+    <string name="reader_viewer_position">%1$d of %2$d</string>
+    <!-- Picture viewer: a picture that is too large (or could not be read) to show here. -->
+    <string name="reader_viewer_too_large">This picture can\'t be previewed here.</string>
+
+    <!-- Compose: leaving a message that has attachments (drafts cannot keep attachments yet). -->
+    <string name="compose_r9_leave_title">Leave this message?</string>
+    <string name="compose_r9_leave_attachments">Drafts can\'t keep attachments yet. Save the text as a draft without them, or keep editing.</string>
+    <string name="compose_r9_save_text_only">Save text only</string>
+    <!-- Compose: leaving after the draft could not be saved (for example, offline). -->
+    <string name="compose_r9_draft_failed_title">This draft wasn\'t saved</string>
+    <string name="compose_r9_leave_without_saving">Leave without saving</string>
+    <!-- Compose: encryption was on but the message could not be sealed. -->
+    <string name="compose_r9_encrypt_failed">This message could not be encrypted, so nothing was sent.</string>
+
+    <!-- Compose formatting editor: toolbar labels (read by TalkBack or shown on the buttons). -->
+    <string name="compose_editor_toolbar">Text formatting</string>
+    <string name="compose_editor_bold">Bold</string>
+    <string name="compose_editor_italic">Italic</string>
+    <string name="compose_editor_underline">Underline</string>
+    <string name="compose_editor_strike">Strikethrough</string>
+    <string name="compose_editor_bullets">Bullets</string>
+    <string name="compose_editor_numbered">Numbered</string>
+    <string name="compose_editor_text_colour">Text colour</string>
+    <string name="compose_editor_black">Black</string>
+    <string name="compose_editor_blue">Blue</string>
+    <string name="compose_editor_red">Red</string>
+    <string name="compose_editor_green">Green</string>
+    <string name="compose_editor_highlight">Highlight</string>
+    <string name="compose_editor_highlight_colour">Highlight colour</string>
+    <string name="compose_editor_yellow">Yellow</string>
+    <string name="compose_editor_pink">Pink</string>
+    <string name="compose_editor_font">Font</string>
+    <string name="compose_editor_sans">Sans serif</string>
+    <string name="compose_editor_serif">Serif</string>
+    <string name="compose_editor_mono">Monospace</string>
+    <string name="compose_editor_larger">Larger</string>
+    <string name="compose_editor_clear">Clear</string>
+    <string name="compose_editor_image">Image</string>
+    <string name="compose_editor_insert_image">Insert image</string>
+</resources>

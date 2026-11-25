@@ -15,6 +15,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
+import com.grapsee.grapmail.ui.components.gmIsShortWindow
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -47,6 +49,8 @@ import com.grapsee.grapmail.ui.components.GradientButton
 import com.grapsee.grapmail.ui.components.OutlineButton
 import com.grapsee.grapmail.ui.theme.H1
 import com.grapsee.grapmail.ui.theme.LocalPalette
+import androidx.compose.ui.res.stringResource
+import com.grapsee.grapmail.R
 
 /**
  * Account Created (A) — founder design verbatim: envelope+check illustration
@@ -61,15 +65,14 @@ fun AccountCreatedScreen(
     onContinueOnboarding: () -> Unit,
 ) {
     val palette = LocalPalette.current
-    Column(
-        Modifier
-            .fillMaxSize()
-            .background(palette.bg)
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = 24.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Spacer(Modifier.height(40.dp))
+    val short = gmIsShortWindow()
+    // Phones, portrait tablets and tall windows: one centred column, exactly
+    // the founder's stack. Wide landscape windows: the scene and the headline
+    // on the left, the card and the action on the right (see ArtFormLayout).
+    ArtFormLayout(
+        modifier = Modifier.background(palette.bg),
+        art = { split ->
+        Spacer(Modifier.height(if (split) 0.dp else 40.dp))
         com.grapsee.grapmail.ui.components.GrapMailLogo(40.dp, wordmark = true)
 
         Spacer(Modifier.height(18.dp))
@@ -77,19 +80,21 @@ fun AccountCreatedScreen(
             "created_a",
             // Bounded so the scene can never push the action below the fold
             // on a short device — the same regression the verify screen had.
-            modifier = Modifier.width(180.dp).aspectRatio(2f),
+            // In the two-pane layout the pane is the bound, so it may grow.
+            modifier = createdArtSize(split, short).aspectRatio(2f),
         )
 
         Spacer(Modifier.height(10.dp))
-        Text("ACCOUNT CREATED", fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.6.sp, color = palette.primarySolid)
+        Text(stringResource(R.string.acct_account_created), fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.6.sp, color = palette.primarySolid, textAlign = TextAlign.Center)
         Spacer(Modifier.height(8.dp))
-        Text("You're all set!", style = H1.copy(fontSize = 28.sp), color = palette.textPrimary)
+        Text(stringResource(R.string.acct_youre_all_set), style = H1.copy(fontSize = 28.sp), color = palette.textPrimary, textAlign = TextAlign.Center)
         Spacer(Modifier.height(8.dp))
         Text(
-            "Your GrapMail account has been successfully\ncreated and you're now signed in.",
+            stringResource(R.string.acct_your_grapmail_account_has_been),
             fontSize = 14.sp, lineHeight = 21.sp, color = palette.textSecondary, textAlign = TextAlign.Center,
         )
-
+        },
+    ) {
         Spacer(Modifier.height(20.dp))
 
         // Profile card with the Active chip
@@ -128,26 +133,26 @@ fun AccountCreatedScreen(
             ) {
                 Icon(Icons.Rounded.Check, contentDescription = null, tint = palette.success, modifier = Modifier.size(13.dp))
                 Spacer(Modifier.width(4.dp))
-                Text("Active", fontSize = 12.sp, fontWeight = FontWeight.Medium, color = palette.success)
+                Text(stringResource(R.string.acct_active), fontSize = 12.sp, fontWeight = FontWeight.Medium, color = palette.success)
             }
         }
 
         Spacer(Modifier.height(20.dp))
-        Text("WHAT'S NEXT?", fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.4.sp, color = palette.textTertiary, modifier = Modifier.fillMaxWidth())
+        Text(stringResource(R.string.acct_whats_next), fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.4.sp, color = palette.textTertiary, modifier = Modifier.fillMaxWidth())
         Spacer(Modifier.height(4.dp))
 
-        NextTile(Icons.Rounded.Mail, Color(0xFFE3ECFB), Color(0xFF1A6DF0), "Explore your mailbox", "Check your inbox, send emails, and more.")
-        NextTile(Icons.Rounded.Contacts, Color(0xFFEDE7FD), Color(0xFF7C5CE0), "Add your contacts", "Stay connected with friends and colleagues.")
-        NextTile(Icons.Rounded.Settings, Color(0xFFDFF5EA), Color(0xFF10B981), "Personalize your experience", "Set up your preferences and get the most out of GrapMail.")
+        NextTile(Icons.Rounded.Mail, Color(0xFFE3ECFB), Color(0xFF1A6DF0), stringResource(R.string.acct_explore_your_mailbox), stringResource(R.string.acct_check_your_inbox_send_emails_and))
+        NextTile(Icons.Rounded.Contacts, Color(0xFFEDE7FD), Color(0xFF7C5CE0), stringResource(R.string.acct_add_your_contacts), stringResource(R.string.acct_stay_connected_with_friends_and))
+        NextTile(Icons.Rounded.Settings, Color(0xFFDFF5EA), Color(0xFF10B981), stringResource(R.string.acct_personalize_your_experience), stringResource(R.string.acct_set_up_your_preferences_and_get_the))
 
         Spacer(Modifier.height(24.dp))
 
-        GradientButton("Continue to Onboarding", onContinueOnboarding, trailing = {
+        GradientButton(stringResource(R.string.acct_continue_to_onboarding), onContinueOnboarding, trailing = {
             Spacer(Modifier.size(10.dp))
             Icon(Icons.AutoMirrored.Rounded.ArrowForward, contentDescription = null, modifier = Modifier.size(18.dp))
         })
         Spacer(Modifier.height(10.dp))
-        Text("We'll take you through a quick setup to get you started.", fontSize = 12.sp, color = palette.textTertiary)
+        Text(stringResource(R.string.acct_well_take_you_through_a_quick_setup), fontSize = 12.sp, color = palette.textTertiary)
         Spacer(Modifier.height(16.dp))
 
         Row(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
@@ -157,6 +162,10 @@ fun AccountCreatedScreen(
         Spacer(Modifier.height(20.dp))
     }
 }
+
+/** 180dp in the single column (as designed); up to 360dp (240dp in a short window) beside the form. */
+private fun createdArtSize(split: Boolean, short: Boolean): Modifier =
+    if (split) Modifier.fillMaxWidth().widthIn(max = if (short) 240.dp else 360.dp) else Modifier.width(180.dp)
 
 /**
  * Account Created (B) — founder design verbatim: glowing envelope
@@ -172,34 +181,31 @@ fun AccountCreatedAltScreen(
 ) {
     val palette = LocalPalette.current
     val clipboard = androidx.compose.ui.platform.LocalClipboardManager.current
-    Column(
-        Modifier
-            .fillMaxSize()
-            .background(palette.bg)
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = 24.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Spacer(Modifier.height(36.dp))
+    val short = gmIsShortWindow()
+    ArtFormLayout(
+        modifier = Modifier.background(palette.bg),
+        art = { split ->
+        Spacer(Modifier.height(if (split) 0.dp else 36.dp))
         com.grapsee.grapmail.ui.components.GrapMailLogo(40.dp, wordmark = true)
 
         Spacer(Modifier.height(16.dp))
         com.grapsee.grapmail.ui.artwork.Artwork(
             "created_b",
             // Bounded — same reason as created_a.
-            modifier = Modifier.width(180.dp).aspectRatio(2f),
+            modifier = createdArtSize(split, short).aspectRatio(2f),
         )
 
         Spacer(Modifier.height(8.dp))
-        Text("ACCOUNT CREATED", fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.6.sp, color = palette.primarySolid)
+        Text(stringResource(R.string.acct_account_created), fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.6.sp, color = palette.primarySolid, textAlign = TextAlign.Center)
         Spacer(Modifier.height(8.dp))
-        Text("You're all set!", style = H1.copy(fontSize = 28.sp), color = palette.textPrimary)
+        Text(stringResource(R.string.acct_youre_all_set), style = H1.copy(fontSize = 28.sp), color = palette.textPrimary, textAlign = TextAlign.Center)
         Spacer(Modifier.height(8.dp))
         Text(
-            "Your GrapMail account has been successfully\ncreated and you're now signed in.",
+            stringResource(R.string.acct_your_grapmail_account_has_been),
             fontSize = 14.sp, lineHeight = 21.sp, color = palette.textSecondary, textAlign = TextAlign.Center,
         )
-
+        },
+    ) {
         Spacer(Modifier.height(20.dp))
 
         Row(
@@ -230,7 +236,7 @@ fun AccountCreatedAltScreen(
             }
             Icon(
                 Icons.Rounded.ContentCopy,
-                contentDescription = "Copy address",
+                contentDescription = stringResource(R.string.acct_copy_address),
                 tint = palette.textTertiary,
                 modifier = Modifier
                     .size(36.dp)
@@ -244,18 +250,18 @@ fun AccountCreatedAltScreen(
 
         Spacer(Modifier.height(18.dp))
 
-        SimpleRow(Icons.Rounded.Mail, "Your secure inbox", "Send, receive and manage your emails.")
-        SimpleRow(Icons.Rounded.Lock, "Built for your privacy", "Your data stays yours.")
-        SimpleRow(Icons.Rounded.Bolt, "Ready for what's next", "Let's get you set up and personalized.")
+        SimpleRow(Icons.Rounded.Mail, stringResource(R.string.acct_your_secure_inbox), stringResource(R.string.acct_send_receive_and_manage_your_emails))
+        SimpleRow(Icons.Rounded.Lock, stringResource(R.string.acct_built_for_your_privacy), stringResource(R.string.acct_your_data_stays_yours))
+        SimpleRow(Icons.Rounded.Bolt, stringResource(R.string.acct_ready_for_whats_next), stringResource(R.string.acct_lets_get_you_set_up_and_personalized))
 
         Spacer(Modifier.height(24.dp))
 
-        GradientButton("Go to Mailbox", onGoToMailbox, trailing = {
+        GradientButton(stringResource(R.string.acct_go_to_mailbox), onGoToMailbox, trailing = {
             Spacer(Modifier.size(10.dp))
             Icon(Icons.AutoMirrored.Rounded.ArrowForward, contentDescription = null, modifier = Modifier.size(18.dp))
         })
         Spacer(Modifier.height(12.dp))
-        OutlineButton("Continue to Onboarding", onContinueOnboarding, trailing = {
+        OutlineButton(stringResource(R.string.acct_continue_to_onboarding), onContinueOnboarding, trailing = {
             Spacer(Modifier.size(10.dp))
             Icon(Icons.AutoMirrored.Rounded.ArrowForward, contentDescription = null, modifier = Modifier.size(18.dp), tint = palette.primarySolid)
         })

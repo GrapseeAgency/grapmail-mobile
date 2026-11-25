@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  First-time feature tips (ui/components/FeatureTip.kt, logic/FeatureTipsStore.kt).
+  One tip per app session, anchored to the control it describes. Titles stay
+  at four words or fewer, bodies at one sentence under 90 characters. The same
+  English text as iOS's "Feature tips" block (GrapMail/en.lproj/Localizable.strings),
+  except the long-press tip: on Android a long press selects, on iOS it previews.
+-->
+<resources>
+    <string name="tip_got_it">Verstanden</string>
+    <string name="tip_close">Tipp schließen</string>
+
+    <string name="tip_swipe_title">Wischen zum Aufräumen</string>
+    <string name="tip_swipe_body">Wische eine Nachricht nach rechts, um sie zu archivieren, oder nach links für den Papierkorb.</string>
+
+    <string name="tip_long_press_title">Mehrere auf einmal auswählen</string>
+    <string name="tip_long_press_body">Halte eine Nachricht gedrückt, um sie auszuwählen, und tippe dann weitere an.</string>
+
+    <string name="tip_categories_title">Teile deinen Posteingang auf</string>
+    <string name="tip_categories_body">Tippe auf einen Chip, um nur Priorität, Personen, Newsletter und mehr zu sehen.</string>
+
+    <string name="tip_screener_title">Neue Absender prüfen</string>
+    <string name="tip_screener_body">„Freigabe ausstehend“ im Menü hält Mails neuer Absender zurück, bis du sie zulässt.</string>
+
+    <string name="tip_accounts_title">Konten schnell wechseln</string>
+    <string name="tip_accounts_body">Tippe auf dein Bild, um das Konto zu wechseln oder ein weiteres hinzuzufügen.</string>
+
+    <string name="tip_snooze_title">Für später zurückstellen</string>
+    <string name="tip_snooze_body">Tippe auf „Mehr“, um die ausgewählte Mail auf einen besseren Zeitpunkt zu verschieben.</string>
+</resources>

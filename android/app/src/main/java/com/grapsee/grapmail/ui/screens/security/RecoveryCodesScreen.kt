@@ -51,11 +51,12 @@ import com.grapsee.grapmail.ui.components.ChipTone
 import com.grapsee.grapmail.ui.components.FooterNote
 import com.grapsee.grapmail.ui.components.GradientButton
 import com.grapsee.grapmail.ui.components.InfoCard
-import com.grapsee.grapmail.ui.components.InfoNoteCard
 import com.grapsee.grapmail.ui.components.StatusChip
 import com.grapsee.grapmail.ui.components.TermsCheckbox
 import com.grapsee.grapmail.ui.theme.LocalPalette
 import kotlinx.coroutines.launch
+import androidx.compose.ui.res.stringResource
+import com.grapsee.grapmail.R
 
 /**
  * Account recovery codes — the ten one-time "XXXX-XXXX-XXXX" strings the
@@ -98,7 +99,7 @@ fun RecoveryCodesScreen(onBack: () -> Unit) {
             loading = true
             failed = false
             try {
-                val token = SessionStore.token(context) ?: throw IllegalStateException("Sign in again.")
+                val token = SessionStore.token(context) ?: throw IllegalStateException(context.getString(R.string.acct_sign_in_again))
                 usable = Api.recoveryCodesStatus(token).usable
             } catch (e: kotlinx.coroutines.CancellationException) {
                 throw e
@@ -115,9 +116,9 @@ fun RecoveryCodesScreen(onBack: () -> Unit) {
             generating = true
             error = null
             try {
-                val token = SessionStore.token(context) ?: throw IllegalStateException("Sign in again.")
+                val token = SessionStore.token(context) ?: throw IllegalStateException(context.getString(R.string.acct_sign_in_again))
                 val resp = Api.generateRecoveryCodes(token)
-                if (resp.codes.isEmpty()) throw IllegalStateException("The server returned no codes. Try again.")
+                if (resp.codes.isEmpty()) throw IllegalStateException(context.getString(R.string.acct_the_server_returned_no_codes_try))
                 // A fresh set retires every earlier one — the gate resets with it.
                 generated = resp.codes
                 confirmed = false
@@ -156,23 +157,23 @@ fun RecoveryCodesScreen(onBack: () -> Unit) {
         onBack = { if (codes != null && !confirmed) leaving = true else onBack() },
         illustration = "ill_sec_backup_generate",
         illustrationWidth = 150,
-        title = "Recovery Codes",
-        body = "One-time codes that unlock password recovery when your phone and your trusted device are both unavailable.",
+        title = stringResource(R.string.acct_recovery_codes),
+        body = stringResource(R.string.acct_one_time_codes_that_unlock_password),
         footer = {
             Column {
                 if (codes == null) {
                     GradientButton(
-                        "Generate Codes",
+                        stringResource(R.string.acct_generate_codes),
                         onClick = { generate() },
                         busy = generating,
                     )
                     Spacer(Modifier.height(6.dp))
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
-                        AccountLink("Back to Account Security", onBack)
+                        AccountLink(stringResource(R.string.acct_back_to_account_security), onBack)
                     }
                 } else {
                     GradientButton(
-                        "Download Codes",
+                        stringResource(R.string.acct_download_codes),
                         trailing = { Icon(Icons.Rounded.Download, contentDescription = null, modifier = Modifier.padding(start = 6.dp)) },
                         onClick = {
                             try {
@@ -186,16 +187,17 @@ fun RecoveryCodesScreen(onBack: () -> Unit) {
                         },
                     )
                     Spacer(Modifier.height(8.dp))
-                    GradientButton("Done", { onBack() }, enabled = confirmed)
+                    GradientButton(stringResource(R.string.acct_done), { onBack() }, enabled = confirmed)
                     Spacer(Modifier.height(4.dp))
                     FooterNote(
-                        text = "Generating a new set retires every code on this list.",
+                        text = stringResource(R.string.acct_generating_a_new_set_retires_every),
                         divider = true,
                     )
                 }
             }
         },
     ) {
+        com.grapsee.grapmail.ui.components.OfflineBanner()
         if (codes == null) {
             // Status row: the server's own answer, drawn as unknown while the
             // read is outstanding — "no" invites a generate, "unknown" must not.
@@ -203,14 +205,14 @@ fun RecoveryCodesScreen(onBack: () -> Unit) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     Icon(Icons.Rounded.Key, contentDescription = null, tint = palette.primarySolid, modifier = Modifier.size(18.dp))
                     Column(Modifier.weight(1f)) {
-                        Text("Recovery codes available", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = palette.textPrimary)
+                        Text(stringResource(R.string.acct_recovery_codes_available), fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = palette.textPrimary)
                         Text(
                             when {
-                                loading -> "Checking…"
-                                failed -> "Could not be read. Try again."
-                                usable == true -> "Yes — a usable set exists on the account."
-                                usable == false -> "No — generate a set to keep a recovery path open."
-                                else -> "The account's status could not be read."
+                                loading -> stringResource(R.string.acct_checking)
+                                failed -> stringResource(R.string.acct_could_not_be_read_try_again)
+                                usable == true -> stringResource(R.string.acct_yes_a_usable_set_exists_on_the)
+                                usable == false -> stringResource(R.string.acct_no_generate_a_set_to_keep_a_recovery)
+                                else -> stringResource(R.string.acct_the_accounts_status_could_not_be)
                             },
                             fontSize = 12.sp,
                             lineHeight = 17.sp,
@@ -218,19 +220,19 @@ fun RecoveryCodesScreen(onBack: () -> Unit) {
                         )
                     }
                     if (failed) {
-                        AccountLink("Retry", { reloadStatus() })
+                        AccountLink(stringResource(R.string.acct_retry), { reloadStatus() })
                     } else if (!loading && usable != null) {
-                        StatusChip(if (usable == true) "Yes" else "No", if (usable == true) ChipTone.Success else ChipTone.Warning)
+                        StatusChip(if (usable == true) stringResource(R.string.acct_yes) else stringResource(R.string.acct_no), if (usable == true) ChipTone.Success else ChipTone.Warning)
                     }
                 }
             }
             Spacer(Modifier.height(12.dp))
             InfoCard {
-                Text("What's Included", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = palette.textPrimary)
+                Text(stringResource(R.string.acct_whats_included), fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = palette.textPrimary)
                 Spacer(Modifier.height(10.dp))
-                RecoveryPoint(Icons.Rounded.Key, "10 One-Time Codes", "Each code resets the password once.")
-                RecoveryPoint(Icons.Rounded.Download, "Use at Forgot Password", "Enter a code instead of the texted one.")
-                RecoveryPoint(Icons.Rounded.Refresh, "Regenerate Anytime", "A new set retires the old one immediately.")
+                RecoveryPoint(Icons.Rounded.Key, stringResource(R.string.acct_10_one_time_codes), stringResource(R.string.acct_each_code_resets_the_password_once))
+                RecoveryPoint(Icons.Rounded.Download, stringResource(R.string.acct_use_at_forgot_password), stringResource(R.string.acct_enter_a_code_instead_of_the_texted))
+                RecoveryPoint(Icons.Rounded.Refresh, stringResource(R.string.acct_regenerate_anytime), stringResource(R.string.acct_a_new_set_retires_the_old_one))
             }
             if (error != null) {
                 Spacer(Modifier.height(8.dp))
@@ -238,14 +240,15 @@ fun RecoveryCodesScreen(onBack: () -> Unit) {
             }
             Spacer(Modifier.height(12.dp))
             InfoNoteCard(
-                title = "Not the same as backup codes",
-                body = "Two-step backup codes prove a sign-in. Recovery codes reset a password. Keep both, and do not store them in the same place.",
+                title = stringResource(R.string.acct_not_the_same_as_backup_codes),
+                body = stringResource(R.string.acct_two_step_backup_codes_prove_a_sign),
             )
         } else {
             InfoCard {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("Your Recovery Codes", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = palette.textPrimary)
-                    Spacer(Modifier.weight(1f))
+                    // The title takes the slack (and wraps at large font sizes), so
+                    // "Copy all" is never pushed off the card.
+                    Text(stringResource(R.string.acct_your_recovery_codes), fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = palette.textPrimary, modifier = Modifier.weight(1f))
                     Row(
                         Modifier
                             .clip(RoundedCornerShape(10.dp))
@@ -263,64 +266,29 @@ fun RecoveryCodesScreen(onBack: () -> Unit) {
                             tint = palette.primarySolid,
                             modifier = Modifier.size(14.dp),
                         )
-                        Text(if (copied) "Copied" else "Copy all", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = palette.primarySolid)
+                        Text(if (copied) stringResource(R.string.acct_copied) else stringResource(R.string.acct_copy_all), fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = palette.primarySolid)
                     }
                 }
                 Spacer(Modifier.height(12.dp))
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    codes.chunked(2).forEach { pair ->
-                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                            pair.forEach { code ->
-                                Box(
-                                    Modifier
-                                        .weight(1f)
-                                        .clip(RoundedCornerShape(10.dp))
-                                        .background(palette.softFill)
-                                        .clickable {
-                                            clipboard.setText(AnnotatedString(code))
-                                            copiedOne = code
-                                        }
-                                        .padding(vertical = 9.dp, horizontal = 8.dp),
-                                ) {
-                                    Row(
-                                        Modifier.fillMaxWidth(),
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.SpaceBetween,
-                                    ) {
-                                        Text(
-                                            code,
-                                            fontSize = 13.sp,
-                                            fontWeight = FontWeight.SemiBold,
-                                            fontFamily = FontFamily.Monospace,
-                                            color = palette.textPrimary,
-                                        )
-                                        Icon(
-                                            if (copiedOne == code) Icons.Rounded.CheckCircle else Icons.Rounded.ContentCopy,
-                                            contentDescription = "Copy $code",
-                                            tint = palette.textTertiary,
-                                            modifier = Modifier.size(14.dp),
-                                        )
-                                    }
-                                }
-                            }
-                            if (pair.size == 1) Spacer(Modifier.weight(1f))
-                        }
-                    }
+                // Two columns, one when a code would not fit half the card (CodeListGrid).
+                CodeListGrid(codes, copiedOne) { code ->
+                    clipboard.setText(AnnotatedString(code))
+                    copiedOne = code
                 }
             }
             Spacer(Modifier.height(12.dp))
             BulletCard(
-                "Keep them safe",
+                stringResource(R.string.acct_keep_them_safe),
                 listOf(
-                    "One time use — each code resets the password exactly once.",
-                    "Codes are stored as hashes — this list is the only readable copy.",
-                    "Generating a new set retires every code shown here.",
+                    stringResource(R.string.acct_one_time_use_each_code_resets_the),
+                    stringResource(R.string.acct_codes_are_stored_as_hashes_this_list),
+                    stringResource(R.string.acct_generating_a_new_set_retires_every_2),
                 ),
             )
             Spacer(Modifier.height(12.dp))
             TermsCheckbox(confirmed, { confirmed = it }) {
                 Text(
-                    "I have saved these codes somewhere safe.",
+                    stringResource(R.string.acct_saved_codes_confirm),
                     fontSize = 13.sp,
                     color = palette.textPrimary,
                 )
@@ -335,13 +303,13 @@ fun RecoveryCodesScreen(onBack: () -> Unit) {
     if (leaving) {
         AlertDialog(
             onDismissRequest = { leaving = false },
-            title = { Text("These codes will not be shown again") },
-            text = { Text("Leave now and the list is gone. The codes themselves keep working — but only if you already saved them.") },
+            title = { Text(stringResource(R.string.acct_codes_not_shown_again)) },
+            text = { Text(stringResource(R.string.acct_leave_now_and_the_list_is_gone_the)) },
             confirmButton = {
-                TextButton(onClick = { leaving = false; onBack() }) { Text("Leave anyway") }
+                TextButton(onClick = { leaving = false; onBack() }) { Text(stringResource(R.string.acct_leave_anyway)) }
             },
             dismissButton = {
-                TextButton(onClick = { leaving = false }) { Text("Stay") }
+                TextButton(onClick = { leaving = false }) { Text(stringResource(R.string.acct_stay)) }
             },
         )
     }

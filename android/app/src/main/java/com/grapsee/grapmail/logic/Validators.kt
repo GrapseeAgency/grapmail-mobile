@@ -1,5 +1,7 @@
 package com.grapsee.grapmail.logic
 
+import com.grapsee.grapmail.R
+import com.grapsee.grapmail.ui.i18n.CoreStrings
 import java.util.Calendar
 
 /**
@@ -8,28 +10,30 @@ import java.util.Calendar
  */
 object Validators {
 
+    private fun realBirthday() = CoreStrings.get(R.string.core_validator_birthday_invalid) { "Enter a real birthday." }
+
     fun firstName(v: String): String? =
-        if (v.trim().length < 2) "Please enter your first name (2+ characters)." else null
+        if (v.trim().length < 2) CoreStrings.get(R.string.core_validator_first_name) { "Please enter your first name (2+ characters)." } else null
 
     fun lastName(v: String): String? =
-        if (v.trim().length < 2) "Please enter your last name (2+ characters)." else null
+        if (v.trim().length < 2) CoreStrings.get(R.string.core_validator_last_name) { "Please enter your last name (2+ characters)." } else null
 
     /** Returns ISO yyyy-MM-dd when the date is real and the person is 13+. */
     fun birthday(year: Int?, month: Int?, day: Int?): Pair<String?, String?> {
         if (year == null || month == null || day == null) return null to null
-        if (year < 1900 || month !in 1..12 || day !in 1..31) return null to "Enter a real birthday."
+        if (year < 1900 || month !in 1..12 || day !in 1..31) return null to realBirthday()
         val cal = Calendar.getInstance()
         cal.setLenient(false)
         return try {
             cal.set(year, month - 1, day, 0, 0, 0)
             cal.timeInMillis
             val time = cal.timeInMillis
-            if (time > System.currentTimeMillis()) return null to "Enter a real birthday."
+            if (time > System.currentTimeMillis()) return null to realBirthday()
             val age = ageFrom(time)
-            if (age < 13) null to "You must be at least 13 years old to create a GrapMail account."
+            if (age < 13) null to CoreStrings.get(R.string.core_validator_birthday_too_young) { "You must be at least 13 years old to create a GrapMail account." }
             else iso(year, month, day) to null
         } catch (_: Exception) {
-            null to "Enter a real birthday."
+            null to realBirthday()
         }
     }
 
@@ -80,10 +84,10 @@ object Validators {
     private fun isAsciiDigit(c: Char) = c in '0'..'9'
 
     sealed interface PasswordReq { val label: String; val met: Boolean
-        data class Length(override val met: Boolean): PasswordReq { override val label = "At least 8 characters" }
-        data class Letter(override val met: Boolean): PasswordReq { override val label = "One letter" }
-        data class Digit(override val met: Boolean): PasswordReq { override val label = "One number" }
-        data class Special(override val met: Boolean): PasswordReq { override val label = "One special character" }
+        data class Length(override val met: Boolean): PasswordReq { override val label = CoreStrings.get(R.string.core_pw_req_length) { "At least 8 characters" } }
+        data class Letter(override val met: Boolean): PasswordReq { override val label = CoreStrings.get(R.string.core_pw_req_letter) { "One letter" } }
+        data class Digit(override val met: Boolean): PasswordReq { override val label = CoreStrings.get(R.string.core_pw_req_digit) { "One number" } }
+        data class Special(override val met: Boolean): PasswordReq { override val label = CoreStrings.get(R.string.core_pw_req_special) { "One special character" } }
     }
 
     fun passwordReqs(pw: String): List<PasswordReq> = listOf(

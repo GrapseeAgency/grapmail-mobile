@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="mail_receipt_read_at">পড়া হয়েছে %1$s</string>
+    <string name="mail_receipt_requested_pending">পঠন রসিদ চাওয়া হয়েছে · এখনও পড়া হয়নি</string>
+    <string name="mail_receipt_server_sent">পঠন রসিদ পাঠানো হয়েছে</string>
+    <string name="mail_receipt_ask_title">প্রেরক একটি পঠন রসিদ চেয়েছেন</string>
+    <string name="mail_receipt_ask_body">আপনি এই বার্তা খুলেছেন জানিয়ে %1$s-কে রসিদ পাঠাবেন? এতে শুধু জানানো হয় আপনি কখন খুলেছেন, আর কিছু নয়।</string>
+    <string name="mail_receipt_ask_send">রসিদ পাঠান</string>
+    <string name="mail_receipt_ask_decline">পাঠাবেন না</string>
+    <string name="mail_receipt_mode_title">পঠন রসিদ পাঠান</string>
+    <string name="mail_receipt_mode_body">যখন কোনো বার্তা পঠন রসিদ চায়। স্প্যাম, ব্লক করা প্রেরক বা এনক্রিপ্ট করা মেলের জন্য রসিদ কখনো পাঠানো হয় না, যদি না আপনি \"সবসময়\" বেছে নেন।</string>
+    <string name="mail_receipt_mode_never">কখনো না</string>
+    <string name="mail_receipt_mode_ask">জিজ্ঞাসা করুন</string>
+    <string name="mail_receipt_mode_always">সবসময়</string>
+    <string name="mail_receipt_mode_always_note">\"সবসময়\" বেছে নিলে স্প্যাম, ব্লক করা প্রেরক ও এনক্রিপ্ট করা মেলের জন্যও রসিদ পাঠানো হয়।</string>
+    <string name="mail_receipt_mode_unavailable">এই সেটিং লোড করা যায়নি। আপনার সংযোগ যাচাই করুন।</string>
+    <string name="mail_compose_request_receipt">পঠন রসিদ চান</string>
+</resources>

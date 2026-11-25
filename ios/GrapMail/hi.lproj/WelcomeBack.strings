@@ -1,0 +1,34 @@
+/*
+  GrapMail — WelcomeBack string table (hi). Translated from en.lproj/WelcomeBack.strings.
+  Keys are the English source text; keep them and their placeholders unchanged.
+*/
+
+/* MARK: - Welcome-back screen */
+"Continue as %@" = "%@ के रूप में जारी रखें";
+"Signing in…" = "साइन इन हो रहा है…";
+"For your security, please sign in again." = "आपकी सुरक्षा के लिए, कृपया फिर से साइन इन करें।";
+"You were signed out from another device." = "आपको किसी दूसरे डिवाइस से साइन आउट कर दिया गया।";
+"You're offline. Connect to sign in." = "आप ऑफ़लाइन हैं। साइन इन करने के लिए कनेक्ट करें।";
+"That password isn't right." = "यह पासवर्ड सही नहीं है।";
+"Use another account" = "दूसरा खाता इस्तेमाल करें";
+"Remove from this device" = "इस डिवाइस से हटाएँ";
+"Back" = "वापस";
+"Address beginning %@, ending %@ at %@" = "पता %1$@ से शुरू, %2$@ पर खत्म, %3$@ पर";
+"Address beginning %@ at %@" = "पता %1$@ से शुरू, %2$@ पर";
+"Signed in as %@" = "%@ के रूप में साइन इन किया गया";
+
+/* MARK: - Remove from this device */
+"Remove %@ from this device?" = "%@ को इस डिवाइस से हटाएँ?";
+"Your account and mail aren't affected. You'll need your address and password to sign in here again." = "आपके खाते और मेल पर कोई असर नहीं पड़ेगा। यहाँ फिर से साइन इन करने के लिए आपको अपना पता और पासवर्ड चाहिए होगा।";
+"Removed from this device" = "इस डिवाइस से हटा दिया गया";
+
+/* MARK: - Account chooser */
+"Choose an account" = "कोई खाता चुनें";
+"Signed out on this device" = "इस डिवाइस पर साइन आउट है";
+"Continue as %@, %@" = "%1$@ के रूप में जारी रखें, %2$@";
+"More options for %@" = "%@ के लिए और विकल्प";
+
+/* MARK: - Sign-out confirmation (account switcher) */
+"Sign out of %@?" = "%@ से साइन आउट करें?";
+"Also remove from this device" = "इस डिवाइस से भी हटाएँ";
+"You'll need to type your address next time." = "अगली बार आपको अपना पता टाइप करना होगा।";

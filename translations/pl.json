@@ -1,0 +1,73 @@
+{
+ "android": {
+  "strings_r9_reader.xml": {
+   "reader_earlier_messages": {"one": "%d wcześniejsza wiadomość", "few": "%d wcześniejsze wiadomości", "many": "%d wcześniejszych wiadomości", "other": "%d wcześniejszej wiadomości"},
+   "reader_participants": {"one": "%d osoba", "few": "%d osoby", "many": "%d osób", "other": "%d osoby"},
+   "reader_message_count": {"one": "%d wiadomość", "few": "%d wiadomości", "many": "%d wiadomości", "other": "%d wiadomości"},
+   "reader_you": "Ty",
+   "reader_unread": "Nieprzeczytane",
+   "reader_earlier_action": "pokaż zwinięte wiadomości",
+   "reader_open_message_action": "otwórz tę wiadomość",
+   "reader_quoted_show": "Pokaż cytowany tekst",
+   "reader_quoted_hide": "Ukryj cytowany tekst",
+   "reader_state_expanded": "Rozwinięte",
+   "reader_state_collapsed": "Zwinięte",
+   "reader_reply_to": "Odpowiedz do %1$s…",
+   "reader_reply_fallback": "Odpowiedz…",
+   "reader_reply_options": "Opcje odpowiedzi",
+   "reader_quick_reply": "Szybka odpowiedź",
+   "reader_attach_share_chooser": "Udostępnij załącznik",
+   "reader_attach_view_image": "zobacz obraz",
+   "reader_attach_save_named": "Zapisz %1$s",
+   "reader_attach_share_named": "Udostępnij %1$s",
+   "reader_attach_share_nothing": "Żadna aplikacja na tym urządzeniu nie może udostępnić tego pliku.",
+   "reader_viewer_position": "%1$d z %2$d",
+   "reader_viewer_too_large": "Tego obrazu nie można tu wyświetlić.",
+   "compose_r9_leave_title": "Opuścić tę wiadomość?",
+   "compose_r9_leave_attachments": "Wersje robocze nie zachowują jeszcze załączników. Zapisz tekst bez nich albo pisz dalej.",
+   "compose_r9_save_text_only": "Zapisz tylko tekst",
+   "compose_r9_draft_failed_title": "Nie zapisano tej wersji roboczej",
+   "compose_r9_leave_without_saving": "Wyjdź bez zapisywania",
+   "compose_r9_encrypt_failed": "Nie udało się zaszyfrować tej wiadomości, więc nic nie wysłano.",
+   "compose_editor_toolbar": "Formatowanie tekstu",
+   "compose_editor_bold": "Pogrubienie",
+   "compose_editor_italic": "Kursywa",
+   "compose_editor_underline": "Podkreślenie",
+   "compose_editor_strike": "Przekreślenie",
+   "compose_editor_bullets": "Punkty",
+   "compose_editor_numbered": "Numerowana",
+   "compose_editor_text_colour": "Kolor tekstu",
+   "compose_editor_black": "Czarny",
+   "compose_editor_blue": "Niebieski",
+   "compose_editor_red": "Czerwony",
+   "compose_editor_green": "Zielony",
+   "compose_editor_highlight": "Wyróżnij",
+   "compose_editor_highlight_colour": "Kolor wyróżnienia",
+   "compose_editor_yellow": "Żółty",
+   "compose_editor_pink": "Różowy",
+   "compose_editor_font": "Czcionka",
+   "compose_editor_sans": "Bezszeryfowa",
+   "compose_editor_larger": "Większe",
+   "compose_editor_clear": "Wyczyść formatowanie",
+   "compose_editor_image": "Obraz",
+   "compose_editor_insert_image": "Wstaw obraz"
+  },
+  "strings_r9_platform.xml": {
+   "r9_platform_notif_channel_new_mail_desc": "Informuje o nowych wiadomościach w skrzynce odbiorczej.",
+   "r9_platform_price_per_week": "%1$s/tydz.",
+   "r9_platform_price_per_month": "%1$s/mies.",
+   "r9_platform_price_per_3_months": "%1$s co 3 miesiące",
+   "r9_platform_price_per_6_months": "%1$s co 6 miesięcy",
+   "r9_platform_price_per_year": "%1$s/rok"
+  },
+  "strings_r9_mailbox.xml": {
+   "mail_sendlater_channel_name": "Wysyłka zaplanowana",
+   "mail_sendlater_channel_desc": "Odliczanie dla wiadomości oczekujących na wysłanie"
+  },
+  "strings_identity.xml": {
+   "identity_settings_appearance": "Wygląd",
+   "identity_match_wallpaper_title": "Dopasuj do tapety",
+   "identity_match_wallpaper_subtitle": "Użyj kolorów tapety dla przycisków i wyróżnień. Awatary, kolory stanu i tekst pozostają firmowe."
+  }
+ }
+}

@@ -1,0 +1,95 @@
+/* ja translation of en.lproj/Reader.strings (round 9, ios_translations_b). Keys stay English; values translated. */
+/* Round 8 — Workstream D (reader & conversation polish, round8-spec §5). English base table "Reader".
+   Looked up with String(localized: "…", table: "Reader") / Text("…", tableName: "Reader").
+   Counted keys also have an entry in Reader.stringsdict, which wins over the entry here.
+   Other languages fall back to these English keys until they are translated. */
+
+/* Conversation: sender name on one's own message */
+"You" = "自分";
+
+/* Conversation: recipients line when the message went only to the reader */
+"to me" = "宛先: 自分";
+
+/* Conversation: recipients line with one recipient. Value: their name or address */
+"to %@" = "宛先: %@";
+
+/* Conversation: recipients line with several recipients (plural in Reader.stringsdict) */
+"to %lld people" = "宛先: %lld 人";
+
+/* Conversation: VoiceOver value on a folded card of an unread message */
+"Unread" = "未読";
+
+/* Conversation: the bar that stands in for folded messages (plural in Reader.stringsdict) */
+"%lld earlier messages" = "以前のメッセージ %lld 件";
+
+/* Conversation: VoiceOver hint on the earlier-messages bar */
+"Shows the folded messages" = "折りたたまれたメッセージを表示します";
+
+/* Conversation: chip under the subject, people in the conversation (plural in Reader.stringsdict) */
+"%lld people" = "%lld 人";
+
+/* Conversation: chip under the subject, messages in the conversation (plural in Reader.stringsdict) */
+"%lld messages" = "%lld 件のメッセージ";
+
+/* Quoted history: button that shows the folded earlier text */
+"Show quoted text" = "引用テキストを表示";
+
+/* Quoted history: button that folds it again */
+"Hide quoted text" = "引用テキストを非表示";
+
+/* Quoted history: VoiceOver state of the button */
+"Collapsed" = "折りたたみ";
+
+/* Quoted history: VoiceOver state of the button */
+"Expanded" = "展開";
+
+/* Quick reply bar: placeholder. Value: the first name of the person the reply goes to */
+"Reply to %@…" = "%@ に返信…";
+
+/* Quick reply bar: placeholder when nobody can be named */
+"Reply…" = "返信…";
+
+/* Quick reply bar: VoiceOver hint */
+"Opens the editor" = "エディタを開きます";
+
+/* Quick reply bar: VoiceOver label of the menu with Reply all and Forward */
+"Reply options" = "返信オプション";
+
+/* Quick reply bar: VoiceOver name of the region */
+"Quick reply" = "クイック返信";
+
+/* Attachments: section title (plural in Reader.stringsdict) */
+"%lld attachments" = "添付ファイル %lld 件";
+
+/* Attachments: link that opens the share sheet for every attachment */
+"Save all" = "すべて保存";
+
+/* Attachments: shown while every attachment is being fetched for Save all */
+"Preparing…" = "準備中…";
+
+/* Attachments: VoiceOver hint on Save all */
+"Opens the share sheet, where Save to Files keeps every attachment" = "共有シートを開きます。“ファイル”に保存ですべての添付ファイルを保存できます";
+
+/* Attachments: VoiceOver label of a picture in the grid. Values: its position, the number of files, its file name */
+"Image %lld of %lld, %@" = "画像 %1$lld/%2$lld、%3$@";
+
+/* Attachments: meta line of a file with no known type or size */
+"File" = "ファイル";
+
+/* Attachments: VoiceOver hint on a file row */
+"Opens a preview" = "プレビューを開きます";
+
+/* Attachments: VoiceOver label of the save button. Value: the file name */
+"Save %@" = "%@ を保存";
+
+/* Attachments: VoiceOver label of the share button. Value: the file name */
+"Share %@" = "%@ を共有";
+
+/* Attachments: context-menu action */
+"Open" = "開く";
+
+/* Attachments: context-menu action */
+"Save" = "保存";
+
+/* Attachments: context-menu action */
+"Share" = "共有";

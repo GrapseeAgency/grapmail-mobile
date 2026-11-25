@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Loading / empty / error / offline states (translated from values/strings_states.xml). -->
+<resources>
+    <string name="states_loading">Wczytywanie…</string>
+    <string name="states_offline_banner">Jesteś offline. Wyświetlamy ostatnio wczytane dane — wszystko, co wymaga sieci, poczeka na ponowne połączenie.</string>
+    <string name="states_error_title">Coś poszło nie tak</string>
+    <string name="states_error_body">Nie udało się tego teraz wczytać. Sprawdź połączenie i spróbuj ponownie.</string>
+    <string name="states_error_offline_body">Jesteś offline. Połącz się z Wi-Fi lub komórkową transmisją danych i spróbuj ponownie.</string>
+    <string name="states_retry">Spróbuj ponownie</string>
+    <string name="states_labels_loading">Wczytywanie etykiet…</string>
+    <string name="states_labels_failed_title">Nie udało się wczytać etykiet</string>
+    <string name="states_scheduled_loading">Wczytywanie zaplanowanej poczty…</string>
+    <string name="states_scheduled_failed_title">Nie udało się wczytać zaplanowanej poczty</string>
+    <string name="states_scheduled_empty_title">Nic nie zaplanowano</string>
+    <string name="states_contacts_loading">Zbieranie osób z Twojej poczty…</string>
+    <string name="states_files_loading">Zbieranie załączników…</string>
+    <string name="states_providers_loading">Wczytywanie połączonych skrzynek…</string>
+    <string name="states_thread_loading">Otwieranie tej rozmowy…</string>
+    <string name="states_activity_failed_title">Nie udało się wczytać aktywności</string>
+    <string name="states_sessions_failed_title">Nie udało się wczytać sesji</string>
+</resources>

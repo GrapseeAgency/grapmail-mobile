@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <plurals name="reader_earlier_messages">
+        <item quantity="one">%d pesan sebelumnya</item>
+        <item quantity="other">%d pesan sebelumnya</item>
+    </plurals>
+    <plurals name="reader_participants">
+        <item quantity="one">%d orang</item>
+        <item quantity="other">%d orang</item>
+    </plurals>
+    <plurals name="reader_message_count">
+        <item quantity="one">%d pesan</item>
+        <item quantity="other">%d pesan</item>
+    </plurals>
+    <string name="reader_you">Anda</string>
+    <string name="reader_unread">Belum dibaca</string>
+    <string name="reader_earlier_action">tampilkan pesan yang dilipat</string>
+    <string name="reader_open_message_action">buka pesan ini</string>
+    <string name="reader_quoted_show">Tampilkan teks kutipan</string>
+    <string name="reader_quoted_hide">Sembunyikan teks kutipan</string>
+    <string name="reader_state_expanded">Terbuka</string>
+    <string name="reader_state_collapsed">Dilipat</string>
+    <string name="reader_reply_to">Balas ke %1$s…</string>
+    <string name="reader_reply_fallback">Balas…</string>
+    <string name="reader_reply_options">Opsi balasan</string>
+    <string name="reader_quick_reply">Balasan cepat</string>
+    <string name="reader_attach_share_chooser">Bagikan lampiran</string>
+    <string name="reader_attach_view_image">lihat gambar</string>
+    <string name="reader_attach_save_named">Simpan %1$s</string>
+    <string name="reader_attach_share_named">Bagikan %1$s</string>
+    <string name="reader_attach_share_nothing">Tidak ada aplikasi di perangkat ini yang dapat membagikan file ini.</string>
+    <string name="reader_viewer_position">%1$d dari %2$d</string>
+    <string name="reader_viewer_too_large">Gambar ini tidak dapat dipratinjau di sini.</string>
+    <string name="compose_r9_leave_title">Tinggalkan pesan ini?</string>
+    <string name="compose_r9_leave_attachments">Draf belum dapat menyimpan lampiran. Simpan teksnya tanpa lampiran, atau lanjutkan menyunting.</string>
+    <string name="compose_r9_save_text_only">Simpan teks saja</string>
+    <string name="compose_r9_draft_failed_title">Draf ini tidak tersimpan</string>
+    <string name="compose_r9_leave_without_saving">Tinggalkan tanpa menyimpan</string>
+    <string name="compose_r9_encrypt_failed">Pesan ini tidak dapat dienkripsi, jadi tidak ada yang terkirim.</string>
+    <string name="compose_editor_toolbar">Pemformatan teks</string>
+    <string name="compose_editor_bold">Tebal</string>
+    <string name="compose_editor_italic">Miring</string>
+    <string name="compose_editor_underline">Garis bawah</string>
+    <string name="compose_editor_strike">Coret</string>
+    <string name="compose_editor_bullets">Poin</string>
+    <string name="compose_editor_numbered">Bernomor</string>
+    <string name="compose_editor_text_colour">Warna teks</string>
+    <string name="compose_editor_black">Hitam</string>
+    <string name="compose_editor_blue">Biru</string>
+    <string name="compose_editor_red">Merah</string>
+    <string name="compose_editor_green">Hijau</string>
+    <string name="compose_editor_highlight">Sorot</string>
+    <string name="compose_editor_highlight_colour">Warna sorotan</string>
+    <string name="compose_editor_yellow">Kuning</string>
+    <string name="compose_editor_pink">Merah muda</string>
+    <string name="compose_editor_font">Font</string>
+    <string name="compose_editor_sans">Tanpa kait</string>
+    <string name="compose_editor_serif">Serif</string>
+    <string name="compose_editor_mono">Monospace</string>
+    <string name="compose_editor_larger">Lebih besar</string>
+    <string name="compose_editor_clear">Hapus format</string>
+    <string name="compose_editor_image">Gambar</string>
+    <string name="compose_editor_insert_image">Sisipkan gambar</string>
+</resources>

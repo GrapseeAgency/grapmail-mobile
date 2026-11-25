@@ -1,0 +1,73 @@
+{
+ "android": {
+  "strings_r9_reader.xml": {
+   "reader_earlier_messages": {"one": "%d আগের বার্তা", "other": "%d আগের বার্তা"},
+   "reader_participants": {"one": "%d জন", "other": "%d জন"},
+   "reader_message_count": {"one": "%dটি বার্তা", "other": "%dটি বার্তা"},
+   "reader_you": "আপনি",
+   "reader_unread": "অপঠিত",
+   "reader_earlier_action": "ভাঁজ করা বার্তাগুলো দেখান",
+   "reader_open_message_action": "এই বার্তাটি খুলুন",
+   "reader_quoted_show": "উদ্ধৃত লেখা দেখান",
+   "reader_quoted_hide": "উদ্ধৃত লেখা লুকান",
+   "reader_state_expanded": "খোলা",
+   "reader_state_collapsed": "ভাঁজ করা",
+   "reader_reply_to": "%1$s-কে উত্তর দিন…",
+   "reader_reply_fallback": "উত্তর দিন…",
+   "reader_reply_options": "উত্তরের বিকল্প",
+   "reader_quick_reply": "দ্রুত উত্তর",
+   "reader_attach_share_chooser": "সংযুক্তি শেয়ার করুন",
+   "reader_attach_view_image": "ছবিটি দেখুন",
+   "reader_attach_save_named": "%1$s সংরক্ষণ করুন",
+   "reader_attach_share_named": "%1$s শেয়ার করুন",
+   "reader_attach_share_nothing": "এই ডিভাইসে কোনো অ্যাপ এই ফাইল শেয়ার করতে পারে না।",
+   "reader_viewer_position": "%1$d / %2$d",
+   "reader_viewer_too_large": "এই ছবিটি এখানে দেখা যাবে না।",
+   "compose_r9_leave_title": "এই বার্তা থেকে বেরোবেন?",
+   "compose_r9_leave_attachments": "খসড়ায় এখনও সংযুক্তি রাখা যায় না। লেখাটি সংযুক্তি ছাড়াই খসড়া হিসেবে সংরক্ষণ করুন, বা সম্পাদনা চালিয়ে যান।",
+   "compose_r9_save_text_only": "শুধু লেখা সংরক্ষণ করুন",
+   "compose_r9_draft_failed_title": "এই খসড়াটি সংরক্ষণ হয়নি",
+   "compose_r9_leave_without_saving": "সংরক্ষণ না করে বেরোন",
+   "compose_r9_encrypt_failed": "এই বার্তাটি এনক্রিপ্ট করা যায়নি, তাই কিছু পাঠানো হয়নি।",
+   "compose_editor_toolbar": "লেখার ফরম্যাটিং",
+   "compose_editor_bold": "বোল্ড",
+   "compose_editor_italic": "ইটালিক",
+   "compose_editor_underline": "আন্ডারলাইন",
+   "compose_editor_strike": "স্ট্রাইকথ্রু",
+   "compose_editor_bullets": "বুলেট",
+   "compose_editor_numbered": "সংখ্যাযুক্ত",
+   "compose_editor_text_colour": "লেখার রং",
+   "compose_editor_black": "কালো",
+   "compose_editor_blue": "নীল",
+   "compose_editor_red": "লাল",
+   "compose_editor_green": "সবুজ",
+   "compose_editor_highlight": "হাইলাইট",
+   "compose_editor_highlight_colour": "হাইলাইটের রং",
+   "compose_editor_yellow": "হলুদ",
+   "compose_editor_pink": "গোলাপি",
+   "compose_editor_font": "ফন্ট",
+   "compose_editor_sans": "সেরিফ ছাড়া",
+   "compose_editor_larger": "বড়",
+   "compose_editor_clear": "ফরম্যাটিং মুছুন",
+   "compose_editor_image": "ছবি",
+   "compose_editor_insert_image": "ছবি ঢোকান"
+  },
+  "strings_r9_platform.xml": {
+   "r9_platform_notif_channel_new_mail_desc": "ইনবক্সে নতুন বার্তা এলে জানায়।",
+   "r9_platform_price_per_week": "%1$s/সপ্তাহ",
+   "r9_platform_price_per_month": "%1$s/মাস",
+   "r9_platform_price_per_3_months": "প্রতি ৩ মাসে %1$s",
+   "r9_platform_price_per_6_months": "প্রতি ৬ মাসে %1$s",
+   "r9_platform_price_per_year": "%1$s/বছর"
+  },
+  "strings_r9_mailbox.xml": {
+   "mail_sendlater_channel_name": "নির্ধারিত পাঠানো",
+   "mail_sendlater_channel_desc": "পাঠানোর অপেক্ষায় থাকা বার্তার কাউন্টডাউন"
+  },
+  "strings_identity.xml": {
+   "identity_settings_appearance": "চেহারা",
+   "identity_match_wallpaper_title": "ওয়ালপেপারের সঙ্গে মিলিয়ে নিন",
+   "identity_match_wallpaper_subtitle": "বোতাম ও হাইলাইটে আপনার ওয়ালপেপারের রং ব্যবহার করুন। অ্যাভাটার, স্টেটাসের রং ও লেখা GrapMail-এর নিজস্ব রং-এই থাকে।"
+  }
+ }
+}

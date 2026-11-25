@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    What Android may copy off this device (Android 12+).
+
+    `android:allowBackup="false"` stops cloud backup, but on Android 12 and
+    later it does NOT stop a device-to-device transfer (the "copy apps and
+    data" step when someone sets up a new phone). Without this file that
+    transfer would copy the mailbox snapshot (subjects, senders, previews),
+    the remembered-account records, the install's device id and the push
+    registration to the new phone. The tokens themselves are sealed with
+    Keystore keys that never leave the device, so they would arrive as
+    unreadable bytes, but the rest would not.
+
+    So nothing is copied, by either path: a new phone signs in fresh, enrols
+    its own device key and gets its own device id, exactly as the security
+    design (round8-spec §2.4) already says it does.
+-->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="root" path="." />
+        <exclude domain="file" path="." />
+        <exclude domain="database" path="." />
+        <exclude domain="sharedpref" path="." />
+        <exclude domain="external" path="." />
+        <exclude domain="device_root" path="." />
+        <exclude domain="device_file" path="." />
+        <exclude domain="device_database" path="." />
+        <exclude domain="device_sharedpref" path="." />
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="root" path="." />
+        <exclude domain="file" path="." />
+        <exclude domain="database" path="." />
+        <exclude domain="sharedpref" path="." />
+        <exclude domain="external" path="." />
+        <exclude domain="device_root" path="." />
+        <exclude domain="device_file" path="." />
+        <exclude domain="device_database" path="." />
+        <exclude domain="device_sharedpref" path="." />
+    </device-transfer>
+</data-extraction-rules>

@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    values-vi/strings_reader.xml: translation of values/strings_reader.xml (same keys, same order).
+    Comments below are kept from the English source for context.
+-->
+<resources>
+    <!-- The inline pill above an HTML body in a dark reader. It names what a tap switches TO. -->
+    <string name="reader_colours_original">Màu gốc</string>
+    <string name="reader_colours_dark">Màu tối</string>
+
+    <!-- The message overflow menu items (same toggle as the pill). -->
+    <string name="reader_colours_menu_original">Hiện màu gốc</string>
+    <string name="reader_colours_menu_dark">Hiện màu tối</string>
+
+    <!-- TalkBack: the pill's click action ("double-tap to …") and its current state. -->
+    <string name="reader_colours_action_original">hiện màu gốc của người gửi này</string>
+    <string name="reader_colours_action_dark">hiện bằng màu tối</string>
+    <string name="reader_colours_state_original">Đang hiện màu gốc</string>
+    <string name="reader_colours_state_dark">Đang hiện màu tối</string>
+
+    <!-- The note under the message after a change, so the per-sender memory is not a surprise later. -->
+    <string name="reader_colours_remembered_original">Thư từ %1$s sẽ mở bằng màu gốc trên thiết bị này.</string>
+    <string name="reader_colours_remembered_dark">Thư từ %1$s sẽ mở bằng màu tối trên thiết bị này.</string>
+</resources>

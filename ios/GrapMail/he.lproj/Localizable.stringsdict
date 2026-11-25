@@ -1,0 +1,281 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>%lld unread</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key><string>%#@n@</string>
+		<key>n</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key><string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key><string>lld</string>
+			<key>one</key><string>%lld לא נקראה</string>
+			<key>other</key><string>%lld לא נקראו</string>
+		</dict>
+	</dict>
+	<key>%lld selected</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key><string>%#@n@</string>
+		<key>n</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key><string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key><string>lld</string>
+			<key>one</key><string>%lld נבחר</string>
+			<key>other</key><string>%lld נבחרו</string>
+		</dict>
+	</dict>
+	<key>%lld messages</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key><string>%#@n@</string>
+		<key>n</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key><string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key><string>lld</string>
+			<key>one</key><string>הודעה %lld</string>
+			<key>other</key><string>%lld הודעות</string>
+		</dict>
+	</dict>
+	<key>%lld new messages</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key><string>%#@n@</string>
+		<key>n</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key><string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key><string>lld</string>
+			<key>one</key><string>הודעה חדשה %lld</string>
+			<key>other</key><string>%lld הודעות חדשות</string>
+		</dict>
+	</dict>
+	<key>%lld Active Sessions</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key><string>%#@n@</string>
+		<key>n</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key><string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key><string>lld</string>
+			<key>one</key><string>הפעלה פעילה %lld</string>
+			<key>other</key><string>%lld הפעלות פעילות</string>
+		</dict>
+	</dict>
+	<key>%lld codes unused.</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key><string>%#@n@</string>
+		<key>n</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key><string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key><string>lld</string>
+			<key>one</key><string>קוד %lld לא בשימוש.</string>
+			<key>other</key><string>%lld קודים לא בשימוש.</string>
+		</dict>
+	</dict>
+	<key>%lld days ago</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key><string>%#@n@</string>
+		<key>n</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key><string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key><string>lld</string>
+			<key>one</key><string>לפני יום %lld</string>
+			<key>other</key><string>לפני %lld ימים</string>
+		</dict>
+	</dict>
+	<key>within %lld days</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key><string>%#@n@</string>
+		<key>n</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key><string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key><string>lld</string>
+			<key>one</key><string>בתוך יום %lld</string>
+			<key>other</key><string>בתוך %lld ימים</string>
+		</dict>
+	</dict>
+	<key>older than %lld days</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key><string>%#@n@</string>
+		<key>n</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key><string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key><string>lld</string>
+			<key>one</key><string>ישן מיום %lld</string>
+			<key>other</key><string>ישן מ-%lld ימים</string>
+		</dict>
+	</dict>
+	<key>%lld remote images hidden</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key><string>%#@n@</string>
+		<key>n</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key><string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key><string>lld</string>
+			<key>one</key><string>תמונה מרוחקת %lld הוסתרה</string>
+			<key>other</key><string>%lld תמונות מרוחקות הוסתרו</string>
+		</dict>
+	</dict>
+	<key>Archived %lld messages</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key><string>%#@n@</string>
+		<key>n</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key><string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key><string>lld</string>
+			<key>one</key><string>הודעה %lld הועברה לארכיון</string>
+			<key>other</key><string>%lld הודעות הועברו לארכיון</string>
+		</dict>
+	</dict>
+	<key>Moved %lld messages to Trash</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key><string>%#@n@</string>
+		<key>n</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key><string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key><string>lld</string>
+			<key>one</key><string>הודעה %lld הועברה לאשפה</string>
+			<key>other</key><string>%lld הודעות הועברו לאשפה</string>
+		</dict>
+	</dict>
+	<key>Restored %lld messages</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key><string>%#@n@</string>
+		<key>n</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key><string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key><string>lld</string>
+			<key>one</key><string>הודעה %lld שוחזרה</string>
+			<key>other</key><string>%lld הודעות שוחזרו</string>
+		</dict>
+	</dict>
+	<key>Labelled %lld messages</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key><string>%#@n@</string>
+		<key>n</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key><string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key><string>lld</string>
+			<key>one</key><string>תווית הוחלה על הודעה %lld</string>
+			<key>other</key><string>תווית הוחלה על %lld הודעות</string>
+		</dict>
+	</dict>
+	<key>Snoozed %lld messages</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key><string>%#@n@</string>
+		<key>n</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key><string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key><string>lld</string>
+			<key>one</key><string>הודעה %lld נדחתה</string>
+			<key>other</key><string>%lld הודעות נדחו</string>
+		</dict>
+	</dict>
+	<key>%lld need a reply</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key><string>%#@n@</string>
+		<key>n</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key><string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key><string>lld</string>
+			<key>one</key><string>%lld ממתינה לתשובה</string>
+			<key>other</key><string>%lld ממתינות לתשובה</string>
+		</dict>
+	</dict>
+	<key>%lld packages arriving</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key><string>%#@n@</string>
+		<key>n</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key><string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key><string>lld</string>
+			<key>one</key><string>חבילה %lld בדרך</string>
+			<key>other</key><string>%lld חבילות בדרך</string>
+		</dict>
+	</dict>
+	<key>%lld sign-in codes</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key><string>%#@n@</string>
+		<key>n</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key><string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key><string>lld</string>
+			<key>one</key><string>קוד כניסה %lld</string>
+			<key>other</key><string>%lld קודי כניסה</string>
+		</dict>
+	</dict>
+	<key>You handled %lld emails today.</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key><string>%#@n@</string>
+		<key>n</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key><string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key><string>lld</string>
+			<key>one</key><string>היום טופלה הודעה %lld.</string>
+			<key>other</key><string>היום טופלו %lld הודעות.</string>
+		</dict>
+	</dict>
+	<key>%lld labels</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key><string>%#@n@</string>
+		<key>n</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key><string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key><string>lld</string>
+			<key>one</key><string>תווית %lld</string>
+			<key>other</key><string>%lld תוויות</string>
+		</dict>
+	</dict>
+	<key>%lld waiting</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key><string>%#@n@</string>
+		<key>n</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key><string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key><string>lld</string>
+			<key>one</key><string>%lld ממתינה</string>
+			<key>other</key><string>%lld ממתינות</string>
+		</dict>
+	</dict>
+	<key>Delete %lld messages permanently?</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key><string>%#@n@</string>
+		<key>n</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key><string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key><string>lld</string>
+			<key>one</key><string>למחוק %lld הודעה לצמיתות?</string>
+			<key>other</key><string>למחוק %lld הודעות לצמיתות?</string>
+		</dict>
+	</dict>
+	<key>%lld senders in the selected messages</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key><string>%#@n@</string>
+		<key>n</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key><string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key><string>lld</string>
+			<key>one</key><string>%lld שולח בהודעות שנבחרו</string>
+			<key>other</key><string>%lld שולחים בהודעות שנבחרו</string>
+		</dict>
+	</dict>
+	<key>%lld muted conversations</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key><string>%#@n@</string>
+		<key>n</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key><string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key><string>lld</string>
+			<key>one</key><string>%lld שיחה מושתקת</string>
+			<key>other</key><string>%lld שיחות מושתקות</string>
+		</dict>
+	</dict>
+	<key>%lld followed conversations</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key><string>%#@n@</string>
+		<key>n</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key><string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key><string>lld</string>
+			<key>one</key><string>%lld שיחה במעקב</string>
+			<key>other</key><string>%lld שיחות במעקב</string>
+		</dict>
+	</dict>
+</dict>
+</plist>

@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  First-time feature tips (ui/components/FeatureTip.kt, logic/FeatureTipsStore.kt).
+  One tip per app session, anchored to the control it describes. Titles stay
+  at four words or fewer, bodies at one sentence under 90 characters. The same
+  English text as iOS's "Feature tips" block (GrapMail/en.lproj/Localizable.strings),
+  except the long-press tip: on Android a long press selects, on iOS it previews.
+-->
+<resources>
+    <string name="tip_got_it">Đã hiểu</string>
+    <string name="tip_close">Đóng mẹo</string>
+
+    <string name="tip_swipe_title">Vuốt để dọn dẹp</string>
+    <string name="tip_swipe_body">Vuốt thư sang phải để lưu trữ, hoặc sang trái để chuyển vào Thùng rác.</string>
+
+    <string name="tip_long_press_title">Chọn nhiều thư cùng lúc</string>
+    <string name="tip_long_press_body">Chạm và giữ một thư để chọn, rồi nhấn vào các thư khác để thêm.</string>
+
+    <string name="tip_categories_title">Chia hộp thư đến</string>
+    <string name="tip_categories_body">Nhấn vào một thẻ để chỉ hiện Ưu tiên, Mọi người, Bản tin và hơn nữa.</string>
+
+    <string name="tip_screener_title">Sàng lọc người gửi mới</string>
+    <string name="tip_screener_body">Chờ phê duyệt, trong menu, giữ thư từ người gửi mới cho đến khi bạn cho phép.</string>
+
+    <string name="tip_accounts_title">Chuyển tài khoản nhanh</string>
+    <string name="tip_accounts_body">Nhấn vào ảnh của bạn để chuyển tài khoản hoặc thêm tài khoản khác.</string>
+
+    <string name="tip_snooze_title">Tạm ẩn để xem sau</string>
+    <string name="tip_snooze_body">Nhấn Thêm để tạm ẩn thư đã chọn đến thời điểm thích hợp hơn.</string>
+</resources>

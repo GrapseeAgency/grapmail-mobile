@@ -1,0 +1,31 @@
+/* GrapMailWidget — base English table. Keys are the exact SwiftUI / String(localized:) literals. */
+
+"Unread mail" = "Nieprzeczytana poczta";
+"The unread count your app last saw, and the newest message." = "Liczba nieprzeczytanych z ostatniego sprawdzenia i najnowsza wiadomość.";
+"GrapMail — not signed in" = "GrapMail — nie zalogowano";
+"GrapMail — no read yet" = "GrapMail — jeszcze nie odczytano";
+/* Lock Screen inline widget: unread count, newest sender */
+"%lld unread · %@" = "Nieprzeczytane: %lld · %@";
+/* Lock Screen inline widget: unread count */
+"%lld unread" = "Nieprzeczytane: %lld";
+"unread" = "nieprzeczytane";
+"No subject" = "Brak tematu";
+"No read yet" = "Jeszcze nie odczytano";
+"Open the app to sign in" = "Otwórz aplikację, aby się zalogować";
+"Scheduled send" = "Zaplanowana wysyłka";
+"(no subject)" = "(brak tematu)";
+"Scheduled" = "Zaplanowane";
+"To %@" = "Do %@";
+"Sending…" = "Wysyłanie…";
+
+/* Home Screen widget row buttons (iOS 17+), read by VoiceOver */
+"Mark as read" = "Oznacz jako przeczytane";
+"Archive" = "Archiwizuj";
+"Star" = "Oznacz gwiazdką";
+"Unstar" = "Usuń gwiazdkę";
+/* The widget row buttons' App Intent and its parameters (hidden from Shortcuts) */
+"Update message" = "Zaktualizuj wiadomość";
+"Message" = "Wiadomość";
+"Action" = "Akcja";
+/* Widget placeholder when no account is signed in */
+"Open GrapMail to sign in" = "Otwórz GrapMail, aby się zalogować";

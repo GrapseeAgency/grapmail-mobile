@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="identity_settings_appearance">Aparência</string>
+    <string name="identity_match_wallpaper_title">Combinar com o papel de parede</string>
+    <string name="identity_match_wallpaper_subtitle">Usa as cores do seu papel de parede em botões e realces. Avatares, cores de status e texto continuam os do GrapMail.</string>
+</resources>

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="r9_platform_notif_channel_new_mail_desc">जब इनबॉक्स में नए संदेश आते हैं तो बताता है।</string>
+    <string name="r9_platform_price_per_week">%1$s/हफ़्ता</string>
+    <string name="r9_platform_price_per_month">%1$s/महीना</string>
+    <string name="r9_platform_price_per_3_months">हर 3 महीने %1$s</string>
+    <string name="r9_platform_price_per_6_months">हर 6 महीने %1$s</string>
+    <string name="r9_platform_price_per_year">%1$s/साल</string>
+</resources>

@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Labels for profile option values (Android).
+  The account stores a stable code (female, male, prefer_not_to_say, custom);
+  these strings are only what the screens show for each code. See
+  logic/ProfileOptions.kt for the code list and the legacy-English mapping.
+
+  The defaults below are resource aliases of the sign-up wizard's existing
+  labels (strings_account.xml), so every locale that already translated
+  acct_female / acct_male / acct_rather_not_say / acct_custom shows the same
+  translation here with no extra work. To give a locale its own wording, put
+  real text under the same name in values-<locale>/strings_profile.xml.
+-->
+<resources>
+
+    <!-- Profile options: gender -->
+    <string name="profile_gender_female">@string/acct_female</string>
+    <string name="profile_gender_male">@string/acct_male</string>
+    <string name="profile_gender_prefer_not_to_say">@string/acct_rather_not_say</string>
+    <string name="profile_gender_custom">@string/acct_custom</string>
+
+</resources>

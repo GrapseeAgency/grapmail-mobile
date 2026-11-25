@@ -25,7 +25,30 @@ import com.grapsee.grapmail.data.MailStore
 import com.grapsee.grapmail.data.Outbox
 import com.grapsee.grapmail.data.OutboxItem
 import com.grapsee.grapmail.data.SessionRefresh
+import com.grapsee.grapmail.ui.i18n.CoreStrings
 import java.util.concurrent.TimeUnit
+
+/**
+ * The failure table below, as pure functions, so OutboxRetryPolicyTest can hold
+ * it without a WorkManager, a Context or a network. [OutboxWorker.deliver] calls
+ * exactly these; there is no second copy of the rule.
+ */
+internal object OutboxRetryPolicy {
+    /** 5xx, 408 and 429 are "try again later"; every other HTTP answer is final. */
+    fun retryableStatus(status: Int): Boolean = status >= 500 || status == 408 || status == 429
+
+    /** What a failed send means: an HTTP answer by its status, anything else (no connection) is a retry. */
+    fun shouldRetry(error: Throwable): Boolean = when (error) {
+        is ApiException -> retryableStatus(error.status)
+        else -> true
+    }
+
+    /** The delivery states the server reports for a send it accepted. */
+    fun accepted(status: String?): Boolean = status == "sent" || status == "queued" || status == "delivered"
+
+    /** Older than [Outbox.MAX_AGE_MS]: given up on, because mail is time-sensitive. */
+    fun expired(createdAt: Long, now: Long): Boolean = now - createdAt > Outbox.MAX_AGE_MS
+}
 
 /**
  * Delivers the [Outbox] once the device is online.
@@ -79,8 +102,8 @@ class OutboxWorker(appContext: Context, params: WorkerParameters) : CoroutineWor
     private enum class Outcome { SENT, GAVE_UP, RETRY }
 
     private suspend fun deliver(item: OutboxItem): Outcome {
-        if (System.currentTimeMillis() - item.createdAt > Outbox.MAX_AGE_MS) {
-            notifyFailed(item, "It waited too long without a connection.")
+        if (OutboxRetryPolicy.expired(item.createdAt, System.currentTimeMillis())) {
+            notifyFailed(item, CoreStrings.get(R.string.core_outbox_too_old) { "It waited too long without a connection." })
             return Outcome.GAVE_UP
         }
         val session = try {
@@ -91,14 +114,14 @@ class OutboxWorker(appContext: Context, params: WorkerParameters) : CoroutineWor
             return Outcome.RETRY
         }
         if (session == null) {
-            notifyFailed(item, "You are signed out of the account it was sent from.")
+            notifyFailed(item, CoreStrings.get(R.string.core_outbox_signed_out) { "You are signed out of the account it was sent from." })
             return Outcome.GAVE_UP
         }
         return try {
             val r = Api.mailSend(session.token, item.request, idempotencyKey = item.idempotencyKey)
-            val accepted = r.status == "sent" || r.status == "queued" || r.status == "delivered"
+            val accepted = OutboxRetryPolicy.accepted(r.status)
             if (!accepted) {
-                notifyFailed(item, r.deliveryError ?: r.error ?: "The server did not accept it.")
+                notifyFailed(item, r.deliveryError ?: r.error ?: CoreStrings.get(R.string.core_outbox_not_accepted) { "The server did not accept it." })
                 return Outcome.GAVE_UP
             }
             if (item.draftId.isNotEmpty()) runCatching { Api.mailDeleteMessage(session.token, item.draftId) }
@@ -107,11 +130,11 @@ class OutboxWorker(appContext: Context, params: WorkerParameters) : CoroutineWor
         } catch (e: kotlinx.coroutines.CancellationException) {
             throw e
         } catch (e: ApiException) {
-            if (e.status >= 500 || e.status == 408 || e.status == 429) {
+            if (OutboxRetryPolicy.shouldRetry(e)) {
                 Outbox.recordAttempt(applicationContext, item.id, "HTTP ${e.status}")
                 Outcome.RETRY
             } else {
-                notifyFailed(item, e.message ?: "The server refused it.")
+                notifyFailed(item, e.message ?: CoreStrings.get(R.string.core_outbox_refused) { "The server refused it." })
                 Outcome.GAVE_UP
             }
         } catch (_: Exception) {
@@ -130,13 +153,18 @@ class OutboxWorker(appContext: Context, params: WorkerParameters) : CoroutineWor
             val manager = context.getSystemService(NotificationManager::class.java)
             if (manager.getNotificationChannel(CHANNEL) == null) {
                 manager.createNotificationChannel(
-                    NotificationChannel(CHANNEL, "Unsent mail", NotificationManager.IMPORTANCE_DEFAULT).apply {
-                        description = "Mail from the Outbox that could not be sent"
+                    NotificationChannel(CHANNEL, CoreStrings.get(R.string.core_outbox_channel_name) { "Unsent mail" }, NotificationManager.IMPORTANCE_DEFAULT).apply {
+                        description = CoreStrings.get(R.string.core_outbox_channel_desc) { "Mail from the Outbox that could not be sent" }
                     },
                 )
             }
         }
-        val subject = item.request.subject.ifBlank { "(no subject)" }
+        val subject = item.request.subject.ifBlank { CoreStrings.get(R.string.core_notif_no_subject) { "(no subject)" } }
+        val body = if (item.draftId.isNotEmpty()) {
+            CoreStrings.get(R.string.core_outbox_reason_still_in_drafts, reason) { reason + " It is still in Drafts." }
+        } else {
+            reason
+        }
         val open = PendingIntent.getActivity(
             context, item.id.hashCode(),
             Intent(context, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP),
@@ -144,9 +172,9 @@ class OutboxWorker(appContext: Context, params: WorkerParameters) : CoroutineWor
         )
         val notification = NotificationCompat.Builder(context, CHANNEL)
             .setSmallIcon(R.mipmap.ic_launcher_monochrome)
-            .setContentTitle("Not sent: $subject")
-            .setContentText(reason + if (item.draftId.isNotEmpty()) " It is still in Drafts." else "")
-            .setStyle(NotificationCompat.BigTextStyle().bigText(reason + if (item.draftId.isNotEmpty()) " It is still in Drafts." else ""))
+            .setContentTitle(CoreStrings.get(R.string.core_outbox_not_sent_title, subject) { "Not sent: $subject" })
+            .setContentText(body)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(body))
             .setContentIntent(open)
             .setAutoCancel(true)
             .build()

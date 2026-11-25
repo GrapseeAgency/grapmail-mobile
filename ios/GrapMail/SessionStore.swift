@@ -170,6 +170,10 @@ enum SessionStore {
         DispatchQueue.main.async {
             NotificationCenter.default.post(name: .gmSessionChanged, object: nil)
         }
+        // Round 8 — B (welcome-back): remember the address, name and photo of
+        // every account that signs in here — never its password or tokens
+        // (RememberedAccounts.swift). Outside credentialsLock on purpose.
+        RememberedAccounts.noteSignedIn(address: address, name: name, token: token)
     }
 
     /// The pair after a rotation, keeping address and name.
@@ -228,6 +232,10 @@ enum SessionStore {
 
     @MainActor
     static func clear() {
+        // Round 8 — B (welcome-back): read before the address is removed below.
+        // Keeps the remembered record (reason `signed_out`, refined to
+        // `expired` by the expiry signal) unless the sign-out asked to remove it.
+        RememberedAccounts.sessionEnding(address: address, name: name)
         credentialsLock.withLock { sessionGeneration = UUID() }
         MailPoll.clear()
         WidgetBridge.clear()
@@ -239,6 +247,10 @@ enum SessionStore {
         // teardown stays deferred inside there: it must not unregister a
         // registration that belongs to a sign-in completed in the meantime.
         NotificationRegistration.shared.sessionEnding()
+        // The reader's per-sender "Show original colours" memory is per
+        // account; it goes with the account, read while its address is still
+        // stored (the block below removes it).
+        ReaderColourPrefs.clear(account: address)
         credentialsLock.withLock {
             if let id = activeAccount()?.id {
                 let accounts = savedAccounts()

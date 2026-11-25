@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="mail_receipt_read_at">پڑھی گئی %1$s</string>
+    <string name="mail_receipt_requested_pending">رسیدِ مطالعہ طلب کی گئی · ابھی نہیں پڑھی گئی</string>
+    <string name="mail_receipt_server_sent">رسیدِ مطالعہ بھیج دی گئی</string>
+    <string name="mail_receipt_ask_title">بھیجنے والے نے رسیدِ مطالعہ طلب کی ہے</string>
+    <string name="mail_receipt_ask_body">%1$s کو رسید بھیجیں کہ آپ نے یہ پیغام کھولا؟ اس سے انہیں صرف یہ پتہ چلتا ہے کہ آپ نے اسے کب کھولا، اور کچھ نہیں۔</string>
+    <string name="mail_receipt_ask_send">رسید بھیجیں</string>
+    <string name="mail_receipt_ask_decline">نہ بھیجیں</string>
+    <string name="mail_receipt_mode_title">رسیدِ مطالعہ بھیجیں</string>
+    <string name="mail_receipt_mode_body">جب کوئی پیغام رسیدِ مطالعہ طلب کرے۔ اسپام، بلاک شدہ بھیجنے والوں یا انکرپٹڈ میل کے لیے رسیدیں کبھی نہیں بھیجی جاتیں، جب تک آپ \"ہمیشہ\" منتخب نہ کریں۔</string>
+    <string name="mail_receipt_mode_never">کبھی نہیں</string>
+    <string name="mail_receipt_mode_ask">پوچھیں</string>
+    <string name="mail_receipt_mode_always">ہمیشہ</string>
+    <string name="mail_receipt_mode_always_note">\"ہمیشہ\" اسپام، بلاک شدہ بھیجنے والوں اور انکرپٹڈ میل کے لیے بھی رسیدیں بھیجتا ہے۔</string>
+    <string name="mail_receipt_mode_unavailable">یہ ترتیب لوڈ نہیں ہو سکی۔ اپنا کنکشن چیک کریں۔</string>
+    <string name="mail_compose_request_receipt">رسیدِ مطالعہ طلب کریں</string>
+</resources>

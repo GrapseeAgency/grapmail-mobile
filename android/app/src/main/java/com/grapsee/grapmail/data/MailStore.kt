@@ -78,6 +78,7 @@ object MailStore {
         val aliases: List<MailAliasDto>? = null,
         val me: MailMeResponse? = null,
         val assignments: Map<String, Set<String>>? = null,
+        val profile: ProfileDto? = null,
     )
 
     private const val SNAPSHOT_FILE = "mailbox-snapshot.json"
@@ -116,6 +117,7 @@ object MailStore {
                 if (snap.version != SNAPSHOT_VERSION) return@launch
                 mutex.withLock {
                     if (!SessionStore.isCurrent(ctx, snap.sessionId)) return@withLock
+                    if (profile == null) profile = snap.profile
                     if (pages.isEmpty() && stats == null && me == null && assignments == null) {
                         pages = snap.pages
                         stats = snap.stats
@@ -160,6 +162,7 @@ object MailStore {
                 aliases = aliases,
                 me = me,
                 assignments = assignments,
+                profile = profile,
             )
         }
         val encoded = try {
@@ -183,6 +186,22 @@ object MailStore {
                 // one cold boot its warm start, and nothing else.
             }
         }
+    }
+
+    private var profile: ProfileDto? = null
+
+    suspend fun cachedProfile(context: android.content.Context, sessionId: String): ProfileDto? {
+        awaitDiskReady()
+        return mutex.withLock { profile.takeIf { SessionStore.isCurrent(context, sessionId) } }
+    }
+
+    suspend fun putProfile(context: android.content.Context, sessionId: String, value: ProfileDto) {
+        val accepted = mutex.withLock {
+            if (!SessionStore.isCurrent(context, sessionId)) return@withLock false
+            profile = value
+            true
+        }
+        if (accepted) scheduleSnapshotWrite()
     }
 
     private var pages: Map<String, PageCache> = emptyMap()
@@ -243,11 +262,15 @@ object MailStore {
      * search), false for a later page appended to what is already shown.
      */
     suspend fun putPage(box: MailBox, query: String?, resp: MailInboxResponse, replace: Boolean,
-                        sessionContext: android.content.Context? = null, sessionId: String? = null) =
+                        sessionContext: android.content.Context? = null, sessionId: String? = null,
+                        refreshStartedAt: Long? = null) =
         mutex.withLock {
             if (sessionId != null && (sessionContext == null || !SessionStore.isCurrent(sessionContext, sessionId)))
                 return@withLock false
             val k = key(box, query)
+            if (refreshStartedAt != null && (pages[k]?.let {
+                it.loadedAtMillis >= refreshStartedAt || it.pages > 1
+            } == true)) return@withLock false
             val prior = if (replace) null else pages[k]
             val merged = ((prior?.messages ?: emptyList()) + resp.messages).distinctBy { it.id }
             pages = pages + (k to PageCache(
@@ -583,6 +606,7 @@ object MailStore {
         // `NonCancellable`, which is where the "must not be cancelled" guarantee
         // actually belongs.
         pages = emptyMap()
+        profile = null
         stats = null
         labels = null
         aliases = null

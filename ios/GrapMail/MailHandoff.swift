@@ -35,17 +35,20 @@ import UIKit
 /// screen makes, one step further out.
 func messageShareText(_ message: MailMessageFull, formattedText: String? = nil) -> String {
     var lines: [String] = []
-    lines.append(message.subject?.nilIfBlank() ?? "(no subject)")
+    lines.append(message.subject?.nilIfBlank() ?? String(localized: "(no subject)"))
     let from = message.from?.display.nilIfBlank() ?? (message.from?.address ?? "").nilIfBlank()
-    lines.append("From: \(from ?? "Not recorded")")
-    if !message.to.isEmpty { lines.append("To: \(message.to.joined(separator: ", "))") }
-    if !message.cc.isEmpty { lines.append("Cc: \(message.cc.joined(separator: ", "))") }
-    lines.append("Date: \(message.createdAt ?? "Not recorded")")
+    let notRecorded = String(localized: "Not recorded")
+    let fromLine = from ?? notRecorded
+    lines.append(String(localized: "From: \(fromLine)", comment: "Shared/printed message header line"))
+    if !message.to.isEmpty { let to = message.to.joined(separator: ", "); lines.append(String(localized: "To: \(to)", comment: "Shared/printed message header line")) }
+    if !message.cc.isEmpty { let cc = message.cc.joined(separator: ", "); lines.append(String(localized: "Cc: \(cc)", comment: "Shared/printed message header line")) }
+    let date = message.createdAt ?? notRecorded
+    lines.append(String(localized: "Date: \(date)", comment: "Shared/printed message header line"))
     lines.append("")
     if let text = message.bodyText?.nilIfBlank() ?? formattedText?.nilIfBlank() {
         lines.append(text)
     } else {
-        lines.append("This message has no text body.")
+        lines.append(String(localized: "This message has no text body."))
     }
     return lines.joined(separator: "\n")
 }
@@ -134,27 +137,29 @@ private let imageSession: URLSession = {
 /// Fetch one remote image, on the person's own opt-in.
 func fetchRemoteImage(_ raw: String) async -> RemoteImageOutcome {
     guard let url = URL(string: raw), url.isHTTP else {
-        return .problem("That address is not one this app can request.")
+        return .problem(String(localized: "That address is not one this app can request."))
     }
     do {
         let (data, response) = try await imageSession.data(from: url)
         let status = (response as? HTTPURLResponse)?.statusCode ?? 0
         if status >= 400 {
-            return .problem("The sender's server refused the image (\(status)).")
+            return .problem(String(localized: "The sender's server refused the image (\(status))."))
         }
         let mime = (response as? HTTPURLResponse)?.mimeType ?? ""
         if !mime.hasPrefix("image/") {
             // The answer that matters most: the address is not a picture. An
             // <img> tag does not license this app to hand a document to a
             // renderer, so the content type is checked, not trusted.
-            return .problem("That address is not an image (\(mime.isEmpty ? "no type given" : mime)).")
+            return .problem(mime.isEmpty
+                ? String(localized: "That address is not an image (no type given).")
+                : String(localized: "That address is not an image (\(mime))."))
         }
         guard let image = UIImage(data: data) else {
-            return .problem("The image could not be read.")
+            return .problem(String(localized: "The image could not be read."))
         }
         return .ready(image)
     } catch {
-        return .problem("The sender's server could not be reached.")
+        return .problem(String(localized: "The sender's server could not be reached."))
     }
 }
 
@@ -183,13 +188,13 @@ struct RemoteImageView: View {
             switch phase {
             case .loading:
                 Text("Loading image…")
-                    .font(.system(size: 12)).foregroundColor(GM.textTertiary)
+                    .gmFont(12).foregroundColor(GM.textTertiary)
                     .frame(maxWidth: .infinity, minHeight: 64)
                     .background(RoundedRectangle(cornerRadius: 12, style: .continuous)
                         .fill(GM.softFill))
             case .problem(let reason):
                 Text(reason)
-                    .font(.system(size: 12)).foregroundColor(GM.textSecondary)
+                    .gmFont(12).foregroundColor(GM.textSecondary)
                     .frame(maxWidth: .infinity, minHeight: 44)
                     .padding(.horizontal, 12)
                     .background(RoundedRectangle(cornerRadius: 12, style: .continuous)
@@ -257,13 +262,13 @@ func printMessageText(
     let info = UIPrintInfo(dictionary: nil)
     info.outputType = .grayscale
     info.orientation = .portrait
-    info.jobName = String((message.subject?.nilIfBlank() ?? "GrapMail message").prefix(60))
+    info.jobName = String((message.subject?.nilIfBlank() ?? String(localized: "GrapMail message")).prefix(60))
     controller.printInfo = info
     controller.printFormatter = UISimpleTextPrintFormatter(
         text: messageShareText(message, formattedText: formattedText))
 
     guard let view = frontView() else {
-        onOutcome("This device could not open its print screen.")
+        onOutcome(String(localized: "This device could not open its print screen."))
         return
     }
     controller.present(from: .zero, in: view, animated: true) { _, completed, error in
@@ -272,9 +277,9 @@ func printMessageText(
             // not observable here, so nothing claims a page exists.
             onOutcome(nil)
         } else if let error = error {
-            onOutcome(apiMessage(error, fallback: "Could not print this message. Try again."))
+            onOutcome(apiMessage(error, fallback: String(localized: "Could not print this message. Try again.")))
         } else {
-            onOutcome("The print was cancelled before it was sent.")
+            onOutcome(String(localized: "The print was cancelled before it was sent."))
         }
     }
 }

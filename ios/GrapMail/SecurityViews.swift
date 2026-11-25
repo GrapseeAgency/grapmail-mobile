@@ -51,9 +51,9 @@ struct AccountSecurityView: View {
     @State private var resetNote: String?
     @State private var cancellingReset = false
 
-    private func sectionLabel(_ text: String) -> some View {
+    private func sectionLabel(_ text: LocalizedStringKey) -> some View {
         Text(text)
-            .font(.system(size: 12, weight: .semibold))
+            .gmFont(12, .semibold)
             .foregroundColor(GM.textTertiary)
             .padding(.top, 18)
             .padding(.bottom, 2)
@@ -70,15 +70,17 @@ struct AccountSecurityView: View {
 
     private var recoveryChip: String? {
         guard !loading, !failed else { return nil }
-        if recoveryEmail == nil { return "Add" }
-        return recoveryVerified ? "Verified" : "Unverified"
+        if recoveryEmail == nil { return String(localized: "Add", comment: "Security hub row chip: nothing set up yet") }
+        return recoveryVerified
+            ? String(localized: "Verified", comment: "Security hub row chip")
+            : String(localized: "Unverified", comment: "Security hub row chip")
     }
 
     private var phoneChip: String? {
         guard !loading, !failed else { return nil }
-        if !hasPhone { return "Add" }
-        if phoneVerified { return "Verified" }
-        return profile?.phoneVerified == false ? "Unverified" : nil
+        if !hasPhone { return String(localized: "Add", comment: "Security hub row chip: nothing set up yet") }
+        if phoneVerified { return String(localized: "Verified", comment: "Security hub row chip") }
+        return profile?.phoneVerified == false ? String(localized: "Unverified", comment: "Security hub row chip") : nil
     }
 
     var body: some View {
@@ -86,51 +88,51 @@ struct AccountSecurityView: View {
             onBack: onBack,
             illustration: secure ? "ill_sec_hub_secure" : "ill_sec_hub",
             illustrationWidth: 120,
-            title: "Account Security",
-            subtitle: "Manage your security settings to keep your account safe and secure."
+            title: String(localized: "Account Security", comment: "Screen title (account security screen)"),
+            subtitle: String(localized: "Manage your security settings to keep your account safe and secure.", comment: "Screen description under the title (account security screen)")
         ) {
             if let pending = resetPending {
                 InfoCard {
-                    StatusChip(text: "Password reset requested", tone: .warning)
+                    StatusChip(text: String(localized: "Password reset requested", comment: "Status chip (account security screen)"), tone: .warning)
                     Text(Self.resetSentence(pending))
-                        .font(.system(size: 12))
+                        .gmFont(12)
                         .foregroundColor(GM.textSecondary)
                         .fixedSize(horizontal: false, vertical: true)
                         .padding(.top, 10)
-                    AccountLink(title: cancellingReset ? "Cancelling…" : "Cancel the reset", action: cancelReset)
+                    AccountLink(title: cancellingReset ? String(localized: "Cancelling…", comment: "Link-style button (account security screen)") : String(localized: "Cancel the reset", comment: "Link-style button (account security screen)"), action: cancelReset)
                         .accessibilityIdentifier("sec-cancel-reset")
                 }
                 .padding(.bottom, 12)
             }
             if let resetNote {
                 Text(resetNote)
-                    .font(.system(size: 12))
+                    .gmFont(12)
                     .foregroundColor(GM.textSecondary)
                     .padding(.bottom, 12)
             }
+            // Jailbreak heuristics (DeviceIntegrityCheck.swift): warn, never block.
+            JailbreakWarningCard()
             // The reference puts the account's verdict above the feature list: it
             // answers "am I safe?" before the six rows that explain why.
             InfoCard {
                 if loading {
-                    Text("Checking your account…")
-                        .font(.system(size: 13))
-                        .foregroundColor(GM.textSecondary)
+                    GMSkeletonList(rows: 2, avatar: false)
                 } else if failed {
                     Text("We couldn't load your security settings.")
-                        .font(.system(size: 13))
+                        .gmFont(13)
                         .foregroundColor(GM.textSecondary)
-                    AccountLink(title: "Try again", action: { reload += 1 })
+                    AccountLink(title: String(localized: "Try again", comment: "Link-style button (account security screen)"), action: { reload += 1 })
                 } else {
                     StatusChip(
-                        text: secure ? "Your account is secure" : "One thing left to do",
+                        text: secure ? String(localized: "Your account is secure", comment: "Status chip (account security screen)") : String(localized: "One thing left to do", comment: "Status chip (account security screen)"),
                         tone: secure ? .success : .warning
                     )
                     Text(secure
-                         ? "All essential security features are active and your account is protected."
+                         ? String(localized: "All essential security features are active and your account is protected.", comment: "Message (account security screen)")
                          : !recoveryVerified
-                         ? "Add a recovery email. It is the only way back into your account if you forget your password."
-                         : "Turn on two-step verification to protect your account even if your password is ever exposed.")
-                        .font(.system(size: 12))
+                         ? String(localized: "Add a recovery email. It is the only way back into your account if you forget your password.", comment: "Message (account security screen)")
+                         : String(localized: "Turn on two-step verification to protect your account even if your password is ever exposed.", comment: "Message (account security screen)"))
+                        .gmFont(12)
                         .foregroundColor(GM.textSecondary)
                         .fixedSize(horizontal: false, vertical: true)
                         .padding(.top, 10)
@@ -141,7 +143,7 @@ struct AccountSecurityView: View {
                     // "you have no codes" is its own kind of wrong warning.
                     if twoFactorOn, let remaining = profile?.backupCodesRemaining, remaining == 0 {
                         Text("Add backup codes so losing access to your recovery email does not lock you out.")
-                            .font(.system(size: 12))
+                            .gmFont(12)
                             .foregroundColor(GM.warnInk)
                             .fixedSize(horizontal: false, vertical: true)
                             .padding(.top, 8)
@@ -157,9 +159,9 @@ struct AccountSecurityView: View {
             // then code) rather than flipping a flag blind.
             SecurityToggleRowView(
                 icon: "shield.lefthalf.filled",
-                title: "Two-Step Verification",
-                subtitle: "Add an extra layer of security to your account with a verification code.",
-                chip: (loading || failed) ? nil : (twoFactorOn ? "Enabled" : "Off"),
+                title: String(localized: "Two-Step Verification", comment: "Settings switch row title (account security screen)"),
+                subtitle: String(localized: "Add an extra layer of security to your account with a verification code.", comment: "Settings switch row description (account security screen)"),
+                chip: (loading || failed) ? nil : (twoFactorOn ? String(localized: "Enabled", comment: "Settings row status chip (account security screen)") : String(localized: "Off", comment: "Settings row status chip (account security screen)")),
                 chipTone: twoFactorOn ? .success : .warning,
                 isOn: twoFactorOn && !loading && !failed,
                 enabled: !loading && !failed,
@@ -168,9 +170,9 @@ struct AccountSecurityView: View {
             SecurityDivider()
             SecurityRowView(
                 icon: "envelope.badge.shield.half.filled",
-                title: "Recovery Email",
+                title: String(localized: "Recovery Email", comment: "Settings row title (account security screen)"),
                 subtitle: recoveryEmail
-                    ?? (loading ? nil : "Where your password reset link and sign-in codes are sent."),
+                    ?? (loading ? nil : String(localized: "Where your password reset link and sign-in codes are sent.", comment: "Settings row description (account security screen)")),
                 chip: recoveryChip,
                 chipTone: recoveryVerified ? .success : .warning,
                 action: onRecoveryEmail
@@ -179,17 +181,17 @@ struct AccountSecurityView: View {
             sectionLabel("Account Management")
             SecurityRowView(
                 icon: "key",
-                title: "Change Password",
-                subtitle: "Update your account password for better security.",
+                title: String(localized: "Change Password", comment: "Settings row title (account security screen)"),
+                subtitle: String(localized: "Update your account password for better security.", comment: "Settings row description (account security screen)"),
                 action: onPassword
             )
             SecurityDivider()
             SecurityRowView(
                 icon: "at",
-                title: "Backup Codes",
+                title: String(localized: "Backup Codes", comment: "Settings row title (account security screen)"),
                 subtitle: (profile?.backupCodesRemaining ?? 0) > 0
-                    ? "\(profile?.backupCodesRemaining ?? 0) codes unused."
-                    : "Generate and manage backup codes for 2FA.",
+                    ? String(localized: "\(profile?.backupCodesRemaining ?? 0) codes unused.", comment: "Settings row description (account security screen)")
+                    : String(localized: "Generate and manage backup codes for 2FA.", comment: "Settings row description (account security screen)"),
                 action: onBackupCodes
             )
             SecurityDivider()
@@ -198,29 +200,29 @@ struct AccountSecurityView: View {
             // without a password at all.
             SecurityRowView(
                 icon: "key.fill",
-                title: "Account Recovery Codes",
-                subtitle: "One-time codes for signing in if you lose your password.",
+                title: String(localized: "Account Recovery Codes", comment: "Settings row title (account security screen)"),
+                subtitle: String(localized: "One-time codes for signing in if you lose your password.", comment: "Settings row description (account security screen)"),
                 action: onRecoveryCodes
             )
             SecurityDivider()
             SecurityRowView(
                 icon: "checkmark.seal",
-                title: "Trusted Devices",
-                subtitle: "Devices that hold a key this account trusts.",
+                title: String(localized: "Trusted Devices", comment: "Settings row title (account security screen)"),
+                subtitle: String(localized: "Devices that hold a key this account trusts.", comment: "Settings row description (account security screen)"),
                 action: onTrustedDevices
             )
             SecurityDivider()
             SecurityRowView(
                 icon: "key.viewfinder",
-                title: "Passkeys",
-                subtitle: "Sign in with your face, fingerprint or passcode instead of a password.",
+                title: String(localized: "Passkeys", comment: "Settings row title (account security screen)"),
+                subtitle: String(localized: "Sign in with your face, fingerprint or passcode instead of a password.", comment: "Settings row description (account security screen)"),
                 action: onPasskeys
             )
             SecurityDivider()
             SecurityRowView(
                 icon: "rectangle.portrait.and.arrow.right",
-                title: "Sign Out All Devices",
-                subtitle: "Log out from all devices except this one.",
+                title: String(localized: "Sign Out All Devices", comment: "Settings row title (account security screen)"),
+                subtitle: String(localized: "Log out from all devices except this one.", comment: "Settings row description (account security screen)"),
                 action: onSignOutAll
             )
             // Two rows the reference hub does not draw but the sector needs a
@@ -228,26 +230,26 @@ struct AccountSecurityView: View {
             SecurityDivider()
             SecurityRowView(
                 icon: "laptopcomputer.and.iphone",
-                title: "Active Sessions",
-                subtitle: "Devices signed in to this account.",
+                title: String(localized: "Active Sessions", comment: "Settings row title (account security screen)"),
+                subtitle: String(localized: "Devices signed in to this account.", comment: "Settings row description (account security screen)"),
                 action: onSessions
             )
             SecurityDivider()
             SecurityRowView(
                 icon: "checkmark.shield",
-                title: "Recent Security Activity",
-                subtitle: "Sign-ins and changes to this account.",
+                title: String(localized: "Recent Security Activity", comment: "Settings row title (account security screen)"),
+                subtitle: String(localized: "Sign-ins and changes to this account.", comment: "Settings row description (account security screen)"),
                 action: onActivity
             )
             SecurityDivider()
             SecurityRowView(
                 icon: "headphones",
-                title: "Help & Support",
-                subtitle: "Visit our support center for security assistance.",
+                title: String(localized: "Help & Support", comment: "Settings row title (account security screen)"),
+                subtitle: String(localized: "Visit our support center for security assistance.", comment: "Settings row description (account security screen)"),
                 action: onSupport
             )
         } footer: {
-            FooterNote(text: "Your security matters. We're here to help.")
+            FooterNote(text: String(localized: "Your security matters. We're here to help.", comment: "Footer note (account security screen)"))
         }
         .task(id: reload) {
             let generation = SessionStore.generation
@@ -284,14 +286,24 @@ struct AccountSecurityView: View {
                   let status = try? await ApiClient.passwordResetStatus(token: token) else { return }
             resetPending = status.success && status.pending ? status : nil
         }
+        .task(id: reload) {
+            // Round 8 — C: keep the safety header current (first entry and
+            // every return from a sub-screen, like the profile read above).
+            guard onSecurityCenter != nil else { return }
+            _ = try? await safetyStore.fetch()
+        }
     }
 
     private static func resetSentence(_ s: PasswordResetStatus) -> String {
-        var line = "A link to reset your password was sent to your recovery email. "
+        // Whole sentences, joined with a space, so no translated fragment has to
+        // carry another's grammar.
+        var parts = [String(localized: "A link to reset your password was sent to your recovery email.", comment: "Security hub: pending password reset notice")]
         if let at = s.availableAt, let date = ServerDate.parse(at) {
-            line += "It works from \(date.formatted(date: .abbreviated, time: .shortened)). "
+            let when = date.formatted(date: .abbreviated, time: .shortened)
+            parts.append(String(localized: "It works from \(when).", comment: "Security hub: pending password reset notice; the argument is a date and time"))
         }
-        return line + "If this was not you, cancel it now and change your recovery email."
+        parts.append(String(localized: "If this was not you, cancel it now and change your recovery email.", comment: "Security hub: pending password reset notice"))
+        return parts.joined(separator: " ")
     }
 
     private func cancelReset() {
@@ -303,12 +315,12 @@ struct AccountSecurityView: View {
                 let result = try await ApiClient.cancelPasswordReset(token: token)
                 if result.success {
                     resetPending = nil
-                    resetNote = result.message ?? "The password reset was cancelled."
+                    resetNote = result.message ?? String(localized: "The password reset was cancelled.", comment: "Message (account security screen)")
                 } else {
-                    resetNote = result.error ?? "The reset could not be cancelled. Try again."
+                    resetNote = result.error ?? String(localized: "The reset could not be cancelled. Try again.", comment: "Message (account security screen)")
                 }
             } catch {
-                resetNote = (error as? ApiError)?.userMessage ?? "The reset could not be cancelled. Try again."
+                resetNote = (error as? ApiError)?.userMessage ?? String(localized: "The reset could not be cancelled. Try again.", comment: "Message (account security screen)")
             }
         }
     }
@@ -324,20 +336,20 @@ struct TwoFactorEnableView: View {
             onBack: onBack,
             illustration: "ill_sec_2fa",
             illustrationWidth: 180,
-            title: "Enable Two-Step Verification",
-            subtitle: "Add an extra layer of security to your account."
+            title: String(localized: "Enable Two-Step Verification", comment: "Screen title (two factor enable screen)"),
+            subtitle: String(localized: "Add an extra layer of security to your account.", comment: "Screen description under the title (two factor enable screen)")
         ) {
             InfoCard {
-                NeedRow(icon: "checkmark.shield", title: "More Protection", body: "Prevents unauthorized access, even if your password is compromised.")
+                NeedRow(icon: "checkmark.shield", title: String(localized: "More Protection", comment: "Feature row title (two factor enable screen)"), body: String(localized: "Prevents unauthorized access, even if your password is compromised.", comment: "Feature row description (two factor enable screen)"))
                 SecurityDivider()
-                NeedRow(icon: "iphone", title: "Use Your Phone", body: "We'll send a 6-digit code to your verified phone number.")
+                NeedRow(icon: "iphone", title: String(localized: "Use Your Phone", comment: "Feature row title (two factor enable screen)"), body: String(localized: "We'll send a 6-digit code to your verified phone number.", comment: "Feature row description (two factor enable screen)"))
                 SecurityDivider()
-                NeedRow(icon: "lock", title: "Easy to Manage", body: "You can turn it off anytime from account security settings.")
+                NeedRow(icon: "lock", title: String(localized: "Easy to Manage", comment: "Feature row title (two factor enable screen)"), body: String(localized: "You can turn it off anytime from account security settings.", comment: "Feature row description (two factor enable screen)"))
             }
             HStack(alignment: .top, spacing: 9) {
-                Image(systemName: "info.circle").font(.system(size: 14)).foregroundColor(GM.primarySolid)
+                Image(systemName: "info.circle").gmFont(14).foregroundColor(GM.primarySolid)
                 Text("You'll need a verified phone number to enable two-step verification.")
-                    .font(.system(size: 12))
+                    .gmFont(12)
                     .foregroundColor(GM.textSecondary)
                     .fixedSize(horizontal: false, vertical: true)
                 Spacer(minLength: 0)
@@ -347,8 +359,8 @@ struct TwoFactorEnableView: View {
             .padding(.top, 12)
         } footer: {
             VStack(spacing: 4) {
-                GradientButton(title: "Continue", action: onContinue)
-                AccountLink(title: "Cancel", action: onBack)
+                GradientButton(title: String(localized: "Continue", comment: "Button title (two factor enable screen)"), action: onContinue)
+                AccountLink(title: String(localized: "Cancel", comment: "Link-style button (two factor enable screen)"), action: onBack)
             }
         }
     }
@@ -370,12 +382,14 @@ private struct NeedRow: View {
     var body: some View {
         HStack(alignment: .top, spacing: 10) {
             Image(systemName: icon)
-                .font(.system(size: 14))
+                .gmFont(14)
                 .foregroundColor(GM.primarySolid)
                 .padding(.top, 2)
             VStack(alignment: .leading, spacing: 1) {
-                Text(title).font(.system(size: 13, weight: .semibold)).foregroundColor(GM.textPrimary)
-                Text(detail).font(.system(size: 12)).foregroundColor(GM.textSecondary)
+                Text(title).gmFont(13, .semibold).foregroundColor(GM.textPrimary)
+                    .fixedSize(horizontal: false, vertical: true)
+                Text(detail).gmFont(12).foregroundColor(GM.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             Spacer(minLength: 0)
         }
@@ -398,24 +412,25 @@ struct ConfirmPasswordView: View {
             onBack: onBack,
             illustration: "ill_sec_password_confirm",
             illustrationWidth: 150,
-            title: "Confirm Your Password",
-            subtitle: "Enter your password to continue."
+            title: String(localized: "Confirm Your Password", comment: "Screen title (confirm password screen)"),
+            subtitle: String(localized: "Enter your password to continue.", comment: "Screen description under the title (confirm password screen)")
         ) {
             AppTextField(
-                title: "Password",
+                title: String(localized: "Password", comment: "Text field label (confirm password screen)"),
                 value: $password,
                 error: error,
-                hint: "Enter your password",
-                isPassword: true
+                hint: String(localized: "Enter your password", comment: "Text field placeholder (confirm password screen)"),
+                isPassword: true,
+                contentType: .password
             )
         } footer: {
             VStack(spacing: 4) {
                 GradientButton(
-                    title: "Continue",
+                    title: String(localized: "Continue", comment: "Button title (confirm password screen)"),
                     enabled: !password.isEmpty,
                     busy: busy,
                     action: {
-                        guard let token = SessionStore.token else { error = "Sign in again."; return }
+                        guard let token = SessionStore.token else { error = String(localized: "Sign in again.", comment: "Message (confirm password screen)"); return }
                         busy = true; error = nil
                         Task {
                             do {
@@ -428,12 +443,12 @@ struct ConfirmPasswordView: View {
                                 onVerified()
                             } catch {
                                 busy = false
-                                self.error = apiMessage(error, fallback: "Could not complete the security request. Try again.")
+                                self.error = apiMessage(error, fallback: String(localized: "Could not complete the security request. Try again.", comment: "Error message shown when the server gives no reason (confirm password screen)"))
                             }
                         }
                     }
                 )
-                AccountLink(title: "Back", action: onBack)
+                AccountLink(title: String(localized: "Back", comment: "Link-style button (confirm password screen)"), action: onBack)
             }
         }
     }
@@ -442,6 +457,7 @@ struct ConfirmPasswordView: View {
 /// 05 — the code goes to the number already on the account; the factor is only
 /// switched on after the code is redeemed.
 struct VerifyPhoneView: View {
+    @Environment(\.dynamicTypeSize) private var dts
     let onBack: () -> Void
     let onAddPhone: () -> Void
     let onVerified: () -> Void
@@ -465,7 +481,7 @@ struct VerifyPhoneView: View {
             profile = loaded
             guard let number = loaded?.phone, !number.isEmpty else {
                 needsPhone = true
-                error = "Add a phone number first."
+                error = String(localized: "Add a phone number first.", comment: "Message (verify phone screen)")
                 return
             }
             let sent = try await ApiClient.startPhoneVerification(phone: number)
@@ -474,7 +490,7 @@ struct VerifyPhoneView: View {
                 expiresAt = Date(timeIntervalSince1970: Double(millis) / 1000)
             }
         } catch {
-            self.error = apiMessage(error, fallback: "Could not complete the security request. Try again.")
+            self.error = apiMessage(error, fallback: String(localized: "Could not complete the security request. Try again.", comment: "Error message shown when the server gives no reason (verify phone screen)"))
         }
     }
 
@@ -483,34 +499,39 @@ struct VerifyPhoneView: View {
             onBack: onBack,
             illustration: "ill_sec_phone",
             illustrationWidth: 170,
-            title: "Verify Your Phone",
-            subtitle: (profile?.phone).map { "We'll text a code to \($0)." }
-                ?? "We'll text a code to the number on this account."
+            title: String(localized: "Verify Your Phone", comment: "Screen title (verify phone screen)"),
+            subtitle: (profile?.phone).map { String(localized: "We'll text a code to \($0).", comment: "Screen description under the title (verify phone screen)") }
+                ?? String(localized: "We'll text a code to the number on this account.", comment: "Screen description under the title (verify phone screen)")
         ) {
             InfoCard {
-                HStack(spacing: 8) {
-                    Image(systemName: "iphone").font(.system(size: 14)).foregroundColor(GM.primarySolid)
-                    Text("Phone Number").font(.system(size: 13, weight: .medium)).foregroundColor(GM.textSecondary)
-                    Spacer()
-                    StatusChip(text: "Verified", tone: .success)
+                GMAdaptiveStack(spacing: 8) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "iphone").gmFont(14).foregroundColor(GM.primarySolid)
+                        Text("Phone Number").gmFont(13, .medium).foregroundColor(GM.textSecondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    if !dts.isAccessibilitySize { Spacer() }
+                    StatusChip(text: String(localized: "Verified", comment: "Status chip (verify phone screen)"), tone: .success)
                 }
                 Text(profile?.phone ?? "—")
-                    .font(.system(size: 16, weight: .semibold))
+                    .gmFont(16, .semibold)
                     .foregroundColor(GM.textPrimary)
                     .padding(.top, 4)
                 Text("Verification Code")
-                    .font(.system(size: 13, weight: .medium))
+                    .gmFont(13, .medium)
                     .foregroundColor(GM.textSecondary)
                     .padding(.top, 14)
                 CodeCells(length: 6, value: $code)
+                    // Round 8 — B: the code is offered above the keyboard.
+                    .textContentType(.oneTimeCode)
                     .padding(.top, 6)
             }
             CodeExpiry(expiresAt: expiresAt)
                 .padding(.top, 10)
             HStack(alignment: .top, spacing: 9) {
-                Image(systemName: "info.circle").font(.system(size: 14)).foregroundColor(GM.primarySolid)
+                Image(systemName: "info.circle").gmFont(14).foregroundColor(GM.primarySolid)
                 Text("Didn't receive the code? Check your spam folder or make sure your phone is on and has signal.")
-                    .font(.system(size: 12))
+                    .gmFont(12)
                     .foregroundColor(GM.textSecondary)
                     .fixedSize(horizontal: false, vertical: true)
                 Spacer(minLength: 0)
@@ -519,16 +540,16 @@ struct VerifyPhoneView: View {
             .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(GM.softFill))
             .padding(.top, 10)
             if let error {
-                Text(error).font(.system(size: 12)).foregroundColor(GM.error).padding(.top, 6)
+                Text(error).gmFont(12).foregroundColor(GM.error).padding(.top, 6)
             }
             if needsPhone {
-                AccountLink(title: "Add a phone number", action: onAddPhone)
+                AccountLink(title: String(localized: "Add a phone number", comment: "Link-style button (verify phone screen)"), action: onAddPhone)
             }
             if needsProof {
-                AccountLink(title: "Enter your password again", action: onBack)
+                AccountLink(title: String(localized: "Enter your password again", comment: "Link-style button (verify phone screen)"), action: onBack)
             }
             if needsPhoneProof {
-                AccountLink(title: "Send me a new code", action: {
+                AccountLink(title: String(localized: "Send me a new code", comment: "Link-style button (verify phone screen)"), action: {
                     needsPhoneProof = false
                     error = nil
                     Task { await send() }
@@ -537,7 +558,7 @@ struct VerifyPhoneView: View {
         } footer: {
             VStack(spacing: 4) {
                 GradientButton(
-                    title: "Continue",
+                    title: String(localized: "Continue", comment: "Button title (verify phone screen)"),
                     enabled: code.count == 6 && challengeId != nil,
                     busy: busy,
                     action: {
@@ -581,12 +602,12 @@ struct VerifyPhoneView: View {
                                 self.error = apiError.localizedDescription
                             } catch {
                                 busy = false
-                                self.error = apiMessage(error, fallback: "Could not complete the security request. Try again.")
+                                self.error = apiMessage(error, fallback: String(localized: "Could not complete the security request. Try again.", comment: "Error message shown when the server gives no reason (verify phone screen)"))
                             }
                         }
                     }
                 )
-                AccountLink(title: "Resend code", action: {
+                AccountLink(title: String(localized: "Resend code", comment: "Link-style button (verify phone screen)"), action: {
                     error = nil
                     Task { await send() }
                 })
@@ -606,26 +627,26 @@ struct TwoFactorEnabledView: View {
             onBack: onContinue,
             illustration: "ill_sec_2fa_on",
             illustrationWidth: 160,
-            title: "Two-Step Verification Enabled",
-            subtitle: "Your account is now protected with an extra layer of security."
+            title: String(localized: "Two-Step Verification Enabled", comment: "Screen title (two factor enabled screen)"),
+            subtitle: String(localized: "Your account is now protected with an extra layer of security.", comment: "Screen description under the title (two factor enabled screen)")
         ) {
-            StatusChip(text: "2-Step Verification Enabled", tone: .success)
+            StatusChip(text: String(localized: "2-Step Verification Enabled", comment: "Status chip (two factor enabled screen)"), tone: .success)
             InfoCard {
                 Text("What's Next?")
-                    .font(.system(size: 14, weight: .semibold))
+                    .gmFont(14, .semibold)
                     .foregroundColor(GM.textPrimary)
-                NeedRow(icon: "checkmark.shield", title: "Keep Backup Codes Safe", body: "Use them if you ever lose access to your phone.")
-                NeedRow(icon: "iphone", title: "Update Your Phone Number", body: "Keep it current so codes always reach you.")
+                NeedRow(icon: "checkmark.shield", title: String(localized: "Keep Backup Codes Safe", comment: "Feature row title (two factor enabled screen)"), body: String(localized: "Use them if you ever lose access to your phone.", comment: "Feature row description (two factor enabled screen)"))
+                NeedRow(icon: "iphone", title: String(localized: "Update Your Phone Number", comment: "Feature row title (two factor enabled screen)"), body: String(localized: "Keep it current so codes always reach you.", comment: "Feature row description (two factor enabled screen)"))
             }
             .padding(.top, 16)
             Text("You'll be asked for a code each time you sign in on a new device.")
-                .font(.system(size: 12))
+                .gmFont(12)
                 .foregroundColor(GM.textSecondary)
                 .padding(.top, 12)
         } footer: {
             VStack(spacing: 4) {
-                GradientButton(title: "Continue", action: onContinue)
-                AccountLink(title: "Back to Security Settings", action: onBackHome)
+                GradientButton(title: String(localized: "Continue", comment: "Button title (two factor enabled screen)"), action: onContinue)
+                AccountLink(title: String(localized: "Back to Security Settings", comment: "Link-style button (two factor enabled screen)"), action: onBackHome)
             }
         }
     }
@@ -645,20 +666,21 @@ struct DisableTwoFactorView: View {
             onBack: onBack,
             illustration: "ill_sec_2fa_off_confirm",
             illustrationWidth: 150,
-            title: "Disable Two-Step Verification?",
-            subtitle: "This will remove the extra layer of security from your account."
+            title: String(localized: "Disable Two-Step Verification?", comment: "Screen title (disable two factor screen)"),
+            subtitle: String(localized: "This will remove the extra layer of security from your account.", comment: "Screen description under the title (disable two factor screen)")
         ) {
             AppTextField(
-                title: "Password",
+                title: String(localized: "Password", comment: "Text field label (disable two factor screen)"),
                 value: $password,
                 error: error,
-                hint: "Enter your password",
-                isPassword: true
+                hint: String(localized: "Enter your password", comment: "Text field placeholder (disable two factor screen)"),
+                isPassword: true,
+                contentType: .password
             )
             HStack(alignment: .top, spacing: 9) {
-                Image(systemName: "checkmark.shield").font(.system(size: 14)).foregroundColor(GM.primarySolid)
+                Image(systemName: "checkmark.shield").gmFont(14).foregroundColor(GM.primarySolid)
                 Text("Disabling two-step verification will make your account less secure. You can enable it again anytime from Account Security settings.")
-                    .font(.system(size: 12))
+                    .gmFont(12)
                     .foregroundColor(GM.textSecondary)
                     .fixedSize(horizontal: false, vertical: true)
                 Spacer(minLength: 0)
@@ -669,7 +691,7 @@ struct DisableTwoFactorView: View {
         } footer: {
             VStack(spacing: 6) {
                 GradientButton(
-                    title: "Continue",
+                    title: String(localized: "Continue", comment: "Button title (disable two factor screen)"),
                     enabled: !password.isEmpty,
                     busy: busy,
                     action: {
@@ -682,12 +704,12 @@ struct DisableTwoFactorView: View {
                                 onDisabled()
                             } catch {
                                 busy = false
-                                self.error = apiMessage(error, fallback: "Could not complete the security request. Try again.")
+                                self.error = apiMessage(error, fallback: String(localized: "Could not complete the security request. Try again.", comment: "Error message shown when the server gives no reason (disable two factor screen)"))
                             }
                         }
                     }
                 )
-                AccountLink(title: "Back", action: onBack)
+                AccountLink(title: String(localized: "Back", comment: "Link-style button (disable two factor screen)"), action: onBack)
             }
         }
     }
@@ -703,24 +725,24 @@ struct TwoFactorDisabledView: View {
             onBack: onDone,
             illustration: "ill_sec_2fa_off",
             illustrationWidth: 160,
-            title: "Two-Step Verification Disabled",
-            subtitle: "Two-step verification has been disabled. Your account is now protected by your password only."
+            title: String(localized: "Two-Step Verification Disabled", comment: "Screen title (two factor disabled screen)"),
+            subtitle: String(localized: "Two-step verification has been disabled. Your account is now protected by your password only.", comment: "Screen description under the title (two factor disabled screen)")
         ) {
             InfoCard {
                 Text("What happens now?")
-                    .font(.system(size: 14, weight: .semibold))
+                    .gmFont(14, .semibold)
                     .foregroundColor(GM.textPrimary)
-                NeedRow(icon: "key", title: "Password Only", body: "Signing in no longer asks for a code.")
-                NeedRow(icon: "message", title: "Backup Codes Retired", body: "The codes you saved no longer apply.")
+                NeedRow(icon: "key", title: String(localized: "Password Only", comment: "Feature row title (two factor disabled screen)"), body: String(localized: "Signing in no longer asks for a code.", comment: "Feature row description (two factor disabled screen)"))
+                NeedRow(icon: "message", title: String(localized: "Backup Codes Retired", comment: "Feature row title (two factor disabled screen)"), body: String(localized: "The codes you saved no longer apply.", comment: "Feature row description (two factor disabled screen)"))
             }
             Text("You can turn two-step verification back on at any time from Account Security.")
-                .font(.system(size: 12))
+                .gmFont(12)
                 .foregroundColor(GM.textSecondary)
                 .padding(.top, 12)
         } footer: {
             VStack(spacing: 4) {
-                GradientButton(title: "Continue", action: onDone)
-                AccountLink(title: "Turn it back on", action: onSecureNow)
+                GradientButton(title: String(localized: "Continue", comment: "Button title (two factor disabled screen)"), action: onDone)
+                AccountLink(title: String(localized: "Turn it back on", comment: "Link-style button (two factor disabled screen)"), action: onSecureNow)
             }
         }
     }
@@ -740,31 +762,31 @@ struct GenerateBackupCodesView: View {
             onBack: onBack,
             illustration: "ill_sec_backup_generate",
             illustrationWidth: 180,
-            title: "Generate & Save Backup Codes",
-            subtitle: "Create one-time backup codes to access your account if you lose your phone."
+            title: String(localized: "Generate & Save Backup Codes", comment: "Screen title (generate backup codes screen)"),
+            subtitle: String(localized: "Create one-time backup codes to access your account if you lose your phone.", comment: "Screen description under the title (generate backup codes screen)")
         ) {
             InfoCard {
                 Text("What's Included")
-                    .font(.system(size: 14, weight: .semibold))
+                    .gmFont(14, .semibold)
                     .foregroundColor(GM.textPrimary)
-                NeedRow(icon: "number", title: "10 One-Time Codes", body: "Each code can be used once.")
-                NeedRow(icon: "lock", title: "Use When Needed", body: "Sign in when your phone is unavailable.")
-                NeedRow(icon: "checkmark.shield", title: "Each Code is Unique", body: "Generating a new set retires the old one.")
+                NeedRow(icon: "number", title: String(localized: "10 One-Time Codes", comment: "Feature row title (generate backup codes screen)"), body: String(localized: "Each code can be used once.", comment: "Feature row description (generate backup codes screen)"))
+                NeedRow(icon: "lock", title: String(localized: "Use When Needed", comment: "Feature row title (generate backup codes screen)"), body: String(localized: "Sign in when your phone is unavailable.", comment: "Feature row description (generate backup codes screen)"))
+                NeedRow(icon: "checkmark.shield", title: String(localized: "Each Code is Unique", comment: "Feature row title (generate backup codes screen)"), body: String(localized: "Generating a new set retires the old one.", comment: "Feature row description (generate backup codes screen)"))
             }
             Text("Store the codes somewhere only you can reach. Anyone with a code can pass your second factor.")
-                .font(.system(size: 12))
+                .gmFont(12)
                 .foregroundColor(GM.textSecondary)
                 .padding(.top, 12)
             if let error {
-                Text(error).font(.system(size: 12)).foregroundColor(GM.error).padding(.top, 6)
+                Text(error).gmFont(12).foregroundColor(GM.error).padding(.top, 6)
             }
         } footer: {
             VStack(spacing: 4) {
                 GradientButton(
-                    title: "Generate Codes",
+                    title: String(localized: "Generate Codes", comment: "Button title (generate backup codes screen)"),
                     busy: busy,
                     action: {
-                        guard let token = SessionStore.token else { error = "Sign in again."; return }
+                        guard let token = SessionStore.token else { error = String(localized: "Sign in again.", comment: "Message (generate backup codes screen)"); return }
                         busy = true; error = nil
                         Task {
                             do {
@@ -773,12 +795,12 @@ struct GenerateBackupCodesView: View {
                                 onGenerated(resp.newBackupCodes ?? [])
                             } catch {
                                 busy = false
-                                self.error = apiMessage(error, fallback: "Could not complete the security request. Try again.")
+                                self.error = apiMessage(error, fallback: String(localized: "Could not complete the security request. Try again.", comment: "Error message shown when the server gives no reason (generate backup codes screen)"))
                             }
                         }
                     }
                 )
-                AccountLink(title: "Cancel", action: onBack)
+                AccountLink(title: String(localized: "Cancel", comment: "Link-style button (generate backup codes screen)"), action: onBack)
             }
         }
     }
@@ -787,6 +809,8 @@ struct GenerateBackupCodesView: View {
 /// 08 — the only time the codes exist in readable form. The server keeps
 /// hashes, so there is no "view them again" path anywhere in the product.
 struct BackupCodesSavedView: View {
+    @Environment(\.dynamicTypeSize) private var dts
+    @ScaledMetric(relativeTo: .body) private var buttonHeight: CGFloat = 54
     let codes: [String]
     let onDone: () -> Void
 
@@ -797,31 +821,35 @@ struct BackupCodesSavedView: View {
     @State private var confirmed = false
     @State private var showLeave = false
 
-    private var grid: [[String]] { stride(from: 0, to: codes.count, by: 2).map { Array(codes[$0..<min($0 + 2, codes.count)]) } }
+    /// Two codes a row; one at the accessibility sizes, where two monospaced
+    /// codes no longer fit side by side.
+    private var perRow: Int { dts.isAccessibilitySize ? 1 : 2 }
+    private var grid: [[String]] { stride(from: 0, to: codes.count, by: perRow).map { Array(codes[$0..<min($0 + perRow, codes.count)]) } }
 
     var body: some View {
         AccountScreen(
             onBack: { if confirmed { onDone() } else { showLeave = true } },
             illustration: "ill_sec_backup_saved",
             illustrationWidth: 150,
-            title: "Backup Codes Saved",
-            subtitle: "Store these codes somewhere safe. They won't be shown again."
+            title: String(localized: "Backup Codes Saved", comment: "Screen title (backup codes saved screen)"),
+            subtitle: String(localized: "Store these codes somewhere safe. They won't be shown again.", comment: "Screen description under the title (backup codes saved screen)")
         ) {
             InfoCard {
-                HStack {
+                GMAdaptiveStack(spacing: dts.isAccessibilitySize ? 8 : nil) {
                     Text("Your Backup Codes")
-                        .font(.system(size: 14, weight: .semibold))
+                        .gmFont(14, .semibold)
                         .foregroundColor(GM.textPrimary)
-                    Spacer()
+                        .fixedSize(horizontal: false, vertical: true)
+                    if !dts.isAccessibilitySize { Spacer() }
                     Button(action: {
                         UIPasteboard.general.string = codes.joined(separator: "\n")
                         copied = true
                     }) {
                         HStack(spacing: 5) {
                             Image(systemName: copied ? "checkmark.circle" : "doc.on.doc")
-                                .font(.system(size: 12, weight: .semibold))
-                            Text(copied ? "Copied" : "Copy all")
-                                .font(.system(size: 12, weight: .semibold))
+                                .gmFont(12, .semibold)
+                            (copied ? Text("Copied") : Text("Copy all"))
+                                .gmFont(12, .semibold)
                         }
                         .foregroundColor(GM.primarySolid)
                     }
@@ -837,10 +865,12 @@ struct BackupCodesSavedView: View {
                                 Button { UIPasteboard.general.string = code; copiedCode = code } label: {
                                     HStack(spacing: 6) {
                                         Text(code)
-                                            .font(.system(size: 13, weight: .semibold, design: .monospaced))
+                                            .gmFont(13, .semibold, design: .monospaced)
                                             .foregroundColor(GM.textPrimary)
+                                            .lineLimit(1)
+                                            .minimumScaleFactor(0.7)
                                         Image(systemName: copiedCode == code ? "checkmark.circle" : "doc.on.doc")
-                                            .font(.system(size: 11))
+                                            .gmFont(11)
                                             .foregroundColor(GM.textTertiary)
                                         Spacer(minLength: 0)
                                     }
@@ -851,33 +881,35 @@ struct BackupCodesSavedView: View {
                                 }
                                 .buttonStyle(.plain)
                             }
-                            if pair.count == 1 { Spacer().frame(maxWidth: .infinity) }
+                            if pair.count == 1 && perRow == 2 { Spacer().frame(maxWidth: .infinity) }
                         }
                     }
                 }
             }
             InfoCard {
-                NeedRow(icon: "lock", title: "Store Safely", body: "Use a password manager or print them out.")
+                NeedRow(icon: "lock", title: String(localized: "Store Safely", comment: "Feature row title (backup codes saved screen)"), body: String(localized: "Use a password manager or print them out.", comment: "Feature row description (backup codes saved screen)"))
                 SecurityDivider()
-                NeedRow(icon: "nosign", title: "Don't Share", body: "Backup codes are for your eyes only.")
+                NeedRow(icon: "nosign", title: String(localized: "Don't Share", comment: "Feature row title (backup codes saved screen)"), body: String(localized: "Backup codes are for your eyes only.", comment: "Feature row description (backup codes saved screen)"))
                 SecurityDivider()
-                NeedRow(icon: "info.circle", title: "One Time Use", body: "Each code can only be used once.")
+                NeedRow(icon: "info.circle", title: String(localized: "One Time Use", comment: "Feature row title (backup codes saved screen)"), body: String(localized: "Each code can only be used once.", comment: "Feature row description (backup codes saved screen)"))
             }
             .padding(.top, 12)
             Text("Copy them into your password manager, or write them down.")
-                .font(.system(size: 12))
+                .gmFont(12)
                 .foregroundColor(GM.textSecondary)
+                .fixedSize(horizontal: false, vertical: true)
                 .padding(.top, 12)
             Button {
                 confirmed.toggle()
             } label: {
                 HStack(spacing: 10) {
                     Image(systemName: confirmed ? "checkmark.square.fill" : "square")
-                        .font(.system(size: 18))
+                        .gmFont(18)
                         .foregroundColor(confirmed ? GM.primarySolid : GM.textTertiary)
                     Text("I have saved these codes somewhere safe.")
-                        .font(.system(size: 13))
+                        .gmFont(13)
                         .foregroundColor(GM.textPrimary)
+                        .fixedSize(horizontal: false, vertical: true)
                     Spacer(minLength: 0)
                 }
             }
@@ -893,18 +925,21 @@ struct BackupCodesSavedView: View {
                     HStack(spacing: 6) {
                         Image(systemName: "square.and.arrow.down")
                         Text("Download Backup Codes")
+                            .multilineTextAlignment(.center)
                     }
-                    .font(.system(size: 16, weight: .semibold))
+                    .gmFont(16, .semibold)
                     .foregroundColor(.white)
+                    .padding(.horizontal, 12)
                     .frame(maxWidth: .infinity)
                     // Capped, not floored: a bare floor grows into any
                     // leftover a parent stack hands out (frame 76's Send
-                    // block, same class). 54 is the design's height.
-                    .frame(minHeight: 54, maxHeight: 54)
+                    // block, same class). 54 is the design's height at the
+                    // default text size; it scales with the label.
+                    .frame(minHeight: buttonHeight, maxHeight: buttonHeight)
                     .background(RoundedRectangle(cornerRadius: GMShape.button, style: .continuous).fill(GM.primarySolid))
                 }
-                GradientButton(title: "Done", enabled: confirmed, action: onDone)
-                FooterNote(text: "Each code can be used once. Generating new codes retires every code on this list.")
+                GradientButton(title: String(localized: "Done", comment: "Button title (backup codes saved screen)"), enabled: confirmed, action: onDone)
+                FooterNote(text: String(localized: "Each code can be used once. Generating new codes retires every code on this list.", comment: "Footer note (backup codes saved screen)"))
             }
         }
         .alert("These codes will not be shown again", isPresented: $showLeave) {
@@ -950,17 +985,17 @@ struct ChangePasswordView: View {
             onBack: onBack,
             illustration: afterSuspicious ? "ill_sec_password_after" : "ill_sec_password",
             illustrationWidth: afterSuspicious ? 180 : 150,
-            eyebrow: afterSuspicious ? "After Suspicious Activity" : nil,
-            title: afterSuspicious ? "Change Your Password" : "Change Password",
+            eyebrow: afterSuspicious ? String(localized: "After Suspicious Activity", comment: "Small label above the screen title (change password screen)") : nil,
+            title: afterSuspicious ? String(localized: "Change Your Password", comment: "Screen title (change password screen)") : String(localized: "Change Password", comment: "Screen title (change password screen)"),
             subtitle: afterSuspicious
-                ? "Your account was accessed from an unfamiliar device. To keep your GrapMail account secure, please update your password now."
-                : "Choose a strong password you have not used here before."
+                ? String(localized: "Your account was accessed from an unfamiliar device. To keep your GrapMail account secure, please update your password now.", comment: "Screen description under the title (change password screen)")
+                : String(localized: "Choose a strong password you have not used here before.", comment: "Screen description under the title (change password screen)")
         ) {
             if afterSuspicious {
                 HStack(alignment: .top, spacing: 9) {
-                    Image(systemName: "exclamationmark.triangle").font(.system(size: 14)).foregroundColor(GM.error)
+                    Image(systemName: "exclamationmark.triangle").gmFont(14).foregroundColor(GM.error)
                     Text("Unrecognized activity was found on your account.")
-                        .font(.system(size: 12))
+                        .gmFont(12)
                         .foregroundColor(GM.error)
                     Spacer(minLength: 0)
                 }
@@ -969,38 +1004,44 @@ struct ChangePasswordView: View {
                 .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(GM.error.opacity(0.35)))
                 .padding(.bottom, 14)
             }
-            AppTextField(title: "Current Password", value: $current, isPassword: true, leadingIcon: "lock")
-            AppTextField(title: "New Password", value: $next, isPassword: true, leadingIcon: "lock")
+            // Round 8 — B: the signed-in address, so the password manager
+            // updates this account's saved password.
+            if let username = SessionStore.address?.nilIfBlank() {
+                CredentialUsernameField(username: username)
+            }
+            AppTextField(title: String(localized: "Current Password", comment: "Text field label (change password screen)"), value: $current, isPassword: true, leadingIcon: "lock", contentType: .password)
+            AppTextField(title: String(localized: "New Password", comment: "Text field label (change password screen)"), value: $next, isPassword: true, leadingIcon: "lock", contentType: .newPassword)
                 .padding(.top, 12)
             AppTextField(
-                title: "Confirm New Password",
+                title: String(localized: "Confirm New Password", comment: "Text field label (change password screen)"),
                 value: $confirm,
-                error: (!confirm.isEmpty && !matches) ? "Passwords do not match." : nil,
+                error: (!confirm.isEmpty && !matches) ? String(localized: "Passwords do not match.", comment: "Text field error (change password screen)") : nil,
                 isPassword: true,
-                leadingIcon: "lock"
+                leadingIcon: "lock",
+                contentType: .newPassword
             )
             .padding(.top, 12)
             InfoCard {
                 Text("Password Requirements")
-                    .font(.system(size: 13, weight: .semibold))
+                    .gmFont(13, .semibold)
                     .foregroundColor(GM.textPrimary)
-                RuleLine(label: "At least 8 characters", met: longEnough)
-                RuleLine(label: "Contains a letter", met: hasLetter)
-                RuleLine(label: "Contains a number", met: hasNumber)
-                RuleLine(label: "Contains a symbol", met: hasSymbol)
+                RuleLine(label: String(localized: "At least 8 characters", comment: "Password requirement (change password screen)"), met: longEnough)
+                RuleLine(label: String(localized: "Contains a letter", comment: "Password requirement (change password screen)"), met: hasLetter)
+                RuleLine(label: String(localized: "Contains a number", comment: "Password requirement (change password screen)"), met: hasNumber)
+                RuleLine(label: String(localized: "Contains a symbol", comment: "Password requirement (change password screen)"), met: hasSymbol)
             }
             .padding(.top, 14)
             if let error {
-                Text(error).font(.system(size: 12)).foregroundColor(GM.error).padding(.top, 6)
+                Text(error).gmFont(12).foregroundColor(GM.error).padding(.top, 6)
             }
         } footer: {
             VStack(spacing: 4) {
                 GradientButton(
-                    title: afterSuspicious ? "Update Password" : "Change Password",
+                    title: afterSuspicious ? String(localized: "Update Password", comment: "Button title (change password screen)") : String(localized: "Change Password", comment: "Button title (change password screen)"),
                     enabled: !current.isEmpty && rulesMet && matches,
                     busy: busy,
                     action: {
-                        guard let token = SessionStore.token else { error = "Sign in again."; return }
+                        guard let token = SessionStore.token else { error = String(localized: "Sign in again.", comment: "Message (change password screen)"); return }
                         busy = true; error = nil
                         Task {
                             do {
@@ -1021,12 +1062,12 @@ struct ChangePasswordView: View {
                                 onChanged()
                             } catch {
                                 busy = false
-                                self.error = apiMessage(error, fallback: "Could not complete the security request. Try again.")
+                                self.error = apiMessage(error, fallback: String(localized: "Could not complete the security request. Try again.", comment: "Error message shown when the server gives no reason (change password screen)"))
                             }
                         }
                     }
                 )
-                AccountLink(title: "Back", action: onBack)
+                AccountLink(title: String(localized: "Back", comment: "Link-style button (change password screen)"), action: onBack)
             }
         }
     }
@@ -1044,24 +1085,24 @@ struct PasswordChangedView: View {
             onBack: onDone,
             illustration: updated ? "ill_sec_password_updated" : "ill_sec_password_ok",
             illustrationWidth: 170,
-            title: updated ? "Password Updated Successfully" : "Password Changed Successfully",
-            subtitle: "Your password has been updated successfully. Other devices were signed out; this one stays signed in."
+            title: updated ? String(localized: "Password Updated Successfully", comment: "Screen title (password changed screen)") : String(localized: "Password Changed Successfully", comment: "Screen title (password changed screen)"),
+            subtitle: String(localized: "Your password has been updated successfully. Other devices were signed out; this one stays signed in.", comment: "Screen description under the title (password changed screen)")
         ) {
             InfoCard {
                 Text("What's Next?")
-                    .font(.system(size: 14, weight: .semibold))
+                    .gmFont(14, .semibold)
                     .foregroundColor(GM.textPrimary)
-                NeedRow(icon: "lock", title: "This device stays signed in", body: "You can carry on where you are.")
+                NeedRow(icon: "lock", title: String(localized: "This device stays signed in", comment: "Feature row title (password changed screen)"), body: String(localized: "You can carry on where you are.", comment: "Feature row description (password changed screen)"))
                 NeedRow(
                     icon: "laptopcomputer.and.iphone",
-                    title: "Other devices are signed out",
-                    body: "You'll need to sign in again on them, including mobile apps, desktop, and other browsers."
+                    title: String(localized: "Other devices are signed out", comment: "Feature row title (password changed screen)"),
+                    body: String(localized: "You'll need to sign in again on them, including mobile apps, desktop, and other browsers.", comment: "Feature row description (password changed screen)")
                 )
             }
             HStack(alignment: .top, spacing: 9) {
-                Image(systemName: "info.circle").font(.system(size: 14)).foregroundColor(GM.primarySolid)
+                Image(systemName: "info.circle").gmFont(14).foregroundColor(GM.primarySolid)
                 Text("This helps keep your account secure and prevents unauthorized access.")
-                    .font(.system(size: 12))
+                    .gmFont(12)
                     .foregroundColor(GM.textSecondary)
                     .fixedSize(horizontal: false, vertical: true)
                 Spacer(minLength: 0)
@@ -1071,10 +1112,10 @@ struct PasswordChangedView: View {
             .padding(.top, 12)
         } footer: {
             VStack(spacing: 6) {
-                GradientButton(title: "Continue", action: onDone)
+                GradientButton(title: String(localized: "Continue", comment: "Button title (password changed screen)"), action: onDone)
                 FooterNote(
-                    text: "If you did not make this change, contact the support team immediately.",
-                    linkText: "support team",
+                    text: String(localized: "If you did not make this change, contact the support team immediately.", comment: "Footer note (password changed screen)"),
+                    linkText: String(localized: "support team", comment: "Tappable words in the footer note; must appear verbatim in the note's translation (password changed screen)"),
                     onLink: onSupport
                 )
             }
@@ -1095,30 +1136,30 @@ struct SignOutAllDevicesView: View {
             onBack: onBack,
             illustration: "ill_sec_signout_all",
             illustrationWidth: 180,
-            title: "Sign Out All Devices",
-            subtitle: "This will sign you out of all devices except this one."
+            title: String(localized: "Sign Out All Devices", comment: "Screen title (sign out all devices screen)"),
+            subtitle: String(localized: "This will sign you out of all devices except this one.", comment: "Screen description under the title (sign out all devices screen)")
         ) {
             InfoCard {
                 Text("You'll stay signed in here")
-                    .font(.system(size: 14, weight: .semibold))
+                    .gmFont(14, .semibold)
                     .foregroundColor(GM.textPrimary)
                 Text("Every other phone, tablet and browser is signed out immediately. This device keeps working, so you can carry on.")
-                    .font(.system(size: 13))
+                    .gmFont(13)
                     .foregroundColor(GM.textSecondary)
                     .fixedSize(horizontal: false, vertical: true)
                     .padding(.top, 6)
             }
             Text("Use this when a device is lost, borrowed or sold — not instead of changing a leaked password.")
-                .font(.system(size: 12))
+                .gmFont(12)
                 .foregroundColor(GM.textSecondary)
                 .padding(.top, 12)
             if let error {
-                Text(error).font(.system(size: 12)).foregroundColor(GM.error).padding(.top, 6)
+                Text(error).gmFont(12).foregroundColor(GM.error).padding(.top, 6)
             }
         } footer: {
             VStack(spacing: 4) {
                 GradientButton(
-                    title: "Sign Out All Devices",
+                    title: String(localized: "Sign Out All Devices", comment: "Button title (sign out all devices screen)"),
                     busy: busy,
                     action: {
                         guard let token = SessionStore.token else { return }
@@ -1142,12 +1183,12 @@ struct SignOutAllDevicesView: View {
                                 onDone()
                             } catch {
                                 busy = false
-                                self.error = apiMessage(error, fallback: "Could not complete the security request. Try again.")
+                                self.error = apiMessage(error, fallback: String(localized: "Could not complete the security request. Try again.", comment: "Error message shown when the server gives no reason (sign out all devices screen)"))
                             }
                         }
                     }
                 )
-                AccountLink(title: "Cancel", action: onBack)
+                AccountLink(title: String(localized: "Cancel", comment: "Link-style button (sign out all devices screen)"), action: onBack)
             }
         }
     }
@@ -1162,25 +1203,25 @@ struct SignedOutAllDevicesView: View {
             onBack: onDone,
             illustration: "ill_sec_signout_all_ok",
             illustrationWidth: 170,
-            title: "Signed Out of All Devices",
-            subtitle: "You have been signed out of all devices except this one."
+            title: String(localized: "Signed Out of All Devices", comment: "Screen title (signed out all devices screen)"),
+            subtitle: String(localized: "You have been signed out of all devices except this one.", comment: "Screen description under the title (signed out all devices screen)")
         ) {
             InfoCard {
                 Text("What happens next?")
-                    .font(.system(size: 14, weight: .semibold))
+                    .gmFont(14, .semibold)
                     .foregroundColor(GM.textPrimary)
                 Text("This device stays signed in. Every other device has to sign in again, and anyone who had a session can no longer read this mailbox.")
-                    .font(.system(size: 13))
+                    .gmFont(13)
                     .foregroundColor(GM.textSecondary)
                     .fixedSize(horizontal: false, vertical: true)
                     .padding(.top, 6)
             }
-            StatusChip(text: "Only this device is signed in", tone: .success)
+            StatusChip(text: String(localized: "Only this device is signed in", comment: "Status chip (signed out all devices screen)"), tone: .success)
                 .padding(.top, 12)
         } footer: {
             VStack(spacing: 6) {
-                GradientButton(title: "Continue", action: onDone)
-                FooterNote(text: "Anyone using this account on another device now needs your password again.")
+                GradientButton(title: String(localized: "Continue", comment: "Button title (signed out all devices screen)"), action: onDone)
+                FooterNote(text: String(localized: "Anyone using this account on another device now needs your password again.", comment: "Footer note (signed out all devices screen)"))
             }
         }
     }
@@ -1188,6 +1229,7 @@ struct SignedOutAllDevicesView: View {
 
 /// 15 — the real device list, current one marked.
 struct ManageSessionsView: View {
+    @Environment(\.dynamicTypeSize) private var dts
     let onBack: () -> Void
     let onRevoke: (SessionDto) -> Void
     let onRevokeAlert: (SessionDto) -> Void
@@ -1197,6 +1239,8 @@ struct ManageSessionsView: View {
     @State private var activeCount = 0
     @State private var loading = true
     @State private var error: String?
+    /// Bumped by Try again; drives the `.task(id:)` read below.
+    @State private var sessionsReload = 0
     /// The device behind an open alert gets the stronger confirmation (21)
     /// rather than the ordinary one (16): it is the device the person came here
     /// to deal with, and that copy names the activity.
@@ -1207,28 +1251,32 @@ struct ManageSessionsView: View {
             onBack: onBack,
             illustration: "ill_sec_sessions",
             illustrationWidth: 170,
-            title: "Manage Active Sessions",
-            subtitle: "Devices currently signed in to this account."
+            title: String(localized: "Manage Active Sessions", comment: "Screen title (manage sessions screen)"),
+            subtitle: String(localized: "Devices currently signed in to this account.", comment: "Screen description under the title (manage sessions screen)")
         ) {
             if loading {
-                Text("Loading sessions…").font(.system(size: 13)).foregroundColor(GM.textSecondary)
+                GMSkeletonList(rows: 3)
             } else if let error {
-                Text(error).font(.system(size: 13)).foregroundColor(GM.error)
+                Text(error).gmFont(13).foregroundColor(GM.error)
+                AccountLink(title: String(localized: "Try again"), action: { sessionsReload += 1 })
             } else if sessions.isEmpty {
-                Text("No sessions are recorded yet.").font(.system(size: 13)).foregroundColor(GM.textSecondary)
+                Text("No sessions are recorded yet.").gmFont(13).foregroundColor(GM.textSecondary)
             } else {
                 VStack(spacing: 10) {
                     // "N Active Sessions" + Revoke All, as the reference header. The
                     // count is the server's true total; Revoke All routes to the
                     // confirm screen, since signing out everywhere is a lock-out.
-                    HStack(spacing: 8) {
-                        Circle().fill(GM.success).frame(width: 8, height: 8)
-                        Text("\(activeCount) Active Sessions")
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundColor(GM.textPrimary)
-                        Spacer(minLength: 0)
+                    GMAdaptiveStack(spacing: 8) {
+                        HStack(spacing: 8) {
+                            Circle().fill(GM.success).frame(width: 8, height: 8)
+                            Text("\(activeCount) Active Sessions")
+                                .gmFont(14, .semibold)
+                                .foregroundColor(GM.textPrimary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        if !dts.isAccessibilitySize { Spacer(minLength: 0) }
                         Button(action: onSignOutAll) {
-                            Text("Revoke All").font(.system(size: 13, weight: .semibold)).foregroundColor(GM.primarySolid)
+                            Text("Revoke All").gmFont(13, .semibold).foregroundColor(GM.primarySolid)
                         }
                         .buttonStyle(.plain)
                     }
@@ -1241,11 +1289,11 @@ struct ManageSessionsView: View {
                     }
                 }
                 HStack(alignment: .top, spacing: 9) {
-                    Image(systemName: "info.circle").font(.system(size: 14)).foregroundColor(GM.primarySolid)
+                    Image(systemName: "info.circle").gmFont(14).foregroundColor(GM.primarySolid)
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("Keep Your Account Secure").font(.system(size: 13, weight: .semibold)).foregroundColor(GM.textPrimary)
+                        Text("Keep Your Account Secure").gmFont(13, .semibold).foregroundColor(GM.textPrimary)
                         Text("If you see a device you don't recognize, revoke the session immediately. This will prevent unauthorized access.")
-                            .font(.system(size: 12))
+                            .gmFont(12)
                             .foregroundColor(GM.textSecondary)
                             .fixedSize(horizontal: false, vertical: true)
                     }
@@ -1256,10 +1304,13 @@ struct ManageSessionsView: View {
                 .padding(.top, 12)
             }
         } footer: {
-            AccountLink(title: "Sign out all devices", action: onSignOutAll)
+            AccountLink(title: String(localized: "Sign out all devices", comment: "Link-style button (manage sessions screen)"), action: onSignOutAll)
         }
-        .task {
-            guard let token = SessionStore.token else { loading = false; return }
+        .task(id: sessionsReload) {
+            loading = true
+            error = nil
+            // No session is a failed read, not an empty list.
+            guard let token = SessionStore.token else { self.error = String(localized: "Sign in again."); loading = false; return }
             do {
                 let resp = try await ApiClient.sessions(token: token)
                 sessions = resp.sessions
@@ -1270,7 +1321,7 @@ struct ManageSessionsView: View {
                     flaggedDeviceId = activity.suspiciousEvent?.deviceId ?? ""
                 }
             } catch {
-                self.error = apiMessage(error, fallback: "Could not complete the security request. Try again.")
+                self.error = apiMessage(error, fallback: String(localized: "Could not complete the security request. Try again.", comment: "Error message shown when the server gives no reason (manage sessions screen)"))
             }
             loading = false
         }
@@ -1308,17 +1359,18 @@ struct RevokeSessionView: View {
             onBack: onBack,
             illustration: "ill_sec_session_revoke",
             illustrationWidth: 170,
-            title: "Revoke Session Access?",
-            subtitle: "This device will be signed out of your GrapMail account and will need to sign in again."
+            title: String(localized: "Revoke Session Access?", comment: "Screen title (revoke session screen)"),
+            subtitle: String(localized: "This device will be signed out of your GrapMail account and will need to sign in again.", comment: "Screen description under the title (revoke session screen)")
         ) {
             InfoCard {
                 HStack(spacing: 10) {
-                    Image(systemName: "laptopcomputer.and.iphone").font(.system(size: 15)).foregroundColor(GM.primarySolid)
+                    Image(systemName: "laptopcomputer.and.iphone").gmFont(15).foregroundColor(GM.primarySolid)
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("Device").font(.system(size: 12)).foregroundColor(GM.textSecondary)
-                        Text(device.isEmpty ? "That device" : device)
-                            .font(.system(size: 14, weight: .semibold))
+                        Text("Device").gmFont(12).foregroundColor(GM.textSecondary)
+                        Text(device.isEmpty ? String(localized: "That device", comment: "Session revocation: stands in for an unnamed device") : device)
+                            .gmFont(14, .semibold)
                             .foregroundColor(GM.textPrimary)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
                     Spacer(minLength: 0)
                 }
@@ -1326,16 +1378,16 @@ struct RevokeSessionView: View {
             CannotBeUndoneNote()
                 .padding(.top, 12)
             if let error {
-                Text(error).font(.system(size: 12)).foregroundColor(GM.error).padding(.top, 6)
+                Text(error).gmFont(12).foregroundColor(GM.error).padding(.top, 6)
             }
         } footer: {
             VStack(spacing: 6) {
                 GradientButton(
-                    title: "Revoke Session",
+                    title: String(localized: "Revoke Session", comment: "Button title (revoke session screen)"),
                     busy: busy,
                     action: { revoke() }
                 )
-                AccountLink(title: "Cancel", action: onBack)
+                AccountLink(title: String(localized: "Cancel", comment: "Link-style button (revoke session screen)"), action: onBack)
             }
         }
     }
@@ -1350,7 +1402,7 @@ struct RevokeSessionView: View {
                 onRevoked(device)
             } catch {
                 busy = false
-                self.error = apiMessage(error, fallback: "Could not complete the security request. Try again.")
+                self.error = apiMessage(error, fallback: String(localized: "Could not complete the security request. Try again.", comment: "Error message shown when the server gives no reason (revoke session screen)"))
             }
         }
     }
@@ -1373,19 +1425,21 @@ struct ConfirmSessionRevocationView: View {
             onBack: onBack,
             illustration: "ill_sec_revoke_confirm",
             illustrationWidth: 170,
-            eyebrow: "Suspicious Access Detected",
-            title: "Confirm Session Revocation",
-            subtitle: "This will immediately sign this session out and no longer have access to your GrapMail account."
+            eyebrow: String(localized: "Suspicious Access Detected", comment: "Small label above the screen title (confirm session revocation screen)"),
+            title: String(localized: "Confirm Session Revocation", comment: "Screen title (confirm session revocation screen)"),
+            subtitle: String(localized: "This will immediately sign this session out and no longer have access to your GrapMail account.", comment: "Screen description under the title (confirm session revocation screen)")
         ) {
             InfoCard {
                 HStack(alignment: .top, spacing: 9) {
-                    Image(systemName: "exclamationmark.triangle").font(.system(size: 14)).foregroundColor(GM.error)
+                    Image(systemName: "exclamationmark.triangle").gmFont(14).foregroundColor(GM.error)
                     VStack(alignment: .leading, spacing: 3) {
                         Text("Unverified activity")
-                            .font(.system(size: 13, weight: .semibold))
+                            .gmFont(13, .semibold)
                             .foregroundColor(GM.textPrimary)
-                        Text((device.isEmpty ? "" : device + " · ") + "This session showed activity that did not match your usual sign-in pattern.")
-                            .font(.system(size: 12))
+                        Text(device.isEmpty
+                             ? String(localized: "This session showed activity that did not match your usual sign-in pattern.", comment: "Session revocation: why the session is flagged")
+                             : String(localized: "\(device) · This session showed activity that did not match your usual sign-in pattern.", comment: "Session revocation: why the session is flagged; the argument is the device name"))
+                            .gmFont(12)
                             .foregroundColor(GM.textSecondary)
                             .fixedSize(horizontal: false, vertical: true)
                     }
@@ -1395,12 +1449,12 @@ struct ConfirmSessionRevocationView: View {
             CannotBeUndoneNote()
                 .padding(.top, 12)
             if let error {
-                Text(error).font(.system(size: 12)).foregroundColor(GM.error).padding(.top, 6)
+                Text(error).gmFont(12).foregroundColor(GM.error).padding(.top, 6)
             }
         } footer: {
             VStack(spacing: 6) {
                 GradientButton(
-                    title: "Revoke Session",
+                    title: String(localized: "Revoke Session", comment: "Button title (confirm session revocation screen)"),
                     busy: busy,
                     action: {
                         guard let token = SessionStore.token else { return }
@@ -1412,12 +1466,12 @@ struct ConfirmSessionRevocationView: View {
                                 onRevoked(device)
                             } catch {
                                 busy = false
-                                self.error = apiMessage(error, fallback: "Could not complete the security request. Try again.")
+                                self.error = apiMessage(error, fallback: String(localized: "Could not complete the security request. Try again.", comment: "Error message shown when the server gives no reason (confirm session revocation screen)"))
                             }
                         }
                     }
                 )
-                AccountLink(title: "Cancel", action: onBack)
+                AccountLink(title: String(localized: "Cancel", comment: "Link-style button (confirm session revocation screen)"), action: onBack)
             }
         }
     }
@@ -1433,22 +1487,22 @@ struct SessionRevokedView: View {
             onBack: onDone,
             illustration: "ill_sec_session_revoked",
             illustrationWidth: 170,
-            title: "Session Revoked Successfully",
-            subtitle: "The session has been revoked and this device can no longer access your account."
+            title: String(localized: "Session Revoked Successfully", comment: "Screen title (session revoked screen)"),
+            subtitle: String(localized: "The session has been revoked and this device can no longer access your account.", comment: "Screen description under the title (session revoked screen)")
         ) {
             InfoCard {
                 Text("Revoked Session")
-                    .font(.system(size: 14, weight: .semibold))
+                    .gmFont(14, .semibold)
                     .foregroundColor(GM.textPrimary)
-                Text(device.isEmpty ? "That device" : device)
-                    .font(.system(size: 14))
+                Text(device.isEmpty ? String(localized: "That device", comment: "Session revocation: stands in for an unnamed device") : device)
+                    .gmFont(14)
                     .foregroundColor(GM.textSecondary)
                     .padding(.top, 6)
             }
         } footer: {
             VStack(spacing: 6) {
-                GradientButton(title: "Done", action: onDone)
-                FooterNote(text: "The device will need your password to sign in again.")
+                GradientButton(title: String(localized: "Done", comment: "Button title (session revoked screen)"), action: onDone)
+                FooterNote(text: String(localized: "The device will need your password to sign in again.", comment: "Footer note (session revoked screen)"))
             }
         }
     }
@@ -1464,29 +1518,30 @@ struct SessionRevokedSuspiciousView: View {
             onBack: onDone,
             illustration: "ill_sec_revoked_suspicious",
             illustrationWidth: 170,
-            title: "Session Revoked Successfully",
-            subtitle: "The suspicious session has been revoked and can no longer access your GrapMail account."
+            title: String(localized: "Session Revoked Successfully", comment: "Screen title (session revoked suspicious screen)"),
+            subtitle: String(localized: "The suspicious session has been revoked and can no longer access your GrapMail account.", comment: "Screen description under the title (session revoked suspicious screen)")
         ) {
             InfoCard {
                 Text("Revoked Session Details")
-                    .font(.system(size: 14, weight: .semibold))
+                    .gmFont(14, .semibold)
                     .foregroundColor(GM.textPrimary)
                 HStack(spacing: 8) {
-                    Image(systemName: "checkmark.shield").font(.system(size: 14)).foregroundColor(GM.success)
+                    Image(systemName: "checkmark.shield").gmFont(14).foregroundColor(GM.success)
                     Text("This device is signed out")
-                        .font(.system(size: 13))
+                        .gmFont(13)
                         .foregroundColor(GM.textSecondary)
                 }
                 .padding(.top, 8)
-                Text(device.isEmpty ? "Unknown device" : device)
-                    .font(.system(size: 13, weight: .semibold))
+                Text(device.isEmpty ? String(localized: "Unknown device", comment: "Session card title when the device name is not known") : device)
+                    .gmFont(13, .semibold)
                     .foregroundColor(GM.textPrimary)
+                    .fixedSize(horizontal: false, vertical: true)
                     .padding(.top, 4)
             }
         } footer: {
             VStack(spacing: 6) {
-                GradientButton(title: "Done", action: onDone)
-                FooterNote(text: "Change your password too — a revoked session does not change a leaked one.")
+                GradientButton(title: String(localized: "Done", comment: "Button title (session revoked suspicious screen)"), action: onDone)
+                FooterNote(text: String(localized: "Change your password too — a revoked session does not change a leaked one.", comment: "Footer note (session revoked suspicious screen)"))
             }
         }
     }
@@ -1516,21 +1571,21 @@ struct SecurityActivityView: View {
             onBack: onBack,
             illustration: "ill_sec_activity",
             illustrationWidth: 150,
-            title: "Recent Security Activity",
-            subtitle: "Sign-ins and changes to your account, newest first."
+            title: String(localized: "Recent Security Activity", comment: "Screen title (security activity screen)"),
+            subtitle: String(localized: "Sign-ins and changes to your account, newest first.", comment: "Screen description under the title (security activity screen)")
         ) {
             if suspicious {
                 HStack(alignment: .top, spacing: 9) {
-                    Image(systemName: "exclamationmark.triangle").font(.system(size: 14)).foregroundColor(GM.error)
+                    Image(systemName: "exclamationmark.triangle").gmFont(14).foregroundColor(GM.error)
                     VStack(alignment: .leading, spacing: 4) {
                         Text("Unrecognized activity")
-                            .font(.system(size: 13, weight: .semibold))
+                            .gmFont(13, .semibold)
                             .foregroundColor(GM.error)
                         Text("A device signed in that this account had not used before.")
-                            .font(.system(size: 12))
+                            .gmFont(12)
                             .foregroundColor(GM.textSecondary)
                             .fixedSize(horizontal: false, vertical: true)
-                        AccountLink(title: "Review it now", action: onOpenAlert)
+                        AccountLink(title: String(localized: "Review it now", comment: "Link-style button (security activity screen)"), action: onOpenAlert)
                     }
                     Spacer(minLength: 0)
                 }
@@ -1540,11 +1595,12 @@ struct SecurityActivityView: View {
                 .padding(.bottom, 14)
             }
             if loading {
-                Text("Loading activity…").font(.system(size: 13)).foregroundColor(GM.textSecondary)
+                GMSkeletonList(rows: 4, avatar: false)
             } else if let error {
-                Text(error).font(.system(size: 13)).foregroundColor(GM.error)
+                Text(error).gmFont(13).foregroundColor(GM.error)
+                AccountLink(title: String(localized: "Try again"), action: { reload += 1 })
             } else if events.isEmpty {
-                Text("Nothing has happened on this account yet.").font(.system(size: 13)).foregroundColor(GM.textSecondary)
+                Text("Nothing has happened on this account yet.").gmFont(13).foregroundColor(GM.textSecondary)
             } else {
                 InfoCard {
                     ForEach(Array(events.enumerated()), id: \.element.id) { index, event in
@@ -1554,17 +1610,19 @@ struct SecurityActivityView: View {
                 }
             }
         } footer: {
-            AccountLink(title: "Manage active sessions", action: onOpenSessions)
+            AccountLink(title: String(localized: "Manage active sessions", comment: "Link-style button (security activity screen)"), action: onOpenSessions)
         }
         .task(id: reload) {
             loading = true
-            guard let token = SessionStore.token else { loading = false; return }
+            error = nil
+            // No session is a failed read, not an empty list.
+            guard let token = SessionStore.token else { self.error = String(localized: "Sign in again."); loading = false; return }
             do {
                 let resp = try await ApiClient.activity(token: token)
                 events = resp.events
                 suspicious = resp.suspicious
             } catch {
-                self.error = apiMessage(error, fallback: "Could not complete the security request. Try again.")
+                self.error = apiMessage(error, fallback: String(localized: "Could not complete the security request. Try again.", comment: "Error message shown when the server gives no reason (security activity screen)"))
             }
             loading = false
         }
@@ -1577,6 +1635,7 @@ struct SecurityActivityView: View {
 /// 19 — the alert itself: what happened, on which device, and two honest ways
 /// out.
 struct SuspiciousSignInAlertView: View {
+    @Environment(\.dynamicTypeSize) private var dts
     let onBack: () -> Void
     let onSecure: () -> Void
     let onThisWasMe: () -> Void
@@ -1590,50 +1649,50 @@ struct SuspiciousSignInAlertView: View {
             onBack: onBack,
             illustration: "ill_sec_alert",
             illustrationWidth: 170,
-            eyebrow: "Security Alert",
-            title: "Suspicious Sign-In Alert",
-            subtitle: "We noticed a sign-in to your account from a device we do not recognise."
+            eyebrow: String(localized: "Security Alert", comment: "Small label above the screen title (suspicious sign in alert screen)"),
+            title: String(localized: "Suspicious Sign-In Alert", comment: "Screen title (suspicious sign in alert screen)"),
+            subtitle: String(localized: "We noticed a sign-in to your account from a device we do not recognise.", comment: "Screen description under the title (suspicious sign in alert screen)")
         ) {
             InfoCard {
                 Text("Sign-in details")
-                    .font(.system(size: 14, weight: .semibold))
+                    .gmFont(14, .semibold)
                     .foregroundColor(GM.textPrimary)
                 if !loaded {
-                    Text("Checking your account\u{2026}").font(.system(size: 13)).foregroundColor(GM.textSecondary)
+                    Text("Checking your account\u{2026}").gmFont(13).foregroundColor(GM.textSecondary)
                 } else {
                     // Never a guess: with no event the honest answer is "not
                     // recorded" / "not available", not "Just now", which could push
                     // someone to revoke their own current device.
-                    detailRow("Device", event?.device.isEmpty == false ? event!.device : "Not recorded")
-                    detailRow("When", event.map { securityRelative($0.at) } ?? "Not available")
-                    detailRow("Address", event?.ip.isEmpty == false ? event!.ip : "Not recorded")
+                    detailRow("Device", event?.device.isEmpty == false ? event!.device : String(localized: "Not recorded", comment: "Security alert detail value when the server did not record it"))
+                    detailRow("When", event.map { securityRelative($0.at) } ?? String(localized: "Not available", comment: "Security alert detail value when it is unknown"))
+                    detailRow("Address", event?.ip.isEmpty == false ? event!.ip : String(localized: "Not recorded", comment: "Security alert detail value when the server did not record it"))
                     if event != nil {
-                        StatusChip(text: "Not recognised", tone: .warning)
+                        StatusChip(text: String(localized: "Not recognised", comment: "Status chip (suspicious sign in alert screen)"), tone: .warning)
                             .padding(.top, 8)
                     }
                 }
             }
-            CannotBeUndoneNote(text: "This wasn't you? Someone may have gained access to your account. Take action now to keep your data safe.")
+            CannotBeUndoneNote(text: String(localized: "This wasn't you? Someone may have gained access to your account. Take action now to keep your data safe.", comment: "Irreversible-action warning (suspicious sign in alert screen)"))
                 .padding(.top, 12)
         } footer: {
             VStack(spacing: 6) {
-                GradientButton(title: "Secure My Account", action: onSecure)
-                AccountLink(title: "This was me", action: {
+                GradientButton(title: String(localized: "Secure My Account", comment: "Button title (suspicious sign in alert screen)"), action: onSecure)
+                AccountLink(title: String(localized: "This was me", comment: "Link-style button (suspicious sign in alert screen)"), action: {
                     // Dismissing is a write, not a navigation. The old handler popped
                     // back whether the write landed or not, so a failed acknowledgement
                     // looked like success and the warning stayed lit on the next load.
-                    guard let token = SessionStore.token else { ackError = "Sign in again to record that."; return }
+                    guard let token = SessionStore.token else { ackError = String(localized: "Sign in again to record that.", comment: "Message (suspicious sign in alert screen)"); return }
                     Task {
                         do {
                             _ = try await ApiClient.acknowledgeActivity(token: token)
                             onThisWasMe()
                         } catch {
-                            ackError = apiMessage(error, fallback: "Could not complete the security request. Try again.")
+                            ackError = apiMessage(error, fallback: String(localized: "Could not complete the security request. Try again.", comment: "Error message shown when the server gives no reason (suspicious sign in alert screen)"))
                         }
                     }
                 })
                 if let ackError {
-                    Text(ackError).font(.system(size: 12)).foregroundColor(GM.error)
+                    Text(ackError).gmFont(12).foregroundColor(GM.error)
                 }
             }
         }
@@ -1646,12 +1705,18 @@ struct SuspiciousSignInAlertView: View {
         }
     }
 
-    private func detailRow(_ label: String, _ value: String) -> some View {
-        HStack {
-            Text(label).font(.system(size: 12)).foregroundColor(GM.textSecondary)
-            Spacer()
-            Text(value).font(.system(size: 13, weight: .semibold)).foregroundColor(GM.textPrimary)
+    private func detailRow(_ label: LocalizedStringKey, _ value: String) -> some View {
+        // Label left, value right; at the accessibility sizes the value goes
+        // under its label so neither is squeezed to a word per line.
+        GMAdaptiveStack(spacing: dts.isAccessibilitySize ? 2 : nil) {
+            Text(label).gmFont(12).foregroundColor(GM.textSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+            if !dts.isAccessibilitySize { Spacer() }
+            Text(value).gmFont(13, .semibold).foregroundColor(GM.textPrimary)
+                .multilineTextAlignment(dts.isAccessibilitySize ? .leading : .trailing)
+                .fixedSize(horizontal: false, vertical: true)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.vertical, 4)
     }
 }
@@ -1662,6 +1727,7 @@ struct SuspiciousSignInAlertView: View {
 /// a way back to the activity trail. Revoke is on-screen so the intruder is cut
 /// off from here, not behind the device list.
 struct SecureMyAccountView: View {
+    @Environment(\.dynamicTypeSize) private var dts
     let onBack: () -> Void
     let onChangePassword: () -> Void
     let onBackToActivity: () -> Void
@@ -1716,7 +1782,7 @@ struct SecureMyAccountView: View {
                 _ = try await ApiClient.revokeSession(token: token, id: session.id)
                 await load()
             } catch {
-                revokeError = apiMessage(error, fallback: "Could not complete the security request. Try again.")
+                revokeError = apiMessage(error, fallback: String(localized: "Could not complete the security request. Try again.", comment: "Error message shown when the server gives no reason (secure my account screen)"))
             }
             revokeBusy = false
         }
@@ -1727,41 +1793,41 @@ struct SecureMyAccountView: View {
             onBack: onBackToActivity,
             illustration: "ill_sec_secure",
             illustrationWidth: 170,
-            title: "Secure My Account",
-            subtitle: "We found a suspicious sign-in to your account. Review the details, revoke the access if it wasn't you, and change your password."
+            title: String(localized: "Secure My Account", comment: "Screen title (secure my account screen)"),
+            subtitle: String(localized: "We found a suspicious sign-in to your account. Review the details, revoke the access if it wasn't you, and change your password.", comment: "Screen description under the title (secure my account screen)")
         ) {
             if checking {
-                Text("Checking your account\u{2026}").font(.system(size: 13)).foregroundColor(GM.textSecondary)
+                Text("Checking your account\u{2026}").gmFont(13).foregroundColor(GM.textSecondary)
             } else {
                 InfoCard {
                     Text("Suspicious Sign-In Details")
-                        .font(.system(size: 14, weight: .semibold))
+                        .gmFont(14, .semibold)
                         .foregroundColor(GM.textPrimary)
                     // Location is the masked IP only — no GeoIP source, so no city is
                     // invented; the caption says so plainly.
-                    detailRowSecure("Location", alertIp.isEmpty ? "Not recorded" : alertIp, "Approximate location based on IP")
-                    detailRowSecure("Device", alertDevice.isEmpty ? "Not recorded" : alertDevice)
-                    detailRowSecure("Time", alertAt.map { securityAbsolute($0) } ?? "Not available", "Your local time")
+                    detailRowSecure("Location", alertIp.isEmpty ? String(localized: "Not recorded", comment: "Security alert detail value when the server did not record it") : alertIp, String(localized: "Approximate location based on IP", comment: "Security alert detail caption"))
+                    detailRowSecure("Device", alertDevice.isEmpty ? String(localized: "Not recorded", comment: "Security alert detail value when the server did not record it") : alertDevice)
+                    detailRowSecure("Time", alertAt.map { securityAbsolute($0) } ?? String(localized: "Not available", comment: "Security alert detail value when it is unknown"), String(localized: "Your local time", comment: "Security alert detail caption"))
                 }
-                CannotBeUndoneNote(text: "This looks suspicious. If this wasn't you, we recommend revoking the access and changing your password immediately.")
+                CannotBeUndoneNote(text: String(localized: "This looks suspicious. If this wasn't you, we recommend revoking the access and changing your password immediately.", comment: "Irreversible-action warning (secure my account screen)"))
                     .padding(.top, 12)
             }
         } footer: {
             VStack(spacing: 6) {
                 if flaggedSession != nil {
-                    GradientButton(title: "Revoke This Session", busy: revokeBusy, action: revokeFlagged)
+                    GradientButton(title: String(localized: "Revoke This Session", comment: "Button title (secure my account screen)"), busy: revokeBusy, action: revokeFlagged)
                     if let revokeError {
-                        Text(revokeError).font(.system(size: 12)).foregroundColor(GM.error)
+                        Text(revokeError).gmFont(12).foregroundColor(GM.error)
                     }
-                    OutlineActionButton(title: "Change Password", action: onChangePassword)
+                    OutlineActionButton(title: String(localized: "Change Password", comment: "Button title (secure my account screen)"), action: onChangePassword)
                 } else if !checking {
                     Text("That device is already signed out. Change your password to end any other session.")
-                        .font(.system(size: 12))
+                        .gmFont(12)
                         .foregroundColor(GM.textSecondary)
                         .multilineTextAlignment(.center)
-                    GradientButton(title: "Change Password", action: onChangePassword)
+                    GradientButton(title: String(localized: "Change Password", comment: "Button title (secure my account screen)"), action: onChangePassword)
                 }
-                AccountLink(title: "Back to Security Activity", action: onBackToActivity)
+                AccountLink(title: String(localized: "Back to Security Activity", comment: "Link-style button (secure my account screen)"), action: onBackToActivity)
             }
         }
         .task {
@@ -1769,18 +1835,23 @@ struct SecureMyAccountView: View {
         }
     }
 
-    private func detailRowSecure(_ label: String, _ value: String, _ caption: String? = nil) -> some View {
-        HStack(alignment: .top) {
+    private func detailRowSecure(_ label: LocalizedStringKey, _ value: String, _ caption: String? = nil) -> some View {
+        // At the accessibility sizes the value goes under its label.
+        GMAdaptiveStack(spacing: dts.isAccessibilitySize ? 2 : nil, verticalAlignment: .top) {
             VStack(alignment: .leading, spacing: 1) {
-                Text(label).font(.system(size: 12)).foregroundColor(GM.textSecondary)
+                Text(label).gmFont(12).foregroundColor(GM.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
                 if let caption {
-                    Text(caption).font(.system(size: 11)).foregroundColor(GM.textTertiary)
+                    Text(caption).gmFont(11).foregroundColor(GM.textTertiary)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
             }
-            Spacer()
-            Text(value).font(.system(size: 13, weight: .semibold)).foregroundColor(GM.textPrimary)
-                .multilineTextAlignment(.trailing)
+            if !dts.isAccessibilitySize { Spacer() }
+            Text(value).gmFont(13, .semibold).foregroundColor(GM.textPrimary)
+                .multilineTextAlignment(dts.isAccessibilitySize ? .leading : .trailing)
+                .fixedSize(horizontal: false, vertical: true)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.vertical, 4)
     }
 }

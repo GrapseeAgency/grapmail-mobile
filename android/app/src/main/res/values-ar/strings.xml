@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">GrapMail</string>
+    <string name="shortcut_compose_short">إنشاء رسالة</string>
+    <string name="shortcut_compose_long">كتابة رسالة جديدة في GrapMail</string>
+    <string name="shortcut_scheduled_short">الإرسال المجدول</string>
+    <string name="shortcut_scheduled_long">عرض الرسائل المنتظرة للإرسال وإلغاؤها</string>
+    <string name="shortcut_subscriptions_short">الاشتراكات</string>
+    <string name="shortcut_subscriptions_long">مراجعة المرسلين وإلغاء الاشتراك من مكان واحد</string>
+    <string name="notif_channel_new_mail">بريد جديد</string>
+    <string name="notif_channel_new_mail_desc">يُعلمك عندما يعثر فحص في الخلفية على رسائل لم تقرأها بعد. لا يستخدم GrapMail خدمة إشعارات فورية، لذا تأتي هذه الإشعارات من التطبيق نفسه حين يسأل الخادم عندما يوقظه النظام.</string>
+    <string name="notif_channel_security">تنبيهات الأمان</string>
+    <string name="notif_channel_security_desc">يُعلمك فور حدوث أي شيء لحسابك: تسجيل دخول من جهاز جديد، أو تغيير كلمة المرور، أو تغيير في الأجهزة الموثوقة. لا تُكتم هذه التنبيهات أبدًا خلال ساعات الهدوء.</string>
+    <string name="widget_description">البريد غير المقروء في لمحة: أعداد من فحوصات GrapMail في الخلفية</string>
+</resources>

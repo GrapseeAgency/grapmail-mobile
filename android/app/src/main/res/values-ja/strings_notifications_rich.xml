@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    values-ja/strings_notifications_rich.xml: translation of values/strings_notifications_rich.xml (same keys, same order).
+    Comments below are kept from the English source for context.
+-->
+<resources>
+    <!-- The notification action that copies a detected one-time sign-in code. -->
+    <string name="notif_rich_action_copy_code">コードをコピー</string>
+    <!-- Toast after the code was copied from the notification. The code itself is not repeated. -->
+    <string name="notif_rich_code_copied">コードをコピーしました</string>
+    <!-- Clipboard label for the copied code (shown by some keyboards/clipboard UIs). -->
+    <string name="notif_rich_code_clip_label">ログインコード</string>
+    <!-- Notification title with a code in front: %1$s is the code, %2$s the sender. -->
+    <string name="notif_rich_title_with_code">%1$s · %2$s</string>
+</resources>

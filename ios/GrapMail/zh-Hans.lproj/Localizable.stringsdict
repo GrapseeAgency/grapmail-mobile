@@ -1,0 +1,151 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>%lld unread</key>
+	<dict><key>NSStringLocalizedFormatKey</key><string>%#@n@</string><key>n</key>
+	<dict><key>NSStringFormatSpecTypeKey</key><string>NSStringPluralRuleType</string><key>NSStringFormatValueTypeKey</key><string>lld</string><key>other</key><string>%lld 封未读</string></dict></dict>
+	<key>%lld selected</key>
+	<dict><key>NSStringLocalizedFormatKey</key><string>%#@n@</string><key>n</key>
+	<dict><key>NSStringFormatSpecTypeKey</key><string>NSStringPluralRuleType</string><key>NSStringFormatValueTypeKey</key><string>lld</string><key>other</key><string>已选择 %lld 项</string></dict></dict>
+	<key>%lld messages</key>
+	<dict><key>NSStringLocalizedFormatKey</key><string>%#@n@</string><key>n</key>
+	<dict><key>NSStringFormatSpecTypeKey</key><string>NSStringPluralRuleType</string><key>NSStringFormatValueTypeKey</key><string>lld</string><key>other</key><string>%lld 封邮件</string></dict></dict>
+	<key>%lld new messages</key>
+	<dict><key>NSStringLocalizedFormatKey</key><string>%#@n@</string><key>n</key>
+	<dict><key>NSStringFormatSpecTypeKey</key><string>NSStringPluralRuleType</string><key>NSStringFormatValueTypeKey</key><string>lld</string><key>other</key><string>%lld 封新邮件</string></dict></dict>
+	<key>%lld Active Sessions</key>
+	<dict><key>NSStringLocalizedFormatKey</key><string>%#@n@</string><key>n</key>
+	<dict><key>NSStringFormatSpecTypeKey</key><string>NSStringPluralRuleType</string><key>NSStringFormatValueTypeKey</key><string>lld</string><key>other</key><string>%lld 个活跃会话</string></dict></dict>
+	<key>%lld codes unused.</key>
+	<dict><key>NSStringLocalizedFormatKey</key><string>%#@n@</string><key>n</key>
+	<dict><key>NSStringFormatSpecTypeKey</key><string>NSStringPluralRuleType</string><key>NSStringFormatValueTypeKey</key><string>lld</string><key>other</key><string>%lld 个验证码未使用。</string></dict></dict>
+	<key>%lld days ago</key>
+	<dict><key>NSStringLocalizedFormatKey</key><string>%#@n@</string><key>n</key>
+	<dict><key>NSStringFormatSpecTypeKey</key><string>NSStringPluralRuleType</string><key>NSStringFormatValueTypeKey</key><string>lld</string><key>other</key><string>%lld 天前</string></dict></dict>
+	<key>within %lld days</key>
+	<dict><key>NSStringLocalizedFormatKey</key><string>%#@n@</string><key>n</key>
+	<dict><key>NSStringFormatSpecTypeKey</key><string>NSStringPluralRuleType</string><key>NSStringFormatValueTypeKey</key><string>lld</string><key>other</key><string>%lld 天内</string></dict></dict>
+	<key>older than %lld days</key>
+	<dict><key>NSStringLocalizedFormatKey</key><string>%#@n@</string><key>n</key>
+	<dict><key>NSStringFormatSpecTypeKey</key><string>NSStringPluralRuleType</string><key>NSStringFormatValueTypeKey</key><string>lld</string><key>other</key><string>早于 %lld 天前</string></dict></dict>
+	<key>%lld remote images hidden</key>
+	<dict><key>NSStringLocalizedFormatKey</key><string>%#@n@</string><key>n</key>
+	<dict><key>NSStringFormatSpecTypeKey</key><string>NSStringPluralRuleType</string><key>NSStringFormatValueTypeKey</key><string>lld</string><key>other</key><string>已隐藏 %lld 张远程图片</string></dict></dict>
+	<key>Archived %lld messages</key>
+	<dict><key>NSStringLocalizedFormatKey</key><string>%#@n@</string><key>n</key>
+	<dict><key>NSStringFormatSpecTypeKey</key><string>NSStringPluralRuleType</string><key>NSStringFormatValueTypeKey</key><string>lld</string><key>other</key><string>已归档 %lld 封邮件</string></dict></dict>
+	<key>Moved %lld messages to Trash</key>
+	<dict><key>NSStringLocalizedFormatKey</key><string>%#@n@</string><key>n</key>
+	<dict><key>NSStringFormatSpecTypeKey</key><string>NSStringPluralRuleType</string><key>NSStringFormatValueTypeKey</key><string>lld</string><key>other</key><string>已将 %lld 封邮件移至已删除</string></dict></dict>
+	<key>Restored %lld messages</key>
+	<dict><key>NSStringLocalizedFormatKey</key><string>%#@n@</string><key>n</key>
+	<dict><key>NSStringFormatSpecTypeKey</key><string>NSStringPluralRuleType</string><key>NSStringFormatValueTypeKey</key><string>lld</string><key>other</key><string>已恢复 %lld 封邮件</string></dict></dict>
+	<key>Labelled %lld messages</key>
+	<dict><key>NSStringLocalizedFormatKey</key><string>%#@n@</string><key>n</key>
+	<dict><key>NSStringFormatSpecTypeKey</key><string>NSStringPluralRuleType</string><key>NSStringFormatValueTypeKey</key><string>lld</string><key>other</key><string>已为 %lld 封邮件添加标签</string></dict></dict>
+	<key>Snoozed %lld messages</key>
+	<dict><key>NSStringLocalizedFormatKey</key><string>%#@n@</string><key>n</key>
+	<dict><key>NSStringFormatSpecTypeKey</key><string>NSStringPluralRuleType</string><key>NSStringFormatValueTypeKey</key><string>lld</string><key>other</key><string>已暂停提醒 %lld 封邮件</string></dict></dict>
+	<key>%lld need a reply</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key><string>%#@n@</string>
+		<key>n</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key><string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key><string>lld</string>
+			<key>other</key><string>%lld 封待回复</string>
+		</dict>
+	</dict>
+	<key>%lld packages arriving</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key><string>%#@n@</string>
+		<key>n</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key><string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key><string>lld</string>
+			<key>other</key><string>%lld 个包裹在途</string>
+		</dict>
+	</dict>
+	<key>%lld sign-in codes</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key><string>%#@n@</string>
+		<key>n</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key><string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key><string>lld</string>
+			<key>other</key><string>%lld 个登录验证码</string>
+		</dict>
+	</dict>
+	<key>You handled %lld emails today.</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key><string>%#@n@</string>
+		<key>n</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key><string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key><string>lld</string>
+			<key>other</key><string>今天您处理了 %lld 封邮件。</string>
+		</dict>
+	</dict>
+	<key>%lld labels</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key><string>%#@n@</string>
+		<key>n</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key><string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key><string>lld</string>
+			<key>other</key><string>%lld 个标签</string>
+		</dict>
+	</dict>
+	<key>%lld waiting</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key><string>%#@n@</string>
+		<key>n</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key><string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key><string>lld</string>
+			<key>other</key><string>%lld 封待跟进</string>
+		</dict>
+	</dict>
+	<key>Delete %lld messages permanently?</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key><string>%#@n@</string>
+		<key>n</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key><string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key><string>lld</string>
+			<key>other</key><string>要永久删除 %lld 封邮件吗？</string>
+		</dict>
+	</dict>
+	<key>%lld senders in the selected messages</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key><string>%#@n@</string>
+		<key>n</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key><string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key><string>lld</string>
+			<key>other</key><string>所选邮件中有 %lld 位发件人</string>
+		</dict>
+	</dict>
+	<key>%lld muted conversations</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key><string>%#@n@</string>
+		<key>n</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key><string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key><string>lld</string>
+			<key>other</key><string>%lld 个已静音的会话</string>
+		</dict>
+	</dict>
+	<key>%lld followed conversations</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key><string>%#@n@</string>
+		<key>n</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key><string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key><string>lld</string>
+			<key>other</key><string>关注了 %lld 个会话</string>
+		</dict>
+	</dict>
+</dict>
+</plist>

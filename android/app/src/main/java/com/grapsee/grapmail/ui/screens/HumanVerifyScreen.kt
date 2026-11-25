@@ -61,6 +61,8 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.grapsee.grapmail.logic.SignUpViewModel
 import com.grapsee.grapmail.ui.theme.LocalPalette
+import androidx.compose.ui.res.stringResource
+import com.grapsee.grapmail.R
 
 private const val CHECKPOINT_PATH = "/verify/grapmail-mobile.html"
 private const val CHECKPOINT_URL = "https://grapsee.com$CHECKPOINT_PATH"
@@ -100,7 +102,7 @@ fun HumanVerifyScreen(vm: SignUpViewModel, onBack: () -> Unit, onDone: () -> Uni
             IconButton(onClick = {
                 if (showChallenge) showChallenge = false else onBack()
             }) {
-                Icon(Icons.AutoMirrored.Rounded.ArrowBack, "Back", tint = palette.textPrimary)
+                Icon(Icons.AutoMirrored.Rounded.ArrowBack, stringResource(R.string.acct_back), tint = palette.textPrimary)
             }
         }
 
@@ -163,16 +165,16 @@ fun HumanVerifyScreen(vm: SignUpViewModel, onBack: () -> Unit, onDone: () -> Uni
                     view.destroy()
                 },
             )
-            TextButton(onClick = { showChallenge = false }) { Text("Cancel verification") }
+            TextButton(onClick = { showChallenge = false }) { Text(stringResource(R.string.acct_cancel_verification)) }
         } else {
             Column(
                 Modifier.weight(1f).widthIn(max = 560.dp).fillMaxWidth()
                     .verticalScroll(rememberScrollState()).padding(horizontal = 24.dp, vertical = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(if (compact) 10.dp else 14.dp),
             ) {
-                Text("Verify your account", color = palette.textPrimary, fontSize = 30.sp,
+                Text(stringResource(R.string.acct_verify_your_account), color = palette.textPrimary, fontSize = 30.sp,
                     lineHeight = 36.sp, fontWeight = FontWeight.Bold)
-                Text("Complete a quick security check to continue.", color = palette.textSecondary,
+                Text(stringResource(R.string.acct_complete_a_quick_security_check_to), color = palette.textSecondary,
                     fontSize = 15.sp, lineHeight = 22.sp)
                 Column(
                     Modifier.fillMaxWidth().background(palette.card, RoundedCornerShape(24.dp))
@@ -182,7 +184,7 @@ fun HumanVerifyScreen(vm: SignUpViewModel, onBack: () -> Unit, onDone: () -> Uni
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     VerificationShield(if (compact) 62.dp else 84.dp)
-                    Text(if (verified) "Verification complete" else "Security check",
+                    Text(if (verified) stringResource(R.string.acct_verification_complete) else stringResource(R.string.acct_security_check),
                         color = palette.textPrimary, fontSize = 22.sp, fontWeight = FontWeight.SemiBold,
                         textAlign = TextAlign.Center,
                         modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite })
@@ -194,11 +196,11 @@ fun HumanVerifyScreen(vm: SignUpViewModel, onBack: () -> Unit, onDone: () -> Uni
                         ) {
                             if (state.humanVerifying) {
                                 CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
-                            } else Text(if (challengeError || state.humanVerifyError != null) "Try again" else "Verify I’m human")
+                            } else Text(if (challengeError || state.humanVerifyError != null) stringResource(R.string.acct_try_again) else stringResource(R.string.acct_verify_im_human))
                         }
-                        val error = if (challengeError) "The challenge couldn’t load. Please try again." else state.humanVerifyError
+                        val error = if (challengeError) stringResource(R.string.acct_the_challenge_couldnt_load_please) else state.humanVerifyError
                         if (error != null || state.humanVerifying) {
-                            Text(error ?: "Checking verification…",
+                            Text(error ?: stringResource(R.string.acct_checking_verification),
                                 color = if (error == null) palette.textSecondary else palette.error,
                                 textAlign = TextAlign.Center,
                                 modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite })
@@ -213,7 +215,7 @@ fun HumanVerifyScreen(vm: SignUpViewModel, onBack: () -> Unit, onDone: () -> Uni
                 colors = ButtonDefaults.buttonColors(containerColor = palette.primarySolid, contentColor = palette.onPrimary),
                 modifier = Modifier.widthIn(max = 560.dp).fillMaxWidth().padding(horizontal = 24.dp, vertical = 12.dp)
                     .heightIn(min = 48.dp).testTag("signup-verify-continue"),
-            ) { Text("Continue", fontWeight = FontWeight.SemiBold) }
+            ) { Text(stringResource(R.string.acct_continue), fontWeight = FontWeight.SemiBold) }
         }
     }
 }

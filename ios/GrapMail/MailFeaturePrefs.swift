@@ -13,7 +13,12 @@ final class MailFeaturePrefs {
 
     private let defaults: UserDefaults
 
+    /// The smart-features switch's UserDefaults key, public so a view can bind
+    /// it with `@AppStorage` and redraw the moment Settings flips it.
+    static let smartFeaturesKey = "grapmail.features.smartFeatures"
+
     private enum Key {
+        static let smartFeatures = MailFeaturePrefs.smartFeaturesKey
         static let readReceipts = "grapmail.features.readReceipts"
         static let trackerShield = "grapmail.features.trackerShield"
         static let remoteImages = "grapmail.features.allowRemoteImages"
@@ -29,6 +34,18 @@ final class MailFeaturePrefs {
     }
 
     // MARK: - The switches
+
+    /// The on-device smart features (Android's `smartFeaturesEnabled`, same
+    /// default: on). Mail settings → Mail intelligence → On-device
+    /// intelligence flips it; off hides the inbox category chips, the Good
+    /// morning card's "package arriving" count, the thread digest and action
+    /// cards, the smart reply strip and the compose Rewrite chip. Views that
+    /// must redraw on a change bind `smartFeaturesKey` with `@AppStorage`
+    /// (same key, same default).
+    var smartFeaturesEnabled: Bool {
+        get { defaults.object(forKey: Key.smartFeatures) as? Bool ?? true }
+        set { defaults.set(newValue, forKey: Key.smartFeatures) }
+    }
 
     /// Send a read receipt for incoming mail. Off until the person turns it
     /// on: a receipt is a statement about them, and the app does not make it

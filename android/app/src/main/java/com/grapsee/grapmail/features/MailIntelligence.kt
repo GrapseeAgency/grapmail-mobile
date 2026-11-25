@@ -1,5 +1,7 @@
 package com.grapsee.grapmail.features
 
+import com.grapsee.grapmail.R
+import com.grapsee.grapmail.ui.i18n.CoreStrings
 import java.util.Locale
 
 /**
@@ -25,11 +27,16 @@ import java.util.Locale
 // F07 — On-device categories & priority views
 // ---------------------------------------------------------------------------
 
-enum class MailCategory(val label: String) {
-    PEOPLE("People"),
-    TRANSACTIONS("Transactions"),
-    NOTICES("Notices"),
-    NEWSLETTERS("Newsletters")
+// The enum constant is the category id the classifier and the views key on;
+// only [label] is display text, and only it is localized.
+enum class MailCategory(private val labelRes: Int, private val englishLabel: String) {
+    PEOPLE(R.string.core_category_people, "People"),
+    TRANSACTIONS(R.string.core_category_transactions, "Transactions"),
+    NOTICES(R.string.core_category_notices, "Notices"),
+    NEWSLETTERS(R.string.core_category_newsletters, "Newsletters"),
+    ;
+
+    val label: String get() = CoreStrings.get(labelRes) { englishLabel }
 }
 
 data class CategoryDecision(
@@ -278,34 +285,34 @@ object SmartReplyEngine {
         val candidates = ArrayList<String>(6)
 
         if (thanks && !question) {
-            candidates.add("You're welcome — happy to help!")
-            candidates.add("Anytime. Thanks for reaching out!")
-            candidates.add("Glad I could help!")
+            candidates.add(CoreStrings.get(R.string.core_reply_welcome) { "You're welcome — happy to help!" })
+            candidates.add(CoreStrings.get(R.string.core_reply_anytime) { "Anytime. Thanks for reaching out!" })
+            candidates.add(CoreStrings.get(R.string.core_reply_glad) { "Glad I could help!" })
         }
 
         if (question && scheduling) {
-            candidates.add("That time works for me — see you then.")
-            candidates.add("Let me check my calendar and confirm shortly.")
-            candidates.add("Thanks for the invite — I'll be there.")
+            candidates.add(CoreStrings.get(R.string.core_reply_time_works) { "That time works for me — see you then." })
+            candidates.add(CoreStrings.get(R.string.core_reply_check_calendar) { "Let me check my calendar and confirm shortly." })
+            candidates.add(CoreStrings.get(R.string.core_reply_invite) { "Thanks for the invite — I'll be there." })
         } else if (question && yesNo) {
-            candidates.add("Yes, that works for me.")
-            candidates.add("No, sorry — not this time.")
-            candidates.add("Let me check and get back to you.")
+            candidates.add(CoreStrings.get(R.string.core_reply_yes) { "Yes, that works for me." })
+            candidates.add(CoreStrings.get(R.string.core_reply_no) { "No, sorry — not this time." })
+            candidates.add(CoreStrings.get(R.string.core_reply_check_back) { "Let me check and get back to you." })
         } else if (question) {
-            candidates.add("Good question — let me get back to you shortly.")
-            candidates.add("Sure, I'll look into it and reply soon.")
-            candidates.add("Will follow up with an answer by end of day.")
+            candidates.add(CoreStrings.get(R.string.core_reply_good_question) { "Good question — let me get back to you shortly." })
+            candidates.add(CoreStrings.get(R.string.core_reply_look_into) { "Sure, I'll look into it and reply soon." })
+            candidates.add(CoreStrings.get(R.string.core_reply_eod) { "Will follow up with an answer by end of day." })
         }
 
         if (urgent) {
-            candidates.add("Understood — I'll prioritize this today.")
-            candidates.add("On it — expect an update from me shortly.")
+            candidates.add(CoreStrings.get(R.string.core_reply_prioritize) { "Understood — I'll prioritize this today." })
+            candidates.add(CoreStrings.get(R.string.core_reply_on_it) { "On it — expect an update from me shortly." })
         }
 
         if (candidates.size < 3) {
-            candidates.add("Thanks for the note!")
-            candidates.add("Got it — thanks!")
-            candidates.add("Sounds good.")
+            candidates.add(CoreStrings.get(R.string.core_reply_thanks_note) { "Thanks for the note!" })
+            candidates.add(CoreStrings.get(R.string.core_reply_got_it) { "Got it — thanks!" })
+            candidates.add(CoreStrings.get(R.string.core_reply_sounds_good) { "Sounds good." })
         }
 
         val tuned = personalize(candidates, userVoice)
@@ -338,11 +345,14 @@ object SmartReplyEngine {
 // F10 — Compose assist: draft, rewrite, tone, proofread
 // ---------------------------------------------------------------------------
 
-enum class ComposeTone(val label: String) {
-    NEUTRAL("Neutral"),
-    PROFESSIONAL("Professional"),
-    FRIENDLY("Friendly"),
-    CONCISE("Concise"),
+enum class ComposeTone(private val labelRes: Int, private val englishLabel: String) {
+    NEUTRAL(R.string.core_tone_neutral, "Neutral"),
+    PROFESSIONAL(R.string.core_tone_professional, "Professional"),
+    FRIENDLY(R.string.core_tone_friendly, "Friendly"),
+    CONCISE(R.string.core_tone_concise, "Concise"),
+    ;
+
+    val label: String get() = CoreStrings.get(labelRes) { englishLabel }
 }
 
 data class ComposeDraft(val subject: String, val body: String)
@@ -396,40 +406,44 @@ object ComposeAssist {
 
     fun proofread(text: String): List<String> {
         val issues = ArrayList<String>()
-        if (Regex("[ \\t]{2,}").containsMatchIn(text)) issues.add("Double spaces could be removed.")
-        if (Regex("\\s+[,.!?;:]").containsMatchIn(text)) issues.add("Spaces before punctuation look off.")
-        if (Regex("""(?i)\b(\w+) \1\b""").containsMatchIn(text)) issues.add("A word appears twice in a row.")
-        if (Regex("(^|[.!?]\\s+)[a-z]").containsMatchIn(text)) issues.add("A sentence starts with a lowercase letter.")
+        if (Regex("[ \\t]{2,}").containsMatchIn(text)) issues.add(CoreStrings.get(R.string.core_proof_double_spaces) { "Double spaces could be removed." })
+        if (Regex("\\s+[,.!?;:]").containsMatchIn(text)) issues.add(CoreStrings.get(R.string.core_proof_space_before_punct) { "Spaces before punctuation look off." })
+        if (Regex("""(?i)\b(\w+) \1\b""").containsMatchIn(text)) issues.add(CoreStrings.get(R.string.core_proof_repeated_word) { "A word appears twice in a row." })
+        if (Regex("(^|[.!?]\\s+)[a-z]").containsMatchIn(text)) issues.add(CoreStrings.get(R.string.core_proof_lowercase_start) { "A sentence starts with a lowercase letter." })
         val tail = text.trimEnd()
         val last = tail.lastOrNull()
-        if (last != null && last.isLetterOrDigit()) issues.add("The message may be missing final punctuation.")
+        if (last != null && last.isLetterOrDigit()) issues.add(CoreStrings.get(R.string.core_proof_final_punct) { "The message may be missing final punctuation." })
         return issues
     }
 
     fun draft(prompt: String, tone: ComposeTone = ComposeTone.NEUTRAL): ComposeDraft {
-        val topic = prompt.trim().trimEnd('.').ifEmpty { "a quick note" }
+        // The keyword lists below are classification logic and stay English;
+        // only the subject and body text a person reads are localized. TOPIC is
+        // a literal token in every language's template (see strings_core.xml).
+        val topic = prompt.trim().trimEnd('.').ifEmpty { CoreStrings.get(R.string.core_draft_default_topic) { "a quick note" } }
         val lower = topic.lowercase(Locale.ROOT)
         val (subject, template) = when {
             listOf("meeting", "call", "sync", "catch up", "schedule").any { lower.contains(it) } ->
-                "Meeting request" to
-                    "I would like to set up a short meeting about TOPIC. Would you have time this week? I am happy to work around your calendar — just let me know what suits you."
+                CoreStrings.get(R.string.core_draft_meeting_subject) { "Meeting request" } to
+                    CoreStrings.get(R.string.core_draft_meeting_body) { "I would like to set up a short meeting about TOPIC. Would you have time this week? I am happy to work around your calendar — just let me know what suits you." }
             listOf("apolog", "sorry", "delay").any { lower.contains(it) } ->
-                "Apologies for the delay" to
-                    "I want to apologize for the delay regarding TOPIC. I am on it now and will update you as soon as there is news."
+                CoreStrings.get(R.string.core_draft_apology_subject) { "Apologies for the delay" } to
+                    CoreStrings.get(R.string.core_draft_apology_body) { "I want to apologize for the delay regarding TOPIC. I am on it now and will update you as soon as there is news." }
             listOf("follow up", "follow-up", "checking in", "reminder").any { lower.contains(it) } ->
-                "Following up" to
-                    "I wanted to follow up on TOPIC. Could you share an update when you get a chance?"
+                CoreStrings.get(R.string.core_draft_followup_subject) { "Following up" } to
+                    CoreStrings.get(R.string.core_draft_followup_body) { "I wanted to follow up on TOPIC. Could you share an update when you get a chance?" }
             lower.contains("thank") ->
-                "Thank you" to
-                    "Thank you — TOPIC. I really appreciate it."
+                CoreStrings.get(R.string.core_draft_thanks_subject) { "Thank you" } to
+                    CoreStrings.get(R.string.core_draft_thanks_body) { "Thank you — TOPIC. I really appreciate it." }
             listOf("invoice", "payment", "quote", "proposal").any { lower.contains(it) } ->
-                "Regarding your request" to
-                    "I am writing about TOPIC. I have attached what you need and am happy to answer any questions."
+                CoreStrings.get(R.string.core_draft_request_subject) { "Regarding your request" } to
+                    CoreStrings.get(R.string.core_draft_request_body) { "I am writing about TOPIC. I have attached what you need and am happy to answer any questions." }
             else ->
-                "Quick note" to
-                    "I wanted to reach out about TOPIC. Let me know your thoughts and I will follow up as needed."
+                CoreStrings.get(R.string.core_draft_note_subject) { "Quick note" } to
+                    CoreStrings.get(R.string.core_draft_note_body) { "I wanted to reach out about TOPIC. Let me know your thoughts and I will follow up as needed." }
         }
-        val body = "Hi,\n\n" + template.replace("TOPIC", topic) + "\n\nBest"
+        val body = CoreStrings.get(R.string.core_draft_greeting) { "Hi," } + "\n\n" +
+            template.replace("TOPIC", topic) + "\n\n" + CoreStrings.get(R.string.core_draft_signoff) { "Best" }
         return ComposeDraft(subject, transform(body, tone))
     }
 
@@ -451,8 +465,22 @@ object ComposeAssist {
         out = out.replace(Regex("(?i)\\bhey\\b"), "Hello")
         out = out.replace(Regex("(?i)^hi\\b"), "Dear")
         out = out.replace("!", ".")
-        if (!out.contains("regards", ignoreCase = true) && !out.contains("best,", ignoreCase = true)) {
-            out = out.trimEnd() + "\n\nBest regards"
+        // Respect a sign-off already on the last line instead of adding a
+        // second one: a casual "Best" / "Cheers" (e.g. the draft template's
+        // own sign-off) is upgraded in place; a formal one, or the localized
+        // draft sign-off, is kept as written.
+        val signed = out.trimEnd()
+        val lastLine = signed.substringAfterLast('\n').trim()
+        val multiLine = signed.contains('\n')
+        val casualSignOff = multiLine && Regex("(?i)^(?:best|cheers)[,.]?\$").matches(lastLine)
+        val formalSignOff = multiLine && (
+            Regex("(?i)^(?:(?:yours )?sincerely|yours truly|best wishes|respectfully)[,.]?\$").matches(lastLine) ||
+                lastLine.equals(CoreStrings.get(R.string.core_draft_signoff) { "Best" }, ignoreCase = true)
+            )
+        if (casualSignOff) {
+            out = signed.substring(0, signed.length - lastLine.length) + "Best regards"
+        } else if (!formalSignOff && !out.contains("regards", ignoreCase = true) && !out.contains("best,", ignoreCase = true)) {
+            out = signed + "\n\nBest regards"
         }
         return out
     }
@@ -460,12 +488,12 @@ object ComposeAssist {
     private fun friendly(text: String): String {
         var out = text
         out = out.replace(Regex("(?i)^dear\\b"), "Hi")
-        out = out.replace(Regex("(?i)\\bbest regards\\b"), "Best")
+        // Whole phrases first: "Kind regards" must become "Best", not "Kind Best".
+        out = out.replace(Regex("(?i)\\b(?:best|kind|warm|warmest)\\s+regards\\b"), "Best")
         out = out.replace(Regex("(?i)\\bsincerely\\b"), "Best")
         out = out.replace(Regex("(?i)\\bregards\\b"), "Best")
         out = out.replace(Regex("(?i)\\bthank you\\b"), "Thanks")
         out = out.replace(Regex("(?i)\\bplease be advised\\b"), "Quick heads-up")
-        out = out.replace(Regex("(?i)\\bkind regards\\b"), "Best")
         return out
     }
 
@@ -551,7 +579,9 @@ object NaturalSearch {
         var beforeDate: String? = null
         var afterDate: String? = null
 
-        val nameMatch = Regex("""(?:[Ff]rom) ([A-Z][a-z]+(?: [A-Z][a-z]+)?)""").find(q)
+        // The look-ahead keeps "from Bob@example.com" whole: a capitalised
+        // name that is really the local part of an address is not a name.
+        val nameMatch = Regex("""(?:[Ff]rom) ([A-Z][a-z]+(?: [A-Z][a-z]+)?)(?![\w.+-]*@)""").find(q)
         if (nameMatch != null) {
             from = nameMatch.groupValues[1]
             q = q.removeRange(nameMatch.range)
@@ -563,7 +593,10 @@ object NaturalSearch {
         consume("""\bin:([^\s]+)""")?.let { if (it.isNotEmpty()) label = it }
 
         if (from == null) {
-            consume("""\bfrom ([\w.+-]{3,})""")?.let { candidate ->
+            // '@' is part of the sender: "from bob@example.com" keeps the
+            // whole address; a plain name ("from bob") still matches.
+            consume("""\bfrom ([\w.+@-]{3,})""")?.let { raw ->
+                val candidate = raw.trimEnd('.')
                 val stopNames = setOf("the", "our", "my", "this", "that", "these", "those")
                 if (candidate.isNotEmpty() && !stopNames.contains(candidate.lowercase(Locale.ROOT))) {
                     from = candidate
@@ -578,19 +611,14 @@ object NaturalSearch {
         consume("""\bbefore:(\d{4}-\d{2}-\d{2})\b""")?.let { if (it.isNotEmpty()) beforeDate = it }
         consume("""\bafter:(\d{4}-\d{2}-\d{2})\b""")?.let { if (it.isNotEmpty()) afterDate = it }
 
-        if (consume("""\bin the last (\d{1,3}) days?\b""") != null) {
-            // handled below through a dedicated matcher for the numeric value
-        }
-        val lastDays = Regex("""(?i)\bin the last (\d{1,3}) days?\b""").find(question)
-        lastDays?.groupValues?.getOrNull(1)?.toIntOrNull()?.let { if (it > 0) afterDays = it }
-        val lastWeeks = Regex("""(?i)\b(?:past|last) (\d{1,3}) weeks?\b""").find(question)
-        lastWeeks?.groupValues?.getOrNull(1)?.toIntOrNull()?.let { if (it > 0) afterDays = it * 7 }
-        val lastMonths = Regex("""(?i)\b(?:past|last) (\d{1,3}) months?\b""").find(question)
-        lastMonths?.groupValues?.getOrNull(1)?.toIntOrNull()?.let { if (it > 0) afterDays = it * 30 }
-        val olderDays = Regex("""(?i)\bolder than (\d{1,3}) days?\b""").find(question)
-        olderDays?.groupValues?.getOrNull(1)?.toIntOrNull()?.let { if (it > 0) beforeDays = it }
-        val olderWeeks = Regex("""(?i)\bolder than (\d{1,3}) weeks?\b""").find(question)
-        olderWeeks?.groupValues?.getOrNull(1)?.toIntOrNull()?.let { if (it > 0) beforeDays = it * 7 }
+        // Each relative-date phrase is consumed (removed from the query) as it
+        // is read, so "past 2 weeks" sets the window and does NOT also become
+        // the free-text term. Later assignments win, as before.
+        consume("""\b(?:in the )?(?:last|past) (\d{1,3}) days?\b""")?.toIntOrNull()?.let { if (it > 0) afterDays = it }
+        consume("""\b(?:past|last) (\d{1,3}) weeks?\b""")?.toIntOrNull()?.let { if (it > 0) afterDays = it * 7 }
+        consume("""\b(?:past|last) (\d{1,3}) months?\b""")?.toIntOrNull()?.let { if (it > 0) afterDays = it * 30 }
+        consume("""\bolder than (\d{1,3}) days?\b""")?.toIntOrNull()?.let { if (it > 0) beforeDays = it }
+        consume("""\bolder than (\d{1,3}) weeks?\b""")?.toIntOrNull()?.let { if (it > 0) beforeDays = it * 7 }
 
         if (consume("""\btoday\b""") != null) { afterDays = 1; beforeDays = 0 }
         if (consume("""\byesterday\b""") != null) { afterDays = 2; beforeDays = 1 }
@@ -599,15 +627,18 @@ object NaturalSearch {
         if (consume("""\bthis month\b""") != null) { afterDays = 31; beforeDays = 0 }
         if (consume("""\blast month\b""") != null) { afterDays = 62; beforeDays = 31 }
 
-        consume("""\b(?:about|regarding) ([\w][\w'& -]{2,40})""")?.let { v ->
-            if (v.isNotEmpty() && subject == null) subject = cleanTopic(v)
-        }
-
+        // Flag phrases are consumed BEFORE the "about …" topic: the topic
+        // matcher takes up to 40 characters and would otherwise swallow
+        // "with attachments" / "unread" / "starred" that follow it.
         if (consume("""\bwith attachments?\b""") != null) attachment = true
         if (consume("""\bwith files?\b""") != null) attachment = true
         if (consume("""\bunread\b""") != null) unread = true
         if (consume("""\bstarr?ed\b""") != null) flagged = true
         if (consume("""\bflagged\b""") != null) flagged = true
+
+        consume("""\b(?:about|regarding) ([\w][\w'& -]{2,40})""")?.let { v ->
+            if (v.isNotEmpty() && subject == null) subject = cleanTopic(v)
+        }
 
         var rest = q
         val scaffolding = listOf(
@@ -622,22 +653,23 @@ object NaturalSearch {
         val text = rest.takeIf { it.length >= 2 }
 
         val parts = ArrayList<String>()
-        from?.let { parts.add("from $it") }
-        to?.let { parts.add("to $it") }
-        subject?.let { parts.add("about \"$it\"") }
-        label?.let { parts.add("in $it") }
-        if (unread == true) parts.add("unread")
-        if (flagged == true) parts.add("flagged")
-        if (attachment == true) parts.add("with attachments")
-        afterDays?.let { parts.add("newer than $it day(s)") }
-        beforeDays?.let { parts.add("older than $it day(s)") }
-        beforeDate?.let { parts.add("before $it") }
-        afterDate?.let { parts.add("after $it") }
-        text?.let { parts.add("matching \"$it\"") }
+        from?.let { parts.add(CoreStrings.get(R.string.core_nl_from, it) { "from $it" }) }
+        to?.let { parts.add(CoreStrings.get(R.string.core_nl_to, it) { "to $it" }) }
+        subject?.let { parts.add(CoreStrings.get(R.string.core_nl_about, it) { "about \"$it\"" }) }
+        label?.let { parts.add(CoreStrings.get(R.string.core_nl_in, it) { "in $it" }) }
+        if (unread == true) parts.add(CoreStrings.get(R.string.core_nl_unread) { "unread" })
+        if (flagged == true) parts.add(CoreStrings.get(R.string.core_nl_flagged) { "flagged" })
+        if (attachment == true) parts.add(CoreStrings.get(R.string.core_nl_with_attachments) { "with attachments" })
+        afterDays?.let { parts.add(CoreStrings.plural(R.plurals.core_nl_newer_than_days, it, it) { "newer than $it day(s)" }) }
+        beforeDays?.let { parts.add(CoreStrings.plural(R.plurals.core_nl_older_than_days, it, it) { "older than $it day(s)" }) }
+        beforeDate?.let { parts.add(CoreStrings.get(R.string.core_nl_before, it) { "before $it" }) }
+        afterDate?.let { parts.add(CoreStrings.get(R.string.core_nl_after, it) { "after $it" }) }
+        text?.let { parts.add(CoreStrings.get(R.string.core_nl_matching, it) { "matching \"$it\"" }) }
         val explanation = if (parts.isEmpty()) {
-            "No filters recognised — searching all mail."
+            CoreStrings.get(R.string.core_nl_no_filters) { "No filters recognised — searching all mail." }
         } else {
-            "Searching: " + parts.joinToString(", ")
+            val joined = parts.joinToString(CoreStrings.get(R.string.core_nl_list_separator) { ", " })
+            CoreStrings.get(R.string.core_nl_searching, joined) { "Searching: $joined" }
         }
 
         return NaturalSearchParse(

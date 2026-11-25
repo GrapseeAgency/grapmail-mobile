@@ -1,0 +1,34 @@
+/*
+  GrapMail — WelcomeBack string table (id). Translated from en.lproj/WelcomeBack.strings.
+  Keys are the English source text; keep them and their placeholders unchanged.
+*/
+
+/* MARK: - Welcome-back screen */
+"Continue as %@" = "Lanjutkan sebagai %@";
+"Signing in…" = "Sedang masuk…";
+"For your security, please sign in again." = "Demi keamanan Anda, silakan masuk lagi.";
+"You were signed out from another device." = "Anda dikeluarkan dari perangkat lain.";
+"You're offline. Connect to sign in." = "Anda sedang offline. Sambungkan untuk masuk.";
+"That password isn't right." = "Sandi itu salah.";
+"Use another account" = "Gunakan akun lain";
+"Remove from this device" = "Hapus dari perangkat ini";
+"Back" = "Kembali";
+"Address beginning %@, ending %@ at %@" = "Alamat berawalan %1$@, berakhiran %2$@, di %3$@";
+"Address beginning %@ at %@" = "Alamat berawalan %1$@, di %2$@";
+"Signed in as %@" = "Masuk sebagai %@";
+
+/* MARK: - Remove from this device */
+"Remove %@ from this device?" = "Hapus %@ dari perangkat ini?";
+"Your account and mail aren't affected. You'll need your address and password to sign in here again." = "Akun dan email Anda tidak terpengaruh. Anda memerlukan alamat dan sandi untuk masuk lagi di sini.";
+"Removed from this device" = "Dihapus dari perangkat ini";
+
+/* MARK: - Account chooser */
+"Choose an account" = "Pilih akun";
+"Signed out on this device" = "Sudah keluar di perangkat ini";
+"Continue as %@, %@" = "Lanjutkan sebagai %1$@, %2$@";
+"More options for %@" = "Opsi lain untuk %@";
+
+/* MARK: - Sign-out confirmation (account switcher) */
+"Sign out of %@?" = "Keluar dari %@?";
+"Also remove from this device" = "Hapus juga dari perangkat ini";
+"You'll need to type your address next time." = "Lain kali Anda perlu mengetik alamat Anda.";

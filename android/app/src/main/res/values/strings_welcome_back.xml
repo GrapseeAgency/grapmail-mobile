@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Round 8 — Workstream B: personal welcome-back sign-in (docs/design/round8-spec.md §2).
+    English only for now; the locale folders fall back to these until the next translation pass.
+    Code: ui/screens/account/WelcomeBackScreen.kt, ui/screens/account/AccountChooserScreen.kt,
+    ui/screens/account/SignOutConfirmDialog.kt, data/RememberedAccounts.kt.
+-->
+<resources>
+    <!-- Welcome-back: the primary button. %1$s: the person's first name (≤ 16 characters). -->
+    <string name="wb_continue_as">Continue as %1$s</string>
+    <!-- The primary button when no usable first name is known. -->
+    <string name="wb_continue">Continue</string>
+    <!-- The primary button while a sign-in is running. -->
+    <string name="wb_signing_in">Signing in…</string>
+    <string name="wb_use_another_account">Use another account</string>
+    <string name="wb_remove_from_device">Remove from this device</string>
+
+    <!-- The banner under the masked address, by why the account was signed out. -->
+    <string name="wb_reason_expired">For your security, please sign in again.</string>
+    <string name="wb_reason_revoked">You were signed out from another device.</string>
+
+    <!-- Password fallback (spec §2.3 rung 3). -->
+    <string name="wb_wrong_password">That password isn\'t right.</string>
+    <string name="wb_offline">You\'re offline. Connect to sign in.</string>
+    <!-- Toast after a passkey signed in a different account than the one shown. %1$s: that address. -->
+    <string name="wb_signed_in_as">Signed in as %1$s</string>
+
+    <!-- TalkBack for the masked address. The full address is never spoken.
+         %1$s: the visible first letters, spelled out; %2$s: the last visible letter; %3$s: the domain. -->
+    <string name="wb_address_spoken">Address beginning %1$s, ending %2$s at %3$s</string>
+    <!-- Same, for a short local part where no last letter is shown. %1$s: first letter; %2$s: domain. -->
+    <string name="wb_address_spoken_short">Address beginning %1$s at %2$s</string>
+
+    <!-- "Remove from this device" confirmation (spec §2.5). %1$s: first name, or the masked address. -->
+    <string name="wb_remove_title">Remove %1$s from this device?</string>
+    <string name="wb_remove_body">Your account and mail aren\'t affected. You\'ll need your address and password to sign in here again.</string>
+    <string name="wb_remove_confirm">Remove</string>
+    <string name="wb_cancel">Cancel</string>
+    <string name="wb_removed">Removed from this device</string>
+
+    <!-- Account chooser (spec §2.6). -->
+    <string name="wb_chooser_title">Choose an account</string>
+    <string name="wb_chooser_subtitle">Signed out on this device</string>
+    <!-- TalkBack for one chooser row. %1$s: display name; %2$s: the spoken masked address. -->
+    <string name="wb_chooser_row_description">Continue as %1$s, %2$s</string>
+    <!-- TalkBack for a row's overflow button. %1$s: display name. -->
+    <string name="wb_chooser_more_options">More options for %1$s</string>
+
+    <!-- Sign-out confirmation with the "also remove" choice (spec §2.4). %1$s: the account's address. -->
+    <string name="wb_signout_title">Sign out of %1$s?</string>
+    <string name="wb_signout_also_remove">Also remove from this device</string>
+    <string name="wb_signout_also_remove_helper">You\'ll need to type your address next time.</string>
+    <string name="wb_signout_confirm">Sign out</string>
+</resources>

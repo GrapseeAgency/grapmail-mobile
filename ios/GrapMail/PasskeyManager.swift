@@ -67,7 +67,7 @@ enum PasskeyManager {
 
         var errorDescription: String? {
             switch self {
-            case .cancelled: return "Passkey sign-in was cancelled."
+            case .cancelled: return String(localized: "Passkey sign-in was cancelled.", comment: "Passkey error: the person closed the sheet")
             case let .failed(message): return message
             }
         }
@@ -91,10 +91,10 @@ enum PasskeyManager {
     @MainActor
     static func register(options: PasskeyRegistrationOptions) async throws -> Registration {
         guard let challengeBytes = options.challenge.dataFromBase64Url() else {
-            throw PasskeyError.failed("The passkey challenge was unreadable. Try again.")
+            throw PasskeyError.failed(String(localized: "The passkey challenge was unreadable. Try again.", comment: "Passkey error"))
         }
         guard let userIdBytes = options.user.id.dataFromBase64Url() else {
-            throw PasskeyError.failed("The passkey account reference was unreadable. Try again.")
+            throw PasskeyError.failed(String(localized: "The passkey account reference was unreadable. Try again.", comment: "Passkey error"))
         }
         let rpId = options.rp.id.nilIfBlank() ?? relyingPartyIdentifier
         let provider = ASAuthorizationPlatformPublicKeyCredentialProvider(relyingPartyIdentifier: rpId)
@@ -106,7 +106,7 @@ enum PasskeyManager {
         let authorization = try await perform(request)
         guard let credential = authorization.credential as? ASAuthorizationPlatformPublicKeyCredentialRegistration,
               let attestationObject = credential.rawAttestationObject else {
-            throw PasskeyError.failed("The passkey could not be created on this device.")
+            throw PasskeyError.failed(String(localized: "The passkey could not be created on this device.", comment: "Passkey error"))
         }
         return Registration(
             credentialId: credential.credentialID.base64UrlEncodedString(),
@@ -124,14 +124,14 @@ enum PasskeyManager {
     @MainActor
     static func assertion(options: PasskeyAuthenticationOptions) async throws -> Assertion {
         guard let challengeBytes = options.challenge.dataFromBase64Url() else {
-            throw PasskeyError.failed("The passkey challenge was unreadable. Try again.")
+            throw PasskeyError.failed(String(localized: "The passkey challenge was unreadable. Try again.", comment: "Passkey error"))
         }
         let rpId = options.rpId?.nilIfBlank() ?? relyingPartyIdentifier
         let provider = ASAuthorizationPlatformPublicKeyCredentialProvider(relyingPartyIdentifier: rpId)
         let request = provider.createCredentialAssertionRequest(challenge: challengeBytes)
         let authorization = try await perform(request)
         guard let credential = authorization.credential as? ASAuthorizationPlatformPublicKeyCredentialAssertion else {
-            throw PasskeyError.failed("The passkey response was not a platform credential.")
+            throw PasskeyError.failed(String(localized: "The passkey response was not a platform credential.", comment: "Passkey error"))
         }
         // `userID` is the credential's user handle — the same bytes the
         // registration request carried as `userID`. nil-safe: a credential
@@ -196,7 +196,7 @@ private final class ControllerSession: NSObject, ASAuthorizationControllerDelega
         if let authError = error as? ASAuthorizationError, authError.code == .canceled {
             passkeyError = .cancelled
         } else {
-            passkeyError = .failed("Passkey sign-in failed. Try again.")
+            passkeyError = .failed(String(localized: "Passkey sign-in failed. Try again.", comment: "Passkey error"))
         }
         continuation?.resume(throwing: passkeyError)
         continuation = nil

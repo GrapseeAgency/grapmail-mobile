@@ -1,5 +1,8 @@
 package com.grapsee.grapmail.ui.components
 
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
 import android.content.Intent
 import android.net.Uri
 import androidx.compose.foundation.background
@@ -28,6 +31,8 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.res.stringResource
+import com.grapsee.grapmail.R
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -43,21 +48,29 @@ import com.grapsee.grapmail.ui.theme.LocalPalette
 fun RequiredUpdateScreen() {
     val palette = LocalPalette.current
     val context = LocalContext.current
+    // Scrolls (a landscape phone at 200% text cannot fit it otherwise, and the
+    // Update button is the only way forward), and stays centred both ways:
+    // the scroll keeps the viewport as its minimum height. The column is
+    // capped so a tablet or desktop window does not stretch the button.
+    val short = gmIsShortWindow()
     Column(
-        Modifier.fillMaxSize().background(palette.bg).padding(32.dp).testTag("gm-update-required"),
+        Modifier.fillMaxSize().background(palette.bg).verticalScroll(rememberScrollState())
+            .padding(horizontal = 32.dp, vertical = if (short) 16.dp else 32.dp)
+            .testTag("gm-update-required"),
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
+      Column(Modifier.widthIn(max = GMLayout.Form), horizontalAlignment = Alignment.CenterHorizontally) {
         Icon(Icons.Rounded.SystemUpdate, null, tint = palette.primarySolid, modifier = Modifier.size(48.dp))
-        Spacer(Modifier.height(20.dp))
-        Text("Update GrapMail to continue", fontSize = 20.sp, fontWeight = FontWeight.Bold,
+        Spacer(Modifier.height(if (short) 12.dp else 20.dp))
+        Text(stringResource(R.string.mail_update_required_title), fontSize = 20.sp, fontWeight = FontWeight.Bold,
             color = palette.textPrimary, textAlign = TextAlign.Center)
         Spacer(Modifier.height(10.dp))
-        Text("This version is no longer supported. Your mail is safe; the new version opens it right where you left it.",
+        Text(stringResource(R.string.mail_update_required_body),
             fontSize = 14.sp, lineHeight = 20.sp, color = palette.textSecondary, textAlign = TextAlign.Center)
         Spacer(Modifier.height(24.dp))
         val storeUrl = com.grapsee.grapmail.logic.RemoteConfig.config.value.storeUrls.android
-        GradientButton("Update now", onClick = {
+        GradientButton(stringResource(R.string.mail_update_now), onClick = {
             if (storeUrl.isNotBlank() && runCatching {
                     context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(storeUrl)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
                 }.isSuccess) return@GradientButton
@@ -70,6 +83,7 @@ fun RequiredUpdateScreen() {
                 }
             }
         })
+      }
     }
 }
 
@@ -78,7 +92,8 @@ fun RequiredUpdateScreen() {
 fun ServerNoticeBanner(text: String, warning: Boolean, onDismiss: () -> Unit) {
     val palette = LocalPalette.current
     Row(
-        Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp)
+        // Capped and centred on wide windows; unchanged on phones.
+        Modifier.gmMaxWidth(GMLayout.Readable).padding(horizontal = 12.dp, vertical = 4.dp)
             .clip(RoundedCornerShape(12.dp))
             .background(if (warning) palette.warnChipBg else palette.softFill)
             .padding(horizontal = 12.dp, vertical = 10.dp)
@@ -91,6 +106,6 @@ fun ServerNoticeBanner(text: String, warning: Boolean, onDismiss: () -> Unit) {
         Spacer(Modifier.width(10.dp))
         Text(text, fontSize = 13.sp, color = if (warning) palette.warnInk else palette.textPrimary,
             modifier = Modifier.weight(1f))
-        androidx.compose.material3.TextButton(onClick = onDismiss) { Text("OK") }
+        androidx.compose.material3.TextButton(onClick = onDismiss) { Text(stringResource(R.string.mail_common_ok)) }
     }
 }

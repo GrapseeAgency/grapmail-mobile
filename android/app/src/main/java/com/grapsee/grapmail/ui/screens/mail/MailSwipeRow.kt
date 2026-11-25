@@ -3,6 +3,7 @@ package com.grapsee.grapmail.ui.screens.mail
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.AnimationSpec
 import androidx.compose.animation.core.CubicBezierEasing
+import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
@@ -16,6 +17,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -38,6 +40,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
@@ -45,6 +48,16 @@ import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.MarkEmailRead
+import androidx.compose.material.icons.rounded.MarkEmailUnread
+import androidx.compose.material.icons.rounded.MoveToInbox
+import androidx.compose.material.icons.rounded.Snooze
+import androidx.compose.material.icons.rounded.Star
+import androidx.compose.material.icons.rounded.StarBorder
+import androidx.compose.ui.graphics.vector.ImageVector
+import com.grapsee.grapmail.ui.components.GMMotion
+import com.grapsee.grapmail.ui.components.rememberMotionReduced
 import com.grapsee.grapmail.ui.theme.LocalPalette
 import kotlin.math.abs
 import kotlin.math.sign
@@ -60,6 +73,14 @@ internal fun SwipeableMessageRow(
     onTrailing: () -> Unit,
     modifier: Modifier = Modifier,
     restoresToInbox: Boolean = false,
+    /**
+     * What each side draws (Settings → Swipe actions, MailSwipePrefs). Null
+     * keeps the original pair: archive (or restore, with [restoresToInbox])
+     * on the right, trash on the left. The commit threshold, the pop and the
+     * row's travel are the same for every action.
+     */
+    leadingGlyph: SwipeGlyph? = null,
+    trailingGlyph: SwipeGlyph? = null,
     content: @Composable () -> Unit,
 ) {
     val scope = rememberCoroutineScope()
@@ -71,6 +92,24 @@ internal fun SwipeableMessageRow(
     var rawOffset by remember { mutableFloatStateOf(0f) }
     var committing by remember { mutableStateOf(false) }
     var animation by remember { mutableStateOf<Job?>(null) }
+
+    // Drawing only: the commit threshold by the same formula the gesture
+    // uses below (which stays the one that decides), so the action behind
+    // the row can say "release now" exactly when releasing would commit.
+    val reduced = rememberMotionReduced()
+    val threshold = with(density) { (width * 0.31f).coerceIn(84.dp.toPx(), 126.dp.toPx()) }
+    val arm = if (width > 0f) (abs(offset) / threshold).coerceIn(0f, 1f) else 0f
+    val armed = width > 0f && abs(offset) >= threshold
+    // One small pop as the drag crosses the threshold; nothing while resting.
+    val pop = remember { Animatable(1f) }
+    LaunchedEffect(armed) {
+        if (armed && !reduced) {
+            pop.animateTo(1.18f, tween(90, easing = GMMotion.EmphasizedDecelerate))
+            pop.animateTo(1f, spring(dampingRatio = 0.6f, stiffness = Spring.StiffnessMedium))
+        } else {
+            pop.snapTo(1f)
+        }
+    }
 
     fun release(commit: Boolean) {
         animation?.cancel()
@@ -138,6 +177,13 @@ internal fun SwipeableMessageRow(
         val distance = with(density) { abs(offset).toDp() }
         if (distance > 8.dp) {
             val isTrash = offset < 0
+            val glyph = (if (isTrash) trailingGlyph else leadingGlyph)
+                ?: when {
+                    isTrash -> SwipeGlyph.Trash
+                    restoresToInbox -> SwipeGlyph.Restore
+                    else -> SwipeGlyph.Archive
+                }
+            val tones = swipeTones(glyph)
             val reveal = distance - 8.dp
             val progress = ((distance.value - 16f) / 92f).coerceIn(0f, 1f)
             Box(
@@ -146,12 +192,20 @@ internal fun SwipeableMessageRow(
             ) {
                 Box(
                     Modifier.width(reveal).fillMaxHeight().background(
-                        if (isTrash) Color(0xFFFFB9C4) else Color(0xFFA1E9B8), CircleShape,
+                        // Deepens as the drag nears the commit threshold.
+                        lerp(tones.rest, tones.armed, arm),
+                        CircleShape,
                     ).clipToBounds(),
                     contentAlignment = Alignment.Center,
                 ) {
                     if (reveal >= 24.dp) {
-                        SwipeActionIcon(isTrash, restore = !isTrash && restoresToInbox, progress = progress)
+                        when (glyph) {
+                            SwipeGlyph.Archive, SwipeGlyph.Restore, SwipeGlyph.Trash ->
+                                SwipeActionIcon(glyph == SwipeGlyph.Trash, restore = glyph == SwipeGlyph.Restore,
+                                    progress = progress, arm = arm, pop = { pop.value })
+                            else -> SwipeVectorIcon(glyph, tones.ink, progress = progress, arm = arm,
+                                pop = { pop.value })
+                        }
                     }
                 }
             }
@@ -162,12 +216,65 @@ internal fun SwipeableMessageRow(
     }
 }
 
+/**
+ * The action a swipe side commits, as drawn behind the row. Archive, Restore
+ * and Trash keep their animated hand-drawn glyphs below; the rest are the
+ * Material glyphs at the same size, alpha and pop.
+ */
+internal enum class SwipeGlyph { Archive, Restore, Trash, Read, Unread, Star, Unstar, Snooze, Move }
+
+private class SwipeTones(val rest: Color, val armed: Color, val ink: Color)
+
+private fun swipeTones(glyph: SwipeGlyph): SwipeTones = when (glyph) {
+    SwipeGlyph.Archive, SwipeGlyph.Restore -> SwipeTones(Color(0xFFA1E9B8), Color(0xFF6CD993), Color(0xFF113B28))
+    SwipeGlyph.Trash -> SwipeTones(Color(0xFFFFB9C4), Color(0xFFFF8A9E), Color(0xFF541A26))
+    SwipeGlyph.Read, SwipeGlyph.Unread -> SwipeTones(Color(0xFFB8D4FF), Color(0xFF86B3FF), Color(0xFF0E2A57))
+    SwipeGlyph.Star, SwipeGlyph.Unstar -> SwipeTones(Color(0xFFFFE3A1), Color(0xFFFFCC55), Color(0xFF4A3300))
+    SwipeGlyph.Snooze -> SwipeTones(Color(0xFFD8CCFF), Color(0xFFB49DFF), Color(0xFF2D1A60))
+    SwipeGlyph.Move -> SwipeTones(Color(0xFFA9E8E1), Color(0xFF6FD3C7), Color(0xFF0B3D38))
+}
+
+private fun swipeVector(glyph: SwipeGlyph): ImageVector = when (glyph) {
+    SwipeGlyph.Read -> Icons.Rounded.MarkEmailRead
+    SwipeGlyph.Unread -> Icons.Rounded.MarkEmailUnread
+    SwipeGlyph.Star -> Icons.Rounded.Star
+    SwipeGlyph.Unstar -> Icons.Rounded.StarBorder
+    SwipeGlyph.Snooze -> Icons.Rounded.Snooze
+    else -> Icons.Rounded.MoveToInbox
+}
+
 @Composable
-private fun SwipeActionIcon(trash: Boolean, restore: Boolean, progress: Float) {
+private fun SwipeVectorIcon(
+    glyph: SwipeGlyph,
+    ink: Color,
+    progress: Float,
+    arm: Float,
+    pop: () -> Float,
+) {
+    androidx.compose.material3.Icon(
+        swipeVector(glyph), null, tint = ink,
+        modifier = Modifier.size(24.dp).graphicsLayer {
+            alpha = progress.coerceAtLeast(0.12f)
+            scaleX = (0.8f + arm * 0.26f) * pop()
+            scaleY = scaleX
+        },
+    )
+}
+
+@Composable
+private fun SwipeActionIcon(
+    trash: Boolean,
+    restore: Boolean,
+    progress: Float,
+    /** 0..1 toward the commit threshold: the glyph grows with it. */
+    arm: Float = progress,
+    /** The threshold pop, read at draw time so it never recomposes the row. */
+    pop: () -> Float = { 1f },
+) {
     val ink = if (trash) Color(0xFF541A26) else Color(0xFF113B28)
     Canvas(Modifier.size(24.dp).graphicsLayer {
         alpha = progress.coerceAtLeast(0.12f)
-        scaleX = 0.82f + progress * 0.18f
+        scaleX = (0.8f + arm * 0.26f) * pop()
         scaleY = scaleX
     }) {
         val unit = size.width / 24f

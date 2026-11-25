@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="identity_settings_appearance">रूप</string>
+    <string name="identity_match_wallpaper_title">वॉलपेपर से मिलाएँ</string>
+    <string name="identity_match_wallpaper_subtitle">बटन और हाइलाइट के लिए अपने वॉलपेपर के रंग इस्तेमाल करें। अवतार, स्थिति के रंग और टेक्स्ट GrapMail के ही रहते हैं।</string>
+</resources>

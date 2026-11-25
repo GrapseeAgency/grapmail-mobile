@@ -1,0 +1,10 @@
+/* Info.plist strings for the GrapMail app target (Indonesian). */
+
+/* Face ID permission sheet (AppLock.swift). */
+"NSFaceIDUsageDescription" = "GrapMail menggunakan Face ID untuk menjaga privasi kotak surat Anda saat aplikasi terkunci.";
+
+/* Home-screen quick action: com.grapsee.grapmail.compose. The key is the title in project.yml. */
+"Compose mail" = "Tulis email";
+
+/* Photo library permission sheet for "Save Image" (round 9). */
+"NSPhotoLibraryAddUsageDescription" = "GrapMail menyimpan foto dan lampiran yang Anda pilih ke pustaka foto Anda.";

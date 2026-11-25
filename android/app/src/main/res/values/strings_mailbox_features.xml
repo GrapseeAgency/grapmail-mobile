@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Mailbox features (2026-11): the Good morning card, one-tap sign-in code
+  chips, the Inbox Zero moment and Choose your swipes. English only for now;
+  a sibling of the other values/*.xml files, merged by aapt. Translations go
+  in values-<locale>/strings_mailbox_features.xml under the same names. The
+  wording is shared with iOS (same spec), so change both together.
+-->
+<resources>
+    <!-- ui/mailfeatures/MorningCard.kt — greeting by local time; %1$s is the mailbox's first name. -->
+    <string name="mailbox_feat_greeting_morning">Good morning</string>
+    <string name="mailbox_feat_greeting_morning_name">Good morning, %1$s</string>
+    <string name="mailbox_feat_greeting_afternoon">Good afternoon</string>
+    <string name="mailbox_feat_greeting_afternoon_name">Good afternoon, %1$s</string>
+    <string name="mailbox_feat_greeting_evening">Good evening</string>
+    <string name="mailbox_feat_greeting_evening_name">Good evening, %1$s</string>
+    <!-- Summary parts; only non-zero parts are shown, joined by a middle dot. -->
+    <plurals name="mailbox_feat_digest_reply">
+        <item quantity="one">%1$d needs a reply</item>
+        <item quantity="other">%1$d need a reply</item>
+    </plurals>
+    <plurals name="mailbox_feat_digest_package">
+        <item quantity="one">%1$d package arriving</item>
+        <item quantity="other">%1$d packages arriving</item>
+    </plurals>
+    <plurals name="mailbox_feat_digest_code">
+        <item quantity="one">%1$d sign-in code</item>
+        <item quantity="other">%1$d sign-in codes</item>
+    </plurals>
+    <string name="mailbox_feat_digest_caught_up">You\'re all caught up</string>
+    <!-- TalkBack reads the card as one sentence: %1$s greeting, %2$s the parts joined. -->
+    <string name="mailbox_feat_digest_a11y">%1$s. %2$s.</string>
+    <string name="mailbox_feat_digest_a11y_join">,\u0020</string>
+    <!-- TalkBack actions on the card. -->
+    <string name="mailbox_feat_action_show_reply">Show messages that need a reply</string>
+    <string name="mailbox_feat_action_show_packages">Show package updates</string>
+    <string name="mailbox_feat_action_show_codes">Show sign-in codes</string>
+    <string name="mailbox_feat_action_show_all">Show all messages</string>
+    <string name="mailbox_feat_dismiss">Dismiss</string>
+    <!-- The active filter chip under the card; %1$s is the filter's name. -->
+    <string name="mailbox_feat_filter_reply">Needs a reply</string>
+    <string name="mailbox_feat_filter_packages">Packages</string>
+    <string name="mailbox_feat_filter_codes">Sign-in codes</string>
+    <string name="mailbox_feat_filter_clear">Clear filter: %1$s</string>
+
+    <!-- ui/components/Mail.kt — the code chip on an inbox row; %1$s is the code. -->
+    <string name="mailbox_feat_code_copy">Copy %1$s</string>
+    <!-- The chip's spoken name; the code itself is not read out. -->
+    <string name="mailbox_feat_code_copy_a11y">Copy sign-in code</string>
+    <!-- Shown on the chip after a copy. The code is not repeated. -->
+    <string name="mailbox_feat_code_copied">Code copied</string>
+    <!-- Clipboard label (shown by some keyboards/clipboard UIs). -->
+    <string name="mailbox_feat_code_clip_label">Sign-in code</string>
+
+    <!-- ui/mailfeatures/InboxZero.kt -->
+    <string name="mailbox_feat_zero_title">All clear</string>
+    <plurals name="mailbox_feat_zero_handled">
+        <item quantity="one">You handled %1$d email today.</item>
+        <item quantity="other">You handled %1$d emails today.</item>
+    </plurals>
+    <string name="mailbox_feat_zero_nothing">Nothing waiting for you.</string>
+
+    <!-- ui/screens/mail/SwipeActionsSetting.kt and the row actions in MailboxScreen.kt -->
+    <string name="mailbox_feat_swipe_title">Swipe actions</string>
+    <string name="mailbox_feat_swipe_body">What a swipe on a message in the list does. Saved on this device only.</string>
+    <string name="mailbox_feat_swipe_right">Swipe right</string>
+    <string name="mailbox_feat_swipe_left">Swipe left</string>
+    <!-- %1$s is "Swipe right" or "Swipe left". -->
+    <string name="mailbox_feat_swipe_change">Change %1$s</string>
+    <string name="mailbox_feat_swipe_archive">Archive</string>
+    <string name="mailbox_feat_swipe_trash">Trash</string>
+    <string name="mailbox_feat_swipe_read">Mark read/unread</string>
+    <string name="mailbox_feat_swipe_star">Star</string>
+    <string name="mailbox_feat_swipe_snooze">Snooze</string>
+    <string name="mailbox_feat_swipe_move">Move to…</string>
+    <string name="mailbox_feat_swipe_none">None</string>
+</resources>

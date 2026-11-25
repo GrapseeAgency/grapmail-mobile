@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  GrapMailWidget privacy manifest (Home/Lock Screen widget + send-later Live
+  Activity). Apple reads every bundle's manifest, extensions included.
+
+  The widget makes no network calls and collects nothing: it draws the numbers
+  the app last wrote into the shared App Group (WidgetShared.swift) and queues
+  widget-button taps there for the app to send. That App Group read/write is
+  the one required-reason API it uses: UserDefaults(suiteName:), reason 1C8F.1
+  (defaults shared only by apps and extensions in the same App Group).
+-->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>NSPrivacyTracking</key>
+	<false/>
+	<key>NSPrivacyTrackingDomains</key>
+	<array/>
+	<key>NSPrivacyCollectedDataTypes</key>
+	<array/>
+	<key>NSPrivacyAccessedAPITypes</key>
+	<array>
+		<dict>
+			<key>NSPrivacyAccessedAPIType</key>
+			<string>NSPrivacyAccessedAPICategoryUserDefaults</string>
+			<key>NSPrivacyAccessedAPITypeReasons</key>
+			<array>
+				<string>1C8F.1</string>
+			</array>
+		</dict>
+	</array>
+</dict>
+</plist>

@@ -1,3 +1,6 @@
+import java.time.LocalDate
+import java.time.ZoneOffset
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -9,7 +12,7 @@ plugins {
 // Provision this ignored client configuration separately, never a service-account key.
 // The founder's required setup, once the Firebase project exists: create it with the
 // package `com.grapsee.grapmail`, add an Android app, and drop the downloaded
-// `google-services.json` HERE — this file only then applies the plugin, and the
+// `google-services.json` HERE â€” this file only then applies the plugin, and the
 // pushed new-mail path goes live beside the poll.
 if (file("google-services.json").isFile) {
     apply(plugin = "com.google.gms.google-services")
@@ -50,7 +53,7 @@ android {
         // tag whose release job actually signed: v0.2.0's run emitted
         // `app-release-unsigned.apk` because the keystore variables were handed to
         // `$GITHUB_ENV` in the same step that built, and the gate refused to
-        // publish it — that failed tag stays in history as the attempt.
+        // publish it â€” that failed tag stays in history as the attempt.
         // 0.3.0 carries the account-record band, the mailbox write sector, the
         // E2E encryption sector, subscriptions and the store-compliance work.
         // v0.3.0's first release-job run FAILED HERE ON PURPOSE: the tag said
@@ -65,14 +68,14 @@ android {
         // reference, drafts that open in the composer, attachments that actually
         // open, a reader that steps / marks unread / asks before loading a
         // sender's images / hands mail to share and print, and the platform
-        // rules that were missing entirely — an iOS icon that had no file, no
+        // rules that were missing entirely â€” an iOS icon that had no file, no
         // splash on either platform, haptics tied to the write rather than the
         // tap, a background new-mail read that says what it is evidence of, an
         // offline fact read from the device, and a home-screen Compose shortcut.
         // 0.5.0 is the gateway-auth release: sign-in, sign-up and every account
         // call moved to the service that owns the mailbox, so the signed-in home
         // reads real mail instead of "Couldn't load Inbox" (the seam and its
-        // proof are in FINDINGS.md). It also carries the §39 runtime leg with
+        // proof are in FINDINGS.md). It also carries the Â§39 runtime leg with
         // its walk-side fixes, and two iOS layout defects the frame audit found
         // (a 520pt sign-in form on a 402pt screen; a stepper wrapping mid-word).
         // v0.6.0 / versionCode 9: the first release that can be signed with the
@@ -82,28 +85,74 @@ android {
         // is 0.6.2 / 11; shipping this as 1 would be refused as a downgrade even
         // with the correct signature, which is another way to keep running the
         // old app while believing the new one was installed.
-        versionCode = 1
-        versionName = "0.0.1"
-        // Real account API — same contract the website uses.
+        // 0.7.0 / versionCode 13: the first release both stores can ship.
+        // Android had been 0.0.1 / 1 while iOS was 0.6.4 / 13, and android.yml
+        // released only on v0.0.1 while ios.yml released on every tag except
+        // it, so no single tag could produce both store builds. 13 is above
+        // every code this app has ever produced (0.6.3 was 12); see
+        // RELEASING.md.
+        versionCode = 13
+        versionName = "0.7.0"
+        // Real account API â€” same contract the website uses.
         buildConfigField("String", "API_BASE", "\"https://grapsee.com/api\"")
         // Play Integrity's cloud project number, provisioned outside the repo
         // the way the Firebase client config is: a blank value is an
         // UNCONFIGURED deployment, and the integrity client treats it as a
-        // quiet no-op (the feature is absent, not failing) — the same
-        // discipline as push. Set it with -PplayIntegrityCloudProject=… or the
+        // quiet no-op (the feature is absent, not failing) â€” the same
+        // discipline as push. Set it with -PplayIntegrityCloudProject=â€¦ or the
         // PLAY_INTEGRITY_CLOUD_PROJECT environment variable once the project
         // exists on the founder's Play console.
         val integrityProject = System.getenv("PLAY_INTEGRITY_CLOUD_PROJECT")?.takeIf { it.isNotBlank() }
             ?: project.findProperty("playIntegrityCloudProject")?.toString()?.takeIf { it.isNotBlank() }
             ?: ""
         buildConfigField("String", "PLAY_INTEGRITY_CLOUD_PROJECT", "\"$integrityProject\"")
-        // Certificate pins for the API host (data/Api.kt apiPinner): comma-separated
-        // sha256/... values from scripts/print-api-pins.sh, passed as the Gradle
-        // property grapmailApiPins or the environment variable GRAPMAIL_API_PINS.
-        // Empty (the default) or a single pin means no pinning.
-        val apiPins = ((project.findProperty("grapmailApiPins") as String?)
-            ?: System.getenv("GRAPMAIL_API_PINS") ?: "").replace("\"", "").trim()
+        // Certificate pins for the API hosts (data/Api.kt apiPinner). The source of
+        // truth is security/api-pins.json at the repo root: iOS compiles the same
+        // file (scripts/generate-pins.py -> ApiPins.swift), and
+        // scripts/check-api-pins.py checks it weekly against the live servers and
+        // its expiry (.github/workflows/pin-expiry.yml). Its pins are compiled in
+        // only while it says "enforce": true. The Gradle property grapmailApiPins
+        // or the environment variable GRAPMAIL_API_PINS (comma-separated sha256/...
+        // values from scripts/print-api-pins.sh) still override the JSON's pins,
+        // and grapmailApiPinsExpires / GRAPMAIL_API_PINS_EXPIRES its expiry. A blank
+        // override counts as unset; -PgrapmailApiPins=none switches pinning off.
+        // Empty or a single pin means no pinning, and so does a date on or after
+        // the expiry: the app then falls back to normal certificate checks.
+        val pinSetFile = project.rootProject.file("../security/api-pins.json")
+        @Suppress("UNCHECKED_CAST")
+        val pinSet: Map<String, Any?> = if (pinSetFile.isFile) {
+            groovy.json.JsonSlurper().parse(pinSetFile) as Map<String, Any?>
+        } else {
+            emptyMap()
+        }
+        @Suppress("UNCHECKED_CAST")
+        val jsonPins = if (pinSet["enforce"] == true) {
+            (pinSet["pins"] as? List<Map<String, Any?>>).orEmpty()
+                .filter { it["placeholder"] != true }
+                .mapNotNull { (it["sha256"] as? String)?.trim()?.takeIf { pin -> pin.isNotEmpty() } }
+                .joinToString(",") { "sha256/$it" }
+        } else {
+            ""
+        }
+        val apiPins = ((project.findProperty("grapmailApiPins") as String?)?.takeIf { it.isNotBlank() }
+            ?: System.getenv("GRAPMAIL_API_PINS")?.takeIf { it.isNotBlank() } ?: jsonPins).replace("\"", "").trim()
+        val apiPinHosts = (listOf(pinSet["host"]) + (pinSet["additionalHosts"] as? List<*>).orEmpty())
+            .mapNotNull { (it as? String)?.trim()?.lowercase()?.takeIf { host -> Regex("^[a-z0-9.-]+$").matches(host) } }
+            .distinct()
+            .joinToString(",")
+        val apiPinsExpires = ((project.findProperty("grapmailApiPinsExpires") as String?)?.takeIf { it.isNotBlank() }
+            ?: System.getenv("GRAPMAIL_API_PINS_EXPIRES")?.takeIf { it.isNotBlank() }
+            ?: (pinSet["expires"] as? String) ?: "").trim()
+        if (apiPinsExpires.isNotEmpty()) {
+            val until = runCatching { LocalDate.parse(apiPinsExpires) }.getOrNull()
+                ?: throw GradleException("Certificate pin expiry must be YYYY-MM-DD, got '$apiPinsExpires' (security/api-pins.json)")
+            if (apiPins.isNotEmpty() && !LocalDate.now(ZoneOffset.UTC).plusDays(30).isBefore(until)) {
+                project.logger.warn("w: certificate pin set expires $apiPinsExpires; the app stops pinning on that date. Refresh security/api-pins.json.")
+            }
+        }
         buildConfigField("String", "API_PINS", "\"$apiPins\"")
+        buildConfigField("String", "API_PIN_HOSTS", "\"$apiPinHosts\"")
+        buildConfigField("String", "API_PINS_EXPIRES", "\"$apiPinsExpires\"")
     }
 
     buildTypes {
@@ -130,6 +179,13 @@ android {
         buildConfig = true
     }
     packaging { resources.excludes += "/META-INF/{AL2.0,LGPL2.1}" }
+    // JVM unit tests (src/test, see TESTING.md) run against AGP's stub
+    // android.jar. ApiException and the transport log through android.util.Log;
+    // with this, those calls return defaults instead of throwing "not mocked",
+    // so the pure logic can be tested without Robolectric or an emulator.
+    testOptions {
+        unitTests.isReturnDefaultValues = true
+    }
 }
 
 dependencies {
@@ -142,8 +198,8 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.6")
     implementation("androidx.navigation:navigation-compose:2.8.2")
     // Delivers the baseline profile (`src/main/baseline-prof.txt`) to ART at
-    // install time, so the mailbox's hot paths — row render, scroll, thread
-    // open — are precompiled AOT instead of JIT-compiled mid-scroll on the
+    // install time, so the mailbox's hot paths â€” row render, scroll, thread
+    // open â€” are precompiled AOT instead of JIT-compiled mid-scroll on the
     // first runs. This is the difference between emulator-smooth and
     // real-device smooth, and it only costs the app its install size.
     implementation("androidx.profileinstaller:profileinstaller:1.4.1")
@@ -152,7 +208,15 @@ dependencies {
     implementation("com.google.android.play:review:2.0.2")
     // GrapMail plans. Purchases are verified by the server (routes/grapmail-billing.ts),
     // never trusted on the device.
-    implementation("com.android.billingclient:billing-ktx:7.1.1")
+    //
+    // Play Billing Library 8, not 7: Google Play refuses new apps and updates
+    // built with Billing 7 after 31 Aug 2026 (extension window closed 1 Nov
+    // 2026), so a 7.x upload is rejected at the Play Console. 8.0.0 is the
+    // newest line whose Kotlin metadata this project's Kotlin 2.0.20 can read
+    // (8.1+ moved to Kotlin 2.2). The plain Java artifact is used on purpose:
+    // data/PlayBilling.kt wraps the two async calls it needs itself, so no
+    // -ktx extension signature (which changed in 8.0) is part of the build.
+    implementation("com.android.billingclient:billing:8.0.0")
     // Brand logos (BIMI) are SVG; drawn to bitmaps for the sender avatar.
     implementation("com.caverock:androidsvg-aar:1.4")
     implementation("com.google.android.play:review-ktx:2.0.2")
@@ -193,12 +257,12 @@ dependencies {
 
     // The system splash screen. Without it the window the person sees between
     // tapping the icon and the first composed frame is the system's blank
-    // default — the smallest form of "this is not a native app".
+    // default â€” the smallest form of "this is not a native app".
     implementation("androidx.core:core-splashscreen:1.0.1")
 
     // The new-mail poll. WorkManager is Android's answer to "do this again
     // later even if the app is closed", it enforces a real minimum interval,
-    // and it survives a reboot — which is what makes the notification a report
+    // and it survives a reboot â€” which is what makes the notification a report
     // of a read the device actually made rather than a timer that dies with a
     // process.
     implementation("androidx.work:work-runtime-ktx:2.9.1")

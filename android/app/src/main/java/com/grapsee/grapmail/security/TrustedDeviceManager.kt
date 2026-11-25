@@ -1,6 +1,8 @@
 package com.grapsee.grapmail.security
 
 import android.content.Context
+import com.grapsee.grapmail.R
+import com.grapsee.grapmail.ui.i18n.CoreStrings
 import com.grapsee.grapmail.data.Api
 import com.grapsee.grapmail.data.DeviceEnrollRequest
 import com.grapsee.grapmail.data.SessionStore
@@ -98,7 +100,7 @@ object TrustedDeviceManager {
             // a device with strong biometrics gets a per-operation-gated key,
             // everything else the declared no-biometric fallback.
             val publicKey = DeviceKeyManager.ensurePublicKeyBase64(context)
-                ?: throw IllegalStateException("The device key could not be created.")
+                ?: throw IllegalStateException(CoreStrings.get(R.string.core_devicekey_create_failed) { "The device key could not be created." })
             val response = Api.enrollDevice(
                 token,
                 DeviceEnrollRequest(

@@ -1,5 +1,7 @@
 package com.grapsee.grapmail.ui.screens.mail
 
+import com.grapsee.grapmail.ui.components.gmMaxWidth
+import com.grapsee.grapmail.ui.components.GMLayout
 import android.app.Application
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -330,7 +332,8 @@ fun MailSnapshotScreen(name: String) {
                 onScreener = {}, onLabels = {}, onNotes = {}, onTasks = {}, onPrefs = {},
                 onAddresses = {}, onConnections = {}, onSubscriptions = {}, onProfile = {},
                 onPrivacy = {},
-                onEncryption = {}, onNotificationPrefs = {}, onHelp = {}, onSignOut = {})
+                onEncryption = {}, onNotificationPrefs = {}, onPerAccountNotifications = {},
+                onHelp = {}, onSignOut = {})
             "mail-notes" -> NotesScreen(profileVm, onBack = {})
             "mail-tasks" -> TasksScreen(profileVm, onBack = {})
             "mail-settings-prefs" -> MailPrefsScreen(profileVm, onBack = {})
@@ -837,8 +840,10 @@ private fun selectionFrame() {
 
 @Composable
 private fun sheetHost(content: @Composable () -> Unit) {
+    // Capped like the live sheets on a wide window (tablet / desktop runs of
+    // the walk); a phone-sized frame is unchanged.
     Column(
-        Modifier.fillMaxSize().padding(top = 40.dp),
+        Modifier.fillMaxSize().padding(top = 40.dp).gmMaxWidth(GMLayout.Form),
         verticalArrangement = androidx.compose.foundation.layout.Arrangement.Top,
     ) { content() }
 }

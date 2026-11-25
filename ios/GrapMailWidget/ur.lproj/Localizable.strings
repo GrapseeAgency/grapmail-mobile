@@ -1,0 +1,31 @@
+/* GrapMailWidget — Urdu (ur). Keys are the exact SwiftUI / String(localized:) literals. */
+
+"Unread mail" = "بغیر پڑھی میل";
+"The unread count your app last saw, and the newest message." = "آپ کی ایپ نے آخری بار جتنی بغیر پڑھی میلز دیکھیں، اور سب سے نیا پیغام۔";
+"GrapMail — not signed in" = "GrapMail — سائن ان نہیں ہیں";
+"GrapMail — no read yet" = "GrapMail — ابھی تک کوئی ڈیٹا نہیں";
+/* Lock Screen inline widget: unread count, newest sender */
+"%lld unread · %@" = "%lld بغیر پڑھی · %@";
+/* Lock Screen inline widget: unread count */
+"%lld unread" = "%lld بغیر پڑھی";
+"unread" = "بغیر پڑھی";
+"No subject" = "کوئی موضوع نہیں";
+"No read yet" = "ابھی تک کوئی ڈیٹا نہیں";
+"Open the app to sign in" = "سائن ان کرنے کے لیے ایپ کھولیں";
+"Scheduled send" = "شیڈول شدہ ترسیل";
+"(no subject)" = "(کوئی موضوع نہیں)";
+"Scheduled" = "شیڈول شدہ";
+"To %@" = "بنام %@";
+"Sending…" = "بھیجی جا رہی ہے…";
+
+/* Home Screen widget row buttons (iOS 17+), read by VoiceOver */
+"Mark as read" = "پڑھا ہوا نشان زد کریں";
+"Archive" = "آرکائیو کریں";
+"Star" = "ستارہ لگائیں";
+"Unstar" = "ستارہ ہٹائیں";
+/* The widget row buttons' App Intent and its parameters (hidden from Shortcuts) */
+"Update message" = "پیغام اپ ڈیٹ کریں";
+"Message" = "پیغام";
+"Action" = "کارروائی";
+/* Widget placeholder when no account is signed in */
+"Open GrapMail to sign in" = "سائن ان کرنے کے لیے GrapMail کھولیں";

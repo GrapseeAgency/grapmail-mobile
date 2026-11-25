@@ -37,6 +37,7 @@ import androidx.compose.material.icons.rounded.WarningAmber
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -56,19 +57,28 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.res.stringResource
+import com.grapsee.grapmail.R
 import androidx.compose.ui.text.withLink
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.isSystemInDarkTheme
 import com.grapsee.grapmail.ui.theme.LocalPalette
 import kotlinx.coroutines.delay
+
+// Round 8 (round8-spec §1.2): text and small glyphs in the brand colour —
+// eyebrows, links, the code timer, copy buttons, the footer shield — draw in
+// `primaryText`, which passes AA on both canvases (#1F5EFF light, #8EA8FF
+// dark). Filled shapes keep `primarySolid` with white on them. The focused code
+// cell draws its stroke in `focusRing`.
 
 /**
  * The recovery/security sector's screen shell — founder design verbatim.
@@ -103,14 +113,22 @@ fun AccountScreen(
         // device, an SE) the artwork gives way first and the action scrolls
         // with the copy — never a clipped field with the button pinned over it.
         val tight = maxHeight < 660.dp || LocalDensity.current.fontScale > 1.3f
+        // Under 360dp (a small phone at large display size, a cover screen, a
+        // narrow split-screen pane) the side margins give 8dp each back to the
+        // copy and the code cells, as iOS does. Wider windows: the design's 24.
+        val side = if (maxWidth < 360.dp) 16.dp else 24.dp
         Column(Modifier.fillMaxSize()) {
             AccountHeader(onBack)
+            // The scroll area spans the window (it scrolls from anywhere), the
+            // copy and footer are capped and centred: a tablet, an unfolded
+            // foldable or a desktop window keeps the phone's reading width.
             Column(
                 Modifier
                     .weight(1f)
                     .fillMaxWidth()
                     .verticalScroll(rememberScrollState())
-                    .padding(horizontal = 24.dp),
+                    .gmMaxWidth(GMLayout.Form)
+                    .padding(horizontal = side),
             ) {
                 if (illustration != null) {
                     Spacer(Modifier.height(if (tight) 2.dp else 4.dp))
@@ -135,7 +153,7 @@ fun AccountScreen(
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Bold,
                         letterSpacing = 1.6.sp,
-                        color = palette.primarySolid,
+                        color = palette.primaryText,
                     )
                     Spacer(Modifier.height(8.dp))
                 }
@@ -162,7 +180,7 @@ fun AccountScreen(
                 }
             }
             if (!tight) {
-                Column(Modifier.padding(horizontal = 24.dp)) { footer() }
+                Column(Modifier.gmMaxWidth(GMLayout.Form).padding(horizontal = side)) { footer() }
                 Spacer(Modifier.height(12.dp))
             }
         }
@@ -183,7 +201,7 @@ fun AccountHeader(onBack: (() -> Unit)?) {
             IconButton(onClick = onBack, modifier = Modifier.align(Alignment.CenterStart)) {
                 Icon(
                     Icons.AutoMirrored.Rounded.ArrowBack,
-                    contentDescription = "Back",
+                    contentDescription = stringResource(R.string.mail_common_back),
                     tint = palette.textPrimary,
                 )
             }
@@ -196,7 +214,8 @@ fun AccountHeader(onBack: (() -> Unit)?) {
 @Composable
 fun DecorativeBlobs() {
     val palette = LocalPalette.current
-    val dark = isSystemInDarkTheme()
+    // The app's own theme, not only the system's, so the blobs follow the palette.
+    val dark = palette.isDark
     val tint = if (dark) palette.primarySolid.copy(alpha = 0.20f) else palette.primarySolid.copy(alpha = 0.07f)
     val second = if (dark) palette.primaryTop.copy(alpha = 0.12f) else palette.primaryTop.copy(alpha = 0.05f)
     Canvas(Modifier.fillMaxWidth().height(260.dp)) {
@@ -252,6 +271,18 @@ fun StatusChip(text: String, tone: ChipTone) {
  * focused cell outlined in brand blue, digits centred. Typing advances, pasting
  * fills the row, backspace walks back — the behaviour a code field is expected
  * to have, not just the look.
+ *
+ * Fitting: the cells are sized from the width they are given. If one row would
+ * squeeze the glyphs below ~80% of the size the font setting asks for (a 320dp
+ * phone at 200% font, a cover screen, a narrow split-screen pane), the code
+ * wraps to two rows of half the cells each — "ABCDE" over "FGHIJ" for a backup
+ * code, so the halves still read as the halves. Gaps tighten on narrow widths
+ * and the cells stop growing at [CodeCellMax] on wide windows. On a phone at
+ * the default font size nothing changes: one row, 8dp gaps, the same sizes.
+ *
+ * The two-row fallback came from screens/account/AdaptiveCodeCells.kt
+ * (WrappingCodeCells), written for the 10-character backup code that clipped
+ * on a 320dp phone at 200% font; every code entry now shares it.
  */
 @Composable
 fun CodeCells(
@@ -261,30 +292,47 @@ fun CodeCells(
     modifier: Modifier = Modifier,
     groupGap: Boolean = false,
     alphanumeric: Boolean = false,
+    /** [GMAutofill.OneTimeCode] for texted / emailed codes, so the autofill
+     *  service can offer the code it read; null (the default) for codes no
+     *  service could know, such as backup codes. */
+    autofill: GMAutofill? = null,
 ) {
     val palette = LocalPalette.current
     val focuses = remember(length) { List(length) { FocusRequester() } }
     val focusManager = LocalFocusManager.current
     val keep: (Char) -> Boolean = { c -> if (alphanumeric) c.isLetterOrDigit() else c.isDigit() }
-    Row(
-        modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        repeat(length) { i ->
-            if (groupGap && i == length / 2) {
-                // "ABCDE-FGHIJ": a visible seam where the dash sits, so the
-                // reader can count the halves without a stray character.
-                Box(Modifier.width(4.dp).height(1.dp).align(Alignment.CenterVertically))
-            }
+    val fontScale = LocalDensity.current.fontScale
+    BoxWithConstraints(modifier.fillMaxWidth()) {
+        val baseSp = if (length > 8) 17f else 20f
+        // What the font setting asks for, in dp (1sp == fontScale dp).
+        val wantedDp = baseSp * fontScale
+        val gap = if (maxWidth < 300.dp) 5.dp else 8.dp
+        val seam = 4.dp + gap // the dash gap, including the extra spacedBy slot it adds
+        fun cellWidth(perRow: Int, withSeam: Boolean): Dp {
+            val gaps = gap * (perRow - 1) + if (withSeam) seam else 0.dp
+            return ((maxWidth - gaps) / perRow).coerceAtMost(CodeCellMax)
+        }
+        // Largest glyph a cell can hold: ~0.7em wide plus side room, and the
+        // line box (~1.3em) inside the 0.94 aspect-ratio square.
+        fun fitDp(cell: Dp): Float =
+            minOf(wantedDp, (cell.value - 6f) / 0.7f, cell.value / 0.94f / 1.3f).coerceAtLeast(8f)
+        val oneRowCell = cellWidth(length, groupGap)
+        val twoRows = length >= 4 && fitDp(oneRowCell) < wantedDp * 0.8f
+        val perRow = if (twoRows) (length + 1) / 2 else length
+        val cell = if (twoRows) cellWidth(perRow, false) else oneRowCell
+        val glyphSp = (fitDp(cell) / fontScale).sp
+
+        @Composable
+        fun Cell(i: Int) {
             val char = value.getOrNull(i)?.toString() ?: ""
             var focused by remember { mutableStateOf(false) }
             val stroke by animateColorAsState(
-                if (focused) palette.primarySolid else palette.border,
+                if (focused) palette.focusRing else palette.border,
                 tween(150), label = "code-stroke",
             )
             Box(
                 Modifier
-                    .weight(1f)
+                    .width(cell)
                     .aspectRatio(0.94f)
                     .clip(RoundedCornerShape(14.dp))
                     .background(palette.otpFill)
@@ -312,9 +360,24 @@ fun CodeCells(
                     modifier = Modifier
                         .fillMaxSize()
                         .focusRequester(focuses[i])
+                        // Only the first cell is the autofill node: a service
+                        // fills ONE field with the whole code, and the cells
+                        // then show it split exactly as if it had been typed
+                        // or pasted. Marking every cell would invite a service
+                        // to write the full code (or one digit) into each.
+                        .gmAutofill(if (i == 0) autofill else null) { filled ->
+                            val accepted = filled.filter(keep)
+                                .let { if (alphanumeric) it.uppercase() else it }
+                                .take(length)
+                            if (accepted.isNotEmpty()) {
+                                onValueChange(accepted)
+                                if (accepted.length == length) focusManager.clearFocus()
+                                else focuses[accepted.length].requestFocus()
+                            }
+                        }
                         .onFocusChanged { focused = it.isFocused },
                     textStyle = TextStyle(
-                        fontSize = if (length > 8) 17.sp else 20.sp,
+                        fontSize = glyphSp,
                         fontWeight = FontWeight.SemiBold,
                         textAlign = TextAlign.Center,
                         color = palette.textPrimary,
@@ -328,8 +391,39 @@ fun CodeCells(
                 )
             }
         }
+
+        if (!twoRows) {
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(gap, Alignment.CenterHorizontally),
+            ) {
+                repeat(length) { i ->
+                    if (groupGap && i == length / 2) {
+                        // "ABCDE-FGHIJ": a visible seam where the dash sits, so the
+                        // reader can count the halves without a stray character.
+                        Box(Modifier.width(4.dp).height(1.dp).align(Alignment.CenterVertically))
+                    }
+                    Cell(i)
+                }
+            }
+        } else {
+            // Two rows: the row break is the seam, so no dash gap is drawn.
+            Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(gap)) {
+                for (start in 0 until length step perRow) {
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(gap, Alignment.CenterHorizontally),
+                    ) {
+                        for (i in start until minOf(start + perRow, length)) Cell(i)
+                    }
+                }
+            }
+        }
     }
 }
+
+/** Cells stop growing here, so six digits on a tablet stay a code, not a row of tiles. */
+private val CodeCellMax = 64.dp
 
 /** "Code expires in 04:52" — the timer under a code row. */
 @Composable
@@ -348,12 +442,13 @@ fun CodeExpiry(expiresAt: Long, onExpired: () -> Unit = {}) {
     val seconds = ((remaining.coerceAtLeast(0) / 1000) % 60).toString().padStart(2, '0')
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
         Icon(Icons.Rounded.Schedule, contentDescription = null, tint = palette.textTertiary, modifier = Modifier.size(16.dp))
-        Text("Code expires in ", fontSize = 13.sp, color = palette.textSecondary)
+        Text(stringResource(R.string.mail_code_expires_in), fontSize = 13.sp, color = palette.textSecondary,
+            modifier = Modifier.weight(1f, fill = false))
         Text(
-            if (remaining > 0) "$minutes:$seconds" else "expired",
+            if (remaining > 0) "$minutes:$seconds" else stringResource(R.string.mail_code_expired),
             fontSize = 13.sp,
             fontWeight = FontWeight.Bold,
-            color = if (remaining > 0) palette.primarySolid else palette.error,
+            color = if (remaining > 0) palette.primaryText else palette.error,
         )
     }
 }
@@ -364,7 +459,7 @@ fun OrDivider(modifier: Modifier = Modifier) {
     val palette = LocalPalette.current
     Row(modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         Box(Modifier.weight(1f).height(1.dp).background(palette.border))
-        Text(" OR ", fontSize = 12.sp, fontWeight = FontWeight.Medium, color = palette.textTertiary)
+        Text(stringResource(R.string.mail_divider_or), fontSize = 12.sp, fontWeight = FontWeight.Medium, color = palette.textTertiary)
         Box(Modifier.weight(1f).height(1.dp).background(palette.border))
     }
 }
@@ -377,10 +472,13 @@ fun AccountLink(text: String, onClick: () -> Unit, modifier: Modifier = Modifier
         text,
         fontSize = 13.sp,
         fontWeight = FontWeight.SemiBold,
-        color = palette.primarySolid,
+        color = palette.primaryText,
+        textAlign = TextAlign.Center,
         modifier = modifier
+            // 48dp touch target (Play / WCAG) without changing how the link looks.
+            .minimumInteractiveComponentSize()
             .clip(RoundedCornerShape(8.dp))
-            .clickable(onClick = onClick)
+            .clickable(role = Role.Button, onClick = onClick)
             .padding(horizontal = 8.dp, vertical = 6.dp),
     )
 }
@@ -407,14 +505,15 @@ fun FooterNote(
             Icon(
                 Icons.Rounded.VerifiedUser,
                 contentDescription = null,
-                tint = palette.primarySolid,
+                tint = palette.primaryText,
                 modifier = Modifier.size(18.dp),
             )
             Text(
-                text = annotatedWithLink(text, linkText, onLink, palette.primarySolid),
+                text = annotatedWithLink(text, linkText, onLink, palette.primaryText),
                 fontSize = 12.sp,
                 lineHeight = 18.sp,
                 color = palette.textSecondary,
+                modifier = Modifier.weight(1f, fill = false),
             )
         }
     }
@@ -478,6 +577,9 @@ fun InfoPanel(title: String, body: String, icon: (@Composable () -> Unit)? = nul
 @Composable
 fun TwoStepRibbon(current: Int, labels: List<String>) {
     val palette = LocalPalette.current
+    // At large text or in a very narrow window only the current step keeps
+    // its label beside the circle, so the ribbon still fits one line.
+    val compactLabels = gmPrefersStackedRows() || gmIsNarrowWindow()
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         labels.forEachIndexed { index, label ->
             val n = index + 1
@@ -498,7 +600,7 @@ fun TwoStepRibbon(current: Int, labels: List<String>) {
                     contentAlignment = Alignment.Center,
                 ) {
                     if (done) {
-                        Icon(Icons.Rounded.Check, contentDescription = null, tint = Color.White, modifier = Modifier.size(14.dp))
+                        Icon(Icons.Rounded.Check, contentDescription = null, tint = palette.onPrimary, modifier = Modifier.size(14.dp))
                     } else {
                         Text(
                             "$n",
@@ -508,13 +610,15 @@ fun TwoStepRibbon(current: Int, labels: List<String>) {
                         )
                     }
                 }
-                Spacer(Modifier.width(8.dp))
-                Text(
-                    label,
-                    fontSize = 13.sp,
-                    fontWeight = if (active) FontWeight.SemiBold else FontWeight.Normal,
-                    color = if (active) palette.primarySolid else palette.textTertiary,
-                )
+                if (!compactLabels || active) {
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        label,
+                        fontSize = 13.sp,
+                        fontWeight = if (active) FontWeight.SemiBold else FontWeight.Normal,
+                        color = if (active) palette.primaryText else palette.textTertiary,
+                    )
+                }
             }
             if (n < labels.size) {
                 Box(
@@ -535,9 +639,10 @@ fun CopyButton(label: String, onClick: () -> Unit) {
     val palette = LocalPalette.current
     Row(
         Modifier
+            .minimumInteractiveComponentSize()
             .clip(RoundedCornerShape(12.dp))
             .border(1.dp, palette.border, RoundedCornerShape(12.dp))
-            .clickable(onClick = onClick)
+            .clickable(role = Role.Button, onClick = onClick)
             .padding(horizontal = 12.dp, vertical = 9.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -545,10 +650,10 @@ fun CopyButton(label: String, onClick: () -> Unit) {
         Icon(
             Icons.Rounded.ContentCopy,
             contentDescription = null,
-            tint = palette.primarySolid,
+            tint = palette.primaryText,
             modifier = Modifier.size(15.dp),
         )
-        Text(label, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = palette.primarySolid)
+        Text(label, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = palette.primaryText)
     }
 }
 
@@ -560,7 +665,7 @@ fun RuleLine(label: String, met: Boolean) {
         Icon(
             Icons.Rounded.CheckCircle,
             contentDescription = null,
-            tint = if (met) palette.primarySolid else palette.textTertiary,
+            tint = if (met) palette.primaryText else palette.textTertiary,
             modifier = Modifier.size(18.dp),
         )
         Spacer(Modifier.width(10.dp))
@@ -568,6 +673,7 @@ fun RuleLine(label: String, met: Boolean) {
             label,
             fontSize = 13.sp,
             color = if (met) palette.textSecondary else palette.textTertiary,
+            modifier = Modifier.weight(1f, fill = false),
         )
     }
 }
@@ -583,7 +689,7 @@ fun IconTile(icon: androidx.compose.ui.graphics.vector.ImageVector, tint: Color?
             .background(palette.softFill),
         contentAlignment = Alignment.Center,
     ) {
-        Icon(icon, contentDescription = null, tint = tint ?: palette.primarySolid, modifier = Modifier.size(20.dp))
+        Icon(icon, contentDescription = null, tint = tint ?: palette.primaryText, modifier = Modifier.size(20.dp))
     }
 }
 

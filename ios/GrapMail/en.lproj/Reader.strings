@@ -1,0 +1,94 @@
+/* Round 8 — Workstream D (reader & conversation polish, round8-spec §5). English base table "Reader".
+   Looked up with String(localized: "…", table: "Reader") / Text("…", tableName: "Reader").
+   Counted keys also have an entry in Reader.stringsdict, which wins over the entry here.
+   Other languages fall back to these English keys until they are translated. */
+
+/* Conversation: sender name on one's own message */
+"You" = "You";
+
+/* Conversation: recipients line when the message went only to the reader */
+"to me" = "to me";
+
+/* Conversation: recipients line with one recipient. Value: their name or address */
+"to %@" = "to %@";
+
+/* Conversation: recipients line with several recipients (plural in Reader.stringsdict) */
+"to %lld people" = "to %lld people";
+
+/* Conversation: VoiceOver value on a folded card of an unread message */
+"Unread" = "Unread";
+
+/* Conversation: the bar that stands in for folded messages (plural in Reader.stringsdict) */
+"%lld earlier messages" = "%lld earlier messages";
+
+/* Conversation: VoiceOver hint on the earlier-messages bar */
+"Shows the folded messages" = "Shows the folded messages";
+
+/* Conversation: chip under the subject, people in the conversation (plural in Reader.stringsdict) */
+"%lld people" = "%lld people";
+
+/* Conversation: chip under the subject, messages in the conversation (plural in Reader.stringsdict) */
+"%lld messages" = "%lld messages";
+
+/* Quoted history: button that shows the folded earlier text */
+"Show quoted text" = "Show quoted text";
+
+/* Quoted history: button that folds it again */
+"Hide quoted text" = "Hide quoted text";
+
+/* Quoted history: VoiceOver state of the button */
+"Collapsed" = "Collapsed";
+
+/* Quoted history: VoiceOver state of the button */
+"Expanded" = "Expanded";
+
+/* Quick reply bar: placeholder. Value: the first name of the person the reply goes to */
+"Reply to %@…" = "Reply to %@…";
+
+/* Quick reply bar: placeholder when nobody can be named */
+"Reply…" = "Reply…";
+
+/* Quick reply bar: VoiceOver hint */
+"Opens the editor" = "Opens the editor";
+
+/* Quick reply bar: VoiceOver label of the menu with Reply all and Forward */
+"Reply options" = "Reply options";
+
+/* Quick reply bar: VoiceOver name of the region */
+"Quick reply" = "Quick reply";
+
+/* Attachments: section title (plural in Reader.stringsdict) */
+"%lld attachments" = "%lld attachments";
+
+/* Attachments: link that opens the share sheet for every attachment */
+"Save all" = "Save all";
+
+/* Attachments: shown while every attachment is being fetched for Save all */
+"Preparing…" = "Preparing…";
+
+/* Attachments: VoiceOver hint on Save all */
+"Opens the share sheet, where Save to Files keeps every attachment" = "Opens the share sheet, where Save to Files keeps every attachment";
+
+/* Attachments: VoiceOver label of a picture in the grid. Values: its position, the number of files, its file name */
+"Image %lld of %lld, %@" = "Image %1$lld of %2$lld, %3$@";
+
+/* Attachments: meta line of a file with no known type or size */
+"File" = "File";
+
+/* Attachments: VoiceOver hint on a file row */
+"Opens a preview" = "Opens a preview";
+
+/* Attachments: VoiceOver label of the save button. Value: the file name */
+"Save %@" = "Save %@";
+
+/* Attachments: VoiceOver label of the share button. Value: the file name */
+"Share %@" = "Share %@";
+
+/* Attachments: context-menu action */
+"Open" = "Open";
+
+/* Attachments: context-menu action */
+"Save" = "Save";
+
+/* Attachments: context-menu action */
+"Share" = "Share";

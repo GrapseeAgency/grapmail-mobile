@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="identity_settings_appearance">화면 스타일</string>
+    <string name="identity_match_wallpaper_title">배경화면과 맞추기</string>
+    <string name="identity_match_wallpaper_subtitle">버튼과 강조에 배경화면 색을 사용합니다. 아바타, 상태 색, 텍스트는 GrapMail 색을 유지합니다.</string>
+</resources>

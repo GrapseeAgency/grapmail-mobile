@@ -1,5 +1,7 @@
 package com.grapsee.grapmail.data
 
+import com.grapsee.grapmail.R
+import com.grapsee.grapmail.ui.i18n.CoreStrings
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
@@ -39,7 +41,10 @@ data class RegisterPushResponse(
     val error: String? = null,
 )
 
-/** These writes must never be replayed with another account's bearer, even after a 401.
+/** The production instance is built by `Api.launchApi` with the API certificate
+ * pinner applied (same `apiPinner()` as Api's own client); the default client
+ * below is only for tests and must not be used for production calls.
+ * These writes must never be replayed with another account's bearer, even after a 401.
  * No authenticator, redirects, automatic retries, response-body logging, or global expiry event. */
 internal class LaunchApi(
     private val base: String,
@@ -72,7 +77,7 @@ internal class LaunchApi(
         // about it rather than inventing one.
         if (text.isBlank()) return@send RegisterPushResponse(success = true)
         val result = json.decodeFromString<RegisterPushResponse>(text)
-        if (!result.success) throw ApiException(status, null, "The server did not confirm the request.")
+        if (!result.success) throw ApiException(status, null, CoreStrings.get(R.string.core_launch_not_confirmed) { "The server did not confirm the request." })
         result
     }
 
@@ -93,7 +98,7 @@ internal class LaunchApi(
             // server did not send.
             if (text.isBlank()) return@send ActionResponse(success = true)
             val result = json.decodeFromString<ActionResponse>(text)
-            if (!result.success) throw ApiException(status, null, "The server did not confirm the request.")
+            if (!result.success) throw ApiException(status, null, CoreStrings.get(R.string.core_launch_not_confirmed) { "The server did not confirm the request." })
             result
         }
 
@@ -111,9 +116,9 @@ internal class LaunchApi(
         client.newCall(request).execute().use { response ->
             // Do not display an untrusted body that could echo credentials.
             if (!response.isSuccessful) throw ApiException(response.code, null, when (response.code) {
-                401 -> "Authentication was refused. Check the password or sign in again."
-                429 -> "Too many attempts. Try again later."
-                else -> "The request could not be confirmed (${response.code})."
+                401 -> CoreStrings.get(R.string.core_launch_auth_refused) { "Authentication was refused. Check the password or sign in again." }
+                429 -> CoreStrings.get(R.string.core_launch_rate_limited) { "Too many attempts. Try again later." }
+                else -> CoreStrings.get(R.string.core_launch_unconfirmed_status, response.code) { "The request could not be confirmed (${response.code})." }
             })
             read(response.code, response.body?.string().orEmpty())
         }

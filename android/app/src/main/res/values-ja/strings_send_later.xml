@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    values-ja/strings_send_later.xml: translation of values/strings_send_later.xml (same keys, same order).
+    Comments below are kept from the English source for context.
+-->
+<resources>
+    <!-- The clock button next to Send (TalkBack label and click action). -->
+    <string name="compose_send_later_button">送信日時を設定</string>
+    <string name="compose_send_later_button_action">送信日時を選択</string>
+
+    <!-- The sheet. -->
+    <string name="compose_send_later_title">後で送信</string>
+    <string name="compose_send_later_later_today">今日の後ほど</string>
+    <string name="compose_send_later_tomorrow_morning">明日の朝</string>
+    <string name="compose_send_later_monday_morning">月曜日の朝</string>
+    <string name="compose_send_later_pick">日時を選択</string>
+    <string name="compose_send_later_pick_hint">最大 30 日先まで</string>
+    <!-- %1$s: the device time zone's name, e.g. "Bangladesh Standard Time". -->
+    <string name="compose_send_later_zone_note">時刻はお使いのタイムゾーンで表示されます: %1$s</string>
+    <!-- TalkBack for one option row. %1$s: option name, %2$s: its day and time. -->
+    <string name="compose_send_later_option_description">%1$s、%2$s</string>
+
+    <!-- Date and time dialogs. -->
+    <string name="compose_send_later_date_title">日付を選択</string>
+    <string name="compose_send_later_time_title">時刻を選択</string>
+    <string name="compose_send_later_next">次へ</string>
+    <string name="compose_send_later_schedule">予約</string>
+    <string name="compose_send_later_cancel">キャンセル</string>
+    <string name="compose_send_later_type_time">時刻を入力</string>
+    <string name="compose_send_later_use_clock">時計で選択</string>
+    <string name="compose_send_later_too_soon">現在から 1 分以上先の時刻を選択してください。</string>
+    <string name="compose_send_later_too_far">30 日以内の時刻を選択してください。</string>
+
+    <!-- In-flight and failure lines in the composer. -->
+    <string name="compose_send_later_scheduling">予約しています…</string>
+    <string name="compose_send_later_offline">接続されていないため、予約されませんでした。メッセージはそのまま残っています。</string>
+
+    <!-- The receipt snackbar shown after compose closes. %1$s: e.g. "Tue 8:00 AM". -->
+    <string name="compose_send_later_scheduled_for">%1$s に送信予定</string>
+    <string name="compose_send_later_undo">元に戻す</string>
+    <string name="compose_send_later_view">表示</string>
+    <string name="compose_send_later_undoing">取り消しています…</string>
+    <string name="compose_send_later_undone">予約を取り消しました。メッセージは下書きに戻りました。</string>
+    <!-- %1$s: the server's reason. -->
+    <string name="compose_send_later_undo_failed">取り消せませんでした: %1$s</string>
+    <string name="compose_send_later_dismiss">閉じる</string>
+</resources>

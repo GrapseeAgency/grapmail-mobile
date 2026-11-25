@@ -1,0 +1,21 @@
+/* GrapMailNotificationService — Japanese. */
+
+"New encrypted message" = "新しい暗号化メッセージ";
+"New mail" = "新着メール";
+"1 new message" = "新着メッセージ 1 件";
+"%lld new messages" = "新着メッセージ %lld 件";
+"%lld unread in the inbox" = "受信トレイに未読 %lld 件";
+"Encrypted message" = "暗号化メッセージ";
+"Unknown sender" = "不明な送信者";
+"No subject" = "件名なし";
+"This was me" = "自分です";
+"Secure account" = "アカウントを保護";
+"Archive" = "アーカイブ";
+"Mark as read" = "既読にする";
+"Reply" = "返信";
+"Send" = "送信";
+"Reply…" = "返信…";
+"Reply in app" = "アプリで返信";
+"More" = "その他";
+/* Notification title: a sign-in code, then the sender */
+"%@ · %@" = "%@ · %@";

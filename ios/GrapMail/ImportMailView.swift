@@ -72,23 +72,24 @@ extension ApiClient {
 struct ImportMailView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.openURL) private var openURL
+    @Environment(\.dynamicTypeSize) private var dts
 
     private struct Provider: Hashable { let label: String; let host: String; let help: String; let helpURL: String? }
     private static let providers = [
         Provider(label: "Gmail", host: "imap.gmail.com",
-                 help: "Turn on 2-Step Verification for the Google account, then create an app password and paste it here. Your Google password itself will not work.",
+                 help: String(localized: "Turn on 2-Step Verification for the Google account, then create an app password and paste it here. Your Google password itself will not work."),
                  helpURL: "https://myaccount.google.com/apppasswords"),
         Provider(label: "Yahoo", host: "imap.mail.yahoo.com",
-                 help: "Create an app password in Yahoo's Account Security settings and paste it here.",
+                 help: String(localized: "Create an app password in Yahoo's Account Security settings and paste it here."),
                  helpURL: "https://login.yahoo.com/account/security"),
         Provider(label: "iCloud", host: "imap.mail.me.com",
-                 help: "Create an app-specific password for your Apple Account and use your full iCloud email address as the username.",
+                 help: String(localized: "Create an app-specific password for your Apple Account and use your full iCloud email address as the username."),
                  helpURL: "https://account.apple.com"),
-        Provider(label: "Other", host: "",
-                 help: "Any provider that offers IMAP over a secure connection (port 993). Check their help pages for the server name.",
+        Provider(label: String(localized: "Other", comment: "Mail import: any other IMAP provider"), host: "",
+                 help: String(localized: "Any provider that offers IMAP over a secure connection (port 993). Check their help pages for the server name."),
                  helpURL: nil),
     ]
-    private static let periods: [(Int, String)] = [(3, "3 months"), (12, "1 year"), (60, "5 years"), (0, "Everything")]
+    private static let periods: [(Int, String)] = [(3, String(localized: "3 months")), (12, String(localized: "1 year")), (60, String(localized: "5 years")), (0, String(localized: "Everything", comment: "Mail import period: all mail"))]
 
     @State private var provider = ImportMailView.providers[0]
     @State private var host = ImportMailView.providers[0].host
@@ -106,9 +107,12 @@ struct ImportMailView: View {
 
     var body: some View {
         NavigationStack {
+            VStack(spacing: 0) {
+            GMOfflineBanner()
             Form {
                 if let job { progress(job) }
                 if !running { form }
+            }
             }
             .navigationTitle("Import mail")
             .navigationBarTitleDisplayMode(.inline)
@@ -135,9 +139,12 @@ struct ImportMailView: View {
                 Text(Self.headline(job)).font(.headline)
                 if total > 0 {
                     ProgressView(value: Double(done), total: Double(total)).tint(GM.primarySolid)
-                    Text("\(done) of \(total) checked · \(job.imported) imported · \(job.skipped) already here"
-                         + (job.failed > 0 ? " · \(job.failed) could not be read" : ""))
+                    // Two whole sentences rather than an optional clause glued on.
+                    Text(job.failed > 0
+                         ? String(localized: "\(done) of \(total) checked · \(job.imported) imported · \(job.skipped) already here · \(job.failed) could not be read")
+                         : String(localized: "\(done) of \(total) checked · \(job.imported) imported · \(job.skipped) already here"))
                         .font(.footnote).foregroundColor(GM.textSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
                 ForEach(job.folders, id: \.name) { f in
                     Text("\(f.name): \(f.done) of \(f.total)").font(.caption).foregroundColor(GM.textTertiary)
@@ -146,6 +153,7 @@ struct ImportMailView: View {
                 if job.state == "done" {
                     Text("Imported mail is in your Inbox, Sent and Archive. Running the import again only brings what is new.")
                         .font(.footnote).foregroundColor(GM.textSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
             }
             .accessibilityElement(children: .combine)
@@ -164,20 +172,31 @@ struct ImportMailView: View {
 
     static func headline(_ job: ImportJob) -> String {
         switch job.state {
-        case "connecting": return "Connecting to \(job.host)…"
-        case "importing": return "Importing from \(job.username)"
-        case "done": return "Import finished"
-        case "cancelled": return "Import stopped"
-        default: return "Import stopped with a problem"
+        case "connecting": return String(localized: "Connecting to \(job.host)…")
+        case "importing": return String(localized: "Importing from \(job.username)")
+        case "done": return String(localized: "Import finished")
+        case "cancelled": return String(localized: "Import stopped")
+        default: return String(localized: "Import stopped with a problem")
+        }
+    }
+
+    /// Four segments do not fit across a phone at the accessibility text sizes
+    /// (the labels truncate to "…"), so the pickers become menus there.
+    @ViewBuilder private func adaptivePicker<P: View>(_ picker: P) -> some View {
+        if dts.isAccessibilitySize {
+            picker.pickerStyle(.menu)
+        } else {
+            picker.pickerStyle(.segmented)
         }
     }
 
     @ViewBuilder private var form: some View {
         Section {
-            Picker("Account", selection: $provider) {
-                ForEach(Self.providers, id: \.self) { Text($0.label).tag($0) }
-            }
-            .pickerStyle(.segmented)
+            adaptivePicker(
+                Picker("Account", selection: $provider) {
+                    ForEach(Self.providers, id: \.self) { Text($0.label).tag($0) }
+                }
+            )
             .onChange(of: provider) { p in host = p.host }
             Text(provider.help).font(.footnote).foregroundColor(GM.textSecondary)
             if let url = provider.helpURL.flatMap(URL.init(string:)) {
@@ -206,10 +225,11 @@ struct ImportMailView: View {
             Toggle("Archive (or All Mail)", isOn: $archive)
         }
         Section("How far back") {
-            Picker("How far back", selection: $months) {
-                ForEach(Self.periods, id: \.0) { Text($0.1).tag($0.0) }
-            }
-            .pickerStyle(.segmented)
+            adaptivePicker(
+                Picker("How far back", selection: $months) {
+                    ForEach(Self.periods, id: \.0) { Text($0.1).tag($0.0) }
+                }
+            )
         }
         Section {
             if let error { Text(error).foregroundColor(GM.error).accessibilityIdentifier("import-error") }
@@ -221,11 +241,11 @@ struct ImportMailView: View {
 
     private func start() {
         let h = host.trimmingCharacters(in: .whitespaces), u = username.trimmingCharacters(in: .whitespaces)
-        if h.isEmpty { error = "Enter the IMAP server name."; return }
-        if u.isEmpty { error = "Enter the email address of that account."; return }
-        if password.isEmpty { error = "Enter the app password."; return }
-        if !inbox && !sent && !archive { error = "Choose at least one folder."; return }
-        guard let token = SessionStore.token else { error = "Sign in again."; return }
+        if h.isEmpty { error = String(localized: "Enter the IMAP server name."); return }
+        if u.isEmpty { error = String(localized: "Enter the email address of that account."); return }
+        if password.isEmpty { error = String(localized: "Enter the app password."); return }
+        if !inbox && !sent && !archive { error = String(localized: "Choose at least one folder."); return }
+        guard let token = SessionStore.token else { error = String(localized: "Sign in again."); return }
         error = nil
         busy = true
         Task {
@@ -233,9 +253,9 @@ struct ImportMailView: View {
             do {
                 let r = try await ApiClient.importStart(token: token, host: h, username: u, password: password,
                                                        inbox: inbox, sent: sent, archive: archive, sinceMonths: months)
-                if r.success { job = r.job; password = "" } else { error = r.error ?? "The import could not start." }
+                if r.success { job = r.job; password = "" } else { error = r.error ?? String(localized: "The import could not start.") }
             } catch {
-                self.error = (error as? ApiError)?.userMessage ?? "The import could not start."
+                self.error = (error as? ApiError)?.userMessage ?? String(localized: "The import could not start.")
             }
         }
     }

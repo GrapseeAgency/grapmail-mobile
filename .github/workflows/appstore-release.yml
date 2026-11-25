@@ -1,0 +1,385 @@
+name: App Store release
+
+# What happens to an iOS build AFTER it reaches App Store Connect.
+#
+# Archiving, signing and the upload itself are NOT repeated here: ios.yml's
+# `release` job already archives with the team from APPLE_TEAM_ID, installs the
+# distribution certificate into a throwaway keychain, checks the provisioning
+# profile is a production one, refuses an archive whose version disagrees with
+# the tag, and uploads with `xcodebuild -exportArchive` (destination=Upload)
+# through the App Store Connect API key. A second copy of that would be a second
+# place for the signing rules to drift — and App Store Connect refuses the same
+# build number twice anyway.
+#
+#   testflight       after a successful tag run of ios.yml: version gate, wait
+#                    for Apple to finish processing the build, optionally add it
+#                    to the TestFlight group in variable ASC_BETA_GROUP
+#   submit           (manual, approved) attach the build to the App Store
+#                    version, turn ON phased release, submit for review. Gated
+#                    on crash-free sessions from TestFlight testers.
+#   phased-pause     pause Apple's 7-day phased release (no approval wait)
+#   phased-resume    resume it (approved, crash-free gated)
+#   phased-complete  release to everyone now (approved, crash-free gated)
+#   phased-status    print where the phased release is
+#   (cron)           every 6h: crash-free check on the version in phased release;
+#                    red on failure, auto-pause if ASC_AUTO_PAUSE == 'true'
+#
+# Apple's phased release only throttles AUTOMATIC updates (1/2/5/10/20/50/100%
+# over 7 days); anyone can still download the new version from the store page.
+# Runbook: RELEASING.md.
+
+on:
+  workflow_run:
+    workflows: [iOS]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      action:
+        description: What to do
+        type: choice
+        options: [phased-status, testflight-wait, submit, phased-pause, phased-resume, phased-complete]
+        default: phased-status
+      version:
+        description: "Marketing version (blank = MARKETING_VERSION in ios/project.yml at the selected ref)"
+        type: string
+        default: ""
+      build:
+        description: "Build number (blank = CURRENT_PROJECT_VERSION at the selected ref)"
+        type: string
+        default: ""
+      release_type:
+        description: "submit: release automatically after approval, or wait for a manual Release click"
+        type: choice
+        options: [AFTER_APPROVAL, MANUAL]
+        default: MANUAL
+      crash_free_threshold:
+        description: Minimum crash-free sessions (%) over the last 24h
+        type: string
+        default: "99.5"
+      min_sessions:
+        description: Minimum sessions for the gate to count as evidence
+        type: string
+        default: "20"
+      override_gate:
+        description: Proceed even though the crash-free gate failed or could not run (recorded)
+        type: boolean
+        default: false
+      override_reason:
+        description: Why the override is safe (required with override_gate; shown in the run summary)
+        type: string
+        default: ""
+      version_override:
+        description: "Ship despite a cross-platform version mismatch or non-increasing version (recorded)"
+        type: boolean
+        default: false
+  schedule:
+    - cron: "47 */6 * * *"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: appstore-release
+  cancel-in-progress: false
+
+env:
+  # Existing ios.yml secret names first; the ASC_* names are accepted too.
+  ASC_KEY_ID: ${{ secrets.ASC_KEY_ID || secrets.APPLE_API_KEY_ID }}
+  ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID || secrets.APPLE_API_ISSUER_ID }}
+  ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 || secrets.APPLE_API_KEY_P8 }}
+
+jobs:
+  testflight:
+    name: TestFlight — wait for processing
+    if: >-
+      (github.event_name == 'workflow_run'
+        && github.event.workflow_run.conclusion == 'success'
+        && github.event.workflow_run.event == 'push'
+        && startsWith(github.event.workflow_run.head_branch, 'v'))
+      || (github.event_name == 'workflow_dispatch' && inputs.action == 'testflight-wait')
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          fetch-depth: 0
+
+      - name: Version gate (tag ↔ MARKETING_VERSION ↔ versionName, build numbers increase)
+        id: versions
+        env:
+          TAG: ${{ github.event.workflow_run.head_branch || (github.ref_type == 'tag' && github.ref_name || '') }}
+          OVERRIDE: ${{ inputs.version_override && 'true' || 'false' }}
+        run: |
+          args=(--platform ios --tag "$TAG" --head HEAD)
+          [[ "$OVERRIDE" == true ]] && args+=(--allow-override) && echo "version_override set by $GITHUB_ACTOR" >> "$GITHUB_STEP_SUMMARY"
+          python3 scripts/release-version-check.py "${args[@]}"
+
+      - name: Install the App Store Connect client
+        run: |
+          python3 -m venv "$RUNNER_TEMP/rel"
+          "$RUNNER_TEMP/rel/bin/pip" install --quiet "pyjwt[crypto]==2.10.1" requests==2.32.3
+
+      - name: Wait until App Store Connect has processed the build
+        env:
+          VERSION: ${{ inputs.version || steps.versions.outputs.ios_marketing_version }}
+          BUILD: ${{ inputs.build || steps.versions.outputs.ios_build_number }}
+        run: |
+          "$RUNNER_TEMP/rel/bin/python" scripts/appstore-connect.py wait-build --version "$VERSION" --build "$BUILD" --timeout 3600
+
+      - name: Add to the TestFlight group (if ASC_BETA_GROUP is set)
+        if: vars.ASC_BETA_GROUP != ''
+        env:
+          VERSION: ${{ inputs.version || steps.versions.outputs.ios_marketing_version }}
+          BUILD: ${{ inputs.build || steps.versions.outputs.ios_build_number }}
+          GROUP: ${{ vars.ASC_BETA_GROUP }}
+        run: |
+          "$RUNNER_TEMP/rel/bin/python" scripts/appstore-connect.py add-to-group --version "$VERSION" --build "$BUILD" --group "$GROUP"
+
+  submit:
+    name: Submit for review with phased release
+    if: github.event_name == 'workflow_dispatch' && inputs.action == 'submit'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: appstore-production
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Must run from the release tag
+        if: github.ref_type != 'tag' && !inputs.version_override
+        run: |
+          echo "::error::run 'submit' from the release tag (Run workflow › Use workflow from › Tags › vX.Y.Z), so the version gate can compare the tag with the build."
+          exit 1
+
+      - name: Version gate
+        id: versions
+        env:
+          TAG: ${{ github.ref_type == 'tag' && github.ref_name || '' }}
+          OVERRIDE: ${{ inputs.version_override && 'true' || 'false' }}
+        run: |
+          args=(--platform ios --tag "$TAG" --head HEAD)
+          [[ "$OVERRIDE" == true ]] && args+=(--allow-override) && echo "version_override set by $GITHUB_ACTOR" >> "$GITHUB_STEP_SUMMARY"
+          python3 scripts/release-version-check.py "${args[@]}"
+
+      - name: Resolve version and build
+        id: target
+        env:
+          IN_VERSION: ${{ inputs.version }}
+          IN_BUILD: ${{ inputs.build }}
+          GATE_VERSION: ${{ steps.versions.outputs.ios_marketing_version }}
+          GATE_BUILD: ${{ steps.versions.outputs.ios_build_number }}
+        run: |
+          v="${IN_VERSION:-$GATE_VERSION}"; b="${IN_BUILD:-$GATE_BUILD}"
+          [[ "$v" =~ ^[0-9]+(\.[0-9]+){0,2}$ ]] || { echo "::error::bad version '$v'"; exit 1; }
+          [[ "$b" =~ ^[0-9]+(\.[0-9]+)*$ ]] || { echo "::error::bad build '$b'"; exit 1; }
+          echo "version=$v" >> "$GITHUB_OUTPUT"; echo "build=$b" >> "$GITHUB_OUTPUT"
+
+      - name: Crash-free gate (TestFlight sessions, last 24h)
+        id: gate
+        env:
+          GRAPMAIL_REPORTS_SECRET: ${{ secrets.GRAPMAIL_REPORTS_SECRET }}
+          GRAPMAIL_REPORTS_SUMMARY_URL: ${{ vars.GRAPMAIL_REPORTS_SUMMARY_URL }}
+          VERSION: ${{ steps.target.outputs.version }}
+          BUILD: ${{ steps.target.outputs.build }}
+          THRESHOLD: ${{ inputs.crash_free_threshold }}
+          MIN_SESSIONS: ${{ inputs.min_sessions }}
+        run: |
+          set +e
+          python3 scripts/release-crash-gate.py --platform ios --version "$VERSION" --build "$BUILD" \
+            --threshold "${THRESHOLD:-99.5}" --min-sessions "${MIN_SESSIONS:-20}" --hours 24
+          echo "rc=$?" >> "$GITHUB_OUTPUT"
+          exit 0
+
+      - name: Decide (gate result or a recorded override)
+        env:
+          RC: ${{ steps.gate.outputs.rc }}
+          OVERRIDE: ${{ inputs.override_gate }}
+          REASON: ${{ inputs.override_reason }}
+        run: &decide |
+          if [[ "$RC" == 0 ]]; then exit 0; fi
+          what=$([[ "$RC" == 1 ]] && echo "FAILED on real data" || echo "could not be evaluated (fail closed)")
+          if [[ "$OVERRIDE" != true ]]; then
+            echo "::error::crash-free gate $what — nothing was changed. Wait for more sessions, fix forward, or re-run with override_gate and override_reason."
+            exit 1
+          fi
+          if [[ -z "${REASON// }" ]]; then
+            echo "::error::override_gate needs an override_reason; it goes on the record."
+            exit 1
+          fi
+          echo "::warning title=crash gate OVERRIDDEN::by $GITHUB_ACTOR — $REASON"
+          {
+            echo ""
+            echo "> ⚠️ **Crash-free gate OVERRIDDEN** (gate $what)"
+            echo "> by @$GITHUB_ACTOR, run $GITHUB_RUN_ID: $REASON"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Install the App Store Connect client
+        run: |
+          python3 -m venv "$RUNNER_TEMP/rel"
+          "$RUNNER_TEMP/rel/bin/pip" install --quiet "pyjwt[crypto]==2.10.1" requests==2.32.3
+
+      - name: Submit with phased release ON
+        env:
+          VERSION: ${{ steps.target.outputs.version }}
+          BUILD: ${{ steps.target.outputs.build }}
+          RELEASE_TYPE: ${{ inputs.release_type }}
+        run: |
+          "$RUNNER_TEMP/rel/bin/python" scripts/appstore-connect.py submit --version "$VERSION" --build "$BUILD" \
+            --release-type "$RELEASE_TYPE" --whats-new-file whatsnew/ios-en-US.txt
+
+  phased-pause:
+    name: Pause the phased release
+    # No environment on purpose: the brake must never wait for a reviewer.
+    if: github.event_name == 'workflow_dispatch' && inputs.action == 'phased-pause'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install the App Store Connect client
+        run: |
+          python3 -m venv "$RUNNER_TEMP/rel"
+          "$RUNNER_TEMP/rel/bin/pip" install --quiet "pyjwt[crypto]==2.10.1" requests==2.32.3
+      - name: Pause
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          "$RUNNER_TEMP/rel/bin/python" scripts/appstore-connect.py phased --action pause ${VERSION:+--version "$VERSION"}
+          echo "- ⏸️ paused by @$GITHUB_ACTOR. Next: pause the failing feature via /grapmail/app-config kill switches; Apple allows 30 days of pause in total." >> "$GITHUB_STEP_SUMMARY"
+
+  phased-status:
+    name: Phased release status
+    if: github.event_name == 'workflow_dispatch' && inputs.action == 'phased-status'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install the App Store Connect client
+        run: |
+          python3 -m venv "$RUNNER_TEMP/rel"
+          "$RUNNER_TEMP/rel/bin/pip" install --quiet "pyjwt[crypto]==2.10.1" requests==2.32.3
+      - name: Status
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          "$RUNNER_TEMP/rel/bin/python" scripts/appstore-connect.py phased --action status ${VERSION:+--version "$VERSION"}
+
+  phased-change:
+    name: ${{ inputs.action == 'phased-complete' && 'Release to everyone' || 'Resume the phased release' }}
+    if: github.event_name == 'workflow_dispatch' && (inputs.action == 'phased-resume' || inputs.action == 'phased-complete')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: appstore-production
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install the App Store Connect client
+        run: |
+          python3 -m venv "$RUNNER_TEMP/rel"
+          "$RUNNER_TEMP/rel/bin/pip" install --quiet "pyjwt[crypto]==2.10.1" requests==2.32.3
+      - name: Where is it now
+        id: now
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          "$RUNNER_TEMP/rel/bin/python" scripts/appstore-connect.py phased --action status ${VERSION:+--version "$VERSION"}
+      - name: Crash-free gate (last 24h)
+        id: gate
+        env:
+          GRAPMAIL_REPORTS_SECRET: ${{ secrets.GRAPMAIL_REPORTS_SECRET }}
+          GRAPMAIL_REPORTS_SUMMARY_URL: ${{ vars.GRAPMAIL_REPORTS_SUMMARY_URL }}
+          VERSION: ${{ steps.now.outputs.version }}
+          BUILD: ${{ steps.now.outputs.build }}
+          THRESHOLD: ${{ inputs.crash_free_threshold }}
+          MIN_SESSIONS: ${{ inputs.min_sessions }}
+        run: |
+          set +e
+          [[ -n "$VERSION" ]] || { echo "::error::no version is in a phased release"; echo "rc=3" >> "$GITHUB_OUTPUT"; exit 1; }
+          python3 scripts/release-crash-gate.py --platform ios --version "$VERSION" --build "$BUILD" \
+            --threshold "${THRESHOLD:-99.5}" --min-sessions "${MIN_SESSIONS:-20}" --hours 24
+          echo "rc=$?" >> "$GITHUB_OUTPUT"
+          exit 0
+      - name: Decide (gate result or a recorded override)
+        env:
+          RC: ${{ steps.gate.outputs.rc }}
+          OVERRIDE: ${{ inputs.override_gate }}
+          REASON: ${{ inputs.override_reason }}
+        run: |
+          if [[ "$RC" == 0 ]]; then exit 0; fi
+          what=$([[ "$RC" == 1 ]] && echo "FAILED on real data" || echo "could not be evaluated (fail closed)")
+          if [[ "$OVERRIDE" != true ]]; then
+            echo "::error::crash-free gate $what — nothing was changed. Wait for more sessions, fix forward, or re-run with override_gate and override_reason."
+            exit 1
+          fi
+          if [[ -z "${REASON// }" ]]; then
+            echo "::error::override_gate needs an override_reason; it goes on the record."
+            exit 1
+          fi
+          echo "::warning title=crash gate OVERRIDDEN::by $GITHUB_ACTOR — $REASON"
+          {
+            echo ""
+            echo "> ⚠️ **Crash-free gate OVERRIDDEN** (gate $what)"
+            echo "> by @$GITHUB_ACTOR, run $GITHUB_RUN_ID: $REASON"
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Apply
+        env:
+          VERSION: ${{ steps.now.outputs.version }}
+          ACTION: ${{ inputs.action == 'phased-complete' && 'complete' || 'resume' }}
+        run: |
+          "$RUNNER_TEMP/rel/bin/python" scripts/appstore-connect.py phased --action "$ACTION" --version "$VERSION"
+
+  watch:
+    name: Watch the phased release
+    if: github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Skip quietly until App Store Connect is set up
+        id: ready
+        run: |
+          if [[ -z "$ASC_KEY_ID" || -z "$ASC_ISSUER_ID" || -z "$ASC_KEY_P8" ]]; then
+            echo "::notice::App Store Connect API key secrets not set yet — nothing to watch"
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Install the App Store Connect client
+        if: steps.ready.outputs.ready == 'true'
+        run: |
+          python3 -m venv "$RUNNER_TEMP/rel"
+          "$RUNNER_TEMP/rel/bin/pip" install --quiet "pyjwt[crypto]==2.10.1" requests==2.32.3
+      - name: Where is the phased release
+        id: now
+        if: steps.ready.outputs.ready == 'true'
+        run: |
+          "$RUNNER_TEMP/rel/bin/python" scripts/appstore-connect.py phased --action status
+      - name: Crash-free gate on the live version
+        id: gate
+        if: steps.now.outputs.phase_state == 'ACTIVE'
+        env:
+          GRAPMAIL_REPORTS_SECRET: ${{ secrets.GRAPMAIL_REPORTS_SECRET }}
+          GRAPMAIL_REPORTS_SUMMARY_URL: ${{ vars.GRAPMAIL_REPORTS_SUMMARY_URL }}
+          VERSION: ${{ steps.now.outputs.version }}
+          BUILD: ${{ steps.now.outputs.build }}
+          THRESHOLD: ${{ vars.CRASH_FREE_THRESHOLD || '99.5' }}
+        run: |
+          set +e
+          python3 scripts/release-crash-gate.py --platform ios --version "$VERSION" --build "$BUILD" \
+            --threshold "$THRESHOLD" --min-sessions 1 --hours 24
+          rc=$?
+          echo "rc=$rc" >> "$GITHUB_OUTPUT"
+          [[ $rc -eq 2 ]] && echo "::warning::crash summary unavailable — the phased release was not judged this round"
+          exit 0
+      - name: Pause automatically (only if ASC_AUTO_PAUSE is 'true')
+        if: steps.gate.outputs.rc == '1' && vars.ASC_AUTO_PAUSE == 'true'
+        env:
+          VERSION: ${{ steps.now.outputs.version }}
+        run: |
+          "$RUNNER_TEMP/rel/bin/python" scripts/appstore-connect.py phased --action pause --version "$VERSION"
+          echo "- ⏸️ auto-paused: the phased release fell below the crash-free threshold" >> "$GITHUB_STEP_SUMMARY"
+      - name: Go red when the live version is unhealthy
+        if: steps.gate.outputs.rc == '1'
+        run: |
+          echo "::error::the version in phased release is below the crash-free threshold. Pause it (action: phased-pause) and use the app-config kill switches — RELEASING.md › When a rollout goes bad."
+          exit 1

@@ -1,0 +1,33 @@
+/* GrapMail — Reader string table (id). Translated from en.lproj/Reader.strings.
+   Counted keys also have an entry in Reader.stringsdict, which wins over the entry here. */
+
+"You" = "Anda";
+"to me" = "kepada saya";
+"to %@" = "kepada %@";
+"to %lld people" = "kepada %lld orang";
+"Unread" = "Belum dibaca";
+"%lld earlier messages" = "%lld pesan sebelumnya";
+"Shows the folded messages" = "Menampilkan pesan yang diciutkan";
+"%lld people" = "%lld orang";
+"%lld messages" = "%lld pesan";
+"Show quoted text" = "Tampilkan teks kutipan";
+"Hide quoted text" = "Sembunyikan teks kutipan";
+"Collapsed" = "Diciutkan";
+"Expanded" = "Diluaskan";
+"Reply to %@…" = "Balas ke %@…";
+"Reply…" = "Balas…";
+"Opens the editor" = "Membuka editor";
+"Reply options" = "Opsi balasan";
+"Quick reply" = "Balasan cepat";
+"%lld attachments" = "%lld lampiran";
+"Save all" = "Simpan semua";
+"Preparing…" = "Menyiapkan…";
+"Opens the share sheet, where Save to Files keeps every attachment" = "Membuka lembar bagikan, tempat Simpan ke File menyimpan semua lampiran";
+"Image %lld of %lld, %@" = "Gambar %1$lld dari %2$lld, %3$@";
+"File" = "File";
+"Opens a preview" = "Membuka pratinjau";
+"Save %@" = "Simpan %@";
+"Share %@" = "Bagikan %@";
+"Open" = "Buka";
+"Save" = "Simpan";
+"Share" = "Bagikan";

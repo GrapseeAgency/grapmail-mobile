@@ -1,5 +1,9 @@
 package com.grapsee.grapmail.ui.screens.mail
 
+import com.grapsee.grapmail.ui.components.gmPrefersStackedRows
+import com.grapsee.grapmail.ui.components.GMLayout
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.ui.text.style.TextOverflow
 import android.content.Intent
 import android.net.Uri
 import androidx.compose.foundation.background
@@ -30,6 +34,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
+import com.grapsee.grapmail.R
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -39,6 +45,9 @@ import com.grapsee.grapmail.data.MailMessageDto
 import com.grapsee.grapmail.data.MailStore
 import com.grapsee.grapmail.data.MailUnsubscribeDto
 import com.grapsee.grapmail.logic.MailboxViewModel
+import com.grapsee.grapmail.ui.components.ErrorState
+import com.grapsee.grapmail.ui.components.ListSkeleton
+import com.grapsee.grapmail.ui.components.OfflineBanner
 import com.grapsee.grapmail.ui.components.SenderAvatar
 import com.grapsee.grapmail.ui.components.unsubscribeMailto
 import com.grapsee.grapmail.ui.components.unsubscribeTarget
@@ -84,12 +93,26 @@ private val SERVICE_LOCAL =
 private fun looksLikeAPerson(address: String): Boolean =
     !SERVICE_LOCAL.containsMatchIn(address.substringBefore("@").lowercase())
 
-/** The web's `frequencyLabel`, same three buckets, same phrases. */
+/**
+ * The web's `frequencyLabel`, same three buckets, same phrases. This is the
+ * parity key the row carries; what the row DRAWS is [frequencyText], the same
+ * bucket read from the string table so it can be translated.
+ */
 fun frequencyLabel(count: Int): String = when {
     count >= 20 -> "20+ emails recently"
     count >= 10 -> "10-20 emails recently"
     else -> "10 or fewer emails recently"
 }
+
+/** [frequencyLabel]'s bucket as the person reads it (same thresholds). */
+@Composable
+fun frequencyText(count: Int): String = stringResource(
+    when {
+        count >= 20 -> R.string.mail_subs_freq_20_plus
+        count >= 10 -> R.string.mail_subs_freq_10_20
+        else -> R.string.mail_subs_freq_10_or_fewer
+    },
+)
 
 /**
  * The web's `detectSubscriptions` over the messages this device has loaded:
@@ -159,8 +182,10 @@ fun SubscriptionsScreen(vm: MailboxViewModel, onBack: () -> Unit) {
     var gone by remember { mutableStateOf(listOf<String>()) }
     var note by remember { mutableStateOf<String?>(null) }
     var confirm by remember { mutableStateOf<SubscriptionRow?>(null) }
+    var attempt by remember { mutableStateOf(0) }
 
-    LaunchedEffect(Unit) {
+    LaunchedEffect(attempt) {
+        failed = false
         // The cache, not a fresh fetch: the same read the Contacts and Files
         // screens make. An absent inbox is "the mail has not been opened
         // here", not an empty mailbox.
@@ -175,50 +200,46 @@ fun SubscriptionsScreen(vm: MailboxViewModel, onBack: () -> Unit) {
         it.direction?.lowercase() in setOf("in", "inbound")
     }
 
-    MailScaffold("Subscriptions", onBack) {
-        Column(
+    MailScaffold(stringResource(R.string.mail_subs_title), onBack, maxContentWidth = GMLayout.Readable) {
+        OfflineBanner()
+        // First load and a failed read draw the shared states outside the
+        // scrolling column (they size and scroll themselves).
+        if (failed) {
+            ErrorState(onRetry = { attempt += 1 },
+                message = stringResource(R.string.mail_subs_failed),
+                modifier = Modifier.testTag("gm-subs-failed"))
+        } else if (!loaded) {
+            ListSkeleton(Modifier.fillMaxSize().testTag("gm-subs-reading"), rows = 6,
+                label = stringResource(R.string.mail_subs_reading))
+        } else Column(
             Modifier.fillMaxSize().verticalScroll(rememberScrollState())
                 .padding(horizontal = 20.dp),
         ) {
             Text(
-                "Senders that keep mailing this account, with a way to stop each one.",
+                stringResource(R.string.mail_subs_intro),
                 fontSize = 13.sp, lineHeight = 20.sp, color = palette.textSecondary,
                 modifier = Modifier.padding(top = 6.dp),
             )
             Spacer(Modifier.height(10.dp))
             when {
-                failed -> Text(
-                    "Could not read the mailbox just now. Try again — open the inbox, " +
-                        "then come back.",
-                    fontSize = 14.sp, color = palette.error,
-                    modifier = Modifier.padding(vertical = 16.dp).testTag("gm-subs-failed"),
-                )
-                !loaded -> Text(
-                    "Reading your mail…", fontSize = 14.sp, color = palette.textTertiary,
-                    modifier = Modifier.padding(vertical = 16.dp).testTag("gm-subs-reading"),
-                )
                 subs.size == 0 -> Column(Modifier.testTag("gm-subs-empty")) {
                     Text(
-                        "No subscriptions detected.",
+                        stringResource(R.string.mail_subs_empty_title),
                         fontSize = 17.sp, fontWeight = FontWeight.SemiBold,
                         color = palette.textPrimary,
                         modifier = Modifier.padding(top = 48.dp, bottom = 10.dp),
                     )
                     Text(
-                        "This screen reads the incoming inbox mail the app has loaded on this " +
-                            "device — $scopeCount messages — and groups the senders that keep " +
-                            "mailing you. A sender counts with two messages when they offer an " +
-                            "unsubscribe, or three when they do not. Nothing is shown here as " +
-                            "an example; the moment mail arrives, the senders appear with their " +
-                            "frequency and a way to stop them.",
+                        stringResource(R.string.mail_subs_empty_body, scopeCount),
                         fontSize = 13.sp, lineHeight = 20.sp, color = palette.textSecondary,
                     )
                     ScopeHint(palette)
                 }
                 else -> {
+                    val mailtoOpened = stringResource(R.string.mail_subs_mailto_opened)
+                    val mailtoNone = stringResource(R.string.mail_subs_mailto_none)
                     Text(
-                        "When you unsubscribe, it can take senders a few days to stop " +
-                            "sending messages.",
+                        stringResource(R.string.mail_subs_delay_note),
                         fontSize = 13.sp, color = palette.textSecondary,
                         modifier = Modifier.padding(vertical = 6.dp),
                     )
@@ -236,20 +257,15 @@ fun SubscriptionsScreen(vm: MailboxViewModel, onBack: () -> Unit) {
                                     Uri.parse("mailto:$addr?subject=unsubscribe"))
                                 try {
                                     context.startActivity(intent)
-                                    note = "The device opened a draft to the sender's " +
-                                        "unsubscribe address. Nothing has left this phone " +
-                                        "until you send it."
+                                    note = mailtoOpened
                                 } catch (e: android.content.ActivityNotFoundException) {
-                                    note = "This device has no mail app that can open " +
-                                        "that address, so nothing was drafted."
+                                    note = mailtoNone
                                 }
                             })
                     }
                     Spacer(Modifier.height(8.dp))
                     Text(
-                        "This screen grouped the $scopeCount incoming messages the app has " +
-                            "loaded; a sender whose mail is not on this device is not on this " +
-                            "list.",
+                        stringResource(R.string.mail_subs_scope, scopeCount),
                         fontSize = 12.sp, lineHeight = 18.sp, color = palette.textTertiary,
                     )
                     ScopeHint(palette)
@@ -266,8 +282,7 @@ fun SubscriptionsScreen(vm: MailboxViewModel, onBack: () -> Unit) {
             }
             Spacer(Modifier.height(14.dp))
             Text(
-                "Nothing was sent to any sender until you press Unsubscribe. This screen " +
-                    "never mails on your behalf on its own.",
+                stringResource(R.string.mail_subs_footer),
                 fontSize = 12.sp, lineHeight = 18.sp, color = palette.textTertiary,
             )
             Spacer(Modifier.height(24.dp))
@@ -290,24 +305,23 @@ fun SubscriptionsScreen(vm: MailboxViewModel, onBack: () -> Unit) {
                         onOpen = {
                             val outcome = openExternally(context, url)
                             gone = gone + s.address
-                            note = outcome + " The row is removed here because this device " +
-                                "cannot see what the page said."
+                            note = context.getString(R.string.mail_subs_removed_note, outcome)
                             confirm = null
                         },
                         onCancel = { confirm = null },
                     )
                 } else {
                     Text(
-                        s.name + " does not offer an unsubscribe, so there is nothing " +
-                            "this device can hand off.",
+                        stringResource(R.string.mail_subs_no_offer, s.name),
                         fontSize = 13.sp, lineHeight = 20.sp, color = palette.textSecondary,
                         modifier = Modifier.padding(horizontal = 20.dp, vertical = 16.dp),
                     )
                     Text(
-                        "Close", fontSize = 14.sp, color = palette.textTertiary,
+                        stringResource(R.string.mail_common_close), fontSize = 14.sp, color = palette.textTertiary,
+                        // The whole line is the 48dp target, not just the word.
                         modifier = Modifier.fillMaxWidth()
-                            .padding(horizontal = 20.dp, vertical = 12.dp)
-                            .clickable { confirm = null },
+                            .clickable(role = androidx.compose.ui.semantics.Role.Button) { confirm = null }
+                            .padding(horizontal = 20.dp, vertical = 14.dp),
                     )
                 }
             }
@@ -318,8 +332,7 @@ fun SubscriptionsScreen(vm: MailboxViewModel, onBack: () -> Unit) {
 @Composable
 private fun ScopeHint(palette: com.grapsee.grapmail.ui.theme.Palette) {
     Text(
-        "When a sender offers a one-click unsubscribe, it is used; otherwise their own " +
-            "unsubscribe page opens.",
+        stringResource(R.string.mail_subs_scope_hint),
         fontSize = 12.sp, lineHeight = 18.sp, color = palette.textTertiary,
         modifier = Modifier.padding(top = 8.dp),
     )
@@ -334,33 +347,67 @@ private fun SubscriptionRowLine(
 ) {
     val webTarget = unsubscribeTarget(s.unsubscribe)
     val mailto = unsubscribeMailto(s.unsubscribe)
+    // At large text the button moves under the sender instead of squeezing
+    // the name and address to a sliver; at the default size the row is as it was.
+    val stacked = gmPrefersStackedRows()
+    val details: @Composable (Modifier) -> Unit = { mod ->
+        Column(mod) {
+            Text(s.name, fontSize = 14.sp, color = palette.textPrimary,
+                maxLines = if (stacked) 3 else 1, overflow = TextOverflow.Ellipsis)
+            Text(s.address, fontSize = 12.sp, color = palette.textSecondary,
+                maxLines = if (stacked) 3 else 1, overflow = TextOverflow.Ellipsis)
+            Text(frequencyText(s.count), fontSize = 12.sp, color = palette.textTertiary)
+        }
+    }
+    if (stacked) {
+        Column(
+            Modifier.fillMaxWidth().padding(vertical = 14.dp).testTag("gm-subs-row"),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                SenderAvatar(display = s.name, address = s.address, size = 38.dp)
+                Spacer(Modifier.width(12.dp))
+                details(Modifier.weight(1f))
+            }
+            UnsubscribeAction(palette, Modifier.align(Alignment.End)) {
+                if (webTarget != null) onUnsubscribe()
+                else if (mailto != null) onMailto(mailto)
+            }
+        }
+        return
+    }
     Row(
         Modifier.fillMaxWidth().padding(vertical = 14.dp).testTag("gm-subs-row"),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         SenderAvatar(display = s.name, address = s.address, size = 38.dp)
         Spacer(Modifier.width(12.dp))
-        Column(Modifier.weight(1f)) {
-            Text(s.name, fontSize = 14.sp, color = palette.textPrimary, maxLines = 1)
-            Text(s.address, fontSize = 12.sp, color = palette.textSecondary, maxLines = 1)
-            Text(s.frequency, fontSize = 12.sp, color = palette.textTertiary)
-        }
+        details(Modifier.weight(1f))
         Spacer(Modifier.width(10.dp))
+        UnsubscribeAction(palette, Modifier) {
+            if (webTarget != null) onUnsubscribe()
+            else if (mailto != null) onMailto(mailto)
+        }
+    }
+}
+
+@Composable
+private fun UnsubscribeAction(
+    palette: com.grapsee.grapmail.ui.theme.Palette,
+    modifier: Modifier,
+    onClick: () -> Unit,
+) {
         // The button names the handoff it actually performs. A one-click offer
         // is advertised, not verified from here, so the label never says
         // "one-click": the sheet's own lines carry that precision.
         Text(
-            "Unsubscribe",
+            stringResource(R.string.mail_subs_unsubscribe),
             fontSize = 13.sp, fontWeight = FontWeight.Medium, color = palette.onPrimary,
             textAlign = TextAlign.Center,
-            modifier = Modifier.clip(CircleShape)
+            modifier = modifier.clip(CircleShape)
                 .background(palette.primarySolid)
-                .clickable {
-                    if (webTarget != null) onUnsubscribe()
-                    else if (mailto != null) onMailto(mailto)
-                }
-                .padding(horizontal = 18.dp, vertical = 13.dp)
+                .clickable(role = androidx.compose.ui.semantics.Role.Button, onClick = onClick)
+                .padding(horizontal = 18.dp, vertical = 15.dp)
                 .testTag("gm-subs-action"),
         )
-    }
 }

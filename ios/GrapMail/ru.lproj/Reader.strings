@@ -1,0 +1,95 @@
+/* ru translation of en.lproj/Reader.strings (round 9, ios_translations_b). Keys stay English; values translated. */
+/* Round 8 — Workstream D (reader & conversation polish, round8-spec §5). English base table "Reader".
+   Looked up with String(localized: "…", table: "Reader") / Text("…", tableName: "Reader").
+   Counted keys also have an entry in Reader.stringsdict, which wins over the entry here.
+   Other languages fall back to these English keys until they are translated. */
+
+/* Conversation: sender name on one's own message */
+"You" = "Вы";
+
+/* Conversation: recipients line when the message went only to the reader */
+"to me" = "мне";
+
+/* Conversation: recipients line with one recipient. Value: their name or address */
+"to %@" = "кому: %@";
+
+/* Conversation: recipients line with several recipients (plural in Reader.stringsdict) */
+"to %lld people" = "Получателей: %lld";
+
+/* Conversation: VoiceOver value on a folded card of an unread message */
+"Unread" = "Непрочитанное";
+
+/* Conversation: the bar that stands in for folded messages (plural in Reader.stringsdict) */
+"%lld earlier messages" = "Предыдущих писем: %lld";
+
+/* Conversation: VoiceOver hint on the earlier-messages bar */
+"Shows the folded messages" = "Показывает свёрнутые письма";
+
+/* Conversation: chip under the subject, people in the conversation (plural in Reader.stringsdict) */
+"%lld people" = "Участников: %lld";
+
+/* Conversation: chip under the subject, messages in the conversation (plural in Reader.stringsdict) */
+"%lld messages" = "Писем: %lld";
+
+/* Quoted history: button that shows the folded earlier text */
+"Show quoted text" = "Показать цитату";
+
+/* Quoted history: button that folds it again */
+"Hide quoted text" = "Скрыть цитату";
+
+/* Quoted history: VoiceOver state of the button */
+"Collapsed" = "Свёрнуто";
+
+/* Quoted history: VoiceOver state of the button */
+"Expanded" = "Развёрнуто";
+
+/* Quick reply bar: placeholder. Value: the first name of the person the reply goes to */
+"Reply to %@…" = "Ответить: %@…";
+
+/* Quick reply bar: placeholder when nobody can be named */
+"Reply…" = "Ответить…";
+
+/* Quick reply bar: VoiceOver hint */
+"Opens the editor" = "Открывает редактор";
+
+/* Quick reply bar: VoiceOver label of the menu with Reply all and Forward */
+"Reply options" = "Варианты ответа";
+
+/* Quick reply bar: VoiceOver name of the region */
+"Quick reply" = "Быстрый ответ";
+
+/* Attachments: section title (plural in Reader.stringsdict) */
+"%lld attachments" = "Вложений: %lld";
+
+/* Attachments: link that opens the share sheet for every attachment */
+"Save all" = "Сохранить все";
+
+/* Attachments: shown while every attachment is being fetched for Save all */
+"Preparing…" = "Подготовка…";
+
+/* Attachments: VoiceOver hint on Save all */
+"Opens the share sheet, where Save to Files keeps every attachment" = "Открывает меню «Поделиться», где «Сохранить в Файлы» сохранит все вложения";
+
+/* Attachments: VoiceOver label of a picture in the grid. Values: its position, the number of files, its file name */
+"Image %lld of %lld, %@" = "Изображение %1$lld из %2$lld, %3$@";
+
+/* Attachments: meta line of a file with no known type or size */
+"File" = "Файл";
+
+/* Attachments: VoiceOver hint on a file row */
+"Opens a preview" = "Открывает просмотр";
+
+/* Attachments: VoiceOver label of the save button. Value: the file name */
+"Save %@" = "Сохранить %@";
+
+/* Attachments: VoiceOver label of the share button. Value: the file name */
+"Share %@" = "Поделиться: %@";
+
+/* Attachments: context-menu action */
+"Open" = "Открыть";
+
+/* Attachments: context-menu action */
+"Save" = "Сохранить";
+
+/* Attachments: context-menu action */
+"Share" = "Поделиться";

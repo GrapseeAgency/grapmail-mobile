@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    values-es/strings_send_later.xml: translation of values/strings_send_later.xml (same keys, same order).
+    Comments below are kept from the English source for context.
+-->
+<resources>
+    <!-- The clock button next to Send (TalkBack label and click action). -->
+    <string name="compose_send_later_button">Programar envío</string>
+    <string name="compose_send_later_button_action">elegir cuándo enviar</string>
+
+    <!-- The sheet. -->
+    <string name="compose_send_later_title">Enviar más tarde</string>
+    <string name="compose_send_later_later_today">Hoy, más tarde</string>
+    <string name="compose_send_later_tomorrow_morning">Mañana por la mañana</string>
+    <string name="compose_send_later_monday_morning">El lunes por la mañana</string>
+    <string name="compose_send_later_pick">Elegir fecha y hora</string>
+    <string name="compose_send_later_pick_hint">Hasta 30 días de antelación</string>
+    <!-- %1$s: the device time zone's name, e.g. "Bangladesh Standard Time". -->
+    <string name="compose_send_later_zone_note">Las horas están en tu zona horaria: %1$s</string>
+    <!-- TalkBack for one option row. %1$s: option name, %2$s: its day and time. -->
+    <string name="compose_send_later_option_description">%1$s, %2$s</string>
+
+    <!-- Date and time dialogs. -->
+    <string name="compose_send_later_date_title">Elige una fecha</string>
+    <string name="compose_send_later_time_title">Elige una hora</string>
+    <string name="compose_send_later_next">Siguiente</string>
+    <string name="compose_send_later_schedule">Programar</string>
+    <string name="compose_send_later_cancel">Cancelar</string>
+    <string name="compose_send_later_type_time">Escribir la hora</string>
+    <string name="compose_send_later_use_clock">Usar el reloj</string>
+    <string name="compose_send_later_too_soon">Elige una hora que sea al menos un minuto después de ahora.</string>
+    <string name="compose_send_later_too_far">Elige una hora con un máximo de 30 días de antelación.</string>
+
+    <!-- In-flight and failure lines in the composer. -->
+    <string name="compose_send_later_scheduling">Programando…</string>
+    <string name="compose_send_later_offline">Sin conexión, así que no se ha programado nada. Tu mensaje sigue aquí.</string>
+
+    <!-- The receipt snackbar shown after compose closes. %1$s: e.g. "Tue 8:00 AM". -->
+    <string name="compose_send_later_scheduled_for">Programado para %1$s</string>
+    <string name="compose_send_later_undo">Deshacer</string>
+    <string name="compose_send_later_view">Ver</string>
+    <string name="compose_send_later_undoing">Cancelando…</string>
+    <string name="compose_send_later_undone">Ya no está programado. El mensaje ha vuelto a Borradores.</string>
+    <!-- %1$s: the server's reason. -->
+    <string name="compose_send_later_undo_failed">No se ha podido cancelar: %1$s</string>
+    <string name="compose_send_later_dismiss">Cerrar</string>
+</resources>

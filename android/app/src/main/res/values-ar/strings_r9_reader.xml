@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <plurals name="reader_earlier_messages">
+        <item quantity="one">رسالة سابقة واحدة</item>
+        <item quantity="other">%d رسالة سابقة</item>
+        <item quantity="zero">%d رسالة سابقة</item>
+        <item quantity="two">رسالتان سابقتان</item>
+        <item quantity="few">%d رسائل سابقة</item>
+        <item quantity="many">%d رسالة سابقة</item>
+    </plurals>
+    <plurals name="reader_participants">
+        <item quantity="one">شخص واحد</item>
+        <item quantity="other">%d شخص</item>
+        <item quantity="zero">%d أشخاص</item>
+        <item quantity="two">شخصان</item>
+        <item quantity="few">%d أشخاص</item>
+        <item quantity="many">%d شخصًا</item>
+    </plurals>
+    <plurals name="reader_message_count">
+        <item quantity="one">رسالة واحدة</item>
+        <item quantity="other">%d رسالة</item>
+        <item quantity="zero">%d رسائل</item>
+        <item quantity="two">رسالتان</item>
+        <item quantity="few">%d رسائل</item>
+        <item quantity="many">%d رسالة</item>
+    </plurals>
+    <string name="reader_you">أنت</string>
+    <string name="reader_unread">غير مقروءة</string>
+    <string name="reader_earlier_action">إظهار الرسائل المطوية</string>
+    <string name="reader_open_message_action">فتح هذه الرسالة</string>
+    <string name="reader_quoted_show">إظهار النص المقتبس</string>
+    <string name="reader_quoted_hide">إخفاء النص المقتبس</string>
+    <string name="reader_state_expanded">مفتوحة</string>
+    <string name="reader_state_collapsed">مطوية</string>
+    <string name="reader_reply_to">الرد على %1$s…</string>
+    <string name="reader_reply_fallback">رد…</string>
+    <string name="reader_reply_options">خيارات الرد</string>
+    <string name="reader_quick_reply">رد سريع</string>
+    <string name="reader_attach_share_chooser">مشاركة المرفق</string>
+    <string name="reader_attach_view_image">عرض الصورة</string>
+    <string name="reader_attach_save_named">حفظ %1$s</string>
+    <string name="reader_attach_share_named">مشاركة %1$s</string>
+    <string name="reader_attach_share_nothing">لا يوجد تطبيق على هذا الجهاز يمكنه مشاركة هذا الملف.</string>
+    <string name="reader_viewer_position">%1$d من %2$d</string>
+    <string name="reader_viewer_too_large">لا يمكن معاينة هذه الصورة هنا.</string>
+    <string name="compose_r9_leave_title">مغادرة هذه الرسالة؟</string>
+    <string name="compose_r9_leave_attachments">المسودات لا تحفظ المرفقات بعد. احفظ النص بدونها أو تابع التحرير.</string>
+    <string name="compose_r9_save_text_only">حفظ النص فقط</string>
+    <string name="compose_r9_draft_failed_title">لم تُحفظ هذه المسودة</string>
+    <string name="compose_r9_leave_without_saving">المغادرة دون حفظ</string>
+    <string name="compose_r9_encrypt_failed">تعذر تشفير هذه الرسالة، لذلك لم يُرسل شيء.</string>
+    <string name="compose_editor_toolbar">تنسيق النص</string>
+    <string name="compose_editor_bold">عريض</string>
+    <string name="compose_editor_italic">مائل</string>
+    <string name="compose_editor_underline">تسطير</string>
+    <string name="compose_editor_strike">يتوسطه خط</string>
+    <string name="compose_editor_bullets">نقاط</string>
+    <string name="compose_editor_numbered">ترقيم</string>
+    <string name="compose_editor_text_colour">لون النص</string>
+    <string name="compose_editor_black">أسود</string>
+    <string name="compose_editor_blue">أزرق</string>
+    <string name="compose_editor_red">أحمر</string>
+    <string name="compose_editor_green">أخضر</string>
+    <string name="compose_editor_highlight">تمييز</string>
+    <string name="compose_editor_highlight_colour">لون التمييز</string>
+    <string name="compose_editor_yellow">أصفر</string>
+    <string name="compose_editor_pink">وردي</string>
+    <string name="compose_editor_font">الخط</string>
+    <string name="compose_editor_sans">بدون زوائد</string>
+    <string name="compose_editor_serif">Serif</string>
+    <string name="compose_editor_mono">Monospace</string>
+    <string name="compose_editor_larger">أكبر</string>
+    <string name="compose_editor_clear">مسح التنسيق</string>
+    <string name="compose_editor_image">صورة</string>
+    <string name="compose_editor_insert_image">إدراج صورة</string>
+</resources>

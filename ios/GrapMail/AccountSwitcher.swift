@@ -15,6 +15,12 @@ struct AccountSwitcher: View {
     @State private var unreads: [String: Int] = [:]
     @State private var savedPhotos: [String: Data] = [:]
     @State private var accountsExpanded = true
+    @Environment(\.dynamicTypeSize) private var dts
+    // Avatars, the icon column and the popover's height follow the text size.
+    @ScaledMetric(relativeTo: .body) private var headerAvatar: CGFloat = 42
+    @ScaledMetric(relativeTo: .body) private var rowAvatar: CGFloat = 32
+    @ScaledMetric(relativeTo: .body) private var iconColumn: CGFloat = 29
+    @ScaledMetric(relativeTo: .body) private var textScale: CGFloat = 1
 
     private var displayedAddress: String? { activeAddress ?? accounts.first?.address }
 
@@ -25,22 +31,24 @@ struct AccountSwitcher: View {
                     withAnimation(.easeInOut(duration: 0.18)) { accountsExpanded.toggle() }
                 } label: {
                     HStack(spacing: 12) {
-                        AccountAvatar(photo: accountPhoto, name: accountName ?? "", address: displayedAddress ?? "", size: 42)
+                        AccountAvatar(photo: accountPhoto, name: accountName ?? "", address: displayedAddress ?? "", size: min(headerAvatar, 64))
                         VStack(alignment: .leading, spacing: 3) {
-                            Text(displayedAddress ?? "GrapMail").font(.system(size: 15, weight: .semibold))
-                                .foregroundStyle(GM.textPrimary).lineLimit(1).truncationMode(.middle)
-                            Text("GrapMail Account").font(.system(size: 12)).foregroundStyle(GM.textSecondary)
+                            Text(displayedAddress ?? "GrapMail").gmFont(15, .semibold)
+                                .foregroundStyle(GM.textPrimary)
+                                // Whole address at the accessibility sizes.
+                                .lineLimit(dts.isAccessibilitySize ? nil : 1).truncationMode(.middle)
+                            Text("GrapMail Account").gmFont(12).foregroundStyle(GM.textSecondary)
                         }
                         Spacer(minLength: 2)
                         Image(systemName: accountsExpanded ? "chevron.up" : "chevron.down")
-                            .font(.system(size: 13, weight: .semibold)).foregroundStyle(GM.textSecondary)
+                            .gmFont(13, .semibold, maxSize: 24).foregroundStyle(GM.textSecondary)
                     }
                     .frame(minHeight: 54)
                     .padding(.horizontal, 9)
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .accessibilityHint(accountsExpanded ? "Hide accounts" : "Show accounts")
+                .accessibilityHint(accountsExpanded ? Text("Hide accounts") : Text("Show accounts"))
 
                 rule
                 if accountsExpanded {
@@ -56,7 +64,7 @@ struct AccountSwitcher: View {
             .padding(12)
         }
         .scrollBounceWhenNeeded()
-        .frame(width: 320, height: min(478, CGFloat(278 + (accountsExpanded ? accounts.count * 48 + 59 : 0))))
+        .frame(width: 320, height: min(478, CGFloat(278 + (accountsExpanded ? accounts.count * 48 + 59 : 0))) * min(max(textScale, 1), 1.6))
         .background {
             LinearGradient(colors: [GM.cardAlt, GM.card], startPoint: .topLeading, endPoint: .bottomTrailing)
         }
@@ -87,15 +95,15 @@ struct AccountSwitcher: View {
             if active { onClose() } else { onSwitch(account.address) }
         } label: {
             HStack(spacing: 11) {
-                AccountAvatar(photo: active ? accountPhoto : savedPhotos[account.id], name: account.name, address: account.address, size: 32)
-                Text(account.address).font(.system(size: 14, weight: active ? .semibold : .medium))
-                    .lineLimit(1).truncationMode(.middle)
+                AccountAvatar(photo: active ? accountPhoto : savedPhotos[account.id], name: account.name, address: account.address, size: min(rowAvatar, 52))
+                Text(account.address).gmFont(14, active ? .semibold : .medium)
+                    .lineLimit(dts.isAccessibilitySize ? nil : 1).truncationMode(.middle)
                 Spacer(minLength: 2)
                 if active {
-                    Image(systemName: "checkmark").font(.system(size: 15, weight: .bold))
+                    Image(systemName: "checkmark").gmFont(15, .bold)
                         .foregroundStyle(GM.successInk).accessibilityHidden(true)
                 } else if let unread = unreads[account.address], unread > 0 {
-                    Text(unread > 99 ? "99+" : String(unread)).font(.system(size: 11, weight: .semibold))
+                    Text(unread > 99 ? "99+" : String(unread)).gmFont(11, .semibold)
                         .padding(.horizontal, 8).padding(.vertical, 4)
                         .background(GM.softFill, in: Capsule())
                         .accessibilityLabel("\(unread) unread")
@@ -117,14 +125,14 @@ struct AccountSwitcher: View {
         }
     }
 
-    private func action(_ title: String, icon: String, chevron: Bool = false, destructive: Bool = false,
+    private func action(_ title: LocalizedStringKey, icon: String, chevron: Bool = false, destructive: Bool = false,
                         handler: @escaping () -> Void) -> some View {
         Button(action: handler) {
             HStack(spacing: 12) {
-                Image(systemName: icon).font(.system(size: 16, weight: .medium)).frame(width: 29)
-                Text(title).font(.system(size: 14, weight: destructive ? .semibold : .medium))
+                Image(systemName: icon).gmFont(16, .medium).frame(width: min(iconColumn, 48))
+                Text(title).gmFont(14, destructive ? .semibold : .medium)
                 Spacer()
-                if chevron { Image(systemName: "chevron.right").font(.system(size: 11, weight: .semibold)) }
+                if chevron { Image(systemName: "chevron.right").gmFont(11, .semibold, maxSize: 24).flipsForRightToLeftLayoutDirection(true) }
             }
             .foregroundStyle(destructive ? GM.error : GM.textPrimary)
             .padding(.horizontal, 10)

@@ -1,0 +1,95 @@
+/* ur translation of en.lproj/Reader.strings (round 9, ios_translations_b). Keys stay English; values translated. */
+/* Round 8 — Workstream D (reader & conversation polish, round8-spec §5). English base table "Reader".
+   Looked up with String(localized: "…", table: "Reader") / Text("…", tableName: "Reader").
+   Counted keys also have an entry in Reader.stringsdict, which wins over the entry here.
+   Other languages fall back to these English keys until they are translated. */
+
+/* Conversation: sender name on one's own message */
+"You" = "آپ";
+
+/* Conversation: recipients line when the message went only to the reader */
+"to me" = "مجھے";
+
+/* Conversation: recipients line with one recipient. Value: their name or address */
+"to %@" = "%@ کو";
+
+/* Conversation: recipients line with several recipients (plural in Reader.stringsdict) */
+"to %lld people" = "%lld لوگوں کو";
+
+/* Conversation: VoiceOver value on a folded card of an unread message */
+"Unread" = "غیر پڑھا";
+
+/* Conversation: the bar that stands in for folded messages (plural in Reader.stringsdict) */
+"%lld earlier messages" = "%lld پچھلے پیغامات";
+
+/* Conversation: VoiceOver hint on the earlier-messages bar */
+"Shows the folded messages" = "تہہ شدہ پیغامات دکھاتا ہے";
+
+/* Conversation: chip under the subject, people in the conversation (plural in Reader.stringsdict) */
+"%lld people" = "%lld لوگ";
+
+/* Conversation: chip under the subject, messages in the conversation (plural in Reader.stringsdict) */
+"%lld messages" = "%lld پیغامات";
+
+/* Quoted history: button that shows the folded earlier text */
+"Show quoted text" = "اقتباس شدہ متن دکھائیں";
+
+/* Quoted history: button that folds it again */
+"Hide quoted text" = "اقتباس شدہ متن چھپائیں";
+
+/* Quoted history: VoiceOver state of the button */
+"Collapsed" = "سمٹا ہوا";
+
+/* Quoted history: VoiceOver state of the button */
+"Expanded" = "پھیلا ہوا";
+
+/* Quick reply bar: placeholder. Value: the first name of the person the reply goes to */
+"Reply to %@…" = "%@ کو جواب دیں…";
+
+/* Quick reply bar: placeholder when nobody can be named */
+"Reply…" = "جواب دیں…";
+
+/* Quick reply bar: VoiceOver hint */
+"Opens the editor" = "ایڈیٹر کھولتا ہے";
+
+/* Quick reply bar: VoiceOver label of the menu with Reply all and Forward */
+"Reply options" = "جواب کے اختیارات";
+
+/* Quick reply bar: VoiceOver name of the region */
+"Quick reply" = "فوری جواب";
+
+/* Attachments: section title (plural in Reader.stringsdict) */
+"%lld attachments" = "%lld اٹیچمنٹس";
+
+/* Attachments: link that opens the share sheet for every attachment */
+"Save all" = "سب محفوظ کریں";
+
+/* Attachments: shown while every attachment is being fetched for Save all */
+"Preparing…" = "تیاری ہو رہی ہے…";
+
+/* Attachments: VoiceOver hint on Save all */
+"Opens the share sheet, where Save to Files keeps every attachment" = "شیئر شیٹ کھولتا ہے، جہاں ”فائلز میں محفوظ کریں“ سے تمام اٹیچمنٹس محفوظ ہو جاتی ہیں";
+
+/* Attachments: VoiceOver label of a picture in the grid. Values: its position, the number of files, its file name */
+"Image %lld of %lld, %@" = "تصویر %1$lld از %2$lld، %3$@";
+
+/* Attachments: meta line of a file with no known type or size */
+"File" = "فائل";
+
+/* Attachments: VoiceOver hint on a file row */
+"Opens a preview" = "پیش نظارہ کھولتا ہے";
+
+/* Attachments: VoiceOver label of the save button. Value: the file name */
+"Save %@" = "%@ محفوظ کریں";
+
+/* Attachments: VoiceOver label of the share button. Value: the file name */
+"Share %@" = "%@ شیئر کریں";
+
+/* Attachments: context-menu action */
+"Open" = "کھولیں";
+
+/* Attachments: context-menu action */
+"Save" = "محفوظ کریں";
+
+/* Attachments: context-menu action */
+"Share" = "شیئر کریں";

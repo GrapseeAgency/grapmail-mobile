@@ -1,0 +1,33 @@
+/* GrapMail — Reader string table (ar). Translated from en.lproj/Reader.strings.
+   Counted keys also have an entry in Reader.stringsdict, which wins over the entry here. */
+
+"You" = "أنت";
+"to me" = "إليّ";
+"to %@" = "إلى %@";
+"to %lld people" = "إلى %lld أشخاص";
+"Unread" = "غير مقروءة";
+"%lld earlier messages" = "%lld رسائل سابقة";
+"Shows the folded messages" = "يعرض الرسائل المطوية";
+"%lld people" = "%lld أشخاص";
+"%lld messages" = "%lld رسائل";
+"Show quoted text" = "إظهار النص المقتبس";
+"Hide quoted text" = "إخفاء النص المقتبس";
+"Collapsed" = "مطوي";
+"Expanded" = "موسّع";
+"Reply to %@…" = "الرد على %@…";
+"Reply…" = "رد…";
+"Opens the editor" = "يفتح المحرر";
+"Reply options" = "خيارات الرد";
+"Quick reply" = "رد سريع";
+"%lld attachments" = "%lld مرفقات";
+"Save all" = "حفظ الكل";
+"Preparing…" = "جارٍ التحضير…";
+"Opens the share sheet, where Save to Files keeps every attachment" = "يفتح ورقة المشاركة، حيث يحفظ «حفظ في الملفات» كل المرفقات";
+"Image %lld of %lld, %@" = "الصورة %1$lld من %2$lld، %3$@";
+"File" = "ملف";
+"Opens a preview" = "يفتح معاينة";
+"Save %@" = "حفظ %@";
+"Share %@" = "مشاركة %@";
+"Open" = "فتح";
+"Save" = "حفظ";
+"Share" = "مشاركة";

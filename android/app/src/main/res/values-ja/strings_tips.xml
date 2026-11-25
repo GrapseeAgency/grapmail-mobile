@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  First-time feature tips (ui/components/FeatureTip.kt, logic/FeatureTipsStore.kt).
+  One tip per app session, anchored to the control it describes. Titles stay
+  at four words or fewer, bodies at one sentence under 90 characters. The same
+  English text as iOS's "Feature tips" block (GrapMail/en.lproj/Localizable.strings),
+  except the long-press tip: on Android a long press selects, on iOS it previews.
+-->
+<resources>
+    <string name="tip_got_it">OK</string>
+    <string name="tip_close">ヒントを閉じる</string>
+
+    <string name="tip_swipe_title">スワイプで整理</string>
+    <string name="tip_swipe_body">メッセージを右にスワイプでアーカイブ、左にスワイプでごみ箱に移動します。</string>
+
+    <string name="tip_long_press_title">まとめて選択</string>
+    <string name="tip_long_press_body">メッセージを長押しして選択し、ほかのメッセージをタップして追加します。</string>
+
+    <string name="tip_categories_title">受信トレイを分類</string>
+    <string name="tip_categories_body">チップをタップすると、重要、個人、ニュースレターなどだけを表示できます。</string>
+
+    <string name="tip_screener_title">新しい送信者をチェック</string>
+    <string name="tip_screener_body">メニューの「承認待ち」には、許可するまで新しい送信者からのメールが保留されます。</string>
+
+    <string name="tip_accounts_title">アカウントをすばやく切り替え</string>
+    <string name="tip_accounts_body">写真をタップしてアカウントを切り替えたり、別のアカウントを追加したりできます。</string>
+
+    <string name="tip_snooze_title">あとでスヌーズ</string>
+    <string name="tip_snooze_body">「その他」をタップすると、選択したメールを都合のよい時間までスヌーズできます。</string>
+</resources>

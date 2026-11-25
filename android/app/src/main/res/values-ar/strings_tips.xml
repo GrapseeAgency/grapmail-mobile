@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  First-time feature tips (ui/components/FeatureTip.kt, logic/FeatureTipsStore.kt).
+  One tip per app session, anchored to the control it describes. Titles stay
+  at four words or fewer, bodies at one sentence under 90 characters. The same
+  English text as iOS's "Feature tips" block (GrapMail/en.lproj/Localizable.strings),
+  except the long-press tip: on Android a long press selects, on iOS it previews.
+-->
+<resources>
+    <string name="tip_got_it">حسنًا</string>
+    <string name="tip_close">إغلاق النصيحة</string>
+
+    <string name="tip_swipe_title">اسحب للترتيب</string>
+    <string name="tip_swipe_body">اسحب رسالة لليمين لأرشفتها، أو لليسار لنقلها إلى المهملات.</string>
+
+    <string name="tip_long_press_title">تحديد عدة رسائل معًا</string>
+    <string name="tip_long_press_body">المس رسالة مع الاستمرار لتحديدها، ثم انقر على رسائل أخرى لإضافتها.</string>
+
+    <string name="tip_categories_title">قسّم بريدك الوارد</string>
+    <string name="tip_categories_body">انقر على شريحة لعرض الأولوية أو الأشخاص أو النشرات الإخبارية وغيرها فقط.</string>
+
+    <string name="tip_screener_title">فرز المرسلين الجدد</string>
+    <string name="tip_screener_body">«بانتظار الموافقة» في القائمة يحتجز بريد المرسلين الجدد حتى تسمح لهم.</string>
+
+    <string name="tip_accounts_title">بدّل الحسابات بسرعة</string>
+    <string name="tip_accounts_body">انقر على صورتك للتبديل بين الحسابات أو إضافة حساب آخر.</string>
+
+    <string name="tip_snooze_title">أجّل لوقت لاحق</string>
+    <string name="tip_snooze_body">انقر على المزيد لتأجيل البريد المحدد إلى وقت أنسب.</string>
+</resources>

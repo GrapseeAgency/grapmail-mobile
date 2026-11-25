@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Connected accounts (ui/screens/mail/ConnectedAccountsScreen.kt). Hebrew. -->
+<resources>
+    <string name="mail_providers_title">תיבות דואר מקושרות</string>
+    <string name="mail_providers_settings_subtitle">Outlook, Yahoo, iCloud וחשבונות IMAP אחרים</string>
+    <string name="mail_providers_intro">ייבוא דואר מ-Outlook או מחשבון IMAP אחר ל-GrapMail. דואר חדש מחשבון מקושר מגיע לדואר הנכנס שלך.</string>
+    <string name="mail_providers_empty">עדיין לא קושרו תיבות דואר.</string>
+    <string name="mail_providers_add">הוספת חשבון</string>
+    <string name="mail_providers_add_outlook">קישור Outlook</string>
+    <string name="mail_providers_add_imap">קישור Yahoo, iCloud, AOL או חשבון IMAP אחר</string>
+    <string name="mail_providers_kind_imap">IMAP</string>
+    <string name="mail_providers_status_syncing">מסנכרן בפעם הראשונה…</string>
+    <string name="mail_providers_status_ok">מחובר</string>
+    <string name="mail_providers_status_reauth">נדרשת התחברות מחדש</string>
+    <string name="mail_providers_status_error">בעיית סנכרון</string>
+    <string name="mail_providers_status_removed">מנותק</string>
+    <string name="mail_providers_last_sync">סנכרון אחרון: %1$s</string>
+    <string name="mail_providers_never_synced">עדיין לא סונכרן</string>
+    <string name="mail_providers_sync_now">סנכרון עכשיו</string>
+    <string name="mail_providers_reconnect">חיבור מחדש</string>
+    <string name="mail_providers_remove">ניתוק</string>
+    <string name="mail_providers_remove_title">לנתק את %1$s?</string>
+    <string name="mail_providers_remove_body">GrapMail יפסיק לסנכרן את החשבון הזה. הדואר שכבר נמצא ב-GrapMail יישאר, ושום דבר לא ישתנה בחשבון האחר.</string>
+    <string name="mail_providers_cancel">ביטול</string>
+    <string name="mail_providers_continue">המשך</string>
+    <string name="mail_providers_retry">ניסיון חוזר</string>
+    <string name="mail_providers_offline">אין חיבור לאינטרנט. יש להתחבר ולנסות שוב.</string>
+    <string name="mail_providers_error">לא ניתן היה לטעון את החשבונות המקושרים.</string>
+    <string name="mail_providers_outlook_title">קישור Outlook</string>
+    <string name="mail_providers_outlook_body">יש להזין את כתובת Outlook או Microsoft 365 שבה תתחבר/י. דף הכניסה של Microsoft ייפתח בדפדפן.</string>
+    <string name="mail_providers_outlook_unavailable">לא ניתן לקשר את Outlook בשרת הזה כרגע.</string>
+    <string name="mail_providers_oauth_state">הכניסה הזו לא תאמה לזו שהאפליקציה התחילה. יש להתחיל מחדש.</string>
+    <string name="mail_providers_oauth_denied">Microsoft לא העניקה גישה. לא קושר דבר.</string>
+    <string name="mail_providers_imap_title">קישור חשבון IMAP</string>
+    <string name="mail_providers_imap_intro">יש לבחור ספק. רוב הספקים דורשים סיסמת אפליקציה ולא את הסיסמה הרגילה.</string>
+    <string name="mail_providers_preset_custom">מותאם אישית</string>
+    <string name="mail_providers_help_app_password">יש ליצור סיסמת אפליקציה בהגדרות האבטחה של הספק ולהדביק אותה כאן. הסיסמה הרגילה בדרך כלל לא תעבוד.</string>
+    <string name="mail_providers_help_custom">יש להזין את שרתי IMAP ו-SMTP מדפי העזרה של הספק.</string>
+    <string name="mail_providers_email">כתובת אימייל</string>
+    <string name="mail_providers_incoming">נכנס (IMAP)</string>
+    <string name="mail_providers_outgoing">יוצא (SMTP)</string>
+    <string name="mail_providers_host">שרת</string>
+    <string name="mail_providers_port">יציאה</string>
+    <string name="mail_providers_tls">TLS</string>
+    <string name="mail_providers_err_email">יש להזין כתובת אימייל מלאה.</string>
+    <string name="mail_providers_err_host">יש להזין שם שרת, למשל imap.example.com.</string>
+    <string name="mail_providers_err_port">יש להשתמש ביציאה בין 1 ל-65535.</string>
+    <string name="mail_providers_connect">קישור</string>
+    <string name="mail_providers_connecting">מתחבר…</string>
+    <string name="mail_providers_no_probe_note">GrapMail בודק את הפרטים בסנכרון הראשון. אם הם שגויים, יוצג בחשבון הזה \"בעיית סנכרון\". הסיסמה לא נשמרת בטלפון הזה.</string>
+</resources>

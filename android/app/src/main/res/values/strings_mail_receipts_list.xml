@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Sent-list read-receipt suffixes (ui/components/Mail.kt, the message row).
+  Shown only on outbound rows when the server's sent list carries
+  readReceiptStatus (routes/grapmail-sent-receipts.ts). Same shape as
+  mail_row_encrypted_suffix: a leading space, a middle dot, one short word.
+-->
+<resources>
+    <string name="mail_row_receipt_read_suffix">\u0020· read</string>
+    <string name="mail_row_receipt_requested_suffix">\u0020· receipt requested</string>
+</resources>

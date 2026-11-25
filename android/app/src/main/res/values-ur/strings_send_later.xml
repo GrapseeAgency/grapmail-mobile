@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    values-ur/strings_send_later.xml: translation of values/strings_send_later.xml (same keys, same order).
+    Comments below are kept from the English source for context.
+-->
+<resources>
+    <!-- The clock button next to Send (TalkBack label and click action). -->
+    <string name="compose_send_later_button">بھیجنا شیڈول کریں</string>
+    <string name="compose_send_later_button_action">بھیجنے کا وقت منتخب کریں</string>
+
+    <!-- The sheet. -->
+    <string name="compose_send_later_title">بعد میں بھیجیں</string>
+    <string name="compose_send_later_later_today">آج بعد میں</string>
+    <string name="compose_send_later_tomorrow_morning">کل صبح</string>
+    <string name="compose_send_later_monday_morning">پیر کی صبح</string>
+    <string name="compose_send_later_pick">تاریخ اور وقت منتخب کریں</string>
+    <string name="compose_send_later_pick_hint">زیادہ سے زیادہ 30 دن آگے</string>
+    <!-- %1$s: the device time zone's name, e.g. "Bangladesh Standard Time". -->
+    <string name="compose_send_later_zone_note">اوقات آپ کے ٹائم زون میں ہیں: %1$s</string>
+    <!-- TalkBack for one option row. %1$s: option name, %2$s: its day and time. -->
+    <string name="compose_send_later_option_description">%1$s، %2$s</string>
+
+    <!-- Date and time dialogs. -->
+    <string name="compose_send_later_date_title">تاریخ منتخب کریں</string>
+    <string name="compose_send_later_time_title">وقت منتخب کریں</string>
+    <string name="compose_send_later_next">آگے</string>
+    <string name="compose_send_later_schedule">شیڈول کریں</string>
+    <string name="compose_send_later_cancel">منسوخ کریں</string>
+    <string name="compose_send_later_type_time">وقت ٹائپ کریں</string>
+    <string name="compose_send_later_use_clock">گھڑی استعمال کریں</string>
+    <string name="compose_send_later_too_soon">ابھی سے کم از کم ایک منٹ بعد کا وقت منتخب کریں۔</string>
+    <string name="compose_send_later_too_far">زیادہ سے زیادہ 30 دن آگے کا وقت منتخب کریں۔</string>
+
+    <!-- In-flight and failure lines in the composer. -->
+    <string name="compose_send_later_scheduling">شیڈول کیا جا رہا ہے…</string>
+    <string name="compose_send_later_offline">کنکشن نہیں ہے، اس لیے کچھ شیڈول نہیں ہوا۔ آپ کا پیغام ابھی یہیں ہے۔</string>
+
+    <!-- The receipt snackbar shown after compose closes. %1$s: e.g. "Tue 8:00 AM". -->
+    <string name="compose_send_later_scheduled_for">%1$s کے لیے شیڈول</string>
+    <string name="compose_send_later_undo">کالعدم کریں</string>
+    <string name="compose_send_later_view">دیکھیں</string>
+    <string name="compose_send_later_undoing">منسوخ کیا جا رہا ہے…</string>
+    <string name="compose_send_later_undone">اب شیڈول نہیں ہے۔ پیغام واپس ڈرافٹس میں ہے۔</string>
+    <!-- %1$s: the server's reason. -->
+    <string name="compose_send_later_undo_failed">منسوخ نہیں ہو سکا: %1$s</string>
+    <string name="compose_send_later_dismiss">برخاست کریں</string>
+</resources>

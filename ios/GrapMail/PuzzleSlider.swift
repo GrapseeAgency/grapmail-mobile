@@ -15,6 +15,9 @@ struct PuzzleSlider: View {
     @State private var targetFraction: CGFloat = 0.55
     @State private var trackWidth: CGFloat = 1
     @State private var appeared = false
+    /// The track holds the "Slide to verify" label, so it grows with the text
+    /// size (56 pt at the default); the piece stays a fixed 44 pt target.
+    @ScaledMetric(relativeTo: .body) private var trackHeight: CGFloat = 56
 
     private var maxX: CGFloat { max(trackWidth - 44 - 12, 1) }
     private var targetX: CGFloat { maxX * targetFraction }
@@ -30,7 +33,7 @@ struct PuzzleSlider: View {
                     .onAppear { trackWidth = geo.size.width }
                     .onChange(of: geo.size.width) { trackWidth = $0 }
             }
-            .frame(height: 56)
+            .frame(height: max(trackHeight, 56))
         }
         .onAppear {
             if !appeared {
@@ -75,33 +78,43 @@ struct PuzzleSlider: View {
     private var notchSide: CGFloat { 132 * 0.62 }
 
     private var track: some View {
-        ZStack {
-            RoundedRectangle(cornerRadius: GMShape.input, style: .continuous)
-                .fill(verified ? GM.success.opacity(0.12) : GM.softFill)
+        GeometryReader { geo in
+            ZStack {
+                RoundedRectangle(cornerRadius: GMShape.input, style: .continuous)
+                    .fill(verified ? GM.success.opacity(0.12) : GM.softFill)
 
-            HStack(spacing: 8) {
-                if verified {
-                    Image(systemName: "checkmark")
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundColor(GM.success)
-                    Text("Verified — you're human!")
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundColor(GM.success)
-                } else {
-                    Image(systemName: "arrow.right")
-                        .font(.system(size: 14))
-                        .foregroundColor(GM.textTertiary)
-                    Text(failed ? "Almost — try again" : "Slide to verify")
-                        .font(.system(size: 14, weight: .medium))
-                        .foregroundColor(failed ? GM.error : GM.textSecondary)
+                HStack(spacing: 8) {
+                    if verified {
+                        Image(systemName: "checkmark")
+                            .gmFont(15, .semibold, maxSize: 26)
+                            .foregroundColor(GM.success)
+                        Text("Verified — you're human!")
+                            .gmFont(14, .semibold)
+                            .foregroundColor(GM.success)
+                            .lineLimit(2)
+                            .minimumScaleFactor(0.8)
+                            .multilineTextAlignment(.center)
+                    } else {
+                        Image(systemName: "arrow.right")
+                            .gmFont(14, maxSize: 26)
+                            .foregroundColor(GM.textTertiary)
+                            .flipsForRightToLeftLayoutDirection(true)
+                        Text(failed ? "Almost — try again" : "Slide to verify")
+                            .gmFont(14, .medium)
+                            .foregroundColor(failed ? GM.error : GM.textSecondary)
+                            .lineLimit(2)
+                            .minimumScaleFactor(0.8)
+                            .multilineTextAlignment(.center)
+                    }
                 }
-            }
+                .padding(.horizontal, 8)
 
-            PuzzlePieceShape()
-                .fill(verified ? AnyShapeStyle(GM.success) : AnyShapeStyle(Color.brandGradient))
-                .frame(width: 44, height: 44)
-                .position(x: dragX + 6 + 22, y: 28)
-                .allowsHitTesting(false)
+                PuzzlePieceShape()
+                    .fill(verified ? AnyShapeStyle(GM.success) : AnyShapeStyle(Color.brandGradient))
+                    .frame(width: 44, height: 44)
+                    .position(x: dragX + 6 + 22, y: geo.size.height / 2)
+                    .allowsHitTesting(false)
+            }
         }
         // The whole 56pt track is the drag surface (Android parity): the
         // piece alone was a 30pt target — under Apple's 44pt minimum — and
@@ -121,12 +134,12 @@ struct PuzzleSlider: View {
                         withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
                             dragX = targetX
                         }
-                        UINotificationFeedbackGenerator().notificationOccurred(.success)
+                        Haptics.success()
                         verified = true
                         onVerified()
                     } else {
                         failed = true
-                        UINotificationFeedbackGenerator().notificationOccurred(.error)
+                        Haptics.error()
                         withAnimation(.spring(response: 0.45, dampingFraction: 0.65)) {
                             dragX = 0
                         }

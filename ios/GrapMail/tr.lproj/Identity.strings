@@ -1,0 +1,10 @@
+/* tr translation of en.lproj/Identity.strings (round 9, ios_translations_b). Keys stay English; values translated. */
+/* Round 8 — Workstream A (GrapMail visual identity). English base table "Identity".
+   Looked up with String(localized: "…", table: "Identity") / Text("…", tableName: "Identity").
+   Other languages fall back to these English keys until they are translated. */
+
+/* VoiceOver label for a masked email address (welcome-back, account chooser). First value: its first letters, spelled out. Second: its last letter. Third: the domain. */
+"Address beginning %@, ending %@ at %@" = "%1$@ ile başlayan, %2$@ ile biten %3$@ adresi";
+
+/* VoiceOver label for a masked email address with no visible last letter. First value: its first letters, spelled out. Second: the domain. */
+"Address beginning %@ at %@" = "%1$@ ile başlayan %2$@ adresi";

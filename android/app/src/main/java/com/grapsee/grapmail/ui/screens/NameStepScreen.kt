@@ -17,7 +17,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.ArrowForward
+import androidx.compose.material.icons.automirrored.rounded.ArrowForward
 import androidx.compose.material.icons.rounded.Error
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material3.Icon
@@ -36,6 +36,8 @@ import com.grapsee.grapmail.logic.Validators
 import com.grapsee.grapmail.ui.components.AppTextField
 import com.grapsee.grapmail.ui.components.GradientButton
 import com.grapsee.grapmail.ui.theme.LocalPalette
+import androidx.compose.ui.res.stringResource
+import com.grapsee.grapmail.R
 
 /**
  * Step 1 — "What's your name?" — founder design verbatim: the person
@@ -66,43 +68,43 @@ fun NameStepScreen(vm: SignUpViewModel, onBack: () -> Unit, onSignIn: () -> Unit
 
     WizardScaffold(
         step = 1,
-        title = "What's your name?",
-        subtitle = AnnotatedSubtitle(rest = "This name appears on your GrapMail profile."),
+        title = stringResource(R.string.acct_whats_your_name),
+        subtitle = AnnotatedSubtitle(rest = stringResource(R.string.acct_this_name_appears_on_your_grapmail)),
         onBack = onBack,
         onSignIn = onSignIn,
         bottomBar = {
             GradientButton(
-                "Next",
+                stringResource(R.string.acct_next),
                 onClick = ::advance,
                 enabled = state.firstName.isNotBlank() && state.lastName.isNotBlank(),
                 trailing = {
                     Spacer(Modifier.size(10.dp))
-                    Icon(Icons.Rounded.ArrowForward, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Icon(Icons.AutoMirrored.Rounded.ArrowForward, contentDescription = null, modifier = Modifier.size(18.dp))
                 },
             )
         },
     ) {
         FieldWithError(
-            label = "First name",
+            label = stringResource(R.string.acct_first_name),
             value = state.firstName,
             onValueChange = {
                 vm.update { copy(firstName = it) }
                 if (firstError != null) firstError = Validators.firstName(it)
             },
-            error = firstError ?: "First name is required",
+            error = firstError ?: stringResource(R.string.acct_first_name_is_required),
             showError = attempted && firstError != null,
             imeAction = ImeAction.Next,
             keyboardActions = KeyboardActions(onNext = { focus.moveFocus(FocusDirection.Next) }),
         )
         Spacer(Modifier.height(12.dp))
         FieldWithError(
-            label = "Last name",
+            label = stringResource(R.string.acct_last_name),
             value = state.lastName,
             onValueChange = {
                 vm.update { copy(lastName = it) }
                 if (lastError != null) lastError = Validators.lastName(it)
             },
-            error = lastError ?: "Last name is required",
+            error = lastError ?: stringResource(R.string.acct_last_name_is_required),
             showError = attempted && lastError != null,
             imeAction = ImeAction.Done,
             keyboardActions = KeyboardActions(onDone = { advance() }),

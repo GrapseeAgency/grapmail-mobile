@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    values-in/strings_send_later.xml: translation of values/strings_send_later.xml (same keys, same order).
+    Comments below are kept from the English source for context.
+-->
+<resources>
+    <!-- The clock button next to Send (TalkBack label and click action). -->
+    <string name="compose_send_later_button">Jadwalkan pengiriman</string>
+    <string name="compose_send_later_button_action">pilih kapan dikirim</string>
+
+    <!-- The sheet. -->
+    <string name="compose_send_later_title">Kirim nanti</string>
+    <string name="compose_send_later_later_today">Nanti hari ini</string>
+    <string name="compose_send_later_tomorrow_morning">Besok pagi</string>
+    <string name="compose_send_later_monday_morning">Senin pagi</string>
+    <string name="compose_send_later_pick">Pilih tanggal &amp; waktu</string>
+    <string name="compose_send_later_pick_hint">Hingga 30 hari ke depan</string>
+    <!-- %1$s: the device time zone's name, e.g. "Bangladesh Standard Time". -->
+    <string name="compose_send_later_zone_note">Waktu ditampilkan dalam zona waktu Anda: %1$s</string>
+    <!-- TalkBack for one option row. %1$s: option name, %2$s: its day and time. -->
+    <string name="compose_send_later_option_description">%1$s, %2$s</string>
+
+    <!-- Date and time dialogs. -->
+    <string name="compose_send_later_date_title">Pilih tanggal</string>
+    <string name="compose_send_later_time_title">Pilih waktu</string>
+    <string name="compose_send_later_next">Berikutnya</string>
+    <string name="compose_send_later_schedule">Jadwalkan</string>
+    <string name="compose_send_later_cancel">Batal</string>
+    <string name="compose_send_later_type_time">Ketik waktu</string>
+    <string name="compose_send_later_use_clock">Gunakan jam</string>
+    <string name="compose_send_later_too_soon">Pilih waktu minimal satu menit dari sekarang.</string>
+    <string name="compose_send_later_too_far">Pilih waktu paling lambat 30 hari ke depan.</string>
+
+    <!-- In-flight and failure lines in the composer. -->
+    <string name="compose_send_later_scheduling">Menjadwalkan…</string>
+    <string name="compose_send_later_offline">Tidak ada koneksi, jadi tidak ada yang dijadwalkan. Pesan Anda masih di sini.</string>
+
+    <!-- The receipt snackbar shown after compose closes. %1$s: e.g. "Tue 8:00 AM". -->
+    <string name="compose_send_later_scheduled_for">Dijadwalkan untuk %1$s</string>
+    <string name="compose_send_later_undo">Urungkan</string>
+    <string name="compose_send_later_view">Lihat</string>
+    <string name="compose_send_later_undoing">Membatalkan…</string>
+    <string name="compose_send_later_undone">Tidak lagi dijadwalkan. Pesan sudah kembali ke Draf.</string>
+    <!-- %1$s: the server's reason. -->
+    <string name="compose_send_later_undo_failed">Tidak dapat membatalkan: %1$s</string>
+    <string name="compose_send_later_dismiss">Tutup</string>
+</resources>

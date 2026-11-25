@@ -43,6 +43,9 @@ import com.grapsee.grapmail.ui.components.InfoCard
 import com.grapsee.grapmail.ui.components.StatusChip
 import com.grapsee.grapmail.ui.theme.LocalPalette
 import kotlinx.coroutines.launch
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.pluralStringResource
+import com.grapsee.grapmail.R
 
 /** 13 — sign out everywhere else. Deliberately not instant: it is a lock-out. */
 @Composable
@@ -57,18 +60,18 @@ fun SignOutAllDevicesScreen(onBack: () -> Unit, onDone: () -> Unit) {
         onBack = onBack,
         illustration = "ill_sec_signout_all",
         illustrationWidth = 180,
-        title = "Sign Out All Devices",
-        body = "This will sign you out of all devices except this one.",
+        title = stringResource(R.string.acct_sign_out_all_devices_title),
+        body = stringResource(R.string.acct_this_will_sign_you_out_of_all),
         footer = {
             Column {
                 GradientButton(
-                    "Sign Out All Devices",
+                    stringResource(R.string.acct_sign_out_all_devices_title),
                     onClick = {
                         busy = true; error = null
                         scope.launch {
                             try {
                                 val session = SessionStore.snapshot(context)
-                                    ?: throw IllegalStateException("Sign in again.")
+                                    ?: throw IllegalStateException(context.getString(R.string.acct_sign_in_again))
                                 val resp = Api.signOutEverywhere(session.token)
                                 val active = SessionStore.snapshot(context)
                                 if (active == null || active.id != session.id) return@launch
@@ -91,16 +94,16 @@ fun SignOutAllDevicesScreen(onBack: () -> Unit, onDone: () -> Unit) {
                 )
                 Spacer(Modifier.height(4.dp))
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
-                    AccountLink("Cancel", onBack)
+                    AccountLink(stringResource(R.string.acct_cancel), onBack)
                 }
             }
         },
     ) {
         InfoCard {
-            Text("You'll stay signed in here", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = palette.textPrimary)
+            Text(stringResource(R.string.acct_youll_stay_signed_in_here), fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = palette.textPrimary)
             Spacer(Modifier.height(8.dp))
             Text(
-                "Every other phone, tablet and browser is signed out immediately. This device keeps working, so you can carry on.",
+                stringResource(R.string.acct_every_other_phone_tablet_and_browser),
                 fontSize = 13.sp,
                 lineHeight = 19.sp,
                 color = palette.textSecondary,
@@ -108,7 +111,7 @@ fun SignOutAllDevicesScreen(onBack: () -> Unit, onDone: () -> Unit) {
         }
         Spacer(Modifier.height(12.dp))
         Text(
-            "Use this when a device is lost, borrowed or sold — not instead of changing a leaked password.",
+            stringResource(R.string.acct_use_this_when_a_device_is_lost),
             fontSize = 12.sp,
             lineHeight = 17.sp,
             color = palette.textSecondary,
@@ -118,7 +121,7 @@ fun SignOutAllDevicesScreen(onBack: () -> Unit, onDone: () -> Unit) {
             Text(error!!, fontSize = 12.sp, color = palette.error)
         }
         Spacer(Modifier.height(10.dp))
-        FooterNote(text = "Sessions on other devices end the moment this completes.", divider = false)
+        FooterNote(text = stringResource(R.string.acct_sessions_on_other_devices_end_the), divider = false)
     }
 }
 
@@ -130,28 +133,28 @@ fun SignedOutAllDevicesScreen(onDone: () -> Unit) {
         onBack = onDone,
         illustration = "ill_sec_signout_all_ok",
         illustrationWidth = 170,
-        title = "Signed Out of All Devices",
-        body = "You have been signed out of all devices except this one.",
+        title = stringResource(R.string.acct_signed_out_of_all_devices_2),
+        body = stringResource(R.string.acct_you_have_been_signed_out_of_all),
         footer = {
             Column {
-                GradientButton("Continue", onDone)
+                GradientButton(stringResource(R.string.acct_continue), onDone)
                 Spacer(Modifier.height(6.dp))
-                FooterNote(text = "Anyone using this account on another device now needs your password again.", divider = true)
+                FooterNote(text = stringResource(R.string.acct_anyone_using_this_account_on_another), divider = true)
             }
         },
     ) {
         InfoCard {
-            Text("What happens next?", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = palette.textPrimary)
+            Text(stringResource(R.string.acct_what_happens_next), fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = palette.textPrimary)
             Spacer(Modifier.height(8.dp))
             Text(
-                "This device stays signed in. Every other device has to sign in again, and anyone who had a session can no longer read this mailbox.",
+                stringResource(R.string.acct_this_device_stays_signed_in_every),
                 fontSize = 13.sp,
                 lineHeight = 19.sp,
                 color = palette.textSecondary,
             )
         }
         Spacer(Modifier.height(12.dp))
-        StatusChip("Only this device is signed in", ChipTone.Success)
+        StatusChip(stringResource(R.string.acct_only_this_device_is_signed_in), ChipTone.Success)
     }
 }
 
@@ -175,11 +178,14 @@ fun ManageSessionsScreen(
     // than the ordinary one (16): it is the device the person came here to deal
     // with, and the copy names the activity.
     var flaggedDeviceId by remember { mutableStateOf("") }
+    // Bumped by Retry; the read below re-runs for each value.
+    var attempt by remember { mutableStateOf(0) }
 
-    LaunchedEffect(Unit) {
+    LaunchedEffect(attempt) {
         loading = true
+        error = null
         try {
-            val token = SessionStore.token(context) ?: throw IllegalStateException("Sign in again.")
+            val token = SessionStore.token(context) ?: throw IllegalStateException(context.getString(R.string.acct_sign_in_again))
             val resp = Api.sessions(token)
             sessions = resp.sessions
             activeCount = if (resp.activeCount > 0) resp.activeCount else resp.sessions.size
@@ -191,10 +197,13 @@ fun ManageSessionsScreen(
                 // `suspicious`; this brings Android level with it.
                 flaggedDeviceId = if (activity.suspicious) activity.suspiciousEvent?.deviceId ?: "" else ""
             }
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
         } catch (e: Exception) {
-            error = e.message
+            // A null message must not fall through to "no sessions recorded".
+            error = e.message ?: context.getString(R.string.states_error_body)
         } finally {
-            loading = false
+            if (kotlinx.coroutines.currentCoroutineContext()[kotlinx.coroutines.Job]?.isActive != false) loading = false
         }
     }
 
@@ -202,18 +211,28 @@ fun ManageSessionsScreen(
         onBack = onBack,
         illustration = "ill_sec_sessions",
         illustrationWidth = 170,
-        title = "Manage Active Sessions",
-        body = "Devices currently signed in to this account.",
+        title = stringResource(R.string.acct_manage_active_sessions_2),
+        body = stringResource(R.string.acct_devices_currently_signed_in_to_this),
         footer = {
             Column {
-                AccountLink("Sign out all devices", onSignOutAll)
+                AccountLink(stringResource(R.string.acct_sign_out_all_devices), onSignOutAll)
             }
         },
     ) {
         when {
-            loading -> Text("Loading sessions…", fontSize = 13.sp, color = palette.textSecondary)
-            error != null -> Text(error!!, fontSize = 13.sp, color = palette.error)
-            sessions.isEmpty() -> Text("No sessions are recorded yet.", fontSize = 13.sp, color = palette.textSecondary)
+            loading -> com.grapsee.grapmail.ui.components.ListSkeleton(
+                rows = 3, avatar = false, label = stringResource(R.string.acct_loading_sessions))
+            error != null -> Column {
+                // A failed read is said as a failure with its way back, never
+                // left looking like an empty history.
+                Text(stringResource(R.string.states_sessions_failed_title), fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold, color = palette.textPrimary)
+                Spacer(Modifier.height(4.dp))
+                Text(error!!, fontSize = 13.sp, color = palette.error)
+                Spacer(Modifier.height(6.dp))
+                AccountLink(stringResource(R.string.states_retry), { attempt++ })
+            }
+            sessions.isEmpty() -> Text(stringResource(R.string.acct_no_sessions_are_recorded_yet), fontSize = 13.sp, color = palette.textSecondary)
             else -> Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 // "N Active Sessions" + Revoke All, as the reference header. The
                 // count is the server's true total, not the (paged) list length;
@@ -225,8 +244,8 @@ fun ManageSessionsScreen(
                             .background(palette.success),
                     )
                     Spacer(Modifier.size(8.dp))
-                    Text("$activeCount Active Sessions", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = palette.textPrimary, modifier = Modifier.weight(1f))
-                    AccountLink("Revoke All", onSignOutAll)
+                    Text(pluralStringResource(R.plurals.acct_active_sessions_count, activeCount, activeCount), fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = palette.textPrimary, modifier = Modifier.weight(1f))
+                    AccountLink(stringResource(R.string.acct_revoke_all), onSignOutAll)
                 }
                 sessions.forEach { session ->
                     SessionCard(
@@ -246,8 +265,8 @@ fun ManageSessionsScreen(
         if (sessions.isNotEmpty()) {
             Spacer(Modifier.height(12.dp))
             InfoNoteCard(
-                title = "Keep Your Account Secure",
-                body = "If you see a device you don't recognize, revoke the session immediately. This will prevent unauthorized access.",
+                title = stringResource(R.string.acct_keep_your_account_secure),
+                body = stringResource(R.string.acct_if_you_see_a_device_you_dont),
             )
         }
     }
@@ -271,17 +290,17 @@ fun RevokeSessionScreen(sessionId: String, device: String, onBack: () -> Unit, o
         onBack = onBack,
         illustration = "ill_sec_session_revoke",
         illustrationWidth = 170,
-        title = "Revoke Session Access?",
-        body = "This device will be signed out of your GrapMail account and will need to sign in again.",
+        title = stringResource(R.string.acct_revoke_session_access),
+        body = stringResource(R.string.acct_this_device_will_be_signed_out_of),
         footer = {
             Column {
                 DestructiveButton(
-                    "Revoke Session",
+                    stringResource(R.string.acct_revoke_session),
                     onClick = {
                         busy = true; error = null
                         scope.launch {
                             try {
-                                val token = SessionStore.token(context) ?: throw IllegalStateException("Sign in again.")
+                                val token = SessionStore.token(context) ?: throw IllegalStateException(context.getString(R.string.acct_sign_in_again))
                                 Api.revokeSession(token, sessionId)
                                 onRevoke(device)
                             } catch (e: Exception) {
@@ -295,7 +314,7 @@ fun RevokeSessionScreen(sessionId: String, device: String, onBack: () -> Unit, o
                 )
                 Spacer(Modifier.height(6.dp))
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
-                    AccountLink("Keep this session", onBack)
+                    AccountLink(stringResource(R.string.acct_keep_this_session), onBack)
                 }
             }
         },
@@ -304,8 +323,8 @@ fun RevokeSessionScreen(sessionId: String, device: String, onBack: () -> Unit, o
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(9.dp)) {
                 Icon(Icons.Rounded.Devices, contentDescription = null, tint = palette.primarySolid, modifier = Modifier.size(18.dp))
                 Column {
-                    Text("Device", fontSize = 12.sp, color = palette.textSecondary)
-                    Text(device.ifBlank { "That device" }, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = palette.textPrimary)
+                    Text(stringResource(R.string.acct_device), fontSize = 12.sp, color = palette.textSecondary)
+                    Text(device.ifBlank { stringResource(R.string.acct_that_device) }, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = palette.textPrimary)
                 }
             }
         }
@@ -334,18 +353,18 @@ fun ConfirmSessionRevocationScreen(sessionId: String, device: String, onBack: ()
         onBack = onBack,
         illustration = "ill_sec_revoke_confirm",
         illustrationWidth = 170,
-        eyebrow = "Suspicious Access Detected",
-        title = "Confirm Session Revocation",
-        body = "This will immediately sign this session out and no longer have access to your GrapMail account.",
+        eyebrow = stringResource(R.string.acct_suspicious_access_detected),
+        title = stringResource(R.string.acct_confirm_session_revocation),
+        body = stringResource(R.string.acct_this_will_immediately_sign_this),
         footer = {
             Column {
                 DestructiveButton(
-                    "Revoke Session Access",
+                    stringResource(R.string.acct_revoke_session_access_2),
                     onClick = {
                         busy = true; error = null
                         scope.launch {
                             try {
-                                val token = SessionStore.token(context) ?: throw IllegalStateException("Sign in again.")
+                                val token = SessionStore.token(context) ?: throw IllegalStateException(context.getString(R.string.acct_sign_in_again))
                                 Api.revokeSession(token, sessionId)
                                 onRevoke(device)
                             } catch (e: Exception) {
@@ -359,7 +378,7 @@ fun ConfirmSessionRevocationScreen(sessionId: String, device: String, onBack: ()
                 )
                 Spacer(Modifier.height(6.dp))
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
-                    AccountLink("Back", onBack)
+                    AccountLink(stringResource(R.string.acct_back), onBack)
                 }
             }
         },
@@ -368,10 +387,11 @@ fun ConfirmSessionRevocationScreen(sessionId: String, device: String, onBack: ()
             Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(9.dp)) {
                 Icon(Icons.Rounded.WarningAmber, contentDescription = null, tint = palette.error, modifier = Modifier.size(18.dp))
                 Column {
-                    Text("Unverified activity", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = palette.textPrimary)
+                    Text(stringResource(R.string.acct_unverified_activity), fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = palette.textPrimary)
                     Spacer(Modifier.height(3.dp))
                     Text(
-                        (if (device.isNotBlank()) device + " · " else "") + "This session showed activity that did not match your usual sign-in pattern.",
+                        if (device.isNotBlank()) stringResource(R.string.acct_unverified_activity_with_device, device)
+                        else stringResource(R.string.acct_unverified_activity_body),
                         fontSize = 12.sp,
                         lineHeight = 17.sp,
                         color = palette.textSecondary,
@@ -396,24 +416,24 @@ fun SessionRevokedScreen(device: String, onDone: () -> Unit) {
         onBack = onDone,
         illustration = "ill_sec_session_revoked",
         illustrationWidth = 170,
-        title = "Session Revoked Successfully",
-        body = "The session has been revoked and this device can no longer access your account.",
+        title = stringResource(R.string.acct_session_revoked_successfully),
+        body = stringResource(R.string.acct_the_session_has_been_revoked_and),
         footer = {
             Column {
-                GradientButton("Done", onDone)
+                GradientButton(stringResource(R.string.acct_done), onDone)
                 Spacer(Modifier.height(6.dp))
-                FooterNote(text = "The device will need your password to sign in again.", divider = true)
+                FooterNote(text = stringResource(R.string.acct_the_device_will_need_your_password), divider = true)
             }
         },
     ) {
         InfoCard {
-            Text("Revoked Session", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = palette.textPrimary)
+            Text(stringResource(R.string.acct_revoked_session), fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = palette.textPrimary)
             Spacer(Modifier.height(6.dp))
-            Text(device.ifBlank { "That device" }, fontSize = 14.sp, color = palette.textSecondary)
+            Text(device.ifBlank { stringResource(R.string.acct_that_device) }, fontSize = 14.sp, color = palette.textSecondary)
             Spacer(Modifier.height(10.dp))
             // No real revocation timestamp is carried to this screen, so it says
             // what is true (the device is out) rather than inventing a time.
-            Text("This device is now signed out.", fontSize = 12.sp, color = palette.textTertiary)
+            Text(stringResource(R.string.acct_this_device_is_now_signed_out), fontSize = 12.sp, color = palette.textTertiary)
         }
     }
 }
@@ -426,25 +446,25 @@ fun SessionRevokedSuspiciousScreen(device: String, onDone: () -> Unit) {
         onBack = onDone,
         illustration = "ill_sec_revoked_suspicious",
         illustrationWidth = 170,
-        title = "Session Revoked Successfully",
-        body = "The suspicious session has been revoked and can no longer access your GrapMail account.",
+        title = stringResource(R.string.acct_session_revoked_successfully),
+        body = stringResource(R.string.acct_the_suspicious_session_has_been),
         footer = {
             Column {
-                GradientButton("Done", onDone)
+                GradientButton(stringResource(R.string.acct_done), onDone)
                 Spacer(Modifier.height(6.dp))
-                FooterNote(text = "Change your password too — a revoked session does not change a leaked one.", divider = true)
+                FooterNote(text = stringResource(R.string.acct_change_your_password_too_a_revoked), divider = true)
             }
         },
     ) {
         InfoCard {
-            Text("Revoked Session Details", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = palette.textPrimary)
+            Text(stringResource(R.string.acct_revoked_session_details), fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = palette.textPrimary)
             Spacer(Modifier.height(8.dp))
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Icon(Icons.Rounded.Security, contentDescription = null, tint = palette.success, modifier = Modifier.size(16.dp))
-                Text("This device is signed out", fontSize = 13.sp, color = palette.textSecondary)
+                Text(stringResource(R.string.acct_this_device_is_signed_out), fontSize = 13.sp, color = palette.textSecondary)
             }
             Spacer(Modifier.height(4.dp))
-            Text(device.ifBlank { "Unknown device" }, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = palette.textPrimary)
+            Text(device.ifBlank { stringResource(R.string.acct_unknown_device) }, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = palette.textPrimary)
         }
     }
 }

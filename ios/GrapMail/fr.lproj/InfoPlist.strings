@@ -1,0 +1,10 @@
+/* Info.plist strings for the GrapMail app target (French). */
+
+/* Face ID permission sheet (AppLock.swift). */
+"NSFaceIDUsageDescription" = "GrapMail utilise Face ID pour protéger votre messagerie lorsque l’app est verrouillée.";
+
+/* Home-screen quick action: com.grapsee.grapmail.compose. The key is the title in project.yml. */
+"Compose mail" = "Nouveau message";
+
+/* Photo library permission sheet for "Save Image" (round 9). */
+"NSPhotoLibraryAddUsageDescription" = "GrapMail enregistre dans votre photothèque les photos et pièces jointes que vous choisissez.";

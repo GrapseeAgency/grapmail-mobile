@@ -11,8 +11,6 @@ import com.android.billingclient.api.ProductDetails
 import com.android.billingclient.api.Purchase
 import com.android.billingclient.api.QueryProductDetailsParams
 import com.android.billingclient.api.QueryPurchasesParams
-import com.android.billingclient.api.queryProductDetails
-import com.android.billingclient.api.queryPurchasesAsync
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.suspendCancellableCoroutine
@@ -68,16 +66,25 @@ object PlayBilling {
             QueryProductDetailsParams.Product.newBuilder().setProductId(it)
                 .setProductType(BillingClient.ProductType.SUBS).build()
         }).build()
-        val result = c.queryProductDetails(params)
-        return result.productDetailsList.orEmpty()
+        // Billing 8 ships its coroutine extensions in the separate `billing-ktx`
+        // artifact; this file depends on `billing` alone, so the callback API is
+        // wrapped here instead of pulling in another dependency.
+        return suspendCancellableCoroutine { cont ->
+            c.queryProductDetailsAsync(params) { _, result ->
+                if (cont.isActive) cont.resume(result.productDetailsList.orEmpty())
+            }
+        }
     }
 
     /** Subscriptions this Play account already owns (for restore and upgrades). */
     suspend fun owned(context: Context): List<Purchase> {
         val c = connect(context) ?: return emptyList()
-        val result = c.queryPurchasesAsync(
-            QueryPurchasesParams.newBuilder().setProductType(BillingClient.ProductType.SUBS).build())
-        return result.purchasesList.filter { it.purchaseState == Purchase.PurchaseState.PURCHASED }
+        val purchases = suspendCancellableCoroutine { cont ->
+            c.queryPurchasesAsync(
+                QueryPurchasesParams.newBuilder().setProductType(BillingClient.ProductType.SUBS).build()
+            ) { _, list -> if (cont.isActive) cont.resume(list) }
+        }
+        return purchases.filter { it.purchaseState == Purchase.PurchaseState.PURCHASED }
     }
 
     /** The first offer's display price, e.g. "BDT 250.00/month". */

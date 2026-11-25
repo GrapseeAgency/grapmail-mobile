@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    values-ru/strings_mailbox_features.xml: translation of values/strings_mailbox_features.xml (same keys, same order).
+    Comments below are kept from the English source for context.
+-->
+<resources>
+    <!-- ui/mailfeatures/MorningCard.kt — greeting by local time; %1$s is the mailbox's first name. -->
+    <string name="mailbox_feat_greeting_morning">Доброе утро</string>
+    <string name="mailbox_feat_greeting_morning_name">Доброе утро, %1$s</string>
+    <string name="mailbox_feat_greeting_afternoon">Добрый день</string>
+    <string name="mailbox_feat_greeting_afternoon_name">Добрый день, %1$s</string>
+    <string name="mailbox_feat_greeting_evening">Добрый вечер</string>
+    <string name="mailbox_feat_greeting_evening_name">Добрый вечер, %1$s</string>
+    <!-- Summary parts; only non-zero parts are shown, joined by a middle dot. -->
+    <plurals name="mailbox_feat_digest_reply">
+        <item quantity="one">%1$d ждёт ответа</item>
+        <item quantity="few">%1$d ждут ответа</item>
+        <item quantity="many">%1$d ждут ответа</item>
+        <item quantity="other">%1$d ждут ответа</item>
+    </plurals>
+    <plurals name="mailbox_feat_digest_package">
+        <item quantity="one">%1$d посылка в пути</item>
+        <item quantity="few">%1$d посылки в пути</item>
+        <item quantity="many">%1$d посылок в пути</item>
+        <item quantity="other">%1$d посылки в пути</item>
+    </plurals>
+    <plurals name="mailbox_feat_digest_code">
+        <item quantity="one">%1$d код для входа</item>
+        <item quantity="few">%1$d кода для входа</item>
+        <item quantity="many">%1$d кодов для входа</item>
+        <item quantity="other">%1$d кода для входа</item>
+    </plurals>
+    <string name="mailbox_feat_digest_caught_up">Вы всё разобрали</string>
+    <!-- TalkBack reads the card as one sentence: %1$s greeting, %2$s the parts joined. -->
+    <string name="mailbox_feat_digest_a11y">%1$s. %2$s.</string>
+    <string name="mailbox_feat_digest_a11y_join">,\u0020</string>
+    <!-- TalkBack actions on the card. -->
+    <string name="mailbox_feat_action_show_reply">Показать письма, ожидающие ответа</string>
+    <string name="mailbox_feat_action_show_packages">Показать новости о посылках</string>
+    <string name="mailbox_feat_action_show_codes">Показать коды для входа</string>
+    <string name="mailbox_feat_action_show_all">Показать все письма</string>
+    <string name="mailbox_feat_dismiss">Закрыть</string>
+    <!-- The active filter chip under the card; %1$s is the filter's name. -->
+    <string name="mailbox_feat_filter_reply">Ждут ответа</string>
+    <string name="mailbox_feat_filter_packages">Посылки</string>
+    <string name="mailbox_feat_filter_codes">Коды для входа</string>
+    <string name="mailbox_feat_filter_clear">Сбросить фильтр: %1$s</string>
+
+    <!-- ui/components/Mail.kt — the code chip on an inbox row; %1$s is the code. -->
+    <string name="mailbox_feat_code_copy">Копировать %1$s</string>
+    <!-- The chip's spoken name; the code itself is not read out. -->
+    <string name="mailbox_feat_code_copy_a11y">Копировать код для входа</string>
+    <!-- Shown on the chip after a copy. The code is not repeated. -->
+    <string name="mailbox_feat_code_copied">Код скопирован</string>
+    <!-- Clipboard label (shown by some keyboards/clipboard UIs). -->
+    <string name="mailbox_feat_code_clip_label">Код для входа</string>
+
+    <!-- ui/mailfeatures/InboxZero.kt -->
+    <string name="mailbox_feat_zero_title">Всё разобрано</string>
+    <plurals name="mailbox_feat_zero_handled">
+        <item quantity="one">Сегодня вы обработали %1$d письмо.</item>
+        <item quantity="few">Сегодня вы обработали %1$d письма.</item>
+        <item quantity="many">Сегодня вы обработали %1$d писем.</item>
+        <item quantity="other">Сегодня вы обработали %1$d письма.</item>
+    </plurals>
+    <string name="mailbox_feat_zero_nothing">Вас ничего не ждёт.</string>
+
+    <!-- ui/screens/mail/SwipeActionsSetting.kt and the row actions in MailboxScreen.kt -->
+    <string name="mailbox_feat_swipe_title">Действия при смахивании</string>
+    <string name="mailbox_feat_swipe_body">Что происходит при смахивании письма в списке. Сохраняется только на этом устройстве.</string>
+    <string name="mailbox_feat_swipe_right">Смахивание вправо</string>
+    <string name="mailbox_feat_swipe_left">Смахивание влево</string>
+    <!-- %1$s is "Swipe right" or "Swipe left". -->
+    <string name="mailbox_feat_swipe_change">Изменить: %1$s</string>
+    <string name="mailbox_feat_swipe_archive">Архивировать</string>
+    <string name="mailbox_feat_swipe_trash">Корзина</string>
+    <string name="mailbox_feat_swipe_read">Прочитано/не прочитано</string>
+    <string name="mailbox_feat_swipe_star">Пометить</string>
+    <string name="mailbox_feat_swipe_snooze">Отложить</string>
+    <string name="mailbox_feat_swipe_move">Переместить в…</string>
+    <string name="mailbox_feat_swipe_none">Нет</string>
+</resources>

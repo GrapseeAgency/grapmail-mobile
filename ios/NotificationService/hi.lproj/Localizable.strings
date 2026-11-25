@@ -1,0 +1,21 @@
+/* GrapMailNotificationService — Hindi. */
+
+"New encrypted message" = "नया एन्क्रिप्टेड संदेश";
+"New mail" = "नया मेल";
+"1 new message" = "1 नया संदेश";
+"%lld new messages" = "%lld नए संदेश";
+"%lld unread in the inbox" = "इनबॉक्स में %lld अपठित";
+"Encrypted message" = "एन्क्रिप्टेड संदेश";
+"Unknown sender" = "अज्ञात प्रेषक";
+"No subject" = "कोई विषय नहीं";
+"This was me" = "यह मैं था";
+"Secure account" = "खाता सुरक्षित करें";
+"Archive" = "संग्रहित करें";
+"Mark as read" = "पढ़ा गया मार्क करें";
+"Reply" = "जवाब दें";
+"Send" = "भेजें";
+"Reply…" = "जवाब दें…";
+"Reply in app" = "ऐप में जवाब दें";
+"More" = "और";
+/* Notification title: a sign-in code, then the sender */
+"%@ · %@" = "%@ · %@";

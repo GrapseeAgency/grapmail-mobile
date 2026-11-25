@@ -1,0 +1,127 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- GrapMail — Reader plurals (ar). Arabic: zero, one, two, few, many, other. -->
+<plist version="1.0">
+<dict>
+	<key>%lld earlier messages</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@n@</string>
+		<key>n</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>zero</key>
+			<string>%lld رسالة سابقة</string>
+			<key>one</key>
+			<string>%lld رسالة سابقة</string>
+			<key>two</key>
+			<string>%lld رسالتان سابقتان</string>
+			<key>few</key>
+			<string>%lld رسائل سابقة</string>
+			<key>many</key>
+			<string>%lld رسالة سابقة</string>
+			<key>other</key>
+			<string>%lld رسالة سابقة</string>
+		</dict>
+	</dict>
+	<key>%lld people</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@n@</string>
+		<key>n</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>zero</key>
+			<string>%lld شخص</string>
+			<key>one</key>
+			<string>%lld شخص</string>
+			<key>two</key>
+			<string>%lld شخصان</string>
+			<key>few</key>
+			<string>%lld أشخاص</string>
+			<key>many</key>
+			<string>%lld شخصًا</string>
+			<key>other</key>
+			<string>%lld شخص</string>
+		</dict>
+	</dict>
+	<key>%lld messages</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@n@</string>
+		<key>n</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>zero</key>
+			<string>%lld رسالة</string>
+			<key>one</key>
+			<string>%lld رسالة</string>
+			<key>two</key>
+			<string>%lld رسالتان</string>
+			<key>few</key>
+			<string>%lld رسائل</string>
+			<key>many</key>
+			<string>%lld رسالة</string>
+			<key>other</key>
+			<string>%lld رسالة</string>
+		</dict>
+	</dict>
+	<key>%lld attachments</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@n@</string>
+		<key>n</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>zero</key>
+			<string>%lld مرفق</string>
+			<key>one</key>
+			<string>%lld مرفق</string>
+			<key>two</key>
+			<string>%lld مرفقان</string>
+			<key>few</key>
+			<string>%lld مرفقات</string>
+			<key>many</key>
+			<string>%lld مرفقًا</string>
+			<key>other</key>
+			<string>%lld مرفق</string>
+		</dict>
+	</dict>
+	<key>to %lld people</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@n@</string>
+		<key>n</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>zero</key>
+			<string>إلى %lld شخص</string>
+			<key>one</key>
+			<string>إلى %lld شخص</string>
+			<key>two</key>
+			<string>إلى %lld شخصين</string>
+			<key>few</key>
+			<string>إلى %lld أشخاص</string>
+			<key>many</key>
+			<string>إلى %lld شخصًا</string>
+			<key>other</key>
+			<string>إلى %lld شخص</string>
+		</dict>
+	</dict>
+</dict>
+</plist>

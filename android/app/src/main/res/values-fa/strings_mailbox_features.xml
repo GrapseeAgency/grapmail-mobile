@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    values-fa/strings_mailbox_features.xml: translation of values/strings_mailbox_features.xml (same keys, same order).
+    Comments below are kept from the English source for context.
+-->
+<resources>
+    <!-- ui/mailfeatures/MorningCard.kt — greeting by local time; %1$s is the mailbox's first name. -->
+    <string name="mailbox_feat_greeting_morning">صبح بخیر</string>
+    <string name="mailbox_feat_greeting_morning_name">صبح بخیر، %1$s</string>
+    <string name="mailbox_feat_greeting_afternoon">ظهر بخیر</string>
+    <string name="mailbox_feat_greeting_afternoon_name">ظهر بخیر، %1$s</string>
+    <string name="mailbox_feat_greeting_evening">عصر بخیر</string>
+    <string name="mailbox_feat_greeting_evening_name">عصر بخیر، %1$s</string>
+    <!-- Summary parts; only non-zero parts are shown, joined by a middle dot. -->
+    <plurals name="mailbox_feat_digest_reply">
+        <item quantity="one">%1$d پیام منتظر پاسخ</item>
+        <item quantity="other">%1$d پیام منتظر پاسخ</item>
+    </plurals>
+    <plurals name="mailbox_feat_digest_package">
+        <item quantity="one">%1$d بسته در راه</item>
+        <item quantity="other">%1$d بسته در راه</item>
+    </plurals>
+    <plurals name="mailbox_feat_digest_code">
+        <item quantity="one">%1$d کد ورود</item>
+        <item quantity="other">%1$d کد ورود</item>
+    </plurals>
+    <string name="mailbox_feat_digest_caught_up">همه‌چیز را بررسی کرده‌اید</string>
+    <!-- TalkBack reads the card as one sentence: %1$s greeting, %2$s the parts joined. -->
+    <string name="mailbox_feat_digest_a11y">%1$s. %2$s.</string>
+    <string name="mailbox_feat_digest_a11y_join">،\u0020</string>
+    <!-- TalkBack actions on the card. -->
+    <string name="mailbox_feat_action_show_reply">نمایش پیام‌هایی که منتظر پاسخ‌اند</string>
+    <string name="mailbox_feat_action_show_packages">نمایش وضعیت بسته‌ها</string>
+    <string name="mailbox_feat_action_show_codes">نمایش کدهای ورود</string>
+    <string name="mailbox_feat_action_show_all">نمایش همهٔ پیام‌ها</string>
+    <string name="mailbox_feat_dismiss">رد کردن</string>
+    <!-- The active filter chip under the card; %1$s is the filter's name. -->
+    <string name="mailbox_feat_filter_reply">منتظر پاسخ</string>
+    <string name="mailbox_feat_filter_packages">بسته‌ها</string>
+    <string name="mailbox_feat_filter_codes">کدهای ورود</string>
+    <string name="mailbox_feat_filter_clear">پاک کردن فیلتر: %1$s</string>
+
+    <!-- ui/components/Mail.kt — the code chip on an inbox row; %1$s is the code. -->
+    <string name="mailbox_feat_code_copy">کپی %1$s</string>
+    <!-- The chip's spoken name; the code itself is not read out. -->
+    <string name="mailbox_feat_code_copy_a11y">کپی کد ورود</string>
+    <!-- Shown on the chip after a copy. The code is not repeated. -->
+    <string name="mailbox_feat_code_copied">کد کپی شد</string>
+    <!-- Clipboard label (shown by some keyboards/clipboard UIs). -->
+    <string name="mailbox_feat_code_clip_label">کد ورود</string>
+
+    <!-- ui/mailfeatures/InboxZero.kt -->
+    <string name="mailbox_feat_zero_title">همه‌چیز مرتب است</string>
+    <plurals name="mailbox_feat_zero_handled">
+        <item quantity="one">امروز به %1$d ایمیل رسیدگی کردید.</item>
+        <item quantity="other">امروز به %1$d ایمیل رسیدگی کردید.</item>
+    </plurals>
+    <string name="mailbox_feat_zero_nothing">چیزی منتظر شما نیست.</string>
+
+    <!-- ui/screens/mail/SwipeActionsSetting.kt and the row actions in MailboxScreen.kt -->
+    <string name="mailbox_feat_swipe_title">کنش‌های کشیدن</string>
+    <string name="mailbox_feat_swipe_body">کاری که کشیدن روی یک پیام در فهرست انجام می‌دهد. فقط در این دستگاه ذخیره می‌شود.</string>
+    <string name="mailbox_feat_swipe_right">کشیدن به راست</string>
+    <string name="mailbox_feat_swipe_left">کشیدن به چپ</string>
+    <!-- %1$s is "Swipe right" or "Swipe left". -->
+    <string name="mailbox_feat_swipe_change">تغییر %1$s</string>
+    <string name="mailbox_feat_swipe_archive">بایگانی</string>
+    <string name="mailbox_feat_swipe_trash">سطل زباله</string>
+    <string name="mailbox_feat_swipe_read">خوانده‌شده/خوانده‌نشده</string>
+    <string name="mailbox_feat_swipe_star">ستاره‌دار کردن</string>
+    <string name="mailbox_feat_swipe_snooze">تعویق</string>
+    <string name="mailbox_feat_swipe_move">انتقال به…</string>
+    <string name="mailbox_feat_swipe_none">هیچ</string>
+</resources>

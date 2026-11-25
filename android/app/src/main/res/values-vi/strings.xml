@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">GrapMail</string>
+    <string name="shortcut_compose_short">Soạn thư</string>
+    <string name="shortcut_compose_long">Viết thư GrapMail mới</string>
+    <string name="shortcut_scheduled_short">Thư đã lên lịch</string>
+    <string name="shortcut_scheduled_long">Xem và hủy thư đang chờ gửi</string>
+    <string name="shortcut_subscriptions_short">Đăng ký</string>
+    <string name="shortcut_subscriptions_long">Xem lại người gửi và hủy đăng ký tại một nơi</string>
+    <string name="notif_channel_new_mail">Thư mới</string>
+    <string name="notif_channel_new_mail_desc">Thông báo cho bạn khi lần kiểm tra trong nền tìm thấy thư bạn chưa đọc. GrapMail không có dịch vụ đẩy, nên các thông báo này đến từ việc ứng dụng tự hỏi máy chủ khi hệ thống đánh thức nó.</string>
+    <string name="notif_channel_security">Cảnh báo bảo mật</string>
+    <string name="notif_channel_security_desc">Thông báo ngay khi có sự kiện xảy ra với tài khoản của bạn: đăng nhập từ thiết bị mới, thay đổi mật khẩu, thay đổi thiết bị tin cậy. Các cảnh báo này không bao giờ bị tắt tiếng trong giờ yên lặng.</string>
+    <string name="widget_description">Xem nhanh thư chưa đọc: số lượng từ các lần kiểm tra nền của GrapMail</string>
+</resources>

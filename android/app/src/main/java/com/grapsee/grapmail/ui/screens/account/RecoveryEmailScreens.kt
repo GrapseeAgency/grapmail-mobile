@@ -39,6 +39,8 @@ import com.grapsee.grapmail.ui.components.OrDivider
 import com.grapsee.grapmail.ui.components.StatusChip
 import com.grapsee.grapmail.ui.theme.LocalPalette
 import kotlinx.coroutines.launch
+import androidx.compose.ui.res.stringResource
+import com.grapsee.grapmail.R
 
 /**
  * Add a recovery email: the only way a GrapMail account gets its password back.
@@ -90,27 +92,27 @@ fun RecoveryEmailScreen(
             val session = SessionStore.snapshot(context)
             if (session == null) {
                 busy = false
-                error = "Your session has expired. Sign in again."
+                error = context.getString(R.string.acct_your_session_has_expired_sign_in)
                 return@launch
             }
             try {
                 val resp = Api.startRecoveryEmail(session.token, address)
                 busy = false
                 if (resp.token == null) {
-                    error = resp.error ?: "We couldn't send the code. Try again."
+                    error = resp.error ?: context.getString(R.string.acct_we_couldnt_send_the_code_try_again)
                     return@launch
                 }
                 verificationToken = resp.token
                 maskedEmail = resp.maskedEmail ?: address
                 expiresAt = resp.expiresAt ?: 0L
                 code = ""
-                if (again) notice = "A new code is on its way."
+                if (again) notice = context.getString(R.string.acct_a_new_code_is_on_its_way)
             } catch (e: ApiException) {
                 busy = false
-                error = e.message ?: "We couldn't send the code. Try again."
+                error = e.message ?: context.getString(R.string.acct_we_couldnt_send_the_code_try_again)
             } catch (_: Exception) {
                 busy = false
-                error = "Network error. Please try again."
+                error = context.getString(R.string.acct_network_error)
             }
         }
     }
@@ -123,7 +125,7 @@ fun RecoveryEmailScreen(
             val session = SessionStore.snapshot(context)
             if (session == null) {
                 busy = false
-                error = "Your session has expired. Sign in again."
+                error = context.getString(R.string.acct_your_session_has_expired_sign_in)
                 return@launch
             }
             try {
@@ -133,11 +135,11 @@ fun RecoveryEmailScreen(
                 confirmed = true
             } catch (e: ApiException) {
                 busy = false
-                error = e.message ?: "That code is not correct."
+                error = e.message ?: context.getString(R.string.acct_that_code_is_not_correct)
                 if (e.status == 410) code = ""
             } catch (_: Exception) {
                 busy = false
-                error = "Network error. Please try again."
+                error = context.getString(R.string.acct_network_error)
             }
         }
     }
@@ -147,21 +149,21 @@ fun RecoveryEmailScreen(
             onBack = null,
             illustration = "account-pending",
             footer = {
-                GradientButton("Continue", onClick = onDone)
+                GradientButton(stringResource(R.string.acct_continue), onClick = onDone)
                 Spacer(Modifier.height(4.dp))
             },
         ) {
-            StatusChip("Recovery email confirmed", ChipTone.Success)
+            StatusChip(stringResource(R.string.acct_recovery_email_confirmed), ChipTone.Success)
             Spacer(Modifier.height(16.dp))
             Text(
-                "You're covered",
+                stringResource(R.string.acct_youre_covered),
                 fontSize = 28.sp,
                 lineHeight = 34.sp,
                 color = palette.textPrimary,
             )
             Spacer(Modifier.height(10.dp))
             Text(
-                "If you ever forget your password, we'll send a reset link to ${email.trim().lowercase()}.",
+                stringResource(R.string.acct_recovery_email_covered_body, email.trim().lowercase()),
                 fontSize = 15.sp,
                 lineHeight = 23.sp,
                 color = palette.textSecondary,
@@ -171,12 +173,13 @@ fun RecoveryEmailScreen(
         verificationToken != null -> AccountScreen(
             onBack = { verificationToken = null; code = ""; error = null; notice = null },
             illustration = "account-recovery-code",
-            eyebrow = "Verify recovery email",
-            title = "Enter the 6-digit code",
-            body = "We sent a code to ${maskedEmail ?: "your email"}. Enter it to confirm this address.",
+            eyebrow = stringResource(R.string.acct_verify_recovery_email),
+            title = stringResource(R.string.acct_enter_the_6_digit_code),
+            body = maskedEmail?.let { stringResource(R.string.acct_recovery_email_code_sent_to, it) }
+                ?: stringResource(R.string.acct_recovery_email_code_sent_generic),
             footer = {
                 GradientButton(
-                    "Confirm",
+                    stringResource(R.string.acct_confirm),
                     onClick = { confirm() },
                     enabled = code.length == 6,
                     busy = busy,
@@ -193,14 +196,14 @@ fun RecoveryEmailScreen(
                 OrDivider()
                 Spacer(Modifier.height(12.dp))
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
-                    AccountLink(if (busy) "Sending…" else "Resend code", onClick = { sendCode(again = true) })
+                    AccountLink(if (busy) stringResource(R.string.acct_sending) else stringResource(R.string.acct_resend_code), onClick = { sendCode(again = true) })
                 }
                 if (notice != null) {
                     Spacer(Modifier.height(6.dp))
                     Text(notice ?: "", fontSize = 12.sp, color = palette.success)
                 }
                 Spacer(Modifier.height(12.dp))
-                FooterNote(text = "Didn't get it? Check your spam folder.", divider = false)
+                FooterNote(text = stringResource(R.string.acct_didnt_get_it_check_your_spam_folder), divider = false)
                 Spacer(Modifier.height(4.dp))
             },
         ) {
@@ -211,6 +214,7 @@ fun RecoveryEmailScreen(
                     code = it.filter(Char::isDigit).take(6)
                     error = null
                 },
+                autofill = com.grapsee.grapmail.ui.components.GMAutofill.OneTimeCode,
             )
             Spacer(Modifier.height(14.dp))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
@@ -221,12 +225,12 @@ fun RecoveryEmailScreen(
         else -> AccountScreen(
             onBack = onBack,
             illustration = "account-forgot",
-            eyebrow = "Recovery email",
-            title = "Add a recovery email",
-            body = "If you ever forget your password, we'll send a reset link here. Use an address outside GrapMail.",
+            eyebrow = stringResource(R.string.acct_recovery_email),
+            title = stringResource(R.string.acct_add_a_recovery_email),
+            body = stringResource(R.string.acct_if_you_ever_forget_your_password),
             footer = {
                 GradientButton(
-                    "Send code",
+                    stringResource(R.string.acct_send_code),
                     onClick = { sendCode(again = false) },
                     enabled = looksLikeEmail,
                     busy = busy,
@@ -242,11 +246,11 @@ fun RecoveryEmailScreen(
                 if (onSkip != null) {
                     Spacer(Modifier.height(12.dp))
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
-                        AccountLink("Skip for now", onClick = onSkip)
+                        AccountLink(stringResource(R.string.acct_skip_for_now), onClick = onSkip)
                     }
                     Spacer(Modifier.height(8.dp))
                     FooterNote(
-                        text = "You can add it later in Settings → Account Security.",
+                        text = stringResource(R.string.acct_you_can_add_it_later_in_settings),
                         divider = false,
                     )
                 }
@@ -254,7 +258,7 @@ fun RecoveryEmailScreen(
             },
         ) {
             AppTextField(
-                label = "Recovery email",
+                label = stringResource(R.string.acct_recovery_email),
                 value = email,
                 onValueChange = { email = it.trim(); error = null },
                 hint = "name@example.com",
@@ -266,8 +270,8 @@ fun RecoveryEmailScreen(
             )
             Spacer(Modifier.height(16.dp))
             InfoPanel(
-                title = "Why it matters",
-                body = "GrapMail resets passwords by email only. Without a verified recovery email, a forgotten password can lock you out.",
+                title = stringResource(R.string.acct_why_it_matters),
+                body = stringResource(R.string.acct_grapmail_resets_passwords_by_email),
             )
             Spacer(Modifier.height(8.dp))
         }

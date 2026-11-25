@@ -1,0 +1,7 @@
+/* Info.plist strings for the GrapMail app target (繁體中文). */
+
+"NSFaceIDUsageDescription" = "應用程式鎖定時，GrapMail 會使用 Face ID 保護您信箱的隱私。";
+"Compose mail" = "撰寫郵件";
+
+/* Photo library permission sheet for "Save Image" (round 9). */
+"NSPhotoLibraryAddUsageDescription" = "GrapMail 會將你選擇的照片和附件儲存到你的照片圖庫。";

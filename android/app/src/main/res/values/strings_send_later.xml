@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Send later (compose → clock button → sheet → receipt snackbar).
+    English only for now; the locale folders get these in the next translation pass.
+    Code: ui/screens/mail/SendLaterSheet.kt, ui/screens/mail/SendLaterSnackbar.kt,
+    ui/screens/mail/ComposeScreen.kt, logic/MailboxViewModel.kt (scheduleSend).
+-->
+<resources>
+    <!-- The clock button next to Send (TalkBack label and click action). -->
+    <string name="compose_send_later_button">Schedule send</string>
+    <string name="compose_send_later_button_action">choose when to send</string>
+
+    <!-- The sheet. -->
+    <string name="compose_send_later_title">Send later</string>
+    <string name="compose_send_later_later_today">Later today</string>
+    <string name="compose_send_later_tomorrow_morning">Tomorrow morning</string>
+    <string name="compose_send_later_monday_morning">Monday morning</string>
+    <string name="compose_send_later_pick">Pick date &amp; time</string>
+    <string name="compose_send_later_pick_hint">Up to 30 days ahead</string>
+    <!-- %1$s: the device time zone's name, e.g. "Bangladesh Standard Time". -->
+    <string name="compose_send_later_zone_note">Times are in your time zone: %1$s</string>
+    <!-- TalkBack for one option row. %1$s: option name, %2$s: its day and time. -->
+    <string name="compose_send_later_option_description">%1$s, %2$s</string>
+
+    <!-- Date and time dialogs. -->
+    <string name="compose_send_later_date_title">Choose a date</string>
+    <string name="compose_send_later_time_title">Choose a time</string>
+    <string name="compose_send_later_next">Next</string>
+    <string name="compose_send_later_schedule">Schedule</string>
+    <string name="compose_send_later_cancel">Cancel</string>
+    <string name="compose_send_later_type_time">Type the time</string>
+    <string name="compose_send_later_use_clock">Use the clock</string>
+    <string name="compose_send_later_too_soon">Pick a time at least a minute from now.</string>
+    <string name="compose_send_later_too_far">Pick a time no more than 30 days ahead.</string>
+
+    <!-- In-flight and failure lines in the composer. -->
+    <string name="compose_send_later_scheduling">Scheduling…</string>
+    <string name="compose_send_later_offline">No connection, so nothing was scheduled. Your message is still here.</string>
+
+    <!-- The receipt snackbar shown after compose closes. %1$s: e.g. "Tue 8:00 AM". -->
+    <string name="compose_send_later_scheduled_for">Scheduled for %1$s</string>
+    <string name="compose_send_later_undo">Undo</string>
+    <string name="compose_send_later_view">View</string>
+    <string name="compose_send_later_undoing">Cancelling…</string>
+    <string name="compose_send_later_undone">Not scheduled any more. The message is back in Drafts.</string>
+    <!-- %1$s: the server's reason. -->
+    <string name="compose_send_later_undo_failed">Could not cancel: %1$s</string>
+    <string name="compose_send_later_dismiss">Dismiss</string>
+</resources>

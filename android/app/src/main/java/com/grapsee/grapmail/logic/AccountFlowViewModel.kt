@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 
 /**
  * Everything the recovery and security screens carry between each other.
@@ -55,6 +56,21 @@ class AccountFlowViewModel : ViewModel() {
         val verifiedPhone: String? = null,
         /** Prefills the sign-in field when a flow hands the person back. */
         val prefillIdentifier: String? = null,
+        /**
+         * Round 8 — B: which remembered account the welcome-back route is
+         * for. An address, not a secret, but held here rather than in the
+         * route for the same reason the rest is: the back stack is written
+         * to disk, and the welcome-back screen exists so the full address
+         * is not on show.
+         */
+        val welcomeBackAddress: String? = null,
+        /**
+         * Round 8 — B: a sentence the standard sign-in shows once on arrival
+         * (welcome-back hands over a blocked/deleted account's server
+         * message here). Its presence also keeps the sign-in screen from
+         * redirecting back to welcome-back.
+         */
+        val signInNotice: String? = null,
     )
 
     private val _state = MutableStateFlow(State())
@@ -74,6 +90,13 @@ class AccountFlowViewModel : ViewModel() {
     }
 
     fun update(block: State.() -> State) {
-        _state.value = _state.value.block()
+        // Atomic read-modify-write: two coroutines updating the flow at once
+        // (a resend landing while a verify settles) can no longer drop a write.
+        _state.update { it.block() }
+    }
+
+    /** Round 8 — B: open welcome-back for [address] (null: the route picks the newest remembered). */
+    fun openWelcomeBack(address: String?) {
+        update { copy(welcomeBackAddress = address, prefillIdentifier = null, signInNotice = null) }
     }
 }

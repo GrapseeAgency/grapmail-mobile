@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    values-fa/strings_reader.xml: translation of values/strings_reader.xml (same keys, same order).
+    Comments below are kept from the English source for context.
+-->
+<resources>
+    <!-- The inline pill above an HTML body in a dark reader. It names what a tap switches TO. -->
+    <string name="reader_colours_original">رنگ‌های اصلی</string>
+    <string name="reader_colours_dark">رنگ‌های تیره</string>
+
+    <!-- The message overflow menu items (same toggle as the pill). -->
+    <string name="reader_colours_menu_original">نمایش رنگ‌های اصلی</string>
+    <string name="reader_colours_menu_dark">نمایش رنگ‌های تیره</string>
+
+    <!-- TalkBack: the pill's click action ("double-tap to …") and its current state. -->
+    <string name="reader_colours_action_original">نمایش رنگ‌های اصلی این فرستنده</string>
+    <string name="reader_colours_action_dark">نمایش با رنگ‌های تیره</string>
+    <string name="reader_colours_state_original">در حال نمایش رنگ‌های اصلی</string>
+    <string name="reader_colours_state_dark">در حال نمایش رنگ‌های تیره</string>
+
+    <!-- The note under the message after a change, so the per-sender memory is not a surprise later. -->
+    <string name="reader_colours_remembered_original">ایمیل‌های %1$s در این دستگاه با رنگ‌های اصلی‌شان باز می‌شوند.</string>
+    <string name="reader_colours_remembered_dark">ایمیل‌های %1$s در این دستگاه با رنگ‌های تیره باز می‌شوند.</string>
+</resources>

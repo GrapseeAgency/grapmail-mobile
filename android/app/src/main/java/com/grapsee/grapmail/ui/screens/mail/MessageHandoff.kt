@@ -36,9 +36,12 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.painter.BitmapPainter
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.grapsee.grapmail.R
 import com.grapsee.grapmail.data.MailMessageFullDto
 import com.grapsee.grapmail.ui.theme.LocalPalette
 import java.io.FileOutputStream
@@ -87,21 +90,29 @@ private const val PRINT_LINE_HEIGHT = 17f
  * that, rather than inventing a sentence for the gap, and a message whose only
  * part is HTML says it was printed as plain text — the same admission the screen
  * makes, one step further out.
+ *
+ * `res` supplies the labels in the person's language (`R.string.mail_share_*`);
+ * the values themselves are still only what the server answered with.
  */
-fun messageShareText(message: MailMessageFullDto, formattedText: String? = null): String = buildString {
-    appendLine(message.subject?.takeIf { it.isNotBlank() } ?: "(no subject)")
+fun messageShareText(
+    message: MailMessageFullDto,
+    formattedText: String?,
+    res: android.content.res.Resources,
+): String = buildString {
+    val notRecorded = res.getString(R.string.mail_share_not_recorded)
+    appendLine(message.subject?.takeIf { it.isNotBlank() } ?: res.getString(R.string.mail_no_subject))
     val from = message.from?.display?.takeIf { it.isNotBlank() }
         ?: message.from?.address?.takeIf { it.isNotBlank() }
-    appendLine("From: ${from ?: "Not recorded"}")
-    if (message.to.isNotEmpty()) appendLine("To: ${message.to.joinToString(", ")}")
-    if (message.cc.isNotEmpty()) appendLine("Cc: ${message.cc.joinToString(", ")}")
-    appendLine("Date: ${message.createdAt ?: "Not recorded"}")
+    appendLine(res.getString(R.string.mail_share_from, from ?: notRecorded))
+    if (message.to.isNotEmpty()) appendLine(res.getString(R.string.mail_share_to, message.to.joinToString(", ")))
+    if (message.cc.isNotEmpty()) appendLine(res.getString(R.string.mail_share_cc, message.cc.joinToString(", ")))
+    appendLine(res.getString(R.string.mail_share_date, message.createdAt ?: notRecorded))
     appendLine()
     val text = message.bodyText?.takeIf { it.isNotBlank() }
         ?: formattedText?.takeIf { it.isNotBlank() }
     when {
         text != null -> append(text)
-        else -> append("This message has no text body.")
+        else -> append(res.getString(R.string.mail_share_no_text_body))
     }
 }
 
@@ -185,6 +196,7 @@ private sealed class RemoteImageOutcome {
 @Composable
 fun RemoteImageView(url: String, label: String) {
     val palette = LocalPalette.current
+    val res = LocalContext.current.resources
     var bitmap by remember(url) { mutableStateOf<ImageBitmap?>(null) }
     var note by remember(url) { mutableStateOf<String?>(null) }
     var loading by remember(url) { mutableStateOf(true) }
@@ -193,7 +205,7 @@ fun RemoteImageView(url: String, label: String) {
         loading = true
         note = null
         bitmap = null
-        when (val outcome = withContext(Dispatchers.IO) { fetchRemoteImage(url) }) {
+        when (val outcome = withContext(Dispatchers.IO) { fetchRemoteImage(url, res) }) {
             is RemoteImageOutcome.Ready -> { bitmap = outcome.bitmap; loading = false }
             is RemoteImageOutcome.Problem -> { note = outcome.reason; loading = false }
         }
@@ -213,7 +225,7 @@ fun RemoteImageView(url: String, label: String) {
                 .background(palette.softFill, RoundedCornerShape(12.dp)),
             contentAlignment = Alignment.Center,
         ) {
-            Text("Loading image…", fontSize = 12.sp, color = palette.textTertiary)
+            Text(stringResource(R.string.mail_remote_image_loading), fontSize = 12.sp, color = palette.textTertiary)
         }
         else -> note?.let { reason ->
             Box(
@@ -229,16 +241,16 @@ fun RemoteImageView(url: String, label: String) {
 }
 
 /** The four answers a fetch can have, named once so the screen can say which. */
-private fun fetchRemoteImage(url: String): RemoteImageOutcome {
+private fun fetchRemoteImage(url: String, res: android.content.res.Resources): RemoteImageOutcome {
     val request = runCatching { Request.Builder().url(url).get().build() }
         .getOrElse {
-            return RemoteImageOutcome.Problem("That address is not one this app can request.")
+            return RemoteImageOutcome.Problem(res.getString(R.string.mail_remote_image_bad_address))
         }
     return runCatching {
         imageClient.newCall(request).execute().use { resp ->
             if (!resp.isSuccessful) {
                 return RemoteImageOutcome.Problem(
-                    "The sender's server refused the image (${resp.code}).")
+                    res.getString(R.string.mail_remote_image_refused, resp.code))
             }
             val type = resp.body?.contentType()?.type ?: ""
             if (!type.startsWith("image/")) {
@@ -246,7 +258,9 @@ private fun fetchRemoteImage(url: String): RemoteImageOutcome {
                 // An <img> tag does not license this app to hand a document to
                 // a renderer, so the content type is checked, not trusted.
                 return RemoteImageOutcome.Problem(
-                    "That address is not an image (${type.ifBlank { "no type given" }}).")
+                    res.getString(R.string.mail_remote_image_not_image,
+                        type.ifBlank { res.getString(R.string.mail_remote_image_no_type) }),
+                )
             }
             val bytes = resp.body?.bytes()
             // A 6000x4000 newsletter image decoded full-size costs ~90 MB of
@@ -265,16 +279,16 @@ private fun fetchRemoteImage(url: String): RemoteImageOutcome {
                     .let { opts -> android.graphics.BitmapFactory.decodeByteArray(data, 0, data.size, opts) }
             }
             if (decoded == null) {
-                RemoteImageOutcome.Problem("The image could not be read.")
+                RemoteImageOutcome.Problem(res.getString(R.string.mail_remote_image_unreadable))
             } else {
                 RemoteImageOutcome.Ready(decoded.asImageBitmap())
             }
         }
     }.getOrElse {
         if (it is java.io.IOException) {
-            RemoteImageOutcome.Problem("The sender's server could not be reached.")
+            RemoteImageOutcome.Problem(res.getString(R.string.mail_remote_image_unreachable))
         } else {
-            RemoteImageOutcome.Problem("The image could not be read.")
+            RemoteImageOutcome.Problem(res.getString(R.string.mail_remote_image_unreadable))
         }
     }
 }
@@ -302,24 +316,24 @@ fun printMessageText(
 ) {
     val manager = context.getSystemService(Context.PRINT_SERVICE) as? PrintManager
     if (manager == null) {
-        onOutcome("This device has no print service.")
+        onOutcome(context.getString(R.string.mail_print_no_service))
         return
     }
-    val docName = (message.subject?.takeIf { it.isNotBlank() } ?: "GrapMail message")
+    val docName = (message.subject?.takeIf { it.isNotBlank() } ?: context.getString(R.string.mail_print_doc_name))
         .take(60)
     // The attributes the system hands `onLayout` are the printer's own, and the
     // page geometry is read from them. What is NOT asked for is the device's
     // last-used attributes: `print()` takes the attributes to *request*, and the
     // panel lets the person change them, so the layout pass is where the real
     // numbers arrive.
-    val adapter = TextPrintAdapter(messageShareText(message, formattedText), docName)
+    val adapter = TextPrintAdapter(messageShareText(message, formattedText, context.resources), docName)
     val handed = runCatching {
         manager.print(docName, adapter, PrintAttributes.Builder().build())
     }.isSuccess
     // `null` means the request reached the print service, which is the most this
     // process can witness: what the person then does with the system's print
     // screen — pick a printer, cancel, save as PDF — belongs to that screen.
-    onOutcome(if (handed) null else "This device could not open its print screen.")
+    onOutcome(if (handed) null else context.getString(R.string.mail_print_no_screen))
 }
 
 /**

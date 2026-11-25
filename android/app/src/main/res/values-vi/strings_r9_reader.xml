@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <plurals name="reader_earlier_messages">
+        <item quantity="one">%d tin nhắn trước</item>
+        <item quantity="other">%d tin nhắn trước</item>
+    </plurals>
+    <plurals name="reader_participants">
+        <item quantity="one">%d người</item>
+        <item quantity="other">%d người</item>
+    </plurals>
+    <plurals name="reader_message_count">
+        <item quantity="one">%d tin nhắn</item>
+        <item quantity="other">%d tin nhắn</item>
+    </plurals>
+    <string name="reader_you">Bạn</string>
+    <string name="reader_unread">Chưa đọc</string>
+    <string name="reader_earlier_action">hiện các tin nhắn đã thu gọn</string>
+    <string name="reader_open_message_action">mở tin nhắn này</string>
+    <string name="reader_quoted_show">Hiện văn bản trích dẫn</string>
+    <string name="reader_quoted_hide">Ẩn văn bản trích dẫn</string>
+    <string name="reader_state_expanded">Đang mở</string>
+    <string name="reader_state_collapsed">Đã thu gọn</string>
+    <string name="reader_reply_to">Trả lời %1$s…</string>
+    <string name="reader_reply_fallback">Trả lời…</string>
+    <string name="reader_reply_options">Tùy chọn trả lời</string>
+    <string name="reader_quick_reply">Trả lời nhanh</string>
+    <string name="reader_attach_share_chooser">Chia sẻ tệp đính kèm</string>
+    <string name="reader_attach_view_image">xem ảnh</string>
+    <string name="reader_attach_save_named">Lưu %1$s</string>
+    <string name="reader_attach_share_named">Chia sẻ %1$s</string>
+    <string name="reader_attach_share_nothing">Không ứng dụng nào trên thiết bị này chia sẻ được tệp này.</string>
+    <string name="reader_viewer_position">%1$d / %2$d</string>
+    <string name="reader_viewer_too_large">Không thể xem trước ảnh này tại đây.</string>
+    <string name="compose_r9_leave_title">Rời khỏi tin nhắn này?</string>
+    <string name="compose_r9_leave_attachments">Bản nháp chưa giữ được tệp đính kèm. Hãy lưu phần văn bản mà không có tệp, hoặc tiếp tục soạn.</string>
+    <string name="compose_r9_save_text_only">Chỉ lưu văn bản</string>
+    <string name="compose_r9_draft_failed_title">Bản nháp này chưa được lưu</string>
+    <string name="compose_r9_leave_without_saving">Rời đi không lưu</string>
+    <string name="compose_r9_encrypt_failed">Không thể mã hóa tin nhắn này nên chưa có gì được gửi.</string>
+    <string name="compose_editor_toolbar">Định dạng văn bản</string>
+    <string name="compose_editor_bold">Đậm</string>
+    <string name="compose_editor_italic">Nghiêng</string>
+    <string name="compose_editor_underline">Gạch chân</string>
+    <string name="compose_editor_strike">Gạch ngang</string>
+    <string name="compose_editor_bullets">Dấu đầu dòng</string>
+    <string name="compose_editor_numbered">Đánh số</string>
+    <string name="compose_editor_text_colour">Màu chữ</string>
+    <string name="compose_editor_black">Đen</string>
+    <string name="compose_editor_blue">Xanh dương</string>
+    <string name="compose_editor_red">Đỏ</string>
+    <string name="compose_editor_green">Xanh lá</string>
+    <string name="compose_editor_highlight">Tô sáng</string>
+    <string name="compose_editor_highlight_colour">Màu tô sáng</string>
+    <string name="compose_editor_yellow">Vàng</string>
+    <string name="compose_editor_pink">Hồng</string>
+    <string name="compose_editor_font">Phông chữ</string>
+    <string name="compose_editor_sans">Không chân</string>
+    <string name="compose_editor_serif">Serif</string>
+    <string name="compose_editor_mono">Monospace</string>
+    <string name="compose_editor_larger">Lớn hơn</string>
+    <string name="compose_editor_clear">Xóa định dạng</string>
+    <string name="compose_editor_image">Hình ảnh</string>
+    <string name="compose_editor_insert_image">Chèn ảnh</string>
+</resources>

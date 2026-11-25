@@ -1,0 +1,24 @@
+{
+  "_note": "Emulator-relative budgets for .github/workflows/quality.yml. Measured on a GitHub ubuntu-latest x86_64 emulator with swiftshader software GPU, NOT a real phone; real devices are usually faster. Startup fails only above budget * (1 + fail_tolerance); jank and a11y are warn-only. See QUALITY-CHECKS.md.",
+  "android_startup": {
+    "cold_ms": 2000,
+    "warm_ms": 1000,
+    "runs": 10,
+    "fail_tolerance": 0.25,
+    "relative_to": "ci-emulator"
+  },
+  "android_jank": {
+    "janky_frames_warn_pct": 10,
+    "relative_to": "ci-emulator"
+  },
+  "android_monkey": {
+    "events": 5000,
+    "seed": 20261123,
+    "throttle_ms": 100,
+    "network_toggle_interval_s": 20
+  },
+  "ios_stress": {
+    "seed": 20261123,
+    "duration_s": 180
+  }
+}

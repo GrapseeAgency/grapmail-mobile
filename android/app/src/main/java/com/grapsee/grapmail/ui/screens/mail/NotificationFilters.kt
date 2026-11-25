@@ -1,5 +1,8 @@
 package com.grapsee.grapmail.ui.screens.mail
 
+import com.grapsee.grapmail.ui.components.GMLayout
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -35,6 +38,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
+import com.grapsee.grapmail.R
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -47,6 +53,9 @@ import com.grapsee.grapmail.data.Api
 import com.grapsee.grapmail.data.NotificationSettingsDto
 import com.grapsee.grapmail.data.SessionStore
 import com.grapsee.grapmail.logic.NotificationPolicy
+import com.grapsee.grapmail.ui.components.DetailSkeleton
+import com.grapsee.grapmail.ui.components.ErrorState
+import com.grapsee.grapmail.ui.components.OfflineBanner
 import com.grapsee.grapmail.ui.theme.LocalPalette
 import kotlinx.coroutines.launch
 
@@ -65,6 +74,7 @@ fun NotificationFiltersDialog(onDismiss: () -> Unit) {
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun NotificationFiltersScreen(onBack: () -> Unit) {
     val palette = LocalPalette.current
@@ -80,15 +90,18 @@ private fun NotificationFiltersScreen(onBack: () -> Unit) {
     LaunchedEffect(reload) {
         loadError = null
         val token = SessionStore.token(context)
-        if (token == null) { loadError = "Sign in again."; return@LaunchedEffect }
+        if (token == null) { loadError = context.getString(R.string.mail_notify_sign_in_again); return@LaunchedEffect }
         try {
             val read = Api.profile(token).profile?.settings?.notifications
-            if (read == null) loadError = "Your notification settings could not be read."
+            if (read == null) loadError = context.getString(R.string.mail_notify_read_failed)
             else { NotificationPolicy.storeForCurrent(context, read); settings = read }
         } catch (e: kotlinx.coroutines.CancellationException) {
             throw e
         } catch (e: Exception) {
-            loadError = e.message ?: "Your notification settings could not be read."
+            loadError = e.message ?: context.getString(R.string.mail_notify_read_failed)
+            // Offline or a failed read: keep the last stored settings on
+            // screen (under the offline banner) instead of an error page.
+            if (settings == null) settings = NotificationPolicy.cachedForCurrent(context)
         }
     }
 
@@ -116,24 +129,21 @@ private fun NotificationFiltersScreen(onBack: () -> Unit) {
 
     val deviceZone = remember { java.util.TimeZone.getDefault().id }
 
-    MailScaffold("Notification filters", onBack) {
+    MailScaffold(stringResource(R.string.mail_notify_title), onBack, maxContentWidth = GMLayout.Form) {
+        OfflineBanner()
+        if (settings == null) {
+            if (loadError != null) ErrorState(onRetry = { reload++ }, message = loadError)
+            else DetailSkeleton(label = stringResource(R.string.mail_notify_checking))
+            return@MailScaffold
+        }
         Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(bottom = 30.dp)) {
-            val s = settings
-            if (s == null) {
-                Text(loadError ?: "Checking your settings…", fontSize = 14.sp,
-                    color = if (loadError != null) palette.error else palette.textSecondary,
-                    modifier = Modifier.padding(20.dp))
-                if (loadError != null) TextButton(onClick = { reload++ }, modifier = Modifier.padding(horizontal = 12.dp)) {
-                    Text("Try again")
-                }
-                return@Column
-            }
+            val s = settings ?: return@Column
 
-            SectionLabel("Alert me about", palette)
+            SectionLabel(stringResource(R.string.mail_notify_alert_me_about), palette)
             listOf(
-                Triple("all", "All new mail", "Every message that reaches the inbox."),
-                Triple("priority", "Priority only", "VIP senders and conversations you follow."),
-                Triple("none", "Nothing", "Only conversations you follow, and security alerts."),
+                Triple("all", stringResource(R.string.mail_notify_mode_all), stringResource(R.string.mail_notify_mode_all_detail)),
+                Triple("priority", stringResource(R.string.mail_notify_mode_priority), stringResource(R.string.mail_notify_mode_priority_detail)),
+                Triple("none", stringResource(R.string.mail_notify_mode_none), stringResource(R.string.mail_notify_mode_none_detail)),
             ).forEach { (value, title, detail) ->
                 Row(
                     Modifier.fillMaxWidth()
@@ -152,49 +162,58 @@ private fun NotificationFiltersScreen(onBack: () -> Unit) {
                 }
             }
 
-            SectionLabel("On the lock screen", palette)
-            SwitchRow("Show sender and subject",
-                if (s.showPreview) "Alerts name who wrote and what about." else "Alerts say only \"New mail\".",
+            SectionLabel(stringResource(R.string.mail_notify_lock_screen), palette)
+            SwitchRow(stringResource(R.string.mail_notify_show_preview),
+                if (s.showPreview) stringResource(R.string.mail_notify_preview_on) else stringResource(R.string.mail_notify_preview_off),
                 s.showPreview, !saving, "notify-preview") { on -> change { it.copy(showPreview = on) } }
 
-            SectionLabel("Quiet hours", palette)
-            SwitchRow("Pause alerts every day",
-                if (s.quietHours.enabled) "From ${s.quietHours.start} to ${s.quietHours.end}" +
-                    (s.quietHours.timeZone.takeIf { it.isNotBlank() }?.let { " ($it)" } ?: "")
-                else "Off",
+            SectionLabel(stringResource(R.string.mail_notify_quiet_hours), palette)
+            SwitchRow(stringResource(R.string.mail_notify_quiet_pause),
+                if (s.quietHours.enabled) {
+                    val zone = s.quietHours.timeZone
+                    if (zone.isNotBlank()) stringResource(R.string.mail_notify_quiet_range_zone, s.quietHours.start, s.quietHours.end, zone)
+                    else stringResource(R.string.mail_notify_quiet_range, s.quietHours.start, s.quietHours.end)
+                }
+                else stringResource(R.string.mail_common_off),
                 s.quietHours.enabled, !saving, "notify-quiet") { on ->
                 change { it.copy(quietHours = it.quietHours.copy(enabled = on, timeZone = deviceZone)) }
             }
             if (s.quietHours.enabled) {
-                Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 6.dp),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    TimeChip("From", s.quietHours.start, !saving) {
+                val sameTimes = stringResource(R.string.mail_notify_quiet_same_times)
+                // Wraps: at large text the two times stack instead of the
+                // second running off a narrow screen.
+                FlowRow(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 6.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    TimeChip(stringResource(R.string.mail_notify_from), stringResource(R.string.mail_notify_change_from),
+                        s.quietHours.start, !saving) {
                         pickTime(s.quietHours.start) { t ->
-                            if (t == s.quietHours.end) note = "Quiet hours need to start and end at different times."
+                            if (t == s.quietHours.end) note = sameTimes
                             else change { it.copy(quietHours = it.quietHours.copy(start = t, timeZone = deviceZone)) }
                         }
                     }
-                    TimeChip("To", s.quietHours.end, !saving) {
+                    TimeChip(stringResource(R.string.mail_notify_to), stringResource(R.string.mail_notify_change_to),
+                        s.quietHours.end, !saving) {
                         pickTime(s.quietHours.end) { t ->
-                            if (t == s.quietHours.start) note = "Quiet hours need to start and end at different times."
+                            if (t == s.quietHours.start) note = sameTimes
                             else change { it.copy(quietHours = it.quietHours.copy(end = t, timeZone = deviceZone)) }
                         }
                     }
                 }
-                SwitchRow("Let VIPs through",
-                    "VIP senders and conversations you follow still alert.",
+                SwitchRow(stringResource(R.string.mail_notify_vip_through),
+                    stringResource(R.string.mail_notify_vip_through_detail),
                     s.quietHours.allowVip, !saving, "notify-quiet-vip") { on ->
                     change { it.copy(quietHours = it.quietHours.copy(allowVip = on)) }
                 }
             }
 
-            SectionLabel("VIP senders", palette)
-            Text("An address (name@example.com) or a whole domain (example.com).",
+            SectionLabel(stringResource(R.string.mail_notify_vip_senders), palette)
+            Text(stringResource(R.string.mail_notify_vip_hint),
                 fontSize = 12.sp, color = palette.textSecondary, modifier = Modifier.padding(horizontal = 20.dp))
             Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                 OutlinedTextField(
                     value = vipInput, onValueChange = { vipInput = it }, singleLine = true,
-                    placeholder = { Text("Add a VIP") },
+                    placeholder = { Text(stringResource(R.string.mail_notify_vip_placeholder)) },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email, imeAction = ImeAction.Done),
                     modifier = Modifier.weight(1f).testTag("notify-vip-input"),
                 )
@@ -203,49 +222,57 @@ private fun NotificationFiltersScreen(onBack: () -> Unit) {
                     val v = vipInput.trim().lowercase().removePrefix("@")
                     val looksRight = Regex("^[^\\s@]+@[^\\s@]+\\.[^\\s@]{2,}$").matches(v) ||
                         Regex("^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\\.)+[a-z]{2,}$").matches(v)
-                    if (!looksRight) note = "\"$v\" is not an address or a domain."
-                    else { vipInput = ""; change("Added $v.") { it.copy(vipSenders = it.vipSenders - v + v) } }
-                }) { Text("Add") }
+                    if (!looksRight) note = context.getString(R.string.mail_notify_vip_invalid, v)
+                    else { vipInput = ""; change(context.getString(R.string.mail_notify_vip_added, v)) { it.copy(vipSenders = it.vipSenders - v + v) } }
+                }) { Text(stringResource(R.string.mail_common_add)) }
             }
             if (s.vipSenders.isEmpty()) {
-                Text("No VIPs yet. You can also add one from a message's menu.", fontSize = 13.sp,
+                Text(stringResource(R.string.mail_notify_vip_empty), fontSize = 13.sp,
                     color = palette.textTertiary, modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp))
             }
             s.vipSenders.forEach { v ->
                 Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
                     Text(v, fontSize = 14.sp, color = palette.textPrimary, modifier = Modifier.weight(1f))
-                    TextButton(enabled = !saving, onClick = { change("Removed $v.") { it.copy(vipSenders = it.vipSenders - v) } }) {
-                        Text("Remove", color = palette.error)
+                    TextButton(enabled = !saving, onClick = { change(context.getString(R.string.mail_notify_vip_removed, v)) { it.copy(vipSenders = it.vipSenders - v) } }) {
+                        Text(stringResource(R.string.mail_common_remove), color = palette.error)
                     }
                 }
             }
 
-            SectionLabel("Conversations", palette)
+            SectionLabel(stringResource(R.string.mail_notify_conversations), palette)
+            val unmutedAll = stringResource(R.string.mail_notify_unmuted_all)
+            val unfollowedAll = stringResource(R.string.mail_notify_unfollowed_all)
             Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    when (val n = s.mutedThreads.size) { 0 -> "No muted conversations"; 1 -> "1 muted conversation"; else -> "$n muted conversations" },
+                    when (val n = s.mutedThreads.size) {
+                        0 -> stringResource(R.string.mail_notify_muted_none)
+                        else -> pluralStringResource(R.plurals.mail_notify_muted_count, n, n)
+                    },
                     fontSize = 14.sp, color = palette.textPrimary, modifier = Modifier.weight(1f),
                 )
                 if (s.mutedThreads.isNotEmpty()) TextButton(enabled = !saving, onClick = {
-                    change("Every conversation can alert again.") { it.copy(mutedThreads = emptyList()) }
-                }) { Text("Unmute all") }
+                    change(unmutedAll) { it.copy(mutedThreads = emptyList()) }
+                }) { Text(stringResource(R.string.mail_notify_unmute_all)) }
             }
             Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    when (val n = s.watchedThreads.size) { 0 -> "No followed conversations"; 1 -> "1 followed conversation"; else -> "$n followed conversations" },
+                    when (val n = s.watchedThreads.size) {
+                        0 -> stringResource(R.string.mail_notify_followed_none)
+                        else -> pluralStringResource(R.plurals.mail_notify_followed_count, n, n)
+                    },
                     fontSize = 14.sp, color = palette.textPrimary, modifier = Modifier.weight(1f),
                 )
                 if (s.watchedThreads.isNotEmpty()) TextButton(enabled = !saving, onClick = {
-                    change("Stopped following every conversation.") { it.copy(watchedThreads = emptyList()) }
-                }) { Text("Clear") }
+                    change(unfollowedAll) { it.copy(watchedThreads = emptyList()) }
+                }) { Text(stringResource(R.string.mail_common_clear)) }
             }
-            Text("Mute or follow a conversation from a message's menu.", fontSize = 12.sp,
+            Text(stringResource(R.string.mail_notify_mute_hint), fontSize = 12.sp,
                 color = palette.textTertiary, modifier = Modifier.padding(horizontal = 20.dp))
 
             Spacer(Modifier.height(16.dp))
-            Text("Security alerts (new sign-ins, password and two-step changes) always come through.",
+            Text(stringResource(R.string.mail_notify_security_note),
                 fontSize = 12.sp, color = palette.textSecondary, modifier = Modifier.padding(horizontal = 20.dp))
-            if (saving) Text("Saving…", fontSize = 13.sp, color = palette.textSecondary,
+            if (saving) Text(stringResource(R.string.mail_common_saving), fontSize = 13.sp, color = palette.textSecondary,
                 modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp))
             note?.let {
                 Text(it, fontSize = 13.sp, color = palette.textSecondary,
@@ -273,12 +300,12 @@ private fun SwitchRow(title: String, detail: String, checked: Boolean, enabled: 
 }
 
 @Composable
-private fun TimeChip(label: String, value: String, enabled: Boolean, onClick: () -> Unit) {
+private fun TimeChip(label: String, clickLabel: String, value: String, enabled: Boolean, onClick: () -> Unit) {
     val palette = LocalPalette.current
     Column(
         Modifier.clip(RoundedCornerShape(12.dp)).background(palette.card)
             .border(1.dp, palette.border, RoundedCornerShape(12.dp))
-            .clickable(enabled = enabled, onClickLabel = "Change $label time", onClick = onClick)
+            .clickable(enabled = enabled, onClickLabel = clickLabel, onClick = onClick)
             .padding(horizontal = 16.dp, vertical = 10.dp),
     ) {
         Text(label, fontSize = 11.sp, color = palette.textSecondary)

@@ -1,0 +1,95 @@
+/* zh-Hant translation of en.lproj/Reader.strings (round 9, ios_translations_b). Keys stay English; values translated. */
+/* Round 8 — Workstream D (reader & conversation polish, round8-spec §5). English base table "Reader".
+   Looked up with String(localized: "…", table: "Reader") / Text("…", tableName: "Reader").
+   Counted keys also have an entry in Reader.stringsdict, which wins over the entry here.
+   Other languages fall back to these English keys until they are translated. */
+
+/* Conversation: sender name on one's own message */
+"You" = "我";
+
+/* Conversation: recipients line when the message went only to the reader */
+"to me" = "寄給我";
+
+/* Conversation: recipients line with one recipient. Value: their name or address */
+"to %@" = "寄給 %@";
+
+/* Conversation: recipients line with several recipients (plural in Reader.stringsdict) */
+"to %lld people" = "寄給 %lld 人";
+
+/* Conversation: VoiceOver value on a folded card of an unread message */
+"Unread" = "未讀";
+
+/* Conversation: the bar that stands in for folded messages (plural in Reader.stringsdict) */
+"%lld earlier messages" = "%lld 封較早的郵件";
+
+/* Conversation: VoiceOver hint on the earlier-messages bar */
+"Shows the folded messages" = "顯示已摺疊的郵件";
+
+/* Conversation: chip under the subject, people in the conversation (plural in Reader.stringsdict) */
+"%lld people" = "%lld 人";
+
+/* Conversation: chip under the subject, messages in the conversation (plural in Reader.stringsdict) */
+"%lld messages" = "%lld 封郵件";
+
+/* Quoted history: button that shows the folded earlier text */
+"Show quoted text" = "顯示引用文字";
+
+/* Quoted history: button that folds it again */
+"Hide quoted text" = "隱藏引用文字";
+
+/* Quoted history: VoiceOver state of the button */
+"Collapsed" = "已摺疊";
+
+/* Quoted history: VoiceOver state of the button */
+"Expanded" = "已展開";
+
+/* Quick reply bar: placeholder. Value: the first name of the person the reply goes to */
+"Reply to %@…" = "回覆 %@…";
+
+/* Quick reply bar: placeholder when nobody can be named */
+"Reply…" = "回覆…";
+
+/* Quick reply bar: VoiceOver hint */
+"Opens the editor" = "開啟編輯器";
+
+/* Quick reply bar: VoiceOver label of the menu with Reply all and Forward */
+"Reply options" = "回覆選項";
+
+/* Quick reply bar: VoiceOver name of the region */
+"Quick reply" = "快速回覆";
+
+/* Attachments: section title (plural in Reader.stringsdict) */
+"%lld attachments" = "%lld 個附件";
+
+/* Attachments: link that opens the share sheet for every attachment */
+"Save all" = "全部儲存";
+
+/* Attachments: shown while every attachment is being fetched for Save all */
+"Preparing…" = "正在準備…";
+
+/* Attachments: VoiceOver hint on Save all */
+"Opens the share sheet, where Save to Files keeps every attachment" = "開啟分享表單，使用「儲存到『檔案』」可保留所有附件";
+
+/* Attachments: VoiceOver label of a picture in the grid. Values: its position, the number of files, its file name */
+"Image %lld of %lld, %@" = "圖片 %1$lld/%2$lld，%3$@";
+
+/* Attachments: meta line of a file with no known type or size */
+"File" = "檔案";
+
+/* Attachments: VoiceOver hint on a file row */
+"Opens a preview" = "開啟預覽";
+
+/* Attachments: VoiceOver label of the save button. Value: the file name */
+"Save %@" = "儲存 %@";
+
+/* Attachments: VoiceOver label of the share button. Value: the file name */
+"Share %@" = "分享 %@";
+
+/* Attachments: context-menu action */
+"Open" = "開啟";
+
+/* Attachments: context-menu action */
+"Save" = "儲存";
+
+/* Attachments: context-menu action */
+"Share" = "分享";

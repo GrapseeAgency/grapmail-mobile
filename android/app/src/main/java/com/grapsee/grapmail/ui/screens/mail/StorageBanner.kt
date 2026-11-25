@@ -1,5 +1,9 @@
 package com.grapsee.grapmail.ui.screens.mail
 
+import com.grapsee.grapmail.ui.components.gmMaxWidth
+import com.grapsee.grapmail.ui.components.GMLayout
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -24,6 +28,8 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.res.stringResource
+import com.grapsee.grapmail.R
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -44,6 +50,7 @@ import kotlinx.coroutines.launch
  * hides it until the level rises. A failed read draws nothing: no banner is a
  * smaller claim than a wrong one.
  */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun StorageBanner(onOpenFiles: () -> Unit) {
     val palette = LocalPalette.current
@@ -75,9 +82,11 @@ fun StorageBanner(onOpenFiles: () -> Unit) {
     val u = usage ?: return
     if (u.level == "ok" || u.level == dismissedLevel) return
     val full = u.level == "full"
-    val title = if (full) "Your storage is full" else "Your storage is almost full"
+    val title = if (full) stringResource(R.string.mail_storage_full)
+    else stringResource(R.string.mail_storage_almost_full)
     Column(
-        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp)
+        // Capped and centred on wide windows, in line with the capped list.
+        Modifier.gmMaxWidth(GMLayout.Readable).padding(horizontal = 16.dp, vertical = 6.dp)
             .clip(RoundedCornerShape(10.dp))
             .background(if (u.level == "warning") palette.warnChipBg else palette.error.copy(alpha = 0.12f))
             .padding(horizontal = 12.dp, vertical = 8.dp)
@@ -86,11 +95,12 @@ fun StorageBanner(onOpenFiles: () -> Unit) {
     ) {
         Text(title, fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
             color = if (u.level == "warning") palette.warnInk else palette.error)
-        Text("${u.usedLabel} of ${u.limitLabel} used (${formatPercent(u.percent)}). Delete large attachments, then empty Trash and Spam.",
+        Text(stringResource(R.string.mail_storage_body, u.usedLabel, u.limitLabel, formatPercent(u.percent)),
             fontSize = 12.sp, color = palette.textSecondary)
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            TextButton(onClick = onOpenFiles) { Text("See large files") }
-            TextButton(onClick = { dismissedLevel = u.level }) { Text("Not now") }
+        // Wraps at large text instead of pushing "Not now" off the banner.
+        FlowRow {
+            TextButton(onClick = onOpenFiles) { Text(stringResource(R.string.mail_storage_see_files)) }
+            TextButton(onClick = { dismissedLevel = u.level }) { Text(stringResource(R.string.mail_common_not_now)) }
         }
     }
 }

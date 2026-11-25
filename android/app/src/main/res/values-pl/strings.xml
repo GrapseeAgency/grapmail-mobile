@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">GrapMail</string>
+    <string name="shortcut_compose_short">Napisz wiadomość</string>
+    <string name="shortcut_compose_long">Napisz nową wiadomość w GrapMail</string>
+    <string name="shortcut_scheduled_short">Zaplanowane wysyłki</string>
+    <string name="shortcut_scheduled_long">Zobacz i anuluj wiadomości oczekujące na wysłanie</string>
+    <string name="shortcut_subscriptions_short">Subskrypcje</string>
+    <string name="shortcut_subscriptions_long">Przeglądaj nadawców i rezygnuj z subskrypcji w jednym miejscu</string>
+    <string name="notif_channel_new_mail">Nowa poczta</string>
+    <string name="notif_channel_new_mail_desc">Informuje, gdy sprawdzanie w tle znajdzie nieprzeczytane wiadomości. GrapMail nie korzysta z usługi push, więc powiadomienia pochodzą z samej aplikacji, która pyta serwer, gdy system ją wybudzi.</string>
+    <string name="notif_channel_security">Alerty bezpieczeństwa</string>
+    <string name="notif_channel_security_desc">Informuje od razu, gdy coś dzieje się z Twoim kontem: logowanie z nowego urządzenia, zmiana hasła lub zaufanych urządzeń. Te alerty nigdy nie są wyciszane przez godziny ciszy.</string>
+    <string name="widget_description">Nieprzeczytana poczta w skrócie: liczby ze sprawdzania w tle GrapMail</string>
+</resources>

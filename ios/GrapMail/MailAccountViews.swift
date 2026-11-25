@@ -82,10 +82,12 @@ struct SelectedAvatar: Transferable {
 // ── shared little pieces ─────────────────────────────────────────────────────
 
 private struct AccountSectionLabel: View {
-    let text: String
+    /// A resource: every caller passes a literal, which the String Catalog
+    /// extracts; uppercased in the device locale after lookup.
+    let text: LocalizedStringResource
     var body: some View {
-        Text(text.uppercased())
-            .font(.system(size: 11, weight: .bold)).kerning(1)
+        Text(String(localized: text).uppercased())
+            .gmFont(11, .bold).kerning(1)
             .foregroundColor(GM.textTertiary)
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, 20).padding(.top, 16).padding(.bottom, 6)
@@ -98,7 +100,7 @@ private struct NoteLine: View {
     let bad: Bool
     var body: some View {
         Text(text)
-            .font(.system(size: 13))
+            .gmFont(13)
             .foregroundColor(bad ? GM.error : GM.success)
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, 20).padding(.vertical, 6)
@@ -110,25 +112,29 @@ private struct NoteLine: View {
 /// Swift's memberwise initialiser keeps declaration order, and CI named the
 /// call sites that tried to pass it out of position.
 private struct AccountAddRow: View {
-    let hint: String
+    /// A resource so each call site's literal is extracted; `AppTextField`
+    /// takes the looked-up String.
+    let hint: LocalizedStringResource
     @Binding var value: String
     let busy: Bool
     let marker: String
     let onAdd: () -> Void
+    /// The round add button grows with the text size beside it (capped).
+    @ScaledMetric(relativeTo: .body) private var addButton: CGFloat = 44
 
     var body: some View {
         HStack(spacing: 10) {
-            AppTextField(value: $value, hint: hint)
+            AppTextField(value: $value, hint: String(localized: hint))
                 .frame(maxWidth: .infinity)
             Button(action: { if !value.trimmed.isEmpty && !busy { onAdd() } }) {
                 ZStack {
                     Circle()
                         .fill(!value.trimmed.isEmpty && !busy ? GM.primarySolid : GM.buttonDisabled)
-                        .frame(width: 44, height: 44)
+                        .frame(width: min(addButton, 64), height: min(addButton, 64))
                     if busy {
                         ProgressView().controlSize(.small).tint(.white)
                     } else {
-                        Image(systemName: "plus").font(.system(size: 16, weight: .semibold))
+                        Image(systemName: "plus").gmFont(16, .semibold, maxSize: 24)
                             .foregroundColor(.white)
                     }
                 }
@@ -159,7 +165,7 @@ private struct AccountRadioRow: View {
                 Circle().fill(GM.primarySolid).frame(width: 12, height: 12)
                     .opacity(selected ? 1 : 0)
             }
-            Text(title).font(.system(size: 15)).foregroundColor(GM.textPrimary)
+            Text(title).gmFont(15).foregroundColor(GM.textPrimary)
             Spacer()
         }
         .contentShape(Rectangle())
@@ -175,10 +181,10 @@ private struct AccountListRow: View {
 
     var body: some View {
         HStack(alignment: .top) {
-            Text(text).font(.system(size: 15)).foregroundColor(GM.textPrimary)
+            Text(text).gmFont(15).foregroundColor(GM.textPrimary)
                 .frame(maxWidth: .infinity, alignment: .leading)
             Button(action: onRemove) {
-                Image(systemName: "trash").font(.system(size: 15))
+                Image(systemName: "trash").gmFont(15)
                     .foregroundColor(GM.textTertiary)
             }
             .accessibilityLabel("Remove")
@@ -189,13 +195,17 @@ private struct AccountListRow: View {
 }
 
 private struct DetailLine2: View {
-    let label: String
+    @Environment(\.dynamicTypeSize) private var dts
+    /// The label is a literal at every call site; the value is data.
+    let label: LocalizedStringKey
     let value: String
     var body: some View {
-        HStack(alignment: .top) {
-            Text(label).font(.system(size: 13)).foregroundColor(GM.textSecondary)
-                .frame(width: 150, alignment: .leading)
-            Text(value).font(.system(size: 14)).foregroundColor(GM.textPrimary)
+        // Label column beside the value; at the accessibility text sizes the
+        // fixed 150-point column would squeeze the value, so they stack.
+        GMAdaptiveStack(spacing: dts.isAccessibilitySize ? CGFloat(2) : nil, verticalAlignment: .top) {
+            Text(label).gmFont(13).foregroundColor(GM.textSecondary)
+                .frame(width: dts.isAccessibilitySize ? nil : CGFloat(150), alignment: .leading)
+            Text(value).gmFont(14).foregroundColor(GM.textPrimary)
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
         .padding(.vertical, 6)
@@ -211,15 +221,28 @@ private struct AccountReadState: View {
     let loading: Bool
     let fatal: String?
     let what: String
+    /// Screen states: Try again under a failed read. Optional so every
+    /// existing call site keeps compiling.
+    var onRetry: (() -> Void)? = nil
     var body: some View {
         if profile == nil && fatal != nil {
             Text("\(what) could not be read. \(fatal!)")
-                .font(.system(size: 14)).foregroundColor(GM.textSecondary)
+                .gmFont(14).foregroundColor(GM.textSecondary)
                 .padding(.vertical, 16)
+            if let onRetry {
+                AccountLink(title: String(localized: "Try again"), action: onRetry)
+            }
         } else if profile == nil {
-            Text(loading ? "Loading…" : "\(what) could not be read.")
-                .font(.system(size: 14)).foregroundColor(GM.textTertiary)
-                .padding(.vertical, 16)
+            if loading {
+                GMSkeletonBlock(lines: 4)
+            } else {
+                Text("\(what) could not be read.")
+                    .gmFont(14).foregroundColor(GM.textTertiary)
+                    .padding(.vertical, 16)
+                if let onRetry {
+                    AccountLink(title: String(localized: "Try again"), action: onRetry)
+                }
+            }
         }
     }
 }
@@ -234,7 +257,7 @@ struct NotesView: View {
     @State private var draft = ""
 
     var body: some View {
-        MailScaffold(title: "Notes", onBack: onBack) {
+        MailScaffold(title: String(localized: "Notes"), onBack: onBack) {
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
                     if let note = vm.state.note {
@@ -246,17 +269,17 @@ struct NotesView: View {
                         vm.saveSettings(ProfileSettingsPatch(notes: [draft.trimmed] + list))
                         draft = ""
                     }
-                    Text("Notes are stored on the account, not on this phone, so they follow " +
-                         "you to any machine you sign in from.")
-                        .font(.system(size: 12)).foregroundColor(GM.textTertiary)
+                    Text("Notes are stored on the account, not on this phone, so they follow you to any machine you sign in from.")
+                        .gmFont(12).foregroundColor(GM.textTertiary)
                         .padding(.vertical, 6)
                     if vm.state.profile == nil {
                         AccountReadState(profile: vm.state.profile, loading: vm.state.loading,
-                                         fatal: vm.state.fatal, what: "Notes")
+                                         fatal: vm.state.fatal, what: String(localized: "Notes"),
+                                         onRetry: { vm.load(force: true) })
                     } else if let notes = vm.state.profile?.settings?.notes {
                         if notes.isEmpty {
                             Text("Nothing kept here yet.")
-                                .font(.system(size: 14)).foregroundColor(GM.textTertiary)
+                                .gmFont(14).foregroundColor(GM.textTertiary)
                                 .padding(.vertical, 16)
                         }
                         ForEach(notes, id: \.self) { note in
@@ -269,6 +292,8 @@ struct NotesView: View {
                     Spacer().frame(height: 24)
                 }
                 .padding(.horizontal, 20)
+                // Wide windows (iPad, Stage Manager, Mac): a centred form column.
+                .gmMaxWidth(GMLayout.form)
             }
         }
         .task { vm.load() }
@@ -286,7 +311,7 @@ struct TasksView: View {
     @State private var draft = ""
 
     var body: some View {
-        MailScaffold(title: "Tasks", onBack: onBack) {
+        MailScaffold(title: String(localized: "Tasks"), onBack: onBack) {
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
                     if let note = vm.state.note {
@@ -299,15 +324,16 @@ struct TasksView: View {
                         draft = ""
                     }
                     Text("Ticking a task removes it. This list has no archive.")
-                        .font(.system(size: 12)).foregroundColor(GM.textTertiary)
+                        .gmFont(12).foregroundColor(GM.textTertiary)
                         .padding(.vertical, 6)
                     if vm.state.profile == nil {
                         AccountReadState(profile: vm.state.profile, loading: vm.state.loading,
-                                         fatal: vm.state.fatal, what: "Tasks")
+                                         fatal: vm.state.fatal, what: String(localized: "Tasks"),
+                                         onRetry: { vm.load(force: true) })
                     } else if let tasks = vm.state.profile?.settings?.tasks {
                         if tasks.isEmpty {
                             Text("No tasks on this account.")
-                                .font(.system(size: 14)).foregroundColor(GM.textTertiary)
+                                .gmFont(14).foregroundColor(GM.textTertiary)
                                 .padding(.vertical, 16)
                         }
                         ForEach(tasks, id: \.self) { task in
@@ -322,7 +348,7 @@ struct TasksView: View {
                                 RoundedRectangle(cornerRadius: 6)
                                     .strokeBorder(GM.border, lineWidth: 1.5)
                                     .frame(width: 22, height: 22)
-                                Text(task).font(.system(size: 15)).foregroundColor(GM.textPrimary)
+                                Text(task).gmFont(15).foregroundColor(GM.textPrimary)
                                 Spacer()
                             }
                             .contentShape(Rectangle())
@@ -337,6 +363,8 @@ struct TasksView: View {
                     Spacer().frame(height: 24)
                 }
                 .padding(.horizontal, 20)
+                // Wide windows (iPad, Stage Manager, Mac): a centred form column.
+                .gmMaxWidth(GMLayout.form)
             }
         }
         .task { vm.load() }
@@ -400,7 +428,7 @@ struct MailPrefsView: View {
     private var overridesDirty: Bool { overridesToSave != (s?.signatures ?? [:]) }
 
     var body: some View {
-        MailScaffold(title: "Mail settings", onBack: onBack) {
+        MailScaffold(title: String(localized: "Mail settings"), onBack: onBack) {
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
                     if let note = vm.state.note {
@@ -408,13 +436,16 @@ struct MailPrefsView: View {
                     }
                     if s == nil {
                         AccountReadState(profile: vm.state.profile, loading: vm.state.loading,
-                                         fatal: vm.state.fatal, what: "These settings")
+                                         fatal: vm.state.fatal, what: String(localized: "These settings"),
+                                         onRetry: { vm.load(force: true) })
                     } else if fieldsReady {
                         prefsBody
                     }
                     Spacer().frame(height: 24)
                 }
                 .padding(.horizontal, 20)
+                // Wide windows (iPad, Stage Manager, Mac): a centred form column.
+                .gmMaxWidth(GMLayout.form)
             }
         }
         .task { vm.load() }
@@ -436,11 +467,10 @@ struct MailPrefsView: View {
     private var prefsBody: some View {
         VStack(alignment: .leading, spacing: 0) {
             AccountSectionLabel(text: "Signature")
-            Text("Appended to what you send, on every address you write from unless " +
-                 "an override says otherwise.")
-                .font(.system(size: 12)).foregroundColor(GM.textTertiary)
+            Text("Appended to what you send, on every address you write from unless an override says otherwise.")
+                .gmFont(12).foregroundColor(GM.textTertiary)
             TextEditor(text: $signature)
-                .font(.system(size: 15))
+                .gmFont(15)
                 .frame(minHeight: 80)
                 .padding(8)
                 .overlay(RoundedRectangle(cornerRadius: GMShape.input)
@@ -450,7 +480,7 @@ struct MailPrefsView: View {
                 vm.saveSettings(ProfileSettingsPatch(signature: signature))
             } label: {
                 Text("Save signature")
-                    .font(.system(size: 14, weight: .semibold))
+                    .gmFont(14, .semibold)
                     .foregroundColor(signature != s?.signature ? GM.primarySolid : GM.textTertiary)
                     .padding(.vertical, 8)
             }
@@ -464,26 +494,24 @@ struct MailPrefsView: View {
             // it never let anyone set — the sentence here and the compose
             // behaviour used to disagree until this section landed.
             AccountSectionLabel(text: "Signature per address")
-            Text("When you send as an alias, this is what gets added, so an alias " +
-                 "does not sign like your personal address. Leave one empty and " +
-                 "that address uses the main signature above.")
-                .font(.system(size: 12)).foregroundColor(GM.textTertiary)
+            Text("When you send as an alias, this is what gets added, so an alias does not sign like your personal address. Leave one empty and that address uses the main signature above.")
+                .gmFont(12).foregroundColor(GM.textTertiary)
             ForEach(signatureAddresses, id: \.self) { address in
                 Text(address)
-                    .font(.system(size: 12, weight: .medium)).foregroundColor(GM.textSecondary)
+                    .gmFont(12, .medium).foregroundColor(GM.textSecondary)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.top, 10)
                 TextEditor(text: Binding(
                     get: { overrides[address] ?? "" },
                     set: { overrides[address] = $0 }
                 ))
-                .font(.system(size: 14))
+                .gmFont(14)
                 .frame(minHeight: 60)
                 .padding(6)
                 .overlay(alignment: .topLeading) {
                     if (overrides[address] ?? "").isEmpty {
                         Text("Uses the main signature")
-                            .font(.system(size: 14)).foregroundColor(GM.textTertiary)
+                            .gmFont(14).foregroundColor(GM.textTertiary)
                             .padding(.leading, 12).padding(.top, 12)
                             .allowsHitTesting(false)
                     }
@@ -497,7 +525,7 @@ struct MailPrefsView: View {
                 vm.saveSettings(ProfileSettingsPatch(signatures: overridesToSave))
             } label: {
                 Text("Save per-address signatures")
-                    .font(.system(size: 14, weight: .semibold))
+                    .gmFont(14, .semibold)
                     .foregroundColor(overridesDirty ? GM.primarySolid : GM.textTertiary)
                     .padding(.vertical, 8)
             }
@@ -510,13 +538,13 @@ struct MailPrefsView: View {
             MailFeatureSettingsSection()
 
             AccountSectionLabel(text: "List density")
-            AccountRadioRow(title: "Comfortable — the roomier list",
+            AccountRadioRow(title: String(localized: "Comfortable — the roomier list"),
                             selected: s?.density != "compact") {
                 if s?.density != "comfortable" {
                     vm.saveSettings(ProfileSettingsPatch(density: "comfortable"))
                 }
             }
-            AccountRadioRow(title: "Compact — more messages per screen",
+            AccountRadioRow(title: String(localized: "Compact — more messages per screen"),
                             selected: s?.density == "compact") {
                 if s?.density != "compact" {
                     vm.saveSettings(ProfileSettingsPatch(density: "compact"))
@@ -528,8 +556,8 @@ struct MailPrefsView: View {
             // nothing on this device read.
             AccountSectionLabel(text: "Time zone and dates")
             Text("How times and dates appear in your mailbox list.")
-                .font(.system(size: 12)).foregroundColor(GM.textTertiary)
-            AccountRadioRow(title: "This device's time zone (\(TimeZone.current.identifier))",
+                .gmFont(12).foregroundColor(GM.textTertiary)
+            AccountRadioRow(title: String(localized: "This device's time zone (\(TimeZone.current.identifier))"),
                             selected: (s?.locale.timezone ?? "").isEmpty) {
                 zoneError = nil
                 if let loc = s?.locale, !loc.timezone.isEmpty {
@@ -537,29 +565,29 @@ struct MailPrefsView: View {
                         language: loc.language, timezone: "", dateFormat: loc.dateFormat)))
                 }
             }
-            AppTextField(title: "Another time zone", value: $timezone, error: zoneError,
-                         hint: "e.g. Europe/London")
+            AppTextField(title: String(localized: "Another time zone"), value: $timezone, error: zoneError,
+                         hint: String(localized: "e.g. Europe/London"))
                 .padding(.top, 4)
                 .onChange(of: timezone) { _ in zoneError = nil }
             Button {
                 guard let loc = s?.locale else { return }
                 guard let zone = MailDisplay.zone(timezone.trimmed) else {
-                    zoneError = "That isn't a time zone. Use a name like Europe/London or America/New_York."
+                    zoneError = String(localized: "That isn't a time zone. Use a name like Europe/London or America/New_York.")
                     return
                 }
                 vm.saveSettings(ProfileSettingsPatch(locale: LocaleInfo(
                     language: loc.language, timezone: zone.identifier, dateFormat: loc.dateFormat)))
             } label: {
                 Text("Use this time zone")
-                    .font(.system(size: 14, weight: .semibold))
+                    .gmFont(14, .semibold)
                     .foregroundColor(zoneDirty ? GM.primarySolid : GM.textTertiary).padding(.vertical, 8)
             }
             .disabled(vm.state.busy || !zoneDirty)
             .buttonStyle(.plain)
             Text("Dates in the mailbox list:")
-                .font(.system(size: 13)).foregroundColor(GM.textSecondary)
-            ForEach([("", "Automatic — follows this device"), ("dmy", "day first (25/10/26)"),
-                     ("mdy", "month first (10/25/26)"), ("ymd", "year first (2026-10-25)")], id: \.0) { code, label in
+                .gmFont(13).foregroundColor(GM.textSecondary)
+            ForEach([("", String(localized: "Automatic — follows this device")), ("dmy", String(localized: "day first (25/10/26)")),
+                     ("mdy", String(localized: "month first (10/25/26)")), ("ymd", String(localized: "year first (2026-10-25)"))], id: \.0) { code, label in
                 AccountRadioRow(title: label, selected: s?.locale.dateFormat == code) {
                     if let loc = s?.locale, loc.dateFormat != code {
                         vm.saveSettings(ProfileSettingsPatch(
@@ -577,13 +605,12 @@ struct MailPrefsView: View {
             // block applies whether or not the Screener is on. A sender can be on
             // one list only, so adding to one takes it off the other.
             AccountSectionLabel(text: "Senders you always accept")
-            Text("Mail from these senders always lands in your inbox, even when the Screener is on. " +
-                 "Use an address (name@example.com) or a whole domain (example.com).")
-                .font(.system(size: 12)).foregroundColor(GM.textTertiary)
+            Text("Mail from these senders always lands in your inbox, even when the Screener is on. Use an address (name@example.com) or a whole domain (example.com).")
+                .gmFont(12).foregroundColor(GM.textTertiary)
             AccountAddRow(hint: "name@example.com or example.com", value: $safeDraft,
                           busy: vm.state.busy, marker: "gm-add-safe") {
                 guard let sender = Self.normalizedSender(safeDraft) else {
-                    safeError = "Enter an address like name@example.com, or a domain like example.com."
+                    safeError = String(localized: "Enter an address like name@example.com, or a domain like example.com.")
                     return
                 }
                 vm.saveSettings(ProfileSettingsPatch(
@@ -593,7 +620,7 @@ struct MailPrefsView: View {
             }
             .onChange(of: safeDraft) { _ in safeError = nil }
             if let safeError {
-                Text(safeError).font(.system(size: 12)).foregroundColor(GM.error)
+                Text(safeError).gmFont(12).foregroundColor(GM.error)
             }
             ForEach(s?.safeSenders ?? [], id: \.self) { e in
                 AccountListRow(text: e, marker: "gm-safe-row") {
@@ -603,13 +630,12 @@ struct MailPrefsView: View {
             }
 
             AccountSectionLabel(text: "Senders you block")
-            Text("Mail from blocked senders goes straight to Trash. " +
-                 "Use an address (name@example.com) or a whole domain (example.com).")
-                .font(.system(size: 12)).foregroundColor(GM.textTertiary)
+            Text("Mail from blocked senders goes straight to Trash. Use an address (name@example.com) or a whole domain (example.com).")
+                .gmFont(12).foregroundColor(GM.textTertiary)
             AccountAddRow(hint: "name@example.com or example.com", value: $blockedDraft,
                           busy: vm.state.busy, marker: "gm-add-blocked") {
                 guard let sender = Self.normalizedSender(blockedDraft) else {
-                    blockedError = "Enter an address like name@example.com, or a domain like example.com."
+                    blockedError = String(localized: "Enter an address like name@example.com, or a domain like example.com.")
                     return
                 }
                 vm.saveSettings(ProfileSettingsPatch(
@@ -619,7 +645,7 @@ struct MailPrefsView: View {
             }
             .onChange(of: blockedDraft) { _ in blockedError = nil }
             if let blockedError {
-                Text(blockedError).font(.system(size: 12)).foregroundColor(GM.error)
+                Text(blockedError).gmFont(12).foregroundColor(GM.error)
             }
             ForEach(s?.blockedSenders ?? [], id: \.self) { e in
                 AccountListRow(text: e, marker: "gm-blocked-row") {
@@ -642,20 +668,19 @@ struct MailPrefsView: View {
     private var autoReplySection: some View {
         VStack(alignment: .leading, spacing: 0) {
             AccountSectionLabel(text: "Auto-reply")
-            Text("While it's on, people who write to you get this message once every 4 days. " +
-                 "Mailing lists and no-reply senders never get one.")
-                .font(.system(size: 12)).foregroundColor(GM.textTertiary)
+            Text("While it's on, people who write to you get this message once every 4 days. Mailing lists and no-reply senders never get one.")
+                .gmFont(12).foregroundColor(GM.textTertiary)
             Toggle("Send auto-replies", isOn: $awayOn)
-                .font(.system(size: 15)).padding(.vertical, 6)
+                .gmFont(15).padding(.vertical, 6)
                 .onChange(of: awayOn) { _ in awayError = nil }
             TextEditor(text: $awayMessage)
-                .font(.system(size: 15))
+                .gmFont(15)
                 .frame(minHeight: 80)
                 .padding(8)
                 .overlay(alignment: .topLeading) {
                     if awayMessage.isEmpty {
                         Text("I'm away until Monday and will reply when I'm back.")
-                            .font(.system(size: 15)).foregroundColor(GM.textTertiary)
+                            .gmFont(15).foregroundColor(GM.textTertiary)
                             .padding(.leading, 13).padding(.top, 16)
                             .allowsHitTesting(false)
                     }
@@ -663,13 +688,13 @@ struct MailPrefsView: View {
                 .overlay(RoundedRectangle(cornerRadius: GMShape.input)
                     .strokeBorder(awayError == nil ? GM.border : GM.error))
                 .accessibilityLabel("Auto-reply message")
-            HStack(spacing: 10) {
-                AppTextField(title: "First day", value: $awayFrom, hint: "YYYY-MM-DD (optional)")
-                AppTextField(title: "Last day", value: $awayTo, hint: "YYYY-MM-DD (optional)")
+            GMAdaptiveStack(spacing: 10) {
+                AppTextField(title: String(localized: "First day"), value: $awayFrom, hint: String(localized: "YYYY-MM-DD (optional)"))
+                AppTextField(title: String(localized: "Last day"), value: $awayTo, hint: String(localized: "YYYY-MM-DD (optional)"))
             }
             .padding(.top, 8)
             if let awayError {
-                Text(awayError).font(.system(size: 12)).foregroundColor(GM.error).padding(.top, 4)
+                Text(awayError).gmFont(12).foregroundColor(GM.error).padding(.top, 4)
             }
             Button {
                 awayError = Self.vacationProblem(on: awayOn, message: awayMessage,
@@ -679,7 +704,7 @@ struct MailPrefsView: View {
                     enabled: awayOn, from: awayFrom.trimmed, to: awayTo.trimmed, message: awayMessage)))
             } label: {
                 Text("Save auto-reply")
-                    .font(.system(size: 14, weight: .semibold))
+                    .gmFont(14, .semibold)
                     .foregroundColor(awayDirty ? GM.primarySolid : GM.textTertiary)
                     .padding(.vertical, 8)
             }
@@ -697,32 +722,30 @@ struct MailPrefsView: View {
     private var forwardingSection: some View {
         VStack(alignment: .leading, spacing: 0) {
             AccountSectionLabel(text: "Forwarding")
-            Text("Send a copy of every message you receive to another address. The original " +
-                 "always stays in GrapMail, and the copy is plain text. Turning it on also puts a " +
-                 "security notice in your inbox, so you'd notice if someone else did.")
-                .font(.system(size: 12)).foregroundColor(GM.textTertiary)
+            Text("Send a copy of every message you receive to another address. The original always stays in GrapMail, and the copy is plain text. Turning it on also puts a security notice in your inbox, so you'd notice if someone else did.")
+                .gmFont(12).foregroundColor(GM.textTertiary)
             Toggle("Forward my mail", isOn: $forwardOn)
-                .font(.system(size: 15)).padding(.vertical, 6)
+                .gmFont(15).padding(.vertical, 6)
                 .onChange(of: forwardOn) { _ in forwardError = nil }
-            AppTextField(title: "Forward to", value: $forwardTo, error: forwardError,
+            AppTextField(title: String(localized: "Forward to"), value: $forwardTo, error: forwardError,
                          hint: "name@example.com", keyboardType: .emailAddress)
                 .onChange(of: forwardTo) { _ in forwardError = nil }
             Button {
                 let address = forwardTo.trimmed.lowercased()
                 let own = Set(signatureAddresses.map { $0.lowercased() })
                 if forwardOn && address.isEmpty {
-                    forwardError = "Add the address to forward to."
+                    forwardError = String(localized: "Add the address to forward to.")
                 } else if !address.isEmpty && Self.normalizedSender(address)?.contains("@") != true {
-                    forwardError = "Forward to a full email address."
+                    forwardError = String(localized: "Forward to a full email address.")
                 } else if own.contains(address) {
-                    forwardError = "Forwarding to your own address would loop."
+                    forwardError = String(localized: "Forwarding to your own address would loop.")
                 } else {
                     vm.saveSettings(ProfileSettingsPatch(forwarding: ForwardingInfo(
                         enabled: forwardOn, address: address)))
                 }
             } label: {
                 Text("Save forwarding")
-                    .font(.system(size: 14, weight: .semibold))
+                    .gmFont(14, .semibold)
                     .foregroundColor(forwardDirty ? GM.primarySolid : GM.textTertiary)
                     .padding(.vertical, 8)
             }
@@ -751,11 +774,11 @@ struct MailPrefsView: View {
     static func vacationProblem(on: Bool, message: String, from: String, to: String) -> String? {
         let start = from.isEmpty ? nil : AccountDates.parse(from)
         let end = to.isEmpty ? nil : AccountDates.parse(to)
-        if !from.isEmpty && start == nil { return "Write the first day as YYYY-MM-DD." }
-        if !to.isEmpty && end == nil { return "Write the last day as YYYY-MM-DD." }
-        if let start, let end, end < start { return "The last day is before the first day." }
+        if !from.isEmpty && start == nil { return String(localized: "Write the first day as YYYY-MM-DD.") }
+        if !to.isEmpty && end == nil { return String(localized: "Write the last day as YYYY-MM-DD.") }
+        if let start, let end, end < start { return String(localized: "The last day is before the first day.") }
         if on && message.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            return "Write the auto-reply before turning it on."
+            return String(localized: "Write the auto-reply before turning it on.")
         }
         return nil
     }
@@ -781,12 +804,12 @@ enum AccountDates {
     static func birthdayProblem(_ value: String) -> String? {
         let text = value.trimmingCharacters(in: .whitespaces)
         if text.isEmpty { return nil }
-        guard let date = parse(text) else { return "Enter your birthday as YYYY-MM-DD." }
+        guard let date = parse(text) else { return String(localized: "Enter your birthday as YYYY-MM-DD.") }
         var cal = Calendar(identifier: .gregorian)
         cal.timeZone = TimeZone(identifier: "UTC")!
-        if date > Date() || cal.component(.year, from: date) < 1900 { return "Enter a real birthday." }
+        if date > Date() || cal.component(.year, from: date) < 1900 { return String(localized: "Enter a real birthday.") }
         let age = cal.dateComponents([.year], from: date, to: Date()).year ?? 0
-        return age < 13 ? "A GrapMail account needs you to be at least 13." : nil
+        return age < 13 ? String(localized: "A GrapMail account needs you to be at least 13.") : nil
     }
 }
 
@@ -804,7 +827,7 @@ struct AddressesView: View {
     @State private var pendingDelete: String?
 
     var body: some View {
-        MailScaffold(title: "Addresses", onBack: onBack) {
+        MailScaffold(title: String(localized: "Addresses"), onBack: onBack) {
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
                     if let note = vm.state.note {
@@ -812,16 +835,15 @@ struct AddressesView: View {
                     }
                     AccountSectionLabel(text: "Your GrapMail address")
                     Text(vm.state.profile?.address
-                         ?? (vm.state.fatal != nil ? "Could not be read" : "Loading…"))
-                        .font(.system(size: 16, weight: .medium))
+                         ?? (vm.state.fatal != nil ? String(localized: "Could not be read") : String(localized: "Loading…")))
+                        .gmFont(16, .medium)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(.horizontal, 14).padding(.vertical, 12)
                         .background(RoundedRectangle(cornerRadius: 10).fill(GM.bgTinted))
                         .accessibilityIdentifier("gm-primary-address")
                     AccountSectionLabel(text: "Email aliases")
-                    Text("An alias delivers into the same mailbox under a second address, " +
-                         "and you can choose it as the sender.")
-                        .font(.system(size: 12)).foregroundColor(GM.textTertiary)
+                    Text("An alias delivers into the same mailbox under a second address, and you can choose it as the sender.")
+                        .gmFont(12).foregroundColor(GM.textTertiary)
                     AccountAddRow(hint: "A label — business, family…", value: $label,
                                   busy: vm.state.busy, marker: "gm-add-alias") {
                         // `POST /aliases` mints the address itself; the label is what
@@ -832,10 +854,9 @@ struct AddressesView: View {
                     aliasesBody
                     if let address = pendingDelete {
                         VStack(alignment: .leading, spacing: 12) {
-                            Text("Stop receiving at \(address)? Mail already delivered stays " +
-                                 "in the mailbox; nothing new arrives at this address.")
-                                .font(.system(size: 13)).foregroundColor(GM.textPrimary)
-                            HStack(spacing: 24) {
+                            Text("Stop receiving at \(address)? Mail already delivered stays in the mailbox; nothing new arrives at this address.")
+                                .gmFont(13).foregroundColor(GM.textPrimary)
+                            GMAdaptiveStack(spacing: 24) {
                                 Button("Cancel") { pendingDelete = nil }
                                     .foregroundColor(GM.textSecondary)
                                 Button("Remove address") {
@@ -845,7 +866,7 @@ struct AddressesView: View {
                                 .foregroundColor(GM.error)
                                 .fontWeight(.semibold)
                             }
-                            .font(.system(size: 14))
+                            .gmFont(14)
                         }
                         .padding(16)
                         .background(RoundedRectangle(cornerRadius: 12).fill(GM.warnChipBg))
@@ -854,6 +875,8 @@ struct AddressesView: View {
                     Spacer().frame(height: 24)
                 }
                 .padding(.horizontal, 20)
+                // Wide windows (iPad, Stage Manager, Mac): a centred form column.
+                .gmMaxWidth(GMLayout.form)
             }
         }
         .task { vm.load() }
@@ -866,19 +889,19 @@ struct AddressesView: View {
         } else if let aliases {
             if aliases.isEmpty {
                 Text("No aliases yet.")
-                    .font(.system(size: 14)).foregroundColor(GM.textTertiary)
+                    .gmFont(14).foregroundColor(GM.textTertiary)
                     .padding(.vertical, 12)
             }
             ForEach(aliases) { a in
                 HStack(alignment: .top) {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(a.label.trimmed.isEmpty ? a.address : a.label)
-                            .font(.system(size: 15, weight: .medium))
+                            .gmFont(15, .medium)
                             .foregroundColor(GM.textPrimary)
-                        Text(a.address).font(.system(size: 13)).foregroundColor(GM.textSecondary)
+                        Text(a.address).gmFont(13).foregroundColor(GM.textSecondary)
                         if !a.isActive {
                             Text("Paused — nothing new arrives here.")
-                                .font(.system(size: 12)).foregroundColor(GM.warnInk)
+                                .gmFont(12).foregroundColor(GM.warnInk)
                         }
                     }
                     Spacer()
@@ -894,7 +917,7 @@ struct AddressesView: View {
             }
         } else if vm.state.fatal != nil {
             Text("Aliases could not be read.")
-                .font(.system(size: 14)).foregroundColor(GM.textSecondary)
+                .gmFont(14).foregroundColor(GM.textSecondary)
                 .padding(.vertical, 12)
         }
     }
@@ -916,8 +939,36 @@ struct ConnectionsView: View {
     @State private var query = ""
     @State private var viewFilter = "all"
     @State private var pendingRemove: ProfileConnection?
+    /// The monogram tile grows with the text size beside it (capped).
+    @ScaledMetric(relativeTo: .body) private var tile: CGFloat = 38
 
     private var connected: [ProfileConnection] { vm.state.profile?.connections ?? [] }
+
+    private var filters: [(String, String)] {
+        [("all", String(localized: "All")), ("mailbox", String(localized: "With mail")),
+         ("products", String(localized: "Grapsee apps"))]
+    }
+
+    private func filterChip(_ key: String, _ label: String) -> some View {
+        let count = connected.count { c in
+            switch key {
+            case "mailbox": return c.scopes.contains("mailbox")
+            case "products": return !(c.host?.contains(".") ?? false)
+            default: return true
+            }
+        }
+        return Button {
+            viewFilter = key
+        } label: {
+            Text("\(label) (\(count))")
+                .gmFont(13, .medium)
+                .foregroundColor(viewFilter == key ? GM.primarySolid
+                                                   : GM.textSecondary)
+                .padding(.horizontal, 10).padding(.vertical, 6)
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("gm-view-\(key)")
+    }
 
     private var shown: [ProfileConnection] {
         connected.filter { c in
@@ -932,69 +983,60 @@ struct ConnectionsView: View {
     }
 
     var body: some View {
-        MailScaffold(title: "Connected accounts", onBack: onBack) {
+        MailScaffold(title: String(localized: "Connected accounts"), onBack: onBack) {
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
                     if let note = vm.state.note {
                         NoteLine(text: note, bad: vm.state.noteIsBad)
                     }
-                    Text("When you use this account to sign in somewhere, that app appears " +
-                         "here with what it can reach, and you can remove it at any time.")
-                        .font(.system(size: 13)).foregroundColor(GM.textSecondary)
+                    Text("When you use this account to sign in somewhere, that app appears here with what it can reach, and you can remove it at any time.")
+                        .gmFont(13).foregroundColor(GM.textSecondary)
                         .padding(.vertical, 8)
-                    AppTextField(value: $query, hint: "Search connected apps by name")
+                    AppTextField(value: $query, hint: String(localized: "Search connected apps by name"))
                         .accessibilityIdentifier("gm-connections-search")
-                    HStack(spacing: 8) {
-                        ForEach([("all", "All"), ("mailbox", "With mail"),
-                                 ("products", "Grapsee apps")], id: \.0) { key, label in
-                            let count = connected.count { c in
-                                switch key {
-                                case "mailbox": return c.scopes.contains("mailbox")
-                                case "products": return !(c.host?.contains(".") ?? false)
-                                default: return true
-                                }
-                            }
-                            Button {
-                                viewFilter = key
-                            } label: {
-                                Text("\(label) (\(count))")
-                                    .font(.system(size: 13, weight: .medium))
-                                    .foregroundColor(viewFilter == key ? GM.primarySolid
-                                                                       : GM.textSecondary)
-                                    .padding(.horizontal, 10).padding(.vertical, 6)
-                            }
-                            .buttonStyle(.plain)
-                            .accessibilityIdentifier("gm-view-\(key)")
+                    // One row of filters while it fits; a column when the
+                    // text size (or a narrow window) leaves no room for three.
+                    ViewThatFits(in: .horizontal) {
+                        HStack(spacing: 8) {
+                            ForEach(filters, id: \.0) { key, label in filterChip(key, label) }
+                        }
+                        VStack(alignment: .leading, spacing: 2) {
+                            ForEach(filters, id: \.0) { key, label in filterChip(key, label) }
                         }
                     }
                     .padding(.vertical, 10)
-                    if shown.isEmpty {
+                    if vm.state.profile == nil {
+                        // Not read yet (or refused): never claim "no app has access".
+                        AccountReadState(profile: nil, loading: vm.state.loading,
+                                         fatal: vm.state.fatal, what: String(localized: "Connected accounts"),
+                                         onRetry: { vm.load(force: true) })
+                    } else if shown.isEmpty {
                         Text(connected.isEmpty ? "No app has access to this account."
                                                : "Nothing matches that.")
-                            .font(.system(size: 14)).foregroundColor(GM.textTertiary)
+                            .gmFont(14).foregroundColor(GM.textTertiary)
                             .padding(.vertical, 16)
                     }
                     ForEach(shown) { c in
-                        HStack(spacing: 12) {
+                        GMAdaptiveStack(spacing: 12) {
                             ZStack {
                                 RoundedRectangle(cornerRadius: 10).fill(GM.softFill)
-                                    .frame(width: 38, height: 38)
+                                    .frame(width: min(tile, 60), height: min(tile, 60))
                                 Text(monogram(c.product))
-                                    .font(.system(size: 14, weight: .semibold))
+                                    .gmFont(14, .semibold, maxSize: 22)
                                     .foregroundColor(GM.primarySolid)
                             }
                             VStack(alignment: .leading, spacing: 2) {
-                                Text(c.product).font(.system(size: 15, weight: .medium))
+                                Text(c.product).gmFont(15, .medium)
                                     .foregroundColor(GM.textPrimary)
                                 let scopes = c.scopes.map(scopeWord).joined(separator: ", ")
                                 Text(scopes.isEmpty ? "Signed in here" : "Sees: \(scopes)")
-                                    .font(.system(size: 12)).foregroundColor(GM.textSecondary)
+                                    .gmFont(12).foregroundColor(GM.textSecondary)
                             }
                             Spacer()
                             Button {
                                 pendingRemove = c
                             } label: {
-                                Text("Remove").font(.system(size: 13, weight: .semibold))
+                                Text("Remove").gmFont(13, .semibold)
                                     .foregroundColor(GM.error)
                             }
                             .accessibilityIdentifier("gm-connection-row")
@@ -1005,10 +1047,9 @@ struct ConnectionsView: View {
                     }
                     if let c = pendingRemove {
                         VStack(alignment: .leading, spacing: 12) {
-                            Text("Cut \(c.product) off? It loses access to what is listed " +
-                                 "beside it, and has to sign in again to get back in.")
-                                .font(.system(size: 13)).foregroundColor(GM.textPrimary)
-                            HStack(spacing: 24) {
+                            Text("Cut \(c.product) off? It loses access to what is listed beside it, and has to sign in again to get back in.")
+                                .gmFont(13).foregroundColor(GM.textPrimary)
+                            GMAdaptiveStack(spacing: 24) {
                                 Button("Cancel") { pendingRemove = nil }
                                     .foregroundColor(GM.textSecondary)
                                 Button("Remove access") {
@@ -1017,7 +1058,7 @@ struct ConnectionsView: View {
                                 }
                                 .foregroundColor(GM.error).fontWeight(.semibold)
                             }
-                            .font(.system(size: 14))
+                            .gmFont(14)
                         }
                         .padding(16)
                         .background(RoundedRectangle(cornerRadius: 12).fill(GM.warnChipBg))
@@ -1026,6 +1067,8 @@ struct ConnectionsView: View {
                     Spacer().frame(height: 24)
                 }
                 .padding(.horizontal, 20)
+                // Wide windows (iPad, Stage Manager, Mac): a centred form column.
+                .gmMaxWidth(GMLayout.form)
             }
         }
         .task { vm.load() }
@@ -1049,10 +1092,10 @@ private func monogram(_ product: String) -> String {
 /// than re-invented so the two clients describe one scope with one phrase.
 private func scopeWord(_ scope: String) -> String {
     switch scope {
-    case "profile": return "name, address and photo"
-    case "mailbox": return "your mailbox"
-    case "projects": return "your projects"
-    case "contacts": return "your contacts"
+    case "profile": return String(localized: "name, address and photo")
+    case "mailbox": return String(localized: "your mailbox")
+    case "projects": return String(localized: "your projects")
+    case "contacts": return String(localized: "your contacts")
     default: return scope
     }
 }
@@ -1063,10 +1106,10 @@ private func scopeWord(_ scope: String) -> String {
 /// splits the two. Android's `sharedWord` is the twin.
 func sharedWord(_ scope: String) -> String {
     switch scope {
-    case "profile": return "Your name, GrapMail address and profile photo"
-    case "mailbox": return "Read and send mail in your GrapMail mailbox"
-    case "projects": return "Projects and client records you own on Grapsee products"
-    case "contacts": return "The people you have exchanged mail with"
+    case "profile": return String(localized: "Your name, GrapMail address and profile photo")
+    case "mailbox": return String(localized: "Read and send mail in your GrapMail mailbox")
+    case "projects": return String(localized: "Projects and client records you own on Grapsee products")
+    case "contacts": return String(localized: "The people you have exchanged mail with")
     default: return scope
     }
 }
@@ -1085,6 +1128,7 @@ struct ConnectionDetailView: View {
     let onBack: () -> Void
     let onSupport: () -> Void
     @State private var confirmRemove = false
+    @ScaledMetric(relativeTo: .body) private var headerTile: CGFloat = 48
 
     private var connected: [ProfileConnection] { vm.state.profile?.connections ?? [] }
     private var entry: ProfileConnection? {
@@ -1093,14 +1137,14 @@ struct ConnectionDetailView: View {
     private var scopes: [String] { entry?.scopes ?? [] }
 
     var body: some View {
+        // The product's own name, as the server recorded it: data, not copy.
         MailScaffold(title: product, onBack: onBack) {
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
                     if vm.state.profile == nil {
                         Text(vm.state.loading ? "Loading…"
-                             : "The account could not be read, so this screen " +
-                               "cannot say what the app can reach.")
-                            .font(.system(size: 14)).foregroundColor(GM.textTertiary)
+                             : "The account could not be read, so this screen cannot say what the app can reach.")
+                            .gmFont(14).foregroundColor(GM.textTertiary)
                             .padding(.vertical, 16)
                             .accessibilityIdentifier("gm-connection-detail-read")
                     } else {
@@ -1112,10 +1156,8 @@ struct ConnectionDetailView: View {
                         if entry == nil {
                             // The web's exact stance: a link to an app that is
                             // not linked is answered, not redirected.
-                            Text("This app does not have access to this account. "
-                                 + "Nothing is being shared with it, and there is "
-                                 + "nothing to remove.")
-                                .font(.system(size: 14)).lineSpacing(5)
+                            Text("This app does not have access to this account. Nothing is being shared with it, and there is nothing to remove.")
+                                .gmFont(14).lineSpacing(5)
                                 .foregroundColor(GM.textSecondary)
                                 .fixedSize(horizontal: false, vertical: true)
                                 .padding(14)
@@ -1133,62 +1175,66 @@ struct ConnectionDetailView: View {
                     Spacer().frame(height: 24)
                 }
                 .padding(.horizontal, 20)
+                // Wide windows (iPad, Stage Manager, Mac): a centred form column.
+                .gmMaxWidth(GMLayout.form)
             }
         }
         .task { vm.load() }
     }
 
     private var header: some View {
-        HStack(spacing: 14) {
+        GMAdaptiveStack(spacing: 14) {
             ZStack {
                 RoundedRectangle(cornerRadius: 12).fill(GM.softFill)
-                    .frame(width: 48, height: 48)
-                Text(monogram(product)).font(.system(size: 18, weight: .semibold))
+                    .frame(width: min(headerTile, 72), height: min(headerTile, 72))
+                Text(monogram(product)).gmFont(18, .semibold, maxSize: 28)
                     .foregroundColor(GM.primarySolid)
             }
             VStack(alignment: .leading, spacing: 2) {
-                Text(product).font(.system(size: 20)).foregroundColor(GM.textPrimary)
-                    .lineLimit(1)
-                    .accessibilityIdentifier("gm-connection-detail-name")
-                Text(entry.map { c in
-                    (c.host ?? "Grapsee product") + " · connected "
-                        + String((c.connectedAt ?? "").prefix(10))
-                } ?? "Not connected to this account")
-                    .font(.system(size: 13)).foregroundColor(GM.textSecondary)
+                Text(product).gmFont(20).foregroundColor(GM.textPrimary)
                     .fixedSize(horizontal: false, vertical: true)
-                    .lineLimit(2)
+                    .accessibilityIdentifier("gm-connection-detail-name")
+                Text(entry.map(Self.connectedLine) ?? String(localized: "Not connected to this account"))
+                    .gmFont(13).foregroundColor(GM.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             Spacer()
         }
         .padding(.top, 8)
     }
 
+    /// "host · connected 2026-03-14" as one localizable sentence, so a
+    /// translation can reorder the host and the date.
+    private static func connectedLine(_ c: ProfileConnection) -> String {
+        let host = c.host ?? String(localized: "Grapsee product")
+        let day = String((c.connectedAt ?? "").prefix(10))
+        return String(localized: "\(host) · connected \(day)", comment: "Linked app subtitle: host or 'Grapsee product', then the date it was connected")
+    }
+
     private var scopesCard: some View {
         VStack(alignment: .leading, spacing: 0) {
             Text("How GrapMail helps you sign in to \(product)")
-                .font(.system(size: 15)).foregroundColor(GM.textPrimary)
-            Text("When you use your Grapsee account to sign in to \(product), this "
-                 + "account proves who you are and hands over only what is listed "
-                 + "below. Your password is never shared with \(product).")
-                .font(.system(size: 13)).lineSpacing(5)
+                .gmFont(15).foregroundColor(GM.textPrimary)
+            Text("When you use your Grapsee account to sign in to \(product), this account proves who you are and hands over only what is listed below. Your password is never shared with \(product).")
+                .gmFont(13).lineSpacing(5)
                 .foregroundColor(GM.textSecondary)
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.top, 8)
             Text("WHAT \(product.uppercased()) CAN REACH")
-                .font(.system(size: 12, weight: .medium))
+                .gmFont(12, .medium)
                 .foregroundColor(GM.textSecondary)
                 .padding(.top, 14)
             let scopes = self.scopes
             if scopes.isEmpty {
                 Text("No access was recorded when this was connected.")
-                    .font(.system(size: 13)).foregroundColor(GM.textSecondary)
+                    .gmFont(13).foregroundColor(GM.textSecondary)
                     .padding(.top, 6)
             }
             ForEach(scopes, id: \.self) { s in
                 HStack(alignment: .top, spacing: 10) {
                     Circle().fill(GM.primarySolid).frame(width: 6, height: 6)
                         .padding(.top, 7)
-                    Text(sharedWord(s)).font(.system(size: 13))
+                    Text(sharedWord(s)).gmFont(13)
                         .foregroundColor(GM.textPrimary)
                         .fixedSize(horizontal: false, vertical: true)
                     Spacer()
@@ -1207,9 +1253,9 @@ struct ConnectionDetailView: View {
     private var removeRow: some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(vm.state.busy ? "Removing…" : "Remove access")
-                .font(.system(size: 15, weight: .medium)).foregroundColor(GM.error)
+                .gmFont(15, .medium).foregroundColor(GM.error)
             Text("Remove all links and stop sharing this account's data with \(product).")
-                .font(.system(size: 12)).lineSpacing(4)
+                .gmFont(12).lineSpacing(4)
                 .foregroundColor(GM.textSecondary)
                 .fixedSize(horizontal: false, vertical: true)
         }
@@ -1225,11 +1271,10 @@ struct ConnectionDetailView: View {
 
     private var confirmBlock: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Cut \(product) off? It loses access to everything listed above "
-                 + "and has to sign in again to get back in.")
-                .font(.system(size: 13)).foregroundColor(GM.textPrimary)
+            Text("Cut \(product) off? It loses access to everything listed above and has to sign in again to get back in.")
+                .gmFont(13).foregroundColor(GM.textPrimary)
                 .fixedSize(horizontal: false, vertical: true)
-            HStack(spacing: 24) {
+            GMAdaptiveStack(spacing: 24) {
                 Button("Cancel") { confirmRemove = false }
                     .foregroundColor(GM.textSecondary)
                 Button("Remove access") {
@@ -1240,7 +1285,7 @@ struct ConnectionDetailView: View {
                 }
                 .foregroundColor(GM.error).fontWeight(.semibold)
             }
-            .font(.system(size: 14))
+            .gmFont(14)
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -1252,9 +1297,9 @@ struct ConnectionDetailView: View {
     private var supportLink: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text("Something wrong with this app?")
-                .font(.system(size: 12)).foregroundColor(GM.textSecondary)
+                .gmFont(12).foregroundColor(GM.textSecondary)
             Button("Report this app", action: onSupport)
-                .font(.system(size: 13, weight: .medium))
+                .gmFont(13, .medium)
                 .foregroundColor(GM.primarySolid)
         }
         .padding(.top, 16)
@@ -1284,7 +1329,7 @@ struct ProfileEditView: View {
     private var p: ProfileDto? { vm.state.profile }
 
     var body: some View {
-        MailScaffold(title: "Personal info", onBack: onBack) {
+        MailScaffold(title: String(localized: "Personal info"), onBack: onBack) {
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
                     if let note = vm.state.note {
@@ -1293,7 +1338,8 @@ struct ProfileEditView: View {
                     if let photoError { NoteLine(text: photoError, bad: true) }
                     if p == nil {
                         AccountReadState(profile: vm.state.profile, loading: vm.state.loading,
-                                         fatal: vm.state.fatal, what: "Your account record")
+                                         fatal: vm.state.fatal, what: String(localized: "Your account record"),
+                                         onRetry: { vm.load(force: true) })
                     } else if fieldsReady {
                         avatarRow
                         fields
@@ -1301,6 +1347,8 @@ struct ProfileEditView: View {
                     Spacer().frame(height: 24)
                 }
                 .padding(.horizontal, 20)
+                // Wide windows (iPad, Stage Manager, Mac): a centred form column.
+                .gmMaxWidth(GMLayout.form)
             }
         }
         .task { vm.load() }
@@ -1310,7 +1358,9 @@ struct ProfileEditView: View {
             last = profile.lastName ?? ""
             display = profile.displayName ?? ""
             birthday = profile.birthday ?? ""
-            gender = profile.gender ?? ""
+            // Held as the code; a profile still holding the legacy English
+            // word ("Female") is read as its code so the right row is selected.
+            gender = GenderOption.normalize(profile.gender) ?? ""
             fieldsReady = true
         }
         .task(id: vm.state.busy ? nil : p?.avatarUrl) {
@@ -1335,7 +1385,7 @@ struct ProfileEditView: View {
             guard let item = photoItem else { return }
             defer { if photoItem == item { photoItem = nil } }
             guard let selected = try? await item.loadTransferable(type: SelectedAvatar.self) else {
-                if !Task.isCancelled { photoError = "Couldn’t open that photo. Choose another image." }
+                if !Task.isCancelled { photoError = String(localized: "Couldn’t open that photo. Choose another image.") }
                 return
             }
             guard !Task.isCancelled else { return }
@@ -1345,7 +1395,7 @@ struct ProfileEditView: View {
     }
 
     private var avatarRow: some View {
-        HStack(spacing: 14) {
+        GMAdaptiveStack(spacing: 14) {
             ZStack {
                 Circle().fill(GM.softFill).frame(width: 64, height: 64)
                 if let img = avatarPreview {
@@ -1354,14 +1404,14 @@ struct ProfileEditView: View {
                         .clipShape(Circle())
                 } else {
                     Text(String((p?.name ?? "?").prefix(1)).uppercased())
-                        .font(.system(size: 22, weight: .semibold))
+                        .gmFont(22, .semibold, maxSize: 32)
                         .foregroundColor(GM.primarySolid)
                 }
             }
             VStack(alignment: .leading, spacing: 4) {
                 PhotosPicker(selection: $photoItem, matching: .images) {
                     Text((p?.avatarUrl?.isEmpty == false) ? "Change photo" : "Add a photo")
-                        .font(.system(size: 14, weight: .semibold))
+                        .gmFont(14, .semibold)
                         .foregroundColor(GM.primarySolid)
                 }
                 .buttonStyle(.plain)
@@ -1369,7 +1419,7 @@ struct ProfileEditView: View {
                     Button {
                         vm.removeAvatar()
                     } label: {
-                        Text("Remove").font(.system(size: 13)).foregroundColor(GM.error)
+                        Text("Remove").gmFont(13).foregroundColor(GM.error)
                     }
                     .buttonStyle(.plain)
                 }
@@ -1382,60 +1432,61 @@ struct ProfileEditView: View {
     private var fields: some View {
         VStack(alignment: .leading, spacing: 0) {
             AccountSectionLabel(text: "Your name")
-            AppTextField(title: "First name", value: $first)
-            AppTextField(title: "Last name", value: $last).padding(.top, 8)
+            AppTextField(title: String(localized: "First name"), value: $first)
+            AppTextField(title: String(localized: "Last name"), value: $last).padding(.top, 8)
             AccountSectionLabel(text: "Birthday")
-            Text("A GrapMail address can receive mail from anyone, so the account requires " +
-                 "an age of at least 13 — the same rule signup enforces.")
-                .font(.system(size: 12)).foregroundColor(GM.textTertiary)
-            AppTextField(title: "Birthday", value: $birthday, hint: "YYYY-MM-DD")
+            Text("A GrapMail address can receive mail from anyone, so the account requires an age of at least 13 — the same rule signup enforces.")
+                .gmFont(12).foregroundColor(GM.textTertiary)
+            AppTextField(title: String(localized: "Birthday"), value: $birthday, hint: String(localized: "YYYY-MM-DD"))
                 .padding(.top, 6)
             AccountSectionLabel(text: "Gender")
-            ForEach(["Female", "Male", "Rather not say", "Custom"], id: \.self) { g in
-                AccountRadioRow(title: g, selected: gender == g) {
+            // The account stores the code (GenderOption, ProfileOptions.swift);
+            // only the row label is translated.
+            ForEach(GenderOption.all, id: \.self) { g in
+                AccountRadioRow(title: GenderOption.label(g), selected: gender == g) {
                     gender = (gender == g) ? "" : g
                 }
             }
             AccountSectionLabel(text: "How you appear")
-            AppTextField(title: "Display name", value: $display, hint: "What recipients see")
+            AppTextField(title: String(localized: "Display name"), value: $display, hint: String(localized: "What recipients see"))
             // A plain save here used to store the recovery email unverified, and
             // reset links are only sent to a verified one. The recovery phone is
             // gone: GrapMail recovers by email only, and nothing read it.
             AccountSectionLabel(text: "Recovery")
             Text(recoveryLine)
-                .font(.system(size: 14)).foregroundColor(GM.textSecondary)
+                .gmFont(14).foregroundColor(GM.textSecondary)
                 .padding(.top, 4)
             Button {
                 showRecoveryEmail = true
             } label: {
                 Text((p?.recoveryEmail ?? "").isEmpty ? "Add recovery email" : "Change recovery email")
-                    .font(.system(size: 14, weight: .semibold))
+                    .gmFont(14, .semibold)
                     .foregroundColor(GM.primarySolid).padding(.vertical, 8)
             }
             .buttonStyle(.plain)
             if let formError {
-                Text(formError).font(.system(size: 13)).foregroundColor(GM.error).padding(.vertical, 6)
+                Text(formError).gmFont(13).foregroundColor(GM.error).padding(.vertical, 6)
             }
             Button {
                 // The same rules sign-up applies, checked before the request so
                 // the person sees which field is wrong.
                 if first.trimmed.count < 2 {
-                    formError = "Enter your first name (2+ characters)."
+                    formError = String(localized: "Enter your first name (2+ characters).")
                 } else if last.trimmed.count < 2 {
-                    formError = "Enter your last name (2+ characters)."
+                    formError = String(localized: "Enter your last name (2+ characters).")
                 } else if display.trimmed.count > 60 {
-                    formError = "Keep the display name to 60 characters."
+                    formError = String(localized: "Keep the display name to 60 characters.")
                 } else {
                     formError = AccountDates.birthdayProblem(birthday)
                 }
                 guard formError == nil else { return }
-                vm.save(label: "Saved.", personal: [
+                vm.save(label: String(localized: "Saved."), personal: [
                     "firstName": first.trimmed, "lastName": last.trimmed, "birthday": birthday.trimmed,
                     "gender": gender, "displayName": display.trimmed,
                 ])
             } label: {
                 Text(vm.state.busy ? "Saving…" : "Save")
-                    .font(.system(size: 15, weight: .semibold))
+                    .gmFont(15, .semibold)
                     .foregroundColor(.white)
                     .frame(maxWidth: .infinity).padding(.vertical, 14)
                     .background(RoundedRectangle(cornerRadius: 24)
@@ -1450,9 +1501,9 @@ struct ProfileEditView: View {
 
     private var recoveryLine: String {
         guard let email = p?.recoveryEmail, !email.isEmpty else {
-            return "No recovery email yet. Without one, a forgotten password can't be reset."
+            return String(localized: "No recovery email yet. Without one, a forgotten password can't be reset.")
         }
-        return p?.recoveryEmailVerified == true ? "\(email) · verified" : "\(email) · not verified yet"
+        return p?.recoveryEmailVerified == true ? String(localized: "\(email) · verified") : String(localized: "\(email) · not verified yet")
     }
 }
 
@@ -1475,48 +1526,45 @@ struct PrivacyView: View {
     private var p: ProfileDto? { vm.state.profile }
 
     var body: some View {
-        MailScaffold(title: "Data & privacy", onBack: onBack) {
+        MailScaffold(title: String(localized: "Data & privacy"), onBack: onBack) {
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
                     AccountSectionLabel(text: "What is kept")
                     ForEach([
-                        "GrapMail address and aliases: the identity of the account and any " +
-                            "extra addresses that deliver into it.",
-                        "Your messages: stored for your account only. Nobody at Grapsee " +
-                            "reads message contents to build profiles, and addresses are not sold.",
-                        "When you agreed to the terms: a timestamp, so the record can answer " +
-                            "“did they agree, and when?”",
+                        String(localized: "GrapMail address and aliases: the identity of the account and any extra addresses that deliver into it."),
+                        String(localized: "Your messages: stored for your account only. Nobody at Grapsee reads message contents to build profiles, and addresses are not sold."),
+                        String(localized: "When you agreed to the terms: a timestamp, so the record can answer “did they agree, and when?”"),
                     ], id: \.self) { line in
                         Text("• \(line)")
-                            .font(.system(size: 13)).foregroundColor(GM.textSecondary)
+                            .gmFont(13).foregroundColor(GM.textSecondary)
                             .padding(.vertical, 4)
                     }
                     AccountSectionLabel(text: "Your controls")
-                    AccountControlRow(title: "Edit personal info", value: "Name, birthday, photo",
+                    AccountControlRow(title: String(localized: "Edit personal info"), value: String(localized: "Name, birthday, photo"),
                                       marker: "gm-privacy-profile", onClick: onProfile)
-                    AccountControlRow(title: "Change phone number", value: "Proven with a code",
+                    AccountControlRow(title: String(localized: "Change phone number"), value: String(localized: "Proven with a code"),
                                       marker: "gm-privacy-phone", onClick: onPhone)
-                    AccountControlRow(title: "Manage addresses", value: "Primary and aliases",
+                    AccountControlRow(title: String(localized: "Manage addresses"), value: String(localized: "Primary and aliases"),
                                       marker: "gm-privacy-addresses", onClick: onAddresses)
-                    AccountControlRow(title: "Mail settings", value: "Signature, density, locale",
+                    AccountControlRow(title: String(localized: "Mail settings"), value: String(localized: "Signature, density, locale"),
                                       marker: "gm-privacy-prefs", onClick: onPrefs)
                     AccountSectionLabel(text: "This account")
                     DetailLine2(label: "Address", value: p?.address
-                        ?? (vm.state.fatal != nil ? "Could not be read" : "Loading…"))
+                        ?? (vm.state.fatal != nil ? String(localized: "Could not be read") : String(localized: "Loading…")))
                     DetailLine2(label: "Created", value: p.flatMap { String($0.createdAt?.prefix(10) ?? "") }.flatMap { $0.isEmpty ? nil : $0 }
-                        ?? (p == nil ? "Could not be read" : "Not reported"))
+                        ?? (p == nil ? String(localized: "Could not be read") : String(localized: "Not reported")))
                     DetailLine2(label: "Terms accepted", value: p.flatMap { String($0.termsAcceptedAt?.prefix(10) ?? "") }.flatMap { $0.isEmpty ? nil : $0 }
-                        ?? (p == nil ? "Could not be read" : "not recorded"))
+                        ?? (p == nil ? String(localized: "Could not be read") : String(localized: "not recorded")))
                     DetailLine2(label: "2-step verification", value: {
                         switch p?.twoFactorState {
-                        case .some(true): return "On"
-                        case .some(false): return "Off"
-                        case .none: return p == nil ? "Could not be read" : "Not reported"
+                        case .some(true): return String(localized: "On")
+                        case .some(false): return String(localized: "Off")
+                        case .none: return p == nil ? String(localized: "Could not be read") : String(localized: "Not reported")
                         }
                     }())
                     AccountSectionLabel(text: "Deleting the account")
                     Text("Deletion removes the mailbox, every message in it, all aliases, and the GrapMail address itself. It is irreversible, so it asks for the account password and a final confirmation.")
-                        .font(.system(size: 13)).foregroundColor(GM.textSecondary)
+                        .gmFont(13).foregroundColor(GM.textSecondary)
                         .padding(.vertical, 6)
                     Button("Delete account", role: .destructive) { showDeletion = true }
                         .padding(.vertical, 8)
@@ -1525,7 +1573,7 @@ struct PrivacyView: View {
                         onSupport()
                     } label: {
                         Text("Go to help & support")
-                            .font(.system(size: 14, weight: .semibold))
+                            .gmFont(14, .semibold)
                             .foregroundColor(GM.primarySolid)
                             .padding(.vertical, 6)
                     }
@@ -1536,13 +1584,15 @@ struct PrivacyView: View {
                         openExternal("https://grapsee.com/legal/privacy-policy")
                     } label: {
                         Text("Privacy Policy · Terms of Service")
-                            .font(.system(size: 14)).foregroundColor(GM.primarySolid)
+                            .gmFont(14).foregroundColor(GM.primarySolid)
                             .padding(.vertical, 6)
                     }
                     .buttonStyle(.plain)
                     Spacer().frame(height: 24)
                 }
                 .padding(.horizontal, 20)
+                // Wide windows (iPad, Stage Manager, Mac): a centred form column.
+                .gmMaxWidth(GMLayout.form)
             }
         }
         .task { vm.load() }
@@ -1600,7 +1650,7 @@ private struct DeleteAccountView: View {
 
     private func delete() {
         guard !busy, !password.isEmpty, let token = SessionStore.token else {
-            error = "Sign in again before requesting deletion."
+            error = String(localized: "Sign in again before requesting deletion.")
             return
         }
         busy = true; error = nil
@@ -1608,11 +1658,19 @@ private struct DeleteAccountView: View {
             defer { busy = false; password = "" }
             do {
                 _ = try await ApiClient.deleteAccount(token: token, password: password)
+                // Round 8 — B: a deleted account is forgotten on this device too
+                // (spec §2.4), read before clear() removes the stored address.
+                if let address = SessionStore.address {
+                    RememberedAccounts.prepareSignOut(address: address, removeFromDevice: true)
+                }
                 SessionStore.clear()
                 URLCache.shared.removeAllCachedResponses()
                 onDeleted()
             } catch {
-                self.error = "Deletion was not confirmed. Check account status before retrying. " + apiMessage(error, fallback: "Try again in a moment.")
+                // One sentence with the server's reason interpolated, not a
+                // translated head glued to another translated string.
+                let reason = apiMessage(error, fallback: String(localized: "Try again in a moment."))
+                self.error = String(localized: "Deletion was not confirmed. Check account status before retrying. \(reason)")
             }
         }
     }
@@ -1627,11 +1685,11 @@ private struct AccountControlRow: View {
         Button(action: onClick) {
             HStack(spacing: 14) {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(title).font(.system(size: 15)).foregroundColor(GM.textPrimary)
-                    Text(value).font(.system(size: 12)).foregroundColor(GM.textSecondary)
+                    Text(title).gmFont(15).foregroundColor(GM.textPrimary)
+                    Text(value).gmFont(12).foregroundColor(GM.textSecondary)
                 }
                 Spacer()
-                Image(systemName: "chevron.forward").font(.system(size: 13))
+                Image(systemName: "chevron.forward").gmFont(13, maxSize: 24)
                     .foregroundColor(GM.textTertiary)
             }
             .contentShape(Rectangle())
@@ -1657,53 +1715,39 @@ struct SupportView: View {
     @State private var open: String?
 
     private let faq: [(String, String)] = [
-        ("I forgot my password. What now?",
-         "Tap Forgot password on the sign-in screen. GrapMail emails a reset link to the "
-         + "recovery email on your account, so add and verify one in Personal info before "
-         + "you need it."),
-        ("Can I sign in with my phone number?",
-         "Yes. The sign-in page accepts either the GrapMail address or the phone "
-         + "number you verified, but the number is never the identity of the account, "
-         + "and mail is never addressed to it."),
-        ("I changed my number. Will I lose the account?",
-         "No, if you change it before losing access. The new number is proven with a "
-         + "code before it replaces the old one."),
-        ("Why can I not create an account for someone under 13?",
-         "GrapMail holds an address that can receive mail from anyone, so the account "
-         + "requires an age of at least 13. The birthday you enter is checked against "
-         + "that rule."),
-        ("What is an alias for?",
-         "An alias delivers into the same mailbox under a second address, and can be "
-         + "chosen as the sender. Useful when you want to write as “business” "
-         + "without a second account."),
-        ("Mail I was expecting never arrived.",
-         "In order: check the sending address was spelled exactly, look in Spam and "
-         + "Trash under “Others”, then check that the sender is not on the "
-         + "suppression list because they unsubscribed earlier. If the mailbox is "
-         + "connected and the message is still missing, the mail server has to be "
-         + "involved. That is a support matter."),
+        (String(localized: "I forgot my password. What now?"),
+         String(localized: "Tap Forgot password on the sign-in screen. GrapMail emails a reset link to the recovery email on your account, so add and verify one in Personal info before you need it.")),
+        (String(localized: "Can I sign in with my phone number?"),
+         String(localized: "Yes. The sign-in page accepts either the GrapMail address or the phone number you verified, but the number is never the identity of the account, and mail is never addressed to it.")),
+        (String(localized: "I changed my number. Will I lose the account?"),
+         String(localized: "No, if you change it before losing access. The new number is proven with a code before it replaces the old one.")),
+        (String(localized: "Why can I not create an account for someone under 13?"),
+         String(localized: "GrapMail holds an address that can receive mail from anyone, so the account requires an age of at least 13. The birthday you enter is checked against that rule.")),
+        (String(localized: "What is an alias for?"),
+         String(localized: "An alias delivers into the same mailbox under a second address, and can be chosen as the sender. Useful when you want to write as “business” without a second account.")),
+        (String(localized: "Mail I was expecting never arrived."),
+         String(localized: "In order: check the sending address was spelled exactly, look in Spam and Trash under “Others”, then check that the sender is not on the suppression list because they unsubscribed earlier. If the mailbox is connected and the message is still missing, the mail server has to be involved. That is a support matter.")),
     ]
 
     var body: some View {
-        MailScaffold(title: "Help & support", onBack: onBack) {
+        MailScaffold(title: String(localized: "Help & support"), onBack: onBack) {
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
-                    Text("Answers to the questions this product actually raises, and how " +
-                         "to reach a person.")
-                        .font(.system(size: 13)).foregroundColor(GM.textTertiary)
+                    Text("Answers to the questions this product actually raises, and how to reach a person.")
+                        .gmFont(13).foregroundColor(GM.textTertiary)
                         .padding(.vertical, 8)
                     ForEach(faq, id: \.0) { q, a in
                         VStack(alignment: .leading, spacing: 6) {
                             HStack(spacing: 8) {
                                 Text(open == q ? "−" : "+")
-                                    .font(.system(size: 15, weight: .bold))
+                                    .gmFont(15, .bold)
                                     .foregroundColor(GM.primarySolid)
-                                Text(q).font(.system(size: 14, weight: .medium))
+                                Text(q).gmFont(14, .medium)
                                     .foregroundColor(GM.textPrimary)
                                     .frame(maxWidth: .infinity, alignment: .leading)
                             }
                             if open == q {
-                                Text(a).font(.system(size: 13)).foregroundColor(GM.textSecondary)
+                                Text(a).gmFont(13).foregroundColor(GM.textSecondary)
                                     .lineSpacing(4)
                             }
                         }
@@ -1717,17 +1761,19 @@ struct SupportView: View {
                         openExternal("https://grapsee.com/contact")
                     } label: {
                         Text("grapsee.com/contact")
-                            .font(.system(size: 14, weight: .semibold))
+                            .gmFont(14, .semibold)
                             .foregroundColor(GM.primarySolid).padding(.vertical, 6)
                     }
                     .buttonStyle(.plain)
                     Text("Recovery screens, in the order that fixes things:")
-                        .font(.system(size: 13)).foregroundColor(GM.textSecondary)
+                        .gmFont(13).foregroundColor(GM.textSecondary)
                         .padding(.top, 6)
                     ForEach([("Forgot password", onForgot), ("Change my phone", onPhone),
                              ("Manage addresses", onAddresses)], id: \.0) { label, go in
                         Button(action: go) {
-                            Text(label).font(.system(size: 14)).foregroundColor(GM.primarySolid)
+                            // `label` stays the English key so the identifier below does
+                            // not change with the language; the row draws its translation.
+                            Text(LocalizedStringKey(label)).gmFont(14).foregroundColor(GM.primarySolid)
                                 .padding(.vertical, 6)
                         }
                         .buttonStyle(.plain)
@@ -1736,6 +1782,8 @@ struct SupportView: View {
                     Spacer().frame(height: 24)
                 }
                 .padding(.horizontal, 20)
+                // Wide windows (iPad, Stage Manager, Mac): a centred form column.
+                .gmMaxWidth(GMLayout.form)
             }
         }
     }

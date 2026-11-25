@@ -86,13 +86,55 @@ MUTATIONS = [
     ("android/app/src/main/AndroidManifest.xml",
      'android:enableOnBackInvokedCallback="true"',
      'android:enableOnBackInvokedCallback="false"'),
-    # a half-verified App Link, shipped because the file "should" appear
+    # ── deep links: every claim backed by a committed well-known file ──────
+    # assetlinks.json vouching for a different package than the one built
+    ("well-known/assetlinks.json",
+     '"package_name": "com.grapsee.grapmail"',
+     '"package_name": "com.grapsee.grapmail.debug"'),
+    # the release upload certificate dropped from the fingerprints
+    ("well-known/assetlinks.json",
+     'A3:7B:0F"',
+     'A3:7B:00"'),
+    # the AASA vouching for a path neither parser reads
+    ("well-known/apple-app-site-association",
+     '"/": "/mail/thread/*"',
+     '"/": "/m/*"'),
+    # an associated domain no committed file vouches for
+    ("ios/project.yml",
+     "          - applinks:grapsee.com\n",
+     "          - applinks:grapsee.com\n          - applinks:www.grapsee.com\n"),
+    # a custom scheme smuggled into the verified https filter
     ("android/app/src/main/AndroidManifest.xml",
-     "            <meta-data\n                android:name=\"android.app.shortcuts\"",
-     "            <intent-filter android:autoVerify=\"true\">\n"
-     "                <action android:name=\"android.intent.action.VIEW\" />\n"
-     "            </intent-filter>\n"
-     "            <meta-data\n                android:name=\"android.app.shortcuts\""),
+     'android:pathPrefix="/mail/thread/" />',
+     'android:pathPrefix="/mail/thread/" />\n                <data android:scheme="grapmail" android:host="thread" />'),
+    # the id check loosened: anything becomes a thread id
+    ("android/app/src/main/java/com/grapsee/grapmail/logic/DeepLinks.kt",
+     'Regex("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$")',
+     'Regex("^.+$")'),
+    # the web path renamed on one platform only
+    ("ios/GrapMail/DeepLinks.swift",
+     'parts[0] == "mail", parts[1] == "thread"',
+     'parts[0] == "m", parts[1] == "t"'),
+    # a link opened behind the app lock (Android)
+    ("android/app/src/main/java/com/grapsee/grapmail/MainActivity.kt",
+     "        com.grapsee.grapmail.logic.AppLock.awaitOpen()\n        onDeepLinkConsumed()\n",
+     "        onDeepLinkConsumed()\n"),
+    # a link opened behind the app lock (iOS)
+    ("ios/GrapMail/RootView.swift",
+     "restoredSession, !renewingSession, !appLock.locked,\n              SessionStore.token != nil",
+     "restoredSession, !renewingSession,\n              SessionStore.token != nil"),
+    # a signed-out link dropped instead of opened after sign-in (iOS)
+    ("ios/GrapMail/RootView.swift",
+     "        path = [.home]\n"
+     "        // A link that arrived signed out was parked, not dropped: the person\n"
+     "        // who just proved the account is theirs gets the thread they tapped\n"
+     "        // (still behind the app lock's rule -- openPendingLink checks it).\n"
+     "        openPendingLink()\n",
+     "        path = [.home]\n"),
+    # the live check made able to fail the build (and so, soon, deleted)
+    (".github/workflows/android.yml",
+     "      - name: Well-known link files are live (warning only)\n        continue-on-error: true\n",
+     "      - name: Well-known link files are live (warning only)\n"),
     # push claimed where there is no push service
     ("ios/project.yml",
      "        UIBackgroundModes:\n          - fetch\n",

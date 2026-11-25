@@ -1,5 +1,10 @@
 package com.grapsee.grapmail.ui.components
 
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
 import android.content.Context
 import android.content.ContextWrapper
 import androidx.activity.compose.BackHandler
@@ -28,6 +33,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
+import com.grapsee.grapmail.R
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -52,7 +59,10 @@ import com.grapsee.grapmail.ui.theme.LocalPalette
 fun AppLockGate(modifier: Modifier = Modifier) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
-    var locked by remember { mutableStateOf(AppLock.isEnabled(context)) }
+    // Every change of mind is also published to AppLock.markGateClosed, so a
+    // parked deep link or notification tap (MainActivity) waits for the same
+    // door this draws -- it never opens a thread under the overlay.
+    var locked by remember { mutableStateOf(AppLock.isEnabled(context).also { AppLock.markGateClosed(it) }) }
     var prompted by remember { mutableStateOf(false) }
 
     fun ask() {
@@ -61,7 +71,10 @@ fun AppLockGate(modifier: Modifier = Modifier) {
         prompted = true
         AppLock.prompt(activity) { verified ->
             prompted = false
-            if (verified) locked = false
+            if (verified) {
+                locked = false
+                AppLock.markGateClosed(false)
+            }
         }
     }
 
@@ -69,7 +82,10 @@ fun AppLockGate(modifier: Modifier = Modifier) {
     // catches the cold start whose first frame lands after the activity has
     // already resumed — the LaunchedEffect is the other half of that pair.
     LifecycleEventEffect(Lifecycle.Event.ON_STOP) {
-        if (AppLock.isEnabled(context)) locked = true
+        if (AppLock.isEnabled(context)) {
+            locked = true
+            AppLock.markGateClosed(true)
+        }
     }
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { ask() }
     LaunchedEffect(Unit) {
@@ -96,7 +112,13 @@ fun AppLockGate(modifier: Modifier = Modifier) {
                 ) { },
             contentAlignment = Alignment.Center,
         ) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            // Scrolls and is capped, so the Unlock button stays reachable in a
+            // landscape phone at large text and does not drift on a desktop window.
+            Column(
+                Modifier.widthIn(max = GMLayout.Form).verticalScroll(rememberScrollState())
+                    .padding(horizontal = 24.dp, vertical = 16.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
                 Icon(
                     Icons.Rounded.Lock, null,
                     tint = palette.textSecondary,
@@ -104,13 +126,15 @@ fun AppLockGate(modifier: Modifier = Modifier) {
                 )
                 Spacer(Modifier.height(14.dp))
                 Text(
-                    "GrapMail is locked",
+                    stringResource(R.string.mail_lock_title),
                     fontSize = 17.sp, fontWeight = FontWeight.SemiBold, color = palette.textPrimary,
+                    textAlign = TextAlign.Center,
                 )
                 Spacer(Modifier.height(6.dp))
                 Text(
-                    "Confirm it is you to open your mailbox",
+                    stringResource(R.string.mail_lock_subtitle),
                     fontSize = 13.sp, color = palette.textSecondary,
+                    textAlign = TextAlign.Center,
                 )
                 Spacer(Modifier.height(22.dp))
                 Box(
@@ -120,11 +144,13 @@ fun AppLockGate(modifier: Modifier = Modifier) {
                         .clickable(
                             indication = null,
                             interactionSource = remember { MutableInteractionSource() },
+                            role = Role.Button,
                         ) { ask() }
-                        .padding(horizontal = 26.dp, vertical = 12.dp),
+                        // 14dp + a 20dp line = the 48dp minimum target.
+                        .padding(horizontal = 26.dp, vertical = 14.dp),
                 ) {
                     Text(
-                        "Unlock",
+                        stringResource(R.string.mail_lock_unlock),
                         fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = palette.onPrimary,
                     )
                 }

@@ -670,10 +670,16 @@ struct MailSnapshotView: View {
             // whole-box search would photograph a lie.
             case "mail-adv-search":
                 return AnyView(
+                // A fixed height: this sheet is one greedy scroll view
+                // (SheetScroll) that centres short content in whatever height
+                // it is offered, so beside the frame's Spacer it took half the
+                // screen and sat mid-way down it. 460 pt holds the whole form,
+                // scope line included, at the default text size, the way a
+                // presented sheet's detent would.
                 sheetFrame(AdvancedSearchSheet(
                     state: model.state,
                     onApply: { _, _, _, _, _, _ in },
-                    onClear: {}, onDone: {}))
+                    onClear: {}, onDone: {}), height: 460)
                 )
             // The filing undo banner over the live list: a read-only walk
             // cannot archive anything, so the words a real archive produces
@@ -748,7 +754,7 @@ struct MailSnapshotView: View {
                     search: {
                         HStack(spacing: 10) {
                             Text("Search in mail")
-                                .font(.system(size: 14))
+                                .gmFont(14)
                                 .foregroundColor(GM.textTertiary)
                             Spacer(minLength: 0)
                         }
@@ -794,8 +800,21 @@ struct MailSnapshotView: View {
         .background(GM.bg)
     }
 
-    private func sheetFrame<V: View>(_ content: V) -> AnyView {
-        AnyView(
+    /// A sheet drawn from the top of the frame, over a Spacer. `height` is for
+    /// a sheet that is its own greedy scroll view: a Spacer beside a flexible
+    /// view splits the height between them, so that sheet gets a fixed one.
+    /// Every other frame passes nil and lays out exactly as before.
+    private func sheetFrame<V: View>(_ content: V, height: CGFloat? = nil) -> AnyView {
+        if let height {
+            return AnyView(
+                VStack(alignment: .leading, spacing: 0) {
+                    content.frame(height: height)
+                    Spacer()
+                }
+                .background(GM.card)
+            )
+        }
+        return AnyView(
             VStack(alignment: .leading, spacing: 0) {
                 content
                 Spacer()

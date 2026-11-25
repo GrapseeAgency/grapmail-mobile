@@ -1,0 +1,29 @@
+/* GrapMailWidget — 繁體中文 */
+
+"Unread mail" = "未讀郵件";
+"The unread count your app last saw, and the newest message." = "應用程式上次看到的未讀數量，以及最新郵件。";
+"GrapMail — not signed in" = "GrapMail — 未登入";
+"GrapMail — no read yet" = "GrapMail — 尚未讀取";
+"%lld unread · %@" = "%lld 封未讀 · %@";
+"%lld unread" = "%lld 封未讀";
+"unread" = "未讀";
+"No subject" = "無主旨";
+"No read yet" = "尚未讀取";
+"Open the app to sign in" = "開啟應用程式以登入";
+"Scheduled send" = "排定傳送";
+"(no subject)" = "（無主旨）";
+"Scheduled" = "已排定";
+"To %@" = "寄給 %@";
+"Sending…" = "正在傳送…";
+
+/* Home Screen widget row buttons (iOS 17+), read by VoiceOver */
+"Mark as read" = "標示為已讀";
+"Archive" = "封存";
+"Star" = "加上星號";
+"Unstar" = "移除星號";
+/* The widget row buttons' App Intent and its parameters (hidden from Shortcuts) */
+"Update message" = "更新郵件";
+"Message" = "郵件";
+"Action" = "動作";
+/* Widget placeholder when no account is signed in */
+"Open GrapMail to sign in" = "開啟 GrapMail 以登入";

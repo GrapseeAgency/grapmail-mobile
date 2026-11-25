@@ -1,0 +1,21 @@
+/* GrapMailNotificationService — Arabic table. */
+
+"New encrypted message" = "رسالة مشفّرة جديدة";
+"New mail" = "بريد جديد";
+"1 new message" = "رسالة جديدة واحدة";
+"%lld new messages" = "%lld رسائل جديدة";
+"%lld unread in the inbox" = "%lld غير مقروءة في البريد الوارد";
+"Encrypted message" = "رسالة مشفّرة";
+"Unknown sender" = "مرسل غير معروف";
+"No subject" = "بلا موضوع";
+"This was me" = "كنت أنا";
+"Secure account" = "تأمين الحساب";
+"Archive" = "أرشفة";
+"Mark as read" = "تعليم كمقروءة";
+"Reply" = "رد";
+"Send" = "إرسال";
+"Reply…" = "رد…";
+"Reply in app" = "الرد في التطبيق";
+"More" = "المزيد";
+/* Notification title: a sign-in code, then the sender */
+"%@ · %@" = "%@ · %@";

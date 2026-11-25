@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="mail_receipt_read_at">Okundu: %1$s</string>
+    <string name="mail_receipt_requested_pending">Okundu bilgisi istendi · henüz okunmadı</string>
+    <string name="mail_receipt_server_sent">Okundu bilgisi gönderildi</string>
+    <string name="mail_receipt_ask_title">Gönderen okundu bilgisi istedi</string>
+    <string name="mail_receipt_ask_body">%1$s adresine bu iletiyi açtığınızı bildiren bir okundu bilgisi gönderilsin mi? Yalnızca ne zaman açtığınızı bildirir.</string>
+    <string name="mail_receipt_ask_send">Gönder</string>
+    <string name="mail_receipt_ask_decline">Gönderme</string>
+    <string name="mail_receipt_mode_title">Okundu bilgisi gönder</string>
+    <string name="mail_receipt_mode_body">Bir ileti okundu bilgisi istediğinde. Her Zaman seçilmedikçe spam, engellenen gönderenler veya şifreli postalar için okundu bilgisi gönderilmez.</string>
+    <string name="mail_receipt_mode_never">Hiçbir zaman</string>
+    <string name="mail_receipt_mode_ask">Sor</string>
+    <string name="mail_receipt_mode_always">Her Zaman</string>
+    <string name="mail_receipt_mode_always_note">Her Zaman seçeneği spam, engellenen gönderenler ve şifreli postalar için de bilgi gönderir.</string>
+    <string name="mail_receipt_mode_unavailable">Bu ayar yüklenemedi. Bağlantınızı kontrol edin.</string>
+    <string name="mail_compose_request_receipt">Okundu bilgisi iste</string>
+</resources>

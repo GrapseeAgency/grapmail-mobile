@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="identity_settings_appearance">Оформление</string>
+    <string name="identity_match_wallpaper_title">Подстроить под обои</string>
+    <string name="identity_match_wallpaper_subtitle">Использовать цвета обоев для кнопок и выделений. Аватары, цвета состояний и текст остаются фирменными.</string>
+</resources>

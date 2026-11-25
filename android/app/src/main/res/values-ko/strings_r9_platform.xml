@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="r9_platform_notif_channel_new_mail_desc">받은편지함에 새 메시지가 도착하면 알려줍니다.</string>
+    <string name="r9_platform_price_per_week">주당 %1$s</string>
+    <string name="r9_platform_price_per_month">월 %1$s</string>
+    <string name="r9_platform_price_per_3_months">3개월마다 %1$s</string>
+    <string name="r9_platform_price_per_6_months">6개월마다 %1$s</string>
+    <string name="r9_platform_price_per_year">연 %1$s</string>
+</resources>

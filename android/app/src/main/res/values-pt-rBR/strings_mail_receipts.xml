@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Brazilian Portuguese translation of values/strings_mail_receipts.xml.
+-->
+<resources>
+    <string name="mail_receipt_read_at">Lida %1$s</string>
+    <string name="mail_receipt_requested_pending">Confirmação de leitura solicitada · ainda não lida</string>
+    <string name="mail_receipt_server_sent">Confirmação de leitura enviada</string>
+    <string name="mail_receipt_ask_title">O remetente pediu uma confirmação de leitura</string>
+    <string name="mail_receipt_ask_body">Enviar uma confirmação para %1$s dizendo que você abriu esta mensagem? Ela informa quando você a abriu, e nada mais.</string>
+    <string name="mail_receipt_ask_send">Enviar confirmação</string>
+    <string name="mail_receipt_ask_decline">Não enviar</string>
+    <string name="mail_receipt_mode_title">Enviar confirmações de leitura</string>
+    <string name="mail_receipt_mode_body">Quando uma mensagem pedir confirmação de leitura. As confirmações nunca são enviadas para spam, remetentes bloqueados ou e-mails criptografados, a menos que você escolha Sempre.</string>
+    <string name="mail_receipt_mode_never">Nunca</string>
+    <string name="mail_receipt_mode_ask">Perguntar</string>
+    <string name="mail_receipt_mode_always">Sempre</string>
+    <string name="mail_receipt_mode_always_note">Sempre também envia confirmações para spam, remetentes bloqueados e e-mails criptografados.</string>
+    <string name="mail_receipt_mode_unavailable">Não foi possível carregar esta configuração. Verifique sua conexão.</string>
+    <string name="mail_compose_request_receipt">Pedir confirmação de leitura</string>
+</resources>

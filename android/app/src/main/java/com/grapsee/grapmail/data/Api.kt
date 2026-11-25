@@ -1,6 +1,8 @@
 package com.grapsee.grapmail.data
 
 import android.content.Context
+import com.grapsee.grapmail.R
+import com.grapsee.grapmail.ui.i18n.CoreStrings
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.suspendCancellableCoroutine
@@ -219,49 +221,49 @@ class ApiException(val status: Int, val code: String?, message: String) :
 }
 
 private fun apiErrorMessage(status: Int, code: String?): String = when (code) {
-    "TOO_MANY_ATTEMPTS" -> "Too many failed attempts. Try again in about 15 minutes."
-    "RATE_LIMITED" -> "Too many requests. Try again in a few minutes."
-    "WRONG_PASSWORD" -> "Check your password and try again."
-    "INVALID_CREDENTIALS" -> "Check your email address and password."
-    "WEAK_PASSWORD" -> "Use at least 8 characters with a letter, a number and a symbol."
-    "INVALID_RESET_CHALLENGE" -> "Request a new password reset code and try again."
-    "TWO_FACTOR_REJECTED" -> "Check your verification code and try again."
-    "INVALID_PHONE" -> "Check the phone number and country code."
-    "PHONE_IN_USE" -> "That phone number is already linked to another account."
-    "PHONE_NOT_VERIFIED" -> "Verify your phone number to continue."
-    "PHONE_PROOF_REQUIRED" -> "Verify your phone number to continue."
-    "NO_RECOVERY_CHANNEL" -> "This account has no verified recovery email, so it can't be reset here. Contact support and we'll help."
-    "BAD_RECOVERY_EMAIL" -> "Check the email address and try again."
-    "RECOVERY_SAME_AS_PRIMARY" -> "Use an email address outside GrapMail, so you can still reach it if you lose access to this account."
-    "EMAIL_DELIVERY_UNAVAILABLE" -> "We couldn't send the email right now. Try again shortly."
-    "CODE_REJECTED" -> "That code is not correct."
-    "CODE_EXPIRED" -> "That code has expired. Request a new one."
-    "EMAIL_PROOF_REQUIRED" -> "Enter the code we emailed you to turn on two-step verification."
-    "TWO_FACTOR_NEEDS_RECOVERY_EMAIL" -> "Add and confirm a recovery email before turning on two-step verification."
-    "RECOVERY_EMAIL_IN_USE" -> "Two-step verification sends its codes to your recovery email. Confirm a new address with a code instead."
-    "SMS_DELIVERY_UNAVAILABLE" -> "The code could not be sent. Try again in a moment."
-    "BAD_ADDRESS" -> "Check the email address and try again."
-    "ADDRESS_REJECTED" -> "That email address is unavailable."
-    "ALIAS_REJECTED" -> "That email address is unavailable."
-    "NO_RECIPIENT" -> "Add at least one recipient."
-    "TOO_MANY_RECIPIENTS" -> "Remove some recipients and try again."
-    "EMPTY_BODY" -> "Write a message before sending."
-    "QUOTA_EXCEEDED" -> "Your mailbox is full. Free up some storage and try again."
-    "BODY_TOO_LARGE" -> "Shorten your message or remove large attachments."
-    "TOO_LARGE" -> "Choose a smaller file and try again."
-    "CANNOT_REVOKE_CURRENT" -> "Sign out to end this session."
-    "TWOFA_REQUIRED_FOR_BACKUP_CODES" -> "Turn on two-step verification to use backup codes."
-    "NO_MAILBOX" -> "Your GrapMail inbox is not ready yet."
-    "HUMAN_VERIFICATION_REQUIRED" -> "Your verification expired or was already used — complete the check again."
+    "TOO_MANY_ATTEMPTS" -> CoreStrings.get(R.string.core_api_too_many_attempts) { "Too many failed attempts. Try again in about 15 minutes." }
+    "RATE_LIMITED" -> CoreStrings.get(R.string.core_api_rate_limited) { "Too many requests. Try again in a few minutes." }
+    "WRONG_PASSWORD" -> CoreStrings.get(R.string.core_api_wrong_password) { "Check your password and try again." }
+    "INVALID_CREDENTIALS" -> CoreStrings.get(R.string.core_api_invalid_credentials) { "Check your email address and password." }
+    "WEAK_PASSWORD" -> CoreStrings.get(R.string.core_api_weak_password) { "Use at least 8 characters with a letter, a number and a symbol." }
+    "INVALID_RESET_CHALLENGE" -> CoreStrings.get(R.string.core_api_invalid_reset_challenge) { "Request a new password reset code and try again." }
+    "TWO_FACTOR_REJECTED" -> CoreStrings.get(R.string.core_api_two_factor_rejected) { "Check your verification code and try again." }
+    "INVALID_PHONE" -> CoreStrings.get(R.string.core_api_invalid_phone) { "Check the phone number and country code." }
+    "PHONE_IN_USE" -> CoreStrings.get(R.string.core_api_phone_in_use) { "That phone number is already linked to another account." }
+    "PHONE_NOT_VERIFIED" -> CoreStrings.get(R.string.core_api_phone_not_verified) { "Verify your phone number to continue." }
+    "PHONE_PROOF_REQUIRED" -> CoreStrings.get(R.string.core_api_phone_proof_required) { "Verify your phone number to continue." }
+    "NO_RECOVERY_CHANNEL" -> CoreStrings.get(R.string.core_api_no_recovery_channel) { "This account has no verified recovery email, so it can't be reset here. Contact support and we'll help." }
+    "BAD_RECOVERY_EMAIL" -> CoreStrings.get(R.string.core_api_bad_recovery_email) { "Check the email address and try again." }
+    "RECOVERY_SAME_AS_PRIMARY" -> CoreStrings.get(R.string.core_api_recovery_same_as_primary) { "Use an email address outside GrapMail, so you can still reach it if you lose access to this account." }
+    "EMAIL_DELIVERY_UNAVAILABLE" -> CoreStrings.get(R.string.core_api_email_delivery_unavailable) { "We couldn't send the email right now. Try again shortly." }
+    "CODE_REJECTED" -> CoreStrings.get(R.string.core_api_code_rejected) { "That code is not correct." }
+    "CODE_EXPIRED" -> CoreStrings.get(R.string.core_api_code_expired) { "That code has expired. Request a new one." }
+    "EMAIL_PROOF_REQUIRED" -> CoreStrings.get(R.string.core_api_email_proof_required) { "Enter the code we emailed you to turn on two-step verification." }
+    "TWO_FACTOR_NEEDS_RECOVERY_EMAIL" -> CoreStrings.get(R.string.core_api_two_factor_needs_recovery_email) { "Add and confirm a recovery email before turning on two-step verification." }
+    "RECOVERY_EMAIL_IN_USE" -> CoreStrings.get(R.string.core_api_recovery_email_in_use) { "Two-step verification sends its codes to your recovery email. Confirm a new address with a code instead." }
+    "SMS_DELIVERY_UNAVAILABLE" -> CoreStrings.get(R.string.core_api_sms_delivery_unavailable) { "The code could not be sent. Try again in a moment." }
+    "BAD_ADDRESS" -> CoreStrings.get(R.string.core_api_bad_address) { "Check the email address and try again." }
+    "ADDRESS_REJECTED" -> CoreStrings.get(R.string.core_api_address_rejected) { "That email address is unavailable." }
+    "ALIAS_REJECTED" -> CoreStrings.get(R.string.core_api_alias_rejected) { "That email address is unavailable." }
+    "NO_RECIPIENT" -> CoreStrings.get(R.string.core_api_no_recipient) { "Add at least one recipient." }
+    "TOO_MANY_RECIPIENTS" -> CoreStrings.get(R.string.core_api_too_many_recipients) { "Remove some recipients and try again." }
+    "EMPTY_BODY" -> CoreStrings.get(R.string.core_api_empty_body) { "Write a message before sending." }
+    "QUOTA_EXCEEDED" -> CoreStrings.get(R.string.core_api_quota_exceeded) { "Your mailbox is full. Free up some storage and try again." }
+    "BODY_TOO_LARGE" -> CoreStrings.get(R.string.core_api_body_too_large) { "Shorten your message or remove large attachments." }
+    "TOO_LARGE" -> CoreStrings.get(R.string.core_api_too_large) { "Choose a smaller file and try again." }
+    "CANNOT_REVOKE_CURRENT" -> CoreStrings.get(R.string.core_api_cannot_revoke_current) { "Sign out to end this session." }
+    "TWOFA_REQUIRED_FOR_BACKUP_CODES" -> CoreStrings.get(R.string.core_api_twofa_required_for_backup_codes) { "Turn on two-step verification to use backup codes." }
+    "NO_MAILBOX" -> CoreStrings.get(R.string.core_api_no_mailbox) { "Your GrapMail inbox is not ready yet." }
+    "HUMAN_VERIFICATION_REQUIRED" -> CoreStrings.get(R.string.core_api_human_verification_required) { "Your verification expired or was already used — complete the check again." }
     else -> when (status) {
-        401 -> "Check your sign-in details or sign in again."
-        403 -> "This action is unavailable for your account."
-        404 -> "This item is no longer available."
-        409 -> "Refresh and try again."
-        413 -> "Choose a smaller file and try again."
-        429 -> "Too many requests. Try again in a few minutes."
-        in 500..599 -> "GrapMail is temporarily unavailable. Try again in a moment."
-        else -> "Please try again."
+        401 -> CoreStrings.get(R.string.core_api_http_401) { "Check your sign-in details or sign in again." }
+        403 -> CoreStrings.get(R.string.core_api_http_403) { "This action is unavailable for your account." }
+        404 -> CoreStrings.get(R.string.core_api_http_404) { "This item is no longer available." }
+        409 -> CoreStrings.get(R.string.core_api_http_409) { "Refresh and try again." }
+        413 -> CoreStrings.get(R.string.core_api_http_413) { "Choose a smaller file and try again." }
+        429 -> CoreStrings.get(R.string.core_api_http_429) { "Too many requests. Try again in a few minutes." }
+        in 500..599 -> CoreStrings.get(R.string.core_api_http_5xx) { "GrapMail is temporarily unavailable. Try again in a moment." }
+        else -> CoreStrings.get(R.string.core_api_generic) { "Please try again." }
     }
 }
 
@@ -987,6 +989,171 @@ private fun apiErrorMessage(status: Int, code: String?): String = when (code) {
     val code: String? = null,
 )
 
+// region Round 8 security — models for docs/design/round8-spec.md §6
+//
+// `GET /grapsee/auth/security/overview` and `POST /grapsee/auth/security/not-me`
+// (JSON Schema: docs/design/security-overview.schema.json). Every enum the server
+// sends (`kind`, `platform`, `formFactor`, event `type`, checklist `id`/`state`,
+// `risk`, `action`, `level`) is decoded as a plain String: the enums are open
+// (§6.1), so an unknown value renders with the generic fallback instead of
+// failing the decode. All user-facing copy is the client's; `label` and
+// `location.label` are the only server-composed strings. Defaults keep a
+// partial body readable (`ignoreUnknownKeys` + `coerceInputValues`).
+//
+// These are also what SecurityOverviewCache writes to disk, so they stay plain
+// @Serializable data with no derived state.
+
+@Serializable data class SecurityOverviewResponse(
+    val success: Boolean = false,
+    val generatedAt: String? = null,
+    val account: SecurityOverviewAccountDto? = null,
+    val score: SafetyScoreDto? = null,
+    val checklist: List<SafetyChecklistItemDto> = emptyList(),
+    val devices: List<SecurityDeviceDto> = emptyList(),
+    val events: List<SecurityTimelineEventDto> = emptyList(),
+    /** Null once the window has no older page (§3.1 "Show older activity"). */
+    val eventsNextCursor: String? = null,
+    val error: String? = null,
+    val code: String? = null,
+)
+
+@Serializable data class SecurityOverviewAccountDto(
+    val address: String = "",
+    val displayName: String? = null,
+    /** False for SSO / passkey-only accounts; `password_health` is then not_applicable. */
+    val hasPassword: Boolean = true,
+    /** Set by not-me, cleared by any password change or reset (§3.6). */
+    val passwordChangeRequired: Boolean = false,
+)
+
+/** §4.1 — computed by the server. The client never recomputes it. */
+@Serializable data class SafetyScoreDto(
+    val version: Int = 1,
+    val value: Int = 0,
+    /** `needs_attention` | `good` | `strong` (open). */
+    val level: String = "",
+    val earnedPoints: Int = 0,
+    val possiblePoints: Int = 0,
+)
+
+/** §4.2 — one checklist row. `state`: `done` | `todo` | `not_applicable` (open). */
+@Serializable data class SafetyChecklistItemDto(
+    val id: String = "",
+    val state: String = "",
+    val points: Int = 0,
+    val earned: Int = 0,
+    val action: String? = null,
+    val meta: SafetyChecklistMetaDto? = null,
+)
+
+/** The union of every item's `meta` keys; each item fills the ones it owns. */
+@Serializable data class SafetyChecklistMetaDto(
+    val count: Int? = null,
+    val remaining: Int? = null,
+    /** `password_health`: e.g. `breached`, `ok`, `unknown`. */
+    val status: String? = null,
+    val lastChangedAt: String? = null,
+)
+
+/** Coarse, city-level, text only (§3.2): never coordinates. */
+@Serializable data class SecurityLocationDto(
+    val label: String? = null,
+    val city: String? = null,
+    val region: String? = null,
+    val country: String? = null,
+)
+
+/** Which existing endpoint removes this device (§3.5, §6.2 `removal`). */
+@Serializable data class SecurityDeviceRemovalDto(
+    /** `trusted_device` → POST /devices/{id}/revoke; `session` → DELETE /account/sessions?id={id}. */
+    val via: String = "",
+    val id: String = "",
+)
+
+@Serializable data class SecurityDeviceDto(
+    /** `td_<uuid>` or `ss_<deviceId>`; opaque. */
+    val id: String = "",
+    /** `app` | `browser` (open). */
+    val kind: String = "",
+    val platform: String = "",
+    /** `phone` | `tablet` | `desktop` (open). */
+    val formFactor: String = "",
+    val label: String = "",
+    val browser: String? = null,
+    val os: String? = null,
+    val current: Boolean = false,
+    val trusted: Boolean = false,
+    val attestation: String? = null,
+    val location: SecurityLocationDto? = null,
+    val ipMasked: String? = null,
+    val firstSeenAt: String? = null,
+    val lastActiveAt: String? = null,
+    val activeSessionCount: Int = 0,
+    /** Null for the current device. */
+    val removal: SecurityDeviceRemovalDto? = null,
+    val notMeAllowed: Boolean = false,
+)
+
+@Serializable data class SecurityTimelineEventDto(
+    val id: String = "",
+    /** §3.3 vocabulary (open): `signin`, `signin_new_device`, … */
+    val type: String = "",
+    val occurredAt: String? = null,
+    val deviceId: String? = null,
+    val deviceLabel: String? = null,
+    val location: SecurityLocationDto? = null,
+    /** `low` | `medium` | `high` (open). */
+    val risk: String? = null,
+    /** `ALLOW` | `ALERT` | `STEP_UP` | `BLOCK` | `REVOKE` (open). */
+    val action: String? = null,
+    val factor: String? = null,
+    /** Absent reads as acknowledged: no "Review" chip on a value the server did not send. */
+    val acknowledged: Boolean = true,
+    val reported: Boolean = false,
+    val notMeAllowed: Boolean = false,
+    /** The event sheet's "Approximate network" row, only when the server sends it. */
+    val ipMasked: String? = null,
+)
+
+/**
+ * §6.3 request — exactly one of [deviceId] / [eventId]. Encoded with the sparse
+ * encoder, so the absent one (and an absent [proof]) is not on the wire at all.
+ */
+@Serializable data class NotMeRequest(
+    val deviceId: String? = null,
+    val eventId: String? = null,
+    val proof: String? = null,
+)
+
+@Serializable data class NotMeTargetDto(
+    /** `device` | `event` (open). */
+    val kind: String = "",
+    val id: String? = null,
+)
+
+@Serializable data class NotMeResultDto(
+    val reportId: String? = null,
+    val target: NotMeTargetDto? = null,
+    val revokedDeviceIds: List<String> = emptyList(),
+    val signedOutSessions: Int = 0,
+    val passwordChangeRequired: Boolean = true,
+    val alreadyReported: Boolean = false,
+)
+
+@Serializable data class NotMeResponse(
+    val success: Boolean = false,
+    val result: NotMeResultDto? = null,
+    /** e.g. `change_password`, `review_recovery` (open). */
+    val nextSteps: List<String> = emptyList(),
+    val error: String? = null,
+    val code: String? = null,
+)
+
+/** `POST /account/verify-password` with the new `secure-account` purpose (§3.4 step 3, §6.4). */
+@Serializable private data class SecureAccountVerifyRequest(val password: String, val purpose: String)
+
+// endregion Round 8 security
+
 /** POST /grapsee/auth/recovery/device/challenge — asks for a nonce to sign. */
 @Serializable data class DeviceChallengeRequest(val identifier: String)
 
@@ -1103,7 +1270,17 @@ data class QuietHoursBody(
 )
 
 object Api {
-    val BASE: String = com.grapsee.grapmail.BuildConfig.API_BASE
+    /**
+     * Test seam ONLY: JVM unit tests (src/test, ApiTest.kt) point the client at
+     * a local MockWebServer through this. Nothing in the app sets it, so in a
+     * shipped build [BASE] is always the BuildConfig value. Read once per call
+     * through the getters below (AUTH, MAIL), never cached.
+     */
+    @Volatile
+    internal var baseOverrideForTests: String? = null
+
+    val BASE: String
+        get() = baseOverrideForTests ?: com.grapsee.grapmail.BuildConfig.API_BASE
 
     /**
      * The avatar bytes have to come straight from the API host. The Next.js
@@ -1229,14 +1406,29 @@ object Api {
         .build()
 
     /**
-     * Certificate pinning for the API host (OWASP MASVS-NETWORK-2), from the
-     * build's `API_PINS`: comma-separated `sha256/<base64 SPKI hash>` values,
-     * printed by `scripts/print-api-pins.sh`.
+     * Certificate pinning for the API hosts (OWASP MASVS-NETWORK-2), from the
+     * build's `API_PINS`: comma-separated `sha256/<base64 SPKI hash>` values.
+     * The source of truth is `security/api-pins.json` (build.gradle.kts reads it;
+     * iOS compiles the same file into ApiPins.swift); `scripts/print-api-pins.sh`
+     * prints a host's live values.
      *
      * Off when no pins are configured, and also when fewer than two are: a single
      * pin with no backup is how an app locks every user out the day the server's
      * certificate is replaced. Pin the issuing CA's key plus a backup (the next
      * CA in the chain, or a second CA the server can move to), not the leaf.
+     *
+     * Also off from `API_PINS_EXPIRES` (the JSON's `expires`, UTC) on, with a
+     * logged warning. Fail-open on purpose, like the platform's own
+     * `<pin-set expiration>` in a Network Security Config: after that date the
+     * connection is still checked by normal certificate validation, just not
+     * pinned. Failing closed would cut off every install that was not updated
+     * in time, through the only channel that could tell it to update; the
+     * weekly CI check (scripts/check-api-pins.py) is what keeps the date from
+     * arriving unnoticed (OWASP MASTG-TEST-0022). Evaluated once when the client
+     * is built, i.e. per process.
+     *
+     * Pinned hosts: `API_PIN_HOSTS` (the JSON's host + additionalHosts, which
+     * includes the avatar host) plus the [BASE] host.
      */
     private fun apiPinner(): okhttp3.CertificatePinner? {
         val pins = com.grapsee.grapmail.BuildConfig.API_PINS.split(',')
@@ -1244,8 +1436,23 @@ object Api {
             .filter { Regex("^sha256/[A-Za-z0-9+/]{43}=$").matches(it) }
             .distinct()
         if (pins.size < 2) return null
-        val host = runCatching { java.net.URI(BASE).host }.getOrNull() ?: return null
-        return okhttp3.CertificatePinner.Builder().apply { pins.forEach { add(host, it) } }.build()
+        val expires = com.grapsee.grapmail.BuildConfig.API_PINS_EXPIRES.trim()
+        if (expires.isNotEmpty()) {
+            val until = runCatching { java.time.LocalDate.parse(expires) }.getOrNull()
+            if (until == null || !java.time.LocalDate.now(java.time.ZoneOffset.UTC).isBefore(until)) {
+                android.util.Log.w("GrapMailApi", "Certificate pin set expired ($expires): pinning is off, platform trust only")
+                return null
+            }
+        }
+        val baseHost = runCatching { java.net.URI(BASE).host }.getOrNull()
+        val hosts = (com.grapsee.grapmail.BuildConfig.API_PIN_HOSTS.split(',') + listOfNotNull(baseHost))
+            .map { it.trim().lowercase() }
+            .filter { it.isNotEmpty() }
+            .distinct()
+        if (hosts.isEmpty()) return null
+        return okhttp3.CertificatePinner.Builder().apply {
+            hosts.forEach { host -> pins.forEach { add(host, it) } }
+        }.build()
     }
 
     // An authenticator can occupy all of the normal client's per-host slots.
@@ -1267,7 +1474,7 @@ object Api {
         call.enqueue(object : Callback {
             override fun onFailure(call: Call, e: IOException) {
                 android.util.Log.w("GrapMailApi", "Network request failed: ${e.javaClass.simpleName}")
-                continuation.resumeWithException(IOException("Check your connection and try again.", e))
+                continuation.resumeWithException(IOException(CoreStrings.get(R.string.core_api_check_connection) { "Check your connection and try again." }, e))
             }
 
             override fun onResponse(call: Call, response: Response) {
@@ -1278,7 +1485,7 @@ object Api {
                     return
                 } catch (e: Exception) {
                     android.util.Log.w("GrapMailApi", "Response read failed: ${e.javaClass.simpleName}")
-                    continuation.resumeWithException(IOException("Could not read the response. Try again.", e))
+                    continuation.resumeWithException(IOException(CoreStrings.get(R.string.core_api_unreadable_response) { "Could not read the response. Try again." }, e))
                     return
                 }
                 continuation.resume(result)
@@ -1307,7 +1514,7 @@ object Api {
         val code = parsed?.get("code")?.toString()?.trim('"')
         val message = parsed?.get("message")?.toString()?.trim('"')
             ?: parsed?.get("error")?.toString()?.trim('"')
-            ?: "Request failed ($status)"
+            ?: CoreStrings.get(R.string.core_api_request_failed, status) { "Request failed ($status)" }
         throw ApiException(status, code, message)
     }
 
@@ -1319,7 +1526,7 @@ object Api {
         json.decodeFromString(strategy, body)
     } catch (e: kotlinx.serialization.SerializationException) {
         android.util.Log.w("GrapMailApi", "Could not decode ${strategy.descriptor.serialName}")
-        throw IOException("Could not read the response. Try again.", e)
+        throw IOException(CoreStrings.get(R.string.core_api_unreadable_response) { "Could not read the response. Try again." }, e)
     }
 
     private fun kotlinx.serialization.json.JsonElement.jsonObjectOrNull() =
@@ -1400,7 +1607,18 @@ object Api {
         }
     }
 
-    private val launchApi by lazy { LaunchApi(BASE, DeviceId.value, userAgent) }
+    // Pinned like `client` (it carries the bearer to the API host), but with
+    // LaunchApi's own no-replay rules: no authenticator, no redirects, no retry.
+    private val launchApi by lazy {
+        LaunchApi(
+            BASE, DeviceId.value, userAgent,
+            OkHttpClient.Builder()
+                .followRedirects(false).followSslRedirects(false).retryOnConnectionFailure(false)
+                .connectTimeout(15, TimeUnit.SECONDS).callTimeout(30, TimeUnit.SECONDS)
+                .apply { apiPinner()?.let { certificatePinner(it) } }
+                .build(),
+        )
+    }
     suspend fun deleteAccount(token: String, password: String) = launchApi.deleteAccount(token, password)
     suspend fun registerPush(token: String, pushToken: String, genericPreview: Boolean?): RegisterPushResponse =
         launchApi.registerPush(token, pushToken, genericPreview)
@@ -1826,6 +2044,64 @@ object Api {
         return decodeResponse<SecurityEventAckResponse>(body)
     }
 
+    // region Round 8 security — docs/design/round8-spec.md §6
+    //
+    // Same gateway, same `authed` builder (bearer + x-device-id, which is how the
+    // server marks this install as the `current` device), same `read` → `fail`
+    // path: a 4xx surfaces as ApiException carrying the server's `code`
+    // (STEP_UP_REQUIRED, CANNOT_TARGET_CURRENT, NOT_FOUND, RATE_LIMITED), and the
+    // screens map those codes to the §3.4 copy themselves.
+
+    /**
+     * GET /security/overview (§6.2): score, checklist, devices and the events
+     * window in one read. All three query parameters are optional; null leaves
+     * the server's default (30 events, 30 days). Out-of-range values are clamped
+     * here to the contract's bounds rather than sent to be refused.
+     */
+    suspend fun securityOverview(
+        token: String,
+        eventsLimit: Int? = null,
+        eventsCursor: String? = null,
+        days: Int? = null,
+    ): SecurityOverviewResponse {
+        val query = buildList {
+            eventsLimit?.let { add("eventsLimit=${it.coerceIn(1, 100)}") }
+            eventsCursor?.takeIf { it.isNotBlank() }?.let { add("eventsCursor=${enc(it)}") }
+            days?.let { add("days=${it.coerceIn(1, 180)}") }
+        }
+        val url = "$AUTH/security/overview" + if (query.isEmpty()) "" else query.joinToString("&", prefix = "?")
+        return read(authed(url, token).get().build()) { decodeResponse<SecurityOverviewResponse>(it) }
+    }
+
+    /**
+     * POST /security/not-me (§6.3). [request] must name exactly one of a device
+     * or an event; the sparse encoder keeps the other key (and an absent proof)
+     * off the wire, because the server answers TARGET_AMBIGUOUS to both.
+     */
+    suspend fun reportNotMe(token: String, request: NotMeRequest): NotMeResponse {
+        val req = authed("$AUTH/security/not-me", token)
+            .post(postBody(jsonSparse.encodeToString(NotMeRequest.serializer(), request)))
+            .build()
+        return read(req) { decodeResponse<NotMeResponse>(it) }
+    }
+
+    /**
+     * The step-up for not-me: verify-password with `purpose: "secure-account"`,
+     * whose `proof` the retry carries. Kept apart from [verifyPassword], whose
+     * body has no purpose and whose callers must not change.
+     */
+    suspend fun verifyPasswordForSecureAccount(token: String, password: String): ProfileResponse {
+        val req = authed("$AUTH/account/verify-password", token)
+            .post(postBody(json.encodeToString(
+                SecureAccountVerifyRequest.serializer(),
+                SecureAccountVerifyRequest(password, "secure-account"),
+            )))
+            .build()
+        return read(req) { decodeResponse<ProfileResponse>(it) }
+    }
+
+    // endregion Round 8 security
+
     /**
      * Step 1 of trusted-device password recovery: ask for a nonce to sign.
      * No bearer — this runs on the forgot-password screen, where the person
@@ -2107,7 +2383,10 @@ object Api {
      * zero — see `MailStatsResponse`.
      */
     private val parkedAccountClient by lazy {
-        OkHttpClient.Builder().callTimeout(3, TimeUnit.SECONDS).build()
+        OkHttpClient.Builder().callTimeout(3, TimeUnit.SECONDS)
+            // It carries a bearer to the API host too, so it pins like `client`.
+            .apply { apiPinner()?.let { certificatePinner(it) } }
+            .build()
     }
 
     suspend fun parkedAccountUnread(token: String): Int? {
@@ -2196,7 +2475,7 @@ object Api {
         // waiting" are both claims about mail the server never listed, and the
         // sector's rule is that an unanswered question is drawn as unanswered.
         if (!resp.success) {
-            throw ApiException(200, resp.code, resp.error ?: "The server returned no listing.")
+            throw ApiException(200, resp.code, resp.error ?: CoreStrings.get(R.string.core_scheduled_no_listing) { "The server returned no listing." })
         }
         return resp
     }
@@ -2312,6 +2591,20 @@ object Api {
             throw e
         }
     }
+
+    /**
+     * `POST /send` for an Outbox item: its stored request and the key minted with
+     * it ([OutboxItem.idempotencyKey]), so a retry from a later process or after a
+     * reboot is the same send to the server. The iOS twin of the same name takes
+     * the stored body bytes because its Outbox keeps bytes; this one keeps the
+     * request and encodes it with the encoder [mailSend] uses, so the body, and
+     * with it the server's fingerprint for the key (backend
+     * lib/send-idempotency.ts, 422 on a mismatch), is identical on every attempt.
+     * [SendKeys] is neither consulted nor settled: the key belongs to the Outbox
+     * item, not to the composer's in-memory send.
+     */
+    suspend fun mailSendQueued(token: String, req: MailSendRequest, idempotencyKey: String): MailSendResponse =
+        mailSend(token, req, idempotencyKey)
 
     /**
      * One-click unsubscribe (RFC 8058), sent through the account's own server:
@@ -2734,6 +3027,17 @@ data class MailSendRequest(
      */
     val e2eEnvelope: JsonObject? = null,
     val attachmentIds: List<String> = emptyList(),
+    /** Ask the recipient for a read receipt; /send records it before queuing. */
+    val requestReadReceipt: Boolean = false,
+    /**
+     * Send later: the instant the server should send at, in the wire form
+     * [MailSchedule.toWire] writes (UTC, `...Z`). `null` is "send now" and is
+     * omitted from the body (`encodeDefaults = false`), so every existing send
+     * and every Outbox item is byte-for-byte what it was. The route refuses a
+     * time under a minute or over 30 days ahead with a 400 and never turns a
+     * refused time into an immediate send (backend `lib/mail-schedule.ts`).
+     */
+    val sendAt: String? = null,
 )
 
 /** One future send, as `GET /grapmail/scheduled` answers it. */

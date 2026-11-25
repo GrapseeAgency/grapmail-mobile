@@ -3,7 +3,7 @@ name: iOS
 on:
   push:
     branches: [main]
-    tags: ["v*", "!v0.0.1"]
+    tags: ["v*"]
   pull_request:
     branches: [main]
   workflow_dispatch:
@@ -21,6 +21,110 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'push' && !startsWith(github.ref, 'refs/tags/v') }}
 
 jobs:
+  # Are the files that let grapsee.com vouch for the app actually served?
+  # `com.apple.developer.associated-domains` (applinks: for Universal Links,
+  # webcredentials: for passkeys) only works while
+  # https://grapsee.com/.well-known/apple-app-site-association answers 200 with
+  # the JSON committed in well-known/ (with the real Team ID in place of
+  # TEAMID). mail-honesty.py §39 proves the COMMITTED file matches the app;
+  # only the network can prove it is LIVE. Warning only, by design: a website
+  # hiccup must never fail an app build. Runs on Linux because it needs curl,
+  # not a Mac. The same step runs in android.yml; see well-known/README.md.
+  well-known-live:
+    name: Well-known link files (live check, warning only)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Well-known link files are live (warning only)
+        continue-on-error: true
+        run: |
+          set +e
+          check() {
+            url="$1"; must="$2"; body="$(mktemp)"
+            headers="$(curl -sS --max-time 20 -o "$body" -D - "$url" | tr -d '\r')"
+            code="$(printf '%s\n' "$headers" | awk 'toupper($1) ~ /^HTTP\// { c = $2 } END { print c }')"
+            ctype="$(printf '%s\n' "$headers" | awk -F': *' 'tolower($1) == "content-type" { print tolower($2) }' | tail -n 1)"
+            if [ "$code" != "200" ]; then
+              echo "::warning title=Well-known file not live::$url answered ${code:-no response} (redirects are not followed and count as failures). Universal Links and in-app passkeys will not work until it is published - see well-known/README.md."
+              return
+            fi
+            case "$ctype" in
+              application/json*) ;;
+              *) echo "::warning title=Well-known file content type::$url is served as '${ctype:-none}', not application/json - see the .htaccess lines in well-known/README.md." ;;
+            esac
+            if ! python3 -c 'import json, sys; json.load(open(sys.argv[1]))' "$body" 2>/dev/null; then
+              echo "::warning title=Well-known file is not JSON::$url does not parse as JSON (an HTML fallback page is the usual cause)."
+              return
+            fi
+            if ! grep -q "$must" "$body"; then
+              echo "::warning title=Well-known file names another app::$url does not mention $must."
+              return
+            fi
+            if grep -q 'TEAMID\.' "$body"; then
+              echo "::warning title=AASA still has the placeholder::$url still says TEAMID - replace it with the Apple Team ID before uploading."
+            fi
+            echo "ok: $url"
+          }
+          check "https://grapsee.com/.well-known/apple-app-site-association" "com.grapsee.grapmail"
+          check "https://grapsee.com/.well-known/assetlinks.json" "com.grapsee.grapmail"
+          exit 0
+
+  # Fast XCTest unit suite (ios/GrapMailTests, see TESTING.md): pure logic and
+  # the E2E crypto vectors, no network and no UI. Independent of the long
+  # screenshot walk below, so a logic regression is reported in minutes, and
+  # the release job will not archive unless it is green.
+  unit-tests:
+    name: Unit tests (XCTest, iPhone simulator)
+    runs-on: macos-15
+    timeout-minutes: 30
+    env:
+      SCHEME: GrapMail
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        working-directory: ios
+        run: xcodegen generate
+
+      - name: Resolve available simulator
+        id: sim
+        run: |
+          NAME=$(xcrun simctl list devices available | grep -m1 -o "iPhone 16 Pro\|iPhone 16\|iPhone 15")
+          echo "name=$NAME" >> "$GITHUB_OUTPUT"
+          echo "Using simulator: $NAME"
+
+      - name: Run GrapMailTests
+        working-directory: ios
+        run: |
+          set -o pipefail
+          xcodebuild test \
+            -project GrapMail.xcodeproj \
+            -scheme "$SCHEME" \
+            -destination "platform=iOS Simulator,name=${{ steps.sim.outputs.name }}" \
+            -only-testing:GrapMailTests \
+            -skipPackagePluginValidation \
+            -resultBundlePath unit.xcresult \
+            | tee /tmp/xcodebuild-unit.log | grep -E "Test Case .*(passed|failed)|error:|Executed|\*\* TEST" || true
+          # grep exits 1 when nothing matched; the real verdict is xcodebuild's,
+          # which pipefail would hide behind `|| true`, so read it back here.
+          grep -q "\*\* TEST SUCCEEDED \*\*" /tmp/xcodebuild-unit.log
+
+      - name: Summarise failures
+        if: failure()
+        run: |
+          grep -E "error:|failed \(" /tmp/xcodebuild-unit.log | sed -E 's#^/Users/runner/work/[^/]+/[^/]+/##' | sort -u | head -n 80 || true
+
+      - name: Upload the unit-test result bundle
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-unit-test-results
+          path: ios/unit.xcresult
+          if-no-files-found: warn
+
   build-test-screenshot:
     name: Build, live-test & screenshot (iPhone simulator)
     runs-on: macos-15
@@ -58,7 +162,10 @@ jobs:
             -project GrapMail.xcodeproj \
             -scheme "$SCHEME" \
             -destination "platform=iOS Simulator,name=${{ steps.sim.outputs.name }}" \
+            -skip-testing:GrapMailTests \
             -resultBundlePath walk.xcresult
+          # GrapMailTests (unit) run in the `unit-tests` job; skipping them here
+          # keeps this job's verdict about the walk alone.
 
       - name: Export screenshots from the result bundle
         if: always()
@@ -229,6 +336,9 @@ jobs:
     name: Archive & upload to App Store Connect
     runs-on: macos-15
     timeout-minutes: 40
+    # Nothing is archived or uploaded unless the unit suite passed on this
+    # commit (ios/GrapMailTests; TESTING.md).
+    needs: unit-tests
     # Pushes to main keep building and walking; only a tag or an explicit run
     # ships. The workflow-level concurrency above still applies, so a release
     # dispatched on main can be cancelled by a push to main — a tag carries its

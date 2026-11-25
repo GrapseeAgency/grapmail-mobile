@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="identity_settings_appearance">外觀</string>
+    <string name="identity_match_wallpaper_title">配合桌布</string>
+    <string name="identity_match_wallpaper_subtitle">按鈕與醒目提示使用桌布的顏色。大頭貼、狀態顏色與文字仍使用 GrapMail 的配色。</string>
+</resources>

@@ -1,0 +1,484 @@
+name: Security scan
+
+# Free, OWASP MASVS-aligned security scanning. What each job proves, and what
+# it cannot, is written down in SECURITY-TESTING.md. Every tool here is free
+# and needs no repository secret: MobSF runs in a throwaway container on the
+# runner, mobsfscan / gitleaks / OSV-Scanner are open-source binaries, and
+# code-scanning uploads are free on public repositories.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    # Mondays 03:17 UTC. A weekly run re-checks unchanged code against new
+    # MobSF rules, new OSV advisories and the full git history.
+    - cron: "17 3 * * 1"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  # Pinned tool versions. Bump deliberately; the scanners' rules change with them.
+  # (The MobSF image is pinned in jobs.mobsf-android.services: service images
+  # cannot read the env context.)
+  MOBSFSCAN_VERSION: "1.2.0"
+  GITLEAKS_VERSION: "8.30.1"
+  GITLEAKS_SHA256: 551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb
+  PYYAML_VERSION: "6.0.2"
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # MobSF static analysis of the built debug APK (MASVS STORAGE, CRYPTO,
+  # NETWORK, PLATFORM, CODE, RESILIENCE - static evidence only).
+  # ---------------------------------------------------------------------------
+  mobsf-android:
+    name: MobSF static analysis (Android APK)
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    services:
+      mobsf:
+        # Tag + index digest, so a re-pushed tag cannot change the scanner.
+        image: opensecurity/mobile-security-framework-mobsf:v4.6.9@sha256:14646df326970ba21558c3c67e0a4ab9e9d92f7938ecb7b1a780c8cc536e16b0
+        ports:
+          - 8000:8000
+        env:
+          # Not a secret: the container lives only for this job, on this
+          # runner, and holds nothing but the debug APK of a public repo.
+          # MobSF reads MOBSF_API_KEY from the environment (mobsf/MobSF/init.py).
+          MOBSF_API_KEY: grapmail-ci-${{ github.run_id }}-${{ github.run_attempt }}
+    env:
+      MOBSF_URL: http://localhost:8000
+      MOBSF_API_KEY: grapmail-ci-${{ github.run_id }}-${{ github.run_attempt }}
+      APK: android/app/build/outputs/apk/debug/app-debug.apk
+      OUT: mobsf-out
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # Same JDK and Gradle invocation as android.yml's build job.
+      - name: Set up JDK 17
+        uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Build debug APK
+        working-directory: android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon
+
+      - name: Wait for MobSF to accept API calls
+        run: |
+          set -euo pipefail
+          mkdir -p "$OUT"
+          # Prefer the key we gave the container. If MobSF ignored it (a future
+          # image change), fall back to the key the container prints at start.
+          key="$MOBSF_API_KEY"
+          for i in $(seq 1 90); do
+            code=$(curl -s -o /dev/null -w '%{http_code}' -H "Authorization: $key" "$MOBSF_URL/api/v1/scans" || true)
+            if [ "$code" = "200" ]; then
+              echo "MobSF ready after ~$((i * 5))s"
+              echo "MOBSF_KEY_RESOLVED=$key" >> "$GITHUB_ENV"
+              exit 0
+            fi
+            if [ "$code" = "401" ]; then
+              printed=$(docker logs "${{ job.services.mobsf.id }}" 2>&1 | grep -oE 'REST API Key: *[A-Za-z0-9_-]+' | tail -1 | sed 's/.*: *//' || true)
+              if [ -n "$printed" ]; then
+                echo "::notice::using the API key printed by the MobSF container"
+                echo "::add-mask::$printed"
+                key="$printed"
+              fi
+            fi
+            sleep 5
+          done
+          echo "::error::MobSF did not become ready in 7.5 minutes (last HTTP $code)"
+          docker logs "${{ job.services.mobsf.id }}" 2>&1 | tail -80
+          exit 1
+
+      - name: Upload APK and run the static scan
+        run: |
+          set -euo pipefail
+          test -s "$APK" || { echo "::error::no debug APK at $APK"; exit 1; }
+          auth=(-H "Authorization: $MOBSF_KEY_RESOLVED")
+          curl -sS --fail-with-body "${auth[@]}" -F "file=@$APK" \
+            "$MOBSF_URL/api/v1/upload" -o "$OUT/upload.json"
+          hash=$(jq -r '.hash // empty' "$OUT/upload.json")
+          [ -n "$hash" ] || { echo "::error::upload returned no hash"; cat "$OUT/upload.json"; exit 1; }
+          echo "MOBSF_HASH=$hash" >> "$GITHUB_ENV"
+          echo "uploaded, MD5 $hash"
+          # The scan call is synchronous and returns when analysis completes.
+          curl -sS --fail-with-body --max-time 2400 "${auth[@]}" --data "hash=$hash" \
+            "$MOBSF_URL/api/v1/scan" -o "$OUT/scan-response.json"
+
+      - name: Download JSON report, scorecard and PDF
+        run: |
+          set -euo pipefail
+          auth=(-H "Authorization: $MOBSF_KEY_RESOLVED")
+          curl -sS --fail-with-body "${auth[@]}" --data "hash=$MOBSF_HASH" \
+            "$MOBSF_URL/api/v1/report_json" -o "$OUT/mobsf-report.json"
+          curl -sS --fail-with-body "${auth[@]}" --data "hash=$MOBSF_HASH" \
+            "$MOBSF_URL/api/v1/scorecard" -o "$OUT/mobsf-scorecard.json" \
+            || echo "::warning::scorecard endpoint failed; the gate does not depend on it"
+          # PDF rendering is a convenience for humans; never let it decide the gate.
+          if curl -sS --fail "${auth[@]}" --data "hash=$MOBSF_HASH" \
+            "$MOBSF_URL/api/v1/download_pdf" -o "$RUNNER_TEMP/mobsf-report.pdf"; then
+            cp "$RUNNER_TEMP/mobsf-report.pdf" "$OUT/mobsf-report.pdf"
+          else
+            echo "::warning::PDF report generation failed; JSON report is still authoritative"
+          fi
+          ls -la "$OUT"
+
+      - name: Upload MobSF reports
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: mobsf-android-report
+          path: |
+            mobsf-out/mobsf-report.json
+            mobsf-out/mobsf-report.pdf
+            mobsf-out/mobsf-scorecard.json
+          if-no-files-found: warn
+
+      - name: Gate on high findings (security/mobsf-allowlist.yml)
+        run: |
+          set -euo pipefail
+          python3 -m venv "$RUNNER_TEMP/gate"
+          "$RUNNER_TEMP/gate/bin/python" -m pip install --quiet "PyYAML==$PYYAML_VERSION"
+          "$RUNNER_TEMP/gate/bin/python" scripts/mobsf-gate.py \
+            --report "$OUT/mobsf-report.json" \
+            --allowlist security/mobsf-allowlist.yml \
+            --fail-on high \
+            --debug-build \
+            --result-json "$OUT/mobsf-gate.json"
+
+      - name: Upload gate decision
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: mobsf-android-gate
+          path: mobsf-out/mobsf-gate.json
+          if-no-files-found: ignore
+
+      - name: MobSF container log on failure
+        if: failure()
+        run: docker logs "${{ job.services.mobsf.id }}" 2>&1 | tail -150
+
+  # ---------------------------------------------------------------------------
+  # mobsfscan: MobSF's source rules (semgrep + libsast) over Kotlin and Swift.
+  # Results go to the Security tab as code-scanning alerts; this job reports,
+  # the MobSF APK gate above is the blocking one.
+  # ---------------------------------------------------------------------------
+  mobsfscan-source:
+    name: mobsfscan (android/ + ios/ sources)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      security-events: write
+      actions: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.12"
+
+      - name: Run mobsfscan
+        run: |
+          python -m pip install --quiet "mobsfscan==$MOBSFSCAN_VERSION"
+          set +e
+          mobsfscan --sarif -o mobsfscan.sarif android/ ios/
+          rc=$?
+          set -e
+          # mobsfscan exits non-zero when it finds something; that is a result,
+          # not a crash. A missing SARIF file is the crash.
+          if [ ! -s mobsfscan.sarif ]; then
+            echo "::error::mobsfscan produced no SARIF (exit $rc)"
+            exit 1
+          fi
+          python - <<'PY'
+          import json, os
+          sarif = json.load(open("mobsfscan.sarif"))
+          counts = {}
+          for run in sarif.get("runs", []):
+              for r in run.get("results", []):
+                  lvl = r.get("level", "warning")
+                  counts[lvl] = counts.get(lvl, 0) + 1
+          with open(os.environ["GITHUB_STEP_SUMMARY"], "a") as fh:
+              fh.write("## mobsfscan (source)\n\n| Level | Count |\n|---|---|\n")
+              for k, v in sorted(counts.items()):
+                  fh.write(f"| {k} | {v} |\n")
+              if not counts:
+                  fh.write("| (none) | 0 |\n")
+              fh.write("\nAlerts are in the Security > Code scanning tab (category `mobsfscan`).\n")
+          PY
+
+      - name: Upload SARIF artifact
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: mobsfscan-sarif
+          path: mobsfscan.sarif
+          if-no-files-found: ignore
+
+      - name: Upload to GitHub code scanning
+        # Fork PRs get a read-only token; the artifact above still carries the result.
+        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+        uses: github/codeql-action/upload-sarif@1bd86f2fdb4b86187fa4059f16f31a3202acc9ea # v4 (v4.39.4)
+        with:
+          sarif_file: mobsfscan.sarif
+          category: mobsfscan
+
+  # ---------------------------------------------------------------------------
+  # gitleaks over git history (MASVS STORAGE/CRYPTO: no keys in the app or repo).
+  # PR: only the PR's commits. Push: only the pushed commits. Schedule/manual:
+  # the whole history. Known historical leaks go in a baseline, not an ignore.
+  # ---------------------------------------------------------------------------
+  secrets:
+    name: gitleaks (secrets in git history)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      security-events: write
+      actions: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Install gitleaks (checksum-verified binary, no licence key needed)
+        run: |
+          set -euo pipefail
+          url="https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          curl -sSfL -o "$RUNNER_TEMP/gitleaks.tgz" "$url"
+          echo "${GITLEAKS_SHA256}  $RUNNER_TEMP/gitleaks.tgz" | sha256sum --check --strict
+          tar -xzf "$RUNNER_TEMP/gitleaks.tgz" -C "$RUNNER_TEMP" gitleaks
+          "$RUNNER_TEMP/gitleaks" version
+
+      - name: Scan
+        env:
+          EVENT: ${{ github.event_name }}
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD: ${{ github.event.pull_request.head.sha }}
+          PUSH_BEFORE: ${{ github.event.before }}
+          PUSH_AFTER: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          args=(git --redact --no-banner --exit-code 1 --report-format sarif --report-path gitleaks.sarif)
+          scope="full history"
+          if [ "$EVENT" = "pull_request" ] && [ -n "$PR_BASE" ]; then
+            args+=(--log-opts "$PR_BASE..$PR_HEAD"); scope="PR commits $PR_BASE..$PR_HEAD"
+          elif [ "$EVENT" = "push" ] && [ -n "$PUSH_BEFORE" ] && ! [[ "$PUSH_BEFORE" =~ ^0+$ ]] \
+               && git cat-file -e "$PUSH_BEFORE^{commit}" 2>/dev/null; then
+            args+=(--log-opts "$PUSH_BEFORE..$PUSH_AFTER"); scope="pushed commits $PUSH_BEFORE..$PUSH_AFTER"
+          fi
+          # Accepted historical findings (rotated keys etc.) live in a baseline
+          # generated with: gitleaks git --report-path security/gitleaks-baseline.json
+          if [ -f security/gitleaks-baseline.json ]; then
+            args+=(--baseline-path security/gitleaks-baseline.json)
+          fi
+          echo "scope: $scope"
+          set +e
+          "$RUNNER_TEMP/gitleaks" "${args[@]}" .
+          rc=$?
+          set -e
+          n=$(jq '[.runs[]?.results[]?] | length' gitleaks.sarif 2>/dev/null || echo "?")
+          {
+            echo "## gitleaks"
+            echo ""
+            echo "| Scope | New leaks | Result |"
+            echo "|---|---|---|"
+            echo "| $scope | $n | $([ $rc -eq 0 ] && echo PASS || echo FAIL) |"
+            echo ""
+            echo "Secrets are redacted in the report. A real leak must be rotated; deleting the commit does not un-leak it."
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit $rc
+
+      - name: Upload SARIF artifact
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: gitleaks-sarif
+          path: gitleaks.sarif
+          if-no-files-found: ignore
+
+      - name: Upload to GitHub code scanning
+        if: always() && hashFiles('gitleaks.sarif') != '' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+        uses: github/codeql-action/upload-sarif@1bd86f2fdb4b86187fa4059f16f31a3202acc9ea # v4 (v4.39.4)
+        with:
+          sarif_file: gitleaks.sarif
+          category: gitleaks
+
+  # ---------------------------------------------------------------------------
+  # OSV-Scanner over resolved Gradle and SwiftPM dependency sets (MASVS CODE:
+  # no known-vulnerable third-party components). The repo commits no
+  # lockfiles, so this job resolves them on the runner first. Report-only.
+  # ---------------------------------------------------------------------------
+  deps:
+    name: OSV-Scanner (Gradle + SwiftPM)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      security-events: write
+      actions: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Resolve Gradle dependencies into gradle.lockfile
+        # Dependency locking is switched on by an init script on the runner, so
+        # no build file changes. The lockfile exists only inside this job.
+        working-directory: android
+        run: |
+          set -euo pipefail
+          mkdir -p ../osv-lockfiles
+          cat > "$RUNNER_TEMP/osv-locking.gradle" <<'GRADLE'
+          allprojects {
+              dependencyLocking { lockAllConfigurations() }
+          }
+          GRADLE
+          chmod +x gradlew
+          if ./gradlew --no-daemon --init-script "$RUNNER_TEMP/osv-locking.gradle" \
+               :app:dependencies --write-locks > "$RUNNER_TEMP/gradle-deps.log" 2>&1; then
+            echo "gradle locks written"
+          else
+            echo "::warning::gradle --write-locks failed; see the log below"
+            tail -40 "$RUNNER_TEMP/gradle-deps.log"
+          fi
+          find ./app -maxdepth 1 -name 'gradle.lockfile' -print -exec cp {} ../osv-lockfiles/gradle.lockfile \;
+          test -s ../osv-lockfiles/gradle.lockfile \
+            || echo "::warning::no gradle.lockfile produced; Android dependencies are NOT covered this run"
+
+      - name: Resolve SwiftPM packages from ios/project.yml into Package.resolved
+        # XcodeGen projects have no Package.swift; build a throwaway manifest
+        # with the same requirements and let SwiftPM resolve it (Linux swift).
+        run: |
+          set -euo pipefail
+          mkdir -p osv-lockfiles/ios "$RUNNER_TEMP/spm/Sources/Resolve"
+          if ! command -v swift >/dev/null; then
+            echo "::warning::swift is not on this runner; iOS packages are NOT covered this run"
+            exit 0
+          fi
+          python3 -m venv "$RUNNER_TEMP/spmgen"
+          "$RUNNER_TEMP/spmgen/bin/python" -m pip install --quiet "PyYAML==$PYYAML_VERSION"
+          "$RUNNER_TEMP/spmgen/bin/python" - "$RUNNER_TEMP/spm/Package.swift" <<'PY'
+          import sys, yaml
+          pkgs = (yaml.safe_load(open("ios/project.yml")) or {}).get("packages") or {}
+          deps = []
+          for name, p in pkgs.items():
+              url = p.get("url")
+              if not url:
+                  continue  # local package (path:), nothing to resolve remotely
+              if "exactVersion" in p or "version" in p:
+                  req = f'exact: "{p.get("exactVersion", p.get("version"))}"'
+              elif "revision" in p:
+                  req = f'revision: "{p["revision"]}"'
+              elif "branch" in p:
+                  req = f'branch: "{p["branch"]}"'
+              elif "minorVersion" in p:
+                  req = f'.upToNextMinor(from: "{p["minorVersion"]}")'
+              else:
+                  req = f'from: "{p.get("from") or p.get("majorVersion") or "0.0.0"}"'
+              deps.append(f'        .package(url: "{url}", {req}),')
+              print(f"{name}: {url} {req}")
+          open(sys.argv[1], "w").write(
+              "// swift-tools-version:5.9\nimport PackageDescription\n"
+              "let package = Package(\n    name: \"GrapMailResolve\",\n    dependencies: [\n"
+              + "\n".join(deps) + "\n    ],\n    targets: [.target(name: \"Resolve\")]\n)\n")
+          PY
+          echo "// placeholder" > "$RUNNER_TEMP/spm/Sources/Resolve/Resolve.swift"
+          if (cd "$RUNNER_TEMP/spm" && swift package resolve); then
+            cp "$RUNNER_TEMP/spm/Package.resolved" osv-lockfiles/ios/Package.resolved
+            cat osv-lockfiles/ios/Package.resolved
+          else
+            echo "::warning::swift package resolve failed; iOS packages are NOT covered this run"
+          fi
+
+      - name: OSV-Scanner (JSON report)
+        id: osv
+        continue-on-error: true
+        uses: google/osv-scanner-action/osv-scanner-action@32d3cd482bdadfb38b186c0ad1b031902d55d932 # v2.7.1
+        with:
+          scan-args: |-
+            --format=json
+            --output=osv-results.json
+            --recursive
+            ./osv-lockfiles
+
+      - name: OSV-Scanner (SARIF for code scanning)
+        continue-on-error: true
+        uses: google/osv-scanner-action/osv-scanner-action@32d3cd482bdadfb38b186c0ad1b031902d55d932 # v2.7.1
+        with:
+          scan-args: |-
+            --format=sarif
+            --output=osv-results.sarif
+            --recursive
+            ./osv-lockfiles
+
+      - name: Summarise
+        if: always()
+        run: |
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          out = ["## OSV-Scanner (dependencies)", ""]
+          covered = [str(p) for p in Path("osv-lockfiles").rglob("*") if p.is_file()]
+          out.append("Lockfiles scanned: " + (", ".join(f"`{c}`" for c in covered) or "**none** (see warnings)"))
+          out.append("")
+          try:
+              data = json.loads(Path("osv-results.json").read_text() or "{}")
+          except Exception:
+              data = None
+          if data is None:
+              out.append("No OSV JSON report was produced.")
+          else:
+              rows = []
+              for res in data.get("results") or []:
+                  src = (res.get("source") or {}).get("path", "?")
+                  for pkg in res.get("packages") or []:
+                      p = pkg.get("package") or {}
+                      ids = [v.get("id", "?") for v in pkg.get("vulnerabilities") or []]
+                      if ids:
+                          rows.append((p.get("ecosystem", "?"), p.get("name", "?"), p.get("version", "?"),
+                                       ", ".join(ids[:6]) + (" ..." if len(ids) > 6 else ""), src))
+              if rows:
+                  out += ["| Ecosystem | Package | Version | Advisories | Lockfile |", "|---|---|---|---|---|"]
+                  out += [f"| {a} | {b} | {c} | {d} | `{e}` |" for a, b, c, d, e in rows]
+              else:
+                  out.append("No known vulnerabilities in the resolved dependency sets.")
+          out += ["", "Report-only: this job does not fail the build. Fix by bumping the dependency in "
+                  "`android/app/build.gradle.kts` or `ios/project.yml`."]
+          with open(os.environ["GITHUB_STEP_SUMMARY"], "a") as fh:
+              fh.write("\n".join(out) + "\n")
+          PY
+
+      - name: Upload OSV reports
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: osv-scanner-report
+          path: |
+            osv-results.json
+            osv-results.sarif
+            osv-lockfiles/
+          if-no-files-found: warn
+
+      - name: Upload to GitHub code scanning
+        if: always() && hashFiles('osv-results.sarif') != '' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+        uses: github/codeql-action/upload-sarif@1bd86f2fdb4b86187fa4059f16f31a3202acc9ea # v4 (v4.39.4)
+        with:
+          sarif_file: osv-results.sarif
+          category: osv-scanner

@@ -36,10 +36,16 @@ import com.grapsee.grapmail.R
 import com.grapsee.grapmail.ui.theme.Palette
 
 /**
- * The GrapMail mark, drawn as vector so it is crisp at every density:
- * a rounded square with the blue gradient, white envelope glyph, and the
- * paper-plane accent — matching the founder's icon. With [wordmark] the
- * "GrapMail" logotype sits beside it.
+ * The GrapMail mark with, when [wordmark] is set, the "GrapMail" logotype
+ * beside it.
+ *
+ * The mark is the founder's own logo file, so its cobalt field and envelope
+ * come from the artwork, not from a gradient drawn here. Retuning it to the
+ * signature gradient is the app-icon work in round8-spec §1.14, and that waits
+ * for founder sign-off. The logotype follows the Round 8 tokens: "Mail" is
+ * drawn in `primaryText`, which is cobalt #1F5EFF in light and #8EA8FF in
+ * dark. The old filled-button blue read at only ≈3.9:1 on the near-black
+ * canvas.
  */
 @Composable
 fun GrapMailLogo(size: Dp = 44.dp, wordmark: Boolean = false) {
@@ -52,7 +58,7 @@ fun GrapMailLogo(size: Dp = 44.dp, wordmark: Boolean = false) {
         Text(
             buildAnnotatedString {
                 withStyle(androidx.compose.ui.text.SpanStyle(color = palette.textPrimary)) { append("Grap") }
-                withStyle(androidx.compose.ui.text.SpanStyle(color = palette.primarySolid)) { append("Mail") }
+                withStyle(androidx.compose.ui.text.SpanStyle(color = palette.primaryText)) { append("Mail") }
             },
             fontSize = 20.sp, fontWeight = FontWeight.Bold,
         )
@@ -72,7 +78,11 @@ private fun Mark(size: Dp, palette: Palette) {
     )
 }
 
-/** The eyebrow label used across the design ("STEP 1 OF 5", "ACCOUNT CREATED"). */
+/**
+ * The eyebrow label used across the design ("STEP 1 OF 5", "ACCOUNT CREATED").
+ * 11 sp text, so it takes `primaryText`, which passes AA on both canvases,
+ * rather than the filled-button cobalt.
+ */
 @Composable
 fun Eyebrow(text: String, modifier: Modifier = Modifier, color: Color? = null) {
     val palette = LocalPalette.current
@@ -82,7 +92,7 @@ fun Eyebrow(text: String, modifier: Modifier = Modifier, color: Color? = null) {
         fontSize = 11.sp,
         fontWeight = FontWeight.Bold,
         letterSpacing = 1.4.sp,
-        color = color ?: palette.primarySolid,
+        color = color ?: palette.primaryText,
     )
 }
 

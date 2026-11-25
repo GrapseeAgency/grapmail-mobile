@@ -1,0 +1,504 @@
+name: Play rollout
+
+# Staged rollout to Google Play, built on the artifact android.yml already
+# produced and verified. Nothing here builds or signs: the `release` job in
+# android.yml owns the keystore, pins the upload certificate, refuses a
+# debuggable or unsigned build, and launches the minified APK on an emulator
+# before it uploads `grapmail-android-release`. This workflow downloads exactly
+# that artifact, re-checks its signer against the same pinned certificate (a
+# file that crossed a workflow boundary is re-proven, not trusted), and hands it
+# to Play.
+#
+#   upload   AAB -> internal / closed (alpha) / production track. Production
+#            starts as a staged rollout (status inProgress, userFraction).
+#            Runs automatically after a successful tag build of android.yml,
+#            to the track in repository variable PLAY_AUTO_TRACK (default
+#            internal), and on demand with action=upload.
+#   promote  widen the production rollout 5% -> 10% -> 20% -> 50% -> 100%, or
+#            start it from the internal/closed track. Refused unless the
+#            crash-free gate passes for the version over the last 24h.
+#   halt     stop the in-progress rollout (no approval wait — it is the brake)
+#   resume   restart a halted rollout (gated like promote)
+#   status   print every track
+#   (cron)   every 6h: crash-free check on whatever is rolling out; red run on
+#            failure, and an automatic halt if PLAY_AUTO_HALT == 'true'.
+#
+# Every change that widens exposure runs in the `play-production` environment,
+# whose required reviewers make each step a human click. Runbook: RELEASING.md.
+
+on:
+  workflow_run:
+    workflows: [Android]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      action:
+        description: What to do
+        type: choice
+        options: [status, upload, promote, halt, resume]
+        default: status
+      track:
+        description: "upload: Play track (alpha = closed testing)"
+        type: choice
+        options: [internal, alpha, production]
+        default: internal
+      fraction:
+        description: "upload to production / promote: share of users (1.0 completes the rollout)"
+        type: choice
+        options: ["0.05", "0.10", "0.20", "0.50", "1.0"]
+        default: "0.05"
+      android_run_id:
+        description: "upload: Android workflow run id to ship (blank = latest successful tag run)"
+        type: string
+        default: ""
+      version_code:
+        description: "promote: version code (blank = the staged release, else newest on the source track)"
+        type: string
+        default: ""
+      crash_free_threshold:
+        description: Minimum crash-free sessions (%) over the last 24h
+        type: string
+        default: "99.5"
+      min_sessions:
+        description: Minimum sessions for the gate to count as evidence
+        type: string
+        default: "50"
+      override_gate:
+        description: Proceed even though the crash-free gate failed or could not run (recorded)
+        type: boolean
+        default: false
+      override_reason:
+        description: Why the override is safe (required with override_gate; shown in the run summary)
+        type: string
+        default: ""
+      version_override:
+        description: "upload: ship despite a cross-platform version mismatch or non-increasing version (recorded)"
+        type: boolean
+        default: false
+  schedule:
+    - cron: "17 */6 * * *"
+
+permissions:
+  contents: read
+  actions: read
+
+# One Play edit at a time: two runs committing edits to the same track race,
+# and the loser's edit is rejected after it has already been approved.
+concurrency:
+  group: play-rollout
+  cancel-in-progress: false
+
+env:
+  PACKAGE_NAME: com.grapsee.grapmail
+  # The same upload certificate android.yml pins (Resolve the production upload key).
+  PINNED_UPLOAD_CERT_SHA256: 34400558533b1e70639390b4dbe74e8ae66da38400215b7d49f88bd714a37b0f
+  SOURCE_TRACK: ${{ vars.PLAY_SOURCE_TRACK || 'internal' }}
+
+jobs:
+  resolve:
+    name: Pick the verified Android build
+    if: >-
+      (github.event_name == 'workflow_run'
+        && github.event.workflow_run.conclusion == 'success'
+        && github.event.workflow_run.event == 'push'
+        && startsWith(github.event.workflow_run.head_branch, 'v'))
+      || (github.event_name == 'workflow_dispatch' && inputs.action == 'upload')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      run_id: ${{ steps.pick.outputs.run_id }}
+      sha: ${{ steps.pick.outputs.sha }}
+      tag: ${{ steps.pick.outputs.tag }}
+      track: ${{ steps.pick.outputs.track }}
+    steps:
+      - name: Resolve run, commit, tag and track
+        id: pick
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT: ${{ github.event_name }}
+          WR_ID: ${{ github.event.workflow_run.id }}
+          INPUT_RUN: ${{ inputs.android_run_id }}
+          INPUT_TRACK: ${{ inputs.track }}
+          AUTO_TRACK: ${{ vars.PLAY_AUTO_TRACK || 'internal' }}
+        run: |
+          set -euo pipefail
+          if [[ "$EVENT" == workflow_run ]]; then
+            run_id="$WR_ID"; track="$AUTO_TRACK"
+          else
+            track="$INPUT_TRACK"
+            if [[ -n "$INPUT_RUN" ]]; then
+              [[ "$INPUT_RUN" =~ ^[0-9]+$ ]] || { echo "::error::android_run_id must be a number"; exit 1; }
+              run_id="$INPUT_RUN"
+            else
+              run_id=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/android.yml/runs?event=push&status=success&per_page=30" \
+                --jq '[.workflow_runs[] | select(.head_branch | startswith("v"))][0].id // empty')
+              [[ -n "$run_id" ]] || { echo "::error::no successful tag run of android.yml found; pass android_run_id"; exit 1; }
+            fi
+          fi
+          case "$track" in internal|alpha|production) ;; *)
+            echo "::error::PLAY_AUTO_TRACK/track must be internal, alpha or production (got '$track')"; exit 1;;
+          esac
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$run_id" > run.json
+          path=$(jq -r .path run.json); conclusion=$(jq -r .conclusion run.json)
+          event=$(jq -r .event run.json); branch=$(jq -r .head_branch run.json); sha=$(jq -r .head_sha run.json)
+          echo "run $run_id: $path $event $branch $sha $conclusion"
+          [[ "$path" == .github/workflows/android.yml ]] || { echo "::error::run $run_id is not an android.yml run ($path)"; exit 1; }
+          [[ "$conclusion" == success ]] || { echo "::error::run $run_id did not succeed ($conclusion): its artifact is not verified"; exit 1; }
+          tag=""
+          if [[ "$event" == push && "$branch" == v* ]]; then
+            tag_sha=$(gh api "repos/$GITHUB_REPOSITORY/commits/$branch" --jq .sha 2>/dev/null || true)
+            [[ "$tag_sha" == "$sha" ]] || { echo "::error::tag $branch no longer points at $sha (moved after the build?)"; exit 1; }
+            tag="$branch"
+          elif [[ "$track" != internal ]]; then
+            echo "::error::run $run_id is an untagged candidate ($event on $branch). Only a tag build may go to $track; untagged candidates may go to internal only."
+            exit 1
+          fi
+          {
+            echo "run_id=$run_id"; echo "sha=$sha"; echo "tag=$tag"; echo "track=$track"
+          } >> "$GITHUB_OUTPUT"
+          {
+            echo "### Play upload candidate"
+            echo "- Android run: [$run_id]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$run_id)"
+            echo "- commit: \`$sha\`  tag: \`${tag:-none (candidate)}\`  track: \`$track\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  upload:
+    name: Upload to Play (${{ needs.resolve.outputs.track }})
+    needs: resolve
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: ${{ needs.resolve.outputs.track == 'production' && 'play-production' || 'play-testing' }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.resolve.outputs.sha }}
+          fetch-depth: 0
+
+      - name: Refuse to run without the Play secret
+        env:
+          PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+        run: |
+          if [[ -z "$PLAY_SERVICE_ACCOUNT_JSON" ]]; then
+            echo "::error::PLAY_SERVICE_ACCOUNT_JSON is not set — nothing was uploaded. See RELEASING.md › One-time setup › Google Play."
+            exit 1
+          fi
+
+      - name: Version gate (tag ↔ versionName ↔ MARKETING_VERSION, codes increase)
+        id: versions
+        env:
+          TAG: ${{ needs.resolve.outputs.tag }}
+          OVERRIDE: ${{ inputs.version_override && 'true' || 'false' }}
+        run: |
+          args=(--platform android --tag "$TAG" --head HEAD)
+          [[ "$OVERRIDE" == true ]] && args+=(--allow-override) && echo "version_override set by $GITHUB_ACTOR" >> "$GITHUB_STEP_SUMMARY"
+          python3 scripts/release-version-check.py "${args[@]}"
+
+      - name: Download the verified release artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: grapmail-android-release
+          run-id: ${{ needs.resolve.outputs.run_id }}
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/release
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Re-prove the artifact (signer pin, package, version, not debuggable)
+        id: artifact
+        env:
+          WANT_CODE: ${{ steps.versions.outputs.android_version_code }}
+          WANT_NAME: ${{ steps.versions.outputs.android_version_name }}
+        run: |
+          set -euo pipefail
+          AAB=$(find "$RUNNER_TEMP/release" -name app-release.aab | head -1)
+          APK=$(find "$RUNNER_TEMP/release" -name app-release.apk | head -1)
+          [[ -s "$AAB" && -s "$APK" ]] || { echo "::error::artifact lacks app-release.aab/.apk"; ls -R "$RUNNER_TEMP/release"; exit 1; }
+          jarsigner -verify "$AAB" | grep -q 'jar verified' || { echo "::error::AAB signature does not verify"; exit 1; }
+          keytool -printcert -jarfile "$AAB" -rfc > "$RUNNER_TEMP/aab.pem"
+          openssl x509 -in "$RUNNER_TEMP/aab.pem" -outform DER > "$RUNNER_TEMP/aab.der"
+          got=$(sha256sum "$RUNNER_TEMP/aab.der" | cut -d' ' -f1)
+          [[ "$got" == "$PINNED_UPLOAD_CERT_SHA256" ]] || { echo "::error::AAB is signed by $got, not the pinned GrapMail upload certificate"; exit 1; }
+          AAPT=$(ls "$ANDROID_HOME"/build-tools/*/aapt | tail -1)
+          "$AAPT" dump badging "$APK" > "$RUNNER_TEMP/badging.txt"
+          grep -q "package: name='$PACKAGE_NAME'" "$RUNNER_TEMP/badging.txt" || { echo "::error::wrong applicationId"; exit 1; }
+          grep -q "versionCode='$WANT_CODE'" "$RUNNER_TEMP/badging.txt" || { echo "::error::artifact versionCode is not $WANT_CODE (build.gradle.kts at this commit)"; head -1 "$RUNNER_TEMP/badging.txt"; exit 1; }
+          grep -q "versionName='$WANT_NAME'" "$RUNNER_TEMP/badging.txt" || { echo "::error::artifact versionName is not $WANT_NAME"; head -1 "$RUNNER_TEMP/badging.txt"; exit 1; }
+          if "$AAPT" dump xmltree "$APK" AndroidManifest.xml | grep -Ew debuggable; then
+            echo "::error::release APK is debuggable"; exit 1
+          fi
+          echo "aab=$AAB" >> "$GITHUB_OUTPUT"
+          echo "- artifact re-verified: signer \`$got\` (pinned), $PACKAGE_NAME $WANT_NAME ($WANT_CODE), not debuggable" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Release notes fit Play's 500-character limit
+        run: |
+          set -euo pipefail
+          ls whatsnew/whatsnew-* > /dev/null 2>&1 || { echo "::error::no whatsnew/whatsnew-<locale> files (e.g. whatsnew/whatsnew-en-US)"; exit 1; }
+          for f in whatsnew/whatsnew-*; do
+            n=$(python3 -c 'import sys; print(len(open(sys.argv[1], encoding="utf-8").read().strip()))' "$f")
+            echo "$f: $n chars"
+            [[ "$n" -gt 0 && "$n" -le 500 ]] || { echo "::error::$f is $n characters; Play allows 1–500"; exit 1; }
+          done
+
+      - name: Install the Play API client
+        run: |
+          python3 -m venv "$RUNNER_TEMP/rel"
+          "$RUNNER_TEMP/rel/bin/pip" install --quiet google-auth==2.36.0 requests==2.32.3
+
+      - name: Version code must be new to Play
+        env:
+          PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+          WANT_CODE: ${{ steps.versions.outputs.android_version_code }}
+        run: |
+          set -euo pipefail
+          top=$("$RUNNER_TEMP/rel/bin/python" scripts/play-track.py max-version-code --package "$PACKAGE_NAME" | tail -1)
+          echo "highest version code on Play: $top; this build: $WANT_CODE"
+          if (( WANT_CODE <= top )); then
+            echo "::error::versionCode $WANT_CODE is not higher than $top already on Play. Bump versionCode in android/app/build.gradle.kts (and the release gate in android.yml) and tag again."
+            exit 1
+          fi
+
+      - name: Upload to Google Play
+        uses: r0adkll/upload-google-play@v1
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+          packageName: ${{ env.PACKAGE_NAME }}
+          releaseFiles: ${{ steps.artifact.outputs.aab }}
+          releaseName: ${{ steps.versions.outputs.android_version_name }} (${{ steps.versions.outputs.android_version_code }})
+          track: ${{ needs.resolve.outputs.track }}
+          # Production starts staged; testing tracks are all-or-nothing.
+          status: ${{ needs.resolve.outputs.track == 'production' && (inputs.fraction == '1.0' && 'completed' || 'inProgress') || 'completed' }}
+          userFraction: ${{ needs.resolve.outputs.track == 'production' && inputs.fraction != '1.0' && (inputs.fraction || '0.05') || '' }}
+          whatsNewDirectory: whatsnew
+
+      - name: Record
+        env:
+          TRACK: ${{ needs.resolve.outputs.track }}
+          FRACTION: ${{ inputs.fraction || '0.05' }}
+        run: |
+          if [[ "$TRACK" == production ]]; then
+            echo "- ✅ uploaded to **production** at **$(python3 -c "print(f'{float(\"$FRACTION\")*100:g}')")%** — next: wait 24h, then promote (RELEASING.md)" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "- ✅ uploaded to **$TRACK** — testers get it from Play; promote to production 5% when the internal test passes" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+  promote:
+    name: Promote production rollout to ${{ inputs.fraction }}
+    if: github.event_name == 'workflow_dispatch' && (inputs.action == 'promote' || inputs.action == 'resume')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: play-production
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Refuse to run without the secrets
+        env:
+          PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+          GRAPMAIL_REPORTS_SECRET: ${{ secrets.GRAPMAIL_REPORTS_SECRET }}
+          OVERRIDE: ${{ inputs.override_gate }}
+        run: |
+          [[ -n "$PLAY_SERVICE_ACCOUNT_JSON" ]] || { echo "::error::PLAY_SERVICE_ACCOUNT_JSON is not set — nothing changed on Play."; exit 1; }
+          if [[ -z "$GRAPMAIL_REPORTS_SECRET" && "$OVERRIDE" != true ]]; then
+            echo "::error::GRAPMAIL_REPORTS_SECRET is not set, so the crash-free gate cannot run and fails closed. Add the secret, or re-run with override_gate and a reason."
+            exit 1
+          fi
+
+      - name: Install the Play API client
+        run: |
+          python3 -m venv "$RUNNER_TEMP/rel"
+          "$RUNNER_TEMP/rel/bin/pip" install --quiet google-auth==2.36.0 requests==2.32.3
+
+      - name: Plan the change
+        id: plan
+        env:
+          PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+          ACTION: ${{ inputs.action }}
+          FRACTION: ${{ inputs.fraction }}
+          VERSION_CODE: ${{ inputs.version_code }}
+        run: |
+          set -euo pipefail
+          args=(plan --package "$PACKAGE_NAME" --track production --source-track "$SOURCE_TRACK")
+          if [[ -n "$VERSION_CODE" ]]; then
+            [[ "$VERSION_CODE" =~ ^[0-9]+$ ]] || { echo "::error::version_code must be a number"; exit 1; }
+            args+=(--version-code "$VERSION_CODE")
+          fi
+          if [[ "$ACTION" == resume ]]; then
+            # Resume keeps the fraction the rollout was halted at.
+            "$RUNNER_TEMP/rel/bin/python" scripts/play-track.py status --package "$PACKAGE_NAME" > /dev/null
+            args+=(--fraction "$FRACTION")
+          else
+            args+=(--fraction "$FRACTION")
+          fi
+          "$RUNNER_TEMP/rel/bin/python" scripts/play-track.py "${args[@]}"
+
+      - name: Crash-free gate (last 24h)
+        id: gate
+        if: steps.plan.outputs.is_increase == 'true'
+        env:
+          GRAPMAIL_REPORTS_SECRET: ${{ secrets.GRAPMAIL_REPORTS_SECRET }}
+          GRAPMAIL_REPORTS_SUMMARY_URL: ${{ vars.GRAPMAIL_REPORTS_SUMMARY_URL }}
+          VERSION_NAME: ${{ steps.plan.outputs.version_name }}
+          VERSION_CODE: ${{ steps.plan.outputs.version_code }}
+          THRESHOLD: ${{ inputs.crash_free_threshold }}
+          MIN_SESSIONS: ${{ inputs.min_sessions }}
+        run: |
+          set +e
+          if [[ -z "$VERSION_NAME" ]]; then
+            echo "::warning::the Play release has no name, so the gate matches on version code only"
+          fi
+          python3 scripts/release-crash-gate.py --platform android \
+            --version "$VERSION_NAME" --build "$VERSION_CODE" \
+            --threshold "${THRESHOLD:-99.5}" --min-sessions "${MIN_SESSIONS:-50}" --hours 24
+          echo "rc=$?" >> "$GITHUB_OUTPUT"
+          exit 0
+
+      - name: Decide (gate result or a recorded override)
+        if: steps.plan.outputs.is_increase == 'true'
+        env:
+          RC: ${{ steps.gate.outputs.rc }}
+          OVERRIDE: ${{ inputs.override_gate }}
+          REASON: ${{ inputs.override_reason }}
+        run: |
+          if [[ "$RC" == 0 ]]; then exit 0; fi
+          what=$([[ "$RC" == 1 ]] && echo "FAILED on real data" || echo "could not be evaluated (fail closed)")
+          if [[ "$OVERRIDE" != true ]]; then
+            echo "::error::crash-free gate $what — rollout NOT widened. Fix forward, wait for more sessions, or re-run with override_gate and override_reason."
+            exit 1
+          fi
+          if [[ -z "${REASON// }" ]]; then
+            echo "::error::override_gate needs an override_reason; it goes on the record."
+            exit 1
+          fi
+          echo "::warning title=crash gate OVERRIDDEN::by $GITHUB_ACTOR — $REASON"
+          {
+            echo ""
+            echo "> ⚠️ **Crash-free gate OVERRIDDEN** (gate $what)"
+            echo "> by @$GITHUB_ACTOR, run $GITHUB_RUN_ID: $REASON"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Apply on Play
+        env:
+          PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+          FRACTION: ${{ steps.plan.outputs.fraction }}
+          VERSION_CODE: ${{ steps.plan.outputs.version_code }}
+        run: |
+          set -euo pipefail
+          "$RUNNER_TEMP/rel/bin/python" scripts/play-track.py set --package "$PACKAGE_NAME" --track production \
+            --source-track "$SOURCE_TRACK" --version-code "$VERSION_CODE" --fraction "$FRACTION" | tee -a "$GITHUB_STEP_SUMMARY"
+
+  halt:
+    name: Halt the production rollout
+    # No environment on purpose: the brake must never wait for a reviewer.
+    # Halting stops NEW installs/updates; people already updated keep the
+    # build, which is why RELEASING.md pairs a halt with a server kill switch.
+    if: github.event_name == 'workflow_dispatch' && inputs.action == 'halt'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install the Play API client
+        run: |
+          python3 -m venv "$RUNNER_TEMP/rel"
+          "$RUNNER_TEMP/rel/bin/pip" install --quiet google-auth==2.36.0 requests==2.32.3
+      - name: Halt
+        env:
+          PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+        run: |
+          set -euo pipefail
+          "$RUNNER_TEMP/rel/bin/python" scripts/play-track.py halt --package "$PACKAGE_NAME" --track production | tee -a "$GITHUB_STEP_SUMMARY"
+          echo "- 🛑 halted by @$GITHUB_ACTOR. Next: pause the failing feature via /grapmail/app-config kill switches, ship a fixed build with a higher versionCode." >> "$GITHUB_STEP_SUMMARY"
+
+  status:
+    name: Play track status
+    if: github.event_name == 'workflow_dispatch' && inputs.action == 'status'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install the Play API client
+        run: |
+          python3 -m venv "$RUNNER_TEMP/rel"
+          "$RUNNER_TEMP/rel/bin/pip" install --quiet google-auth==2.36.0 requests==2.32.3
+      - name: Status
+        env:
+          PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+        run: |
+          "$RUNNER_TEMP/rel/bin/python" scripts/play-track.py status --package "$PACKAGE_NAME"
+
+  watch:
+    name: Watch the in-progress rollout
+    if: github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Skip quietly until Play is set up
+        id: ready
+        env:
+          PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+        run: |
+          if [[ -z "$PLAY_SERVICE_ACCOUNT_JSON" ]]; then
+            echo "::notice::PLAY_SERVICE_ACCOUNT_JSON not set yet — nothing to watch"
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Install the Play API client
+        if: steps.ready.outputs.ready == 'true'
+        run: |
+          python3 -m venv "$RUNNER_TEMP/rel"
+          "$RUNNER_TEMP/rel/bin/pip" install --quiet google-auth==2.36.0 requests==2.32.3
+      - name: Find the in-progress production release
+        id: live
+        if: steps.ready.outputs.ready == 'true'
+        env:
+          PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+        run: |
+          set +e
+          # `plan` at the current fraction is a read-only way to find the staged release.
+          "$RUNNER_TEMP/rel/bin/python" scripts/play-track.py status --package "$PACKAGE_NAME"
+          python3 - <<'PY' > /dev/null
+          PY
+          out=$("$RUNNER_TEMP/rel/bin/python" scripts/play-track.py plan --package "$PACKAGE_NAME" --track production \
+                --source-track production --fraction 1.0 2>&1)
+          rc=$?
+          echo "$out"
+          if [[ $rc -ne 0 ]] || ! grep -q '"mode": "update"' <<< "$out"; then
+            echo "staged=false" >> "$GITHUB_OUTPUT"
+            echo "nothing is staged on production"
+          else
+            echo "staged=true" >> "$GITHUB_OUTPUT"
+          fi
+          exit 0
+      - name: Crash-free gate on the live rollout
+        id: gate
+        if: steps.live.outputs.staged == 'true' && steps.live.outputs.status_now == 'inProgress'
+        env:
+          GRAPMAIL_REPORTS_SECRET: ${{ secrets.GRAPMAIL_REPORTS_SECRET }}
+          GRAPMAIL_REPORTS_SUMMARY_URL: ${{ vars.GRAPMAIL_REPORTS_SUMMARY_URL }}
+          VERSION_NAME: ${{ steps.live.outputs.version_name }}
+          VERSION_CODE: ${{ steps.live.outputs.version_code }}
+          THRESHOLD: ${{ vars.CRASH_FREE_THRESHOLD || '99.5' }}
+        run: |
+          set +e
+          python3 scripts/release-crash-gate.py --platform android --version "$VERSION_NAME" --build "$VERSION_CODE" \
+            --threshold "$THRESHOLD" --min-sessions 1 --hours 24
+          rc=$?
+          echo "rc=$rc" >> "$GITHUB_OUTPUT"
+          [[ $rc -eq 2 ]] && echo "::warning::crash summary unavailable — the rollout was not judged this round"
+          exit 0
+      - name: Halt automatically (only if PLAY_AUTO_HALT is 'true')
+        if: steps.gate.outputs.rc == '1' && vars.PLAY_AUTO_HALT == 'true'
+        env:
+          PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+        run: |
+          "$RUNNER_TEMP/rel/bin/python" scripts/play-track.py halt --package "$PACKAGE_NAME" --track production | tee -a "$GITHUB_STEP_SUMMARY"
+          echo "- 🛑 auto-halted: the live rollout fell below the crash-free threshold" >> "$GITHUB_STEP_SUMMARY"
+      - name: Go red when the live rollout is unhealthy
+        if: steps.gate.outputs.rc == '1'
+        run: |
+          echo "::error::the production rollout is below the crash-free threshold. Halt it (action: halt) and use the app-config kill switches — RELEASING.md › When a rollout goes bad."
+          exit 1

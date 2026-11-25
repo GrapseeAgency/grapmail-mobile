@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="r9_platform_notif_channel_new_mail_desc">Te avisa cuando llegan mensajes nuevos a tu bandeja de entrada.</string>
+    <string name="r9_platform_price_per_week">%1$s/semana</string>
+    <string name="r9_platform_price_per_month">%1$s/mes</string>
+    <string name="r9_platform_price_per_3_months">%1$s cada 3 meses</string>
+    <string name="r9_platform_price_per_6_months">%1$s cada 6 meses</string>
+    <string name="r9_platform_price_per_year">%1$s/año</string>
+</resources>

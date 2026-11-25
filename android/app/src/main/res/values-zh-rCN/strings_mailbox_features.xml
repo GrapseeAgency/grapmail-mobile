@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    values-zh-rCN/strings_mailbox_features.xml: translation of values/strings_mailbox_features.xml (same keys, same order).
+    Comments below are kept from the English source for context.
+-->
+<resources>
+    <!-- ui/mailfeatures/MorningCard.kt — greeting by local time; %1$s is the mailbox's first name. -->
+    <string name="mailbox_feat_greeting_morning">早上好</string>
+    <string name="mailbox_feat_greeting_morning_name">%1$s，早上好</string>
+    <string name="mailbox_feat_greeting_afternoon">下午好</string>
+    <string name="mailbox_feat_greeting_afternoon_name">%1$s，下午好</string>
+    <string name="mailbox_feat_greeting_evening">晚上好</string>
+    <string name="mailbox_feat_greeting_evening_name">%1$s，晚上好</string>
+    <!-- Summary parts; only non-zero parts are shown, joined by a middle dot. -->
+    <plurals name="mailbox_feat_digest_reply">
+        <item quantity="other">%1$d 封待回复</item>
+    </plurals>
+    <plurals name="mailbox_feat_digest_package">
+        <item quantity="other">%1$d 个包裹即将送达</item>
+    </plurals>
+    <plurals name="mailbox_feat_digest_code">
+        <item quantity="other">%1$d 个登录验证码</item>
+    </plurals>
+    <string name="mailbox_feat_digest_caught_up">已全部处理完毕</string>
+    <!-- TalkBack reads the card as one sentence: %1$s greeting, %2$s the parts joined. -->
+    <string name="mailbox_feat_digest_a11y">%1$s。%2$s。</string>
+    <string name="mailbox_feat_digest_a11y_join">，</string>
+    <!-- TalkBack actions on the card. -->
+    <string name="mailbox_feat_action_show_reply">显示需要回复的邮件</string>
+    <string name="mailbox_feat_action_show_packages">显示包裹动态</string>
+    <string name="mailbox_feat_action_show_codes">显示登录验证码</string>
+    <string name="mailbox_feat_action_show_all">显示所有邮件</string>
+    <string name="mailbox_feat_dismiss">关闭</string>
+    <!-- The active filter chip under the card; %1$s is the filter's name. -->
+    <string name="mailbox_feat_filter_reply">待回复</string>
+    <string name="mailbox_feat_filter_packages">包裹</string>
+    <string name="mailbox_feat_filter_codes">登录验证码</string>
+    <string name="mailbox_feat_filter_clear">清除筛选条件：%1$s</string>
+
+    <!-- ui/components/Mail.kt — the code chip on an inbox row; %1$s is the code. -->
+    <string name="mailbox_feat_code_copy">复制 %1$s</string>
+    <!-- The chip's spoken name; the code itself is not read out. -->
+    <string name="mailbox_feat_code_copy_a11y">复制登录验证码</string>
+    <!-- Shown on the chip after a copy. The code is not repeated. -->
+    <string name="mailbox_feat_code_copied">验证码已复制</string>
+    <!-- Clipboard label (shown by some keyboards/clipboard UIs). -->
+    <string name="mailbox_feat_code_clip_label">登录验证码</string>
+
+    <!-- ui/mailfeatures/InboxZero.kt -->
+    <string name="mailbox_feat_zero_title">全部清空</string>
+    <plurals name="mailbox_feat_zero_handled">
+        <item quantity="other">您今天处理了 %1$d 封邮件。</item>
+    </plurals>
+    <string name="mailbox_feat_zero_nothing">没有待处理的事项。</string>
+
+    <!-- ui/screens/mail/SwipeActionsSetting.kt and the row actions in MailboxScreen.kt -->
+    <string name="mailbox_feat_swipe_title">滑动操作</string>
+    <string name="mailbox_feat_swipe_body">在列表中滑动邮件时执行的操作。仅保存在此设备上。</string>
+    <string name="mailbox_feat_swipe_right">向右滑动</string>
+    <string name="mailbox_feat_swipe_left">向左滑动</string>
+    <!-- %1$s is "Swipe right" or "Swipe left". -->
+    <string name="mailbox_feat_swipe_change">更改%1$s</string>
+    <string name="mailbox_feat_swipe_archive">归档</string>
+    <string name="mailbox_feat_swipe_trash">删除</string>
+    <string name="mailbox_feat_swipe_read">标为已读/未读</string>
+    <string name="mailbox_feat_swipe_star">加星标</string>
+    <string name="mailbox_feat_swipe_snooze">暂停提醒</string>
+    <string name="mailbox_feat_swipe_move">移动到…</string>
+    <string name="mailbox_feat_swipe_none">无</string>
+</resources>

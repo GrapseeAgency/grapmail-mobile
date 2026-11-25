@@ -1,0 +1,331 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>%lld unread</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key><string>%#@n@</string>
+		<key>n</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key><string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key><string>lld</string>
+			<key>one</key><string>%lld непрочитанное</string>
+			<key>few</key><string>%lld непрочитанных</string>
+			<key>many</key><string>%lld непрочитанных</string>
+			<key>other</key><string>%lld непрочитанного</string>
+		</dict>
+	</dict>
+	<key>%lld selected</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key><string>%#@n@</string>
+		<key>n</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key><string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key><string>lld</string>
+			<key>one</key><string>Выбрано: %lld</string>
+			<key>few</key><string>Выбрано: %lld</string>
+			<key>many</key><string>Выбрано: %lld</string>
+			<key>other</key><string>Выбрано: %lld</string>
+		</dict>
+	</dict>
+	<key>%lld messages</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key><string>%#@n@</string>
+		<key>n</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key><string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key><string>lld</string>
+			<key>one</key><string>%lld письмо</string>
+			<key>few</key><string>%lld письма</string>
+			<key>many</key><string>%lld писем</string>
+			<key>other</key><string>%lld письма</string>
+		</dict>
+	</dict>
+	<key>%lld new messages</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key><string>%#@n@</string>
+		<key>n</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key><string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key><string>lld</string>
+			<key>one</key><string>%lld новое письмо</string>
+			<key>few</key><string>%lld новых письма</string>
+			<key>many</key><string>%lld новых писем</string>
+			<key>other</key><string>%lld нового письма</string>
+		</dict>
+	</dict>
+	<key>%lld Active Sessions</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key><string>%#@n@</string>
+		<key>n</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key><string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key><string>lld</string>
+			<key>one</key><string>%lld активный сеанс</string>
+			<key>few</key><string>%lld активных сеанса</string>
+			<key>many</key><string>%lld активных сеансов</string>
+			<key>other</key><string>%lld активного сеанса</string>
+		</dict>
+	</dict>
+	<key>%lld codes unused.</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key><string>%#@n@</string>
+		<key>n</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key><string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key><string>lld</string>
+			<key>one</key><string>Не использован %lld код.</string>
+			<key>few</key><string>Не использовано %lld кода.</string>
+			<key>many</key><string>Не использовано %lld кодов.</string>
+			<key>other</key><string>Не использовано %lld кода.</string>
+		</dict>
+	</dict>
+	<key>%lld days ago</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key><string>%#@n@</string>
+		<key>n</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key><string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key><string>lld</string>
+			<key>one</key><string>%lld день назад</string>
+			<key>few</key><string>%lld дня назад</string>
+			<key>many</key><string>%lld дней назад</string>
+			<key>other</key><string>%lld дня назад</string>
+		</dict>
+	</dict>
+	<key>within %lld days</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key><string>%#@n@</string>
+		<key>n</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key><string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key><string>lld</string>
+			<key>one</key><string>за %lld день</string>
+			<key>few</key><string>за %lld дня</string>
+			<key>many</key><string>за %lld дней</string>
+			<key>other</key><string>за %lld дня</string>
+		</dict>
+	</dict>
+	<key>older than %lld days</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key><string>%#@n@</string>
+		<key>n</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key><string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key><string>lld</string>
+			<key>one</key><string>старше %lld дня</string>
+			<key>few</key><string>старше %lld дней</string>
+			<key>many</key><string>старше %lld дней</string>
+			<key>other</key><string>старше %lld дня</string>
+		</dict>
+	</dict>
+	<key>%lld remote images hidden</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key><string>%#@n@</string>
+		<key>n</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key><string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key><string>lld</string>
+			<key>one</key><string>Скрыто %lld внешнее изображение</string>
+			<key>few</key><string>Скрыто %lld внешних изображения</string>
+			<key>many</key><string>Скрыто %lld внешних изображений</string>
+			<key>other</key><string>Скрыто %lld внешнего изображения</string>
+		</dict>
+	</dict>
+	<key>Archived %lld messages</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key><string>%#@n@</string>
+		<key>n</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key><string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key><string>lld</string>
+			<key>one</key><string>Архивировано %lld письмо</string>
+			<key>few</key><string>Архивировано %lld письма</string>
+			<key>many</key><string>Архивировано %lld писем</string>
+			<key>other</key><string>Архивировано %lld письма</string>
+		</dict>
+	</dict>
+	<key>Moved %lld messages to Trash</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key><string>%#@n@</string>
+		<key>n</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key><string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key><string>lld</string>
+			<key>one</key><string>%lld письмо перемещено в корзину</string>
+			<key>few</key><string>%lld письма перемещены в корзину</string>
+			<key>many</key><string>%lld писем перемещено в корзину</string>
+			<key>other</key><string>%lld письма перемещено в корзину</string>
+		</dict>
+	</dict>
+	<key>Restored %lld messages</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key><string>%#@n@</string>
+		<key>n</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key><string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key><string>lld</string>
+			<key>one</key><string>Восстановлено %lld письмо</string>
+			<key>few</key><string>Восстановлено %lld письма</string>
+			<key>many</key><string>Восстановлено %lld писем</string>
+			<key>other</key><string>Восстановлено %lld письма</string>
+		</dict>
+	</dict>
+	<key>Labelled %lld messages</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key><string>%#@n@</string>
+		<key>n</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key><string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key><string>lld</string>
+			<key>one</key><string>Ярлык добавлен к %lld письму</string>
+			<key>few</key><string>Ярлык добавлен к %lld письмам</string>
+			<key>many</key><string>Ярлык добавлен к %lld письмам</string>
+			<key>other</key><string>Ярлык добавлен к %lld письма</string>
+		</dict>
+	</dict>
+	<key>Snoozed %lld messages</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key><string>%#@n@</string>
+		<key>n</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key><string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key><string>lld</string>
+			<key>one</key><string>Отложено %lld письмо</string>
+			<key>few</key><string>Отложено %lld письма</string>
+			<key>many</key><string>Отложено %lld писем</string>
+			<key>other</key><string>Отложено %lld письма</string>
+		</dict>
+	</dict>
+	<key>%lld need a reply</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key><string>%#@n@</string>
+		<key>n</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key><string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key><string>lld</string>
+			<key>one</key><string>%lld ждёт ответа</string>
+			<key>few</key><string>%lld ждут ответа</string>
+			<key>many</key><string>%lld ждут ответа</string>
+			<key>other</key><string>%lld ждут ответа</string>
+		</dict>
+	</dict>
+	<key>%lld packages arriving</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key><string>%#@n@</string>
+		<key>n</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key><string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key><string>lld</string>
+			<key>one</key><string>%lld посылка в пути</string>
+			<key>few</key><string>%lld посылки в пути</string>
+			<key>many</key><string>%lld посылок в пути</string>
+			<key>other</key><string>%lld посылки в пути</string>
+		</dict>
+	</dict>
+	<key>%lld sign-in codes</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key><string>%#@n@</string>
+		<key>n</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key><string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key><string>lld</string>
+			<key>one</key><string>%lld код для входа</string>
+			<key>few</key><string>%lld кода для входа</string>
+			<key>many</key><string>%lld кодов для входа</string>
+			<key>other</key><string>%lld кода для входа</string>
+		</dict>
+	</dict>
+	<key>You handled %lld emails today.</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key><string>%#@n@</string>
+		<key>n</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key><string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key><string>lld</string>
+			<key>one</key><string>Сегодня вы разобрали %lld письмо.</string>
+			<key>few</key><string>Сегодня вы разобрали %lld письма.</string>
+			<key>many</key><string>Сегодня вы разобрали %lld писем.</string>
+			<key>other</key><string>Сегодня вы разобрали %lld письма.</string>
+		</dict>
+	</dict>
+	<key>%lld labels</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key><string>%#@n@</string>
+		<key>n</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key><string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key><string>lld</string>
+			<key>one</key><string>%lld ярлык</string>
+			<key>few</key><string>%lld ярлыка</string>
+			<key>many</key><string>%lld ярлыков</string>
+			<key>other</key><string>%lld ярлыка</string>
+		</dict>
+	</dict>
+	<key>%lld waiting</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key><string>%#@n@</string>
+		<key>n</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key><string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key><string>lld</string>
+			<key>one</key><string>%lld ждёт</string>
+			<key>few</key><string>%lld ждут</string>
+			<key>many</key><string>%lld ждут</string>
+			<key>other</key><string>%lld ждут</string>
+		</dict>
+	</dict>
+	<key>Delete %lld messages permanently?</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key><string>%#@n@</string>
+		<key>n</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key><string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key><string>lld</string>
+			<key>one</key><string>Удалить навсегда %lld письмо?</string>
+			<key>few</key><string>Удалить навсегда %lld письма?</string>
+			<key>many</key><string>Удалить навсегда %lld писем?</string>
+			<key>other</key><string>Удалить навсегда %lld письма?</string>
+		</dict>
+	</dict>
+	<key>%lld senders in the selected messages</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key><string>%#@n@</string>
+		<key>n</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key><string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key><string>lld</string>
+			<key>one</key><string>%lld отправитель в выбранных письмах</string>
+			<key>few</key><string>%lld отправителя в выбранных письмах</string>
+			<key>many</key><string>%lld отправителей в выбранных письмах</string>
+			<key>other</key><string>%lld отправителя в выбранных письмах</string>
+		</dict>
+	</dict>
+	<key>%lld muted conversations</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key><string>%#@n@</string>
+		<key>n</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key><string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key><string>lld</string>
+			<key>one</key><string>%lld цепочка без звука</string>
+			<key>few</key><string>%lld цепочки без звука</string>
+			<key>many</key><string>%lld цепочек без звука</string>
+			<key>other</key><string>%lld цепочки без звука</string>
+		</dict>
+	</dict>
+	<key>%lld followed conversations</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key><string>%#@n@</string>
+		<key>n</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key><string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key><string>lld</string>
+			<key>one</key><string>%lld отслеживаемая цепочка</string>
+			<key>few</key><string>%lld отслеживаемые цепочки</string>
+			<key>many</key><string>%lld отслеживаемых цепочек</string>
+			<key>other</key><string>%lld отслеживаемой цепочки</string>
+		</dict>
+	</dict>
+</dict>
+</plist>

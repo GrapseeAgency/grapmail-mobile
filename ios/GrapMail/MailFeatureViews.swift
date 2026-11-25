@@ -6,6 +6,14 @@ import SwiftUI
 // and MailTrust.swift judges, and everything below renders that verdict on
 // the screen the person is already looking at. Nothing here fetches, and
 // nothing here sends; the panels still render in a tunnel.
+//
+// Type: every font here is a system text style (`.system(.subheadline)` …),
+// so it already follows the iPhone's text-size setting. The adaptive work is
+// in the layouts: chip rows that no longer fit across fall back to a stack or
+// a horizontal scroll, and the sheets scroll when their content outgrows a
+// short window or the accessibility sizes. Tappable chips keep a 44 pt
+// target, and the reader's strips cap at the reading width
+// (`GMLayout.readable`; compose at `GMLayout.compose`) on wide windows.
 
 // MARK: - Switch row (F16, F24 settings)
 
@@ -20,6 +28,7 @@ struct MailFeatureSwitchRow: View {
                 Text(title)
                     .font(.system(.subheadline).weight(.medium))
                     .foregroundColor(GM.textPrimary)
+                    .fixedSize(horizontal: false, vertical: true)
                 if !subtitle.isEmpty {
                     Text(subtitle)
                         .font(.system(.caption))
@@ -47,12 +56,12 @@ struct MailCategoryChipsRow: View {
     @Binding var selected: String?
 
     private static let chips: [MailCategoryChipSpec] = [
-        MailCategoryChipSpec(label: "All", key: nil),
-        MailCategoryChipSpec(label: "Priority", key: "priority"),
-        MailCategoryChipSpec(label: "People", key: "people"),
-        MailCategoryChipSpec(label: "Transactions", key: "transactions"),
-        MailCategoryChipSpec(label: "Notices", key: "notices"),
-        MailCategoryChipSpec(label: "Newsletters", key: "newsletters"),
+        MailCategoryChipSpec(label: String(localized: "All", comment: "Inbox category chip"), key: nil),
+        MailCategoryChipSpec(label: String(localized: "Priority", comment: "Inbox category chip"), key: "priority"),
+        MailCategoryChipSpec(label: String(localized: "People", comment: "Inbox category chip"), key: "people"),
+        MailCategoryChipSpec(label: String(localized: "Transactions", comment: "Inbox category chip"), key: "transactions"),
+        MailCategoryChipSpec(label: String(localized: "Notices", comment: "Inbox category chip"), key: "notices"),
+        MailCategoryChipSpec(label: String(localized: "Newsletters", comment: "Inbox category chip"), key: "newsletters"),
     ]
 
     var body: some View {
@@ -63,7 +72,6 @@ struct MailCategoryChipsRow: View {
                 }
             }
             .padding(.horizontal, 16)
-            .padding(.vertical, 4)
         }
     }
 
@@ -72,16 +80,25 @@ struct MailCategoryChipsRow: View {
         return Button {
             selected = chip.key
         } label: {
+            // Never truncated: the row scrolls sideways, so each chip takes
+            // the width its text needs at any text size.
             Text(chip.label)
                 .font(.system(.footnote).weight(.medium))
                 .foregroundColor(on ? .white : GM.textPrimary)
+                .lineLimit(1)
+                .fixedSize(horizontal: true, vertical: true)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 6)
                 .background(on ? GM.primarySolid : GM.softFill)
                 .clipShape(Capsule())
                 .overlay(Capsule().stroke(on ? Color.clear : GM.border, lineWidth: 1))
+                // The 44 pt target (it replaces the row's old 4 pt padding).
+                .frame(minHeight: 44)
+                .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .accessibilityAddTraits(on ? .isSelected : [])
+        .accessibilityIdentifier("mail-category-\(chip.key ?? "all")")
     }
 }
 
@@ -93,34 +110,80 @@ struct SmartReplyStrip: View {
     let text: String
     let onPick: (String) -> Void
 
+    @Environment(\.dynamicTypeSize) private var dts
+    /// Settings → On-device intelligence: off means no suggestions.
+    @AppStorage(MailFeaturePrefs.smartFeaturesKey) private var smartFeatures = true
+
     private var suggestions: [String] {
-        SmartReplyAssistant.suggest(for: text)
+        guard smartFeatures else { return [] }
+        return SmartReplyAssistant.suggest(for: text)
     }
 
     var body: some View {
+        let suggestions = self.suggestions
         if !suggestions.isEmpty {
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 8) {
-                    ForEach(suggestions, id: \.self) { suggestion in
-                        Button {
-                            onPick(suggestion)
-                        } label: {
-                            Text(suggestion)
-                                .font(.system(.footnote))
-                                .foregroundColor(GM.textPrimary)
-                                .lineLimit(1)
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 7)
-                                .background(GM.softFill)
-                                .clipShape(Capsule())
-                                .overlay(Capsule().stroke(GM.border, lineWidth: 1))
+            Group {
+                if dts.isAccessibilitySize {
+                    // At the accessibility sizes one sideways chip can be
+                    // wider than the screen: the suggestions stack and wrap.
+                    VStack(alignment: .leading, spacing: 8) {
+                        ForEach(suggestions, id: \.self) { suggestion in
+                            chip(suggestion, wraps: true)
                         }
-                        .buttonStyle(.plain)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 4)
+                } else {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 8) {
+                            ForEach(suggestions, id: \.self) { suggestion in
+                                chip(suggestion, wraps: false)
+                            }
+                        }
+                        .padding(.horizontal, 16)
                     }
                 }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 4)
             }
+            .gmMaxWidth(GMLayout.readable)
+        }
+    }
+
+    private func chip(_ suggestion: String, wraps: Bool) -> some View {
+        Button {
+            onPick(suggestion)
+        } label: {
+            chipLabel(suggestion, wraps: wraps)
+                .frame(minHeight: 44)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+
+    @ViewBuilder private func chipLabel(_ suggestion: String, wraps: Bool) -> some View {
+        if wraps {
+            Text(suggestion)
+                .font(.system(.footnote))
+                .foregroundColor(GM.textPrimary)
+                .multilineTextAlignment(.leading)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 7)
+                .background(GM.softFill)
+                .clipShape(RoundedRectangle(cornerRadius: GMShape.small, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: GMShape.small, style: .continuous)
+                    .stroke(GM.border, lineWidth: 1))
+        } else {
+            Text(suggestion)
+                .font(.system(.footnote))
+                .foregroundColor(GM.textPrimary)
+                .lineLimit(1)
+                .fixedSize(horizontal: true, vertical: true)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 7)
+                .background(GM.softFill)
+                .clipShape(Capsule())
+                .overlay(Capsule().stroke(GM.border, lineWidth: 1))
         }
     }
 }
@@ -139,7 +202,19 @@ struct MailSmartPanelView: View {
 
     @State private var prioritySet = false
     @State private var receiptNoted = false
+    /// True while a server-backed receipt indicator (ReadReceiptsServer.swift)
+    /// is on screen; the older on-device chip is hidden then, so one message
+    /// never shows two receipt claims.
+    @State private var serverAskShown = false
+    @State private var serverReadShown = false
     @State private var linkAlert: LinkAlert?
+    /// The category dot grows with the text beside it (7 pt at the default).
+    @ScaledMetric(relativeTo: .caption2) private var categoryDot: CGFloat = 7
+    /// At the accessibility sizes the badge row is stacked, and a badge's
+    /// words may wrap rather than run past the card's edge.
+    @Environment(\.dynamicTypeSize) private var dts
+
+    private var badgeFixed: Bool { !dts.isAccessibilitySize }
 
     // The five intelligence passes (tracker sweep, category decision, action
     // cards, link verdicts, receipt sniff) re-ran their regex batteries over
@@ -151,6 +226,9 @@ struct MailSmartPanelView: View {
     @State private var cards: [MailActionCard] = []
     @State private var linkVerdicts: [UrlVerdict] = []
     @State private var asksReceipt = false
+    /// Settings → On-device intelligence: off hides the thread digest and the
+    /// action cards (Android's MailSmartPanel gates the same two).
+    @AppStorage(MailFeaturePrefs.smartFeaturesKey) private var smartFeatures = true
 
     private var isPriority: Bool {
         prioritySet || MailFeaturePrefs.shared.prioritySenders.contains((message.from?.address ?? "").lowercased())
@@ -179,18 +257,25 @@ struct MailSmartPanelView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 8) {
-                categoryBadge
-                if !isPriority {
-                    prioritizeButton
+            // The badge row side by side when it fits; stacked when the text
+            // size (or a narrow Split View column) no longer leaves room.
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 8) {
+                    badgeRowItems
+                    Spacer(minLength: 0)
                 }
-                // Settings → Opened-mail markers: off means no chip.
-                if asksReceipt && MailFeaturePrefs.shared.readReceiptsEnabled {
-                    receiptChip
+                VStack(alignment: .leading, spacing: 8) {
+                    badgeRowItems
                 }
-                Spacer(minLength: 0)
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
-            if let summary {
+            // Server-backed read receipts: the Ask prompt on received mail,
+            // "Read <time>" on sent mail. Each renders nothing without server data.
+            ReadReceiptAskPrompt(messageId: message.id, isOutbound: message.direction == "outbound",
+                                 onShown: { serverAskShown = $0 })
+            SentReadLine(messageId: message.id, isOutbound: message.direction == "outbound",
+                         onShown: { serverReadShown = $0 })
+            if smartFeatures, let summary {
                 summaryCard(summary)
             }
             if showsTrackerBanner {
@@ -199,7 +284,7 @@ struct MailSmartPanelView: View {
             if !linkVerdicts.isEmpty {
                 linkRow
             }
-            if !cards.isEmpty {
+            if smartFeatures && !cards.isEmpty {
                 actionRow
             }
         }
@@ -210,6 +295,8 @@ struct MailSmartPanelView: View {
             RoundedRectangle(cornerRadius: GMShape.card, style: .continuous)
                 .stroke(GM.border, lineWidth: 1))
         .padding(.horizontal, 16)
+        // A comfortable reading width on wide windows, wherever it is placed.
+        .gmMaxWidth(GMLayout.readable)
         .sheet(item: $linkAlert) { alert in
             UrlWarningSheet(verdict: alert.verdict, onOpen: onOpenUrl, onClose: { linkAlert = nil })
         }
@@ -233,14 +320,27 @@ struct MailSmartPanelView: View {
 
     // MARK: rows
 
+    @ViewBuilder private var badgeRowItems: some View {
+        categoryBadge
+        if !isPriority {
+            prioritizeButton
+        }
+        // Settings → Opened-mail markers: off means no chip.
+        if asksReceipt && MailFeaturePrefs.shared.readReceiptsEnabled
+            && !(serverAskShown || serverReadShown) {
+            receiptChip
+        }
+    }
+
     private var categoryBadge: some View {
         HStack(spacing: 5) {
             Circle()
                 .fill(categoryColor)
-                .frame(width: 7, height: 7)
+                .frame(width: categoryDot, height: categoryDot)
             Text(categoryLabel)
                 .font(.system(.caption2).weight(.semibold))
                 .foregroundColor(GM.textSecondary)
+                .fixedSize(horizontal: badgeFixed, vertical: true)
         }
         .padding(.horizontal, 9)
         .padding(.vertical, 5)
@@ -249,13 +349,13 @@ struct MailSmartPanelView: View {
     }
 
     private var categoryLabel: String {
-        guard let decision else { return "GENERAL" }
+        guard let decision else { return String(localized: "GENERAL", comment: "Message category badge") }
         switch decision.category {
-        case .people: return decision.priority ? "PEOPLE - PRIORITY" : "PEOPLE"
-        case .transactions: return "TRANSACTIONS"
-        case .notices: return "NOTICES"
-        case .newsletters: return "NEWSLETTERS"
-        case .general: return "GENERAL"
+        case .people: return decision.priority ? String(localized: "PEOPLE - PRIORITY", comment: "Message category badge") : String(localized: "PEOPLE", comment: "Message category badge")
+        case .transactions: return String(localized: "TRANSACTIONS", comment: "Message category badge")
+        case .notices: return String(localized: "NOTICES", comment: "Message category badge")
+        case .newsletters: return String(localized: "NEWSLETTERS", comment: "Message category badge")
+        case .general: return String(localized: "GENERAL", comment: "Message category badge")
         }
     }
 
@@ -283,12 +383,15 @@ struct MailSmartPanelView: View {
                     .font(.system(.caption2))
                 Text("Prioritize")
                     .font(.system(.caption2).weight(.medium))
+                    .fixedSize(horizontal: badgeFixed, vertical: true)
             }
             .foregroundColor(GM.textSecondary)
             .padding(.horizontal, 9)
             .padding(.vertical, 5)
             .background(GM.softFill)
             .clipShape(Capsule())
+            .frame(minHeight: 44)
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
     }
@@ -301,6 +404,7 @@ struct MailSmartPanelView: View {
                         .font(.system(.caption2))
                     Text("Receipt noted")
                         .font(.system(.caption2).weight(.medium))
+                        .fixedSize(horizontal: badgeFixed, vertical: true)
                 }
                 .foregroundColor(GM.successInk)
                 .padding(.horizontal, 9)
@@ -317,12 +421,15 @@ struct MailSmartPanelView: View {
                             .font(.system(.caption2))
                         Text("Mark acknowledged")
                             .font(.system(.caption2).weight(.medium))
+                            .fixedSize(horizontal: badgeFixed, vertical: true)
                     }
                     .foregroundColor(GM.textSecondary)
                     .padding(.horizontal, 9)
                     .padding(.vertical, 5)
                     .background(GM.softFill)
                     .clipShape(Capsule())
+                    .frame(minHeight: 44)
+                    .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
             }
@@ -352,6 +459,7 @@ struct MailSmartPanelView: View {
             Text("Computed on this device - nothing sent anywhere.")
                 .font(.system(.caption2))
                 .foregroundColor(GM.textTertiary)
+                .fixedSize(horizontal: false, vertical: true)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(10)
@@ -365,7 +473,12 @@ struct MailSmartPanelView: View {
                 .font(.system(.caption))
                 .foregroundColor(GM.warning)
             VStack(alignment: .leading, spacing: 2) {
-                Text("\(scan?.trackerCount ?? 0) tracker \(scan?.trackerCount ?? 0 == 1 ? "pixel" : "pixels") blocked - \(scan?.remoteImageCount ?? 0) remote images held")
+                // A whole sentence per count, not a "pixel"/"pixels" word
+                // spliced into the middle of a translated sentence.
+                let trackers = scan?.trackerCount ?? 0
+                let remote = scan?.remoteImageCount ?? 0
+                Text(trackers == 1 ? String(localized: "1 tracker pixel blocked - \(remote) remote images held")
+                                   : String(localized: "\(trackers) tracker pixels blocked - \(remote) remote images held"))
                     .font(.system(.caption).weight(.medium))
                     .foregroundColor(GM.textPrimary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -408,6 +521,8 @@ struct MailSmartPanelView: View {
                             .padding(.vertical, 6)
                             .background(GM.softFill)
                             .clipShape(Capsule())
+                            .frame(minHeight: 44)
+                            .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
                     }
@@ -461,6 +576,19 @@ struct UrlWarningSheet: View {
     }
 
     var body: some View {
+        // As designed when it fits (buttons pinned to the bottom); scrolls when
+        // the text size or a short window (landscape, Split View, Stage
+        // Manager) leaves less height than the warning needs.
+        ViewThatFits(in: .vertical) {
+            content(pinButtons: true)
+            ScrollView {
+                content(pinButtons: false)
+            }
+        }
+        .gmMaxWidth(GMLayout.form)
+    }
+
+    @ViewBuilder private func content(pinButtons: Bool) -> some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack(spacing: 8) {
                 Image(systemName: "exclamationmark.shield.fill")
@@ -468,6 +596,7 @@ struct UrlWarningSheet: View {
                 Text(verdict.risk == .high ? "High-risk link" : "Open with care")
                     .font(.system(.body).weight(.semibold))
                     .foregroundColor(GM.textPrimary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             VStack(alignment: .leading, spacing: 4) {
                 Text("The button pointed at")
@@ -476,6 +605,7 @@ struct UrlWarningSheet: View {
                 Text(verdict.displayHost)
                     .font(.system(.footnote).weight(.medium))
                     .foregroundColor(GM.textPrimary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             if !verdict.reasons.isEmpty {
                 VStack(alignment: .leading, spacing: 6) {
@@ -495,7 +625,7 @@ struct UrlWarningSheet: View {
                 .font(.system(.caption2))
                 .foregroundColor(GM.textTertiary)
                 .lineLimit(3)
-            Spacer(minLength: 0)
+            if pinButtons { Spacer(minLength: 0) }
             VStack(spacing: 8) {
                 if onOpen != nil {
                     Button {
@@ -504,6 +634,7 @@ struct UrlWarningSheet: View {
                     } label: {
                         Text("Open anyway")
                             .font(.system(.subheadline).weight(.semibold))
+                            .multilineTextAlignment(.center)
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 12)
                             .foregroundColor(.white)
@@ -517,6 +648,7 @@ struct UrlWarningSheet: View {
                 } label: {
                     Text("Not now")
                         .font(.system(.subheadline).weight(.medium))
+                        .multilineTextAlignment(.center)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 12)
                         .foregroundColor(GM.textSecondary)
@@ -552,6 +684,7 @@ struct MailMagicSearchField: View {
                 }
                 .font(.system(.footnote).weight(.semibold))
                 .foregroundColor(text.isEmpty ? GM.textTertiary : GM.primarySolid)
+                .fixedSize()
                 .disabled(text.isEmpty)
             }
             .padding(.horizontal, 12)
@@ -579,8 +712,8 @@ struct MailMagicSearchField: View {
     private func apply() {
         let parsed = NaturalSearch.parse(text)
         note = parsed.isEmpty
-            ? "Nothing structured recognized - this runs as plain search."
-            : "Understood: \(parsed.explanation)"
+            ? String(localized: "Nothing structured recognized - this runs as plain search.")
+            : String(localized: "Understood: \(parsed.explanation)")
         onApply(parsed)
     }
 }
@@ -596,39 +729,27 @@ struct MailComposeTools: View {
     // The rewrite battery ran ten-plus regexes over the whole draft on every
     // keystroke. Now it waits for the typing to settle and computes once.
     @State private var rewrites: [RewriteSuggestion] = []
+    /// Settings → On-device intelligence: off hides Rewrite (Android hides its
+    /// compose assist row behind the same switch). Templates and the
+    /// reminder are the person's own tools and stay.
+    @AppStorage(MailFeaturePrefs.smartFeaturesKey) private var smartFeatures = true
 
     var body: some View {
-        HStack(spacing: 8) {
-            Menu {
-                ForEach(ComposeAssistant.templates, id: \.name) { template in
-                    Button(template.name) {
-                        subject = template.subject
-                        draft = template.body
-                    }
-                }
-            } label: {
-                chip("Templates", icon: "doc.text", active: false)
+        // One row as designed when it fits; at the larger text sizes or in a
+        // narrow window the chips scroll sideways instead of being squeezed.
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 8) {
+                chips
+                Spacer(minLength: 0)
             }
-            if !rewrites.isEmpty {
-                Menu {
-                    ForEach(rewrites, id: \.title) { suggestion in
-                        Button(suggestion.title) {
-                            draft = suggestion.text
-                        }
-                    }
-                } label: {
-                    chip("Rewrite", icon: "wand.and.stars", active: false)
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    chips
                 }
             }
-            Button {
-                remindIfNoReply.toggle()
-                UserDefaults.standard.set(remindIfNoReply, forKey: "gm.pendingFollowUp")
-            } label: {
-                chip(remindIfNoReply ? "Reminder on" : "Remind me", icon: "bell", active: remindIfNoReply)
-            }
-            .buttonStyle(.plain)
-            Spacer(minLength: 0)
         }
+        // Compose's own width on wide windows, wherever it is placed.
+        .gmMaxWidth(GMLayout.compose)
         .task(id: draft) {
             guard draft.count >= 24 else { rewrites = []; return }
             try? await Task.sleep(nanoseconds: 400_000_000)
@@ -637,12 +758,45 @@ struct MailComposeTools: View {
         }
     }
 
-    private func chip(_ label: String, icon: String, active: Bool) -> some View {
+    @ViewBuilder private var chips: some View {
+        Menu {
+            ForEach(ComposeAssistant.templates, id: \.name) { template in
+                Button(template.name) {
+                    subject = template.subject
+                    draft = template.body
+                }
+            }
+        } label: {
+            chip("Templates", icon: "doc.text", active: false)
+        }
+        if smartFeatures && !rewrites.isEmpty {
+            Menu {
+                ForEach(rewrites, id: \.title) { suggestion in
+                    Button(suggestion.title) {
+                        draft = suggestion.text
+                    }
+                }
+            } label: {
+                chip("Rewrite", icon: "wand.and.stars", active: false)
+            }
+        }
+        Button {
+            remindIfNoReply.toggle()
+            UserDefaults.standard.set(remindIfNoReply, forKey: "gm.pendingFollowUp")
+        } label: {
+            chip(remindIfNoReply ? "Reminder on" : "Remind me", icon: "bell", active: remindIfNoReply)
+        }
+        .buttonStyle(.plain)
+    }
+
+    /// A key: every caller passes a literal (one a ternary of two).
+    private func chip(_ label: LocalizedStringKey, icon: String, active: Bool) -> some View {
         HStack(spacing: 5) {
             Image(systemName: icon)
                 .font(.system(.caption2).weight(.semibold))
             Text(label)
                 .font(.system(.caption).weight(.medium))
+                .fixedSize()
         }
         .foregroundColor(active ? .white : GM.textPrimary)
         .padding(.horizontal, 10)
@@ -650,17 +804,27 @@ struct MailComposeTools: View {
         .background(active ? GM.primarySolid : GM.softFill)
         .clipShape(Capsule())
         .overlay(Capsule().stroke(active ? Color.clear : GM.border, lineWidth: 1))
+        // A 44 pt target around the visible chip.
+        .frame(minHeight: 44)
+        .contentShape(Rectangle())
     }
 }
 
 // MARK: - Settings section (F12, F16, F24, F26)
 
 struct MailFeatureSettingsSection: View {
+    /// Android's "On-device intelligence" switch (`smartFeaturesEnabled`).
+    /// Bound through @AppStorage on the same key, so every surface that reads
+    /// it the same way (inbox chips, Good morning card, reader, compose)
+    /// redraws the moment it flips.
+    @AppStorage(MailFeaturePrefs.smartFeaturesKey) private var smartFeatures = true
     @State private var readReceipts = MailFeaturePrefs.shared.readReceiptsEnabled
     @State private var trackerShield = MailFeaturePrefs.shared.trackerShieldEnabled
     @State private var remoteImages = MailFeaturePrefs.shared.allowRemoteImages
     @State private var showFollowUps = false
     @State private var showImport = false
+    /// Icon column of the two navigation rows (20 pt at the default text size).
+    @ScaledMetric(relativeTo: .subheadline) private var iconColumn: CGFloat = 20
 
     private var waitingCount: Int {
         MailFeaturePrefs.shared.awaitingReplies.count
@@ -668,25 +832,41 @@ struct MailFeatureSettingsSection: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
+            // Choose your swipes (SwipePreferences.swift): per device, read by
+            // the mailbox list's MailSwipeRow. Here because this section is the
+            // one Mail settings (MailPrefsView) composes for on-device behaviour.
+            SwipeActionsSettingsSection()
+                .padding(.top, 12)
+                .padding(.bottom, 8)
+
             Text("MAIL INTELLIGENCE")
                 .font(.system(.caption2).weight(.semibold))
                 .tracking(0.8)
                 .foregroundColor(GM.textTertiary)
 
             VStack(spacing: 12) {
+                // First in the section, as on Android (MailFeatureCards.kt):
+                // categories, the thread digest, action cards, smart replies
+                // and the compose rewrite all run on this device, and this
+                // one switch turns them off together.
+                MailFeatureSwitchRow(
+                    title: String(localized: "On-device intelligence"),
+                    subtitle: String(localized: "Categories, summaries and replies stay on this device"),
+                    isOn: $smartFeatures)
                 // Nothing is ever sent to the sender, so the row says so: the old
                 // "Read receipts" name promised a receipt that does not exist.
                 MailFeatureSwitchRow(
-                    title: "Opened-mail markers",
-                    subtitle: "When a message asks for a read receipt, let me mark it acknowledged on this device. Nothing is sent to the sender.",
+                    title: String(localized: "Opened-mail markers"),
+                    subtitle: String(localized: "When a message asks for a read receipt, let me mark it acknowledged on this device. Nothing is sent to the sender."),
                     isOn: receiptsBinding)
+                ReadReceiptModeSetting()
                 MailFeatureSwitchRow(
-                    title: "Tracker shield",
-                    subtitle: "Count and flag tracking pixels before a message loads anything.",
+                    title: String(localized: "Tracker shield"),
+                    subtitle: String(localized: "Count and flag tracking pixels before a message loads anything."),
                     isOn: shieldBinding)
                 MailFeatureSwitchRow(
-                    title: "Load remote images",
-                    subtitle: "On loads images as a message opens, which tells senders when you read it. Off waits until you tap Show images.",
+                    title: String(localized: "Load remote images"),
+                    subtitle: String(localized: "On loads images as a message opens, which tells senders when you read it. Off waits until you tap Show images."),
                     isOn: imagesBinding)
             }
 
@@ -731,24 +911,29 @@ struct MailFeatureSettingsSection: View {
         })
     }
 
-    private func settingsButton(title: String, detail: String, icon: String, action: @escaping () -> Void) -> some View {
+    /// Keys: both callers pass literals (the detail a ternary of two).
+    private func settingsButton(title: LocalizedStringKey, detail: LocalizedStringKey, icon: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             HStack(spacing: 10) {
                 Image(systemName: icon)
                     .font(.system(.subheadline))
                     .foregroundColor(GM.textSecondary)
-                    .frame(width: 20)
+                    .frame(width: iconColumn)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(title)
                         .font(.system(.subheadline).weight(.medium))
                         .foregroundColor(GM.textPrimary)
+                        .fixedSize(horizontal: false, vertical: true)
                     Text(detail)
                         .font(.system(.caption))
                         .foregroundColor(GM.textSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
                 Spacer(minLength: 0)
                 Image(systemName: "chevron.right")
                     .font(.system(.caption).weight(.semibold))
+                    // A forward chevron points the other way in right-to-left layouts.
+                    .flipsForRightToLeftLayoutDirection(true)
                     .foregroundColor(GM.textTertiary)
             }
             .padding(.vertical, 6)
@@ -775,6 +960,7 @@ private struct MailFollowUpItem: Identifiable {
 struct FollowUpCenterSheet: View {
     let onClose: () -> Void
 
+    @Environment(\.dynamicTypeSize) private var dts
     @State private var revision = 0
 
     private var waiting: [MailFollowUpItem] {
@@ -798,41 +984,25 @@ struct FollowUpCenterSheet: View {
                 .foregroundColor(GM.primarySolid)
             }
             if waiting.isEmpty {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("Nothing is waiting on a reply.")
-                        .font(.system(.subheadline))
-                        .foregroundColor(GM.textSecondary)
-                    Text("Turn on the reminder in a reply, and every thread you are waiting on shows up here.")
-                        .font(.system(.caption))
-                        .foregroundColor(GM.textTertiary)
-                        .fixedSize(horizontal: false, vertical: true)
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Nothing is waiting on a reply.")
+                            .font(.system(.subheadline))
+                            .foregroundColor(GM.textSecondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                        Text("Turn on the reminder in a reply, and every thread you are waiting on shows up here.")
+                            .font(.system(.caption))
+                            .foregroundColor(GM.textTertiary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
+                .scrollDisabledIfAvailable()
             } else {
                 ScrollView {
                     VStack(spacing: 10) {
                         ForEach(waiting) { item in
-                            HStack(alignment: .center, spacing: 10) {
-                                VStack(alignment: .leading, spacing: 3) {
-                                    Text(item.title)
-                                        .font(.system(.subheadline).weight(.medium))
-                                        .foregroundColor(GM.textPrimary)
-                                        .lineLimit(1)
-                                    Text("Waiting since \(Self.format(item.since))")
-                                        .font(.system(.caption))
-                                        .foregroundColor(GM.textSecondary)
-                                }
-                                Spacer(minLength: 8)
-                                Button("Done") {
-                                    MailFeaturePrefs.shared.clearAwaitingReply(threadId: item.id)
-                                    revision += 1
-                                }
-                                .font(.system(.footnote).weight(.semibold))
-                                .foregroundColor(GM.primarySolid)
-                            }
-                            .padding(12)
-                            .background(GM.cardAlt)
-                            .clipShape(RoundedRectangle(cornerRadius: GMShape.small, style: .continuous))
+                            followUpRow(item)
                         }
                     }
                 }
@@ -840,6 +1010,47 @@ struct FollowUpCenterSheet: View {
             Spacer(minLength: 0)
         }
         .padding(20)
+        .gmMaxWidth(GMLayout.form)
+    }
+
+    @ViewBuilder private func followUpRow(_ item: MailFollowUpItem) -> some View {
+        let text = VStack(alignment: .leading, spacing: 3) {
+            Text(item.title)
+                .font(.system(.subheadline).weight(.medium))
+                .foregroundColor(GM.textPrimary)
+                .lineLimit(dts.isAccessibilitySize ? 3 : 1)
+            Text("Waiting since \(Self.format(item.since))")
+                .font(.system(.caption))
+                .foregroundColor(GM.textSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        let done = Button("Done") {
+            MailFeaturePrefs.shared.clearAwaitingReply(threadId: item.id)
+            revision += 1
+        }
+        .font(.system(.footnote).weight(.semibold))
+        .foregroundColor(GM.primarySolid)
+
+        Group {
+            if dts.isAccessibilitySize {
+                // Title, date and the button on their own lines: side by side
+                // they leave the title a word or two at the largest sizes.
+                VStack(alignment: .leading, spacing: 8) {
+                    text
+                    done.frame(minHeight: 44)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            } else {
+                HStack(alignment: .center, spacing: 10) {
+                    text
+                    Spacer(minLength: 8)
+                    done
+                }
+            }
+        }
+        .padding(12)
+        .background(GM.cardAlt)
+        .clipShape(RoundedRectangle(cornerRadius: GMShape.small, style: .continuous))
     }
 
     private static func format(_ date: Date) -> String {
@@ -850,16 +1061,54 @@ struct FollowUpCenterSheet: View {
     }
 }
 
+private extension View {
+    /// The empty follow-up note sits in a scroll view only so it can never be
+    /// clipped at the accessibility sizes; it should not bounce when it fits.
+    @ViewBuilder func scrollDisabledIfAvailable() -> some View {
+        if #available(iOS 16.4, *) {
+            self.scrollBounceBehavior(.basedOnSize)
+        } else {
+            self
+        }
+    }
+}
+
 // MARK: - Import assistant (F26)
 
 struct MailImportSheet: View {
     let onClose: () -> Void
 
+    @Environment(\.dynamicTypeSize) private var dts
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
     @State private var raw = ""
     @State private var findings: [String] = []
     @State private var checked = false
+    /// The paste box (140 pt tall at the default text size).
+    @ScaledMetric(relativeTo: .footnote) private var editorHeight: CGFloat = 140
+
+    /// At the accessibility sizes, or in a short window (landscape phone,
+    /// keyboard up), the whole sheet scrolls so "Check the paste" stays
+    /// reachable; otherwise it keeps the designed layout with the findings
+    /// scrolling on their own.
+    private var scrollsWhole: Bool {
+        dts.isAccessibilitySize || verticalSizeClass == .compact
+    }
 
     var body: some View {
+        Group {
+            if scrollsWhole {
+                ScrollView {
+                    content
+                }
+                .scrollDismissesKeyboard(.interactively)
+            } else {
+                content
+            }
+        }
+        .gmMaxWidth(GMLayout.form)
+    }
+
+    private var content: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Text("Import assistant")
@@ -878,7 +1127,7 @@ struct MailImportSheet: View {
                 .fixedSize(horizontal: false, vertical: true)
             TextEditor(text: $raw)
                 .font(.system(.footnote))
-                .frame(minHeight: 140)
+                .frame(minHeight: verticalSizeClass == .compact ? min(editorHeight, 100) : editorHeight)
                 .padding(8)
                 .background(GM.inputFill)
                 .clipShape(RoundedRectangle(cornerRadius: GMShape.input, style: .continuous))
@@ -888,6 +1137,7 @@ struct MailImportSheet: View {
             } label: {
                 Text("Check the paste")
                     .font(.system(.subheadline).weight(.semibold))
+                    .multilineTextAlignment(.center)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 12)
                     .foregroundColor(.white)
@@ -902,28 +1152,34 @@ struct MailImportSheet: View {
                         .font(.system(.footnote))
                         .foregroundColor(GM.textTertiary)
                         .fixedSize(horizontal: false, vertical: true)
+                } else if scrollsWhole {
+                    findingsList
                 } else {
                     ScrollView {
-                        VStack(alignment: .leading, spacing: 6) {
-                            ForEach(findings, id: \.self) { line in
-                                HStack(alignment: .top, spacing: 8) {
-                                    Image(systemName: "checkmark.circle")
-                                        .font(.system(.caption))
-                                        .foregroundColor(GM.success)
-                                    Text(line)
-                                        .font(.system(.footnote))
-                                        .foregroundColor(GM.textPrimary)
-                                        .fixedSize(horizontal: false, vertical: true)
-                                }
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                            }
-                        }
+                        findingsList
                     }
                 }
             }
-            Spacer(minLength: 0)
+            if !scrollsWhole { Spacer(minLength: 0) }
         }
         .padding(20)
+    }
+
+    private var findingsList: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            ForEach(findings, id: \.self) { line in
+                HStack(alignment: .top, spacing: 8) {
+                    Image(systemName: "checkmark.circle")
+                        .font(.system(.caption))
+                        .foregroundColor(GM.success)
+                    Text(line)
+                        .font(.system(.footnote))
+                        .foregroundColor(GM.textPrimary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
     }
 
     static func inspect(_ text: String) -> [String] {
@@ -946,7 +1202,8 @@ struct MailImportSheet: View {
             }
             if upper.hasPrefix("END:VCARD") {
                 if inCard && !(name.isEmpty && email.isEmpty) {
-                    out.append(email.isEmpty ? name : "\(name.isEmpty ? "Contact" : name) - \(email)")
+                    let who = name.isEmpty ? String(localized: "Contact", comment: "Import finding: a contact card with no name") : name
+                    out.append(email.isEmpty ? name : String(localized: "\(who) - \(email)", comment: "Import finding: contact name, email"))
                 }
                 inCard = false
                 continue
@@ -959,7 +1216,8 @@ struct MailImportSheet: View {
             }
             if upper.hasPrefix("END:VEVENT") {
                 if inEvent && !event.isEmpty {
-                    out.append(when.isEmpty ? "Event: \(event)" : "Event: \(event) - \(when)")
+                    out.append(when.isEmpty ? String(localized: "Event: \(event)", comment: "Import finding: calendar event title")
+                                            : String(localized: "Event: \(event) - \(when)", comment: "Import finding: calendar event title, start"))
                 }
                 inEvent = false
                 continue

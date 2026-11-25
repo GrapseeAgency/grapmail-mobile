@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="identity_settings_appearance">Tampilan</string>
+    <string name="identity_match_wallpaper_title">Samakan dengan wallpaper</string>
+    <string name="identity_match_wallpaper_subtitle">Gunakan warna wallpaper Anda untuk tombol dan sorotan. Avatar, warna status, dan teks tetap warna GrapMail.</string>
+</resources>

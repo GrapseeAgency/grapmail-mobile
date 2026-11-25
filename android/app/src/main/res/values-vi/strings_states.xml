@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Loading / empty / error / offline states (ui/components/ScreenStates.kt and the
+     screens wired to it). Kept in its own file so the other string files, edited in
+     parallel, are untouched; prefix states_. Translated from values/strings_states.xml. -->
+<resources>
+    <string name="states_loading">Đang tải…</string>
+    <string name="states_offline_banner">Bạn đang ngoại tuyến. Đang hiển thị nội dung tải gần nhất — mọi thao tác cần mạng sẽ chờ đến khi bạn kết nối lại.</string>
+    <string name="states_error_title">Đã xảy ra lỗi</string>
+    <string name="states_error_body">Hiện không tải được. Hãy kiểm tra kết nối và thử lại.</string>
+    <string name="states_error_offline_body">Bạn đang ngoại tuyến. Hãy kết nối Wi-Fi hoặc dữ liệu di động rồi thử lại.</string>
+    <string name="states_retry">Thử lại</string>
+    <string name="states_labels_loading">Đang tải nhãn…</string>
+    <string name="states_labels_failed_title">Không tải được nhãn</string>
+    <string name="states_scheduled_loading">Đang tải thư đã lên lịch…</string>
+    <string name="states_scheduled_failed_title">Không tải được thư đã lên lịch</string>
+    <string name="states_scheduled_empty_title">Không có thư nào được lên lịch</string>
+    <string name="states_contacts_loading">Đang thu thập người liên hệ từ thư của bạn…</string>
+    <string name="states_files_loading">Đang thu thập tệp đính kèm…</string>
+    <string name="states_providers_loading">Đang tải các hộp thư đã kết nối…</string>
+    <string name="states_thread_loading">Đang mở cuộc hội thoại này…</string>
+    <string name="states_activity_failed_title">Không tải được hoạt động</string>
+    <string name="states_sessions_failed_title">Không tải được phiên đăng nhập</string>
+</resources>

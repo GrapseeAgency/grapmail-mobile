@@ -1,9 +1,22 @@
 package com.grapsee.grapmail.ui.components
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateIntAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandHorizontally
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -33,39 +46,53 @@ import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.DoneAll
-import androidx.compose.material.icons.rounded.Label
+import androidx.compose.material.icons.automirrored.rounded.Label
 import androidx.compose.material.icons.rounded.MarkunreadMailbox
 import androidx.compose.material.icons.rounded.Mail
 import androidx.compose.material.icons.rounded.Menu
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.MoveToInbox
+import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.PersonAddAlt1
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Star
 import androidx.compose.material.icons.rounded.StarBorder
 import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.ContentCopy
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
+import com.grapsee.grapmail.R
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.grapsee.grapmail.data.MailMessageDto
-import com.grapsee.grapmail.ui.theme.GrapMailAvatarRampDark
-import com.grapsee.grapmail.ui.theme.GrapMailAvatarRampLight
+import com.grapsee.grapmail.ui.theme.AvatarInk
+import com.grapsee.grapmail.ui.theme.avatarColor
+import com.grapsee.grapmail.ui.theme.avatarFill
+import com.grapsee.grapmail.ui.theme.avatarInitials
 import com.grapsee.grapmail.ui.theme.LocalPalette
 import com.grapsee.grapmail.data.parseMailInstant
 import java.time.ZoneId
@@ -73,6 +100,7 @@ import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
 import java.util.Date
 import java.util.Locale
+import kotlinx.coroutines.launch
 
 /**
  * Mailbox vocabulary — the parts every mail screen is assembled from.
@@ -105,7 +133,9 @@ fun CountBadge(count: Int?, max: Int = 99, modifier: Modifier = Modifier) {
             .background(palette.softFill)
             .padding(horizontal = 7.dp, vertical = 1.dp),
     ) {
-        Text(label, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = palette.primarySolid)
+        // primaryText, not the filled-button cobalt: #2F66FF on the dark soft
+        // fill is ~3:1, under AA for 11 sp text; #8EA8FF passes (round8 §1.2).
+        Text(label, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = palette.primaryText)
     }
 }
 
@@ -239,68 +269,48 @@ fun urlHost(raw: String): String? {
 }
 
 /**
- * The ramp slot for a sender key.
+ * A sender's avatar (round8-spec §1.6): their GrapMail photo or verified brand
+ * logo when the server has one, GrapMail's initials disc otherwise.
  *
- * An explicit fold rather than `String.hashCode()`, for two reasons that are
- * both about the two apps disagreeing quietly:
+ * The disc colour is the shared slot `avatarColor` (ui/theme/AvatarColors.kt):
+ * FNV-1a 32-bit over the normalised address, mod 10, into GrapMail's own
+ * 10-hue palette. iOS and web implement the same function and assert the same
+ * vectors, so one sender wears one colour on every platform. It replaces the
+ * old `rampIndex` fold, whose slot the web never shared. The address is hashed
+ * rather than the name: two people called "Team" should not share a colour, and
+ * one person renaming themselves should not move. The name is the key only
+ * when the server never named an address.
  *
- *  - iOS masks its accumulator to 30 bits (`MailUI.tint`), and Java's hash is a
- *    signed 32-bit overflow. They land on different slots for the same address,
- *    so a sender would wear one colour on Android and another on iOS — visible
- *    in the screenshot pair for the very same message.
- *  - `abs(Int.MIN_VALUE)` is `Int.MIN_VALUE`: negating it does not make it
- *    positive, so the old `if (h < 0) (-h) % size` could index the list with a
- *    negative number and crash on one particular address. Keeping the
- *    accumulator masked means it is never negative and `%` is always safe.
+ * The initials come from the display name when there is one and from the
+ * address's local part when there is not. They never come from the address's
+ * first character, which would put every `@grapsee.com` sender under the same
+ * letter. Discs of 56 dp and up carry two letters when the name has two words.
+ * With no letter at all, the person glyph is drawn.
  *
- * Masking the low 30 bits after a 32-bit wrap gives the same value as taking
- * the modulo of the unwrapped product, which is why this matches iOS exactly —
- * and both iterate UTF-16 units, so a name with an emoji folds the same way on
- * each platform too.
- *
- * The size is a parameter rather than a reference to one list, because there are
- * now two lists — light and dark — and an index taken against the wrong one is an
- * out-of-bounds crash on a sender whose hash lands in the last two slots.
- */
-private fun rampIndex(key: String, size: Int): Int {
-    var h = 0
-    for (ch in key) h = (h * 31 + ch.code) and 0x3FFFFFFF
-    return h % size
-}
-
-/**
- * A sender's initial on a stable colour.
- *
- * The initial comes from the display name when there is one and from the
- * address when there is not — never from the address's first character, which
- * would render every `@grapsee.com` sender under the same letter.
+ * In a row the avatar is decorative (the row already announces the sender), so
+ * the disc exposes nothing to TalkBack.
  */
 @Composable
 fun SenderAvatar(display: String, address: String?, size: Dp = 40.dp, modifier: Modifier = Modifier) {
-    val initial = remember(display, address) {
-        val source = display.trim().ifBlank { (address ?: "").substringBefore("@") }
-        source.firstOrNull { !it.isWhitespace() }?.uppercaseChar()?.toString() ?: "?"
-    }
-    // Hash the address rather than the name: two people called "Team" should not
-    // share a colour, and one person renaming themselves should not move. The
-    // name is the fallback only when the server never named an address at all —
-    // iOS applies the same rule in `MailUI.tint`, and the same key has to produce
-    // the same slot on both.
-    //
+    val palette = LocalPalette.current
+    val twoLetters = size >= 56.dp
+    val initials = remember(display, address, twoLetters) { avatarInitials(display, address, twoLetters) }
     // The appearance is a `remember` key because the resolved colour depends on it:
-    // a disc that keeps its light-theme hue after the system flips to dark is the
-    // same defect as a text colour that does, only smaller.
-    val appearance = androidx.compose.foundation.isSystemInDarkTheme()
-    val tint = remember(address, display, appearance) {
-        val ramp = if (appearance) GrapMailAvatarRampDark else GrapMailAvatarRampLight
-        ramp[rampIndex((address ?: "").ifBlank { display }, ramp.size)]
+    // a disc that keeps its light-theme hue after the theme flips to dark is the
+    // same defect as a text colour that does, only smaller. It is read from the
+    // app's palette, so it follows the app theme rather than only the system's.
+    val appearance = palette.isDark
+    val fill = remember(address, display, appearance) {
+        avatarFill(avatarColor(address, display, appearance))
     }
-    // The sender's own photo when they are a GrapMail correspondent who set one
-    // (data/SenderPhotos.kt). The initial is drawn until it arrives and whenever
-    // there is none, so a slow or failed lookup looks exactly like before.
+    // The sender's own photo, or their brand (BIMI) logo, when the server has
+    // one (data/SenderPhotos.kt resolves both, logo on its plate). The disc is
+    // drawn at once and stays under the image, so a slow or failed lookup looks
+    // exactly like a sender with no picture.
     val context = androidx.compose.ui.platform.LocalContext.current
+    val firstPhoto = remember(address) { com.grapsee.grapmail.data.SenderPhotos.cached(address) }
     val photo by androidx.compose.runtime.produceState(
-        initialValue = remember(address) { com.grapsee.grapmail.data.SenderPhotos.cached(address) },
+        initialValue = firstPhoto,
         address,
     ) {
         val wanted = address?.trim().orEmpty()
@@ -308,24 +318,50 @@ fun SenderAvatar(display: String, address: String?, size: Dp = 40.dp, modifier: 
             value = com.grapsee.grapmail.data.SenderPhotos.photo(context, wanted)
         }
     }
+    val reduced = rememberMotionReduced()
+    // Sized from the disc, not the font scale: the disc does not grow with text
+    // either (§1.6.3), so the letters must not outgrow it.
+    val glyphSize = with(androidx.compose.ui.platform.LocalDensity.current) {
+        (size * (if (initials.size > 1) 0.36f else 0.42f)).toSp()
+    }
     Box(
-        modifier.size(size).clip(CircleShape).background(tint),
+        modifier
+            .size(size)
+            .clip(CircleShape)
+            .background(fill)
+            // Dark theme only: a 1 dp white-at-10% hairline so the disc separates
+            // from the card. Transparent in light.
+            .border(1.dp, palette.avatarRing, CircleShape)
+            .clearAndSetSemantics { },
         contentAlignment = Alignment.Center,
     ) {
+        if (initials.isEmpty()) {
+            Icon(Icons.Rounded.Person, contentDescription = null, tint = AvatarInk, modifier = Modifier.size(size * 0.5f))
+        } else {
+            Text(
+                initials.joinToString(""),
+                fontSize = glyphSize,
+                fontWeight = FontWeight.SemiBold,
+                color = AvatarInk,
+                maxLines = 1,
+                softWrap = false,
+            )
+        }
         val image = photo
         if (image != null) {
+            // A picture that arrives after the first frame crossfades in over the
+            // disc (150 ms). One already decoded for the first frame, or any
+            // picture under reduced motion, simply appears.
+            val fadeIn = !reduced && image !== firstPhoto
+            val photoAlpha = remember(image) { Animatable(if (fadeIn) 0f else 1f) }
+            LaunchedEffect(image) {
+                if (fadeIn) photoAlpha.animateTo(1f, tween(GMMotion.ShortMs, easing = GMMotion.Standard))
+            }
             androidx.compose.foundation.Image(
                 bitmap = image,
                 contentDescription = null,
                 contentScale = androidx.compose.ui.layout.ContentScale.Crop,
-                modifier = Modifier.size(size).clip(CircleShape),
-            )
-        } else {
-            Text(
-                initial,
-                fontSize = (size.value * 0.42f).sp,
-                fontWeight = FontWeight.SemiBold,
-                color = Color.White,
+                modifier = Modifier.size(size).clip(CircleShape).graphicsLayer { alpha = photoAlpha.value },
             )
         }
     }
@@ -340,8 +376,12 @@ fun SenderAvatar(display: String, address: String?, size: Dp = 40.dp, modifier: 
  * Returns null when there is no trustworthy instant to show. A row that cannot
  * know when the message arrived shows no time rather than a plausible one — the
  * list is sorted by time, so an invented timestamp would also invent the order.
+ *
+ * `yesterday` is the word drawn for yesterday's mail; composable callers pass
+ * the localized `R.string.mail_time_yesterday`. The default is the English
+ * text, for callers outside composition.
  */
-fun mailTime(iso: String?, now: Date = Date()): String? {
+fun mailTime(iso: String?, now: Date = Date(), yesterday: String = "Yesterday"): String? {
     if (iso.isNullOrBlank()) return null
     // Mail settings → time zone and date format, when the account chose them;
     // the device's own otherwise. Read as snapshot state, so a row redraws the
@@ -350,14 +390,14 @@ fun mailTime(iso: String?, now: Date = Date()): String? {
     val dateFormat = com.grapsee.grapmail.data.MailDisplayPrefs.dateFormat
     val locale = Locale.getDefault(Locale.Category.FORMAT)
     val today = now.toInstant().atZone(zone).toLocalDate()
-    val cacheKey = "${zone.id}|${locale.toLanguageTag()}|$dateFormat|$today|$iso"
+    val cacheKey = "${zone.id}|${locale.toLanguageTag()}|$dateFormat|$today|$yesterday|$iso"
     formattedMailTimes.get(cacheKey)?.let { return it }
 
     val then = parseMailInstant(iso)?.atZone(zone) ?: return null
     val date = then.toLocalDate()
     val formatted = when {
         date == today -> shortMailTime.withLocale(locale).format(then)
-        date == today.minusDays(1) -> "Yesterday"
+        date == today.minusDays(1) -> yesterday
         date.year == today.year -> sameYearDate(dateFormat).withLocale(locale).format(then)
         else -> olderDate(dateFormat).withLocale(locale).format(then)
     }
@@ -421,9 +461,23 @@ fun MessageRow(
     onStar: () -> Unit,
     selecting: Boolean,
     modifier: Modifier = Modifier,
+    /**
+     * The one-time sign-in code the list found in this row (CodeFinder, last
+     * 60 minutes, never sealed mail — MailDigest in MorningCard.kt decides),
+     * or null. Drawn as a "Copy 482913" chip beside the preview; hidden with
+     * the preview (compact density) and while picking rows.
+     */
+    signInCode: String? = null,
 ) {
     val palette = LocalPalette.current
     val compact = com.grapsee.grapmail.data.MailDisplayPrefs.compact
+    val reduced = rememberMotionReduced()
+    // Keyed by the message, so the row's small animations only ever answer a
+    // change to THIS message (read, starred) and never a row slot being
+    // handed a different message.
+    key(message.id) {
+    val senderWeight = easedWeight(message.isRead, FontWeight.Medium, FontWeight.SemiBold, reduced)
+    val subjectWeight = easedWeight(message.isRead, FontWeight.Normal, FontWeight.Medium, reduced)
     Row(
         modifier
             .fillMaxWidth()
@@ -458,9 +512,9 @@ fun MessageRow(
         Column(Modifier.weight(1f)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    message.from?.display?.takeIf { it.isNotBlank() } ?: "Unknown sender",
+                    message.from?.display?.takeIf { it.isNotBlank() } ?: stringResource(R.string.mail_unknown_sender),
                     fontSize = 15.sp,
-                    fontWeight = if (message.isRead) FontWeight.Medium else FontWeight.SemiBold,
+                    fontWeight = senderWeight,
                     color = palette.textPrimary,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -475,12 +529,19 @@ fun MessageRow(
             Text(
                 message.subjectOrNone,
                 fontSize = 14.sp,
-                fontWeight = if (message.isRead) FontWeight.Normal else FontWeight.Medium,
+                fontWeight = subjectWeight,
                 color = palette.textPrimary,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.padding(top = 3.dp),
             )
+            // The code chip: only where the preview itself is shown, never on
+            // sealed mail, never while picking (a tap there selects). At large
+            // text it moves under the preview instead of squeezing it.
+            val chipCode = signInCode?.takeIf {
+                !compact && !selecting && !message.isE2eEncrypted && !message.snippet.isNullOrBlank()
+            }
+            val chipStacked = androidx.compose.ui.platform.LocalDensity.current.fontScale >= 1.3f
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 2.dp)) {
                 if (!compact && !message.snippet.isNullOrBlank()) {
                     Text(
@@ -492,20 +553,30 @@ fun MessageRow(
                         modifier = Modifier.weight(1f, fill = false),
                     )
                 }
-                if (message.isE2eEncrypted) {
-                    Text(" · encrypted", fontSize = 11.sp, color = palette.successInk, maxLines = 1)
+                if (chipCode != null && !chipStacked) {
+                    Spacer(Modifier.width(6.dp))
+                    SignInCodeChip(chipCode)
                 }
+                if (message.isE2eEncrypted) {
+                    Text(stringResource(R.string.mail_row_encrypted_suffix), fontSize = 11.sp, color = palette.successInk, maxLines = 1)
+                }
+                // Server read-receipt status, present only on sent-list rows (routes/grapmail-sent-receipts.ts).
+                if (message.direction == "outbound" && message.readReceiptStatus == "read") {
+                    Text(stringResource(R.string.mail_row_receipt_read_suffix), fontSize = 11.sp, color = palette.successInk, maxLines = 1)
+                } else if (message.direction == "outbound" && message.readReceiptStatus == "requested") {
+                    Text(stringResource(R.string.mail_row_receipt_requested_suffix), fontSize = 11.sp, color = palette.textTertiary, maxLines = 1)
+                }
+            }
+            if (chipCode != null && chipStacked) {
+                SignInCodeChip(chipCode, Modifier.padding(top = 6.dp))
             }
         }
 
         Spacer(Modifier.width(8.dp))
         Column(horizontalAlignment = Alignment.End) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                if (!message.isRead) {
-                    Box(Modifier.size(6.dp).clip(CircleShape).background(palette.primarySolid))
-                    Spacer(Modifier.width(5.dp))
-                }
-                val time = mailTime(message.createdAt)
+                UnreadDot(unread = !message.isRead, reduced = reduced)
+                val time = mailTime(message.createdAt, yesterday = stringResource(R.string.mail_time_yesterday))
                 if (time != null) {
                     Text(time, fontSize = 12.sp, color = palette.textTertiary, maxLines = 1)
                 }
@@ -513,7 +584,7 @@ fun MessageRow(
             Spacer(Modifier.height(6.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
                 if (message.hasAttachments) {
-                    Icon(Icons.Rounded.AttachFile, "Has attachments", tint = palette.textTertiary,
+                    Icon(Icons.Rounded.AttachFile, stringResource(R.string.mail_row_has_attachments), tint = palette.textTertiary,
                         modifier = Modifier.size(15.dp))
                     Spacer(Modifier.width(5.dp))
                 }
@@ -521,16 +592,169 @@ fun MessageRow(
                     onClick = onStar,
                     modifier = Modifier.size(48.dp),
                 ) {
-                    Icon(
-                        if (message.isStarred) Icons.Rounded.Star else Icons.Rounded.StarBorder,
-                        if (message.isStarred) "Unstar" else "Star",
-                        tint = if (message.isStarred) palette.star else palette.textSecondary,
-                        modifier = Modifier.size(19.dp),
+                    AnimatedStarIcon(
+                        starred = message.isStarred,
+                        contentDescription = if (message.isStarred) stringResource(R.string.mail_action_unstar)
+                            else stringResource(R.string.mail_action_star),
+                        reduced = reduced,
                     )
                 }
             }
         }
     }
+    }
+}
+
+/**
+ * "Copy 482913" — one tap puts the code on the clipboard (marked sensitive,
+ * MailFeatureIntents.copySensitiveCode), plays a confirm haptic and turns the
+ * chip into "Code copied" for a moment. It consumes its own tap, so the
+ * email does not open. TalkBack hears "Copy sign-in code", never the code,
+ * and then "Code copied" (polite live region). Grows with the text: the
+ * label never ellipsizes, and the row stacks it under the preview at large
+ * font sizes.
+ */
+@Composable
+private fun SignInCodeChip(code: String, modifier: Modifier = Modifier) {
+    val palette = LocalPalette.current
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val view = androidx.compose.ui.platform.LocalView.current
+    var copied by remember(code) { mutableStateOf(false) }
+    LaunchedEffect(copied) {
+        if (copied) {
+            kotlinx.coroutines.delay(1_800)
+            copied = false
+        }
+    }
+    val copyLabel = stringResource(R.string.mailbox_feat_code_copy, code)
+    val copyA11y = stringResource(R.string.mailbox_feat_code_copy_a11y)
+    val copiedLabel = stringResource(R.string.mailbox_feat_code_copied)
+    val clipLabel = stringResource(R.string.mailbox_feat_code_clip_label)
+    val ink = if (copied) palette.successInk else palette.primaryText
+    val shape = RoundedCornerShape(50)
+    Row(
+        modifier
+            .clip(shape)
+            .background(if (copied) palette.successChipBg else palette.primarySolid.copy(alpha = 0.10f))
+            .border(1.dp, ink.copy(alpha = 0.45f), shape)
+            .clickable(role = Role.Button, onClickLabel = copyA11y) {
+                if (com.grapsee.grapmail.ui.mailfeatures.MailFeatureIntents.copySensitiveCode(context, clipLabel, code)) {
+                    view.performHapticFeedback(
+                        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R)
+                            android.view.HapticFeedbackConstants.CONFIRM
+                        else android.view.HapticFeedbackConstants.VIRTUAL_KEY,
+                    )
+                    copied = true
+                }
+            }
+            .semantics {
+                contentDescription = if (copied) copiedLabel else copyA11y
+                liveRegion = androidx.compose.ui.semantics.LiveRegionMode.Polite
+            }
+            .heightIn(min = 32.dp)
+            .padding(horizontal = 10.dp, vertical = 4.dp)
+            .testTag("mail-row-code-chip"),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(
+            if (copied) Icons.Rounded.Check else Icons.Rounded.ContentCopy, null,
+            tint = ink, modifier = Modifier.size(14.dp),
+        )
+        Spacer(Modifier.width(5.dp))
+        Text(
+            if (copied) copiedLabel else copyLabel,
+            fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = ink,
+            maxLines = 1, softWrap = false,
+            modifier = Modifier.clearAndSetSemantics { },
+        )
+    }
+}
+
+/**
+ * The row's text weight, eased between read and unread instead of popping.
+ * Animates only when `read` changes; with reduced motion it is the plain value.
+ * On a font with only static weights the step lands mid-way, which is still
+ * softer than the old instant swap.
+ */
+@Composable
+private fun easedWeight(read: Boolean, readWeight: FontWeight, unreadWeight: FontWeight, reduced: Boolean): FontWeight {
+    val weight by animateIntAsState(
+        targetValue = if (read) readWeight.weight else unreadWeight.weight,
+        animationSpec = GMMotion.tween(reduced, GMMotion.MediumMs),
+        label = "rowWeight",
+    )
+    return FontWeight(weight.coerceIn(1, 1000))
+}
+
+/** The unread dot beside the time: fades and shrinks out when the message is read. */
+@Composable
+private fun UnreadDot(unread: Boolean, reduced: Boolean) {
+    val palette = LocalPalette.current
+    if (reduced) {
+        if (unread) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(Modifier.size(6.dp).clip(CircleShape).background(palette.primarySolid))
+                Spacer(Modifier.width(5.dp))
+            }
+        }
+        return
+    }
+    AnimatedVisibility(
+        visible = unread,
+        enter = fadeIn(tween(GMMotion.ShortMs, easing = GMMotion.Standard)) +
+            scaleIn(tween(GMMotion.MediumMs, easing = GMMotion.EmphasizedDecelerate), initialScale = 0.4f) +
+            expandHorizontally(tween(GMMotion.MediumMs, easing = GMMotion.Standard), expandFrom = Alignment.Start),
+        exit = fadeOut(tween(GMMotion.MediumMs, easing = GMMotion.Standard)) +
+            scaleOut(tween(GMMotion.MediumMs, easing = GMMotion.Standard), targetScale = 0.4f) +
+            shrinkHorizontally(tween(GMMotion.MediumMs, easing = GMMotion.Standard), shrinkTowards = Alignment.Start),
+        label = "unreadDot",
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.size(6.dp).clip(CircleShape).background(palette.primarySolid))
+            Spacer(Modifier.width(5.dp))
+        }
+    }
+}
+
+/**
+ * The row's star. Starring pops it 1 -> 1.3 -> 1 (120 ms out, a damped spring
+ * back) while the fill colour eases in; un-starring dips it gently to 0.85
+ * and back. Only a real toggle animates: the first composition, a theme
+ * change and reduced motion all just show the state.
+ */
+@Composable
+private fun AnimatedStarIcon(starred: Boolean, contentDescription: String, reduced: Boolean) {
+    val palette = LocalPalette.current
+    val tint = if (starred) palette.star else palette.textSecondary
+    val scale = remember { Animatable(1f) }
+    val colour = remember { androidx.compose.animation.Animatable(tint) }
+    var shown by remember { mutableStateOf(starred) }
+    LaunchedEffect(starred, tint) {
+        val toggled = shown != starred
+        shown = starred
+        if (!toggled || reduced) {
+            scale.snapTo(1f)
+            colour.snapTo(tint)
+            return@LaunchedEffect
+        }
+        launch { colour.animateTo(tint, tween(GMMotion.MediumMs, easing = GMMotion.Standard)) }
+        if (starred) {
+            scale.animateTo(1.3f, tween(120, easing = GMMotion.EmphasizedDecelerate))
+            scale.animateTo(1f, spring(dampingRatio = 0.6f, stiffness = Spring.StiffnessMedium))
+        } else {
+            scale.animateTo(0.85f, tween(110, easing = GMMotion.Standard))
+            scale.animateTo(1f, tween(170, easing = GMMotion.Standard))
+        }
+    }
+    Icon(
+        if (starred) Icons.Rounded.Star else Icons.Rounded.StarBorder,
+        contentDescription,
+        tint = colour.value,
+        modifier = Modifier.size(19.dp).graphicsLayer {
+            scaleX = scale.value
+            scaleY = scale.value
+        },
+    )
 }
 
 // ── header, tabs, chips ──────────────────────────────────────────────────────
@@ -608,6 +832,11 @@ fun BoxTab(
     badgeColor: Color,
     count: Int?,
     active: Boolean,
+    /**
+     * The word drawn on the tab. `title` stays the English box key, because the
+     * CI walk finds the tab by its `mail-box-tab-$title` tag in every locale.
+     */
+    label: String = title,
     onClick: () -> Unit,
 ) {
     val palette = LocalPalette.current
@@ -623,7 +852,7 @@ fun BoxTab(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(icon, null, tint = tint, modifier = Modifier.size(17.dp))
-        Text(title, color = palette.textPrimary, fontSize = 13.sp,
+        Text(label, color = palette.textPrimary, fontSize = 13.sp,
             fontWeight = FontWeight.Medium, softWrap = false, maxLines = 1)
         if (count != null && count > 0) {
             Text(
@@ -646,12 +875,13 @@ fun BoxTab(
 @Composable
 fun MailFab(onClick: () -> Unit, modifier: Modifier = Modifier, expanded: Boolean = true) {
     val palette = LocalPalette.current
+    val composeLabel = stringResource(R.string.mail_compose)
     Row(
         modifier
             .clip(RoundedCornerShape(24.dp))
             .background(palette.primarySolid)
             .clickable(role = Role.Button, onClick = onClick)
-            .semantics { contentDescription = "Compose" }
+            .semantics { contentDescription = composeLabel }
             .animateContentSize(alignment = Alignment.CenterEnd)
             .height(48.dp)
             .padding(horizontal = if (expanded) 20.dp else 14.dp),
@@ -660,7 +890,7 @@ fun MailFab(onClick: () -> Unit, modifier: Modifier = Modifier, expanded: Boolea
         Icon(Icons.Rounded.Edit, null, tint = palette.onPrimary, modifier = Modifier.size(20.dp))
         if (expanded) {
             Spacer(Modifier.width(10.dp))
-            Text("Compose", fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = palette.onPrimary)
+            Text(composeLabel, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = palette.onPrimary)
         }
     }
 }
@@ -674,12 +904,16 @@ fun ToolAction(icon: androidx.compose.ui.graphics.vector.ImageVector, label: Str
                modifier: Modifier = Modifier) {
     val palette = LocalPalette.current
     Column(
-        modifier.clickable(onClick = onClick).padding(horizontal = 12.dp, vertical = 8.dp),
+        modifier.clickable(role = Role.Button, onClick = onClick)
+            .heightIn(min = 48.dp)
+            .padding(horizontal = 12.dp, vertical = 8.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Icon(icon, null, tint = palette.textPrimary, modifier = Modifier.size(20.dp))
         Spacer(Modifier.height(4.dp))
-        Text(label, fontSize = 11.sp, color = palette.textPrimary)
+        // One line: the bar scrolls sideways when the actions outgrow it, so a
+        // long translation never wraps into a column of letters.
+        Text(label, fontSize = 11.sp, color = palette.textPrimary, maxLines = 1, softWrap = false)
     }
 }
 
@@ -711,25 +945,35 @@ fun SelectionToolbar(
 ) {
     val palette = LocalPalette.current
     Column(modifier.fillMaxWidth().background(palette.card)) {
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = 12.dp)) {
-            Icon(Icons.Rounded.Close, "Close selection", tint = palette.textPrimary,
-                modifier = Modifier.size(22.dp).clip(CircleShape).clickable(onClick = onClose).padding(4.dp))
-            Spacer(Modifier.width(12.dp))
-            Text("$count selected", fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = palette.textPrimary)
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = 4.dp)) {
+            // A real 48dp button: the bare 22dp glyph was too small a target.
+            androidx.compose.material3.IconButton(onClick = onClose) {
+                Icon(Icons.Rounded.Close, stringResource(R.string.mail_selection_close), tint = palette.textPrimary,
+                    modifier = Modifier.size(22.dp))
+            }
+            Spacer(Modifier.width(4.dp))
+            Text(pluralStringResource(R.plurals.mail_selection_count, count, count),
+                fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = palette.textPrimary,
+                maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
+        // Seven or eight actions do not fit a 320-360 dp phone (nor the list
+        // pane of the tablet layout): without the sideways scroll the last
+        // ones, More (snooze) among them, were squeezed to nothing.
         Row(
-            Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 4.dp),
+            Modifier.fillMaxWidth()
+                .horizontalScroll(rememberScrollState())
+                .padding(horizontal = 4.dp, vertical = 4.dp),
             horizontalArrangement = Arrangement.spacedBy(2.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            ToolAction(Icons.Rounded.Archive, "Archive", onArchive)
-            ToolAction(Icons.Rounded.Delete, "Delete", onDelete)
-            ToolAction(Icons.Rounded.MoveToInbox, "Move", onMove)
-            ToolAction(Icons.Rounded.Label, "Label", onLabel)
-            ToolAction(Icons.Rounded.DoneAll, "Mark read", onMarkRead)
-            ToolAction(Icons.Rounded.MarkunreadMailbox, "Mark unread", onMarkUnread)
-            onSender?.let { ToolAction(Icons.Rounded.PersonAddAlt1, "Sender", it) }
-            ToolAction(Icons.Rounded.MoreVert, "More", onMore)
+            ToolAction(Icons.Rounded.Archive, stringResource(R.string.mail_action_archive), onArchive)
+            ToolAction(Icons.Rounded.Delete, stringResource(R.string.mail_action_delete), onDelete)
+            ToolAction(Icons.Rounded.MoveToInbox, stringResource(R.string.mail_action_move), onMove)
+            ToolAction(Icons.AutoMirrored.Rounded.Label, stringResource(R.string.mail_action_label), onLabel)
+            ToolAction(Icons.Rounded.DoneAll, stringResource(R.string.mail_action_mark_read), onMarkRead)
+            ToolAction(Icons.Rounded.MarkunreadMailbox, stringResource(R.string.mail_action_mark_unread), onMarkUnread)
+            onSender?.let { ToolAction(Icons.Rounded.PersonAddAlt1, stringResource(R.string.mail_action_sender), it) }
+            ToolAction(Icons.Rounded.MoreVert, stringResource(R.string.mail_action_more), onMore)
         }
     }
 }
@@ -755,36 +999,53 @@ fun MailStateBlock(
     filtered: Boolean = false,
     boxTitle: String,
     onRetry: () -> Unit,
+    /**
+     * The box's name as drawn in the sentences below. `boxTitle` stays the
+     * English key (the Inbox welcome is chosen by it); callers pass the
+     * localized name here.
+     */
+    boxLabel: String = boxTitle,
+    /**
+     * The Inbox Zero moment (ui/mailfeatures/InboxZero.kt), drawn instead of
+     * the welcome line when the unfiltered Inbox is empty. The caller passes
+     * it only after a successful, online load; null keeps the old state.
+     */
+    inboxZero: (@Composable () -> Unit)? = null,
     content: @Composable () -> Unit,
 ) {
     val palette = LocalPalette.current
     when {
         !failed && !noMailbox && !empty -> content()
 
-        loading -> CenteredState("Checking your mailbox…", null, palette)
+        // First load with nothing cached: rows shaped like the rows to come
+        // (ScreenStates.kt), announced to TalkBack as the same sentence the
+        // text placeholder used to show.
+        loading -> ListSkeleton(Modifier.fillMaxSize(), rows = 8,
+            label = stringResource(R.string.mail_state_loading))
 
         noMailbox -> CenteredState(
-            "No GrapMail mailbox on this account",
-            "The account you signed in with has no mailbox provisioned, so there is " +
-                "nothing to list. This is not a connection problem.",
+            stringResource(R.string.mail_state_no_mailbox_title),
+            stringResource(R.string.mail_state_no_mailbox_body),
             palette,
         )
 
         failed -> CenteredState(
-            "Couldn't load $boxTitle",
-            "Your mailbox could not be reached. Nothing has been deleted.",
-            palette, action = "Try again" to onRetry,
+            stringResource(R.string.mail_state_failed_title, boxLabel),
+            stringResource(R.string.mail_state_failed_body),
+            palette, action = stringResource(R.string.mail_common_try_again) to onRetry,
         )
 
+        empty && boxTitle == "Inbox" && !filtered && inboxZero != null -> inboxZero()
+
         empty && boxTitle == "Inbox" && !filtered -> CenteredState(
-            "Welcome home to GrapMail",
-            "Your inbox is fresh, quiet, and completely protected.",
+            stringResource(R.string.mail_state_welcome_title),
+            stringResource(R.string.mail_state_welcome_body),
             palette,
         )
 
         else -> CenteredState(
-            if (filtered) "No matching messages" else "$boxTitle is empty",
-            if (filtered) "Try changing your search or filters." else "No messages here yet.",
+            if (filtered) stringResource(R.string.mail_state_no_matches) else stringResource(R.string.mail_state_box_empty, boxLabel),
+            if (filtered) stringResource(R.string.mail_state_no_matches_body) else stringResource(R.string.mail_state_box_empty_body),
             palette,
         )
     }
@@ -813,7 +1074,7 @@ private fun CenteredState(
     }
 }
 
-// ── label colours ───────────────────────────────────────────────────────────
+// ── label colours ────────────────────────────────────────────────────────────
 
 /**
  * The eight colour keys the label route accepts, in the order the picker shows
@@ -874,8 +1135,9 @@ fun SenderBadges(address: String?, modifier: Modifier = Modifier) {
     }
     if ("subscriber" !in badges) return
     val palette = com.grapsee.grapmail.ui.theme.LocalPalette.current
+    val badgeDescription = stringResource(R.string.mail_badge_subscriber_description)
     Text(
-        "Subscriber",
+        stringResource(R.string.mail_badge_subscriber),
         fontSize = 10.sp,
         fontWeight = FontWeight.SemiBold,
         color = palette.primarySolid,
@@ -884,6 +1146,28 @@ fun SenderBadges(address: String?, modifier: Modifier = Modifier) {
             .clip(RoundedCornerShape(50))
             .border(1.dp, palette.primarySolid.copy(alpha = 0.5f), RoundedCornerShape(50))
             .padding(horizontal = 6.dp, vertical = 1.dp)
-            .semantics { contentDescription = "Subscriber: this sender supports GrapMail with a paid plan" },
+            .semantics { contentDescription = badgeDescription },
     )
 }
+
+/**
+ * A box's name as the person reads it. [com.grapsee.grapmail.data.MailBox.title]
+ * stays the English key: test tags (`mail-box-tab-$title`) and the CI walk are
+ * built from it, so only what is drawn goes through the string table.
+ */
+@Composable
+fun com.grapsee.grapmail.data.MailBox.displayTitle(): String = stringResource(
+    when (this) {
+        com.grapsee.grapmail.data.MailBox.Inbox -> R.string.mail_box_inbox
+        com.grapsee.grapmail.data.MailBox.Starred -> R.string.mail_box_starred
+        com.grapsee.grapmail.data.MailBox.Sent -> R.string.mail_box_sent
+        com.grapsee.grapmail.data.MailBox.Drafts -> R.string.mail_box_drafts
+        com.grapsee.grapmail.data.MailBox.Snoozed -> R.string.mail_box_snoozed
+        com.grapsee.grapmail.data.MailBox.Archive -> R.string.mail_box_archive
+        com.grapsee.grapmail.data.MailBox.Spam -> R.string.mail_box_spam
+        com.grapsee.grapmail.data.MailBox.Trash -> R.string.mail_box_trash
+        com.grapsee.grapmail.data.MailBox.Screener -> R.string.mail_box_screener
+        com.grapsee.grapmail.data.MailBox.All -> R.string.mail_box_all
+        com.grapsee.grapmail.data.MailBox.None -> R.string.mail_box_inbox
+    },
+)

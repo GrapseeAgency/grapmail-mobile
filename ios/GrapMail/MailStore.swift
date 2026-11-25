@@ -131,6 +131,7 @@ actor MailStore {
         let version: Int
         let account: String
         let pages: [String: DiskPage]
+        let profileData: Data?
     }
 
     private static var snapshotURL: URL? {
@@ -191,28 +192,37 @@ actor MailStore {
     private var assignments: [String: Set<String>]?
     private var cacheGeneration = SessionStore.generation
     private var diskLoaded = false
+    private var diskRead: Task<DiskSnapshot?, Never>?
+    private var profileValue: ProfileDto?
     private var snapshotWriteTask: Task<Void, Never>?
     private var snapshotRevision = 0
 
     func awaitDiskReady() async {
         ensureSession()
         guard !diskLoaded else { return }
-        diskLoaded = true
         guard let account = SessionStore.address?.lowercased(),
               let url = Self.snapshotURL else { return }
         let capturedGeneration = cacheGeneration
         let capturedAccount = account
-        let snapshot: DiskSnapshot? = await Task.detached(priority: .userInitiated) {
+        let read = diskRead ?? Task.detached(priority: .userInitiated) { () -> DiskSnapshot? in
             guard let data = try? Data(contentsOf: url) else { return nil }
             return try? JSONDecoder().decode(DiskSnapshot.self, from: data)
-        }.value
+        }
+        diskRead = read
+        let snapshot = await read.value
+        guard !diskLoaded, capturedGeneration == cacheGeneration,
+              capturedGeneration == SessionStore.generation else { return }
+        diskLoaded = true
+        diskRead = nil
         guard let snapshot, snapshot.version == Self.snapshotVersion,
               snapshot.account == capturedAccount,
               capturedGeneration == cacheGeneration,
               capturedGeneration == SessionStore.generation,
-              SessionStore.address?.lowercased() == capturedAccount,
-              pages.isEmpty else { return }
-        pages = snapshot.pages.mapValues(\.live)
+              SessionStore.address?.lowercased() == capturedAccount else { return }
+        if pages.isEmpty { pages = snapshot.pages.mapValues(\.live) }
+        if profileValue == nil, let data = snapshot.profileData {
+            profileValue = try? JSONDecoder().decode(ProfileDto.self, from: data)
+        }
     }
 
     private func scheduleSnapshotWrite() {
@@ -239,7 +249,8 @@ actor MailStore {
             let snapshot = DiskSnapshot(
                 version: Self.snapshotVersion,
                 account: account,
-                pages: snapshotPages.mapValues(DiskPage.init)
+                pages: snapshotPages.mapValues(DiskPage.init),
+                profileData: profileValue.flatMap { try? JSONEncoder().encode($0) }
             )
             let data = try? JSONEncoder().encode(snapshot)
             guard !Task.isCancelled, revision == snapshotRevision,
@@ -248,7 +259,7 @@ actor MailStore {
             // A detached writer could outlive cancellation and recreate a deleted
             // snapshot after sign-out; keeping the commit on this actor means a
             // queued clear always runs after an in-progress write and deletes it.
-            try? data.write(to: url, options: .atomic)
+            try? data.write(to: url, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
         }
     }
 
@@ -303,6 +314,19 @@ actor MailStore {
         }
         scheduleSnapshotWrite()
         return !resp.messages.isEmpty
+    }
+
+    func cachedProfile(generation: UUID) async -> ProfileDto? {
+        await awaitDiskReady()
+        guard generation == SessionStore.generation else { return nil }
+        return profileValue
+    }
+
+    func putProfile(_ value: ProfileDto, generation: UUID) {
+        ensureSession()
+        guard generation == cacheGeneration else { return }
+        profileValue = value
+        scheduleSnapshotWrite()
     }
 
     func stats() -> MailStatsResponse? { ensureSession(); return statsValue }
@@ -595,7 +619,10 @@ actor MailStore {
         snapshotRevision &+= 1
         if let url = Self.snapshotURL { try? FileManager.default.removeItem(at: url) }
         if let url = Self.notificationDirectory { try? FileManager.default.removeItem(at: url) }
+        diskRead?.cancel()
+        diskRead = nil
         pages = [:]
+        profileValue = nil
         statsValue = nil
         labelsValue = nil
         aliasesValue = nil

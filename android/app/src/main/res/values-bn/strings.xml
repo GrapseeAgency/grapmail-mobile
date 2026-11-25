@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">GrapMail</string>
+    <string name="shortcut_compose_short">মেল লিখুন</string>
+    <string name="shortcut_compose_long">নতুন GrapMail বার্তা লিখুন</string>
+    <string name="shortcut_scheduled_short">নির্ধারিত মেল</string>
+    <string name="shortcut_scheduled_long">পাঠানোর অপেক্ষায় থাকা মেল দেখুন ও বাতিল করুন</string>
+    <string name="shortcut_subscriptions_short">সাবস্ক্রিপশন</string>
+    <string name="shortcut_subscriptions_long">এক জায়গায় প্রেরকদের পর্যালোচনা করুন ও আনসাবস্ক্রাইব করুন</string>
+    <string name="notif_channel_new_mail">নতুন মেল</string>
+    <string name="notif_channel_new_mail_desc">ব্যাকগ্রাউন্ড যাচাইয়ে অপঠিত বার্তা পাওয়া গেলে আপনাকে জানায়। GrapMail-এর কোনো পুশ পরিষেবা নেই, তাই সিস্টেম অ্যাপটিকে জাগালে অ্যাপ নিজেই সার্ভারকে জিজ্ঞাসা করে।</string>
+    <string name="notif_channel_security">নিরাপত্তা সতর্কতা</string>
+    <string name="notif_channel_security_desc">আপনার অ্যাকাউন্টে কিছু ঘটলেই সঙ্গে সঙ্গে জানায়: নতুন ডিভাইস থেকে সাইন ইন, পাসওয়ার্ড পরিবর্তন, বিশ্বস্ত ডিভাইসে পরিবর্তন। নীরব সময়েও এগুলি কখনো বন্ধ হয় না।</string>
+    <string name="widget_description">এক নজরে অপঠিত মেল: GrapMail-এর ব্যাকগ্রাউন্ড যাচাই থেকে গণনা</string>
+</resources>

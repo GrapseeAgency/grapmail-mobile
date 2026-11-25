@@ -78,7 +78,11 @@ struct RootView: View {
         case createdAlt(address: String, name: String)
         case onboarding(address: String, name: String)
         case home
-        case mailThread(id: String, isThread: Bool, focus: String? = nil, more: Bool = false)
+        // `zoomSource` is the list row's message id when the list's tap pushed
+        // the reader: the iOS 18 zoom transition grows the reader out of that
+        // row. nil -- links, notifications, stepping -- is the plain push.
+        case mailThread(id: String, isThread: Bool, focus: String? = nil, more: Bool = false,
+                        zoomSource: String? = nil)
         // Compose carries an optional reply target and mode: empty reply opens
         // blank, "reply|all|forward" opens prepared from the full server row.
         case mailCompose(reply: String, mode: String, recipient: String = "")
@@ -94,6 +98,8 @@ struct RootView: View {
         // one has a parent, so a deep link can never strand somebody on a
         // child with no way back.
         case mailNotes, mailTasks, mailPrefs, mailAddresses, mailConnections
+        // Connected mailboxes: Outlook (OAuth) and IMAP accounts synced in.
+        case mailProviders
         // Per-scope notification preferences (mail / security / account),
         // edited on the account-wide preference row the push backend reads.
         case mailNotifPrefs
@@ -116,6 +122,22 @@ struct RootView: View {
         // would be two answers to "is the key open right now".
         case e2eStatus, e2eSetup, e2eUnlock, e2eDetails, e2ePublish
         case e2eChangePassphrase, e2eRemove, e2eRecipients
+        // MARK: Round 8 — security center
+        // The Device & Security Center (SecurityCenterView.swift) and the
+        // "This wasn't me" arc (NotMeFlow.swift): secured screen, change
+        // password in required mode (back asks first), recovery review. All
+        // dispatched by `securityCenterDestination`.
+        case secCenter
+        case secNotMeDone(device: String)
+        case secRecoveryReview
+        case secPasswordRequired
+        // MARK: Round 8 — welcome back
+        // The personal welcome-back sign-in for one remembered, signed-out
+        // account, and the chooser for two or more (WelcomeBackView.swift).
+        // Both open the same screen; `signInRoute()` picks between them and
+        // the classic `.signIn`. Dispatched by `welcomeBackDestination`.
+        case welcomeBack(address: String)
+        case accountChooser
     }
 
     /// One mailbox for the whole signed-in stack. The list, the thread, compose
@@ -145,9 +167,15 @@ struct RootView: View {
     /// The app-lock cover (AppLock.swift). Owned at the stack so every
     /// destination behind it is one gate.
     @ObservedObject private var appLock = AppLock.shared
-    /// Set when the widget deep link arrives before the launch restore has
-    /// decided the stack; consumed by the onChange that consumes notifications.
-    @State private var pendingScheduled = false
+    /// A tapped link (DeepLinks.swift) -- grapmail://thread|message|scheduled|compose,
+    /// https://grapsee.com/mail/thread/<id>, or mailto: -- parked until three
+    /// things are true at once: the launch restore has decided the stack, a
+    /// session exists, and the app lock is not in front. Signed out it waits
+    /// through sign-in (`enterMailbox` opens it); locked it waits for the
+    /// unlock (`.onChange(of: appLock.locked)`). Cleared the moment it opens.
+    /// It replaces the widget's old `pendingScheduled` flag: grapmail://scheduled
+    /// is one of the links now, parked and opened by the same rule.
+    @State private var pendingLink: DeepLink?
     @State private var restoredSession = false
     @State private var renewingSession = false
     /// The ten codes live in SecurityFlow.backupCodes, not a view @State, so
@@ -156,10 +184,25 @@ struct RootView: View {
     /// is signed out survives `path.removeAll()` and is readable by whoever
     /// signs in next.
 
+    // MARK: Round 8 — welcome back (state)
+    /// The sign-out sheet's account, while the sheet is up.
+    @State private var signOutPrompt: SignOutPrompt?
+    /// "Signed in as {address}" after a passkey picked another account (§2.3).
+    @State private var welcomeBackToast: String?
+    /// The server's reason when a welcome-back account turned out to be
+    /// blocked, shown once on the classic sign-in form it falls back to.
+    @State private var signInNotice: String?
+
     private func backToSignIn() {
         recovery.clearSignInChallenge()
         if path.contains(.signIn) {
             while let last = path.last, last != .signIn { path.removeLast() }
+        } else if recovery.prefillIdentifier == nil,
+                  let index = path.lastIndex(where: { isWelcomeBackRoute($0) }) {
+            // Came from welcome-back (two-step "Back to sign in"): return to
+            // it rather than to a blank form. A prefilled address (reset done,
+            // address found) still lands on the classic form below.
+            path.removeSubrange(path.index(after: index)...)
         } else {
             path.append(.signIn)
         }
@@ -220,9 +263,16 @@ struct RootView: View {
                 }
             }
             .onAppear { appLock.checkOnActive() }
-            // -- Widget deep links: grapmail://scheduled, tapped from the home widget
-            // or the send-later Live Activity -> the Scheduled screen, where cancel lives.
-            .onOpenURL { url in handleWidgetURL(url) }
+            // -- Deep links. The custom scheme (grapmail://thread/<id>, the
+            // widget's and Live Activity's grapmail://scheduled, ...) arrives
+            // here; so would mailto: if this app is ever the default mail app.
+            .onOpenURL { url in handleIncomingURL(url) }
+            // -- Universal Links: https://grapsee.com/mail/thread/<id>. iOS
+            // delivers these as a browsing activity, never through onOpenURL,
+            // and only while the associated-domains entitlement is signed in
+            // AND grapsee.com serves the association file
+            // (well-known/README.md). Same parser, same parking rule.
+            .onContinueUserActivity(NSUserActivityTypeBrowsingWeb) { activity in handleUserActivity(activity) }
             .task(id: scenePhase == .active && path.contains(.home) ? SessionStore.generation : nil) {
                 if scenePhase == .active, path.contains(.home) { await account.watchAvatar() }
             }
@@ -235,6 +285,9 @@ struct RootView: View {
             // refused authenticated request.
             .task {
                 guard !restoredSession, SecuritySnapshot.requested() == nil else { return }
+                // Round 8 — welcome back: the install-marker wipe and the
+                // 90-day prune run before anything reads the remembered list.
+                RememberedAccounts.bootstrap()
                 let generation = SessionStore.generation
                 let session = await SessionStore.launchSession()
                 guard !Task.isCancelled, generation == SessionStore.generation else { return }
@@ -242,6 +295,11 @@ struct RootView: View {
                 if path.isEmpty {
                     if session.stored { path = [.home] }
                     else if !SessionStore.accounts().isEmpty { showRemainingAccount(or: []) }
+                    else {
+                        // Signed out with a remembered account: "Continue as …".
+                        let landing = signInRoute()
+                        if landing != .signIn { path = [landing] }
+                    }
                 }
                 if session.stored && !session.unexpired {
                     renewingSession = true
@@ -249,8 +307,8 @@ struct RootView: View {
                     renewingSession = false
                     guard !Task.isCancelled, generation == SessionStore.generation else { return }
                     if shortcuts.pendingCompose, renewal == .renewed { openComposeShortcut() }
-                    if shortcuts.pendingCompose, renewal == .rejected, path.last != .signIn {
-                        path = [.signIn]
+                    if shortcuts.pendingCompose, renewal == .rejected, !(path.last.map { isSignInSurface($0) } ?? false) {
+                        path = [signInRoute()]
                     }
                     // A transient unavailable result keeps Home and the shortcut
                     // pending. The normal authenticated retry/expiry path decides
@@ -271,7 +329,7 @@ struct RootView: View {
             // sign-in) never reach here — only a rejected bearer does.
             .onReceive(NotificationCenter.default.publisher(for: .gmSessionExpired)) { _ in
                 restoredSession = true
-                showRemainingAccount(or: [.signIn])
+                showRemainingAccount(or: [signInRoute()])
             }
             // A security push's "Secure account" action, or a plain tap on the
             // alert banner (SecurityPush.handle). The hub refetches on entry,
@@ -279,6 +337,12 @@ struct RootView: View {
             // account's live state, not a copy.
             .onReceive(NotificationCenter.default.publisher(for: .gmOpenAccountSecurity)) { _ in
                 openSecurityHub()
+            }
+            // Round 8 — security center: the mailbox's §3.6 banner and §4.3
+            // nudge card (SafetyNudgeCard.swift) ask for the Center or the
+            // required-mode password screen through this one signal.
+            .onReceive(NotificationCenter.default.publisher(for: .gmOpenSecurityCenter)) { note in
+                openSecurityCenter(note.object as? String)
             }
             // A long-press on the icon that says "Compose mail" has to land in
             // the composer. The delegate parks the request until a stack exists
@@ -289,9 +353,19 @@ struct RootView: View {
             .onChange(of: shortcuts.pendingMail) { _ in openNotificationMail() }
             .onChange(of: restoredSession) { _ in
                 openNotificationMail()
-                if pendingScheduled { openScheduledScreen() }
+                openPendingLink()
+                routeSignedOutLink()
             }
-            .onChange(of: renewingSession) { _ in openNotificationMail() }
+            .onChange(of: renewingSession) { _ in
+                openNotificationMail()
+                openPendingLink()
+            }
+            // The unlock is the moment a parked notification tap or link may
+            // finally open; nothing behind the cover moves before it.
+            .onChange(of: appLock.locked) { _ in
+                openNotificationMail()
+                openPendingLink()
+            }
             .onChange(of: shortcuts.pendingCompose) { pending in
                 guard pending, restoredSession, !renewingSession else { return }
                 openComposeShortcut()
@@ -302,45 +376,119 @@ struct RootView: View {
             .onReceive(NotificationCenter.default.publisher(for: UIApplication.didEnterBackgroundNotification)) { _ in
                 MailPoll.scheduleNext()
             }
+            // Round 8 — welcome back: the sign-out sheet ("Also remove from
+            // this device") and the "Signed in as …" toast. One modifier so
+            // this body stays within what the type-checker resolves.
+            .modifier(WelcomeBackHost(prompt: $signOutPrompt, toast: welcomeBackToast) { remove in
+                performSignOut(removeFromDevice: remove)
+            })
         }
     }
 
-    /// grapmail://scheduled -- the widget and the send-later Live Activity tap
-    /// through here. Deferred while the launch restore has not decided the
-    /// stack, then consumed by the same onChange that consumes a cold-start
-    /// notification.
-    private func handleWidgetURL(_ url: URL) {
-        guard url.scheme == "grapmail", url.host == "scheduled" else { return }
-        if restoredSession, SessionStore.token != nil {
-            openScheduledScreen()
-        } else {
-            pendingScheduled = true
-        }
+    /// Every URL the scene hands over: the custom scheme (the widget and the
+    /// send-later Live Activity tap grapmail://scheduled through here, a
+    /// shared thread link is grapmail://thread/<id>) and mailto:. Anything
+    /// DeepLink.parse does not recognise exactly -- an id that is not the
+    /// server's uuid included -- does nothing at all.
+    private func handleIncomingURL(_ url: URL) {
+        guard let link = DeepLink.parse(url) else { return }
+        receive(link)
     }
 
-    private func openScheduledScreen() {
-        pendingScheduled = false
-        guard SessionStore.token != nil else { return }
+    /// A Universal Link's browsing activity, parsed by the same rules.
+    private func handleUserActivity(_ activity: NSUserActivity) {
+        guard let link = DeepLink.parse(activity) else { return }
+        receive(link)
+    }
+
+    /// Park, then try. A link handed over while the scene is still coming
+    /// forward can beat the `.active` phase change that re-arms the lock, so
+    /// the lock is asked first -- otherwise the thread would be pushed in the
+    /// instant before the cover goes up and load (and mark itself read)
+    /// behind it. Already active means the scene hook has decided.
+    private func receive(_ link: DeepLink) {
+        pendingLink = link
+        if scenePhase != .active { appLock.checkOnActive() }
+        openPendingLink()
+        routeSignedOutLink()
+    }
+
+    /// Opens the parked link once nothing stands in front of it. Every exit
+    /// that is not "open it now" leaves it parked for the next trigger:
+    /// the restore finishing, a renewal finishing, the unlock, a sign-in.
+    private func openPendingLink() {
+        // A stored token, not `hasValidSession`: an hour-old access token on
+        // a warm app is still a session -- the reader's first request renews
+        // it through the single-flight path, as it does for a notification
+        // tap -- and nothing would ever retry a link parked on "expired".
+        guard let link = pendingLink, restoredSession, !renewingSession, !appLock.locked,
+              SessionStore.token != nil else { return }
+        pendingLink = nil
         if path.last != .home { path = [.home] }
-        path.append(.mailScheduled)
+        switch link {
+        case let .thread(id):
+            // Two-pane (regular width): the link selects the thread in the
+            // reader column instead of pushing a reader over the list.
+            if mailboxSizeClass == .regular { inlineMail = MailPaneSelection(id: id, isThread: true) }
+            else { path.append(.mailThread(id: id, isThread: true)) }
+        case let .message(id):
+            // The message route: the thread route answers a message id 404.
+            if mailboxSizeClass == .regular { inlineMail = MailPaneSelection(id: id, isThread: false) }
+            else { path.append(.mailThread(id: id, isThread: false)) }
+        case .scheduled:
+            path.append(.mailScheduled)
+        case let .compose(recipient):
+            // The composer's existing prefilled-recipient slot -- the same one
+            // the contact screen's "Write" fills. Nothing else is carried.
+            path.append(.mailCompose(reply: "", mode: "reply", recipient: recipient))
+        case .inbox:
+            // The widget's unread count: the mailbox home (the line above has
+            // already popped everything pushed over it), on the Inbox, with
+            // nothing open in the reader column and nothing picked.
+            inlineMail = nil
+            mail.clearSelection()
+            mail.open(.inbox)
+        }
+    }
+
+    /// Signed out with a link waiting: the honest route is sign-in, the same
+    /// answer the compose shortcut gives. The link stays parked and
+    /// `enterMailbox` opens it once the person has proved the account.
+    private func routeSignedOutLink() {
+        guard pendingLink != nil, restoredSession, !renewingSession,
+              SessionStore.token == nil, SecuritySnapshot.requested() == nil,
+              !path.contains(where: { isSignInSurface($0) }) else { return }
+        path = [signInRoute()]
     }
 
     private func openNotificationMail() {
-        guard restoredSession, !renewingSession, let target = shortcuts.pendingMail else { return }
+        // The same door as a deep link: a tap that names a thread opens it on
+        // the same route, and never behind the app lock. Coming forward from
+        // a notification can beat the `.active` hook, so the lock is asked
+        // first; a locked app keeps the tap parked until the unlock's
+        // onChange calls back in here.
+        if shortcuts.pendingMail != nil, scenePhase != .active { appLock.checkOnActive() }
+        guard restoredSession, !renewingSession, !appLock.locked, let target = shortcuts.pendingMail else { return }
         shortcuts.pendingMail = nil
         if target.account.caseInsensitiveCompare(SessionStore.address ?? "") != .orderedSame {
             guard SessionStore.switchTo(target.account) else { return }
             enterMailbox()
         }
         guard SessionStore.token != nil else { return }
-        path = [.home, .mailThread(id: target.threadId ?? target.messageId, isThread: target.threadId != nil, focus: target.messageId, more: target.more)]
+        if mailboxSizeClass == .regular {
+            inlineMail = MailPaneSelection(id: target.threadId ?? target.messageId, isThread: target.threadId != nil,
+                                           focus: target.messageId, more: target.more)
+            path = [.home]
+        } else {
+            path = [.home, .mailThread(id: target.threadId ?? target.messageId, isThread: target.threadId != nil, focus: target.messageId, more: target.more)]
+        }
         if target.reply { path.append(.mailCompose(reply: target.messageId, mode: "reply")) }
     }
 
     private func openComposeShortcut() {
         shortcuts.consume()
         guard SessionStore.hasValidSession else {
-            path = [.signIn]
+            path = [signInRoute()]
             return
         }
         if path.last != .home { path = [.home] }
@@ -354,7 +502,7 @@ struct RootView: View {
     private func openSecurityHub() {
         guard restoredSession, !renewingSession else { return }
         guard SessionStore.hasValidSession else {
-            path = [.signIn]
+            path = [signInRoute()]
             return
         }
         if path.contains(.security) {
@@ -404,7 +552,7 @@ struct RootView: View {
             } else {
                 WelcomeView(
                     onCreateAccount: { path.append(.stepName) },
-                    onSignIn: { path.append(.signIn) }
+                    onSignIn: { path.append(signInRoute()) }
                 )
             }
         }
@@ -430,8 +578,18 @@ struct RootView: View {
                  .secRevokedAlert, .secActivity, .secAlert, .secSecure,
                  .secTrustedDevices, .secRecoveryCodes, .secPasskeys, .recoveryEmail:
                 securityDestination(route)
+            // Round 8 — security center.
+            case .secCenter, .secNotMeDone, .secRecoveryReview, .secPasswordRequired:
+                securityCenterDestination(route)
+            // Round 8 — welcome back.
+            case .welcomeBack, .accountChooser:
+                welcomeBackDestination(route)
+            // `.onboarding` belongs here too: it was missing from this list, so
+            // the walkthrough pushed after sign-up fell through to the
+            // signed-in switch and drew a blank screen with no way forward.
             case .stepName, .stepInfo, .stepAddress, .stepPassword, .stepTerms,
-                 .humanVerify, .created, .createdAlt, .recoveryEmailSignup:
+                 .humanVerify, .created, .createdAlt, .recoveryEmailSignup,
+                 .onboarding:
                 wizardDestination(route)
             default:
                 // Everything signed-in: mailbox, account band, encryption
@@ -452,7 +610,7 @@ struct RootView: View {
                 case .welcome:
                     WelcomeView(
                         onCreateAccount: { path.append(.stepName) },
-                        onSignIn: { path.append(.signIn) }
+                        onSignIn: { path.append(signInRoute()) }
                     )
                 case .signIn:
                     SignInView(
@@ -462,8 +620,11 @@ struct RootView: View {
                         onSignUp: { path.append(.stepName) },
                         onForgotPassword: { path.append(.forgotPassword) },
                         onNeedSecondFactor: { path.append(.twoFactor) },
-                        onNeedEmailVerification: { path.append(.emailVerification) }
+                        onNeedEmailVerification: { path.append(.emailVerification) },
+                        notice: signInNotice
                     )
+                    // The notice is shown once: SignInView copies it on appear.
+                    .onAppear { DispatchQueue.main.async { signInNotice = nil } }
                 case .emailVerification:
                     EmailVerificationView(model: recovery,
                                           onSignedIn: { _ in enterMailbox() },
@@ -578,21 +739,27 @@ struct RootView: View {
         switch route {
 
                 case .security:
+                    // Round 8: with `security_center` on, the Trusted Devices,
+                    // Active Sessions and Recent Activity rows open the Device &
+                    // Security Center (§3) — the old screens stay reachable by
+                    // their own routes — and the hub gains the safety header.
                     AccountSecurityView(
                         onBack: { path.removeLast() },
                         onTwoFactor: { path.append(.secEnable) },
                         onDisableTwoFactor: { path.append(.secDisable) },
                         onPhone: { path.append(.phoneVerify) },
-                        onSessions: { path.append(.secSessions) },
-                        onActivity: { path.append(.secActivity) },
+                        onSessions: { path.append(SecFeature.enabled ? .secCenter : .secSessions) },
+                        onActivity: { path.append(SecFeature.enabled ? .secCenter : .secActivity) },
                         onBackupCodes: { path.append(.secBackup) },
                         onPassword: { path.append(.secPassword) },
                         onSignOutAll: { path.append(.secSignOutAll) },
                         onSupport: { openSupport() },
                         onRecoveryCodes: { path.append(.secRecoveryCodes) },
-                        onTrustedDevices: { path.append(.secTrustedDevices) },
+                        onTrustedDevices: { path.append(SecFeature.enabled ? .secCenter : .secTrustedDevices) },
                         onPasskeys: { path.append(.secPasskeys) },
-                        onRecoveryEmail: { path.append(.recoveryEmail) }
+                        onRecoveryEmail: { path.append(.recoveryEmail) },
+                        onSecurityCenter: SecFeature.enabled ? { path.append(.secCenter) } : nil,
+                        onSafetyItem: { id, done in openSafetyItem(id, done: done) }
                     )
                 case .recoveryEmail:
                     RecoveryEmailView(
@@ -735,6 +902,104 @@ struct RootView: View {
         }
     }
 
+    // MARK: Round 8 — security center
+
+    /// The Center, the "Account secured" screen, change password in required
+    /// mode and the recovery review (§3.4). Every exit lands back on the
+    /// Center, which refetches on return.
+    @ViewBuilder private func securityCenterDestination(_ route: Route) -> some View {
+        switch route {
+        case .secCenter:
+            SecurityCenterView(
+                onBack: { path.removeLast() },
+                onAction: { id, done in openSafetyItem(id, done: done) },
+                onSecured: { label in path.append(.secNotMeDone(device: label)) },
+                onChangePassword: { path.append(.secPasswordRequired) },
+                onSignOut: signOutOfMailbox
+            )
+        case let .secNotMeDone(device):
+            AccountSecuredView(
+                device: device,
+                onChangePassword: { path.append(.secPasswordRequired) },
+                onDone: { backToSecurityCenter() }
+            )
+        case .secPasswordRequired:
+            RequiredChangePasswordView(
+                onChanged: {
+                    // The secured screen and this one are spent: back from the
+                    // review must not land on a password form that just worked.
+                    path.removeAll { route in
+                        if case .secNotMeDone = route { return true }
+                        return route == .secPasswordRequired
+                    }
+                    path.append(.secRecoveryReview)
+                },
+                onLeave: { path.removeLast() },
+                onForgot: { path.append(.forgotPassword) }
+            )
+        case .secRecoveryReview:
+            RecoveryReviewView(
+                onDone: { backToSecurityCenter() },
+                onOpen: { id in openSafetyItem(id, done: false) }
+            )
+        default:
+            mailDestination(route)
+        }
+    }
+
+    /// A safety checklist row's (or recovery-review row's) destination — the
+    /// existing security screens (§4.2 "Action → existing screen").
+    private func openSafetyItem(_ id: SecChecklistID, done: Bool) {
+        switch id {
+        case .twoStep:
+            if done { backToSecurity() } else { path.append(.secEnable) }
+        case .passkey:
+            path.append(.secPasskeys)
+        case .recoveryCodes:
+            path.append(.secRecoveryCodes)
+        case .recoveryEmail:
+            path.append(.recoveryEmail)
+        case .passwordHealth:
+            path.append(.secPassword)
+        case .recoveryPhone:
+            path.append(.phoneVerify)
+        case .secondDevice, .alertsReviewed:
+            // Answered inside the Center (devices section / first "Review"
+            // row); from the hub header the Center is the door.
+            if path.last != .secCenter { path.append(.secCenter) }
+        default:
+            break
+        }
+    }
+
+    /// Back to the Center, whichever door the person came through.
+    private func backToSecurityCenter() {
+        if path.contains(.secCenter) {
+            while let last = path.last, last != .secCenter { path.removeLast() }
+        } else {
+            path.removeAll { route in
+                switch route {
+                case .secNotMeDone, .secPasswordRequired, .secRecoveryReview: return true
+                default: return false
+                }
+            }
+            path.append(.secCenter)
+        }
+    }
+
+    /// The mailbox slot's doors (`.gmOpenSecurityCenter`). Signed out, there
+    /// is nothing to open; the same restore rule as the other openers.
+    private func openSecurityCenter(_ target: String?) {
+        guard restoredSession, !renewingSession, SessionStore.hasValidSession else { return }
+        if target == "password" {
+            if path.last != .secPasswordRequired { path.append(.secPasswordRequired) }
+        } else if path.contains(.secCenter) {
+            backToSecurityCenter()
+        } else {
+            path.append(.secCenter)
+        }
+    }
+
     /// Sign-up's five steps, the human check and the two finish screens.
     @ViewBuilder private func wizardDestination(_ route: Route) -> some View {
         switch route {
@@ -832,6 +1097,16 @@ struct RootView: View {
         signedInModels.reset()
         inlineMail = nil
         path = [.home]
+        // Round 8 — welcome back: a passkey that signed in another account
+        // than the one chosen is accepted and announced (§2.3).
+        if let notice = WelcomeBackGate.signedInAsNotice {
+            WelcomeBackGate.signedInAsNotice = nil
+            showWelcomeBackToast(notice)
+        }
+        // A link that arrived signed out was parked, not dropped: the person
+        // who just proved the account is theirs gets the thread they tapped
+        // (still behind the app lock's rule -- openPendingLink checks it).
+        openPendingLink()
     }
 
     private func showRemainingAccount(or fallback: [Route]) {
@@ -840,20 +1115,167 @@ struct RootView: View {
         } else {
             e2e.clearForSignOut()
             signedInModels.reset()
+            inlineMail = nil
             path = fallback
         }
     }
 
+    /// Every sign-out door (drawer, account switcher, settings, the Security
+    /// Center). With welcome-back on, the confirmation sheet asks whether to
+    /// also remove the account from this device (§2.4); otherwise it signs out
+    /// at once, as before.
     private func signOutOfMailbox() {
+        guard WelcomeBackGate.isEnabled, let address = SessionStore.address, address.contains("@") else {
+            performSignOut(removeFromDevice: false)
+            return
+        }
+        signOutPrompt = SignOutPrompt(address: address)
+    }
+
+    /// End the active session. The remembered record (never a password or
+    /// token) is kept unless `removeFromDevice`; RememberedAccounts reads the
+    /// choice inside SessionStore.clear().
+    private func performSignOut(removeFromDevice: Bool) {
+        if let address = SessionStore.address {
+            RememberedAccounts.prepareSignOut(address: address, removeFromDevice: removeFromDevice)
+        }
         SessionStore.clear()
-        showRemainingAccount(or: [])
+        // Another signed-in account takes over when there is one; otherwise a
+        // remembered account opens on "Continue as …", and the welcome screen
+        // stays underneath it.
+        let landing = signInRoute()
+        showRemainingAccount(or: landing == .signIn ? [] : [landing])
+    }
+
+    // MARK: Round 8 — welcome back
+
+    /// Where a signed-out "sign in" goes: welcome-back for one remembered,
+    /// signed-out account, the chooser for two or more, the classic form when
+    /// there is none, the flag is off, or "Use another account" was tapped in
+    /// this launch (§2.1). A remembered account never signs anyone in; it only
+    /// pre-fills the address and shows the name and photo.
+    private func signInRoute() -> Route {
+        let remembered = WelcomeBackGate.candidates()
+        if remembered.count >= 2 { return .accountChooser }
+        if let only = remembered.first { return .welcomeBack(address: only.address) }
+        return .signIn
+    }
+
+    private func isWelcomeBackRoute(_ route: Route) -> Bool {
+        switch route {
+        case .welcomeBack, .accountChooser: return true
+        default: return false
+        }
+    }
+
+    /// Any sign-in surface: the classic form, welcome-back or the chooser.
+    private func isSignInSurface(_ route: Route) -> Bool {
+        route == .signIn || isWelcomeBackRoute(route)
+    }
+
+    @ViewBuilder private func welcomeBackDestination(_ route: Route) -> some View {
+        switch route {
+        case let .welcomeBack(address):
+            welcomeBackScreen(preferred: address)
+        case .accountChooser:
+            welcomeBackScreen(preferred: nil)
+        default:
+            mailDestination(route)
+        }
+    }
+
+    /// The same sign-in pipeline as SignInView: success → enterMailbox(), a
+    /// two-step account → the existing two-step screen, forgot password → the
+    /// existing reset flow with the address prefilled.
+    private func welcomeBackScreen(preferred: String?) -> some View {
+        WelcomeBackScreen(
+            model: recovery,
+            preferredAddress: preferred,
+            onBack: { if !path.isEmpty { path.removeLast() } },
+            onSignedIn: { _ in enterMailbox() },
+            onNeedSecondFactor: { path.append(.twoFactor) },
+            onNeedEmailVerification: { path.append(.emailVerification) },
+            onForgotPassword: { path.append(.forgotPassword) },
+            onExit: { exit in leaveWelcomeBack(exit) }
+        )
+    }
+
+    /// "Use another account", the last record removed, or a blocked account:
+    /// the classic sign-in form takes the welcome-back screen's place.
+    private func leaveWelcomeBack(_ exit: WelcomeBackScreen.Exit) {
+        path.removeAll { isWelcomeBackRoute($0) }
+        switch exit {
+        case .useAnotherAccount, .removedAll:
+            recovery.prefillIdentifier = nil
+        case let .blocked(address, message):
+            recovery.prefillIdentifier = address
+            signInNotice = message
+        }
+        path.append(.signIn)
+    }
+
+    private func showWelcomeBackToast(_ text: String) {
+        welcomeBackToast = text
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
+            if welcomeBackToast == text { welcomeBackToast = nil }
+        }
     }
 
     @Environment(\.horizontalSizeClass) private var mailboxSizeClass
-    @State private var inlineMail: InlineMail?
-    private struct InlineMail {
-        let id: String
-        let isThread: Bool
+    /// The text size the two-pane breakpoint and list width follow
+    /// (`MailPaneLayout`, MailTwoPane.swift): larger text needs a wider list
+    /// and a wider window before list and reader share it.
+    @Environment(\.dynamicTypeSize) private var mailboxTextSize
+    /// The reader column's open mail on a regular width (MailTwoPane.swift).
+    /// State here, not in the `.home` destination, so rotation, Split View
+    /// resizing and a collapse to one column all keep the same mail open.
+    @State private var inlineMail: MailPaneSelection?
+    /// The one namespace the iOS 18 zoom push shares between a list row
+    /// (`matchedTransitionSource`) and the reader it opens
+    /// (`navigationTransition(.zoom)`), both in MailRowPreview.swift.
+    @Namespace private var mailZoom
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    /// The reader column's change of mail: a short fade-and-slide from the
+    /// trailing edge on the two-pane layout; nothing under Reduce Motion or
+    /// when the reader is the only column.
+    private func readerColumnTransition(wide: Bool) -> AnyTransition {
+        guard wide, !reduceMotion else { return AnyTransition.identity }
+        return AnyTransition.opacity.combined(with: .move(edge: .trailing))
+    }
+
+    /// The reader column on a regular width, or the reader alone below the
+    /// two-pane breakpoint. A ZStack so that, while a new selection slides in,
+    /// the outgoing reader overlaps it instead of taking an HStack slot beside
+    /// it. On two-pane a selection change fades and slides in from the trailing
+    /// edge in ~0.22 s; under Reduce Motion, or with the reader as the only
+    /// column, it swaps with no animation, as before.
+    @ViewBuilder private func readerColumn(wide: Bool) -> some View {
+        ZStack {
+            if let selection = inlineMail {
+                ThreadView(
+                    vm: mail, e2e: e2e, id: selection.id, isThread: selection.isThread,
+                    onBack: { inlineMail = nil },
+                    onReply: { id, mode in path.append(.mailCompose(reply: id, mode: mode)) },
+                    onStepPrev: { inlineMail = MailPaneSelection(id: $0.id, isThread: $0.isThread) },
+                    onStepNext: { inlineMail = MailPaneSelection(id: $0.id, isThread: $0.isThread) },
+                    onContacts: { path.append(.mailContacts) },
+                    initialMessageId: selection.focus, openMessageActions: selection.more,
+                    inColumn: wide
+                )
+                .id(selection.id)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .transition(readerColumnTransition(wide: wide))
+            } else {
+                // Only reached on two-pane: the caller draws this column with
+                // nothing selected only when `wide`.
+                MailPaneEmptyState()
+                    .transition(readerColumnTransition(wide: wide))
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .clipped()
+        .animation(wide && !reduceMotion ? .easeOut(duration: 0.22) : nil, value: inlineMail?.id)
     }
 
     /// The signed-in world: mailbox, account record, encryption,
@@ -863,14 +1285,19 @@ struct RootView: View {
 
                 case .home:
                     GeometryReader { geometry in
-                        let wide = mailboxSizeClass == .regular && geometry.size.width >= 760
+                        // Size class + the width this window really has + the
+                        // text size (MailPaneLayout): 760 pt and min(420, 42%)
+                        // at the design sizes, exactly as before.
+                        let wide = MailPaneLayout.isTwoPane(sizeClass: mailboxSizeClass,
+                                                            width: geometry.size.width,
+                                                            dynamicTypeSize: mailboxTextSize)
                         HStack(spacing: 0) {
                             if wide || inlineMail == nil {
                                 MailboxView(
                                     vm: mail,
-                                    onThread: { id, isThread in
-                                        if wide { inlineMail = InlineMail(id: id, isThread: isThread) }
-                                        else { path.append(.mailThread(id: id, isThread: isThread)) }
+                                    onThread: { id, isThread, rowID in
+                                        if wide { inlineMail = MailPaneSelection(id: id, isThread: isThread) }
+                                        else { path.append(.mailThread(id: id, isThread: isThread, zoomSource: rowID)) }
                                     },
                                     // A draft is the person's own unfinished mail; the
                                     // only useful tap is the one that lets them finish it.
@@ -892,27 +1319,30 @@ struct RootView: View {
                                     onSwitchAccount: { address in
                                         if SessionStore.switchTo(address) { enterMailbox() }
                                     },
-                                    accountPhoto: account.state.avatar
+                                    accountPhoto: account.state.avatar,
+                                    openRowID: wide ? inlineMail?.id : nil,
+                                    onReply: { id in path.append(.mailCompose(reply: id, mode: "reply")) },
+                                    // Two-pane selects rather than pushes: no zoom source.
+                                    zoomNamespace: wide ? nil : mailZoom
                                 )
-                                .frame(width: wide ? min(420, geometry.size.width * 0.42) : nil)
+                                .frame(width: wide ? MailPaneLayout.listWidth(total: geometry.size.width,
+                                                                              dynamicTypeSize: mailboxTextSize) : nil)
                             }
                             if wide { Divider() }
-                            if let selection = inlineMail {
-                                ThreadView(
-                                    vm: mail, e2e: e2e, id: selection.id, isThread: selection.isThread,
-                                    onBack: { inlineMail = nil },
-                                    onReply: { id, mode in path.append(.mailCompose(reply: id, mode: mode)) },
-                                    onStepPrev: { inlineMail = InlineMail(id: $0.id, isThread: $0.isThread) },
-                                    onStepNext: { inlineMail = InlineMail(id: $0.id, isThread: $0.isThread) },
-                                    onContacts: { path.append(.mailContacts) },
-                                    initialMessageId: nil, openMessageActions: false
+                            // The reader column (MailTwoPane.swift). Its own
+                            // function: this destination is already near what
+                            // the type-checker resolves in one expression.
+                            if wide || inlineMail != nil {
+                                readerColumn(wide: wide)
+                            }
+                        }
+                        // iPad hardware-keyboard commands, two-pane only.
+                        .background {
+                            if wide {
+                                MailPaneShortcuts(
+                                    vm: mail, selection: $inlineMail,
+                                    onCompose: { path.append(.mailCompose(reply: "", mode: "reply")) }
                                 )
-                                .id(selection.id)
-                                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                            } else if wide {
-                                Text("Select a message to read")
-                                    .foregroundStyle(GM.textSecondary)
-                                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                             }
                         }
                     }
@@ -933,6 +1363,12 @@ struct RootView: View {
                             }
                         } else { account.load() }
                     }
+                    // Round 8 — security center: the mailbox slot's overview
+                    // (§4.3 B.2: at most one background read a day per account).
+                    .task(id: SessionStore.generation) {
+                        guard SecFeature.enabled else { return }
+                        await SecurityOverviewStore.shared.refreshIfDue()
+                    }
                     .task(id: account.state.busy ? nil : account.state.profile?.avatarUrl) {
                         if !account.state.busy { account.loadAvatar() }
                     }
@@ -940,7 +1376,7 @@ struct RootView: View {
                         if phase == .active { account.load(force: true) }
                     }
                     .id(SessionStore.generation)
-                case let .mailThread(id, isThread, focus, more):
+                case let .mailThread(id, isThread, focus, more, zoomSource):
                     ThreadView(
                         vm: mail, e2e: e2e, id: id, isThread: isThread,
                         onBack: { path.removeLast() },
@@ -963,6 +1399,10 @@ struct RootView: View {
                         onContacts: { path.append(.mailContacts) },
                         initialMessageId: focus, openMessageActions: more
                     )
+                    // iOS 18+: zooms out of the tapped row and back into it on
+                    // swipe-back. No source (links, notifications) or iOS 16-17:
+                    // the standard push, unchanged.
+                    .mailZoomDestination(sourceID: zoomSource, in: mailZoom)
                 case let .mailCompose(reply, mode, recipient):
                     ComposeView(vm: mail, account: account, e2e: e2e, replyId: reply, mode: mode,
                                 onBack: { path.removeLast() }, initialRecipient: recipient)
@@ -1014,7 +1454,8 @@ struct RootView: View {
                         onHelp: { path.append(.mailSupport) },
                         onSignOut: signOutOfMailbox,
                         onNotificationPrefs: { path.append(.mailNotifPrefs) },
-                        onPerAccountNotifications: { path.append(.perAccountNotifications) }
+                        onPerAccountNotifications: { path.append(.perAccountNotifications) },
+                        onProviders: { path.append(.mailProviders) }
                     )
                 case .mailNotifPrefs:
                     NotificationPrefsView(onBack: { path.removeLast() })
@@ -1028,6 +1469,8 @@ struct RootView: View {
                     MailPrefsView(vm: account, onBack: { path.removeLast() })
                 case .mailAddresses:
                     AddressesView(vm: account, onBack: { path.removeLast() })
+                case .mailProviders:
+                    ConnectedAccountsView(onBack: { path.removeLast() })
                 case .mailConnections:
                     ConnectionsView(vm: account, onBack: { path.removeLast() },
                                     onOpen: { path.append(.accountConnectionDetail(product: $0)) })
@@ -1156,6 +1599,52 @@ struct RootView: View {
             // above, and the switch inside a ViewBuilder must stay total.
             EmptyView()
         }
+    }
+}
+
+// MARK: Round 8 — welcome back
+
+/// The account the sign-out sheet is asking about.
+private struct SignOutPrompt: Identifiable {
+    let address: String
+    var id: String { address }
+}
+
+/// RootView's welcome-back chrome, kept out of its body: the sign-out sheet
+/// (§2.4, "Also remove from this device", default off) and the short
+/// "Signed in as …" toast (§2.3).
+private struct WelcomeBackHost: ViewModifier {
+    @Binding var prompt: SignOutPrompt?
+    let toast: String?
+    let onSignOut: (_ removeFromDevice: Bool) -> Void
+
+    func body(content: Content) -> some View {
+        content
+            .sheet(item: $prompt) { item in
+                SignOutConfirmSheet(
+                    address: item.address,
+                    onConfirm: { remove in
+                        prompt = nil
+                        onSignOut(remove)
+                    },
+                    onCancel: { prompt = nil }
+                )
+            }
+            .overlay(alignment: .bottom) {
+                if let toast {
+                    Text(verbatim: toast)
+                        .gmFont(.captionMedium)
+                        .foregroundColor(GM.bg)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 12)
+                        .background(Capsule().fill(GM.textPrimary))
+                        .padding(.horizontal, 24)
+                        .padding(.bottom, 24)
+                        .allowsHitTesting(false)
+                        .transition(.opacity)
+                }
+            }
     }
 }
 

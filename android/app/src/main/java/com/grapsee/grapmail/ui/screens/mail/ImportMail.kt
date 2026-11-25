@@ -1,5 +1,8 @@
 package com.grapsee.grapmail.ui.screens.mail
 
+import com.grapsee.grapmail.ui.components.GMLayout
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -36,6 +39,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
+import com.grapsee.grapmail.R
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -58,24 +63,31 @@ import kotlinx.coroutines.launch
  * The other account is only read; nothing there changes. The app password is sent
  * once over TLS to start the import and is not kept, here or on the server.
  */
-private data class Provider(val label: String, val host: String, val help: String, val helpUrl: String?)
+/**
+ * `label` is the provider's own brand name and also builds the chip's test tag
+ * (`import-provider-other`), so it stays English; `labelRes` translates the one
+ * label that is a word rather than a brand.
+ */
+private data class Provider(
+    val label: String, val host: String, val help: Int, val helpUrl: String?, val labelRes: Int? = null,
+)
 
 private val PROVIDERS = listOf(
     Provider("Gmail", "imap.gmail.com",
-        "Turn on 2-Step Verification for the Google account, then create an app password and paste it here. Your Google password itself will not work.",
+        R.string.mail_import_help_gmail,
         "https://myaccount.google.com/apppasswords"),
     Provider("Yahoo", "imap.mail.yahoo.com",
-        "Create an app password in Yahoo's Account Security settings and paste it here.",
+        R.string.mail_import_help_yahoo,
         "https://login.yahoo.com/account/security"),
     Provider("iCloud", "imap.mail.me.com",
-        "Create an app-specific password for your Apple Account and use your full iCloud email address as the username.",
+        R.string.mail_import_help_icloud,
         "https://account.apple.com"),
     Provider("Other", "",
-        "Any provider that offers IMAP over a secure connection (port 993). Check their help pages for the server name.",
-        null),
+        R.string.mail_import_help_other,
+        null, labelRes = R.string.mail_import_provider_other),
 )
 
-private val PERIODS = listOf(3 to "3 months", 12 to "1 year", 60 to "5 years", 0 to "Everything")
+private val PERIODS = listOf(3 to R.string.mail_import_period_3m, 12 to R.string.mail_import_period_1y, 60 to R.string.mail_import_period_5y, 0 to R.string.mail_import_period_all)
 
 @Composable
 fun ImportMailDialog(onDismiss: () -> Unit) {
@@ -114,7 +126,8 @@ private fun ImportMailScreen(onBack: () -> Unit) {
         } while (true)
     }
 
-    MailScaffold("Import mail", onBack) {
+    MailScaffold(stringResource(R.string.mail_import_title), onBack, maxContentWidth = GMLayout.Form) {
+        com.grapsee.grapmail.ui.components.OfflineBanner()
         Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 8.dp)) {
             val j = job
             if (j != null) ImportProgress(j, onCancel = {
@@ -124,15 +137,18 @@ private fun ImportMailScreen(onBack: () -> Unit) {
             })
             if (j != null && j.finishedAt == null) return@Column
 
-            Text("Bring your mail from another account into GrapMail. The other account is only read: nothing there changes, and your password is not kept.",
+            Text(stringResource(R.string.mail_import_intro),
                 fontSize = 13.sp, lineHeight = 19.sp, color = palette.textSecondary)
             Spacer(Modifier.height(14.dp))
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            // Chips keep their look; each sits in a 48dp touch target, which
+            // also supplies the gap between wrapped lines.
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 PROVIDERS.forEach { p ->
                     val selected = p == provider
-                    Text(p.label, fontSize = 14.sp, fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                    Text(p.labelRes?.let { stringResource(it) } ?: p.label, fontSize = 14.sp, fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
                         color = if (selected) palette.onPrimary else palette.textPrimary,
-                        modifier = Modifier.clip(RoundedCornerShape(20.dp))
+                        modifier = Modifier.align(Alignment.CenterVertically).minimumInteractiveComponentSize()
+                            .clip(RoundedCornerShape(20.dp))
                             .background(if (selected) palette.primarySolid else palette.card)
                             .border(1.dp, if (selected) palette.primarySolid else palette.border, RoundedCornerShape(20.dp))
                             .clickable(role = Role.RadioButton) { provider = p; host = p.host }
@@ -141,44 +157,47 @@ private fun ImportMailScreen(onBack: () -> Unit) {
                 }
             }
             Spacer(Modifier.height(10.dp))
-            Text(provider.help, fontSize = 12.sp, lineHeight = 18.sp, color = palette.textSecondary)
+            Text(stringResource(provider.help), fontSize = 12.sp, lineHeight = 18.sp, color = palette.textSecondary)
             provider.helpUrl?.let { url ->
-                TextButton(onClick = { runCatching { uri.openUri(url) } }) { Text("Create an app password") }
+                TextButton(onClick = { runCatching { uri.openUri(url) } }) { Text(stringResource(R.string.mail_import_create_app_password)) }
             }
             if (provider.host.isEmpty()) {
                 OutlinedTextField(value = host, onValueChange = { host = it.trim() }, singleLine = true,
-                    label = { Text("IMAP server") }, placeholder = { Text("imap.example.com") },
+                    label = { Text(stringResource(R.string.mail_import_imap_server)) }, placeholder = { Text("imap.example.com") },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
                     modifier = Modifier.fillMaxWidth().testTag("import-host"))
                 Spacer(Modifier.height(8.dp))
             }
             OutlinedTextField(value = username, onValueChange = { username = it.trim() }, singleLine = true,
-                label = { Text("Email address") },
+                label = { Text(stringResource(R.string.mail_import_email_address)) },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
                 modifier = Modifier.fillMaxWidth().testTag("import-username"))
             Spacer(Modifier.height(8.dp))
             OutlinedTextField(value = password, onValueChange = { password = it }, singleLine = true,
-                label = { Text("App password") }, visualTransformation = PasswordVisualTransformation(),
+                label = { Text(stringResource(R.string.mail_import_app_password)) }, visualTransformation = PasswordVisualTransformation(),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                 modifier = Modifier.fillMaxWidth().testTag("import-password"))
 
             Spacer(Modifier.height(14.dp))
-            Text("Folders", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = palette.textPrimary)
-            listOf(Triple("Inbox", inbox) { v: Boolean -> inbox = v }, Triple("Sent", sent) { v: Boolean -> sent = v },
-                Triple("Archive (or All Mail)", archive) { v: Boolean -> archive = v }).forEach { (label, checked, set) ->
-                Row(Modifier.fillMaxWidth().clickable(role = Role.Checkbox) { set(!checked) }, verticalAlignment = Alignment.CenterVertically) {
+            Text(stringResource(R.string.mail_import_folders), fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = palette.textPrimary)
+            listOf(Triple(stringResource(R.string.mail_box_inbox), inbox) { v: Boolean -> inbox = v },
+                Triple(stringResource(R.string.mail_box_sent), sent) { v: Boolean -> sent = v },
+                Triple(stringResource(R.string.mail_import_folder_archive), archive) { v: Boolean -> archive = v }).forEach { (label, checked, set) ->
+                // The whole row is the target, at least 48dp tall.
+                Row(Modifier.fillMaxWidth().heightIn(min = 48.dp).clickable(role = Role.Checkbox) { set(!checked) }, verticalAlignment = Alignment.CenterVertically) {
                     Checkbox(checked = checked, onCheckedChange = null, colors = CheckboxDefaults.colors(checkedColor = palette.primarySolid))
-                    Text(label, fontSize = 14.sp, color = palette.textPrimary)
+                    Text(label, fontSize = 14.sp, color = palette.textPrimary, modifier = Modifier.weight(1f))
                 }
             }
             Spacer(Modifier.height(8.dp))
-            Text("How far back", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = palette.textPrimary)
+            Text(stringResource(R.string.mail_import_how_far_back), fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = palette.textPrimary)
             Spacer(Modifier.height(6.dp))
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 PERIODS.forEach { (value, label) ->
                     val selected = months == value
-                    Text(label, fontSize = 13.sp, color = if (selected) palette.onPrimary else palette.textPrimary,
-                        modifier = Modifier.clip(RoundedCornerShape(16.dp))
+                    Text(stringResource(label), fontSize = 13.sp, color = if (selected) palette.onPrimary else palette.textPrimary,
+                        modifier = Modifier.align(Alignment.CenterVertically).minimumInteractiveComponentSize()
+                            .clip(RoundedCornerShape(16.dp))
                             .background(if (selected) palette.primarySolid else palette.card)
                             .border(1.dp, if (selected) palette.primarySolid else palette.border, RoundedCornerShape(16.dp))
                             .clickable(role = Role.RadioButton) { months = value }
@@ -190,28 +209,32 @@ private fun ImportMailScreen(onBack: () -> Unit) {
                 Text(it, fontSize = 13.sp, color = palette.error, modifier = Modifier.testTag("import-error"))
             }
             Spacer(Modifier.height(16.dp))
-            GradientButton(if (busy) "Starting…" else "Start import", onClick = {
+            val errHost = stringResource(R.string.mail_import_err_host)
+            val errUser = stringResource(R.string.mail_import_err_user)
+            val errPassword = stringResource(R.string.mail_import_err_password)
+            val errFolder = stringResource(R.string.mail_import_err_folder)
+            GradientButton(if (busy) stringResource(R.string.mail_import_starting) else stringResource(R.string.mail_import_start), onClick = {
                 if (busy) return@GradientButton
                 error = when {
-                    host.isBlank() -> "Enter the IMAP server name."
-                    username.isBlank() -> "Enter the email address of that account."
-                    password.isBlank() -> "Enter the app password."
-                    !inbox && !sent && !archive -> "Choose at least one folder."
+                    host.isBlank() -> errHost
+                    username.isBlank() -> errUser
+                    password.isBlank() -> errPassword
+                    !inbox && !sent && !archive -> errFolder
                     else -> null
                 }
                 if (error != null) return@GradientButton
                 busy = true
                 scope.launch {
                     val token = SessionStore.token(context)
-                    if (token == null) { busy = false; error = "Sign in again."; return@launch }
+                    if (token == null) { busy = false; error = context.getString(R.string.mail_notify_sign_in_again); return@launch }
                     runCatching { Api.importStart(token, host, username, password, inbox, sent, archive, months) }
-                        .onSuccess { r -> if (r.success) { job = r.job; password = "" } else error = r.error ?: "The import could not start." }
-                        .onFailure { e -> error = e.message ?: "The import could not start." }
+                        .onSuccess { r -> if (r.success) { job = r.job; password = "" } else error = r.error ?: context.getString(R.string.mail_import_could_not_start) }
+                        .onFailure { e -> error = e.message ?: context.getString(R.string.mail_import_could_not_start) }
                     busy = false
                 }
             })
             Spacer(Modifier.height(16.dp))
-            Text("Outlook.com and Microsoft 365 no longer allow importing with a password, so they are not listed. Mail from Outlook can be forwarded to your GrapMail address instead.",
+            Text(stringResource(R.string.mail_import_outlook_note),
                 fontSize = 12.sp, lineHeight = 18.sp, color = palette.textTertiary)
             Spacer(Modifier.height(24.dp))
         }
@@ -229,25 +252,25 @@ private fun ImportProgress(job: ImportJobDto, onCancel: () -> Unit) {
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         Text(when (job.state) {
-            "connecting" -> "Connecting to ${job.host}…"
-            "importing" -> "Importing from ${job.username}"
-            "done" -> "Import finished"
-            "cancelled" -> "Import stopped"
-            else -> "Import stopped with a problem"
+            "connecting" -> stringResource(R.string.mail_import_connecting, job.host)
+            "importing" -> stringResource(R.string.mail_import_importing, job.username)
+            "done" -> stringResource(R.string.mail_import_done)
+            "cancelled" -> stringResource(R.string.mail_import_cancelled)
+            else -> stringResource(R.string.mail_import_problem)
         }, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = palette.textPrimary)
         if (total > 0) {
             LinearProgressIndicator(progress = { (done.toFloat() / total).coerceIn(0f, 1f) },
                 modifier = Modifier.fillMaxWidth(), color = palette.primarySolid)
-            Text("$done of $total checked · ${job.imported} imported · ${job.skipped} already here" +
-                (if (job.failed > 0) " · ${job.failed} could not be read" else ""),
+            Text(if (job.failed > 0) stringResource(R.string.mail_import_progress_failed, done, total, job.imported, job.skipped, job.failed)
+                else stringResource(R.string.mail_import_progress, done, total, job.imported, job.skipped),
                 fontSize = 12.sp, color = palette.textSecondary)
         }
-        job.folders.forEach { f -> Text("${f.name}: ${f.done} of ${f.total}", fontSize = 12.sp, color = palette.textTertiary) }
+        job.folders.forEach { f -> Text(stringResource(R.string.mail_import_folder_progress, f.name, f.done, f.total), fontSize = 12.sp, color = palette.textTertiary) }
         job.error?.let { Text(it, fontSize = 13.sp, color = palette.error) }
         if (job.finishedAt == null) {
-            TextButton(onClick = onCancel, modifier = Modifier.testTag("import-cancel")) { Text("Stop the import") }
+            TextButton(onClick = onCancel, modifier = Modifier.testTag("import-cancel")) { Text(stringResource(R.string.mail_import_stop)) }
         } else if (job.state == "done") {
-            Text("Imported mail is in your Inbox, Sent and Archive. Running the import again only brings what is new.",
+            Text(stringResource(R.string.mail_import_done_note),
                 fontSize = 12.sp, color = palette.textSecondary)
         }
     }

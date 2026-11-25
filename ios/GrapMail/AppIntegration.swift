@@ -13,7 +13,7 @@ import UserNotifications
 /// lets mail arrive to a notification instead to a screen the person has to
 /// remember to open.
 ///
-/// ── HOW MAIL ANNOUNCES ITSELF ────────────────────────────────────────────
+/// ── HOW MAIL ANNOUNCES ITSELF ─────────────────────────────────────────────
 /// Two paths, one rule: nothing is announced that the app did not verify with
 /// its own authenticated read. The server can wake this app (the device's push
 /// token is registered with the GrapMail backend at sign-in and removed at
@@ -24,42 +24,10 @@ import UserNotifications
 /// the wording below never claims either — the wake schedule is the server's
 /// and the poll interval is the system's, not ours.
 
-// ── haptics ─────────────────────────────────────────────────────────────────
-
-/// The device's sense of an action having happened.
-///
-/// Three kinds, because the events are different: filing moves a message
-/// somewhere, starring marks one, and a send either reached the server or did
-/// not. A single generic tick on all of them is decoration — the person cannot
-/// tell by feel whether the thing they did worked, which is exactly what a
-/// haptic is for.
-///
-/// There is no system "reduce haptics" flag an app can read (Settings exposes
-/// System Haptics without an API), so the honest gate is the one iOS gives:
-/// VoiceOver already speaks these outcomes, and these calls stay silent when
-/// the generator cannot run rather than forcing anything.
-enum GMHaptics {
-    /// A message moved boxes: archive, trash, spam, restore, snooze, and their
-    /// reverses. Medium, because the mail leaves the screen.
-    static func filing() {
-        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-    }
-
-    /// A star toggled. Light: nothing moved, a flag changed.
-    static func marking() {
-        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-    }
-
-    /// The server accepted a send.
-    static func success() {
-        UINotificationFeedbackGenerator().notificationOccurred(.success)
-    }
-
-    /// A write the server refused, or a read it would not answer.
-    static func failure() {
-        UINotificationFeedbackGenerator().notificationOccurred(.error)
-    }
-}
+// ── haptics ──
+// `GMHaptics` (filing / marking / success / failure) now lives in
+// Haptics.swift with the generator helper it plays through, so every haptic
+// in the app goes through one file.
 
 // ── network ─────────────────────────────────────────────────────────────────
 
@@ -252,11 +220,15 @@ enum MailPoll {
     private static func announceGeneric(message: MailMessage, account: String?, generation: UUID) async -> Bool {
         let content = UNMutableNotificationContent()
         content.title = "GrapMail"
-        content.body = "New mail"
+        content.body = String(localized: "New mail", comment: "Generic notification body when previews are hidden")
         content.sound = .default
         if let account, !account.isEmpty {
             content.subtitle = account
-            content.userInfo = ["messageId": message.id, "threadId": message.threadId ?? "", "account": account]
+            // `generic` lets the tap handler open the message: this banner has
+            // no mail category (no actions on a hidden preview), and without
+            // the marker the tap was dropped and only the app came forward.
+            content.userInfo = ["messageId": message.id, "threadId": message.threadId ?? "", "account": account,
+                                "generic": "1"]
         }
         guard !Task.isCancelled, generation == SessionStore.generation else { return false }
         do {
@@ -283,11 +255,14 @@ enum MailPoll {
             return false
         }
         let content = UNMutableNotificationContent()
-        content.title = "\(grew) new message\(grew == 1 ? "" : "s")"
-        content.body = "\(total) unread in the inbox"
+        // A whole title per count: the "s" suffix this used to splice in has
+        // no equivalent in most languages.
+        content.title = grew == 1 ? String(localized: "1 new message")
+                                  : String(localized: "\(grew) new messages")
+        content.body = String(localized: "\(total) unread in the inbox")
         let encrypted = message?.isE2eEncrypted == true
         let privatePreview = encrypted || UserDefaults.standard.bool(forKey: "mailGenericPreviews")
-        if encrypted { content.title = "New encrypted message" }
+        if encrypted { content.title = String(localized: "New encrypted message") }
         content.sound = .default
         if !privatePreview, let previewFile, let attachment = try? UNNotificationAttachment(identifier: "image", url: previewFile) {
             content.attachments = [attachment]
@@ -308,16 +283,26 @@ enum MailPoll {
 
         var notification: UNNotificationContent = content
         if !privatePreview, let message, let sender = message.from?.display.nilIfBlank() {
-            content.title = sender
-            let subject = message.subject?.nilIfBlank() ?? "(no subject)"
+            // A one-time sign-in code leads the title and gets its own "Copy
+            // code" button (CodeFinder.swift; never for sealed or hidden mail —
+            // `privatePreview` covers both).
+            let code = content.categoryIdentifier == actionCategory ? CodeFinder.find(message) : nil
+            content.title = code.map { String(localized: "\($0) · \(sender)", comment: "Notification title: a sign-in code, then the sender") } ?? sender
+            if let code {
+                content.categoryIdentifier = CodeFinder.notificationCategory
+                content.userInfo[CodeFinder.userInfoKey] = code
+            }
+            let subject = message.subject?.nilIfBlank() ?? String(localized: "(no subject)")
             let preview = message.snippet?.nilIfBlank()
             content.body = [subject, preview].compactMap { $0 }.joined(separator: "\n")
             content.threadIdentifier = message.threadId ?? message.id
             if let address = message.from?.address?.nilIfBlank(),
                let avatar = await senderAvatar(sender, address: address) {
+                // A communication banner titles itself with the person's name,
+                // so the coded title is the name shown here.
                 let person = INPerson(
                     personHandle: INPersonHandle(value: address, type: .emailAddress),
-                    nameComponents: nil, displayName: sender, image: avatar,
+                    nameComponents: nil, displayName: content.title, image: avatar,
                     contactIdentifier: nil, customIdentifier: address
                 )
                 let intent = INSendMessageIntent(
@@ -325,9 +310,13 @@ enum MailPoll {
                     content: content.body, speakableGroupName: nil, conversationIdentifier: content.threadIdentifier,
                     serviceName: nil, sender: person, attachments: nil
                 )
-                let interaction = INInteraction(intent: intent, response: nil)
-                interaction.direction = .incoming
-                try? await interaction.donate()
+                // A message carrying a code is not donated: Siri suggestions
+                // would remember the person under a name with a code in it.
+                if code == nil {
+                    let interaction = INInteraction(intent: intent, response: nil)
+                    interaction.direction = .incoming
+                    try? await interaction.donate()
+                }
                 if let updated = try? content.updating(from: intent) { notification = updated }
             }
         }
@@ -410,6 +399,27 @@ enum MailPoll {
         // schedule is the system's, and DATA-FLOW.md says so.
         request.earliestBeginDate = Date(timeIntervalSinceNow: 15 * 60)
         try? BGTaskScheduler.shared.submit(request)
+    }
+}
+
+// ── sign-in codes on the pasteboard ─────────────────────────────────────────
+
+/// The "Copy code" notification action's answer. The code is re-checked
+/// against `CodeFinder.isPlausible` (userInfo is the extension's, but a
+/// payload is still input), written local-only — never to Universal Clipboard
+/// on the person's other devices — and set to expire after three minutes, the
+/// iOS equivalent of Android's sensitive-clip flag.
+enum SignInCodePasteboard {
+    static let lifetime: TimeInterval = 180
+
+    @MainActor
+    static func copy(_ code: String?) {
+        guard CodeFinder.isPlausible(code), let code else { return }
+        UIPasteboard.general.setItems(
+            [["public.utf8-plain-text": code]],
+            options: [.localOnly: true, .expirationDate: Date().addingTimeInterval(lifetime)]
+        )
+        GMHaptics.success()
     }
 }
 
@@ -589,8 +599,8 @@ enum SecurityPush {
     /// forward, which is the point — securing the account happens in it.
     static var registeredCategory: UNNotificationCategory {
         UNNotificationCategory(identifier: category, actions: [
-            UNNotificationAction(identifier: ackAction, title: "This was me"),
-            UNNotificationAction(identifier: secureAction, title: "Secure account", options: [.foreground]),
+            UNNotificationAction(identifier: ackAction, title: String(localized: "This was me", comment: "Security alert notification action")),
+            UNNotificationAction(identifier: secureAction, title: String(localized: "Secure account", comment: "Security alert notification action"), options: [.foreground]),
         ], intentIdentifiers: [], options: [])
     }
 
@@ -643,23 +653,40 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
     /// lives for the whole process, and every future sign-in needs the hook.
     private var sessionChangeObserver: NSObjectProtocol?
 
+    /// The mail category's actions, shared by the plain mail category and the
+    /// sign-in code one (which puts "Copy code" in front of the same set).
+    private static var mailActions: [UNNotificationAction] {
+        [
+            UNNotificationAction(identifier: "archive", title: String(localized: "Archive", comment: "Mail notification action")),
+            UNNotificationAction(identifier: "read", title: String(localized: "Mark as read", comment: "Mail notification action")),
+            // Inline reply: the person answers without the app ever coming
+            // forward. `reply.text` is the text field itself; `reply` stays
+            // as the door into the full composer - the option the encrypted
+            // path falls back to.
+            UNTextInputNotificationAction(identifier: "reply.text", title: String(localized: "Reply", comment: "Mail notification action"), options: [],
+                                          textInputButtonTitle: String(localized: "Send", comment: "Inline reply send button"), textInputPlaceholder: String(localized: "Reply…", comment: "Inline reply placeholder")),
+            UNNotificationAction(identifier: "reply", title: String(localized: "Reply in app", comment: "Mail notification action"), options: [.foreground]),
+            UNNotificationAction(identifier: "more", title: String(localized: "More", comment: "Mail notification action"), options: [.foreground]),
+        ]
+    }
+
     func application(_ application: UIApplication,
                      didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
         let center = UNUserNotificationCenter.current()
         center.delegate = self
         center.setNotificationCategories([
-            UNNotificationCategory(identifier: MailPoll.actionCategory, actions: [
-                UNNotificationAction(identifier: "archive", title: "Archive"),
-                UNNotificationAction(identifier: "read", title: "Mark as read"),
-                // Inline reply: the person answers without the app ever coming
-                // forward. `reply.text` is the text field itself; `reply` stays
-                // as the door into the full composer - the option the encrypted
-                // path falls back to.
-                UNTextInputNotificationAction(identifier: "reply.text", title: "Reply", options: [],
-                                              textInputButtonTitle: "Send", textInputPlaceholder: "Reply…"),
-                UNNotificationAction(identifier: "reply", title: "Reply in app", options: [.foreground]),
-                UNNotificationAction(identifier: "more", title: "More", options: [.foreground]),
-            ], intentIdentifiers: [], options: []),
+            UNNotificationCategory(identifier: MailPoll.actionCategory, actions: Self.mailActions,
+                                   intentIdentifiers: [], options: []),
+            // A message with a one-time sign-in code (CodeFinder.swift): the
+            // Notification Service Extension and `MailPoll.announce` stamp
+            // this category. "Copy code" runs in the background; it asks for
+            // the device to be unlocked first, so a locked phone never hands
+            // its code to whoever holds it.
+            UNNotificationCategory(identifier: CodeFinder.notificationCategory, actions: [
+                UNNotificationAction(identifier: CodeFinder.copyActionIdentifier,
+                                     title: String(localized: "Copy code", comment: "Mail notification action: copies the sign-in code in the message"),
+                                     options: [.authenticationRequired]),
+            ] + Self.mailActions, intentIdentifiers: [], options: []),
             // Security alerts are their own category: the OS renders "This was
             // me" / "Secure account" from it, and the response handler below
             // routes by it. setNotificationCategories REPLACES the set, so both
@@ -772,9 +799,24 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
             SecurityPush.handle(response: response) { completionHandler() }
             return
         }
+        // "Copy code": a local write, no account or network needed. Never for a
+        // sealed message — the extension and the poll never stamp one, and the
+        // flags are checked again here.
+        if response.actionIdentifier == CodeFinder.copyActionIdentifier {
+            if info["encrypted"] as? String != "1", info["e2e"] as? String != "1",
+               info["privatePreview"] as? String != "1" {
+                SignInCodePasteboard.copy(info[CodeFinder.userInfoKey] as? String)
+            }
+            completionHandler()
+            return
+        }
         let isRemote = request.trigger is UNPushNotificationTrigger
         let accountKey = isRemote ? "mailbox" : "account"
-        guard isRemote || request.content.categoryIdentifier == MailPoll.actionCategory,
+        let mailCategory = request.content.categoryIdentifier == MailPoll.actionCategory ||
+            request.content.categoryIdentifier == CodeFinder.notificationCategory
+        // A hidden-preview banner (`announceGeneric`) carries no category, only the marker.
+        let genericMail = (info["generic"] as? String) == "1"
+        guard isRemote || mailCategory || genericMail,
               let account = info[accountKey] as? String, SessionStore.account(account) != nil,
               let messageId = info["messageId"] as? String, !messageId.isEmpty else {
             completionHandler()

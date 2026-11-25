@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    values-iw/strings_send_later.xml: translation of values/strings_send_later.xml (same keys, same order).
+    Comments below are kept from the English source for context.
+-->
+<resources>
+    <!-- The clock button next to Send (TalkBack label and click action). -->
+    <string name="compose_send_later_button">תזמון שליחה</string>
+    <string name="compose_send_later_button_action">בחירת מועד השליחה</string>
+
+    <!-- The sheet. -->
+    <string name="compose_send_later_title">שליחה מאוחר יותר</string>
+    <string name="compose_send_later_later_today">מאוחר יותר היום</string>
+    <string name="compose_send_later_tomorrow_morning">מחר בבוקר</string>
+    <string name="compose_send_later_monday_morning">יום שני בבוקר</string>
+    <string name="compose_send_later_pick">בחירת תאריך ושעה</string>
+    <string name="compose_send_later_pick_hint">עד 30 ימים מראש</string>
+    <!-- %1$s: the device time zone's name, e.g. "Bangladesh Standard Time". -->
+    <string name="compose_send_later_zone_note">השעות מוצגות לפי אזור הזמן שלך: %1$s</string>
+    <!-- TalkBack for one option row. %1$s: option name, %2$s: its day and time. -->
+    <string name="compose_send_later_option_description">%1$s, %2$s</string>
+
+    <!-- Date and time dialogs. -->
+    <string name="compose_send_later_date_title">בחירת תאריך</string>
+    <string name="compose_send_later_time_title">בחירת שעה</string>
+    <string name="compose_send_later_next">הבא</string>
+    <string name="compose_send_later_schedule">תזמון</string>
+    <string name="compose_send_later_cancel">ביטול</string>
+    <string name="compose_send_later_type_time">הקלדת השעה</string>
+    <string name="compose_send_later_use_clock">שימוש בשעון</string>
+    <string name="compose_send_later_too_soon">יש לבחור שעה של דקה אחת לפחות מעכשיו.</string>
+    <string name="compose_send_later_too_far">יש לבחור שעה של עד 30 ימים מעכשיו.</string>
+
+    <!-- In-flight and failure lines in the composer. -->
+    <string name="compose_send_later_scheduling">התזמון מתבצע…</string>
+    <string name="compose_send_later_offline">אין חיבור, ולכן שום דבר לא תוזמן. ההודעה עדיין כאן.</string>
+
+    <!-- The receipt snackbar shown after compose closes. %1$s: e.g. "Tue 8:00 AM". -->
+    <string name="compose_send_later_scheduled_for">מתוזמנת ל-%1$s</string>
+    <string name="compose_send_later_undo">ביטול פעולה</string>
+    <string name="compose_send_later_view">הצגה</string>
+    <string name="compose_send_later_undoing">מבטל…</string>
+    <string name="compose_send_later_undone">השליחה כבר לא מתוזמנת. ההודעה חזרה לטיוטות.</string>
+    <!-- %1$s: the server's reason. -->
+    <string name="compose_send_later_undo_failed">לא ניתן לבטל: %1$s</string>
+    <string name="compose_send_later_dismiss">סגירה</string>
+</resources>

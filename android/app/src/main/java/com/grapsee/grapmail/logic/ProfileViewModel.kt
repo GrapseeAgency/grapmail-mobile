@@ -3,15 +3,19 @@ package com.grapsee.grapmail.logic
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.grapsee.grapmail.R
 import com.grapsee.grapmail.data.Api
 import com.grapsee.grapmail.data.ApiException
+import com.grapsee.grapmail.data.MailStore
 import com.grapsee.grapmail.data.AvatarPhoto
 import com.grapsee.grapmail.data.ProfileConnectionDto
 import com.grapsee.grapmail.data.ProfileDto
 import com.grapsee.grapmail.data.ProfilePatch
 import com.grapsee.grapmail.data.ProfileSettingsPatch
+import com.grapsee.grapmail.data.RememberedAccounts
 import com.grapsee.grapmail.data.SessionStore
 import com.grapsee.grapmail.data.SessionSnapshot
+import com.grapsee.grapmail.ui.i18n.CoreStrings
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -163,6 +167,15 @@ class ProfileViewModel @JvmOverloads constructor(
         ) return
         profileLoad = viewModelScope.launch {
             val session = SessionStore.snapshot(getApplication()) ?: return@launch
+            val context = getApplication<Application>()
+            if (state.value.profile == null) {
+                val cached = MailStore.cachedProfile(context, session.id)
+                if (!SessionStore.isCurrent(context, session.id)) return@launch
+                if (cached != null) {
+                    _state.update { it.copy(profile = cached, loading = false, fatal = null) }
+                    com.grapsee.grapmail.data.MailDisplayPrefs.apply(context, cached.settings)
+                }
+            }
             _state.update { it.copy(loading = it.profile == null) }
             if (state.value.profile == null && state.value.avatar == null) {
                 val cached = AvatarPhoto.readCached(getApplication(), session)
@@ -172,8 +185,12 @@ class ProfileViewModel @JvmOverloads constructor(
             }
             runCatching { Api.profile(session.token) }
                 .onSuccess { resp ->
+                    if (!SessionStore.isCurrent(context, session.id)) return@launch
                     val fresh = resp.profile
-                    if (fresh != null) profileLoadedAt = android.os.SystemClock.elapsedRealtime()
+                    if (fresh != null) {
+                        profileLoadedAt = android.os.SystemClock.elapsedRealtime()
+                        MailStore.putProfile(context, session.id, fresh)
+                    }
                     com.grapsee.grapmail.data.MailDisplayPrefs.apply(getApplication(), fresh?.settings)
                     if (fresh != null && fresh.avatarUrl != state.value.profile?.avatarUrl) {
                         avatarLoad?.cancel()
@@ -185,7 +202,7 @@ class ProfileViewModel @JvmOverloads constructor(
                             profile = fresh ?: it.profile, loading = false,
                             avatar = it.avatar,
                             avatarTried = !avatarChanged && it.avatarTried,
-                            fatal = if (fresh == null && it.profile == null) "The account record is unavailable." else null,
+                            fatal = if (fresh == null && it.profile == null) CoreStrings.get(R.string.core_profile_unavailable) { "The account record is unavailable." } else null,
                             staleError = null,
                         )
                     }
@@ -193,6 +210,7 @@ class ProfileViewModel @JvmOverloads constructor(
                 }
                 .onFailure { e ->
                     if (e is kotlinx.coroutines.CancellationException) throw e
+                    if (!SessionStore.isCurrent(context, session.id)) return@launch
                     val msg = reason(e)
                     _state.update {
                         it.copy(loading = false,
@@ -254,7 +272,7 @@ class ProfileViewModel @JvmOverloads constructor(
     }
 
     private fun writeTokenMissing() {
-        _state.update { it.copy(busy = false, note = "Sign in again.", noteIsBad = true) }
+        _state.update { it.copy(busy = false, note = CoreStrings.get(R.string.core_sign_in_again) { "Sign in again." }, noteIsBad = true) }
     }
 
     /**
@@ -267,10 +285,15 @@ class ProfileViewModel @JvmOverloads constructor(
     fun save(label: String, patch: ProfilePatch) {
         if (!beginWrite()) return
         viewModelScope.launch {
-            val t = token() ?: run { writeTokenMissing(); return@launch }
-            runCatching { Api.patchProfile(t, patch) }
+            val context = getApplication<Application>()
+            val session = SessionStore.snapshot(context) ?: run { writeTokenMissing(); return@launch }
+            runCatching { Api.patchProfile(session.token, patch) }
                 .onSuccess { resp ->
-                    if (resp.profile != null) profileLoadedAt = android.os.SystemClock.elapsedRealtime()
+                    if (!SessionStore.isCurrent(context, session.id)) return@launch
+                    resp.profile?.let {
+                        profileLoadedAt = android.os.SystemClock.elapsedRealtime()
+                        MailStore.putProfile(context, session.id, it)
+                    }
                     com.grapsee.grapmail.data.MailDisplayPrefs.apply(getApplication(), resp.profile?.settings)
                     _state.update {
                         it.copy(
@@ -279,6 +302,9 @@ class ProfileViewModel @JvmOverloads constructor(
                             note = resp.message?.takeIf { m -> m.isNotBlank() } ?: label,
                             noteIsBad = false,
                         )
+                    }
+                    if (patch.firstName != null || patch.lastName != null || patch.displayName != null) {
+                        refreshRemembered()
                     }
                 }
                 .onFailure { e ->
@@ -291,10 +317,10 @@ class ProfileViewModel @JvmOverloads constructor(
     }
 
     fun saveSettings(patch: ProfileSettingsPatch) =
-        save("Saved.", ProfilePatch(settings = patch))
+        save(CoreStrings.get(R.string.core_profile_saved) { "Saved." }, ProfilePatch(settings = patch))
 
     fun saveConnections(keep: List<ProfileConnectionDto>) =
-        save("Removed.", ProfilePatch(connections = keep))
+        save(CoreStrings.get(R.string.core_profile_removed) { "Removed." }, ProfilePatch(connections = keep))
 
     /**
      * Mint or retire an alias — the two routes the mailbox API already declares,
@@ -313,12 +339,12 @@ class ProfileViewModel @JvmOverloads constructor(
             runCatching {
                 if (remove) {
                     val r = Api.mailDeleteAlias(t, value)
-                    if (!r.success) error(r.error ?: "That alias could not be removed.")
-                    r.message ?: "Alias removed."
+                    if (!r.success) error(r.error ?: CoreStrings.get(R.string.core_alias_remove_failed) { "That alias could not be removed." })
+                    r.message ?: CoreStrings.get(R.string.core_alias_removed) { "Alias removed." }
                 } else {
                     val r = Api.mailCreateAlias(t, value)
-                    if (!r.success) error(r.error ?: r.message ?: "The alias could not be created.")
-                    r.message ?: "Alias created."
+                    if (!r.success) error(r.error ?: r.message ?: CoreStrings.get(R.string.core_alias_create_failed) { "The alias could not be created." })
+                    r.message ?: CoreStrings.get(R.string.core_alias_created) { "Alias created." }
                 }
             }
                 .onSuccess { msg ->
@@ -349,16 +375,17 @@ class ProfileViewModel @JvmOverloads constructor(
                     _state.update {
                         it.copy(busy = false, avatar = saved, avatarTried = true,
                             profile = it.profile?.copy(avatarUrl = resp.avatarUrl ?: it.profile.avatarUrl),
-                            note = resp.message?.takeIf { m -> m.isNotBlank() } ?: "Profile photo updated.",
+                            note = resp.message?.takeIf { m -> m.isNotBlank() } ?: CoreStrings.get(R.string.core_avatar_updated) { "Profile photo updated." },
                             noteIsBad = false)
                     }
                     AvatarPhoto.cache(getApplication(), session, saved)
+                    RememberedAccounts.refreshAsync(getApplication(), session.address)
                     onSaved()
                     load(force = true)
                 }
                 .onFailure { e ->
                     if (e is kotlinx.coroutines.CancellationException) throw e
-                    _state.update { it.copy(busy = false, note = "Couldn’t confirm your profile photo. Try again.", noteIsBad = true) }
+                    _state.update { it.copy(busy = false, note = CoreStrings.get(R.string.core_avatar_unconfirmed) { "Couldn’t confirm your profile photo. Try again." }, noteIsBad = true) }
                 }
         }
     }
@@ -374,10 +401,11 @@ class ProfileViewModel @JvmOverloads constructor(
                     _state.update {
                         it.copy(busy = false, avatar = null, avatarTried = true,
                             profile = it.profile?.copy(avatarUrl = null),
-                            note = resp.message?.takeIf { m -> m.isNotBlank() } ?: "Profile photo removed.",
+                            note = resp.message?.takeIf { m -> m.isNotBlank() } ?: CoreStrings.get(R.string.core_avatar_removed) { "Profile photo removed." },
                             noteIsBad = false)
                     }
                     AvatarPhoto.forget(getApplication(), session)
+                    RememberedAccounts.refreshAsync(getApplication(), session.address)
                 }
                 .onFailure { e ->
                     if (e is kotlinx.coroutines.CancellationException) throw e
@@ -388,7 +416,18 @@ class ProfileViewModel @JvmOverloads constructor(
 
     fun clearNote() = _state.update { it.copy(note = null, noteIsBad = false) }
 
+    /**
+     * Round-8 §2.4: a remembered (welcome-back) record is updated on profile
+     * name/photo changes while signed in. Best-effort and display-only — the
+     * record never holds a credential and never signs anyone in.
+     */
+    private suspend fun refreshRemembered() {
+        if (snapshotMode) return
+        val session = SessionStore.snapshot(getApplication()) ?: return
+        RememberedAccounts.refreshAsync(getApplication(), session.address)
+    }
+
     private fun reason(e: Throwable): String =
         (e as? ApiException)?.message?.takeIf { it.isNotBlank() }
-            ?: "That change did not go through."
+            ?: CoreStrings.get(R.string.core_change_failed) { "That change did not go through." }
 }

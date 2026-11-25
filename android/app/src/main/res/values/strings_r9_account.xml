@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Round 9 (final pre-launch pass), builder android_account_security.
+    English only. The locale folders fall back to these until the next
+    translation pass adds them to values-<lang>/.
+    Code: ui/components/FeatureTip.kt, logic/FeatureTipsStore.kt,
+    ui/screens/security/SafetyScore.kt.
+-->
+<resources>
+    <!-- One-time tip on the safety-score ring, first Security Center visit (round8-spec §4.5). -->
+    <string name="tip_safety_score_title">Your account safety score</string>
+    <string name="tip_safety_score_body">Tap a step to make your account harder to break into.</string>
+</resources>

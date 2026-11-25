@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    values-ar/strings_send_later.xml: translation of values/strings_send_later.xml (same keys, same order).
+    Comments below are kept from the English source for context.
+-->
+<resources>
+    <!-- The clock button next to Send (TalkBack label and click action). -->
+    <string name="compose_send_later_button">جدولة الإرسال</string>
+    <string name="compose_send_later_button_action">اختيار وقت الإرسال</string>
+
+    <!-- The sheet. -->
+    <string name="compose_send_later_title">الإرسال لاحقًا</string>
+    <string name="compose_send_later_later_today">لاحقًا اليوم</string>
+    <string name="compose_send_later_tomorrow_morning">صباح الغد</string>
+    <string name="compose_send_later_monday_morning">صباح الاثنين</string>
+    <string name="compose_send_later_pick">اختيار التاريخ والوقت</string>
+    <string name="compose_send_later_pick_hint">حتى 30 يومًا مقدمًا</string>
+    <!-- %1$s: the device time zone's name, e.g. "Bangladesh Standard Time". -->
+    <string name="compose_send_later_zone_note">الأوقات حسب منطقتك الزمنية: %1$s</string>
+    <!-- TalkBack for one option row. %1$s: option name, %2$s: its day and time. -->
+    <string name="compose_send_later_option_description">%1$s، %2$s</string>
+
+    <!-- Date and time dialogs. -->
+    <string name="compose_send_later_date_title">اختر تاريخًا</string>
+    <string name="compose_send_later_time_title">اختر وقتًا</string>
+    <string name="compose_send_later_next">التالي</string>
+    <string name="compose_send_later_schedule">جدولة</string>
+    <string name="compose_send_later_cancel">إلغاء</string>
+    <string name="compose_send_later_type_time">كتابة الوقت</string>
+    <string name="compose_send_later_use_clock">استخدام الساعة</string>
+    <string name="compose_send_later_too_soon">اختر وقتًا بعد دقيقة واحدة على الأقل من الآن.</string>
+    <string name="compose_send_later_too_far">اختر وقتًا لا يتجاوز 30 يومًا من الآن.</string>
+
+    <!-- In-flight and failure lines in the composer. -->
+    <string name="compose_send_later_scheduling">جارٍ الجدولة…</string>
+    <string name="compose_send_later_offline">لا يوجد اتصال، لذا لم تتم جدولة أي شيء. لا تزال رسالتك هنا.</string>
+
+    <!-- The receipt snackbar shown after compose closes. %1$s: e.g. "Tue 8:00 AM". -->
+    <string name="compose_send_later_scheduled_for">مجدولة في %1$s</string>
+    <string name="compose_send_later_undo">تراجع</string>
+    <string name="compose_send_later_view">عرض</string>
+    <string name="compose_send_later_undoing">جارٍ الإلغاء…</string>
+    <string name="compose_send_later_undone">لم تعد مجدولة. عادت الرسالة إلى المسودات.</string>
+    <!-- %1$s: the server's reason. -->
+    <string name="compose_send_later_undo_failed">تعذّر الإلغاء: %1$s</string>
+    <string name="compose_send_later_dismiss">إغلاق</string>
+</resources>

@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <plurals name="reader_earlier_messages">
+        <item quantity="one">%d wcześniejsza wiadomość</item>
+        <item quantity="other">%d wcześniejszej wiadomości</item>
+        <item quantity="few">%d wcześniejsze wiadomości</item>
+        <item quantity="many">%d wcześniejszych wiadomości</item>
+    </plurals>
+    <plurals name="reader_participants">
+        <item quantity="one">%d osoba</item>
+        <item quantity="other">%d osoby</item>
+        <item quantity="few">%d osoby</item>
+        <item quantity="many">%d osób</item>
+    </plurals>
+    <plurals name="reader_message_count">
+        <item quantity="one">%d wiadomość</item>
+        <item quantity="other">%d wiadomości</item>
+        <item quantity="few">%d wiadomości</item>
+        <item quantity="many">%d wiadomości</item>
+    </plurals>
+    <string name="reader_you">Ty</string>
+    <string name="reader_unread">Nieprzeczytane</string>
+    <string name="reader_earlier_action">pokaż zwinięte wiadomości</string>
+    <string name="reader_open_message_action">otwórz tę wiadomość</string>
+    <string name="reader_quoted_show">Pokaż cytowany tekst</string>
+    <string name="reader_quoted_hide">Ukryj cytowany tekst</string>
+    <string name="reader_state_expanded">Rozwinięte</string>
+    <string name="reader_state_collapsed">Zwinięte</string>
+    <string name="reader_reply_to">Odpowiedz do %1$s…</string>
+    <string name="reader_reply_fallback">Odpowiedz…</string>
+    <string name="reader_reply_options">Opcje odpowiedzi</string>
+    <string name="reader_quick_reply">Szybka odpowiedź</string>
+    <string name="reader_attach_share_chooser">Udostępnij załącznik</string>
+    <string name="reader_attach_view_image">zobacz obraz</string>
+    <string name="reader_attach_save_named">Zapisz %1$s</string>
+    <string name="reader_attach_share_named">Udostępnij %1$s</string>
+    <string name="reader_attach_share_nothing">Żadna aplikacja na tym urządzeniu nie może udostępnić tego pliku.</string>
+    <string name="reader_viewer_position">%1$d z %2$d</string>
+    <string name="reader_viewer_too_large">Tego obrazu nie można tu wyświetlić.</string>
+    <string name="compose_r9_leave_title">Opuścić tę wiadomość?</string>
+    <string name="compose_r9_leave_attachments">Wersje robocze nie zachowują jeszcze załączników. Zapisz tekst bez nich albo pisz dalej.</string>
+    <string name="compose_r9_save_text_only">Zapisz tylko tekst</string>
+    <string name="compose_r9_draft_failed_title">Nie zapisano tej wersji roboczej</string>
+    <string name="compose_r9_leave_without_saving">Wyjdź bez zapisywania</string>
+    <string name="compose_r9_encrypt_failed">Nie udało się zaszyfrować tej wiadomości, więc nic nie wysłano.</string>
+    <string name="compose_editor_toolbar">Formatowanie tekstu</string>
+    <string name="compose_editor_bold">Pogrubienie</string>
+    <string name="compose_editor_italic">Kursywa</string>
+    <string name="compose_editor_underline">Podkreślenie</string>
+    <string name="compose_editor_strike">Przekreślenie</string>
+    <string name="compose_editor_bullets">Punkty</string>
+    <string name="compose_editor_numbered">Numerowana</string>
+    <string name="compose_editor_text_colour">Kolor tekstu</string>
+    <string name="compose_editor_black">Czarny</string>
+    <string name="compose_editor_blue">Niebieski</string>
+    <string name="compose_editor_red">Czerwony</string>
+    <string name="compose_editor_green">Zielony</string>
+    <string name="compose_editor_highlight">Wyróżnij</string>
+    <string name="compose_editor_highlight_colour">Kolor wyróżnienia</string>
+    <string name="compose_editor_yellow">Żółty</string>
+    <string name="compose_editor_pink">Różowy</string>
+    <string name="compose_editor_font">Czcionka</string>
+    <string name="compose_editor_sans">Bezszeryfowa</string>
+    <string name="compose_editor_serif">Serif</string>
+    <string name="compose_editor_mono">Monospace</string>
+    <string name="compose_editor_larger">Większe</string>
+    <string name="compose_editor_clear">Wyczyść formatowanie</string>
+    <string name="compose_editor_image">Obraz</string>
+    <string name="compose_editor_insert_image">Wstaw obraz</string>
+</resources>

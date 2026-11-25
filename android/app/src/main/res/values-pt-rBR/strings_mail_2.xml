@@ -1,0 +1,183 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Brazilian Portuguese translation of values/strings_mail.xml (part 2 of 3:
+  ScheduledScreen, StorageBanner, SubscriptionsScreen, MessageHandoff, PlanScreen,
+  NotificationFilters, ImportMail).
+-->
+<resources>
+    <!-- ui/screens/mail/ScheduledScreen.kt, StorageBanner.kt -->
+    <string name="mail_no_subject">(sem assunto)</string>
+    <string name="mail_scheduled_fallback_subject">E-mail programado</string>
+    <string name="mail_scheduled_title">Programados</string>
+    <string name="mail_scheduled_empty">Nada programado.</string>
+    <string name="mail_scheduled_to">Para %1$s</string>
+    <string name="mail_scheduled_sends">Envio em %1$s</string>
+    <string name="mail_scheduled_awaiting_instant">Aguardando o horário do servidor</string>
+    <string name="mail_scheduled_cancelling">Cancelando…</string>
+    <string name="mail_storage_full">Seu armazenamento está cheio</string>
+    <string name="mail_storage_almost_full">Seu armazenamento está quase cheio</string>
+    <string name="mail_storage_body">%1$s de %2$s usados (%3$s). Exclua anexos grandes e depois esvazie a Lixeira e o Spam.</string>
+    <string name="mail_storage_see_files">Ver arquivos grandes</string>
+    <string name="mail_common_not_now">Agora não</string>
+
+    <!-- ui/screens/mail/SubscriptionsScreen.kt -->
+    <string name="mail_subs_freq_20_plus">Mais de 20 e-mails recentemente</string>
+    <string name="mail_subs_freq_10_20">10 a 20 e-mails recentemente</string>
+    <string name="mail_subs_freq_10_or_fewer">10 e-mails ou menos recentemente</string>
+    <string name="mail_subs_title">Assinaturas</string>
+    <string name="mail_subs_intro">Remetentes que enviam e-mails com frequência para esta conta, com uma forma de interromper cada um.</string>
+    <string name="mail_subs_failed">Não foi possível ler a caixa de correio agora. Tente novamente — abra a caixa de entrada e depois volte.</string>
+    <string name="mail_subs_reading">Lendo seus e-mails…</string>
+    <string name="mail_subs_empty_title">Nenhuma assinatura detectada.</string>
+    <string name="mail_subs_empty_body">Esta tela lê os e-mails recebidos que o app carregou neste dispositivo — %1$d mensagens — e agrupa os remetentes que enviam e-mails com frequência. Um remetente conta com duas mensagens quando oferece cancelamento de inscrição, ou três quando não oferece. Nada aparece aqui como exemplo; assim que os e-mails chegarem, os remetentes aparecem com a frequência e uma forma de interrompê-los.</string>
+    <string name="mail_subs_delay_note">Depois de cancelar a inscrição, os remetentes podem levar alguns dias para parar de enviar mensagens.</string>
+    <string name="mail_subs_mailto_opened">O dispositivo abriu um rascunho para o endereço de cancelamento do remetente. Nada sai deste celular até você enviar.</string>
+    <string name="mail_subs_mailto_none">Este dispositivo não tem um app de e-mail que abra esse endereço, então nenhum rascunho foi criado.</string>
+    <string name="mail_subs_scope">Esta tela agrupou as %1$d mensagens recebidas que o app carregou; um remetente cujos e-mails não estão neste dispositivo não aparece nesta lista.</string>
+    <string name="mail_subs_footer">Nada foi enviado a nenhum remetente até você tocar em Cancelar inscrição. Esta tela nunca envia e-mails por conta própria em seu nome.</string>
+    <string name="mail_subs_removed_note">%1$s A linha foi removida aqui porque este dispositivo não consegue ver o que a página disse.</string>
+    <string name="mail_subs_no_offer">%1$s não oferece cancelamento de inscrição, então não há nada que este dispositivo possa encaminhar.</string>
+    <string name="mail_subs_scope_hint">Quando um remetente oferece cancelamento com um clique, ele é usado; caso contrário, a página de cancelamento do próprio remetente é aberta.</string>
+    <string name="mail_subs_unsubscribe">Cancelar inscrição</string>
+
+    <!-- ui/screens/mail/MessageHandoff.kt -->
+    <string name="mail_share_not_recorded">Não registrado</string>
+    <string name="mail_share_from">De: %1$s</string>
+    <string name="mail_share_to">Para: %1$s</string>
+    <string name="mail_share_cc">Cc: %1$s</string>
+    <string name="mail_share_date">Data: %1$s</string>
+    <string name="mail_share_no_text_body">Esta mensagem não tem corpo de texto.</string>
+    <string name="mail_remote_image_loading">Carregando imagem…</string>
+    <string name="mail_remote_image_bad_address">Este app não pode solicitar esse endereço.</string>
+    <string name="mail_remote_image_refused">O servidor do remetente recusou a imagem (%1$d).</string>
+    <string name="mail_remote_image_not_image">Esse endereço não é uma imagem (%1$s).</string>
+    <string name="mail_remote_image_no_type">tipo não informado</string>
+    <string name="mail_remote_image_unreadable">Não foi possível ler a imagem.</string>
+    <string name="mail_remote_image_unreachable">Não foi possível acessar o servidor do remetente.</string>
+    <string name="mail_print_no_service">Este dispositivo não tem serviço de impressão.</string>
+    <string name="mail_print_doc_name">Mensagem do GrapMail</string>
+    <string name="mail_print_no_screen">Este dispositivo não conseguiu abrir a tela de impressão.</string>
+
+    <!-- ui/screens/mail/PlanScreen.kt -->
+    <string name="mail_common_loading">Carregando…</string>
+    <string name="mail_plan_pending">O Google Play ainda está processando seu pagamento. Seu plano muda quando ele for concluído.</string>
+    <string name="mail_plan_confirming">Confirmando sua compra…</string>
+    <string name="mail_plan_youre_on">Você está no %1$s.</string>
+    <string name="mail_plan_verify_failed">Ainda não foi possível confirmar a compra. Vamos tentar de novo.</string>
+    <string name="mail_plan_read_failed">Não foi possível ler seu plano.</string>
+    <string name="mail_plan_title">Seu plano</string>
+    <string name="mail_plan_current">Plano atual</string>
+    <string name="mail_plan_renews">Renova em %1$s</string>
+    <string name="mail_plan_ends">Termina em %1$s — não será renovado</string>
+    <string name="mail_plan_badge_note">Suas mensagens mostram um selo de Assinante para outros usuários do GrapMail. Ele indica que você apoia o GrapMail; não é uma verificação de identidade.</string>
+    <string name="mail_plan_this_month">Este mês</string>
+    <string name="mail_plan_used_of">%1$d de %2$d destinatários externos</string>
+    <string name="mail_plan_counts_note">Conta pessoas fora do GrapMail. E-mails para endereços GrapMail nunca são limitados. Reinicia em %1$s.</string>
+    <string name="mail_plan_plans">Planos</string>
+    <string name="mail_plan_play_missing">O Google Play não está disponível neste dispositivo, então não é possível comprar planos aqui.</string>
+    <string name="mail_plan_free">Grátis</string>
+    <plurals name="mail_plan_recipients_month">
+        <item quantity="one">%1$d destinatário externo por mês</item>
+        <item quantity="other">%1$d destinatários externos por mês</item>
+    </plurals>
+    <string name="mail_plan_not_available_here">Indisponível aqui</string>
+    <string name="mail_plan_not_available_yet">Ainda indisponível</string>
+    <string name="mail_plan_subscribe">Assinar</string>
+    <string name="mail_plan_switch_to">Mudar para %1$s</string>
+    <string name="mail_plan_sheet_failed">O Google Play não conseguiu abrir a tela de compra. Tente novamente.</string>
+    <string name="mail_plan_manage">Gerenciar ou cancelar no Google Play</string>
+    <string name="mail_plan_prices_note">Os preços são definidos e cobrados pelo Google Play na sua moeda. O GrapMail confirma cada compra com o Google antes de mudar seu plano.</string>
+
+    <!-- ui/screens/mail/NotificationFilters.kt -->
+    <string name="mail_common_off">Desativado</string>
+    <string name="mail_common_add">Adicionar</string>
+    <string name="mail_common_remove">Remover</string>
+    <string name="mail_common_saving">Salvando…</string>
+    <string name="mail_notify_sign_in_again">Entre novamente.</string>
+    <string name="mail_notify_read_failed">Não foi possível ler suas configurações de notificação.</string>
+    <string name="mail_notify_title">Filtros de notificação</string>
+    <string name="mail_notify_checking">Verificando suas configurações…</string>
+    <string name="mail_notify_alert_me_about">Me avisar sobre</string>
+    <string name="mail_notify_mode_all">Todos os novos e-mails</string>
+    <string name="mail_notify_mode_all_detail">Todas as mensagens que chegam à caixa de entrada.</string>
+    <string name="mail_notify_mode_priority">Somente prioritários</string>
+    <string name="mail_notify_mode_priority_detail">Remetentes VIP e conversas que você segue.</string>
+    <string name="mail_notify_mode_none">Nada</string>
+    <string name="mail_notify_mode_none_detail">Apenas conversas que você segue e alertas de segurança.</string>
+    <string name="mail_notify_lock_screen">Na tela de bloqueio</string>
+    <string name="mail_notify_show_preview">Mostrar remetente e assunto</string>
+    <string name="mail_notify_preview_on">Os alertas mostram quem escreveu e sobre o quê.</string>
+    <string name="mail_notify_preview_off">Os alertas dizem apenas \"Novo e-mail\".</string>
+    <string name="mail_notify_quiet_hours">Horário silencioso</string>
+    <string name="mail_notify_quiet_pause">Pausar alertas todos os dias</string>
+    <string name="mail_notify_quiet_range">Das %1$s às %2$s</string>
+    <string name="mail_notify_quiet_range_zone">Das %1$s às %2$s (%3$s)</string>
+    <string name="mail_notify_quiet_same_times">O horário silencioso precisa começar e terminar em horários diferentes.</string>
+    <string name="mail_notify_from">Das</string>
+    <string name="mail_notify_to">Às</string>
+    <string name="mail_notify_change_from">Alterar horário de início</string>
+    <string name="mail_notify_change_to">Alterar horário de término</string>
+    <string name="mail_notify_vip_through">Deixar VIPs passarem</string>
+    <string name="mail_notify_vip_through_detail">Remetentes VIP e conversas que você segue continuam gerando alertas.</string>
+    <string name="mail_notify_vip_senders">Remetentes VIP</string>
+    <string name="mail_notify_vip_hint">Um endereço (nome@exemplo.com) ou um domínio inteiro (exemplo.com).</string>
+    <string name="mail_notify_vip_placeholder">Adicionar um VIP</string>
+    <string name="mail_notify_vip_invalid">\"%1$s\" não é um endereço nem um domínio.</string>
+    <string name="mail_notify_vip_added">%1$s adicionado.</string>
+    <string name="mail_notify_vip_removed">%1$s removido.</string>
+    <string name="mail_notify_vip_empty">Nenhum VIP ainda. Você também pode adicionar um pelo menu de uma mensagem.</string>
+    <string name="mail_notify_conversations">Conversas</string>
+    <string name="mail_notify_muted_none">Nenhuma conversa silenciada</string>
+    <plurals name="mail_notify_muted_count">
+        <item quantity="one">%1$d conversa silenciada</item>
+        <item quantity="other">%1$d conversas silenciadas</item>
+    </plurals>
+    <string name="mail_notify_unmuted_all">Todas as conversas podem gerar alertas novamente.</string>
+    <string name="mail_notify_unmute_all">Reativar todas</string>
+    <string name="mail_notify_followed_none">Nenhuma conversa seguida</string>
+    <plurals name="mail_notify_followed_count">
+        <item quantity="one">%1$d conversa seguida</item>
+        <item quantity="other">%1$d conversas seguidas</item>
+    </plurals>
+    <string name="mail_notify_unfollowed_all">Você deixou de seguir todas as conversas.</string>
+    <string name="mail_notify_mute_hint">Silencie ou siga uma conversa pelo menu de uma mensagem.</string>
+    <string name="mail_notify_security_note">Os alertas de segurança (novos logins, mudanças de senha e da verificação em duas etapas) sempre chegam.</string>
+
+    <!-- ui/screens/mail/ImportMail.kt -->
+    <string name="mail_import_help_gmail">Ative a verificação em duas etapas na conta Google, depois crie uma senha de app e cole aqui. A sua senha do Google não vai funcionar.</string>
+    <string name="mail_import_help_yahoo">Crie uma senha de app nas configurações de Segurança da conta do Yahoo e cole aqui.</string>
+    <string name="mail_import_help_icloud">Crie uma senha específica de app para sua Conta Apple e use seu endereço de e-mail completo do iCloud como nome de usuário.</string>
+    <string name="mail_import_help_other">Qualquer provedor que ofereça IMAP por conexão segura (porta 993). Consulte as páginas de ajuda do provedor para saber o nome do servidor.</string>
+    <string name="mail_import_provider_other">Outro</string>
+    <string name="mail_import_period_3m">3 meses</string>
+    <string name="mail_import_period_1y">1 ano</string>
+    <string name="mail_import_period_5y">5 anos</string>
+    <string name="mail_import_period_all">Tudo</string>
+    <string name="mail_import_title">Importar e-mails</string>
+    <string name="mail_import_intro">Traga seus e-mails de outra conta para o GrapMail. A outra conta é apenas lida: nada muda lá, e sua senha não é guardada.</string>
+    <string name="mail_import_create_app_password">Criar uma senha de app</string>
+    <string name="mail_import_imap_server">Servidor IMAP</string>
+    <string name="mail_import_email_address">Endereço de e-mail</string>
+    <string name="mail_import_app_password">Senha de app</string>
+    <string name="mail_import_folders">Pastas</string>
+    <string name="mail_import_folder_archive">Arquivo (ou Todos os e-mails)</string>
+    <string name="mail_import_how_far_back">Período</string>
+    <string name="mail_import_err_host">Digite o nome do servidor IMAP.</string>
+    <string name="mail_import_err_user">Digite o endereço de e-mail dessa conta.</string>
+    <string name="mail_import_err_password">Digite a senha de app.</string>
+    <string name="mail_import_err_folder">Escolha pelo menos uma pasta.</string>
+    <string name="mail_import_starting">Iniciando…</string>
+    <string name="mail_import_start">Iniciar importação</string>
+    <string name="mail_import_could_not_start">Não foi possível iniciar a importação.</string>
+    <string name="mail_import_outlook_note">O Outlook.com e o Microsoft 365 não permitem mais importar com senha, por isso não aparecem na lista. Os e-mails do Outlook podem ser encaminhados para seu endereço GrapMail.</string>
+    <string name="mail_import_connecting">Conectando a %1$s…</string>
+    <string name="mail_import_importing">Importando de %1$s</string>
+    <string name="mail_import_done">Importação concluída</string>
+    <string name="mail_import_cancelled">Importação interrompida</string>
+    <string name="mail_import_problem">A importação parou com um problema</string>
+    <string name="mail_import_progress">%1$d de %2$d verificados · %3$d importados · %4$d já estavam aqui</string>
+    <string name="mail_import_progress_failed">%1$d de %2$d verificados · %3$d importados · %4$d já estavam aqui · %5$d não puderam ser lidos</string>
+    <string name="mail_import_folder_progress">%1$s: %2$d de %3$d</string>
+    <string name="mail_import_stop">Interromper a importação</string>
+    <string name="mail_import_done_note">Os e-mails importados estão na Caixa de entrada, em Enviados e no Arquivo. Importar de novo só traz o que for novo.</string>
+</resources>

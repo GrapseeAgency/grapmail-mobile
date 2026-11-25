@@ -1,0 +1,262 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Brazilian Portuguese translation of values/strings_account.xml (part 1 of 4).
+  Remaining keys are in strings_account_2.xml, strings_account_3.xml and strings_account_4.xml.
+-->
+<resources>
+
+    <!-- WizardScaffold.kt -->
+    <string name="acct_back">Voltar</string>
+    <string name="acct_wizard_step_of">Etapa %1$d de 5</string>
+    <string name="acct_create_account">CRIAR CONTA</string>
+    <string name="acct_already_have_an_account">"Já tem uma conta?  "</string>
+    <string name="acct_sign_in">Entrar</string>
+
+    <!-- NameStepScreen.kt -->
+    <string name="acct_whats_your_name">Qual é o seu nome?</string>
+    <string name="acct_this_name_appears_on_your_grapmail">Este nome aparece no seu perfil do GrapMail.</string>
+    <string name="acct_next">Avançar</string>
+    <string name="acct_first_name">Nome</string>
+    <string name="acct_first_name_is_required">O nome é obrigatório</string>
+    <string name="acct_last_name">Sobrenome</string>
+    <string name="acct_last_name_is_required">O sobrenome é obrigatório</string>
+
+    <!-- AddressStepScreen.kt -->
+    <string name="acct_choose_your_grapmail_address">Escolha seu endereço GrapMail</string>
+    <string name="acct_pick_an_available_address_or_create">Escolha um endereço disponível ou crie o seu. Você vai usá-lo para entrar e receber e-mails.</string>
+    <string name="acct_suggested_for_you">Sugestões para você</string>
+    <string name="acct_based_on_your_name_you_can_change_it">Com base no seu nome. Você pode mudar depois.</string>
+    <string name="acct_finding_available_addresses">Procurando endereços disponíveis…</string>
+    <string name="acct_no_suggestions_from_your_name_create">Nenhuma sugestão com base no seu nome — crie o seu abaixo.</string>
+    <string name="acct_create_your_own">Crie o seu</string>
+    <string name="acct_choose_a_unique_address_3_30">Escolha um endereço exclusivo (3 a 30 caracteres).</string>
+    <string name="acct_choose_your_own_address">Escolha seu próprio endereço</string>
+    <string name="acct_yourname">seunome</string>
+    <string name="acct_domain">Domínio</string>
+    <string name="acct_this_address_is_available">Este endereço está disponível!</string>
+    <string name="acct_checking">Verificando…</string>
+    <string name="acct_address_taken_try">Esse endereço já está em uso — tente %1$s</string>
+    <string name="acct_address_taken">Esse endereço já está em uso</string>
+    <string name="acct_that_address_cannot_be_used">Esse endereço não pode ser usado.</string>
+    <string name="acct_could_not_check_right_now_confirmed">Não foi possível verificar agora — isso será confirmado quando a conta for criada.</string>
+    <string name="acct_use_letters_numbers_dots_dashes_or">Use letras, números, pontos (.), hifens (-) ou sublinhados (_).\nEvite nomes reservados como admin, support, postmaster etc.</string>
+    <string name="acct_available">Disponível</string>
+
+    <!-- BasicInfoStepScreen.kt -->
+    <string-array name="acct_months">
+        <item>Janeiro</item>
+        <item>Fevereiro</item>
+        <item>Março</item>
+        <item>Abril</item>
+        <item>Maio</item>
+        <item>Junho</item>
+        <item>Julho</item>
+        <item>Agosto</item>
+        <item>Setembro</item>
+        <item>Outubro</item>
+        <item>Novembro</item>
+        <item>Dezembro</item>
+    </string-array>
+    <string name="acct_basic_info">Informações básicas</string>
+    <string name="acct_tell_us_a_little_more_about_yourself">Conte um pouco mais sobre você. Isso nos ajuda a deixar sua experiência mais pessoal.</string>
+    <string name="acct_couldnt_open_that_photo_choose">Não foi possível abrir essa foto. Escolha outra imagem.</string>
+    <string name="acct_profile_photo">Foto do perfil</string>
+    <string name="acct_profile_photo_2">"Foto do perfil "</string>
+    <string name="acct_optional">(Opcional)</string>
+    <string name="acct_add_a_photo_to_make_your_account">Adicione uma foto para deixar sua conta mais pessoal. Você pode mudá-la depois nas configurações.</string>
+    <string name="acct_change_photo">Trocar foto</string>
+    <string name="acct_choose_photo">Escolher foto</string>
+    <string name="acct_birthday">"Data de nascimento "</string>
+    <string name="acct_required">(Obrigatório)</string>
+    <string name="acct_month">Mês</string>
+    <string name="acct_day">Dia</string>
+    <string name="acct_year">Ano</string>
+    <string name="acct_you_must_be_13_or_older_to_create_an">Você precisa ter 13 anos ou mais para criar uma conta.</string>
+    <string name="acct_gender">"Gênero "</string>
+    <string name="acct_female">Feminino</string>
+    <string name="acct_male">Masculino</string>
+    <string name="acct_rather_not_say">Prefiro não dizer</string>
+    <string name="acct_custom">Personalizado</string>
+
+    <!-- CreatedScreens.kt -->
+    <string name="acct_account_created">CONTA CRIADA</string>
+    <string name="acct_youre_all_set">Tudo pronto!</string>
+    <string name="acct_your_grapmail_account_has_been">Sua conta GrapMail foi criada\ncom sucesso e você já está conectado.</string>
+    <string name="acct_active">Ativa</string>
+    <string name="acct_whats_next">E AGORA?</string>
+    <string name="acct_explore_your_mailbox">Explore sua caixa de correio</string>
+    <string name="acct_check_your_inbox_send_emails_and">Confira sua caixa de entrada, envie e-mails e muito mais.</string>
+    <string name="acct_add_your_contacts">Adicione seus contatos</string>
+    <string name="acct_stay_connected_with_friends_and">Fique em contato com amigos e colegas.</string>
+    <string name="acct_personalize_your_experience">Personalize sua experiência</string>
+    <string name="acct_set_up_your_preferences_and_get_the">Defina suas preferências e aproveite o GrapMail ao máximo.</string>
+    <string name="acct_continue_to_onboarding">Continuar para a configuração inicial</string>
+    <string name="acct_well_take_you_through_a_quick_setup">Vamos guiar você por uma configuração rápida para começar.</string>
+    <string name="acct_copy_address">Copiar endereço</string>
+    <string name="acct_your_secure_inbox">Sua caixa de entrada segura</string>
+    <string name="acct_send_receive_and_manage_your_emails">Envie, receba e organize seus e-mails.</string>
+    <string name="acct_built_for_your_privacy">Feito para a sua privacidade</string>
+    <string name="acct_your_data_stays_yours">Seus dados continuam sendo seus.</string>
+    <string name="acct_ready_for_whats_next">Pronto para o que vem por aí</string>
+    <string name="acct_lets_get_you_set_up_and_personalized">Vamos configurar e personalizar tudo para você.</string>
+    <string name="acct_go_to_mailbox">Ir para a caixa de correio</string>
+
+    <!-- GrapMailLegalScreen.kt -->
+    <string name="acct_terms_of_service">Termos de Serviço</string>
+    <string name="acct_privacy_policy">Política de Privacidade</string>
+    <string name="acct_your_account">Sua conta</string>
+    <string name="acct_you_must_be_at_least_13_to_create_a">Você precisa ter pelo menos 13 anos para criar uma conta GrapMail. Mantenha sua senha em sigilo e use as configurações de recuperação e segurança da conta se achar que outra pessoa acessou sua caixa de correio.</string>
+    <string name="acct_using_grapmail">Usando o GrapMail</string>
+    <string name="acct_use_your_mailbox_for_lawful">Use sua caixa de correio para comunicações lícitas. Não envie spam, mensagens em massa não solicitadas, phishing, malware ou mensagens que assediem outras pessoas. Contas que fizerem mau uso do serviço podem ser suspensas.</string>
+    <string name="acct_sending_and_receiving">Envio e recebimento</string>
+    <string name="acct_a_message_can_be_queued_sent_or_fail">Uma mensagem pode ficar na fila, ser enviada ou falhar. Confira Enviados e qualquer aviso de entrega quando o horário for importante. Uma mensagem na fila ainda está aguardando envio.</string>
+    <string name="acct_leaving_grapmail">Saindo do GrapMail</string>
+    <string name="acct_you_can_sign_out_on_this_device_or">Você pode sair neste dispositivo ou solicitar a exclusão da conta em Configurações → Dados e privacidade. Salve os e-mails de que precisar antes de excluir sua conta.</string>
+    <string name="acct_account_and_mailbox_data">Dados da conta e da caixa de correio</string>
+    <string name="acct_grapmail_uses_your_account_details">O GrapMail usa os dados da sua conta para criar e proteger sua caixa de correio. O serviço armazena os endereços, mensagens e anexos necessários para enviar, receber e sincronizar seus e-mails.</string>
+    <string name="acct_security_and_notifications">Segurança e notificações</string>
+    <string name="acct_google_recaptcha_helps_protect">O Google reCAPTCHA ajuda a proteger o cadastro contra abusos. Se você ativar os alertas de novos e-mails, o GrapMail pode registrar um token de dispositivo do Firebase para enviar notificações ao seu aparelho. Você pode alterar o acesso às notificações nas Configurações do Android.</string>
+    <string name="acct_images_and_device_storage">Imagens e armazenamento do dispositivo</string>
+    <string name="acct_remote_images_are_hidden_by_default">Imagens remotas ficam ocultas por padrão no leitor de mensagens. Exibi-las pode contatar o servidor de imagens do remetente. O app também mantém um cache local da caixa de correio para que os e-mails carregados recentemente fiquem disponíveis mais rápido.</string>
+    <string name="acct_encryption_choices">Opções de criptografia</string>
+    <string name="acct_grapmail_offers_end_to_end">O GrapMail oferece criptografia de ponta a ponta para mensagens compatíveis. E-mails comuns e mensagens criptografadas têm níveis de privacidade diferentes. Você pode gerenciar a criptografia e revisar os dados da sua conta nas Configurações.</string>
+    <string name="acct_control_and_deletion">Controle e exclusão</string>
+    <string name="acct_in_settings_data_privacy_you_can">Em Configurações → Dados e privacidade, você pode revisar seu perfil e solicitar a exclusão. Para dúvidas sobre retenção, acesso ou outras solicitações de privacidade, use o link de contato da Grapsee abaixo.</string>
+    <string name="acct_grapmail_guide">Guia do GrapMail</string>
+    <string name="acct_this_guide_explains_how_grapmail">Este guia explica como o GrapMail funciona. Para as informações legais atuais da Grapsee, acesse a página oficial abaixo.</string>
+    <string name="acct_legal_read_official">Leia a versão oficial: %1$s</string>
+    <string name="acct_contact_grapsee">Fale com a Grapsee</string>
+
+    <!-- WelcomeScreen.kt -->
+    <string name="acct_welcome_legal_line">Leia os %1$s e a %2$s.</string>
+    <string name="acct_welcome_to">Boas-vindas ao</string>
+    <string name="acct_a_faster_safer_and_more_private_way">Um jeito mais rápido, seguro e privado de manter contato.</string>
+    <string name="acct_create_account_button">Criar conta</string>
+
+    <!-- TermsStepScreen.kt -->
+    <string name="acct_terms_privacy">Termos e Privacidade</string>
+    <string name="acct_please_read_and_agree_to_our_terms">Leia e aceite nossos Termos de Serviço e nossa Política de Privacidade para continuar.</string>
+    <string name="acct_creating">Criando…</string>
+    <string name="acct_grapmail_terms_of_service">Termos de Serviço do GrapMail</string>
+    <string name="acct_1_your_account">"1.  Sua conta"</string>
+    <string name="acct_terms_section_account_body">Ao criar uma conta, você concorda com nossos %1$s e confirma que tem pelo menos 13 anos. Você é responsável por manter sua conta segura e por toda atividade realizada nela.</string>
+    <string name="acct_2_privacy_policy">"2.  Política de Privacidade"</string>
+    <string name="acct_terms_section_privacy_body">O GrapMail usa os dados da sua conta e da caixa de correio para operar o serviço. Saiba mais sobre dados da conta, notificações, imagens remotas e exclusão na %1$s.</string>
+    <string name="acct_i_agree_to_the_terms_of_service_and">Concordo com os Termos de Serviço e a Política de Privacidade.</string>
+    <string name="acct_you_must_scroll_to_the_bottom_of">Role até o final deste documento para ativar a caixa de seleção.</string>
+
+    <!-- HumanVerifyScreen.kt -->
+    <string name="acct_cancel_verification">Cancelar verificação</string>
+    <string name="acct_verify_your_account">Verifique sua conta</string>
+    <string name="acct_complete_a_quick_security_check_to">Faça uma verificação rápida de segurança para continuar.</string>
+    <string name="acct_verification_complete">Verificação concluída</string>
+    <string name="acct_security_check">Verificação de segurança</string>
+    <string name="acct_try_again">Tentar novamente</string>
+    <string name="acct_verify_im_human">Verificar que sou humano</string>
+    <string name="acct_the_challenge_couldnt_load_please">Não foi possível carregar o desafio. Tente novamente.</string>
+    <string name="acct_checking_verification">Verificando…</string>
+    <string name="acct_continue">Continuar</string>
+
+    <!-- OnboardingScreen.kt -->
+    <string name="acct_welcome">BOAS-VINDAS</string>
+    <string name="acct_welcome_to_your_sanctuary">Boas-vindas ao seu refúgio</string>
+    <string name="acct_your_new_address_is_ready_welcome_to">Seu novo endereço está pronto; boas-vindas a um jeito mais limpo de se comunicar.</string>
+    <string name="acct_get_started">Começar</string>
+    <string name="acct_screener_gate">FILTRO DE REMETENTES</string>
+    <string name="acct_you_decide_who_reaches_you">Você decide quem chega até você</string>
+    <string name="acct_unknown_senders_wait_in_the_screener">Remetentes desconhecidos aguardam no Filtro até você decidir.</string>
+    <string name="acct_subscriptions">ASSINATURAS</string>
+    <string name="acct_tame_the_clutter">Acabe com a bagunça</string>
+    <string name="acct_unsubscribe_snooze_and_return_to">Cancele inscrições, adie mensagens e volte ao que importa.</string>
+    <string name="acct_quiet_by_default">SILENCIOSO POR PADRÃO</string>
+    <string name="acct_choose_your_rhythm">Escolha seu ritmo</string>
+    <string name="acct_set_your_theme_and_decide_when">Defina seu tema e decida quando o GrapMail pode interromper você.</string>
+    <string name="acct_your_sanctuary">SEU REFÚGIO</string>
+    <string name="acct_your_inbox_is_yours_again">Sua caixa de entrada é sua de novo</string>
+    <string name="acct_welcome_home_your_new_mailbox_is">Que bom ter você aqui; sua nova caixa de correio está pronta.</string>
+    <string name="acct_open_my_mailbox">Abrir minha caixa de correio</string>
+    <string name="acct_onboarding_animated_scene">Cena animada: %1$s</string>
+    <string name="acct_skip">Pular</string>
+
+    <!-- PasswordStepScreen.kt -->
+    <string name="acct_both_passwords_must_match_period">As duas senhas precisam ser iguais.</string>
+    <string name="acct_create_a_strong_password">Crie uma senha forte</string>
+    <string name="acct_your_password_keeps_your_account">Sua senha mantém sua conta segura. Faça uma senha exclusiva, forte e fácil de lembrar.</string>
+    <string name="acct_your_grapmail_address">Seu endereço GrapMail</string>
+    <string name="acct_edit">Editar</string>
+    <string name="acct_password_label">"Senha "</string>
+    <string name="acct_password">Senha</string>
+    <string name="acct_strong">Forte</string>
+    <string name="acct_good">Boa</string>
+    <string name="acct_fair">Razoável</string>
+    <string name="acct_weak">Fraca</string>
+    <string name="acct_confirm_password_label">"Confirmar senha "</string>
+    <string name="acct_confirm_password">Confirmar senha</string>
+    <string name="acct_re_enter_your_password">Digite a senha novamente</string>
+    <string name="acct_password_requirements">Requisitos da senha</string>
+    <string name="acct_at_least_8_characters">Pelo menos 8 caracteres</string>
+    <string name="acct_a_mix_of_letters_numbers_and_symbols">Uma combinação de letras, números e símbolos</string>
+    <string name="acct_both_passwords_must_match">As duas senhas precisam ser iguais</string>
+
+    <!-- account/AddressRecoveryScreens.kt -->
+    <string name="acct_we_couldnt_find_a_grapmail_account">Não encontramos nenhuma conta GrapMail com esse número.</string>
+    <string name="acct_too_many_lookups_try_again_in_a">Muitas consultas. Tente novamente daqui a pouco.</string>
+    <string name="acct_we_couldnt_check_that_number_try">Não foi possível verificar esse número. Tente novamente.</string>
+    <string name="acct_network_error">Erro de rede. Tente novamente.</string>
+    <string name="acct_recover_your_grapmail_address">Recupere seu endereço GrapMail</string>
+    <string name="acct_find_your_grapmail_address">Encontre seu endereço GrapMail</string>
+    <string name="acct_enter_the_phone_number_linked_to">Digite o número de telefone vinculado à sua conta GrapMail. Vamos verificar nossos registros e mostrar o endereço de e-mail associado a ele.</string>
+    <string name="acct_find_my_email">Encontrar meu e-mail</string>
+    <string name="acct_need_help_contact_support">Precisa de ajuda? Fale com nossa equipe de suporte.</string>
+    <string name="acct_support_team">equipe de suporte</string>
+    <string name="acct_phone_number">Número de telefone</string>
+    <string name="acct_enter_your_verified_phone_number">Digite seu número de telefone verificado</string>
+    <string name="acct_back_to_sign_in">Voltar para o login</string>
+    <string name="acct_for_your_security_this_address_is">Para sua segurança, este endereço está parcialmente oculto. Você pode copiá-lo para usar no login.</string>
+    <string name="acct_email_found">E-mail encontrado</string>
+    <string name="acct_your_grapmail_address_has_been_found">Seu endereço GrapMail\nfoi encontrado!</string>
+    <string name="acct_here_is_the_email_address_associated">Este é o endereço de e-mail associado à sua conta. Você pode copiá-lo ou usá-lo para entrar.</string>
+    <string name="acct_copy">Copiar</string>
+
+    <!-- account/PhoneScreens.kt -->
+    <string name="acct_bangladesh">Bangladesh</string>
+    <string name="acct_india">Índia</string>
+    <string name="acct_pakistan">Paquistão</string>
+    <string name="acct_united_states">Estados Unidos</string>
+    <string name="acct_united_kingdom">Reino Unido</string>
+    <string name="acct_united_arab_emirates">Emirados Árabes Unidos</string>
+    <string name="acct_saudi_arabia">Arábia Saudita</string>
+    <string name="acct_malaysia">Malásia</string>
+    <string name="acct_enter_a_valid_phone_number">Digite um número de telefone válido.</string>
+    <string name="acct_we_couldnt_send_a_code_to_that">Não foi possível enviar um código para esse número.</string>
+    <string name="acct_that_number_is_already_linked_to">Esse número já está vinculado a outra conta.</string>
+    <string name="acct_please_wait_a_moment_before_asking">Aguarde um momento antes de pedir outro código.</string>
+    <string name="acct_we_couldnt_send_your_code_try_again">Não foi possível enviar seu código. Tente novamente.</string>
+    <string name="acct_sign_in_first_so_the_number_can_be">Entre primeiro para que o número possa ser salvo na sua conta.</string>
+    <string name="acct_that_code_is_not_correct">Esse código não está correto.</string>
+    <string name="acct_we_couldnt_verify_that_code_try">Não foi possível verificar esse código. Tente novamente.</string>
+    <string name="acct_phone_verification">Verificação de telefone</string>
+    <string name="acct_verify_your_phone_number">Verifique seu número de telefone</string>
+    <string name="acct_enter_the_6_digit_code">Digite o código de 6 dígitos</string>
+    <string name="acct_well_send_you_a_6_digit_code_by_sms">Vamos enviar um código de 6 dígitos por SMS.</string>
+    <string name="acct_sms_sent_to">SMS enviado para %1$s. O código expira em cinco minutos.</string>
+    <string name="acct_send_verification_code">Enviar código de verificação</string>
+    <string name="acct_your_phone_number_is_only_used_for">Seu número de telefone é usado apenas para fins de segurança e não será compartilhado com ninguém.</string>
+    <string name="acct_verify_and_continue">Verificar e continuar</string>
+    <string name="acct_if_the_text_message_hasnt_arrived">Se o SMS não chegar, você pode pedir outro código depois de um minuto.</string>
+    <string name="acct_sms_code">Código SMS</string>
+    <string name="acct_country_code">Código do país</string>
+    <string name="acct_verification_code">Código de verificação</string>
+    <string name="acct_6_digit_sms_code">Código SMS de 6 dígitos</string>
+    <string name="acct_sending">Enviando…</string>
+    <string name="acct_resend_code">Reenviar código</string>
+    <string name="acct_close">Fechar</string>
+    <string name="acct_go_to_account_security">Ir para Segurança da conta</string>
+    <string name="acct_back_to_home">Voltar para o início</string>
+    <string name="acct_your_phone_number_is_securely_stored">Seu número de telefone é armazenado com segurança e usado apenas para recuperação da conta e verificação em duas etapas.</string>
+    <string name="acct_phone_verified">Telefone verificado</string>
+    <string name="acct_your_phone_number_has_been_verified">Seu número de telefone\nfoi verificado!</string>
+    <string name="acct_phone_now_linked">Seu número de telefone %1$s agora está vinculado à sua conta GrapMail. Você pode usá-lo para recuperar a conta e para a verificação em duas etapas.</string>
+    <string name="acct_verified_phone_number">Número de telefone verificado</string>
+    <string name="acct_verified">Verificado</string>
+</resources>

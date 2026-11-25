@@ -1,0 +1,33 @@
+/* GrapMail — Reader string table (de). Translated from en.lproj/Reader.strings.
+   Counted keys also have an entry in Reader.stringsdict, which wins over the entry here. */
+
+"You" = "Du";
+"to me" = "an mich";
+"to %@" = "an %@";
+"to %lld people" = "an %lld Personen";
+"Unread" = "Ungelesen";
+"%lld earlier messages" = "%lld frühere Nachrichten";
+"Shows the folded messages" = "Zeigt die eingeklappten Nachrichten";
+"%lld people" = "%lld Personen";
+"%lld messages" = "%lld Nachrichten";
+"Show quoted text" = "Zitierten Text anzeigen";
+"Hide quoted text" = "Zitierten Text ausblenden";
+"Collapsed" = "Eingeklappt";
+"Expanded" = "Ausgeklappt";
+"Reply to %@…" = "%@ antworten…";
+"Reply…" = "Antworten…";
+"Opens the editor" = "Öffnet den Editor";
+"Reply options" = "Antwortoptionen";
+"Quick reply" = "Schnellantwort";
+"%lld attachments" = "%lld Anhänge";
+"Save all" = "Alle speichern";
+"Preparing…" = "Wird vorbereitet…";
+"Opens the share sheet, where Save to Files keeps every attachment" = "Öffnet das Teilen-Menü, wo „In Dateien sichern“ alle Anhänge speichert";
+"Image %lld of %lld, %@" = "Bild %1$lld von %2$lld, %3$@";
+"File" = "Datei";
+"Opens a preview" = "Öffnet eine Vorschau";
+"Save %@" = "%@ speichern";
+"Share %@" = "%@ teilen";
+"Open" = "Öffnen";
+"Save" = "Speichern";
+"Share" = "Teilen";

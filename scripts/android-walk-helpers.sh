@@ -144,7 +144,9 @@ ensure_foreground() {
   # meant to recover from it. Keep the output; a recovery that cannot explain
   # itself is not a recovery.
   local launched
-  launched=$(adb shell am start -W -n "$PKG/.MainActivity" 2>&1 | tr -d '\r' | head -6)
+  # `--es gmNoTips 1`, like every launch in android-walk.sh: no first-time
+  # feature tip over the screen the walk is about to photograph.
+  launched=$(adb shell am start -W -n "$PKG/.MainActivity" --es gmNoTips 1 2>&1 | tr -d '\r' | head -6)
   echo "  [foreground] am start — $(echo "$launched" | tr '\n' ' ')" >&2
   sleep 4
   if app_in_foreground; then return 0; fi

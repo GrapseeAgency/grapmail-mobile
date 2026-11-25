@@ -1,0 +1,73 @@
+{
+ "android": {
+  "strings_r9_reader.xml": {
+   "reader_earlier_messages": {"zero": "%d رسالة سابقة", "one": "رسالة سابقة واحدة", "two": "رسالتان سابقتان", "few": "%d رسائل سابقة", "many": "%d رسالة سابقة", "other": "%d رسالة سابقة"},
+   "reader_participants": {"zero": "%d أشخاص", "one": "شخص واحد", "two": "شخصان", "few": "%d أشخاص", "many": "%d شخصًا", "other": "%d شخص"},
+   "reader_message_count": {"zero": "%d رسائل", "one": "رسالة واحدة", "two": "رسالتان", "few": "%d رسائل", "many": "%d رسالة", "other": "%d رسالة"},
+   "reader_you": "أنت",
+   "reader_unread": "غير مقروءة",
+   "reader_earlier_action": "إظهار الرسائل المطوية",
+   "reader_open_message_action": "فتح هذه الرسالة",
+   "reader_quoted_show": "إظهار النص المقتبس",
+   "reader_quoted_hide": "إخفاء النص المقتبس",
+   "reader_state_expanded": "مفتوحة",
+   "reader_state_collapsed": "مطوية",
+   "reader_reply_to": "الرد على %1$s…",
+   "reader_reply_fallback": "رد…",
+   "reader_reply_options": "خيارات الرد",
+   "reader_quick_reply": "رد سريع",
+   "reader_attach_share_chooser": "مشاركة المرفق",
+   "reader_attach_view_image": "عرض الصورة",
+   "reader_attach_save_named": "حفظ %1$s",
+   "reader_attach_share_named": "مشاركة %1$s",
+   "reader_attach_share_nothing": "لا يوجد تطبيق على هذا الجهاز يمكنه مشاركة هذا الملف.",
+   "reader_viewer_position": "%1$d من %2$d",
+   "reader_viewer_too_large": "لا يمكن معاينة هذه الصورة هنا.",
+   "compose_r9_leave_title": "مغادرة هذه الرسالة؟",
+   "compose_r9_leave_attachments": "المسودات لا تحفظ المرفقات بعد. احفظ النص بدونها أو تابع التحرير.",
+   "compose_r9_save_text_only": "حفظ النص فقط",
+   "compose_r9_draft_failed_title": "لم تُحفظ هذه المسودة",
+   "compose_r9_leave_without_saving": "المغادرة دون حفظ",
+   "compose_r9_encrypt_failed": "تعذر تشفير هذه الرسالة، لذلك لم يُرسل شيء.",
+   "compose_editor_toolbar": "تنسيق النص",
+   "compose_editor_bold": "عريض",
+   "compose_editor_italic": "مائل",
+   "compose_editor_underline": "تسطير",
+   "compose_editor_strike": "يتوسطه خط",
+   "compose_editor_bullets": "نقاط",
+   "compose_editor_numbered": "ترقيم",
+   "compose_editor_text_colour": "لون النص",
+   "compose_editor_black": "أسود",
+   "compose_editor_blue": "أزرق",
+   "compose_editor_red": "أحمر",
+   "compose_editor_green": "أخضر",
+   "compose_editor_highlight": "تمييز",
+   "compose_editor_highlight_colour": "لون التمييز",
+   "compose_editor_yellow": "أصفر",
+   "compose_editor_pink": "وردي",
+   "compose_editor_font": "الخط",
+   "compose_editor_sans": "بدون زوائد",
+   "compose_editor_larger": "أكبر",
+   "compose_editor_clear": "مسح التنسيق",
+   "compose_editor_image": "صورة",
+   "compose_editor_insert_image": "إدراج صورة"
+  },
+  "strings_r9_platform.xml": {
+   "r9_platform_notif_channel_new_mail_desc": "يخبرك عند وصول رسائل جديدة إلى صندوق الوارد.",
+   "r9_platform_price_per_week": "%1$s أسبوعيًا",
+   "r9_platform_price_per_month": "%1$s شهريًا",
+   "r9_platform_price_per_3_months": "%1$s كل 3 أشهر",
+   "r9_platform_price_per_6_months": "%1$s كل 6 أشهر",
+   "r9_platform_price_per_year": "%1$s سنويًا"
+  },
+  "strings_r9_mailbox.xml": {
+   "mail_sendlater_channel_name": "إرسال مجدول",
+   "mail_sendlater_channel_desc": "عدّ تنازلي للرسائل التي تنتظر الإرسال"
+  },
+  "strings_identity.xml": {
+   "identity_settings_appearance": "المظهر",
+   "identity_match_wallpaper_title": "مطابقة الخلفية",
+   "identity_match_wallpaper_subtitle": "استخدم ألوان خلفية الشاشة للأزرار والتمييزات. تبقى الصور الرمزية وألوان الحالة والنص بألوان GrapMail."
+  }
+ }
+}

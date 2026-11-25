@@ -181,10 +181,20 @@ final class MailboxModel: ObservableObject {
         /// and a loaded draft fill fields without an edit, so a composer
         /// nobody touched neither autosaves nor saves on close.
         var userEdited = false
+        /// Send later: a `POST /send` with `sendAt` is in flight. Rides with
+        /// `sending` (which blocks every other compose action); this only
+        /// changes the words ("Scheduling…").
+        var scheduling = false
+        /// The server's id and recorded instant for a scheduled send — the
+        /// receipt's Undo target and the time it shows.
+        var scheduledId: String?
+        var scheduledFor: String?
         /// "outbox": no connection at Send; the message waits in Outbox.swift and
         /// goes out by itself when the device is online. Accepted, so the
         /// composer closes and Send cannot queue it twice.
-        var accepted: Bool { resultStatus == "sent" || resultStatus == "queued" || resultStatus == "delivered" || resultStatus == "outbox" }
+        /// "scheduled": the server holds it until `scheduledFor`; accepted for
+        /// the same reason.
+        var accepted: Bool { resultStatus == "sent" || resultStatus == "queued" || resultStatus == "delivered" || resultStatus == "outbox" || resultStatus == "scheduled" }
     }
 
     struct LabelState {
@@ -478,7 +488,7 @@ final class MailboxModel: ObservableObject {
             guard let token = self.token else {
                 self.state.loading = false
                 self.state.loadingMore = false
-                self.state.fatal = "Sign in again."
+                self.state.fatal = String(localized: "Sign in again.")
                 return
             }
 
@@ -753,6 +763,11 @@ final class MailboxModel: ObservableObject {
             done = written.done
             failure = written.failure
             guard self.sessionIsLive, !written.stopped else { return }
+            // Inbox Zero's "handled today": counted here, where the server
+            // accepted, and nowhere else (MailboxInsights.swift).
+            if MailHandledToday.counts(action), !done.isEmpty {
+                MailHandledToday.record(done.count, account: self.state.accountAddress)
+            }
             if !done.isEmpty { await self.invalidateFor(action) }
             self.state.busy = false
             self.state.selection.subtract(done)
@@ -818,7 +833,7 @@ final class MailboxModel: ObservableObject {
     /// A `until` it cannot parse still produces the count rather than nothing: the
     /// undo must exist even when the date cannot be shown.
     static func snoozeNote(_ count: Int, until: String?) -> String {
-        let head = count == 1 ? "Snoozed 1 message" : "Snoozed \(count) messages"
+        let head = count == 1 ? String(localized: "Snoozed 1 message") : String(localized: "Snoozed \(count) messages")
         // `MailTime.parse` is private to that type, so the formatter is used
         // directly rather than reaching for a helper that is not exposed.
         guard let raw = until else { return head }
@@ -828,7 +843,11 @@ final class MailboxModel: ObservableObject {
         else { return head }
         let f = DateFormatter()
         f.dateFormat = "EEE, d MMM · h:mm a"
-        return "\(head) until \(f.string(from: date))"
+        let when = f.string(from: date)
+        // One sentence per count, so a translation can put the date anywhere.
+        return count == 1
+            ? String(localized: "Snoozed 1 message until \(when)")
+            : String(localized: "Snoozed \(count) messages until \(when)")
     }
 
     /// Take the mail back out of snooze — the one place `unsnooze` is reachable.
@@ -853,6 +872,8 @@ final class MailboxModel: ObservableObject {
             let failure = written.failure
             let undone = restored.count
             guard self.sessionIsLive, !written.stopped else { return }
+            // Only what actually came back leaves "handled today".
+            if !restored.isEmpty { MailHandledToday.undo(restored.count, account: self.state.accountAddress) }
             if !restored.isEmpty { await self.invalidateFor(.unsnooze) }
             self.state.busy = false
             // Cleared only for what actually came back; a partial undo keeps the
@@ -869,7 +890,7 @@ final class MailboxModel: ObservableObject {
                 // reaching this line would print "2 of 3 came back. " with a dangling
                 // period, the same shape as the truncated sender clause the
                 // unsubscribe sheet had.
-                self.state.snoozeUndoNote = "\(undone) of \(ids.count) came back. \(failure)"
+                self.state.snoozeUndoNote = String(localized: "\(undone) of \(ids.count) came back. \(failure)")
             }
             if !restored.isEmpty { self.load(replace: true) }
         }
@@ -923,7 +944,7 @@ final class MailboxModel: ObservableObject {
                 if let error {
                     if error is CancellationError {
                         interrupted = true
-                        failure = failure ?? "The action was interrupted. Try again."
+                        failure = failure ?? String(localized: "The action was interrupted. Try again.")
                         continue
                     }
                     failure = failure ?? Self.describe(error)
@@ -954,12 +975,16 @@ final class MailboxModel: ObservableObject {
             )
             let (redone, failure) = (written.done, written.failure)
             guard self.sessionIsLive, !written.stopped else { return }
+            // An accepted undo of a counted filing takes its count back.
+            if MailHandledToday.undoes(inv), !redone.isEmpty {
+                MailHandledToday.undo(redone.count, account: self.state.accountAddress)
+            }
             if !redone.isEmpty { await self.invalidateFor(inv) }
             let left = self.state.undoIds.filter { !redone.contains($0) }
             self.state.busy = false
             self.state.undoIds = left
             if left.isEmpty { self.state.undoInverse = nil }
-            self.state.undoNote = failure.map { "\(redone.count) of \(ids.count) reversed. \($0)" }
+            self.state.undoNote = failure.map { String(localized: "\(redone.count) of \(ids.count) reversed. \($0)") }
             self.state.actionError = failure
             if !redone.isEmpty { self.load(replace: true) }
         }
@@ -1001,13 +1026,17 @@ final class MailboxModel: ObservableObject {
 
     private var pendingRowActions: Set<String> = []
 
-    func actOn(_ id: String, _ action: MailAction, onOutcome: ((String?) -> Void)? = nil) {
+    /// One message's action: swipes, row menus and the reader. `until` is the
+    /// snooze instant (the SnoozeSheet's choice), so a swipe can snooze its
+    /// row directly instead of going through the selection.
+    func actOn(_ id: String, _ action: MailAction, until: String? = nil,
+               onOutcome: ((String?) -> Void)? = nil) {
         guard let token else {
-            onOutcome?("You are signed out, so this could not be saved.")
+            onOutcome?(String(localized: "You are signed out, so this could not be saved."))
             return
         }
         guard !state.busy, pendingRowActions.insert(id).inserted else {
-            onOutcome?("A message action is already in progress.")
+            onOutcome?(String(localized: "A message action is already in progress."))
             return
         }
         Task { [weak self] in
@@ -1037,8 +1066,13 @@ final class MailboxModel: ObservableObject {
             default: GMHaptics.filing()
             }
             do {
-                _ = try await ApiClient.mailAction(token: token, id: id, action: action, until: nil)
+                _ = try await ApiClient.mailAction(token: token, id: id, action: action, until: until)
                 guard self.sessionIsLive else { return }
+                // Inbox Zero's "handled today", counted where the server
+                // accepted -- the reader's filings included.
+                if MailHandledToday.counts(action) {
+                    MailHandledToday.record(1, account: self.state.accountAddress)
+                }
                 await self.invalidateFor(action)
                 // The optimistic mutation already is the accepted server
                 // state. Counts refresh on the existing 30-second gate/poll;
@@ -1048,7 +1082,15 @@ final class MailboxModel: ObservableObject {
                 // swipe one to Trash, press Undo, and the trashed message is
                 // unsnoozed too. `act()` clears for bulk actions; this path needed
                 // the equivalent for the single row.
-                if self.state.snoozeUndoIds.contains(id) {
+                if action == .snooze {
+                    // The single-row snooze gets the same undo as the bulk
+                    // one, and supersedes the filing offer the way `act()` does.
+                    self.state.snoozeUndoIds = [id]
+                    self.state.snoozeUndoNote = Self.snoozeNote(1, until: until)
+                    self.state.undoIds = []
+                    self.state.undoInverse = nil
+                    self.state.undoNote = nil
+                } else if self.state.snoozeUndoIds.contains(id) {
                     let left = self.state.snoozeUndoIds.filter { $0 != id }
                     self.state.snoozeUndoIds = left
                     if left.isEmpty { self.state.snoozeUndoNote = nil }
@@ -1164,6 +1206,9 @@ final class MailboxModel: ObservableObject {
             let removed = Set(written.done)
             let failure = written.failure
             guard self.sessionIsLive, !written.stopped else { return }
+            if !removed.isEmpty {
+                MailHandledToday.record(removed.count, account: self.state.accountAddress)
+            }
             var updated = self.state
             updated.busy = false
             updated.selection.subtract(removed)
@@ -1299,7 +1344,7 @@ final class MailboxModel: ObservableObject {
                 self.state.busy = false
                 return
             }
-            let labelName = self.state.labels.first { $0.id == labelId }?.name ?? "label"
+            let labelName = self.state.labels.first { $0.id == labelId }?.name ?? String(localized: "label", comment: "Fallback name for a label whose name is unknown")
             let written = await self.parallelWrites(
                 targets,
                 write: { id in
@@ -1329,13 +1374,13 @@ final class MailboxModel: ObservableObject {
             // as a success, and "Labelled 0 messages" over a selection that was not
             // labelled is the same lie in a nicer form.
             if done == 0 {
-                note = failure ?? "The label was not saved."
+                note = failure ?? String(localized: "The label was not saved.")
             } else if let f = failure {
-                note = "\(done) of \(targets.count) saved. \(f)"
+                note = String(localized: "\(done) of \(targets.count) saved. \(f)")
             } else if remove {
-                note = "Removed \"\(labelName)\" from \(done)"
+                note = String(localized: "Removed \"\(labelName)\" from \(done)")
             } else {
-                note = done == 1 ? "Labelled 1 message" : "Labelled \(done) messages"
+                note = done == 1 ? String(localized: "Labelled 1 message") : String(localized: "Labelled \(done) messages")
             }
             self.state.labelNote = note
             await self.applyMarks()
@@ -1398,7 +1443,7 @@ final class MailboxModel: ObservableObject {
     /// would let the Files screen offer a download of bytes the server has
     /// thrown away.
     func deleteAttachment(_ id: String, then: @escaping (Bool, String) -> Void) {
-        guard let token else { then(false, "Sign in again to remove this."); return }
+        guard let token else { then(false, String(localized: "Sign in again to remove this.")); return }
         Task { [weak self] in
             guard let self else { return }
             do {
@@ -1417,9 +1462,9 @@ final class MailboxModel: ObservableObject {
                         return updated
                     }
                     self.filesRevision &+= 1
-                    then(true, "Removed.")
+                    then(true, String(localized: "Removed."))
                 } else {
-                    then(false, r.error ?? "The server refused to remove that file.")
+                    then(false, r.error ?? String(localized: "The server refused to remove that file."))
                 }
             } catch {
                 then(false, Self.describe(error))
@@ -1427,23 +1472,39 @@ final class MailboxModel: ObservableObject {
         }
     }
 
+    /// Attachments whose whole file this device already holds -- the copy
+    /// "Open in another app" fetched (temporary) or the one "Save" wrote -- by
+    /// attachment id, stamped with the account it was fetched for. Drag-out
+    /// reads only this (AttachmentDrag.swift): a drag has to start inside the
+    /// long press, so nothing is ever downloaded for one.
+    @Published private var localAttachmentFiles: [String: (url: URL, generation: UUID)] = [:]
+
+    /// The local file for an attachment, when this account fetched it and it
+    /// is still there; nil otherwise (no drag is offered).
+    func localAttachmentFile(_ id: String) -> URL? {
+        guard let entry = localAttachmentFiles[id], entry.generation == SessionStore.generation,
+              FileManager.default.fileExists(atPath: entry.url.path) else { return nil }
+        return entry.url
+    }
+
     func downloadAttachment(_ a: MailAttachment, then: @escaping (String) -> Void) {
-        guard let token else { then("Sign in again to save this."); return }
+        guard let token else { then(String(localized: "Sign in again to save this.")); return }
         Task {
             do {
                 let downloaded = try await ApiClient.mailAttachmentFile(token: token, id: a.id)
                 defer { try? FileManager.default.removeItem(at: downloaded) }
-                guard sessionIsLive else { then("The account changed before this file could be saved."); return }
+                guard sessionIsLive else { then(String(localized: "The account changed before this file could be saved.")); return }
                 do {
                     let url = try await Self.writeAttachment(downloaded, name: a.name, temporary: false)
                     guard sessionIsLive else {
                         try? FileManager.default.removeItem(at: url)
-                        then("The account changed before this file could be saved.")
+                        then(String(localized: "The account changed before this file could be saved."))
                         return
                     }
-                    then("Saved as \(url.lastPathComponent) in the Files app.")
+                    localAttachmentFiles[a.id] = (url, SessionStore.generation)
+                    then(String(localized: "Saved as \(url.lastPathComponent) in the Files app."))
                 } catch {
-                    then("Downloaded, but the file could not be written.")
+                    then(String(localized: "Downloaded, but the file could not be written."))
                 }
             } catch {
                 then(Self.describe(error))
@@ -1452,18 +1513,19 @@ final class MailboxModel: ObservableObject {
     }
 
     func prepareAttachment(_ a: MailAttachment, then: @escaping (URL?, String?) -> Void) {
-        guard let token else { then(nil, "Sign in again to open this."); return }
+        guard let token else { then(nil, String(localized: "Sign in again to open this.")); return }
         Task {
             do {
                 let downloaded = try await ApiClient.mailAttachmentFile(token: token, id: a.id)
                 defer { try? FileManager.default.removeItem(at: downloaded) }
-                guard sessionIsLive else { then(nil, "The account changed before this file could be opened."); return }
+                guard sessionIsLive else { then(nil, String(localized: "The account changed before this file could be opened.")); return }
                 let url = try await Self.writeAttachment(downloaded, name: a.name, temporary: true)
                 guard sessionIsLive else {
                     try? FileManager.default.removeItem(at: url)
-                    then(nil, "The account changed before this file could be opened.")
+                    then(nil, String(localized: "The account changed before this file could be opened."))
                     return
                 }
+                localAttachmentFiles[a.id] = (url, SessionStore.generation)
                 then(url, nil)
             } catch {
                 then(nil, Self.describe(error))
@@ -1501,7 +1563,7 @@ final class MailboxModel: ObservableObject {
                           then: @escaping (MailAttachment?, String) -> Void) {
         guard let token else {
             try? FileManager.default.removeItem(at: file)
-            then(nil, "Sign in again to attach a file."); return
+            then(nil, String(localized: "Sign in again to attach a file.")); return
         }
         Task {
             defer { try? FileManager.default.removeItem(at: file) }
@@ -1509,10 +1571,10 @@ final class MailboxModel: ObservableObject {
                 let a = try await ApiClient.mailAttachmentUploadFile(
                     token: token, file: file, filename: filename, mimeType: mimeType)
                 guard sessionIsLive else {
-                    then(nil, "The account changed before this file could be attached.")
+                    then(nil, String(localized: "The account changed before this file could be attached."))
                     return
                 }
-                then(a, "Attached \(a.name ?? filename).")
+                then(a, String(localized: "Attached \(a.name ?? filename)."))
             } catch {
                 then(nil, Self.describe(error))
             }
@@ -1526,7 +1588,7 @@ final class MailboxModel: ObservableObject {
     func openThread(_ threadId: String, focusedID: String? = nil) {
         if snapshotSeeded && threadLoadedFor == threadId { return }
         guard let token else {
-            thread = ThreadState(error: "Sign in again.")
+            thread = ThreadState(error: String(localized: "Sign in again."))
             return
         }
         loadReader(threadId, isThread: true) { [weak self] in
@@ -1564,7 +1626,7 @@ final class MailboxModel: ObservableObject {
                 }
                 if visible.isEmpty {
                     self.thread = initial.isEmpty
-                        ? ThreadState(error: "This conversation has no available messages.")
+                        ? ThreadState(error: String(localized: "This conversation has no available messages."))
                         : ThreadState(messages: initial, nextCursor: cached?.nextCursor, hasMore: cached?.hasMore ?? false)
                     return
                 }
@@ -1676,7 +1738,7 @@ final class MailboxModel: ObservableObject {
     /// so the note never says "unsubscribed".
     func unsubscribeOneClick(address: String, url: String, onNote: @escaping (String) -> Void) {
         guard let token else {
-            onNote("You are signed out, so this could not be sent.")
+            onNote(String(localized: "You are signed out, so this could not be sent."))
             return
         }
         Task {
@@ -1685,8 +1747,8 @@ final class MailboxModel: ObservableObject {
                     token: token, address: address, url: url)
                 GMHaptics.filing()
                 onNote(r.success
-                      ? "One-click request sent — the list's answer is not visible from here."
-                      : (r.error ?? "The one-click request was not accepted."))
+                      ? String(localized: "One-click request sent — the list's answer is not visible from here.")
+                      : (r.error ?? String(localized: "The one-click request was not accepted.")))
             } catch {
                 GMHaptics.failure()
                 onNote(Self.describe(error))
@@ -1701,7 +1763,7 @@ final class MailboxModel: ObservableObject {
     /// decision's own sentence so the two doors cannot drift.
     func blockSender(_ sender: String, onNote: @escaping (String) -> Void) {
         guard let token else {
-            onNote("You are signed out, so this could not be saved.")
+            onNote(String(localized: "You are signed out, so this could not be saved."))
             return
         }
         Task {
@@ -1710,8 +1772,8 @@ final class MailboxModel: ObservableObject {
                     token: token, sender: sender, scope: .address, decision: .blocked)
                 GMHaptics.filing()
                 onNote(r.success
-                      ? "Blocked. " + MailDecision.blocked.note
-                      : (r.error ?? "The block was not accepted."))
+                      ? String(localized: "Blocked. \(MailDecision.blocked.note)")
+                      : (r.error ?? String(localized: "The block was not accepted.")))
             } catch {
                 GMHaptics.failure()
                 onNote(Self.describe(error))
@@ -1730,7 +1792,7 @@ final class MailboxModel: ObservableObject {
     /// means the server accepted it. Android's `markUnread` is the same contract.
     func markUnread(_ id: String, onOutcome: @escaping (String?) -> Void) {
         guard let token else {
-            onOutcome("You are signed out, so this could not be saved.")
+            onOutcome(String(localized: "You are signed out, so this could not be saved."))
             return
         }
         Task { [weak self] in
@@ -1755,12 +1817,12 @@ final class MailboxModel: ObservableObject {
         guard !snapshotSeeded, let message = thread.messages.first(where: { $0.id == id }) else { return nil }
         let needsAttachments = message.hasAttachments && message.attachments.isEmpty
         guard needsAttachments || (!message.isRead && message.direction == "inbound") else { return nil }
-        guard let token else { return "Sign in again." }
+        guard let token else { return String(localized: "Sign in again.") }
         do {
             let details: MailMessageFull?
             if needsAttachments {
                 details = try await ApiClient.mailMessage(token: token, id: id).message
-                guard details != nil else { return "Attachment details are unavailable." }
+                guard details != nil else { return String(localized: "Attachment details are unavailable.") }
             } else {
                 _ = try await ApiClient.mailAction(token: token, id: id, action: .read)
                 details = nil
@@ -1787,7 +1849,7 @@ final class MailboxModel: ObservableObject {
     func openMessage(_ id: String) {
         if snapshotSeeded && threadLoadedFor == id { return }
         guard let token else {
-            thread = ThreadState(error: "Sign in again.")
+            thread = ThreadState(error: String(localized: "Sign in again."))
             return
         }
         loadReader(id, isThread: false) { [weak self] in
@@ -1808,7 +1870,7 @@ final class MailboxModel: ObservableObject {
                     self.thread = ThreadState(messages: [m])
                     await MailStore.shared.patchFlags(id: m.id, read: true, generation: self.sessionGeneration)
                 } else {
-                    self.thread = ThreadState(error: "This message could not be opened.")
+                    self.thread = ThreadState(error: String(localized: "This message could not be opened."))
                 }
                 self.reproject()
             } catch {
@@ -1853,7 +1915,7 @@ final class MailboxModel: ObservableObject {
         if !allowImages, let cached = formattedBodyCache.object(forKey: key) { return cached.render }
         guard let token else {
             return BodyRender(html: nil, bodyText: nil, blockedImages: 0,
-                              allowImages: allowImages, error: "Sign in again.")
+                              allowImages: allowImages, error: String(localized: "Sign in again."))
         }
         do {
             let response = try await ApiClient.mailBody(token: token, id: messageId, allowImages: allowImages)
@@ -1862,7 +1924,7 @@ final class MailboxModel: ObservableObject {
             let html = response.bodyHtml?.nilIfBlank()
             let render = BodyRender(html: html, bodyText: response.bodyText,
                                     blockedImages: response.blockedImages,
-                                    allowImages: allowImages, error: html == nil ? "The formatted body was empty." : nil)
+                                    allowImages: allowImages, error: html == nil ? String(localized: "The formatted body was empty.") : nil)
             if !allowImages, let html {
                 let length = html.utf16.count
                 if length <= 262_144 {
@@ -1961,14 +2023,14 @@ final class MailboxModel: ObservableObject {
                     ))
                 guard !Task.isCancelled, self.sessionIsLive else { return }
                 self.compose.autosaving = false
-                self.compose.autosaveNote = "Draft saved"
+                self.compose.autosaveNote = String(localized: "Draft saved")
                 if let newId = resp.id { self.compose.draftId = newId }
                 self.loadedBoxes.remove(.drafts)
                 await MailStore.shared.invalidate(.drafts, generation: self.sessionGeneration)
             } catch {
                 guard !Task.isCancelled, self.sessionIsLive else { return }
                 self.compose.autosaving = false
-                self.compose.autosaveNote = "Draft not saved — it will be saved on the next change."
+                self.compose.autosaveNote = String(localized: "Draft not saved — it will be saved on the next change.")
             }
         }
     }
@@ -2002,14 +2064,14 @@ final class MailboxModel: ObservableObject {
             }
             guard self.composeGeneration == generation, self.sessionIsLive else { return }
             guard let m = original else {
-                self.compose.error = mode == "draft" ? "Could not open this draft." : "Could not load the original message."
+                self.compose.error = mode == "draft" ? String(localized: "Could not open this draft.") : String(localized: "Could not load the original message.")
                 return
             }
             let draftHtml = mode == "draft" && m.hasHtml
                 ? (try? await ApiClient.mailBody(token: token, id: id, allowImages: false))?.bodyHtml : nil
             guard self.composeGeneration == generation, self.sessionIsLive else { return }
             if mode == "draft", m.hasHtml, draftHtml?.nilIfBlank() == nil {
-                self.compose.error = "Could not load the draft formatting."
+                self.compose.error = String(localized: "Could not load the draft formatting.")
                 return
             }
             let me = self.state.accountAddress?.lowercased()
@@ -2049,11 +2111,7 @@ final class MailboxModel: ObservableObject {
                 self.compose.body = quoted + sig
                 self.compose.inReplyTo = m.id
             case "forward":
-                let head = "Forwarded message\n" +
-                    "From: \(m.from?.display ?? m.from?.address ?? "")\n" +
-                    "Date: \(m.createdAt ?? "")\n" +
-                    "Subject: \(m.subject ?? "(no subject)")\n" +
-                    "To: \(m.to.joined(separator: ", "))\n\n"
+                let head = Self.forwardHeader(m)
                 self.compose.to = ""
                 self.compose.subject = Self.forwardSubject(m.subject)
                 self.compose.body = head + quoted + sig
@@ -2067,19 +2125,36 @@ final class MailboxModel: ObservableObject {
         }
     }
 
+    /// The forwarded-message header: one localizable block with the original's
+    /// fields interpolated, so a translation can reorder or relabel the lines
+    /// as a whole instead of being stitched from separately translated pieces.
+    static func forwardHeader(_ m: MailMessageFull) -> String {
+        let from = m.from?.display ?? m.from?.address ?? ""
+        let date = m.createdAt ?? ""
+        let subject = m.subject ?? String(localized: "(no subject)")
+        let to = m.to.joined(separator: ", ")
+        return String(localized: "Forwarded message\nFrom: \(from)\nDate: \(date)\nSubject: \(subject)\nTo: \(to)\n\n",
+                      comment: "Header block inserted above a forwarded message's quoted text")
+    }
+
     /// The quote block: every body line prefixed. An empty body quotes
     /// nothing -- inventing a blank line under the header would claim the
     /// message had a body.
     static func quoteOf(_ m: MailMessageFull) -> String {
         let who = m.from?.display ?? m.from?.address ?? ""
         let body = (m.bodyText ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        // A whole sentence per case (date known / unknown) rather than a
+        // translated "an unknown date" spliced into a translated sentence.
+        let attribution = m.createdAt.map {
+            String(localized: "On \($0), \(who) wrote:", comment: "Reply quote attribution: date, sender")
+        } ?? String(localized: "On an unknown date, \(who) wrote:", comment: "Reply quote attribution when the date is unknown")
         if body.isEmpty {
-            return "\n\nOn \(m.createdAt ?? "an unknown date"), \(who) wrote:\n"
+            return "\n\n\(attribution)\n"
         }
         let lines = body.components(separatedBy: "\n")
             .map { $0.isEmpty ? ">" : "> \($0)" }
             .joined(separator: "\n")
-        return "\n\nOn \(m.createdAt ?? "an unknown date"), \(who) wrote:\n\(lines)\n"
+        return "\n\n\(attribution)\n\(lines)\n"
     }
 
     /// The signature arrives as EDITABLE text appended when the compose opens,
@@ -2110,6 +2185,7 @@ final class MailboxModel: ObservableObject {
         autosaveNeedsFollowUp = false
         autosaveTask?.cancel()
         autosaveTask = nil
+        requestReadReceipt = false
         compose = ComposeState(to: initialRecipient)
     }
 
@@ -2155,6 +2231,9 @@ final class MailboxModel: ObservableObject {
     private var pendingSendTask: Task<Void, Never>?
     private var heldSend: HeldSend?
 
+    /// Compose toggle "Request read receipt". Sent with /send; reset with each new compose.
+    @Published var requestReadReceipt = false
+
     func send(e2eEnvelope: String? = nil, attachmentIds: [String] = []) {
         guard let token, !compose.sending, !compose.accepted, !compose.pendingSend else { return }
         // An empty To is refused here, not by the server: a message with no
@@ -2162,7 +2241,7 @@ final class MailboxModel: ObservableObject {
         // the person pressed Send twice is worse than a button that says why
         // it is waiting. Cc and Bcc do not count -- the route requires `to`.
         if Self.splitAddresses(compose.to).isEmpty {
-            compose.error = "Add at least one recipient in To."
+            compose.error = String(localized: "Add at least one recipient in To.")
             return
         }
         // The envelope is validated NOW, not at the end of the window: an
@@ -2171,7 +2250,7 @@ final class MailboxModel: ObservableObject {
         var envelopeJson: RawJSON? = nil
         if let env = e2eEnvelope {
             guard let parsed = RawJSON(object: env) else {
-                compose.error = "The encrypted envelope could not be prepared — nothing was sent."
+                compose.error = String(localized: "The encrypted envelope could not be prepared — nothing was sent.")
                 return
             }
             envelopeJson = parsed
@@ -2181,7 +2260,8 @@ final class MailboxModel: ObservableObject {
             bcc: Self.splitAddresses(compose.bcc), subject: compose.subject,
             bodyText: envelopeJson == nil ? compose.body : "",
             bodyHtml: envelopeJson == nil ? compose.bodyHtml : nil,
-            inReplyTo: compose.inReplyTo, e2eEnvelope: envelopeJson, attachmentIds: attachmentIds)
+            inReplyTo: compose.inReplyTo, e2eEnvelope: envelopeJson, attachmentIds: attachmentIds,
+            requestReadReceipt: requestReadReceipt && envelopeJson == nil)
         let held = HeldSend(
             token: token, request: req, draftId: compose.draftId,
             generation: composeGeneration,
@@ -2253,7 +2333,7 @@ final class MailboxModel: ObservableObject {
                     // kept only as the last resort of a refusal.
                     updated.result = r.message ?? r.error
                     updated.resultStatus = r.status
-                    updated.error = r.deliveryError ?? r.error ?? (sent ? nil : "Could not send this message. Try again.")
+                    updated.error = r.deliveryError ?? r.error ?? (sent ? nil : String(localized: "Could not send this message. Try again."))
                     if sent { updated.draftId = "" }
                     self.compose = updated
                 }
@@ -2296,7 +2376,7 @@ final class MailboxModel: ObservableObject {
                     updated.sending = false
                     updated.error = nil
                     updated.resultStatus = "outbox"
-                    updated.result = "No connection. Saved in the Outbox: it sends by itself when you are back online."
+                    updated.result = String(localized: "No connection. Saved in the Outbox: it sends by itself when you are back online.")
                     self.compose = updated
                     GMHaptics.success()
                     return
@@ -2306,6 +2386,171 @@ final class MailboxModel: ObservableObject {
                 self.compose.sending = false
                 self.compose.error = Self.describe(error)
             }
+        }
+    }
+
+    // ── send later ───────────────────────────────────────────────────────────
+    //
+    // docs/SEND_LATER_IOS_HANDOFF.md §2. The normal `POST /send` body plus
+    // `sendAt`; the server holds the row as 'scheduled' until its time.
+    //
+    // No five-second undo hold: nothing leaves before the chosen time, and the
+    // receipt's Undo (`DELETE /scheduled/:id`) is the take-back. No Outbox
+    // either: `Outbox.accepted` counts only sent/queued/delivered, so a
+    // scheduled answer replayed from the Outbox would be reported as a failure
+    // and orphan the draft — and a chosen time can expire while it waits. An
+    // offline schedule therefore says so and leaves the composer as it was.
+
+    /// The To check both Send and the clock button make before anything else.
+    /// True (and the composer's error set) when To is empty.
+    func refuseMissingRecipient() -> Bool {
+        guard Self.splitAddresses(compose.to).isEmpty else { return false }
+        compose.error = String(localized: "Add at least one recipient in To.")
+        return true
+    }
+
+    func scheduleSend(at date: Date, e2eEnvelope: String? = nil, attachmentIds: [String] = []) {
+        guard let token, !compose.sending, !compose.accepted, !compose.pendingSend else { return }
+        if refuseMissingRecipient() {
+            GMHaptics.failure()
+            return
+        }
+        if let refusal = SendLaterSchedule.windowError(for: date) {
+            compose.error = refusal
+            GMHaptics.failure()
+            return
+        }
+        var envelopeJson: RawJSON? = nil
+        if let env = e2eEnvelope {
+            guard let parsed = RawJSON(object: env) else {
+                compose.error = String(localized: "The encrypted envelope could not be prepared — nothing was scheduled.")
+                GMHaptics.failure()
+                return
+            }
+            envelopeJson = parsed
+        }
+        var req = MailSendRequest(
+            to: Self.splitAddresses(compose.to), cc: Self.splitAddresses(compose.cc),
+            bcc: Self.splitAddresses(compose.bcc), subject: compose.subject,
+            bodyText: envelopeJson == nil ? compose.body : "",
+            bodyHtml: envelopeJson == nil ? compose.bodyHtml : nil,
+            inReplyTo: compose.inReplyTo, e2eEnvelope: envelopeJson, attachmentIds: attachmentIds,
+            requestReadReceipt: requestReadReceipt && envelopeJson == nil)
+        req.sendAt = SendLaterSchedule.wireString(date)
+        let request = req
+        let generation = composeGeneration
+        let subject = compose.subject
+        let pending = stopAutosaveDebounce()
+        compose.sending = true
+        compose.scheduling = true
+        compose.error = nil
+        compose.result = nil
+        compose.resultStatus = nil
+        Task { [weak self] in
+            // An in-flight autosave settles first, then the draft id is read
+            // live: the cleanup below targets the row that exists NOW.
+            await pending?.value
+            guard let self, self.sessionIsLive else { return }
+            let draft = self.compose.draftId
+            do {
+                let r = try await ApiClient.mailSend(token: token, request)
+                guard self.sessionIsLive else { return }
+                let scheduled = r.status == "scheduled"
+                // A deployment that predates `sendAt` sends at once; that is
+                // still a send the server accepted, and the receipt says which.
+                let sentNow = r.status == "sent" || r.status == "queued" || r.status == "delivered"
+                let accepted = scheduled || sentNow
+                if self.composeGeneration == generation {
+                    // One state write: the composer's close, the receipt and
+                    // the Undo target change together.
+                    var updated = self.compose
+                    updated.sending = false
+                    updated.scheduling = false
+                    updated.resultStatus = r.status
+                    updated.result = sentNow
+                        ? String(localized: "This server sent the message now: it does not support scheduling yet.")
+                        : (r.message ?? r.error)
+                    updated.error = accepted ? r.deliveryError
+                        : (r.deliveryError ?? r.error ?? String(localized: "Could not schedule this message. Try again."))
+                    if scheduled {
+                        updated.scheduledId = r.id
+                        updated.scheduledFor = r.scheduledFor ?? request.sendAt
+                    }
+                    if accepted { updated.draftId = "" }
+                    self.compose = updated
+                }
+                guard accepted else {
+                    GMHaptics.failure()
+                    return
+                }
+                if scheduled, let id = r.id {
+                    ScheduledStore.shared.insert(MailScheduledMessage(
+                        id: id, subject: subject.nilIfBlank(), to: request.to,
+                        scheduledFor: r.scheduledFor ?? request.sendAt,
+                        createdAt: SendLaterSchedule.wireString(Date())))
+                }
+                GMHaptics.success()
+                self.loadedBoxes.remove(.sent)
+                await MailStore.shared.invalidate(.sent, generation: self.sessionGeneration)
+                if sentNow {
+                    self.loadedBoxes.remove(.inbox)
+                    await MailStore.shared.invalidate(.inbox, generation: self.sessionGeneration)
+                }
+                // The draft this compose continued is now the scheduled row's
+                // copy; the delete runs only AFTER the server accepted it.
+                if !draft.isEmpty,
+                   (try? await ApiClient.mailDeleteMessage(token: token, id: draft)) != nil, self.sessionIsLive {
+                    self.loadedBoxes.remove(.drafts)
+                    await MailStore.shared.invalidate(.drafts, generation: self.sessionGeneration)
+                }
+                if self.sessionIsLive { self.load(replace: true) }
+                if scheduled { await self.refreshScheduledActivity(token: token) }
+            } catch {
+                guard self.composeGeneration == generation, self.sessionIsLive else { return }
+                GMHaptics.failure()
+                self.compose.sending = false
+                self.compose.scheduling = false
+                self.compose.error = Self.isOffline(error)
+                    ? String(localized: "No connection, so nothing was scheduled. Your message is still here.")
+                    : Self.describe(error)
+            }
+        }
+    }
+
+    /// The receipt's Undo: `DELETE /scheduled/:id`. The server turns the row
+    /// back into a draft (body and attachments kept), so Drafts is invalidated
+    /// rather than anything being deleted here. Nil on success, else the reason.
+    func undoScheduledSend(id: String) async -> String? {
+        guard let token else {
+            return String(localized: "The mail service did not accept this session. You are still signed in to your account.")
+        }
+        do {
+            _ = try await ApiClient.mailScheduledCancel(token, id: id)
+            guard sessionIsLive else { return nil }
+            ScheduledStore.shared.remove(id: id)
+            GMHaptics.marking()
+            loadedBoxes.remove(.drafts)
+            await MailStore.shared.invalidate(.drafts, generation: sessionGeneration)
+            if state.box == .drafts, sessionIsLive { load(replace: true) }
+            await refreshScheduledActivity(token: token)
+            return nil
+        } catch {
+            GMHaptics.failure()
+            return Self.describe(error)
+        }
+    }
+
+    /// Re-reads the scheduled list and mirrors it onto the Lock Screen, so the
+    /// countdown starts (or moves on) at once instead of on the next visit to
+    /// the Scheduled screen. The Live Activity is only ever synced from a
+    /// WHOLE list: a failed read with no complete list on hand leaves it as is.
+    private func refreshScheduledActivity(token: String) async {
+        if let list = try? await ApiClient.mailScheduledList(token).messages, sessionIsLive {
+            ScheduledStore.shared.replace(list)
+        }
+        guard sessionIsLive, ScheduledStore.shared.isComplete else { return }
+        if #available(iOS 16.2, *) {
+            SendLaterActivityManager.sync(messages: ScheduledStore.shared.current)
         }
     }
 
@@ -2337,7 +2582,7 @@ final class MailboxModel: ObservableObject {
                 if self.composeGeneration == generation {
                     var updated = self.compose
                     updated.sending = false
-                    updated.result = "Saved to Drafts"
+                    updated.result = String(localized: "Saved to Drafts")
                     updated.resultStatus = "draft"
                     updated.error = nil
                     if let newId = resp.id { updated.draftId = newId }
@@ -2410,17 +2655,17 @@ final class MailboxModel: ObservableObject {
     /// (`grapmail-labels.ts:105`); sending `color` creates an uncoloured label and
     /// still returns 200, so the mistake would be invisible.
     func createLabel(name: String, colour: String?, then: @escaping (Bool, String) -> Void) {
-        guard let token else { then(false, "Sign in again."); return }
+        guard let token else { then(false, String(localized: "Sign in again.")); return }
         Task {
             do {
                 let r = try await ApiClient.mailCreateLabel(token: token, name: name, colour: colour)
                 guard sessionIsLive else { return }
                 guard r.success, let label = r.label else {
-                    then(false, r.error ?? "The label could not be created.")
+                    then(false, r.error ?? String(localized: "The label could not be created."))
                     return
                 }
                 refreshLabels(force: true)
-                then(true, "Created \(label.name).")
+                then(true, String(localized: "Created \(label.name)."))
             } catch { then(false, Self.describe(error)) }
         }
     }
@@ -2430,26 +2675,26 @@ final class MailboxModel: ObservableObject {
     /// showing what the server holds beats the list showing what was typed.
     func renameLabel(id: String, name: String, colour: String?,
                      then: @escaping (Bool, String) -> Void) {
-        guard let token else { then(false, "Sign in again."); return }
+        guard let token else { then(false, String(localized: "Sign in again.")); return }
         Task {
             do {
                 _ = try await ApiClient.mailRenameLabel(token: token, id: id,
                                                          name: name, colour: colour)
                 guard sessionIsLive else { return }
                 refreshLabels(force: true)
-                then(true, "Saved.")
+                then(true, String(localized: "Saved."))
             } catch { then(false, Self.describe(error)) }
         }
     }
 
     func deleteLabel(id: String, then: @escaping (String) -> Void) {
-        guard let token else { then("Sign in again."); return }
+        guard let token else { then(String(localized: "Sign in again.")); return }
         Task {
             do {
                 try await ApiClient.mailDeleteLabel(token: token, id: id)
                 guard sessionIsLive else { return }
                 refreshLabels(force: true)
-                then("Label removed. Its messages keep their other labels.")
+                then(String(localized: "Label removed. Its messages keep their other labels."))
             } catch { then(Self.describe(error)) }
         }
     }
@@ -2477,7 +2722,7 @@ final class MailboxModel: ObservableObject {
         }
         guard let token else {
             aliasesState.read = .failed
-            aliasesState.error = "Sign in again."
+            aliasesState.error = String(localized: "Sign in again.")
             return
         }
         aliasesState.read = .reading
@@ -2549,7 +2794,7 @@ final class MailboxModel: ObservableObject {
                     var updated = self.screener
                     updated.loaded = true
                     updated.enabled = response.enabled ?? updated.enabled
-                    updated.error = response.error ?? (response.enabled == nil ? "Screener status is unavailable." : nil)
+                    updated.error = response.error ?? (response.enabled == nil ? String(localized: "Screener status is unavailable.") : nil)
                     self.screener = updated
                 }
             } catch {
@@ -2589,7 +2834,7 @@ final class MailboxModel: ObservableObject {
                 var updated = self.screener
                 updated.busy = false
                 updated.enabled = response.enabled ?? updated.enabled
-                updated.error = response.error ?? (response.enabled == nil ? "The setting could not be confirmed." : nil)
+                updated.error = response.error ?? (response.enabled == nil ? String(localized: "The setting could not be confirmed.") : nil)
                 self.screener = updated
             } catch {
                 guard self.sessionIsLive else { return }
@@ -2619,10 +2864,10 @@ final class MailboxModel: ObservableObject {
         then: @escaping (String) -> Void,
     ) {
         guard !screener.busy else { return }
-        guard let token else { then("Sign in again to decide on this sender."); return }
+        guard let token else { then(String(localized: "Sign in again to decide on this sender.")); return }
         let senders = Self.senders(from: addresses, scope: scope)
         guard !senders.isEmpty else {
-            then("Those messages name no sender to decide on."); return
+            then(String(localized: "Those messages name no sender to decide on.")); return
         }
         screener.busy = true
         screener.error = nil
@@ -2637,7 +2882,7 @@ final class MailboxModel: ObservableObject {
                     // `success` is the store's own word for the write landing. A
                     // 200 that did not say so is not counted as saved.
                     if r.success { saved += 1 }
-                    else { failure = r.error ?? "The server refused that decision." }
+                    else { failure = r.error ?? String(localized: "The server refused that decision.") }
                 } catch { failure = Self.describe(error) }
             }
             guard self.sessionIsLive else { return }
@@ -2645,9 +2890,9 @@ final class MailboxModel: ObservableObject {
             self.screener.error = failure
             let message: String
             if let failure, saved == 0 { message = failure }
-            else if let failure { message = "\(saved) of \(senders.count) saved. \(failure)" }
-            else if saved == 1 { message = "\(decision.done): \(senders[0])" }
-            else { message = "\(decision.done): \(saved) senders" }
+            else if let failure { message = String(localized: "\(saved) of \(senders.count) saved. \(failure)") }
+            else if saved == 1 { message = String(localized: "\(decision.done): \(senders[0])", comment: "Screener receipt: decision, sender address") }
+            else { message = String(localized: "\(decision.done): \(saved) senders", comment: "Screener receipt: decision, number of senders") }
             then(message)
         }
     }
@@ -2661,10 +2906,10 @@ final class MailboxModel: ObservableObject {
     /// still in force somewhere.
     func undoDecision(_ address: String, scope: MailSenderScope, then: @escaping (String) -> Void) {
         guard !screener.busy else { return }
-        guard let token else { then("Sign in again to change this."); return }
+        guard let token else { then(String(localized: "Sign in again to change this.")); return }
         let sender = Self.senders(from: [address], scope: scope).first
         guard let sender else {
-            then("That message names no sender to change."); return
+            then(String(localized: "That message names no sender to change.")); return
         }
         screener.busy = true
         Task { [weak self] in
@@ -2675,8 +2920,8 @@ final class MailboxModel: ObservableObject {
                 guard self.sessionIsLive else { return }
                 self.screener.busy = false
                 then(r.removed == true
-                     ? "Forgotten — their next message waits in the queue again."
-                     : "No decision was recorded for them, so there was nothing to forget.")
+                     ? String(localized: "Forgotten — their next message waits in the queue again.")
+                     : String(localized: "No decision was recorded for them, so there was nothing to forget."))
             } catch {
                 self.screener.busy = false
                 self.screener.error = Self.describe(error)
@@ -2736,11 +2981,10 @@ final class MailboxModel: ObservableObject {
         // `.http` pattern does not match through it implicitly.
         if let api = error as? ApiError, case let .http(status, _, _) = api,
            status == 401 {
-            return "The mail service did not accept this session. " +
-                   "You are still signed in to your account."
+            return String(localized: "The mail service did not accept this session. You are still signed in to your account.")
         }
         if let api = error as? ApiError { return api.userMessage }
-        return apiMessage(error, fallback: "Could not complete the mailbox request. Try again.")
+        return apiMessage(error, fallback: String(localized: "Could not complete the mailbox request. Try again."))
     }
 }
 

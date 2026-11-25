@@ -20,6 +20,10 @@ import UIKit
 ///    a new revision, so recipients see the new face on the next resolve and
 ///    an old file is never mistaken for it.
 ///  - Images are downsampled to avatar size before they are kept in memory.
+///  - Whether the picture is a verified brand logo (BIMI) rather than a
+///    person's photo is remembered too (`isBrandLogo`), because the two are
+///    drawn differently (round8-spec §1.6.5): a logo sits on a plate with a
+///    hairline, a photo is a plain circle crop.
 ///
 /// Failure is quiet by design: any error leaves the initial in place, which is
 /// what the row showed before this existed.
@@ -39,6 +43,9 @@ final class SenderPhotos: @unchecked Sendable {
     private let lock = NSLock()
     private var answers: [String: Answer] = [:]
     private var lastKnown: [String: String] = [:]
+    /// Senders whose current picture is a brand logo (`kind == "brand"` or
+    /// `source == "bimi"`), by normalised address.
+    private var brands: Set<String> = []
     private var pending: [String: [CheckedContinuation<Answer?, Never>]] = [:]
     private var flushScheduled = false
     private let images: NSCache<NSString, UIImage> = {
@@ -57,6 +64,13 @@ final class SenderPhotos: @unchecked Sendable {
         let revision = lock.withLock { lastKnown[key] }
         guard let revision else { return nil }
         return images.object(forKey: "\(key)|\(revision)" as NSString)
+    }
+
+    /// Whether this sender's picture is a verified brand logo (BIMI) rather
+    /// than a person's photo. False until the server has answered.
+    func isBrandLogo(_ address: String) -> Bool {
+        let key = Self.key(address)
+        return lock.withLock { brands.contains(key) }
     }
 
     /// The sender's photo, or nil to keep the initial. Never throws.
@@ -87,7 +101,7 @@ final class SenderPhotos: @unchecked Sendable {
 
     /// Forget everything, e.g. on sign-out or an account switch.
     func clear() {
-        lock.withLock { answers.removeAll(); lastKnown.removeAll() }
+        lock.withLock { answers.removeAll(); lastKnown.removeAll(); brands.removeAll() }
         images.removeAllObjects()
         try? FileManager.default.removeItem(at: directory)
     }
@@ -144,9 +158,11 @@ final class SenderPhotos: @unchecked Sendable {
         let now = Date()
         for (key, waiters) in batch {
             var revision: String?
+            var brand = false
             if let avatar = resolved?[key], avatar.kind == "person" || avatar.kind == "brand",
                let value = avatar.revision, value.range(of: "^[a-f0-9]{32}$", options: .regularExpression) != nil {
                 revision = value
+                brand = avatar.kind == "brand" || avatar.source == "bimi"
             }
             // Only a real answer is remembered; a failed call is asked again next time.
             var answer: Answer?
@@ -154,9 +170,15 @@ final class SenderPhotos: @unchecked Sendable {
                 let badges = (resolved[key]?.badges ?? []).filter { Self.knownBadges.contains($0) }
                 let made = Answer(revision: revision, badges: badges, at: now)
                 answer = made
+                let isBrand = brand
                 lock.withLock {
                     answers["\(viewer)|\(key)"] = made
                     lastKnown[key] = revision
+                    if isBrand {
+                        brands.insert(key)
+                    } else {
+                        brands.remove(key)
+                    }
                 }
             }
             for waiter in waiters { waiter.resume(returning: answer) }
@@ -195,19 +217,20 @@ final class SenderPhotos: @unchecked Sendable {
 
     private static func downsample(_ data: Data) -> UIImage? {
         // A brand logo (BIMI) arrives as SVG, already checked server-side to be
-        // self-contained. ImageIO cannot read vectors, so it is drawn here, on a
-        // white disc as mail apps show brand marks.
+        // self-contained. ImageIO cannot read vectors, so it is drawn here,
+        // scaled to FILL the square (BIMI SVG Tiny PS logos are square and
+        // designed for circular cropping) on a transparent background: the
+        // avatar view puts the theme's plate (#FFFFFF / #F4F5F7) behind it.
         let head = String(decoding: data.prefix(256), as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
         if head.hasPrefix("<svg") || head.hasPrefix("<?xml") {
             guard let logo = UIImage(svgData: data) else { return nil }
             let side = targetPixels
             let format = UIGraphicsImageRendererFormat()
             format.scale = 1
-            return UIGraphicsImageRenderer(size: CGSize(width: side, height: side), format: format).image { context in
-                UIColor.white.setFill()
-                context.fill(CGRect(x: 0, y: 0, width: side, height: side))
+            format.opaque = false
+            return UIGraphicsImageRenderer(size: CGSize(width: side, height: side), format: format).image { _ in
                 let size = logo.size
-                let scale = min(side / max(size.width, 1), side / max(size.height, 1))
+                let scale = max(side / max(size.width, 1), side / max(size.height, 1))
                 let drawn = CGSize(width: size.width * scale, height: size.height * scale)
                 logo.draw(in: CGRect(x: (side - drawn.width) / 2, y: (side - drawn.height) / 2,
                                      width: drawn.width, height: drawn.height))

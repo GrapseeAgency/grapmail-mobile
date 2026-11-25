@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    values-tr/strings_reader.xml: translation of values/strings_reader.xml (same keys, same order).
+    Comments below are kept from the English source for context.
+-->
+<resources>
+    <!-- The inline pill above an HTML body in a dark reader. It names what a tap switches TO. -->
+    <string name="reader_colours_original">Orijinal renkler</string>
+    <string name="reader_colours_dark">Koyu renkler</string>
+
+    <!-- The message overflow menu items (same toggle as the pill). -->
+    <string name="reader_colours_menu_original">Orijinal renkleri göster</string>
+    <string name="reader_colours_menu_dark">Koyu renkleri göster</string>
+
+    <!-- TalkBack: the pill's click action ("double-tap to …") and its current state. -->
+    <string name="reader_colours_action_original">bu gönderenin orijinal renklerini göster</string>
+    <string name="reader_colours_action_dark">koyu renklerle göster</string>
+    <string name="reader_colours_state_original">Orijinal renkler gösteriliyor</string>
+    <string name="reader_colours_state_dark">Koyu renkler gösteriliyor</string>
+
+    <!-- The note under the message after a change, so the per-sender memory is not a surprise later. -->
+    <string name="reader_colours_remembered_original">%1$s tarafından gönderilen postalar bu cihazda orijinal renkleriyle açılacak.</string>
+    <string name="reader_colours_remembered_dark">%1$s tarafından gönderilen postalar bu cihazda koyu renklerle açılacak.</string>
+</resources>

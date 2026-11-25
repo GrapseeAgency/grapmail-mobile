@@ -1,0 +1,21 @@
+/* GrapMailNotificationService — Persian. */
+
+"New encrypted message" = "پیام رمزگذاری‌شدهٔ جدید";
+"New mail" = "نامهٔ جدید";
+"1 new message" = "۱ پیام جدید";
+"%lld new messages" = "%lld پیام جدید";
+"%lld unread in the inbox" = "%lld خوانده‌نشده در صندوق ورودی";
+"Encrypted message" = "پیام رمزگذاری‌شده";
+"Unknown sender" = "فرستندهٔ ناشناس";
+"No subject" = "بدون موضوع";
+"This was me" = "این من بودم";
+"Secure account" = "ایمن‌سازی حساب";
+"Archive" = "بایگانی";
+"Mark as read" = "علامت‌گذاری به‌عنوان خوانده‌شده";
+"Reply" = "پاسخ";
+"Send" = "ارسال";
+"Reply…" = "پاسخ…";
+"Reply in app" = "پاسخ در برنامه";
+"More" = "بیشتر";
+/* Notification title: a sign-in code, then the sender */
+"%@ · %@" = "%@ · %@";

@@ -1,5 +1,12 @@
 package com.grapsee.grapmail.ui.mailfeatures
 
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -34,6 +41,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
+import com.grapsee.grapmail.R
 import com.grapsee.grapmail.data.MailMessageFullDto
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -81,6 +91,33 @@ object MailFeatureIntents {
             manager.setPrimaryClip(android.content.ClipData.newPlainText(label, text))
         }
     }
+
+    /**
+     * A one-time code onto the clipboard, marked sensitive so Android 13+
+     * keeps it out of the clipboard preview (the framework key there, the
+     * documented literal below it, ignored where unknown) — the same marking
+     * the notification's "Copy code" uses (logic/Notifications.kt). The code is
+     * re-checked against [com.grapsee.grapmail.logic.CodeFinder.isPlausible]
+     * so nothing but a code shape is ever copied. True when the copy landed.
+     */
+    fun copySensitiveCode(context: android.content.Context, label: String, code: String): Boolean {
+        if (!com.grapsee.grapmail.logic.CodeFinder.isPlausible(code)) return false
+        return runCatching {
+            val manager = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE)
+                as android.content.ClipboardManager
+            val clip = android.content.ClipData.newPlainText(label, code)
+            clip.description.extras = android.os.PersistableBundle().apply {
+                putBoolean(
+                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU)
+                        android.content.ClipDescription.EXTRA_IS_SENSITIVE
+                    else "android.content.extra.IS_SENSITIVE",
+                    true,
+                )
+            }
+            manager.setPrimaryClip(clip)
+            true
+        }.getOrDefault(false)
+    }
 }
 
 @Composable
@@ -90,21 +127,23 @@ fun ThreadSummaryCard(summary: ThreadSummary, modifier: Modifier = Modifier) {
         Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    "Thread summary · " + summary.messageCount + " messages",
+                    pluralStringResource(R.plurals.mail_thread_summary_title, summary.messageCount, summary.messageCount),
                     fontSize = 12.sp,
                     fontWeight = FontWeight.SemiBold,
                 )
                 Spacer(Modifier.weight(1f))
                 Text(
-                    if (expanded) "Less" else "More",
+                    if (expanded) stringResource(R.string.mail_summary_less) else stringResource(R.string.mail_summary_more),
                     fontSize = 12.sp,
-                    modifier = Modifier.clickable(onClickLabel = if (expanded) "Collapse summary" else "Expand summary") { expanded = !expanded },
+                    modifier = Modifier.clickable(
+                        onClickLabel = if (expanded) stringResource(R.string.mail_summary_collapse) else stringResource(R.string.mail_summary_expand),
+                    ) { expanded = !expanded },
                 )
             }
             Text(summary.headline, fontSize = 13.sp)
             if (expanded) {
                 summary.keyPoints.forEach { point ->
-                    Text("• " + point, fontSize = 12.sp)
+                    Text(stringResource(R.string.mail_bullet_item, point), fontSize = 12.sp)
                 }
             }
         }
@@ -150,12 +189,12 @@ fun SmartReplyStrip(suggestions: List<String>, onPick: (String) -> Unit, modifie
 @Composable
 fun MailCategoryChipsRow(selected: String?, onSelect: (String?) -> Unit, modifier: Modifier = Modifier) {
     val options = listOf(
-        "All" to "",
-        "Priority" to "priority",
-        "People" to "people",
-        "Transactions" to "transactions",
-        "Notices" to "notices",
-        "Newsletters" to "newsletters",
+        stringResource(R.string.mail_category_all) to "",
+        stringResource(R.string.mail_category_priority) to "priority",
+        stringResource(R.string.mail_category_people) to "people",
+        stringResource(R.string.mail_category_transactions) to "transactions",
+        stringResource(R.string.mail_category_notices) to "notices",
+        stringResource(R.string.mail_category_newsletters) to "newsletters",
     )
     Row(
         modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
@@ -183,11 +222,13 @@ fun TrackerShieldBanner(
     Row(modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         Text(
             if (trackerCount > 0) {
-                trackerCount.toString() + " tracker" + (if (trackerCount == 1) "" else "s") +
-                    " blocked · " + remoteCount + " remote image" +
-                    (if (remoteCount == 1) "" else "s") + " stopped"
+                stringResource(
+                    R.string.mail_tracker_summary,
+                    pluralStringResource(R.plurals.mail_trackers_blocked, trackerCount, trackerCount),
+                    pluralStringResource(R.plurals.mail_remote_images_stopped, remoteCount, remoteCount),
+                )
             } else {
-                "Tracker shield on — tracking pixels stripped before display"
+                stringResource(R.string.mail_tracker_shield_on)
             },
             fontSize = 12.sp,
             modifier = Modifier.weight(1f),
@@ -201,28 +242,31 @@ fun QrWarningDialog(verdict: UrlVerdict, onDismiss: () -> Unit, onOpen: () -> Un
     AlertDialog(
         onDismissRequest = onDismiss,
         title = {
-            Text(if (verdict.risk == UrlRisk.HIGH) "Dangerous link detected" else "Careful with this link")
+            Text(
+                if (verdict.risk == UrlRisk.HIGH) stringResource(R.string.mail_link_dangerous)
+                else stringResource(R.string.mail_link_careful),
+            )
         },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text(
-                    "Destination: " + verdict.displayHost.ifEmpty { verdict.original },
+                    stringResource(R.string.mail_link_destination, verdict.displayHost.ifEmpty { verdict.original }),
                     fontSize = 13.sp,
                     fontWeight = FontWeight.Medium,
                 )
                 verdict.reasons.forEach { reason ->
-                    Text("• " + reason, fontSize = 12.sp)
+                    Text(stringResource(R.string.mail_bullet_item, reason), fontSize = 12.sp)
                 }
                 if (verdict.reasons.isEmpty()) {
-                    Text("No known danger signals were found for this link.", fontSize = 12.sp)
+                    Text(stringResource(R.string.mail_link_no_signals), fontSize = 12.sp)
                 }
             }
         },
         confirmButton = {
-            TextButton(onClick = { onOpen() }) { Text("Open anyway") }
+            TextButton(onClick = { onOpen() }) { Text(stringResource(R.string.mail_link_open_anyway)) }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel") }
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.mail_common_cancel)) }
         },
     )
 }
@@ -237,42 +281,42 @@ fun ComposeAssistRow(getBody: () -> String, setBody: (String) -> Unit, modifier:
         modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        AssistChip(onClick = { showPrompt = true }, label = { Text("Draft", fontSize = 12.sp) })
+        AssistChip(onClick = { showPrompt = true }, label = { Text(stringResource(R.string.mail_assist_draft), fontSize = 12.sp) })
         AssistChip(
             onClick = { setBody(ComposeAssist.rewrite(getBody())) },
-            label = { Text("Rewrite", fontSize = 12.sp) },
+            label = { Text(stringResource(R.string.mail_assist_rewrite), fontSize = 12.sp) },
         )
         AssistChip(
             onClick = { setBody(ComposeAssist.transform(getBody(), ComposeTone.PROFESSIONAL)) },
-            label = { Text("Professional", fontSize = 12.sp) },
+            label = { Text(stringResource(R.string.mail_assist_professional), fontSize = 12.sp) },
         )
         AssistChip(
             onClick = { setBody(ComposeAssist.transform(getBody(), ComposeTone.FRIENDLY)) },
-            label = { Text("Friendly", fontSize = 12.sp) },
+            label = { Text(stringResource(R.string.mail_assist_friendly), fontSize = 12.sp) },
         )
         AssistChip(
             onClick = { setBody(ComposeAssist.transform(getBody(), ComposeTone.CONCISE)) },
-            label = { Text("Concise", fontSize = 12.sp) },
+            label = { Text(stringResource(R.string.mail_assist_concise), fontSize = 12.sp) },
         )
         AssistChip(
             onClick = { issues = ComposeAssist.proofread(getBody()) },
-            label = { Text("Proofread", fontSize = 12.sp) },
+            label = { Text(stringResource(R.string.mail_assist_proofread), fontSize = 12.sp) },
         )
     }
 
     if (showPrompt) {
         AlertDialog(
             onDismissRequest = { showPrompt = false },
-            title = { Text("Draft with on-device assist") },
+            title = { Text(stringResource(R.string.mail_assist_draft_title)) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedTextField(
                         value = prompt,
                         onValueChange = { prompt = it },
-                        label = { Text("What should the message say?") },
+                        label = { Text(stringResource(R.string.mail_assist_prompt_label)) },
                         modifier = Modifier.fillMaxWidth().height(110.dp),
                     )
-                    Text("Runs fully on-device — nothing leaves the phone.", fontSize = 11.sp)
+                    Text(stringResource(R.string.mail_assist_on_device_note), fontSize = 11.sp)
                 }
             },
             confirmButton = {
@@ -284,10 +328,10 @@ fun ComposeAssistRow(getBody: () -> String, setBody: (String) -> Unit, modifier:
                             showPrompt = false
                         }
                     },
-                ) { Text("Draft it") }
+                ) { Text(stringResource(R.string.mail_assist_draft_it)) }
             },
             dismissButton = {
-                TextButton(onClick = { showPrompt = false }) { Text("Cancel") }
+                TextButton(onClick = { showPrompt = false }) { Text(stringResource(R.string.mail_common_cancel)) }
             },
         )
     }
@@ -295,18 +339,18 @@ fun ComposeAssistRow(getBody: () -> String, setBody: (String) -> Unit, modifier:
     issues?.let { list ->
         AlertDialog(
             onDismissRequest = { issues = null },
-            title = { Text("Proofread") },
+            title = { Text(stringResource(R.string.mail_assist_proofread)) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     if (list.isEmpty()) {
-                        Text("No obvious issues found.", fontSize = 13.sp)
+                        Text(stringResource(R.string.mail_assist_no_issues), fontSize = 13.sp)
                     } else {
-                        list.forEach { issue -> Text("• " + issue, fontSize = 13.sp) }
+                        list.forEach { issue -> Text(stringResource(R.string.mail_bullet_item, issue), fontSize = 13.sp) }
                     }
                 }
             },
             confirmButton = {
-                TextButton(onClick = { issues = null }) { Text("Done") }
+                TextButton(onClick = { issues = null }) { Text(stringResource(R.string.mail_common_done)) }
             },
         )
     }
@@ -323,7 +367,7 @@ fun TemplatePickerChip(
     var open by remember { mutableStateOf(false) }
     AssistChip(
         onClick = { open = true },
-        label = { Text("Templates", fontSize = 12.sp) },
+        label = { Text(stringResource(R.string.mail_templates), fontSize = 12.sp) },
         modifier = modifier,
     )
     if (open) {
@@ -335,13 +379,13 @@ fun TemplatePickerChip(
 
         AlertDialog(
             onDismissRequest = { open = false },
-            title = { Text("Templates") },
+            title = { Text(stringResource(R.string.mail_templates)) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedTextField(
                         value = query,
                         onValueChange = { query = it },
-                        label = { Text("Search templates") },
+                        label = { Text(stringResource(R.string.mail_templates_search)) },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
                     )
@@ -349,12 +393,13 @@ fun TemplatePickerChip(
                         it.name.contains(query, ignoreCase = true) || it.body.contains(query, ignoreCase = true)
                     }
                     if (filtered.isEmpty()) {
-                        Text("No templates match.", fontSize = 12.sp)
+                        Text(stringResource(R.string.mail_templates_no_match), fontSize = 12.sp)
                     }
+                    val insertLabel = stringResource(R.string.mail_templates_insert)
                     filtered.forEach { template ->
                         Row(
                             Modifier.fillMaxWidth()
-                                .clickable(onClickLabel = "Insert template") {
+                                .clickable(onClickLabel = insertLabel) {
                                     onInsert(prefs.fillTemplate(template.body, firstName, myName))
                                     open = false
                                 },
@@ -378,7 +423,7 @@ fun TemplatePickerChip(
                                         prefs.saveTemplates(next)
                                         templates = next
                                     },
-                                ) { Text("Delete", fontSize = 11.sp) }
+                                ) { Text(stringResource(R.string.mail_action_delete), fontSize = 11.sp) }
                             }
                         }
                     }
@@ -386,14 +431,14 @@ fun TemplatePickerChip(
                         OutlinedTextField(
                             value = newName,
                             onValueChange = { newName = it },
-                            label = { Text("Name") },
+                            label = { Text(stringResource(R.string.mail_templates_name)) },
                             singleLine = true,
                             modifier = Modifier.fillMaxWidth(),
                         )
                         OutlinedTextField(
                             value = newBody,
                             onValueChange = { newBody = it },
-                            label = { Text("Body — supports {first_name} and {my_name}") },
+                            label = { Text(stringResource(R.string.mail_templates_body)) },
                             modifier = Modifier.fillMaxWidth().height(120.dp),
                         )
                         TextButton(
@@ -407,14 +452,14 @@ fun TemplatePickerChip(
                                     adding = false
                                 }
                             },
-                        ) { Text("Save template") }
+                        ) { Text(stringResource(R.string.mail_templates_save)) }
                     } else {
-                        TextButton(onClick = { adding = true }) { Text("New template") }
+                        TextButton(onClick = { adding = true }) { Text(stringResource(R.string.mail_templates_new)) }
                     }
                 }
             },
             confirmButton = {
-                TextButton(onClick = { open = false }) { Text("Close") }
+                TextButton(onClick = { open = false }) { Text(stringResource(R.string.mail_common_close)) }
             },
         )
     }
@@ -428,19 +473,19 @@ fun FollowUpBanner(count: Int, onOpen: () -> Unit, modifier: Modifier = Modifier
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
-            if (count == 1) "1 message awaiting a reply" else count.toString() + " messages awaiting a reply",
+            pluralStringResource(R.plurals.mail_followup_awaiting, count, count),
             fontSize = 12.sp,
             fontWeight = FontWeight.Medium,
         )
         Spacer(Modifier.weight(1f))
-        TextButton(onClick = onOpen) { Text("Review", fontSize = 12.sp) }
+        TextButton(onClick = onOpen) { Text(stringResource(R.string.mail_followup_review), fontSize = 12.sp) }
     }
 }
 
 @Composable
 fun ReadReceiptChip(sent: Boolean, modifier: Modifier = Modifier) {
     Text(
-        if (sent) "Opened · noted on this device" else "Opened-mail markers on",
+        if (sent) stringResource(R.string.mail_receipt_opened) else stringResource(R.string.mail_receipt_markers_on),
         fontSize = 11.sp,
         modifier = modifier,
     )
@@ -469,7 +514,7 @@ fun MailComposeTools(getBody: () -> String, setBody: (String) -> Unit) {
                     setBody(if (current.isBlank()) text else current + "\n\n" + text)
                 },
             )
-            Text("Assist runs fully on-device", fontSize = 11.sp, color = LocalPalette.current.textSecondary)
+            Text(stringResource(R.string.mail_assist_runs_on_device), fontSize = 11.sp, color = LocalPalette.current.textSecondary)
         }
     }
 }
@@ -496,42 +541,43 @@ fun MailFeatureSettingsSection() {
             .padding(vertical = 8.dp),
         verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {
-        com.grapsee.grapmail.ui.screens.mail.SectionLabel("Privacy & intelligence", palette)
+        com.grapsee.grapmail.ui.screens.mail.SectionLabel(stringResource(R.string.mail_features_section), palette)
         MailFeatureSwitchRow(
-            "On-device intelligence",
-            "Categories, summaries and replies stay on this device",
+            stringResource(R.string.mail_features_smart_title),
+            stringResource(R.string.mail_features_smart_body),
             smart,
         ) {
             smart = it
             prefs.smartFeaturesEnabled = it
         }
         MailFeatureSwitchRow(
-            "Tracker shield",
-            "Hold remote images and tracking pixels until you tap Show images. Off loads them automatically.",
+            stringResource(R.string.mail_features_shield_title),
+            stringResource(R.string.mail_features_shield_body),
             shield,
         ) {
             shield = it
             prefs.trackerShieldEnabled = it
         }
         MailFeatureSwitchRow(
-            "QR & link warnings",
-            "Warn before opening scanned or suspicious links",
+            stringResource(R.string.mail_features_qr_title),
+            stringResource(R.string.mail_features_qr_body),
             qr,
         ) {
             qr = it
             prefs.qrWarningsEnabled = it
         }
         MailFeatureSwitchRow(
-            "Opened-mail markers",
-            "Mark messages you've opened, on this device only. Nothing is sent to the sender.",
+            stringResource(R.string.mail_features_receipts_title),
+            stringResource(R.string.mail_features_receipts_body),
             receipts,
         ) {
             receipts = it
             prefs.readReceiptsEnabled = it
         }
+        ReadReceiptModeSetting()
         MailFeatureSwitchRow(
-            "Follow-up reminders",
-            "Remind me when a reply is overdue",
+            stringResource(R.string.mail_features_followups_title),
+            stringResource(R.string.mail_features_followups_body),
             followups,
         ) {
             followups = it
@@ -541,8 +587,8 @@ fun MailFeatureSettingsSection() {
             Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            TextButton(onClick = { showFollowUps = true }) { Text("Follow-up center", fontSize = 13.sp) }
-            TextButton(onClick = { showImport = true }) { Text("Import assistant", fontSize = 13.sp) }
+            TextButton(onClick = { showFollowUps = true }) { Text(stringResource(R.string.mail_features_followup_center), fontSize = 13.sp) }
+            TextButton(onClick = { showImport = true }) { Text(stringResource(R.string.mail_features_import_assistant), fontSize = 13.sp) }
         }
     }
     if (showFollowUps) {
@@ -656,6 +702,9 @@ fun MailSmartPanel(message: MailMessageFullDto?, messages: List<MailMessageFullD
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         summary?.let { ThreadSummaryCard(it) }
+        // Server-backed read receipts: Ask prompt for received mail, "Read <time>" for sent.
+        ReadReceiptAskPrompt(messageId = message.id, direction = message.direction)
+        val serverRead = SentReadLine(messageId = message.id, direction = message.direction)
         if (!cards.isNullOrEmpty()) {
             // Named, not trailing: ActionCardsRow's last parameter is `modifier`,
             // so a trailing lambda would be read as a Modifier and every field
@@ -680,7 +729,8 @@ fun MailSmartPanel(message: MailMessageFullDto?, messages: List<MailMessageFullD
                         onClick = { warning = v },
                         label = {
                             Text(
-                                (if (v.risk == UrlRisk.HIGH) "! " else "Review: ") + v.displayHost,
+                                if (v.risk == UrlRisk.HIGH) stringResource(R.string.mail_link_chip_high, v.displayHost)
+                                else stringResource(R.string.mail_link_chip_review, v.displayHost),
                                 fontSize = 12.sp,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
@@ -700,7 +750,8 @@ fun MailSmartPanel(message: MailMessageFullDto?, messages: List<MailMessageFullD
                 )
             }
         }
-        if (prefs.readReceiptsEnabled) {
+        // The on-device "Opened" marker is hidden once the server has a real receipt.
+        if (prefs.readReceiptsEnabled && !serverRead) {
             ReadReceiptChip(sent = prefs.wasReceiptSent(message.id))
         }
     }
@@ -714,5 +765,75 @@ fun MailSmartPanel(message: MailMessageFullDto?, messages: List<MailMessageFullD
                 warning = null
             },
         )
+    }
+}
+
+// ── Round 8 — C: the mailbox safety nudge (docs/design/round8-spec.md §4.3 B) ──
+
+/**
+ * One card at the top of the mailbox list, below the greeting: a mini score
+ * ring (40, stroke 5), "Make your account harder to break into", the score and
+ * the top todo step, an "Improve" text button that opens the Security Center,
+ * and a 44 dp close button labelled "Dismiss". `primaryContainer`, radius 20,
+ * padding 16. Rendering only: when it shows, the "shown" stamp and the
+ * slide-out on dismiss are owned by MailboxSafetySlotContent
+ * (ui/screens/security/SecurityCenterScreen.kt).
+ */
+@Composable
+fun SafetyNudgeCard(
+    value: Int,
+    level: String?,
+    nextStep: String,
+    onImprove: () -> Unit,
+    onDismiss: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val palette = LocalPalette.current
+    Row(
+        modifier
+            .fillMaxWidth()
+            .padding(horizontal = 10.dp, vertical = 6.dp)
+            .clip(RoundedCornerShape(20.dp))
+            .background(palette.primaryContainer)
+            .padding(start = 16.dp, top = 16.dp, bottom = 8.dp, end = 4.dp),
+        verticalAlignment = Alignment.Top,
+    ) {
+        com.grapsee.grapmail.ui.screens.security.SafetyMiniRing(value = value, level = level)
+        Spacer(Modifier.width(12.dp))
+        Column(Modifier.weight(1f)) {
+            Text(
+                stringResource(R.string.seccenter_nudge_title),
+                style = com.grapsee.grapmail.ui.theme.BodyMedium,
+                color = palette.onPrimaryContainer,
+            )
+            Spacer(Modifier.height(2.dp))
+            Text(
+                stringResource(R.string.seccenter_nudge_body, value, nextStep),
+                style = com.grapsee.grapmail.ui.theme.Caption,
+                color = palette.onPrimaryContainer,
+            )
+            TextButton(
+                onClick = onImprove,
+                contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 0.dp, vertical = 4.dp),
+                modifier = Modifier.heightIn(min = 44.dp),
+            ) {
+                Text(
+                    stringResource(R.string.seccenter_nudge_improve),
+                    style = com.grapsee.grapmail.ui.theme.BodyMedium,
+                    color = palette.primaryText,
+                )
+            }
+        }
+        IconButton(
+            onClick = onDismiss,
+            modifier = Modifier.size(44.dp),
+        ) {
+            Icon(
+                Icons.Rounded.Close,
+                contentDescription = stringResource(R.string.seccenter_nudge_dismiss),
+                tint = palette.onPrimaryContainer,
+                modifier = Modifier.size(20.dp),
+            )
+        }
     }
 }

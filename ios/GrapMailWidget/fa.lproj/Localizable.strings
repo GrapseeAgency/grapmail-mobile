@@ -1,0 +1,31 @@
+/* GrapMailWidget — Persian. */
+
+"Unread mail" = "نامه‌های خوانده‌نشده";
+"The unread count your app last saw, and the newest message." = "آخرین تعداد خوانده‌نشده‌هایی که برنامه دید، و جدیدترین پیام.";
+"GrapMail — not signed in" = "GrapMail — وارد نشده‌اید";
+"GrapMail — no read yet" = "GrapMail — هنوز داده‌ای نیست";
+/* Lock Screen inline widget: unread count, newest sender */
+"%lld unread · %@" = "%lld خوانده‌نشده · %@";
+/* Lock Screen inline widget: unread count */
+"%lld unread" = "%lld خوانده‌نشده";
+"unread" = "خوانده‌نشده";
+"No subject" = "بدون موضوع";
+"No read yet" = "هنوز داده‌ای نیست";
+"Open the app to sign in" = "برای ورود، برنامه را باز کنید";
+"Scheduled send" = "ارسال زمان‌بندی‌شده";
+"(no subject)" = "(بدون موضوع)";
+"Scheduled" = "زمان‌بندی‌شده";
+"To %@" = "به %@";
+"Sending…" = "در حال ارسال…";
+
+/* Home Screen widget row buttons (iOS 17+), read by VoiceOver */
+"Mark as read" = "علامت‌گذاری به‌عنوان خوانده‌شده";
+"Archive" = "بایگانی";
+"Star" = "ستاره‌دار کردن";
+"Unstar" = "برداشتن ستاره";
+/* The widget row buttons' App Intent and its parameters (hidden from Shortcuts) */
+"Update message" = "به‌روزرسانی پیام";
+"Message" = "پیام";
+"Action" = "عملیات";
+/* Widget placeholder when no account is signed in */
+"Open GrapMail to sign in" = "برای ورود، GrapMail را باز کنید";

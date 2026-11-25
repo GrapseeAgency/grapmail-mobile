@@ -1,0 +1,10 @@
+/* Info.plist strings for the GrapMail app target (Bengali). */
+
+/* Face ID permission sheet (AppLock.swift). */
+"NSFaceIDUsageDescription" = "অ্যাপ লক থাকলে আপনার মেইলবক্স ব্যক্তিগত রাখতে GrapMail Face ID ব্যবহার করে।";
+
+/* Home-screen quick action: com.grapsee.grapmail.compose. The key is the title in project.yml. */
+"Compose mail" = "মেইল লিখুন";
+
+/* Photo library permission sheet for "Save Image" (round 9). */
+"NSPhotoLibraryAddUsageDescription" = "GrapMail আপনার বেছে নেওয়া ছবি ও সংযুক্তি আপনার ফটো লাইব্রেরিতে সংরক্ষণ করে।";

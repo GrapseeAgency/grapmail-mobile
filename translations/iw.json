@@ -1,0 +1,73 @@
+{
+ "android": {
+  "strings_r9_reader.xml": {
+   "reader_earlier_messages": {"one": "%d הודעה קודמת", "two": "שתי הודעות קודמות", "other": "%d הודעות קודמות"},
+   "reader_participants": {"one": "%d אדם", "two": "שני אנשים", "other": "%d אנשים"},
+   "reader_message_count": {"one": "הודעה %d", "two": "שתי הודעות", "other": "%d הודעות"},
+   "reader_you": "אתה",
+   "reader_unread": "לא נקרא",
+   "reader_earlier_action": "הצגת ההודעות המקופלות",
+   "reader_open_message_action": "פתיחת ההודעה הזו",
+   "reader_quoted_show": "הצגת טקסט מצוטט",
+   "reader_quoted_hide": "הסתרת טקסט מצוטט",
+   "reader_state_expanded": "פתוח",
+   "reader_state_collapsed": "מקופל",
+   "reader_reply_to": "השב ל-%1$s…",
+   "reader_reply_fallback": "השב…",
+   "reader_reply_options": "אפשרויות תגובה",
+   "reader_quick_reply": "תגובה מהירה",
+   "reader_attach_share_chooser": "שיתוף קובץ מצורף",
+   "reader_attach_view_image": "הצגת התמונה",
+   "reader_attach_save_named": "שמירת %1$s",
+   "reader_attach_share_named": "שיתוף %1$s",
+   "reader_attach_share_nothing": "אין במכשיר הזה אפליקציה שיכולה לשתף את הקובץ.",
+   "reader_viewer_position": "%1$d מתוך %2$d",
+   "reader_viewer_too_large": "אי אפשר להציג את התמונה הזו כאן.",
+   "compose_r9_leave_title": "לצאת מההודעה הזו?",
+   "compose_r9_leave_attachments": "טיוטות עדיין לא שומרות קבצים מצורפים. אפשר לשמור את הטקסט בלי הקבצים, או להמשיך לערוך.",
+   "compose_r9_save_text_only": "שמירת הטקסט בלבד",
+   "compose_r9_draft_failed_title": "הטיוטה הזו לא נשמרה",
+   "compose_r9_leave_without_saving": "יציאה בלי לשמור",
+   "compose_r9_encrypt_failed": "לא ניתן היה להצפין את ההודעה, ולכן דבר לא נשלח.",
+   "compose_editor_toolbar": "עיצוב טקסט",
+   "compose_editor_bold": "מודגש",
+   "compose_editor_italic": "נטוי",
+   "compose_editor_underline": "קו תחתון",
+   "compose_editor_strike": "קו חוצה",
+   "compose_editor_bullets": "תבליטים",
+   "compose_editor_numbered": "ממוספר",
+   "compose_editor_text_colour": "צבע הטקסט",
+   "compose_editor_black": "שחור",
+   "compose_editor_blue": "כחול",
+   "compose_editor_red": "אדום",
+   "compose_editor_green": "ירוק",
+   "compose_editor_highlight": "הדגשה",
+   "compose_editor_highlight_colour": "צבע הדגשה",
+   "compose_editor_yellow": "צהוב",
+   "compose_editor_pink": "ורוד",
+   "compose_editor_font": "גופן",
+   "compose_editor_sans": "ללא תגים",
+   "compose_editor_larger": "גדול יותר",
+   "compose_editor_clear": "ניקוי עיצוב",
+   "compose_editor_image": "תמונה",
+   "compose_editor_insert_image": "הוספת תמונה"
+  },
+  "strings_r9_platform.xml": {
+   "r9_platform_notif_channel_new_mail_desc": "מיידע אותך כשמגיעות הודעות חדשות לתיבה.",
+   "r9_platform_price_per_week": "%1$s לשבוע",
+   "r9_platform_price_per_month": "%1$s לחודש",
+   "r9_platform_price_per_3_months": "%1$s כל 3 חודשים",
+   "r9_platform_price_per_6_months": "%1$s כל 6 חודשים",
+   "r9_platform_price_per_year": "%1$s לשנה"
+  },
+  "strings_r9_mailbox.xml": {
+   "mail_sendlater_channel_name": "שליחות מתוזמנות",
+   "mail_sendlater_channel_desc": "ספירה לאחור להודעות שממתינות לשליחה"
+  },
+  "strings_identity.xml": {
+   "identity_settings_appearance": "מראה",
+   "identity_match_wallpaper_title": "התאמה לטפט",
+   "identity_match_wallpaper_subtitle": "שימוש בצבעי הטפט לכפתורים ולהדגשות. האווטרים, צבעי המצב והטקסט נשארים בצבעי GrapMail."
+  }
+ }
+}

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="identity_settings_appearance">Giao diện</string>
+    <string name="identity_match_wallpaper_title">Khớp hình nền</string>
+    <string name="identity_match_wallpaper_subtitle">Dùng màu của hình nền cho nút và phần tô sáng. Ảnh đại diện, màu trạng thái và chữ vẫn theo GrapMail.</string>
+</resources>

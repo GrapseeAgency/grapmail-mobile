@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">GrapMail</string>
+    <string name="shortcut_compose_short">میل لکھیں</string>
+    <string name="shortcut_compose_long">GrapMail کا نیا پیغام لکھیں</string>
+    <string name="shortcut_scheduled_short">شیڈول شدہ ارسال</string>
+    <string name="shortcut_scheduled_long">بھیجے جانے کی منتظر میل دیکھیں اور منسوخ کریں</string>
+    <string name="shortcut_subscriptions_short">سبسکرپشنز</string>
+    <string name="shortcut_subscriptions_long">بھیجنے والوں کا جائزہ لیں اور ایک ہی جگہ ان سبسکرائب کریں</string>
+    <string name="notif_channel_new_mail">نئی میل</string>
+    <string name="notif_channel_new_mail_desc">جب بیک گراؤنڈ جانچ میں ایسے پیغامات ملیں جو آپ نے ابھی تک نہیں پڑھے تو آپ کو مطلع کرتا ہے۔ GrapMail کوئی پُش سروس استعمال نہیں کرتا، اس لیے یہ اطلاعات اس وقت آتی ہیں جب سسٹم ایپ کو جگاتا ہے اور ایپ خود سرور سے پوچھتی ہے۔</string>
+    <string name="notif_channel_security">سیکیورٹی الرٹس</string>
+    <string name="notif_channel_security_desc">آپ کے اکاؤنٹ کے ساتھ کچھ بھی ہونے پر فوراً مطلع کرتا ہے: کسی نئے آلے سے سائن اِن، پاس ورڈ کی تبدیلی، یا قابلِ اعتماد آلے میں تبدیلی۔ خاموش اوقات میں بھی یہ کبھی خاموش نہیں ہوتے۔</string>
+    <string name="widget_description">غیر پڑھی میل ایک نظر میں: GrapMail کی بیک گراؤنڈ جانچ سے تعداد</string>
+</resources>

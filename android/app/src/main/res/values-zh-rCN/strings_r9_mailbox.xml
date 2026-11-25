@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="mail_sendlater_channel_name">定时发送</string>
+    <string name="mail_sendlater_channel_desc">等待发送的邮件倒计时</string>
+</resources>

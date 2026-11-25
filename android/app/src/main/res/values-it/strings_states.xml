@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Loading / empty / error / offline states (Italian). Translated from values/strings_states.xml. -->
+<resources>
+    <!-- Shared -->
+    <string name="states_loading">Caricamento…</string>
+    <string name="states_offline_banner">Sei offline. Viene mostrato l\'ultimo contenuto caricato: tutto ciò che richiede la rete resterà in attesa finché non ti riconnetti.</string>
+    <string name="states_error_title">Si è verificato un problema</string>
+    <string name="states_error_body">Impossibile caricare al momento. Controlla la connessione e riprova.</string>
+    <string name="states_error_offline_body">Sei offline. Connettiti al Wi-Fi o ai dati mobili, poi riprova.</string>
+    <string name="states_retry">Riprova</string>
+
+    <!-- Labels -->
+    <string name="states_labels_loading">Caricamento etichette…</string>
+    <string name="states_labels_failed_title">Impossibile caricare le etichette</string>
+
+    <!-- Scheduled -->
+    <string name="states_scheduled_loading">Caricamento email programmate…</string>
+    <string name="states_scheduled_failed_title">Impossibile caricare le email programmate</string>
+    <string name="states_scheduled_empty_title">Nessuna email programmata</string>
+
+    <!-- Contacts and files -->
+    <string name="states_contacts_loading">Raccolta dei contatti dalla tua posta…</string>
+    <string name="states_files_loading">Raccolta degli allegati…</string>
+
+    <!-- Connected mailboxes -->
+    <string name="states_providers_loading">Caricamento caselle di posta collegate…</string>
+
+    <!-- Reader -->
+    <string name="states_thread_loading">Apertura della conversazione…</string>
+
+    <!-- Security -->
+    <string name="states_activity_failed_title">Impossibile caricare l\'attività</string>
+    <string name="states_sessions_failed_title">Impossibile caricare le sessioni</string>
+</resources>

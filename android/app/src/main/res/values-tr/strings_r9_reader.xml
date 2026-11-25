@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <plurals name="reader_earlier_messages">
+        <item quantity="one">%d önceki ileti</item>
+        <item quantity="other">%d önceki ileti</item>
+    </plurals>
+    <plurals name="reader_participants">
+        <item quantity="one">%d kişi</item>
+        <item quantity="other">%d kişi</item>
+    </plurals>
+    <plurals name="reader_message_count">
+        <item quantity="one">%d ileti</item>
+        <item quantity="other">%d ileti</item>
+    </plurals>
+    <string name="reader_you">Siz</string>
+    <string name="reader_unread">Okunmadı</string>
+    <string name="reader_earlier_action">katlanmış iletileri göster</string>
+    <string name="reader_open_message_action">bu iletiyi aç</string>
+    <string name="reader_quoted_show">Alıntılanan metni göster</string>
+    <string name="reader_quoted_hide">Alıntılanan metni gizle</string>
+    <string name="reader_state_expanded">Açık</string>
+    <string name="reader_state_collapsed">Katlanmış</string>
+    <string name="reader_reply_to">%1$s kişisine yanıtla…</string>
+    <string name="reader_reply_fallback">Yanıtla…</string>
+    <string name="reader_reply_options">Yanıt seçenekleri</string>
+    <string name="reader_quick_reply">Hızlı yanıt</string>
+    <string name="reader_attach_share_chooser">Eki paylaş</string>
+    <string name="reader_attach_view_image">resmi görüntüle</string>
+    <string name="reader_attach_save_named">%1$s kaydet</string>
+    <string name="reader_attach_share_named">%1$s paylaş</string>
+    <string name="reader_attach_share_nothing">Bu cihazdaki hiçbir uygulama bu dosyayı paylaşamıyor.</string>
+    <string name="reader_viewer_position">%1$d / %2$d</string>
+    <string name="reader_viewer_too_large">Bu resim burada önizlenemiyor.</string>
+    <string name="compose_r9_leave_title">Bu iletiden çıkılsın mı?</string>
+    <string name="compose_r9_leave_attachments">Taslaklar henüz ekleri saklamıyor. Metni eksiz taslak olarak kaydedin ya da düzenlemeye devam edin.</string>
+    <string name="compose_r9_save_text_only">Yalnızca metni kaydet</string>
+    <string name="compose_r9_draft_failed_title">Bu taslak kaydedilmedi</string>
+    <string name="compose_r9_leave_without_saving">Kaydetmeden çık</string>
+    <string name="compose_r9_encrypt_failed">Bu ileti şifrelenemediği için hiçbir şey gönderilmedi.</string>
+    <string name="compose_editor_toolbar">Metin biçimlendirme</string>
+    <string name="compose_editor_bold">Kalın</string>
+    <string name="compose_editor_italic">İtalik</string>
+    <string name="compose_editor_underline">Altı çizili</string>
+    <string name="compose_editor_strike">Üstü çizili</string>
+    <string name="compose_editor_bullets">Madde işaretleri</string>
+    <string name="compose_editor_numbered">Numaralı</string>
+    <string name="compose_editor_text_colour">Metin rengi</string>
+    <string name="compose_editor_black">Siyah</string>
+    <string name="compose_editor_blue">Mavi</string>
+    <string name="compose_editor_red">Kırmızı</string>
+    <string name="compose_editor_green">Yeşil</string>
+    <string name="compose_editor_highlight">Vurgula</string>
+    <string name="compose_editor_highlight_colour">Vurgu rengi</string>
+    <string name="compose_editor_yellow">Sarı</string>
+    <string name="compose_editor_pink">Pembe</string>
+    <string name="compose_editor_font">Yazı tipi</string>
+    <string name="compose_editor_sans">Serifsiz</string>
+    <string name="compose_editor_serif">Serif</string>
+    <string name="compose_editor_mono">Monospace</string>
+    <string name="compose_editor_larger">Daha büyük</string>
+    <string name="compose_editor_clear">Biçimi temizle</string>
+    <string name="compose_editor_image">Resim</string>
+    <string name="compose_editor_insert_image">Resim ekle</string>
+</resources>

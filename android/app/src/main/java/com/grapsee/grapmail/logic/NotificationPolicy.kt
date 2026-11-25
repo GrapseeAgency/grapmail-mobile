@@ -1,11 +1,13 @@
 package com.grapsee.grapmail.logic
 
 import android.content.Context
+import com.grapsee.grapmail.R
 import com.grapsee.grapmail.data.Api
 import com.grapsee.grapmail.data.NotificationSettingsDto
 import com.grapsee.grapmail.data.ProfilePatch
 import com.grapsee.grapmail.data.ProfileSettingsPatch
 import com.grapsee.grapmail.data.SessionStore
+import com.grapsee.grapmail.ui.i18n.CoreStrings
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -160,11 +162,11 @@ object NotificationPolicy {
         change: (NotificationSettingsDto) -> NotificationSettingsDto,
     ): String? = withContext(Dispatchers.IO) {
         writes.withLock {
-            val token = SessionStore.token(context) ?: return@withLock "Sign in again."
+            val token = SessionStore.token(context) ?: return@withLock CoreStrings.get(R.string.core_sign_in_again) { "Sign in again." }
             val account = SessionStore.address(context)
             try {
                 val current = Api.profile(token).profile?.settings?.notifications
-                    ?: return@withLock "Your notification settings could not be read. Try again."
+                    ?: return@withLock CoreStrings.get(R.string.core_notify_prefs_read_failed) { "Your notification settings could not be read. Try again." }
                 val next = change(current)
                 val saved = Api.patchProfile(token, ProfilePatch(settings = ProfileSettingsPatch(notifications = next)))
                 val stored = saved.profile?.settings?.notifications ?: next
@@ -174,7 +176,7 @@ object NotificationPolicy {
             } catch (e: kotlinx.coroutines.CancellationException) {
                 throw e
             } catch (e: Exception) {
-                e.message ?: "The change could not be saved. Try again."
+                e.message ?: CoreStrings.get(R.string.core_notify_prefs_save_failed) { "The change could not be saved. Try again." }
             }
         }
     }

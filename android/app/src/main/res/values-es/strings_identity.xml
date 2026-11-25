@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="identity_settings_appearance">Apariencia</string>
+    <string name="identity_match_wallpaper_title">Igualar el fondo</string>
+    <string name="identity_match_wallpaper_subtitle">Usa los colores de tu fondo de pantalla en botones y resaltados. Los avatares, los colores de estado y el texto siguen siendo de GrapMail.</string>
+</resources>

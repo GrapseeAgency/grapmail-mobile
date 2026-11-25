@@ -1,0 +1,33 @@
+/* GrapMail — Reader string table (bn). Translated from en.lproj/Reader.strings.
+   Counted keys also have an entry in Reader.stringsdict, which wins over the entry here. */
+
+"You" = "আপনি";
+"to me" = "আমাকে";
+"to %@" = "%@-কে";
+"to %lld people" = "%lld জনকে";
+"Unread" = "অপঠিত";
+"%lld earlier messages" = "আগের %lld টি বার্তা";
+"Shows the folded messages" = "ভাঁজ করা বার্তাগুলো দেখায়";
+"%lld people" = "%lld জন";
+"%lld messages" = "%lld টি বার্তা";
+"Show quoted text" = "উদ্ধৃত লেখা দেখান";
+"Hide quoted text" = "উদ্ধৃত লেখা লুকান";
+"Collapsed" = "সংকুচিত";
+"Expanded" = "প্রসারিত";
+"Reply to %@…" = "%@-কে উত্তর দিন…";
+"Reply…" = "উত্তর দিন…";
+"Opens the editor" = "এডিটর খোলে";
+"Reply options" = "উত্তরের বিকল্প";
+"Quick reply" = "দ্রুত উত্তর";
+"%lld attachments" = "%lld টি সংযুক্তি";
+"Save all" = "সব সংরক্ষণ করুন";
+"Preparing…" = "প্রস্তুত হচ্ছে…";
+"Opens the share sheet, where Save to Files keeps every attachment" = "শেয়ার শিট খোলে, যেখানে “ফাইলে সংরক্ষণ করুন” সব সংযুক্তি রেখে দেয়";
+"Image %lld of %lld, %@" = "%2$lld টির মধ্যে ছবি %1$lld, %3$@";
+"File" = "ফাইল";
+"Opens a preview" = "প্রিভিউ খোলে";
+"Save %@" = "%@ সংরক্ষণ করুন";
+"Share %@" = "%@ শেয়ার করুন";
+"Open" = "খুলুন";
+"Save" = "সংরক্ষণ করুন";
+"Share" = "শেয়ার";

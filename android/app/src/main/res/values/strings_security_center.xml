@@ -1,0 +1,244 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Round 8, Workstream C: Device & Security Center, the account safety score and
+    "This wasn't me" (docs/design/round8-spec.md §3, §4, §6).
+    English only for now. The locale folders fall back to these until the next
+    translation pass (spec §7.6).
+    Code: ui/screens/security/SecurityCenterScreen.kt, SafetyScore.kt, NotMeFlow.kt,
+    ui/mailfeatures/MailFeatureCards.kt (SafetyNudgeCard).
+-->
+<resources>
+    <!-- ── Security Center (§3.1) ─────────────────────────────────────────── -->
+    <string name="seccenter_title">Devices &amp; security</string>
+    <!-- Section label. %1$d: how many devices are listed. -->
+    <string name="seccenter_section_devices">YOUR DEVICES · %1$d</string>
+    <string name="seccenter_section_activity">RECENT SECURITY ACTIVITY</string>
+    <!-- %1$d: total devices. -->
+    <string name="seccenter_show_all_devices">Show all %1$d devices</string>
+    <string name="seccenter_show_fewer_devices">Show fewer devices</string>
+    <string name="seccenter_show_older_activity">Show older activity</string>
+    <string name="seccenter_loading_older">Loading older activity…</string>
+    <string name="seccenter_older_failed">Couldn\'t load older activity. Try again.</string>
+    <string name="seccenter_footer">Locations are approximate and based on your network.</string>
+    <!-- The hub row that opens the center. -->
+    <string name="seccenter_hub_row_subtitle">Your devices, recent sign-ins and your safety score</string>
+    <string name="seccenter_open_center">Open Devices &amp; security</string>
+    <string name="seccenter_device_keys_link">Hardware keys on trusted devices</string>
+    <string name="seccenter_footer_link_hint">Manage which devices can prove themselves without a password.</string>
+
+    <!-- ── Device card (§3.2) ─────────────────────────────────────────────── -->
+    <string name="seccenter_subtitle_android">GrapMail for Android</string>
+    <string name="seccenter_subtitle_ios">GrapMail for iOS</string>
+    <!-- %1$s: browser, %2$s: operating system. -->
+    <string name="seccenter_subtitle_browser">%1$s · %2$s</string>
+    <string name="seccenter_badge_this_device">This device</string>
+    <string name="seccenter_badge_this_browser">This browser</string>
+    <string name="seccenter_badge_trusted">Trusted</string>
+    <string name="seccenter_location_unavailable">Location unavailable</string>
+    <string name="seccenter_active_now">Active now</string>
+    <!-- %1$s: a localized relative time, e.g. "5 min. ago", "3 hr. ago", "2 days ago". -->
+    <string name="seccenter_active_ago">Active %1$s</string>
+    <!-- %1$s: a medium date, e.g. "3 Nov 2026". -->
+    <string name="seccenter_last_active_on">Last active %1$s</string>
+    <!-- %1$s: a medium date. -->
+    <string name="seccenter_first_seen">First seen %1$s</string>
+    <!-- TalkBack for the menu button. %1$s: device label. -->
+    <string name="seccenter_more_options_for">More options for %1$s</string>
+    <string name="seccenter_menu_not_me">This wasn\'t me</string>
+    <string name="seccenter_menu_remove">Remove device</string>
+    <string name="seccenter_menu_sign_out">Sign out</string>
+    <string name="seccenter_unknown_device">Unknown device</string>
+    <string name="seccenter_local_device_note">Shown from this phone; the server hasn\'t listed it yet.</string>
+    <string name="seccenter_needs_connection">Connect to the internet to do this.</string>
+
+    <!-- ── Remove device (§3.5) ───────────────────────────────────────────── -->
+    <!-- %1$s: device label. -->
+    <string name="seccenter_remove_title">Remove %1$s?</string>
+    <string name="seccenter_remove_body">It will be signed out and will need your password to sign in again.</string>
+    <string name="seccenter_remove_confirm">Remove</string>
+    <string name="seccenter_cancel">Cancel</string>
+    <!-- Snackbar. %1$s: device label. -->
+    <string name="seccenter_removed">%1$s removed</string>
+    <string name="seccenter_remove_failed">Couldn\'t remove the device. Try again.</string>
+
+    <!-- ── Timeline (§3.3) ────────────────────────────────────────────────── -->
+    <string name="seccenter_event_signin">Signed in</string>
+    <string name="seccenter_event_signin_new_device">New device signed in</string>
+    <string name="seccenter_event_signin_suspicious">Unusual sign-in attempt</string>
+    <string name="seccenter_event_signin_blocked">Sign-in blocked</string>
+    <string name="seccenter_event_password_changed">Password changed</string>
+    <string name="seccenter_event_passkey_added">Passkey added</string>
+    <string name="seccenter_event_passkey_removed">Passkey removed</string>
+    <string name="seccenter_event_two_step_enabled">2-step verification turned on</string>
+    <string name="seccenter_event_two_step_disabled">2-step verification turned off</string>
+    <string name="seccenter_event_recovery_requested">Account recovery requested</string>
+    <string name="seccenter_event_recovery_used">Recovery used to sign in</string>
+    <string name="seccenter_event_recovery_codes_generated">New recovery codes created</string>
+    <string name="seccenter_event_device_added">Device added as trusted</string>
+    <string name="seccenter_event_device_removed">Device removed</string>
+    <string name="seccenter_event_session_signed_out">Signed out remotely</string>
+    <string name="seccenter_event_not_me_reported">You reported activity as not you</string>
+    <string name="seccenter_event_account_created">Account created</string>
+    <string name="seccenter_event_unknown">Security activity</string>
+    <string name="seccenter_day_today">Today</string>
+    <string name="seccenter_day_yesterday">Yesterday</string>
+    <string name="seccenter_chip_review">Review</string>
+    <string name="seccenter_chip_reported">Reported</string>
+    <string name="seccenter_events_empty_title">No security activity in the last 30 days</string>
+    <string name="seccenter_events_empty_body">Sign-ins, password changes and new devices will show up here.</string>
+    <!-- Event sheet (§3.3). -->
+    <string name="seccenter_sheet_when">When</string>
+    <string name="seccenter_sheet_device">Device</string>
+    <string name="seccenter_sheet_location">Location</string>
+    <string name="seccenter_sheet_network">Approximate network</string>
+    <string name="seccenter_sheet_not_recorded">Not recorded</string>
+    <string name="seccenter_this_was_me">This was me</string>
+    <string name="seccenter_close">Close</string>
+    <string name="seccenter_ack_failed">Couldn\'t save that. Try again.</string>
+
+    <!-- ── States (§3.7) ──────────────────────────────────────────────────── -->
+    <string name="seccenter_loading">Loading your security info</string>
+    <string name="seccenter_error_title">Couldn\'t load your security info</string>
+    <string name="seccenter_error_body">Check your connection and try again.</string>
+    <string name="seccenter_try_again">Try again</string>
+    <string name="seccenter_retry">Retry</string>
+    <!-- %1$s: a time, e.g. "9:41 AM". -->
+    <string name="seccenter_stale_offline">You\'re offline. Showing what we last saw at %1$s.</string>
+    <!-- %1$s: a time. -->
+    <string name="seccenter_stale_error">Couldn\'t refresh. Showing what we last saw at %1$s.</string>
+
+    <!-- ── Password-change-required banner (§3.6) ─────────────────────────── -->
+    <string name="seccenter_banner_title">Finish securing your account</string>
+    <string name="seccenter_banner_body">Set a new password to finish.</string>
+    <string name="seccenter_change_password">Change password</string>
+
+    <!-- ── Safety score (§4) ──────────────────────────────────────────────── -->
+    <string name="seccenter_score_title">Account safety</string>
+    <string name="seccenter_score_of_100">of 100</string>
+    <string name="seccenter_level_needs_attention">Needs attention</string>
+    <string name="seccenter_level_good">Good</string>
+    <string name="seccenter_level_strong">Strong</string>
+    <string name="seccenter_next_all_done">You\'ve done everything</string>
+    <string name="seccenter_next_fully_protected">Your account is fully protected</string>
+    <!-- %1$s: the title of the most valuable step still to do. -->
+    <string name="seccenter_next_start_with">Start with: %1$s</string>
+    <!-- TalkBack for the ring. %1$d: score, %2$s: level word. -->
+    <string name="seccenter_ring_description">Account safety %1$d out of 100, %2$s</string>
+    <string name="seccenter_celebration_announcement">Account safety 100 out of 100. Fully protected.</string>
+    <string name="seccenter_show_fewer_steps">Show fewer steps</string>
+    <!-- Checklist pill. %1$d: points. -->
+    <string name="seccenter_points_pill">+%1$d</string>
+    <!-- TalkBack. %1$s: title, %2$s: why it matters, %3$d: points. -->
+    <string name="seccenter_item_todo_description">%1$s. %2$s. Worth %3$d points.</string>
+    <!-- TalkBack. %1$s: done title. -->
+    <string name="seccenter_item_done_description">%1$s. Done.</string>
+
+    <string name="seccenter_item_two_step_todo">Turn on 2-step verification</string>
+    <string name="seccenter_item_two_step_done">2-step verification is on</string>
+    <string name="seccenter_item_two_step_why">Someone with your password still can\'t get in without a code.</string>
+    <string name="seccenter_item_passkey_todo">Add a passkey</string>
+    <string name="seccenter_item_passkey_done">Passkey added</string>
+    <string name="seccenter_item_passkey_why">Sign in with your face, fingerprint or screen lock — there\'s nothing to phish.</string>
+    <string name="seccenter_item_recovery_codes_todo">Save recovery codes</string>
+    <string name="seccenter_item_recovery_codes_done">Recovery codes saved</string>
+    <string name="seccenter_item_recovery_codes_why">Get back in even if you lose every device.</string>
+    <string name="seccenter_item_recovery_email_todo">Add a recovery email</string>
+    <string name="seccenter_item_recovery_email_done">Recovery email verified</string>
+    <string name="seccenter_item_recovery_email_why">We can reach you there if you\'re ever locked out.</string>
+    <string name="seccenter_item_second_device_todo">Sign in on a second device</string>
+    <string name="seccenter_item_second_device_why">A second phone or tablet can vouch for you if you lose this one.</string>
+    <string name="seccenter_item_password_health_todo">Change your password</string>
+    <string name="seccenter_item_password_health_done">Password not found in known breaches</string>
+    <string name="seccenter_item_password_health_why">This password appears in a public data breach.</string>
+    <string name="seccenter_item_recovery_phone_todo">Verify a phone number</string>
+    <string name="seccenter_item_recovery_phone_done">Phone verified</string>
+    <string name="seccenter_item_recovery_phone_why">A second way to get codes if email isn\'t available.</string>
+    <string name="seccenter_item_alerts_reviewed_done">No alerts to review</string>
+    <string name="seccenter_item_alerts_reviewed_why">Confirm recent sign-ins were really you.</string>
+    <!-- How-to sheet for the second-device step (§4.2 #5). -->
+    <string name="seccenter_second_device_sheet_title">Sign in on a second device</string>
+    <string name="seccenter_second_device_sheet_body">Install GrapMail on another phone or tablet and sign in. It becomes trusted automatically.</string>
+    <string name="seccenter_got_it">Got it</string>
+
+    <!-- ── Mailbox nudge (§4.3 B) ─────────────────────────────────────────── -->
+    <string name="seccenter_nudge_title">Make your account harder to break into</string>
+    <!-- %1$d: score, %2$s: title of the next step. -->
+    <string name="seccenter_nudge_body">Your safety score is %1$d. Next: %2$s — it takes about a minute.</string>
+    <string name="seccenter_nudge_improve">Improve</string>
+    <string name="seccenter_nudge_dismiss">Dismiss</string>
+
+    <!-- ── This wasn't me (§3.4) ──────────────────────────────────────────── -->
+    <string name="seccenter_notme_title">Secure your account?</string>
+    <!-- %1$s: device label (shown bold). -->
+    <string name="seccenter_notme_body">We\'ll sign out %1$s right away, then sign out every other device and browser except this one. You\'ll choose a new password next.</string>
+    <string name="seccenter_notme_body_no_device">We\'ll sign out whoever did this right away, then sign out every other device and browser except this one. You\'ll choose a new password next.</string>
+    <!-- %1$s: device label. -->
+    <string name="seccenter_notme_bullet_device">Sign out %1$s and remove its trust</string>
+    <string name="seccenter_notme_bullet_no_device">Sign out whoever did this</string>
+    <string name="seccenter_notme_bullet_others">Sign out all other sessions</string>
+    <string name="seccenter_notme_bullet_password">Ask you to set a new password</string>
+    <string name="seccenter_notme_confirm">Secure my account</string>
+    <string name="seccenter_notme_securing">Securing…</string>
+    <string name="seccenter_notme_this_activity">this activity</string>
+    <!-- Step-up (§3.4 step 3). -->
+    <string name="seccenter_stepup_title">Confirm it\'s you</string>
+    <string name="seccenter_stepup_password">Password</string>
+    <string name="seccenter_stepup_continue">Continue</string>
+    <string name="seccenter_stepup_empty">Enter your password.</string>
+    <!-- Errors (§3.4 step 6, §6.3). -->
+    <string name="seccenter_err_gone">That device is already gone.</string>
+    <string name="seccenter_err_current">That\'s the device you\'re using. Use Sign out instead.</string>
+    <string name="seccenter_err_rate_limited">Too many attempts. Try again in a few minutes.</string>
+    <string name="seccenter_err_network">Couldn\'t reach GrapMail. Nothing was changed.</string>
+    <string name="seccenter_err_generic">Something went wrong. Nothing was changed.</string>
+
+    <!-- Account secured (§3.4 step 4). -->
+    <string name="seccenter_secured_title">Account secured</string>
+    <string name="seccenter_secured_already">You already secured your account from this report. Set a new password if you haven\'t yet.</string>
+
+    <!-- Required-mode password change (§3.4 step 4). -->
+    <string name="seccenter_leave_title">Leave without changing your password?</string>
+    <string name="seccenter_leave_body">Your account stays at risk until you do.</string>
+    <string name="seccenter_leave_stay">Stay</string>
+    <string name="seccenter_leave_leave">Leave</string>
+
+    <!-- Recovery review (§3.4 step 5). -->
+    <string name="seccenter_review_title">Review your recovery options</string>
+    <string name="seccenter_review_body">These are the ways back into your account if you\'re ever locked out.</string>
+    <string name="seccenter_review_recovery_email">Recovery email</string>
+    <string name="seccenter_review_phone">Phone</string>
+    <string name="seccenter_review_recovery_codes">Recovery codes</string>
+    <string name="seccenter_review_passkeys">Passkeys</string>
+    <string name="seccenter_review_done_chip">Done</string>
+    <string name="seccenter_review_not_set">Not set</string>
+    <string name="seccenter_review_unknown">Couldn\'t check</string>
+    <string name="seccenter_done">Done</string>
+
+    <!-- ── Plurals ────────────────────────────────────────────────────────── -->
+    <plurals name="seccenter_steps_to_strong">
+        <item quantity="one">%1$d step to Strong</item>
+        <item quantity="other">%1$d steps to Strong</item>
+    </plurals>
+    <plurals name="seccenter_see_all_steps">
+        <item quantity="one">See all %1$d step</item>
+        <item quantity="other">See all %1$d steps</item>
+    </plurals>
+    <plurals name="seccenter_item_alerts_reviewed_todo">
+        <item quantity="one">Review %1$d security alert</item>
+        <item quantity="other">Review %1$d security alerts</item>
+    </plurals>
+    <plurals name="seccenter_item_second_device_done">
+        <item quantity="one">%1$d trusted device</item>
+        <item quantity="other">%1$d trusted devices</item>
+    </plurals>
+    <!-- Account secured body. %1$s: device label, %2$d: other sessions signed out. -->
+    <plurals name="seccenter_secured_body">
+        <item quantity="one">%1$s and %2$d other session were signed out. Set a new password now to finish.</item>
+        <item quantity="other">%1$s and %2$d other sessions were signed out. Set a new password now to finish.</item>
+    </plurals>
+    <!-- Account secured body when the report had no device. %1$d: sessions signed out. -->
+    <plurals name="seccenter_secured_body_no_device">
+        <item quantity="one">%1$d session was signed out. Set a new password now to finish.</item>
+        <item quantity="other">%1$d sessions were signed out. Set a new password now to finish.</item>
+    </plurals>
+</resources>

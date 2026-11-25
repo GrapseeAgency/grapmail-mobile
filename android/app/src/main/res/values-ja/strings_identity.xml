@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="identity_settings_appearance">外観</string>
+    <string name="identity_match_wallpaper_title">壁紙に合わせる</string>
+    <string name="identity_match_wallpaper_subtitle">ボタンとハイライトに壁紙の色を使います。アバター、状態の色、テキストは GrapMail の色のままです。</string>
+</resources>

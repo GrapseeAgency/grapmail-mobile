@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <plurals name="reader_earlier_messages">
+        <item quantity="one">較早的 %d 封郵件</item>
+        <item quantity="other">較早的 %d 封郵件</item>
+    </plurals>
+    <plurals name="reader_participants">
+        <item quantity="one">%d 人</item>
+        <item quantity="other">%d 人</item>
+    </plurals>
+    <plurals name="reader_message_count">
+        <item quantity="one">%d 封郵件</item>
+        <item quantity="other">%d 封郵件</item>
+    </plurals>
+    <string name="reader_you">我</string>
+    <string name="reader_unread">未讀</string>
+    <string name="reader_earlier_action">顯示收合的郵件</string>
+    <string name="reader_open_message_action">開啟這封郵件</string>
+    <string name="reader_quoted_show">顯示引用內容</string>
+    <string name="reader_quoted_hide">隱藏引用內容</string>
+    <string name="reader_state_expanded">已展開</string>
+    <string name="reader_state_collapsed">已收合</string>
+    <string name="reader_reply_to">回覆 %1$s…</string>
+    <string name="reader_reply_fallback">回覆…</string>
+    <string name="reader_reply_options">回覆選項</string>
+    <string name="reader_quick_reply">快速回覆</string>
+    <string name="reader_attach_share_chooser">分享附件</string>
+    <string name="reader_attach_view_image">檢視圖片</string>
+    <string name="reader_attach_save_named">儲存 %1$s</string>
+    <string name="reader_attach_share_named">分享 %1$s</string>
+    <string name="reader_attach_share_nothing">此裝置上沒有可以分享這個檔案的應用程式。</string>
+    <string name="reader_viewer_position">第 %1$d 張，共 %2$d 張</string>
+    <string name="reader_viewer_too_large">無法在這裡預覽這張圖片。</string>
+    <string name="compose_r9_leave_title">要離開這封郵件嗎？</string>
+    <string name="compose_r9_leave_attachments">草稿目前無法保留附件。請儲存不含附件的內文，或繼續編輯。</string>
+    <string name="compose_r9_save_text_only">只儲存內文</string>
+    <string name="compose_r9_draft_failed_title">這份草稿沒有儲存</string>
+    <string name="compose_r9_leave_without_saving">不儲存並離開</string>
+    <string name="compose_r9_encrypt_failed">這封郵件無法加密，因此沒有送出。</string>
+    <string name="compose_editor_toolbar">文字格式</string>
+    <string name="compose_editor_bold">粗體</string>
+    <string name="compose_editor_italic">斜體</string>
+    <string name="compose_editor_underline">底線</string>
+    <string name="compose_editor_strike">刪除線</string>
+    <string name="compose_editor_bullets">項目符號</string>
+    <string name="compose_editor_numbered">編號</string>
+    <string name="compose_editor_text_colour">文字顏色</string>
+    <string name="compose_editor_black">黑色</string>
+    <string name="compose_editor_blue">藍色</string>
+    <string name="compose_editor_red">紅色</string>
+    <string name="compose_editor_green">綠色</string>
+    <string name="compose_editor_highlight">醒目提示</string>
+    <string name="compose_editor_highlight_colour">醒目提示顏色</string>
+    <string name="compose_editor_yellow">黃色</string>
+    <string name="compose_editor_pink">粉紅色</string>
+    <string name="compose_editor_font">字型</string>
+    <string name="compose_editor_sans">無襯線</string>
+    <string name="compose_editor_serif">Serif</string>
+    <string name="compose_editor_mono">Monospace</string>
+    <string name="compose_editor_larger">放大</string>
+    <string name="compose_editor_clear">清除格式</string>
+    <string name="compose_editor_image">圖片</string>
+    <string name="compose_editor_insert_image">插入圖片</string>
+</resources>

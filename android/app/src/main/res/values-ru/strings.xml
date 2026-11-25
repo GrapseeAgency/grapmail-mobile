@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">GrapMail</string>
+    <string name="shortcut_compose_short">Написать</string>
+    <string name="shortcut_compose_long">Написать новое письмо в GrapMail</string>
+    <string name="shortcut_scheduled_short">Запланированные</string>
+    <string name="shortcut_scheduled_long">Просмотр и отмена писем, ожидающих отправки</string>
+    <string name="shortcut_subscriptions_short">Подписки</string>
+    <string name="shortcut_subscriptions_long">Все отправители и отписка в одном месте</string>
+    <string name="notif_channel_new_mail">Новые письма</string>
+    <string name="notif_channel_new_mail_desc">
+        Сообщает, когда фоновая проверка нашла непрочитанные письма.
+        В GrapMail нет push-сервиса, поэтому приложение само обращается
+        к серверу, когда система его пробуждает.
+    </string>
+    <string name="notif_channel_security">Оповещения безопасности</string>
+    <string name="notif_channel_security_desc">
+        Сразу сообщает о событиях в вашем аккаунте: вход с нового устройства,
+        смена пароля, изменение доверенных устройств. Эти уведомления
+        не отключаются в тихие часы.
+    </string>
+    <string name="widget_description">Непрочитанные письма с первого взгляда: данные фоновых проверок GrapMail</string>
+</resources>

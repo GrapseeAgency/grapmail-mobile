@@ -43,6 +43,9 @@ import com.grapsee.grapmail.ui.components.OrDivider
 import com.grapsee.grapmail.ui.components.StatusChip
 import com.grapsee.grapmail.ui.theme.LocalPalette
 import kotlinx.coroutines.launch
+import androidx.compose.ui.res.stringResource
+import com.grapsee.grapmail.R
+import androidx.compose.ui.platform.LocalContext
 
 /**
  * Find your GrapMail address — founder design verbatim. One number in, a
@@ -61,6 +64,7 @@ fun FindAddressScreen(
 ) {
     val palette = LocalPalette.current
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
     val state by flow.state.collectAsStateWithLifecycle()
 
     var phone by rememberSaveable { mutableStateOf("") }
@@ -75,7 +79,7 @@ fun FindAddressScreen(
                 val resp = Api.findAddress(phone.trim())
                 busy = false
                 if (resp.maskedAddress.isNullOrBlank()) {
-                    error = "We couldn't find a GrapMail account with that number."
+                    error = context.getString(R.string.acct_we_couldnt_find_a_grapmail_account)
                     return@launch
                 }
                 flow.update {
@@ -88,13 +92,13 @@ fun FindAddressScreen(
             } catch (e: ApiException) {
                 busy = false
                 error = when (e.code) {
-                    "NOT_FOUND" -> "We couldn't find a GrapMail account with that number."
-                    "RATE_LIMITED" -> "Too many lookups. Try again in a little while."
-                    else -> e.message ?: "We couldn't check that number. Try again."
+                    "NOT_FOUND" -> context.getString(R.string.acct_we_couldnt_find_a_grapmail_account)
+                    "RATE_LIMITED" -> context.getString(R.string.acct_too_many_lookups_try_again_in_a)
+                    else -> e.message ?: context.getString(R.string.acct_we_couldnt_check_that_number_try)
                 }
             } catch (_: Exception) {
                 busy = false
-                error = "Network error. Please try again."
+                error = context.getString(R.string.acct_network_error)
             }
         }
     }
@@ -102,12 +106,12 @@ fun FindAddressScreen(
     AccountScreen(
         onBack = onBack,
         illustration = "account-find-address",
-        eyebrow = "Recover your GrapMail address",
-        title = "Find your GrapMail address",
-        body = "Enter the phone number linked to your GrapMail account. We'll check our records and show you the email address associated with it.",
+        eyebrow = stringResource(R.string.acct_recover_your_grapmail_address),
+        title = stringResource(R.string.acct_find_your_grapmail_address),
+        body = stringResource(R.string.acct_enter_the_phone_number_linked_to),
         footer = {
             GradientButton(
-                "Find My Email",
+                stringResource(R.string.acct_find_my_email),
                 onClick = { submit() },
                 enabled = phone.isNotBlank(),
                 busy = busy,
@@ -124,8 +128,8 @@ fun FindAddressScreen(
             OrDivider()
             Spacer(Modifier.height(16.dp))
             FooterNote(
-                text = "Need help? Contact our support team.",
-                linkText = "support team",
+                text = stringResource(R.string.acct_need_help_contact_support),
+                linkText = stringResource(R.string.acct_support_team),
                 onLink = onSupport,
                 divider = false,
             )
@@ -133,10 +137,10 @@ fun FindAddressScreen(
         },
     ) {
         AppTextField(
-            label = "Phone number",
+            label = stringResource(R.string.acct_phone_number),
             value = phone,
             onValueChange = { phone = it; error = null },
-            hint = "Enter your verified phone number",
+            hint = stringResource(R.string.acct_enter_your_verified_phone_number),
             showLabel = false,
             keyboard = KeyboardType.Phone,
             leading = {
@@ -169,7 +173,7 @@ fun AddressFoundScreen(
         illustration = "account-address-found",
         footer = {
             GradientButton(
-                "Back to Sign In",
+                stringResource(R.string.acct_back_to_sign_in),
                 onClick = { onBackToSignIn(state.foundAddressFull) },
                 trailing = {
                     Spacer(Modifier.size(10.dp))
@@ -178,16 +182,16 @@ fun AddressFoundScreen(
             )
             Spacer(Modifier.height(4.dp))
             FooterNote(
-                text = "For your security, this address is partially hidden. You can copy it to use for sign in.",
+                text = stringResource(R.string.acct_for_your_security_this_address_is),
                 divider = false,
             )
             Spacer(Modifier.height(4.dp))
         },
     ) {
-        StatusChip("Email Found", ChipTone.Success)
+        StatusChip(stringResource(R.string.acct_email_found), ChipTone.Success)
         Spacer(Modifier.height(16.dp))
         Text(
-            "Your GrapMail address\nhas been found!",
+            stringResource(R.string.acct_your_grapmail_address_has_been_found),
             fontSize = 28.sp,
             lineHeight = 34.sp,
             fontWeight = FontWeight.Bold,
@@ -196,7 +200,7 @@ fun AddressFoundScreen(
         )
         Spacer(Modifier.height(10.dp))
         Text(
-            "Here is the email address associated with your account. You can copy it or use it to sign in.",
+            stringResource(R.string.acct_here_is_the_email_address_associated),
             fontSize = 15.sp,
             lineHeight = 23.sp,
             color = palette.textSecondary,
@@ -207,7 +211,7 @@ fun AddressFoundScreen(
                 IconTile(Icons.Rounded.Mail)
                 Spacer(Modifier.size(12.dp))
                 androidx.compose.foundation.layout.Column(Modifier.weight(1f)) {
-                    Text("Your GrapMail address", fontSize = 12.sp, color = palette.textSecondary)
+                    Text(stringResource(R.string.acct_your_grapmail_address), fontSize = 12.sp, color = palette.textSecondary)
                     Text(
                         shown,
                         fontSize = 15.sp,
@@ -215,7 +219,7 @@ fun AddressFoundScreen(
                         color = palette.textPrimary,
                     )
                 }
-                CopyButton("Copy") {
+                CopyButton(stringResource(R.string.acct_copy)) {
                     clipboard.setText(AnnotatedString(copyable))
                 }
             }

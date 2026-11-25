@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="identity_settings_appearance">外观</string>
+    <string name="identity_match_wallpaper_title">匹配壁纸</string>
+    <string name="identity_match_wallpaper_subtitle">按钮和高亮使用壁纸的颜色。头像、状态颜色和文字仍使用 GrapMail 的配色。</string>
+</resources>

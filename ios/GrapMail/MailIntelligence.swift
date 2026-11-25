@@ -74,7 +74,7 @@ enum MailCategorizer {
         let address = senderAddress.lowercased()
         let text = (subject + "\n" + bodyText).lowercased()
 
-        if knownSenders.contains(address) {
+        if knownSenders.contains(where: { $0.trimmingCharacters(in: .whitespaces).lowercased() == address }) {
             return CategoryDecision(category: .people, priority: true)
         }
         if hasListUnsubscribe || containsAny(newsletterWords, in: text) {
@@ -122,18 +122,18 @@ enum ThreadSummarizer {
 
         var lines: [String] = []
         if senders.count == 1, let only = senders.first {
-            lines.append("\(messages.count) messages with \(only)")
+            lines.append(String(localized: "\(messages.count) messages with \(only)", comment: "Thread summary: message count, the one other person"))
         } else {
-            lines.append("\(messages.count) messages from \(max(senders.count, 1)) people")
+            lines.append(String(localized: "\(messages.count) messages from \(max(senders.count, 1)) people", comment: "Thread summary: message count, people count"))
         }
         if let opener = named.first ?? messages.first, let gist = firstSentence(of: opener.body) {
-            lines.append("Opened with: \(gist)")
+            lines.append(String(localized: "Opened with: \(gist)", comment: "Thread summary: first sentence of the first message"))
         }
         if let last = messages.last, let closing = lastSentence(of: last.body) {
             if closing.contains("?") {
-                lines.append("Still open: \(closing)")
+                lines.append(String(localized: "Still open: \(closing)", comment: "Thread summary: the last message's open question"))
             } else {
-                lines.append("Latest: \(closing)")
+                lines.append(String(localized: "Latest: \(closing)", comment: "Thread summary: first sentence of the latest message"))
             }
         }
         return ThreadSummary(lines: lines, messageCount: messages.count, participants: max(senders.count, 1))
@@ -199,19 +199,19 @@ enum SmartReplyAssistant {
         let thanks = ["thank you", "thanks", "appreciate it", "appreciate the"].contains { text.contains($0) }
 
         if scheduling {
-            add("That time works for me.")
-            add("Could we shift it a little later?")
+            add(String(localized: "That time works for me.", comment: "Smart reply suggestion"))
+            add(String(localized: "Could we shift it a little later?", comment: "Smart reply suggestion"))
         }
         if asks {
-            add("Yes — I'll take care of it.")
-            add("Let me check and confirm today.")
+            add(String(localized: "Yes — I'll take care of it.", comment: "Smart reply suggestion"))
+            add(String(localized: "Let me check and confirm today.", comment: "Smart reply suggestion"))
         }
         if thanks {
-            add("You're welcome — happy to help.")
+            add(String(localized: "You're welcome — happy to help.", comment: "Smart reply suggestion"))
         }
-        add("Thanks — got it.")
-        add("Sounds good.")
-        add("I'll get back to you shortly.")
+        add(String(localized: "Thanks — got it.", comment: "Smart reply suggestion"))
+        add(String(localized: "Sounds good.", comment: "Smart reply suggestion"))
+        add(String(localized: "I'll get back to you shortly.", comment: "Smart reply suggestion"))
         return out
     }
 }
@@ -271,7 +271,14 @@ enum NaturalSearch {
         if out.from.isEmpty, let m = firstGroups("\\b(?:from|by)\\s+([a-z0-9][\\w.'-]*(?:\\s+[a-z0-9][\\w.'-]*){0,3})", in: text) {
             let candidate = trimmedToStopwords(m[1])
             if !candidate.isEmpty { out.from = candidate }
-            text = text.replacingOccurrences(of: m[0], with: " ")
+            // Remove only "from <sender>", so a time or attachment phrase the
+            // greedy match swept up ("alice last week with") stays readable.
+            let keyword = String(m[0].dropLast(m[1].count))
+            if !candidate.isEmpty, m[1].hasPrefix(candidate) {
+                text = text.replacingOccurrences(of: keyword + candidate, with: " ")
+            } else {
+                text = text.replacingOccurrences(of: m[0], with: " ")
+            }
         }
         if out.subject.isEmpty, let m = firstGroups("\\b(?:about|regarding|re)\\s+([a-z0-9][\\w.'-]*(?:\\s+[a-z0-9][\\w.'-]*){0,4})", in: text) {
             let candidate = trimmedToStopwords(m[1])
@@ -314,15 +321,17 @@ enum NaturalSearch {
         }
 
         var parts: [String] = []
-        if !out.from.isEmpty { parts.append("from \(out.from)") }
-        if !out.to.isEmpty { parts.append("to \(out.to)") }
-        if !out.subject.isEmpty { parts.append("about \"\(out.subject)\"") }
-        if out.hasAttachment == true { parts.append("with attachments") }
-        if out.hasAttachment == false { parts.append("without attachments") }
-        if let d = out.afterDate { parts.append("after \(d)") }
-        if let n = out.afterDaysAgo { parts.append(n == 0 ? "from today" : (n == 1 ? "since yesterday" : "within \(n) days")) }
-        if let n = out.beforeDaysAgo { parts.append("older than \(n) days") }
-        if let d = out.beforeDate { parts.append("before \(d)") }
+        // Display only: each part is a whole phrase shown as one chip of the
+        // " · " list; the parsing above stays on its English keywords.
+        if !out.from.isEmpty { parts.append(String(localized: "from \(out.from)", comment: "Search explanation chip: sender")) }
+        if !out.to.isEmpty { parts.append(String(localized: "to \(out.to)", comment: "Search explanation chip: recipient")) }
+        if !out.subject.isEmpty { parts.append(String(localized: "about \"\(out.subject)\"", comment: "Search explanation chip: subject words")) }
+        if out.hasAttachment == true { parts.append(String(localized: "with attachments")) }
+        if out.hasAttachment == false { parts.append(String(localized: "without attachments")) }
+        if let d = out.afterDate { parts.append(String(localized: "after \(d)", comment: "Search explanation chip: a YYYY-MM-DD date")) }
+        if let n = out.afterDaysAgo { parts.append(n == 0 ? String(localized: "from today") : (n == 1 ? String(localized: "since yesterday") : String(localized: "within \(n) days"))) }
+        if let n = out.beforeDaysAgo { parts.append(String(localized: "older than \(n) days")) }
+        if let d = out.beforeDate { parts.append(String(localized: "before \(d)", comment: "Search explanation chip: a YYYY-MM-DD date")) }
         out.explanation = parts.joined(separator: " · ")
         return out
     }
@@ -348,6 +357,8 @@ enum NaturalSearch {
     private static func trimmedToStopwords(_ s: String) -> String {
         var words: [String] = []
         for w in s.split(separator: " ") {
+            // A leading article is not the topic: "about the budget" -> "budget".
+            if words.isEmpty && (w == "the" || w == "a") { continue }
             if stopwords.contains(String(w)) { break }
             words.append(String(w))
             if words.count >= 3 { break }
@@ -401,15 +412,15 @@ enum ComposeAssistant {
         var out: [RewriteSuggestion] = []
         let short = shorten(text)
         if short != text, short.count >= 8 {
-            out.append(RewriteSuggestion(title: "Shorter", text: short))
+            out.append(RewriteSuggestion(title: String(localized: "Shorter", comment: "Rewrite suggestion title"), text: short))
         }
         let formal = formalize(text)
         if formal != text {
-            out.append(RewriteSuggestion(title: "More formal", text: formal))
+            out.append(RewriteSuggestion(title: String(localized: "More formal", comment: "Rewrite suggestion title"), text: formal))
         }
         let warm = warm(text)
         if warm != text {
-            out.append(RewriteSuggestion(title: "Warmer", text: warm))
+            out.append(RewriteSuggestion(title: String(localized: "Warmer", comment: "Rewrite suggestion title"), text: warm))
         }
         return Array(out.prefix(3))
     }
@@ -418,16 +429,16 @@ enum ComposeAssistant {
     /// templates are for the mail nobody enjoys writing, not for the mail
     /// that deserves real words.
     static let templates: [MailComposeTemplate] = [
-        MailComposeTemplate(name: "Quick intro", subject: "Quick intro",
-                            body: "Hi [name],\n\n[One line about who you are and why you're writing.]\n\nWould you have 15 minutes this week to talk?\n\nThanks,\n"),
-        MailComposeTemplate(name: "Follow-up", subject: "Following up",
-                            body: "Hi [name],\n\nFollowing up on my note below — happy to resend anything that got buried.\n\nThanks,\n"),
-        MailComposeTemplate(name: "Meeting request", subject: "Time to talk?",
-                            body: "Hi [name],\n\nCould we find 30 minutes this week? [Two or three windows that suit you.]\n\nThanks,\n"),
-        MailComposeTemplate(name: "Thanks", subject: "Thank you",
-                            body: "Hi [name],\n\nThank you — [one line on what helped].\n\nBest,\n"),
-        MailComposeTemplate(name: "Status update", subject: "Status update",
-                            body: "Hi [name],\n\nQuick status: [what is done], [what is next], [anything blocked].\n\nBest,\n"),
+        MailComposeTemplate(name: String(localized: "Quick intro", comment: "Compose template name"), subject: String(localized: "Quick intro", comment: "Compose template subject"),
+                            body: String(localized: "Hi [name],\n\n[One line about who you are and why you're writing.]\n\nWould you have 15 minutes this week to talk?\n\nThanks,\n", comment: "Compose template body; keep the [bracketed] placeholders")),
+        MailComposeTemplate(name: String(localized: "Follow-up", comment: "Compose template name"), subject: String(localized: "Following up", comment: "Compose template subject"),
+                            body: String(localized: "Hi [name],\n\nFollowing up on my note below — happy to resend anything that got buried.\n\nThanks,\n", comment: "Compose template body; keep the [bracketed] placeholders")),
+        MailComposeTemplate(name: String(localized: "Meeting request", comment: "Compose template name"), subject: String(localized: "Time to talk?", comment: "Compose template subject"),
+                            body: String(localized: "Hi [name],\n\nCould we find 30 minutes this week? [Two or three windows that suit you.]\n\nThanks,\n", comment: "Compose template body; keep the [bracketed] placeholders")),
+        MailComposeTemplate(name: String(localized: "Thanks", comment: "Compose template name"), subject: String(localized: "Thank you", comment: "Compose template subject"),
+                            body: String(localized: "Hi [name],\n\nThank you — [one line on what helped].\n\nBest,\n", comment: "Compose template body; keep the [bracketed] placeholders")),
+        MailComposeTemplate(name: String(localized: "Status update", comment: "Compose template name"), subject: String(localized: "Status update", comment: "Compose template subject"),
+                            body: String(localized: "Hi [name],\n\nQuick status: [what is done], [what is next], [anything blocked].\n\nBest,\n", comment: "Compose template body; keep the [bracketed] placeholders")),
     ]
 
     private static func shorten(_ text: String) -> String {

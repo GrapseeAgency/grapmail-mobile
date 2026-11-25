@@ -35,12 +35,16 @@ import com.grapsee.grapmail.data.SessionStore
 import com.grapsee.grapmail.ui.components.AccountLink
 import com.grapsee.grapmail.ui.components.AccountScreen
 import com.grapsee.grapmail.ui.components.AppTextField
+import com.grapsee.grapmail.ui.components.GMAutofill
+import com.grapsee.grapmail.security.PasswordCredentials
 import com.grapsee.grapmail.ui.components.FooterNote
 import com.grapsee.grapmail.ui.components.GradientButton
 import com.grapsee.grapmail.ui.components.InfoCard
 import com.grapsee.grapmail.ui.components.RuleLine
 import com.grapsee.grapmail.ui.theme.LocalPalette
 import kotlinx.coroutines.launch
+import androidx.compose.ui.res.stringResource
+import com.grapsee.grapmail.R
 
 /**
  * 11 / 23 — change the password.
@@ -90,32 +94,33 @@ fun ChangePasswordScreen(
         onBack = onBack,
         illustration = if (afterSuspicious) "ill_sec_password_after" else "ill_sec_password",
         illustrationWidth = if (afterSuspicious) 180 else 150,
-        eyebrow = if (afterSuspicious) "After Suspicious Activity" else null,
-        title = if (afterSuspicious) "Change Your Password" else "Change Password",
+        eyebrow = if (afterSuspicious) stringResource(R.string.acct_after_suspicious_activity) else null,
+        title = if (afterSuspicious) stringResource(R.string.acct_change_your_password) else stringResource(R.string.acct_change_password),
         body = if (afterSuspicious)
-            "Your account was accessed from an unfamiliar device. To keep your GrapMail account secure, please update your password now."
+            stringResource(R.string.acct_your_account_was_accessed_from_an)
         else
-            "Choose a strong password you have not used here before.",
+            stringResource(R.string.acct_choose_a_strong_password_you_have),
         footer = {
             Column {
                 GradientButton(
-                    if (afterSuspicious) "Update Password" else "Change Password",
+                    if (afterSuspicious) stringResource(R.string.acct_update_password) else stringResource(R.string.acct_change_password),
                     trailing = { Icon(Icons.AutoMirrored.Rounded.ArrowForward, contentDescription = null, modifier = Modifier.padding(start = 6.dp)) },
                     onClick = {
                         when {
-                            current.isBlank() -> { error = "Enter your current password."; return@GradientButton }
-                            !longEnough -> { error = "Use at least 8 characters."; return@GradientButton }
-                            !hasLetter -> { error = "Add at least one letter."; return@GradientButton }
-                            !hasNumber -> { error = "Add at least one number."; return@GradientButton }
-                            !hasSymbol -> { error = "Add at least one symbol."; return@GradientButton }
-                            !matches -> { error = "The two new passwords do not match."; return@GradientButton }
+                            current.isBlank() -> { error = context.getString(R.string.acct_enter_your_current_password); return@GradientButton }
+                            !longEnough -> { error = context.getString(R.string.acct_use_at_least_8_characters); return@GradientButton }
+                            !hasLetter -> { error = context.getString(R.string.acct_add_at_least_one_letter); return@GradientButton }
+                            !hasNumber -> { error = context.getString(R.string.acct_add_at_least_one_number); return@GradientButton }
+                            !hasSymbol -> { error = context.getString(R.string.acct_add_at_least_one_symbol); return@GradientButton }
+                            !matches -> { error = context.getString(R.string.acct_the_two_new_passwords_do_not_match); return@GradientButton }
                         }
                         busy = true; error = null
                         scope.launch {
                             try {
                                 val session = SessionStore.snapshot(context)
-                                    ?: throw IllegalStateException("Sign in again.")
-                                val resp = Api.changePassword(session.token, current, next)
+                                    ?: throw IllegalStateException(context.getString(R.string.acct_sign_in_again))
+                                val newPassword = next
+                                val resp = Api.changePassword(session.token, current, newPassword)
                                 val active = SessionStore.snapshot(context)
                                 if (active == null || active.id != session.id) return@launch
                                 resp.accessToken?.let { fresh ->
@@ -125,6 +130,10 @@ fun ChangePasswordScreen(
                                         expectedToken = active.token,
                                     )
                                 }
+                                // The server took the new password: offer it to
+                                // the password manager so the saved one is not
+                                // left stale. Fire-and-forget, silent on decline.
+                                PasswordCredentials.offerToSave(context, session.address, newPassword)
                                 onChanged()
                             } catch (e: Exception) {
                                 error = e.message
@@ -138,7 +147,7 @@ fun ChangePasswordScreen(
                 )
                 Spacer(Modifier.height(4.dp))
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
-                    AccountLink("Back", onBack)
+                    AccountLink(stringResource(R.string.acct_back), onBack)
                 }
             }
         },
@@ -156,7 +165,7 @@ fun ChangePasswordScreen(
             ) {
                 Icon(Icons.Rounded.WarningAmber, contentDescription = null, tint = palette.error, modifier = Modifier.size(17.dp))
                 Text(
-                    "Unrecognized activity was found on your account.",
+                    stringResource(R.string.acct_unrecognized_activity_was_found_on),
                     fontSize = 12.sp,
                     lineHeight = 17.sp,
                     color = palette.error,
@@ -165,28 +174,31 @@ fun ChangePasswordScreen(
             Spacer(Modifier.height(14.dp))
         }
 
-        AppTextField("Current Password", current, { current = it; error = null }, password = true, leading = { Icon(Icons.Rounded.Lock, contentDescription = null) })
+        AppTextField(stringResource(R.string.acct_current_password), current, { current = it; error = null }, password = true, leading = { Icon(Icons.Rounded.Lock, contentDescription = null) },
+            autofill = GMAutofill.Password)
         Spacer(Modifier.height(12.dp))
-        AppTextField("New Password", next, { next = it; error = null }, password = true, leading = { Icon(Icons.Rounded.Lock, contentDescription = null) })
+        AppTextField(stringResource(R.string.acct_new_password_2), next, { next = it; error = null }, password = true, leading = { Icon(Icons.Rounded.Lock, contentDescription = null) },
+            autofill = GMAutofill.NewPassword)
         Spacer(Modifier.height(12.dp))
         AppTextField(
-            "Confirm New Password", confirm, { confirm = it; error = null },
+            stringResource(R.string.acct_confirm_new_password_2), confirm, { confirm = it; error = null },
             password = true, leading = { Icon(Icons.Rounded.Lock, contentDescription = null) },
-            error = if (confirm.isNotEmpty() && !matches) "Passwords do not match." else null,
+            error = if (confirm.isNotEmpty() && !matches) stringResource(R.string.acct_passwords_do_not_match) else null,
+            autofill = GMAutofill.NewPassword,
         )
         Spacer(Modifier.height(14.dp))
         InfoCard {
             Text(
-                "Password Requirements",
+                stringResource(R.string.acct_password_requirements_2),
                 fontSize = 13.sp,
                 fontWeight = FontWeight.SemiBold,
                 color = palette.textPrimary,
             )
             Spacer(Modifier.height(4.dp))
-            RuleLine("At least 8 characters", longEnough)
-            RuleLine("Contains a letter", hasLetter)
-            RuleLine("Contains a number", hasNumber)
-            RuleLine("Contains a symbol", hasSymbol)
+            RuleLine(stringResource(R.string.acct_at_least_8_characters), longEnough)
+            RuleLine(stringResource(R.string.acct_contains_a_letter), hasLetter)
+            RuleLine(stringResource(R.string.acct_contains_a_number), hasNumber)
+            RuleLine(stringResource(R.string.acct_contains_a_symbol), hasSymbol)
         }
         if (error != null) {
             Spacer(Modifier.height(8.dp))
@@ -213,27 +225,27 @@ fun PasswordChangedScreen(
         onBack = onDone,
         illustration = if (updated) "ill_sec_password_updated" else "ill_sec_password_ok",
         illustrationWidth = 170,
-        title = if (updated) "Password Updated Successfully" else "Password Changed Successfully",
-        body = "Your password has been updated successfully. Other devices were signed out; this one stays signed in.",
+        title = if (updated) stringResource(R.string.acct_password_updated_successfully) else stringResource(R.string.acct_password_changed_successfully),
+        body = stringResource(R.string.acct_your_password_has_been_updated),
         footer = {
             Column {
-                GradientButton("Continue", onDone)
+                GradientButton(stringResource(R.string.acct_continue), onDone)
                 Spacer(Modifier.height(6.dp))
                 FooterNote(
-                    text = "If you did not make this change, contact the support team immediately.",
-                    linkText = "support team",
+                    text = stringResource(R.string.acct_if_you_did_not_make_this_change),
+                    linkText = stringResource(R.string.acct_support_team),
                     onLink = onSupport,
                 )
             }
         },
     ) {
         InfoCard {
-            Text("What's Next?", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = palette.textPrimary)
+            Text(stringResource(R.string.acct_whats_next_title), fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = palette.textPrimary)
             Spacer(Modifier.height(8.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Rounded.Lock, contentDescription = null, tint = palette.primarySolid, modifier = Modifier.size(16.dp))
                 Text(
-                    "You'll need to sign in again on your other devices, including mobile apps, desktop, and other browsers.",
+                    stringResource(R.string.acct_youll_need_to_sign_in_again_on_your),
                     fontSize = 13.sp,
                     lineHeight = 19.sp,
                     color = palette.textSecondary,
@@ -241,6 +253,6 @@ fun PasswordChangedScreen(
             }
         }
         Spacer(Modifier.height(12.dp))
-        InfoNoteCard(body = "This helps keep your account secure and prevents unauthorized access.")
+        InfoNoteCard(body = stringResource(R.string.acct_this_helps_keep_your_account_secure))
     }
 }

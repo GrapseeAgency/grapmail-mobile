@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Sent-list read-receipt suffixes (translated from values/strings_mail_receipts_list.xml). -->
+<resources>
+    <string name="mail_row_receipt_read_suffix">\u0020· נקרא</string>
+    <string name="mail_row_receipt_requested_suffix">\u0020· התבקש אישור קריאה</string>
+</resources>

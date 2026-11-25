@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">GrapMail</string>
+    <string name="shortcut_compose_short">نوشتن نامه</string>
+    <string name="shortcut_compose_long">نوشتن پیام جدید GrapMail</string>
+    <string name="shortcut_scheduled_short">ارسال‌های زمان‌بندی‌شده</string>
+    <string name="shortcut_scheduled_long">دیدن و لغو نامه‌هایی که منتظر ارسال‌اند</string>
+    <string name="shortcut_subscriptions_short">اشتراک‌ها</string>
+    <string name="shortcut_subscriptions_long">بررسی فرستندگان و لغو اشتراک در یک جا</string>
+    <string name="notif_channel_new_mail">نامهٔ جدید</string>
+    <string name="notif_channel_new_mail_desc">وقتی بررسی پس‌زمینه پیام‌های خوانده‌نشده پیدا کند، به شما اطلاع می‌دهد. GrapMail سرویس Push ندارد، بنابراین این اعلان‌ها از درخواست خود برنامه از سرور می‌آیند، هر وقت سیستم آن را بیدار کند.</string>
+    <string name="notif_channel_security">هشدارهای امنیتی</string>
+    <string name="notif_channel_security_desc">به‌محض اینکه اتفاقی برای حسابتان بیفتد اطلاع می‌دهد: ورود از دستگاه جدید، تغییر گذرواژه، تغییر دستگاه مورد اعتماد. این هشدارها هرگز در ساعات سکوت بی‌صدا نمی‌شوند.</string>
+    <string name="widget_description">نامه‌های خوانده‌نشده در یک نگاه: شمارش از بررسی‌های پس‌زمینهٔ GrapMail</string>
+</resources>

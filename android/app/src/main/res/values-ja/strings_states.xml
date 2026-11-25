@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Loading / empty / error / offline states (ui/components/ScreenStates.kt and the
+     screens wired to it). Kept in its own file so the other string files, edited in
+     parallel, are untouched; prefix states_. Translated from values/strings_states.xml. -->
+<resources>
+    <string name="states_loading">読み込み中…</string>
+    <string name="states_offline_banner">オフラインです。前回読み込んだ内容を表示しています。ネットワークが必要な操作は再接続後に行われます。</string>
+    <string name="states_error_title">問題が発生しました</string>
+    <string name="states_error_body">現在読み込めません。接続を確認して、もう一度お試しください。</string>
+    <string name="states_error_offline_body">オフラインです。Wi-Fi またはモバイルデータに接続して、もう一度お試しください。</string>
+    <string name="states_retry">再試行</string>
+    <string name="states_labels_loading">ラベルを読み込み中…</string>
+    <string name="states_labels_failed_title">ラベルを読み込めませんでした</string>
+    <string name="states_scheduled_loading">予約メールを読み込み中…</string>
+    <string name="states_scheduled_failed_title">予約メールを読み込めませんでした</string>
+    <string name="states_scheduled_empty_title">予約はありません</string>
+    <string name="states_contacts_loading">メールから連絡先を収集中…</string>
+    <string name="states_files_loading">添付ファイルを収集中…</string>
+    <string name="states_providers_loading">接続済みのメールボックスを読み込み中…</string>
+    <string name="states_thread_loading">このスレッドを開いています…</string>
+    <string name="states_activity_failed_title">アクティビティを読み込めませんでした</string>
+    <string name="states_sessions_failed_title">セッションを読み込めませんでした</string>
+</resources>

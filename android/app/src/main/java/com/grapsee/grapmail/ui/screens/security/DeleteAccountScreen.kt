@@ -35,6 +35,8 @@ import com.grapsee.grapmail.ui.components.GradientButton
 import com.grapsee.grapmail.ui.components.InfoCard
 import com.grapsee.grapmail.ui.theme.LocalPalette
 import kotlinx.coroutines.launch
+import androidx.compose.ui.res.stringResource
+import com.grapsee.grapmail.R
 
 /**
  * In-app account deletion — the store requirement, wired to the only route
@@ -62,19 +64,19 @@ fun DeleteAccountScreen(onBack: () -> Unit, onDeleted: () -> Unit) {
         onBack = onBack,
         illustration = "ill_sec_2fa_off_confirm",
         illustrationWidth = 150,
-        title = "Delete Account",
-        body = "Deleting this account is permanent. Please read what is removed before continuing.",
+        title = stringResource(R.string.acct_delete_account),
+        body = stringResource(R.string.acct_deleting_this_account_is_permanent),
         footer = {
             Column {
                 GradientButton(
-                    "Delete my account",
+                    stringResource(R.string.acct_delete_my_account),
                     onClick = {
-                        if (password.isBlank()) { error = "Enter your password."; return@GradientButton }
+                        if (password.isBlank()) { error = context.getString(R.string.acct_enter_your_password_period); return@GradientButton }
                         busy = true; error = null
                         scope.launch {
                             try {
                                 val token = SessionStore.token(context)
-                                    ?: throw IllegalStateException("Sign in again.")
+                                    ?: throw IllegalStateException(context.getString(R.string.acct_sign_in_again))
                                 Api.deleteAccount(token, password)
                                 onDeleted()
                             } catch (e: ApiException) {
@@ -82,11 +84,11 @@ fun DeleteAccountScreen(onBack: () -> Unit, onDeleted: () -> Unit) {
                                 // password; the rest is the server's own word,
                                 // including the not-yet-deployed 404.
                                 error = when (e.status) {
-                                    403 -> "That password is not correct."
-                                    else -> e.message ?: "The request could not be confirmed."
+                                    403 -> context.getString(R.string.acct_that_password_is_not_correct)
+                                    else -> e.message ?: context.getString(R.string.acct_the_request_could_not_be_confirmed)
                                 }
                             } catch (e: Exception) {
-                                error = e.message ?: "Network error. Please try again."
+                                error = e.message ?: context.getString(R.string.acct_network_error)
                             } finally {
                                 busy = false
                             }
@@ -97,19 +99,18 @@ fun DeleteAccountScreen(onBack: () -> Unit, onDeleted: () -> Unit) {
                 )
                 Spacer(Modifier.height(4.dp))
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
-                    AccountLink("Cancel", onBack)
+                    AccountLink(stringResource(R.string.acct_cancel), onBack)
                 }
             }
         },
     ) {
         InfoCard {
-            Text("What is deleted", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = palette.textPrimary)
+            Text(stringResource(R.string.acct_what_is_deleted), fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = palette.textPrimary)
             Spacer(Modifier.height(8.dp))
             listOf(
-                "Your GrapMail mailbox — the address itself, so mail addressed to it " +
-                    "will no longer reach anyone.",
-                "Every message: sent, received, drafted, archived and trashed.",
-                "Your aliases — the extra addresses that delivered into this mailbox.",
+                stringResource(R.string.acct_delete_removes_mailbox),
+                stringResource(R.string.acct_every_message_sent_received_drafted),
+                stringResource(R.string.acct_your_aliases_the_extra_addresses),
             ).forEach {
                 Row(Modifier.padding(vertical = 3.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Icon(
@@ -131,8 +132,7 @@ fun DeleteAccountScreen(onBack: () -> Unit, onDeleted: () -> Unit) {
                 modifier = Modifier.size(16.dp),
             )
             Text(
-                "This cannot be undone and cannot be recovered. The address is not " +
-                    "held for you — a deleted address may not be re-created.",
+                stringResource(R.string.acct_delete_cannot_be_undone),
                 fontSize = 12.sp,
                 lineHeight = 17.sp,
                 color = palette.textSecondary,
@@ -144,15 +144,16 @@ fun DeleteAccountScreen(onBack: () -> Unit, onDeleted: () -> Unit) {
             Spacer(Modifier.height(8.dp))
         }
         com.grapsee.grapmail.ui.components.AppTextField(
-            label = "Password",
+            label = stringResource(R.string.acct_password),
             value = password,
             onValueChange = { password = it; error = null },
             password = true,
-            hint = "Enter your password to confirm",
+            hint = stringResource(R.string.acct_enter_your_password_to_confirm),
+            autofill = com.grapsee.grapmail.ui.components.GMAutofill.Password,
         )
         Spacer(Modifier.height(14.dp))
         FooterNote(
-            text = "Only the password on this account can start the deletion.",
+            text = stringResource(R.string.acct_only_the_password_on_this_account),
             divider = false,
         )
     }

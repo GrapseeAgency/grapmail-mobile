@@ -242,6 +242,8 @@ object SessionStore {
                 sessionCacheKnown = true
                 SecurityProfileCache.clear()
                 MailStore.clear()
+                // Round 8 — B: a switched-to account is in the foreground.
+                RememberedAccounts.touchAsync(context, address)
             }
             switched
         }
@@ -275,7 +277,7 @@ object SessionStore {
         name: String,
         expiresAt: Long,
     ) = withContext(Dispatchers.IO) {
-        writes.withLock {
+        val saved = writes.withLock {
             // The active address BEFORE this save: if it differs, the mailbox
             // caches belong to the previous account and must be cleared.
             val previousActive = context.sessionStore.data.first().let {
@@ -318,7 +320,21 @@ object SessionStore {
                 // A failed or cancelled save leaves DataStore authoritative.
                 if (!committed) sessionCacheKnown = false
             }
+            committed
         }
+        // Round 8 — B: every completed sign-in, whichever door stored it,
+        // writes the remembered-account record (display data only, never a
+        // credential). Outside the lock — it reads this store again for the
+        // profile refresh — and never able to fail the sign-in itself.
+        if (saved) {
+            try {
+                RememberedAccounts.recordSignIn(context, address, name)
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (_: Exception) {
+            }
+        }
+        Unit
     }
 
     /**
@@ -379,18 +395,32 @@ object SessionStore {
     private fun normaliseExpiry(raw: Long): Long =
         if (raw in 1 until 100_000_000_000L) raw * 1000L else raw
 
-    suspend fun clear(context: Context) = removeSessions(context) { true }
+    suspend fun clear(context: Context) = removeSessions(context, { RememberedAccounts.Ending.SignedOut }) { true }
 
+    /** The person signed out (or deleted the account — the caller then forgets the record). */
     suspend fun clearIfCurrent(context: Context, id: String): Boolean =
-        removeSessions(context) { it.id == id }
+        removeSessions(context, { RememberedAccounts.Ending.SignedOut }) { it.id == id }
 
-    suspend fun clearIfToken(context: Context, token: String): Boolean =
-        removeSessions(context) { it.token == token }
+    /**
+     * The server refused [token]. Why it ended is whatever the refresh layer
+     * noted against it ([SessionEvents.takeEnding]) or, with nothing noted,
+     * an expiry — the remembered record's welcome-back banner reads it.
+     */
+    suspend fun clearIfToken(
+        context: Context,
+        token: String,
+        ending: RememberedAccounts.Ending? = null,
+    ): Boolean {
+        val reason = ending ?: SessionEvents.takeEnding(token) ?: RememberedAccounts.Ending.Expired
+        return removeSessions(context, { reason }) { it.token == token }
+    }
 
     /** Sign out one account, keeping the others; the next stored account, if
      *  any, becomes active. */
     suspend fun removeAccount(context: Context, address: String): Boolean =
-        removeSessions(context) { it.address.equals(address, ignoreCase = true) }
+        removeSessions(context, { RememberedAccounts.Ending.SignedOut }) {
+            it.address.equals(address, ignoreCase = true)
+        }
 
     /**
      * Remove every session matching the predicate; when nothing remains the
@@ -398,9 +428,15 @@ object SessionStore {
      * invalidates the mailbox caches and cancels the notifications — the
      * removed account's mail must not outlive its sign-out.
      */
-    private suspend fun removeSessions(context: Context, matches: (StoredSession) -> Boolean): Boolean =
+    private suspend fun removeSessions(
+        context: Context,
+        ending: (StoredSession) -> RememberedAccounts.Ending,
+        matches: (StoredSession) -> Boolean,
+    ): Boolean =
         withContext(Dispatchers.IO + NonCancellable) {
-            writes.withLock {
+            // Round 8 — B: who left, and why, for the remembered-account records.
+            var ended = emptyList<Pair<StoredSession, RememberedAccounts.Ending>>()
+            val removed = writes.withLock {
                 var cleared = false
                 var removedIds = emptySet<String>()
                 context.sessionStore.edit { prefs ->
@@ -408,6 +444,7 @@ object SessionStore {
                     if (blob.sessions.none(matches)) return@edit
                     val remaining = blob.sessions.filterNot(matches)
                     removedIds = blob.sessions.filter(matches).map { it.id }.toSet()
+                    ended = blob.sessions.filter(matches).map { it to ending(it) }
                     cleared = true
                     if (remaining.isEmpty()) {
                         prefs.clear()
@@ -431,5 +468,16 @@ object SessionStore {
                 }
                 cleared
             }
+            // Outside the lock, and best-effort: a record that could not be
+            // updated must never keep a session from being removed.
+            if (removed) {
+                for ((session, why) in ended) {
+                    try {
+                        RememberedAccounts.markEnded(context, session.address, session.name, why)
+                    } catch (_: Exception) {
+                    }
+                }
+            }
+            removed
         }
 }

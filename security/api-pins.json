@@ -1,0 +1,94 @@
+{
+  "_about": [
+    "Certificate pins for the GrapMail API hosts: the ONE source of truth for both apps.",
+    "Android: android/app/build.gradle.kts reads this file into BuildConfig (API_PINS, API_PIN_HOSTS, API_PINS_EXPIRES); data/Api.kt apiPinner applies it.",
+    "iOS: scripts/generate-pins.py writes ios/GrapMail/ApiPins.swift from this file (commit the result); PinnedSessionDelegate.swift applies it.",
+    "CI: .github/workflows/pin-expiry.yml runs scripts/check-api-pins.py weekly (schema, live chains, expiry) and opens an issue when it fails.",
+    "sha256 = base64(SHA-256(DER SubjectPublicKeyInfo)), the value after OkHttp's 'sha256/' prefix. Print live values with scripts/print-api-pins.sh <host>.",
+    "Pinning is ENFORCED only when ALL hold: enforce == true, at least 2 well-formed non-placeholder pins, and today (UTC) is before 'expires'. After 'expires' both apps stop pinning and fall back to normal platform certificate validation (fail-open, like Android Network Security Config's <pin-set expiration>); see SECURITY-TESTING.md.",
+    "Why CA keys and not the leaf: the leaf key changes with every renewal (Cloudflare Universal SSL and cPanel AutoSSL both reissue roughly every 90 days, with a new key), so a leaf pin would brick every install at the next renewal. Pinning the issuing CA keys survives renewals; the trade-off is that ANY certificate that CA issues for the host is accepted, so pinning narrows trust from every CA in the device store to the CAs listed here, but does not lock to our own key.",
+    "Why several CA keys and not one intermediate: Let's Encrypt rotates issuance across intermediates (YR1/YR2 for RSA, YE1/YE2 for ECDSA, YR3/YE3 in reserve), and grapsee.com's own CT history already shows YR1, YR2, YE1 and GTS WE1. So this file pins the Gen-Y roots that sit above every LE intermediate (Root YR, Root YE) and GTS WE1 plus GTS Root R4, with the ISRG roots as backups.",
+    "IMPORTANT: grapsee.com is fronted by Cloudflare (104.21.28.182 / 172.67.147.20) on a Cloudflare-managed edge certificate. Cloudflare chooses and rotates that CA (Let's Encrypt, Google Trust Services, SSL.com; Sectigo for backup certificates) without notice and says it does not support pinning Universal SSL. A switch to SSL.com or Sectigo would fail every pinned API call until an app update ships or 'expires' passes. That is why 'enforce' is false in this commit. Before setting it to true: move grapsee.com to a Cloudflare custom certificate (or an Advanced certificate locked to one CA) and add the founder's backup key below.",
+    "To change pins: edit this file, run python3 scripts/generate-pins.py, run python3 scripts/check-api-pins.py, ship BOTH apps, and keep the old pins in the list until the old installs have updated."
+  ],
+  "schemaVersion": 1,
+  "host": "grapsee.com",
+  "additionalHosts": ["api.iqracsc.com"],
+  "enforce": false,
+  "expires": "2027-11-23",
+  "pins": [
+    {
+      "sha256": "kIdp6NNEd8wsugYyyIYFsi1ylMCED3hZbSR8ZFsa/A4=",
+      "role": "intermediate",
+      "note": "Google Trust Services WE1 (EC P-256), issuer of grapsee.com's live Cloudflare edge certificate. Seen live in the grapsee.com chain on 2026-11-23.",
+      "cert": { "subject": "CN=WE1, O=Google Trust Services, C=US", "issuer": "CN=GTS Root R4 (also cross-issued by GlobalSign ECC Root CA - R4)", "notAfter": "2029-02-20" }
+    },
+    {
+      "sha256": "mEflZT5enoR1FuXLgYYGqnVEoZvmf9c2bVBpiOjYQ0c=",
+      "role": "intermediate",
+      "note": "GTS Root R4 (EC P-384). grapsee.com serves it as the cross-signed certificate under GlobalSign Root CA; devices that trust the self-signed R4 end the chain on the same key. Covers a WE1 -> WE2 change inside Google Trust Services. Seen live on 2026-11-23.",
+      "cert": { "subject": "CN=GTS Root R4, O=Google Trust Services LLC, C=US", "issuer": "CN=GlobalSign Root CA (cross-sign, notAfter 2028-01-28); self-signed version notAfter 2036-06-22", "notAfter": "2028-01-28" }
+    },
+    {
+      "sha256": "fk6IOKit1ild5647BH06ujSIq5XbCgqlbYl6ANhhi88=",
+      "role": "intermediate",
+      "note": "Let's Encrypt Root YR (RSA 4096), served cross-signed by ISRG Root X1 above every RSA intermediate (YR1/YR2/YR3). Seen live in the api.iqracsc.com chain on 2026-11-23; also covers grapsee.com if Cloudflare (or the cPanel origin) moves to Let's Encrypt RSA.",
+      "cert": { "subject": "CN=Root YR, O=ISRG, C=US", "issuer": "CN=ISRG Root X1, O=Internet Security Research Group, C=US", "notAfter": "2032-09-02" }
+    },
+    {
+      "sha256": "sCkq5UWXjg+7mKu9lMhhYF5bGLsy7VI/UNW3tccdR7w=",
+      "role": "backup",
+      "note": "Let's Encrypt Root YE (EC P-384), cross-signed by ISRG Root X2, above every ECDSA intermediate (YE1/YE2/YE3). Not in today's live chains; there for Cloudflare switching grapsee.com to Let's Encrypt ECDSA. CT logs show a *.grapsee.com certificate from YE1 issued 2026-10-25. Hash from letsencrypt.org/certs/gen-y/root-ye-by-x2.der.",
+      "cert": { "subject": "CN=Root YE, O=ISRG, C=US", "issuer": "CN=ISRG Root X2, O=Internet Security Research Group, C=US", "notAfter": "2032-09-02" }
+    },
+    {
+      "sha256": "C5+lpZ7tcVwmwQIMcRtPbsQtWLABXhQzejna0wHFr8M=",
+      "role": "backup",
+      "note": "ISRG Root X1 (RSA 4096), the trust anchor the device ends api.iqracsc.com's chain on (seen in the live trust path on 2026-11-23). Backup if Let's Encrypt changes its intermediate tier again. Let's Encrypt lists it as trusted until about 2030-06-04.",
+      "cert": { "subject": "CN=ISRG Root X1, O=Internet Security Research Group, C=US", "issuer": "self-signed", "notAfter": "2035-06-04" }
+    },
+    {
+      "sha256": "diGVwiVYbubAI3RW4hB9xU8e/CH2GnkuvVFZE8zmgzI=",
+      "role": "backup",
+      "note": "ISRG Root X2 (EC P-384). Devices that trust X2 directly (newer iOS and Android) end a Let's Encrypt ECDSA chain here instead of on X1. Hash from letsencrypt.org/certs/isrg-root-x2.der.",
+      "cert": { "subject": "CN=ISRG Root X2, O=Internet Security Research Group, C=US", "issuer": "self-signed", "notAfter": "2040-09-17" }
+    },
+    {
+      "sha256": "REPLACE_WITH_FOUNDER_BACKUP_KEY_SPKI_SHA256_BASE64",
+      "role": "backup",
+      "placeholder": true,
+      "note": "PLACEHOLDER: ignored by both apps and the generator until replaced. The founder must generate an offline backup key pair (see SECURITY-TESTING.md, 'Backup pin'), keep the private key off every server, and put its SPKI hash here. It only protects you if, on the day you need it, you can install a certificate for that key at the edge (a Cloudflare custom certificate). Remove 'placeholder' when the value is real.",
+      "cert": { "subject": "(founder-held backup key, not yet generated)", "issuer": "n/a", "notAfter": "n/a" }
+    }
+  ],
+  "observed": {
+    "_about": "What the live servers presented when this pin set was written. Documentation only; nothing reads it. Leaf hashes are recorded so a mismatch report can be compared, but leaves are deliberately NOT pinned.",
+    "checkedOn": "2026-11-23",
+    "method": "Qualys SSL Labs API v3 live scan (all endpoints), CA certificates from letsencrypt.org and i.pki.goog, SPKI SHA-256 computed locally.",
+    "grapsee.com": {
+      "endpoints": ["104.21.28.182", "172.67.147.20", "2606:4700:3036::ac43:9314", "2606:4700:3032::6815:1cb6"],
+      "servedChain": [
+        { "subject": "CN=grapsee.com", "issuer": "CN=WE1, O=Google Trust Services, C=US", "key": "EC P-256", "notAfter": "2027-01-19", "sha256": "Q7TDGBYt1q00VQH8gXWsT68/77aPhNdRF5vlyq8xvC4=", "pinned": false },
+        { "subject": "CN=WE1, O=Google Trust Services, C=US", "issuer": "CN=GTS Root R4", "key": "EC P-256", "notAfter": "2029-02-20", "sha256": "kIdp6NNEd8wsugYyyIYFsi1ylMCED3hZbSR8ZFsa/A4=", "pinned": true },
+        { "subject": "CN=GTS Root R4, O=Google Trust Services LLC, C=US", "issuer": "CN=GlobalSign Root CA, OU=Root CA, O=GlobalSign nv-sa, C=BE", "key": "EC P-384", "notAfter": "2028-01-28", "sha256": "mEflZT5enoR1FuXLgYYGqnVEoZvmf9c2bVBpiOjYQ0c=", "pinned": true }
+      ],
+      "trustAnchors": [
+        { "subject": "CN=GTS Root R4 (self-signed)", "notAfter": "2036-06-22", "sha256": "mEflZT5enoR1FuXLgYYGqnVEoZvmf9c2bVBpiOjYQ0c=" },
+        { "subject": "CN=GlobalSign Root CA", "notAfter": "2028-01-28", "sha256": "K87oWBWM9UZfyddvDfoxL+8lpNyoUB2ptGtn0fv6G2Q=" },
+        { "subject": "OU=GlobalSign ECC Root CA - R4 (via the GlobalSign-issued WE1)", "notAfter": "2038-01-19", "sha256": "CLOmM1/OXvSPjw5UOYbAf9GKOxImEp9hhku9W90fHMk=" }
+      ]
+    },
+    "api.iqracsc.com": {
+      "endpoints": ["103.174.153.19"],
+      "servedChain": [
+        { "subject": "CN=*.iqracsc.com", "issuer": "CN=YR1, O=Let's Encrypt, C=US", "key": "RSA 2048", "notAfter": "2027-02-06", "sha256": "Hx0ZWZCNg8RF5uSKaT4Bvb8crLrBvioUBjAibLcc0is=", "pinned": false },
+        { "subject": "CN=YR1, O=Let's Encrypt, C=US", "issuer": "CN=Root YR, O=ISRG, C=US", "key": "RSA 2048", "notAfter": "2028-09-02", "sha256": "LoMHBotttiDko50Gi13uXW71eIy7LAttI+rYT8wXF4w=", "pinned": false },
+        { "subject": "CN=Root YR, O=ISRG, C=US", "issuer": "CN=ISRG Root X1", "key": "RSA 4096", "notAfter": "2032-09-02", "sha256": "fk6IOKit1ild5647BH06ujSIq5XbCgqlbYl6ANhhi88=", "pinned": true }
+      ],
+      "trustAnchors": [
+        { "subject": "CN=ISRG Root X1", "notAfter": "2035-06-04", "sha256": "C5+lpZ7tcVwmwQIMcRtPbsQtWLABXhQzejna0wHFr8M=" }
+      ],
+      "notes": "Shared cPanel host: a client that sends no SNI receives another tenant's certificate (CN=*.aaaltd.com.bd). Both apps always send SNI."
+    }
+  }
+}

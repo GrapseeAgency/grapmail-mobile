@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="mail_receipt_read_at">Прочитано %1$s</string>
+    <string name="mail_receipt_requested_pending">Запрошено уведомление о прочтении · ещё не прочитано</string>
+    <string name="mail_receipt_server_sent">Уведомление о прочтении отправлено</string>
+    <string name="mail_receipt_ask_title">Отправитель запросил уведомление о прочтении</string>
+    <string name="mail_receipt_ask_body">Отправить %1$s уведомление о том, что вы открыли это письмо? Получатель узнает только время открытия.</string>
+    <string name="mail_receipt_ask_send">Отправить</string>
+    <string name="mail_receipt_ask_decline">Не отправлять</string>
+    <string name="mail_receipt_mode_title">Уведомления о прочтении</string>
+    <string name="mail_receipt_mode_body">Если письмо запрашивает уведомление о прочтении. Для спама, заблокированных отправителей и зашифрованных писем уведомления не отправляются, если не выбрано «Всегда».</string>
+    <string name="mail_receipt_mode_never">Никогда</string>
+    <string name="mail_receipt_mode_ask">Спрашивать</string>
+    <string name="mail_receipt_mode_always">Всегда</string>
+    <string name="mail_receipt_mode_always_note">«Всегда» также отправляет уведомления для спама, заблокированных отправителей и зашифрованных писем.</string>
+    <string name="mail_receipt_mode_unavailable">Не удалось загрузить настройку. Проверьте подключение.</string>
+    <string name="mail_compose_request_receipt">Запросить уведомление о прочтении</string>
+</resources>

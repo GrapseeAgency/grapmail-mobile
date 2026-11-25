@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="mail_receipt_read_at">Gelesen %1$s</string>
+    <string name="mail_receipt_requested_pending">Lesebestätigung angefordert · noch nicht gelesen</string>
+    <string name="mail_receipt_server_sent">Lesebestätigung gesendet</string>
+    <string name="mail_receipt_ask_title">Der Absender bittet um eine Lesebestätigung</string>
+    <string name="mail_receipt_ask_body">Eine Bestätigung an %1$s senden, dass Sie diese Nachricht geöffnet haben? Sie erfahren nur, wann Sie sie geöffnet haben – sonst nichts.</string>
+    <string name="mail_receipt_ask_send">Bestätigung senden</string>
+    <string name="mail_receipt_ask_decline">Nicht senden</string>
+    <string name="mail_receipt_mode_title">Lesebestätigungen senden</string>
+    <string name="mail_receipt_mode_body">Wenn eine Nachricht eine Lesebestätigung anfordert. Für Spam, blockierte Absender und verschlüsselte E-Mails werden nie Bestätigungen gesendet, außer Sie wählen „Immer“.</string>
+    <string name="mail_receipt_mode_never">Nie</string>
+    <string name="mail_receipt_mode_ask">Fragen</string>
+    <string name="mail_receipt_mode_always">Immer</string>
+    <string name="mail_receipt_mode_always_note">„Immer“ sendet Bestätigungen auch für Spam, blockierte Absender und verschlüsselte E-Mails.</string>
+    <string name="mail_receipt_mode_unavailable">Diese Einstellung konnte nicht geladen werden. Prüfen Sie Ihre Verbindung.</string>
+    <string name="mail_compose_request_receipt">Lesebestätigung anfordern</string>
+</resources>

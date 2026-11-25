@@ -1,0 +1,436 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>%lld unread</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@n@</string>
+		<key>n</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>%lld nieprzeczytana</string>
+			<key>few</key>
+			<string>%lld nieprzeczytane</string>
+			<key>many</key>
+			<string>%lld nieprzeczytanych</string>
+			<key>other</key>
+			<string>%lld nieprzeczytanej</string>
+		</dict>
+	</dict>
+	<key>%lld selected</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@n@</string>
+		<key>n</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>Zaznaczono %lld</string>
+			<key>few</key>
+			<string>Zaznaczono %lld</string>
+			<key>many</key>
+			<string>Zaznaczono %lld</string>
+			<key>other</key>
+			<string>Zaznaczono %lld</string>
+		</dict>
+	</dict>
+	<key>%lld messages</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@n@</string>
+		<key>n</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>%lld wiadomość</string>
+			<key>few</key>
+			<string>%lld wiadomości</string>
+			<key>many</key>
+			<string>%lld wiadomości</string>
+			<key>other</key>
+			<string>%lld wiadomości</string>
+		</dict>
+	</dict>
+	<key>%lld new messages</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@n@</string>
+		<key>n</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>%lld nowa wiadomość</string>
+			<key>few</key>
+			<string>%lld nowe wiadomości</string>
+			<key>many</key>
+			<string>%lld nowych wiadomości</string>
+			<key>other</key>
+			<string>%lld nowej wiadomości</string>
+		</dict>
+	</dict>
+	<key>%lld Active Sessions</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@n@</string>
+		<key>n</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>%lld aktywna sesja</string>
+			<key>few</key>
+			<string>%lld aktywne sesje</string>
+			<key>many</key>
+			<string>%lld aktywnych sesji</string>
+			<key>other</key>
+			<string>%lld aktywnej sesji</string>
+		</dict>
+	</dict>
+	<key>%lld codes unused.</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@n@</string>
+		<key>n</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>%lld nieużyty kod.</string>
+			<key>few</key>
+			<string>%lld nieużyte kody.</string>
+			<key>many</key>
+			<string>%lld nieużytych kodów.</string>
+			<key>other</key>
+			<string>%lld nieużytego kodu.</string>
+		</dict>
+	</dict>
+	<key>%lld days ago</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@n@</string>
+		<key>n</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>%lld dzień temu</string>
+			<key>few</key>
+			<string>%lld dni temu</string>
+			<key>many</key>
+			<string>%lld dni temu</string>
+			<key>other</key>
+			<string>%lld dnia temu</string>
+		</dict>
+	</dict>
+	<key>within %lld days</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@n@</string>
+		<key>n</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>w ciągu %lld dnia</string>
+			<key>few</key>
+			<string>w ciągu %lld dni</string>
+			<key>many</key>
+			<string>w ciągu %lld dni</string>
+			<key>other</key>
+			<string>w ciągu %lld dnia</string>
+		</dict>
+	</dict>
+	<key>older than %lld days</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@n@</string>
+		<key>n</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>starsze niż %lld dzień</string>
+			<key>few</key>
+			<string>starsze niż %lld dni</string>
+			<key>many</key>
+			<string>starsze niż %lld dni</string>
+			<key>other</key>
+			<string>starsze niż %lld dnia</string>
+		</dict>
+	</dict>
+	<key>%lld remote images hidden</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@n@</string>
+		<key>n</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>Ukryto %lld obraz zdalny</string>
+			<key>few</key>
+			<string>Ukryto %lld obrazy zdalne</string>
+			<key>many</key>
+			<string>Ukryto %lld obrazów zdalnych</string>
+			<key>other</key>
+			<string>Ukryto %lld obrazu zdalnego</string>
+		</dict>
+	</dict>
+	<key>Archived %lld messages</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@n@</string>
+		<key>n</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>Zarchiwizowano %lld wiadomość</string>
+			<key>few</key>
+			<string>Zarchiwizowano %lld wiadomości</string>
+			<key>many</key>
+			<string>Zarchiwizowano %lld wiadomości</string>
+			<key>other</key>
+			<string>Zarchiwizowano %lld wiadomości</string>
+		</dict>
+	</dict>
+	<key>Moved %lld messages to Trash</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@n@</string>
+		<key>n</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>Przeniesiono %lld wiadomość do kosza</string>
+			<key>few</key>
+			<string>Przeniesiono %lld wiadomości do kosza</string>
+			<key>many</key>
+			<string>Przeniesiono %lld wiadomości do kosza</string>
+			<key>other</key>
+			<string>Przeniesiono %lld wiadomości do kosza</string>
+		</dict>
+	</dict>
+	<key>Restored %lld messages</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@n@</string>
+		<key>n</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>Przywrócono %lld wiadomość</string>
+			<key>few</key>
+			<string>Przywrócono %lld wiadomości</string>
+			<key>many</key>
+			<string>Przywrócono %lld wiadomości</string>
+			<key>other</key>
+			<string>Przywrócono %lld wiadomości</string>
+		</dict>
+	</dict>
+	<key>Labelled %lld messages</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@n@</string>
+		<key>n</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>Dodano etykietę do %lld wiadomości</string>
+			<key>few</key>
+			<string>Dodano etykietę do %lld wiadomości</string>
+			<key>many</key>
+			<string>Dodano etykietę do %lld wiadomości</string>
+			<key>other</key>
+			<string>Dodano etykietę do %lld wiadomości</string>
+		</dict>
+	</dict>
+	<key>Snoozed %lld messages</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@n@</string>
+		<key>n</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>Odłożono %lld wiadomość</string>
+			<key>few</key>
+			<string>Odłożono %lld wiadomości</string>
+			<key>many</key>
+			<string>Odłożono %lld wiadomości</string>
+			<key>other</key>
+			<string>Odłożono %lld wiadomości</string>
+		</dict>
+	</dict>
+	<key>%lld need a reply</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key><string>%#@n@</string>
+		<key>n</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key><string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key><string>lld</string>
+			<key>one</key><string>%lld czeka na odpowiedź</string>
+			<key>few</key><string>%lld czekają na odpowiedź</string>
+			<key>many</key><string>%lld czeka na odpowiedź</string>
+			<key>other</key><string>%lld czeka na odpowiedź</string>
+		</dict>
+	</dict>
+	<key>%lld packages arriving</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key><string>%#@n@</string>
+		<key>n</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key><string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key><string>lld</string>
+			<key>one</key><string>%lld przesyłka w drodze</string>
+			<key>few</key><string>%lld przesyłki w drodze</string>
+			<key>many</key><string>%lld przesyłek w drodze</string>
+			<key>other</key><string>%lld przesyłki w drodze</string>
+		</dict>
+	</dict>
+	<key>%lld sign-in codes</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key><string>%#@n@</string>
+		<key>n</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key><string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key><string>lld</string>
+			<key>one</key><string>%lld kod logowania</string>
+			<key>few</key><string>%lld kody logowania</string>
+			<key>many</key><string>%lld kodów logowania</string>
+			<key>other</key><string>%lld kodu logowania</string>
+		</dict>
+	</dict>
+	<key>You handled %lld emails today.</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key><string>%#@n@</string>
+		<key>n</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key><string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key><string>lld</string>
+			<key>one</key><string>Dziś obsłużono %lld e-mail.</string>
+			<key>few</key><string>Dziś obsłużono %lld e-maile.</string>
+			<key>many</key><string>Dziś obsłużono %lld e-maili.</string>
+			<key>other</key><string>Dziś obsłużono %lld e-maila.</string>
+		</dict>
+	</dict>
+	<key>%lld labels</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key><string>%#@n@</string>
+		<key>n</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key><string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key><string>lld</string>
+			<key>one</key><string>%lld etykieta</string>
+			<key>few</key><string>%lld etykiety</string>
+			<key>many</key><string>%lld etykiet</string>
+			<key>other</key><string>%lld etykiety</string>
+		</dict>
+	</dict>
+	<key>%lld waiting</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key><string>%#@n@</string>
+		<key>n</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key><string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key><string>lld</string>
+			<key>one</key><string>%lld czeka</string>
+			<key>few</key><string>%lld czekają</string>
+			<key>many</key><string>%lld czeka</string>
+			<key>other</key><string>%lld czeka</string>
+		</dict>
+	</dict>
+	<key>Delete %lld messages permanently?</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key><string>%#@n@</string>
+		<key>n</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key><string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key><string>lld</string>
+			<key>one</key><string>Usunąć trwale %lld wiadomość?</string>
+			<key>few</key><string>Usunąć trwale %lld wiadomości?</string>
+			<key>many</key><string>Usunąć trwale %lld wiadomości?</string>
+			<key>other</key><string>Usunąć trwale %lld wiadomości?</string>
+		</dict>
+	</dict>
+	<key>%lld senders in the selected messages</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key><string>%#@n@</string>
+		<key>n</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key><string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key><string>lld</string>
+			<key>one</key><string>%lld nadawca w zaznaczonych wiadomościach</string>
+			<key>few</key><string>%lld nadawcy w zaznaczonych wiadomościach</string>
+			<key>many</key><string>%lld nadawców w zaznaczonych wiadomościach</string>
+			<key>other</key><string>%lld nadawcy w zaznaczonych wiadomościach</string>
+		</dict>
+	</dict>
+	<key>%lld muted conversations</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key><string>%#@n@</string>
+		<key>n</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key><string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key><string>lld</string>
+			<key>one</key><string>%lld wyciszona rozmowa</string>
+			<key>few</key><string>%lld wyciszone rozmowy</string>
+			<key>many</key><string>%lld wyciszonych rozmów</string>
+			<key>other</key><string>%lld wyciszonej rozmowy</string>
+		</dict>
+	</dict>
+	<key>%lld followed conversations</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key><string>%#@n@</string>
+		<key>n</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key><string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key><string>lld</string>
+			<key>one</key><string>%lld obserwowana rozmowa</string>
+			<key>few</key><string>%lld obserwowane rozmowy</string>
+			<key>many</key><string>%lld obserwowanych rozmów</string>
+			<key>other</key><string>%lld obserwowanej rozmowy</string>
+		</dict>
+	</dict>
+</dict>
+</plist>

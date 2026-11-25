@@ -33,18 +33,19 @@ struct PasskeysView: View {
             onBack: onBack,
             illustration: "ill_sec_hub",
             illustrationWidth: 150,
-            title: "Passkeys",
-            subtitle: "Sign in with your face, fingerprint or device passcode — no password to type, leak or reuse."
+            title: String(localized: "Passkeys", comment: "Screen title (passkeys screen)"),
+            subtitle: String(localized: "Sign in with your face, fingerprint or device passcode — no password to type, leak or reuse.", comment: "Screen description under the title (passkeys screen)")
         ) {
             if loading {
-                Text("Loading passkeys…").font(.system(size: 13)).foregroundColor(GM.textSecondary)
+                GMSkeletonList(rows: 3, avatar: false)
             } else if let error {
-                Text(error).font(.system(size: 13)).foregroundColor(GM.error)
-                AccountLink(title: "Try again", action: { Task { await load() } })
+                Text(error).gmFont(13).foregroundColor(GM.error)
+                    .fixedSize(horizontal: false, vertical: true)
+                AccountLink(title: String(localized: "Try again", comment: "Link-style button (passkeys screen)"), action: { Task { await load() } })
             } else {
                 if passkeys.isEmpty {
                     Text("No passkeys are registered for this account yet. Add one below and this device can sign you in without your password.")
-                        .font(.system(size: 13))
+                        .gmFont(13)
                         .foregroundColor(GM.textSecondary)
                         .fixedSize(horizontal: false, vertical: true)
                 } else {
@@ -55,9 +56,9 @@ struct PasskeysView: View {
                     }
                 }
                 HStack(alignment: .top, spacing: 9) {
-                    Image(systemName: "info.circle").font(.system(size: 14)).foregroundColor(GM.primarySolid)
+                    Image(systemName: "info.circle").gmFont(14).foregroundColor(GM.primaryText).accessibilityHidden(true)
                     Text("A passkey works only where your iCloud Keychain is — revoking a device does not remove its passkey, and deleting a passkey does not revoke the device that made it.")
-                        .font(.system(size: 12))
+                        .gmFont(12)
                         .foregroundColor(GM.textSecondary)
                         .fixedSize(horizontal: false, vertical: true)
                     Spacer(minLength: 0)
@@ -66,21 +67,21 @@ struct PasskeysView: View {
                 .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(GM.softFill))
                 .padding(.top, 12)
                 if let addError {
-                    Text(addError).font(.system(size: 12)).foregroundColor(GM.error).padding(.top, 6)
+                    Text(addError).gmFont(12).foregroundColor(GM.error).padding(.top, 6)
                 }
                 if let deleteError {
-                    Text(deleteError).font(.system(size: 12)).foregroundColor(GM.error).padding(.top, 6)
+                    Text(deleteError).gmFont(12).foregroundColor(GM.error).padding(.top, 6)
                 }
             }
         } footer: {
             VStack(spacing: 6) {
-                GradientButton(title: "Add Passkey", busy: adding, action: addPasskey)
-                FooterNote(text: "Registering a passkey signs a challenge with this device's credential manager. The private key never leaves it.")
+                GradientButton(title: String(localized: "Add Passkey", comment: "Button title (passkeys screen)"), busy: adding, action: addPasskey)
+                FooterNote(text: String(localized: "Registering a passkey signs a challenge with this device's credential manager. The private key never leaves it.", comment: "Footer note (passkeys screen)"))
             }
         }
         .task { await load() }
         .alert(
-            "Delete \(pendingDelete?.name.isEmpty == false ? pendingDelete!.name : "this passkey")?",
+            pendingDelete.map { $0.name.isEmpty ? Text("Delete this passkey?") : Text("Delete \($0.name)?") } ?? Text("Delete this passkey?"),
             isPresented: Binding(get: { pendingDelete != nil }, set: { if !$0 { pendingDelete = nil } })
         ) {
             Button("Cancel", role: .cancel) { pendingDelete = nil }
@@ -93,14 +94,20 @@ struct PasskeysView: View {
     // ── reads and writes ─────────────────────────────────────────────────────
 
     private func load() async {
-        guard let token = SessionStore.token else { loading = false; return }
+        // No session is a failure to read, not "no passkeys".
+        guard let token = SessionStore.token else { error = String(localized: "Sign in again."); loading = false; return }
         loading = true
         error = nil
         do {
             let resp = try await ApiClient.listPasskeys(token: token)
             passkeys = resp.passkeys
+            // Round 8 — B: the welcome-back hint (spec §2.4) follows every change
+            // to the list. A hint only: it never signs anyone in or skips a step.
+            if resp.success, let address = SessionStore.address {
+                RememberedAccounts.setHasPasskey(!resp.passkeys.isEmpty, for: address)
+            }
         } catch {
-            self.error = apiMessage(error, fallback: "Could not load the passkey list. Try again.")
+            self.error = apiMessage(error, fallback: String(localized: "Could not load the passkey list. Try again.", comment: "Error message shown when the server gives no reason (passkeys screen)"))
         }
         loading = false
     }
@@ -110,7 +117,7 @@ struct PasskeysView: View {
     /// credential row reads like the device row next to it.
     private func addPasskey() {
         guard let token = SessionStore.token else {
-            addError = "Sign in again."
+            addError = String(localized: "Sign in again.", comment: "Error when the session has expired")
             return
         }
         adding = true
@@ -122,7 +129,7 @@ struct PasskeysView: View {
                 guard optionsResponse.success, let challengeId = optionsResponse.challengeId.nilIfBlank(),
                       let challenge = optionsResponse.challengeBase64Url,
                       let options = optionsResponse.options else {
-                    addError = "Passkey registration is not available right now. Try again."
+                    addError = String(localized: "Passkey registration is not available right now. Try again.", comment: "Error when passkey registration cannot start")
                     return
                 }
                 let registration = try await PasskeyManager.register(options: options)
@@ -135,20 +142,21 @@ struct PasskeysView: View {
                         clientDataJSON: registration.clientDataJSON,
                         attestationObject: registration.attestationObject))
                 guard verified.success else {
-                    addError = verified.error?.nilIfBlank() ?? "The passkey was not verified. Try again."
+                    addError = verified.error?.nilIfBlank() ?? String(localized: "The passkey was not verified. Try again.", comment: "Error when the server did not verify a new passkey")
                     return
                 }
                 await load()
             } catch PasskeyManager.PasskeyError.cancelled {
                 // The person closed the sheet — not a failure to report.
             } catch {
-                addError = apiMessage(error, fallback: "The passkey could not be added. Try again.")
+                addError = apiMessage(error, fallback: String(localized: "The passkey could not be added. Try again.", comment: "Error message shown when the server gives no reason (passkeys screen)"))
             }
         }
     }
 
     private func delete(_ passkey: PasskeyDto) {
         guard let token = SessionStore.token else { return }
+        guard !deleting else { return }
         deleting = true
         deleteError = nil
         Task {
@@ -158,7 +166,7 @@ struct PasskeysView: View {
                 pendingDelete = nil
                 await load()
             } catch {
-                deleteError = apiMessage(error, fallback: "The passkey could not be deleted. Try again.")
+                deleteError = apiMessage(error, fallback: String(localized: "The passkey could not be deleted. Try again.", comment: "Error message shown when the server gives no reason (passkeys screen)"))
                 pendingDelete = nil
             }
         }
@@ -173,23 +181,28 @@ private struct PasskeyCardView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 8) {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
                 Image(systemName: "key.viewfinder")
-                    .font(.system(size: 15, weight: .medium))
-                    .foregroundColor(GM.primarySolid)
-                Text(passkey.name.isEmpty ? "Passkey" : passkey.name)
-                    .font(.system(size: 15, weight: .semibold))
+                    .gmFont(15, .medium)
+                    .foregroundColor(GM.primaryText)
+                    .accessibilityHidden(true)
+                Text(passkey.name.isEmpty ? String(localized: "Passkey", comment: "Passkey card title when the passkey has no name") : passkey.name)
+                    .gmFont(15, .semibold)
                     .foregroundColor(GM.textPrimary)
-                    .lineLimit(1)
+                    .lineLimit(3)
+                    .fixedSize(horizontal: false, vertical: true)
                 Spacer(minLength: 0)
             }
             Text(lastUsedLine)
-                .font(.system(size: 11))
+                .gmFont(11)
                 .foregroundColor(GM.textTertiary)
+                .fixedSize(horizontal: false, vertical: true)
             Button(action: onDelete) {
                 Text("Delete passkey")
-                    .font(.system(size: 13, weight: .semibold))
+                    .gmFont(13, .semibold)
                     .foregroundColor(GM.error)
+                    .frame(minHeight: 44, alignment: .leading)
+                    .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .padding(.top, 2)
@@ -202,11 +215,11 @@ private struct PasskeyCardView: View {
 
     private var lastUsedLine: String {
         if let lastUsed = passkey.lastUsedAt?.nilIfBlank() {
-            return "Last used " + securityAbsolute(lastUsed)
+            return String(localized: "Last used \(securityAbsolute(lastUsed))", comment: "Passkey card: when it was last used; the argument is a date and time")
         }
         if let created = passkey.createdAt?.nilIfBlank() {
-            return "Registered " + securityAbsolute(created) + " · never used"
+            return String(localized: "Registered \(securityAbsolute(created)) · never used", comment: "Passkey card: when it was registered; the argument is a date and time")
         }
-        return "Never used"
+        return String(localized: "Never used", comment: "Passkey card: the passkey has never been used")
     }
 }

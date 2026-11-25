@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    values-fr/strings_mailbox_features.xml: translation of values/strings_mailbox_features.xml (same keys, same order).
+    Comments below are kept from the English source for context.
+-->
+<resources>
+    <!-- ui/mailfeatures/MorningCard.kt — greeting by local time; %1$s is the mailbox's first name. -->
+    <string name="mailbox_feat_greeting_morning">Bonjour</string>
+    <string name="mailbox_feat_greeting_morning_name">Bonjour %1$s</string>
+    <string name="mailbox_feat_greeting_afternoon">Bon après-midi</string>
+    <string name="mailbox_feat_greeting_afternoon_name">Bon après-midi, %1$s</string>
+    <string name="mailbox_feat_greeting_evening">Bonsoir</string>
+    <string name="mailbox_feat_greeting_evening_name">Bonsoir %1$s</string>
+    <!-- Summary parts; only non-zero parts are shown, joined by a middle dot. -->
+    <plurals name="mailbox_feat_digest_reply">
+        <item quantity="one">%1$d en attente de réponse</item>
+        <item quantity="many">%1$d en attente de réponse</item>
+        <item quantity="other">%1$d en attente de réponse</item>
+    </plurals>
+    <plurals name="mailbox_feat_digest_package">
+        <item quantity="one">%1$d colis en approche</item>
+        <item quantity="many">%1$d de colis en approche</item>
+        <item quantity="other">%1$d colis en approche</item>
+    </plurals>
+    <plurals name="mailbox_feat_digest_code">
+        <item quantity="one">%1$d code de connexion</item>
+        <item quantity="many">%1$d de codes de connexion</item>
+        <item quantity="other">%1$d codes de connexion</item>
+    </plurals>
+    <string name="mailbox_feat_digest_caught_up">Vous êtes à jour</string>
+    <!-- TalkBack reads the card as one sentence: %1$s greeting, %2$s the parts joined. -->
+    <string name="mailbox_feat_digest_a11y">%1$s. %2$s.</string>
+    <string name="mailbox_feat_digest_a11y_join">,\u0020</string>
+    <!-- TalkBack actions on the card. -->
+    <string name="mailbox_feat_action_show_reply">Afficher les messages en attente de réponse</string>
+    <string name="mailbox_feat_action_show_packages">Afficher le suivi des colis</string>
+    <string name="mailbox_feat_action_show_codes">Afficher les codes de connexion</string>
+    <string name="mailbox_feat_action_show_all">Afficher tous les messages</string>
+    <string name="mailbox_feat_dismiss">Ignorer</string>
+    <!-- The active filter chip under the card; %1$s is the filter's name. -->
+    <string name="mailbox_feat_filter_reply">En attente de réponse</string>
+    <string name="mailbox_feat_filter_packages">Colis</string>
+    <string name="mailbox_feat_filter_codes">Codes de connexion</string>
+    <string name="mailbox_feat_filter_clear">Retirer le filtre : %1$s</string>
+
+    <!-- ui/components/Mail.kt — the code chip on an inbox row; %1$s is the code. -->
+    <string name="mailbox_feat_code_copy">Copier %1$s</string>
+    <!-- The chip's spoken name; the code itself is not read out. -->
+    <string name="mailbox_feat_code_copy_a11y">Copier le code de connexion</string>
+    <!-- Shown on the chip after a copy. The code is not repeated. -->
+    <string name="mailbox_feat_code_copied">Code copié</string>
+    <!-- Clipboard label (shown by some keyboards/clipboard UIs). -->
+    <string name="mailbox_feat_code_clip_label">Code de connexion</string>
+
+    <!-- ui/mailfeatures/InboxZero.kt -->
+    <string name="mailbox_feat_zero_title">Tout est traité</string>
+    <plurals name="mailbox_feat_zero_handled">
+        <item quantity="one">Vous avez traité %1$d e-mail aujourd\'hui.</item>
+        <item quantity="many">Vous avez traité %1$d d\'e-mails aujourd\'hui.</item>
+        <item quantity="other">Vous avez traité %1$d e-mails aujourd\'hui.</item>
+    </plurals>
+    <string name="mailbox_feat_zero_nothing">Rien ne vous attend.</string>
+
+    <!-- ui/screens/mail/SwipeActionsSetting.kt and the row actions in MailboxScreen.kt -->
+    <string name="mailbox_feat_swipe_title">Actions de balayage</string>
+    <string name="mailbox_feat_swipe_body">L\'effet d\'un balayage sur un message de la liste. Enregistré uniquement sur cet appareil.</string>
+    <string name="mailbox_feat_swipe_right">Balayer vers la droite</string>
+    <string name="mailbox_feat_swipe_left">Balayer vers la gauche</string>
+    <!-- %1$s is "Swipe right" or "Swipe left". -->
+    <string name="mailbox_feat_swipe_change">Modifier : %1$s</string>
+    <string name="mailbox_feat_swipe_archive">Archiver</string>
+    <string name="mailbox_feat_swipe_trash">Corbeille</string>
+    <string name="mailbox_feat_swipe_read">Marquer comme lu/non lu</string>
+    <string name="mailbox_feat_swipe_star">Ajouter aux favoris</string>
+    <string name="mailbox_feat_swipe_snooze">Mettre en attente</string>
+    <string name="mailbox_feat_swipe_move">Déplacer vers…</string>
+    <string name="mailbox_feat_swipe_none">Aucune</string>
+</resources>

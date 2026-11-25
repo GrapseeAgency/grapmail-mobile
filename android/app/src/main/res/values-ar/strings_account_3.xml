@@ -1,0 +1,158 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Arabic translation of values/strings_account.xml (part 3).
+  Covers security/BackupCodeScreens.kt through security/RecoveryCodesScreen.kt.
+-->
+<resources>
+
+    <!-- security/BackupCodeScreens.kt -->
+    <string name="acct_generate_save_backup_codes">إنشاء الرموز الاحتياطية وحفظها</string>
+    <string name="acct_create_one_time_backup_codes_to">أنشئ رموزًا احتياطية لمرة واحدة للوصول إلى حسابك إذا فقدت هاتفك.</string>
+    <string name="acct_generate_codes">إنشاء الرموز</string>
+    <string name="acct_cancel">إلغاء</string>
+    <string name="acct_whats_included">ما الذي يتضمنه</string>
+    <string name="acct_10_one_time_codes">10 رموز لمرة واحدة</string>
+    <string name="acct_each_code_can_be_used_once">يمكن استخدام كل رمز مرة واحدة.</string>
+    <string name="acct_use_when_needed">استخدمها عند الحاجة</string>
+    <string name="acct_sign_in_when_your_phone_is">سجّل الدخول عندما لا يكون هاتفك متاحًا.</string>
+    <string name="acct_each_code_is_unique">كل رمز فريد</string>
+    <string name="acct_generating_a_new_set_retires_the_old">إنشاء مجموعة جديدة يُبطل المجموعة القديمة.</string>
+    <string name="acct_store_the_codes_somewhere_only_you">احفظ الرموز في مكان لا يصل إليه سواك. أي شخص يملك رمزًا يمكنه تجاوز عامل التحقق الثاني.</string>
+    <string name="acct_backup_codes_saved">تم حفظ الرموز الاحتياطية</string>
+    <string name="acct_store_these_codes_somewhere_safe">احفظ هذه الرموز في مكان آمن. لن تظهر مرة أخرى.</string>
+    <string name="acct_download_backup_codes">تنزيل الرموز الاحتياطية</string>
+    <string name="acct_done">تم</string>
+    <string name="acct_each_code_can_be_used_once_2">يمكن استخدام كل رمز مرة واحدة. إنشاء رموز جديدة يُبطل جميع الرموز في هذه القائمة.</string>
+    <string name="acct_your_backup_codes">رموزك الاحتياطية</string>
+    <string name="acct_copied">تم النسخ</string>
+    <string name="acct_copy_all">نسخ الكل</string>
+    <string name="acct_copy_code">نسخ %1$s</string>
+    <string name="acct_keep_them_safe">احتفظ بها بأمان</string>
+    <string name="acct_store_safely_use_a_password_manager">احفظها بأمان — استخدم مدير كلمات مرور أو اطبعها.</string>
+    <string name="acct_dont_share_backup_codes_are_for_your">لا تشاركها — الرموز الاحتياطية لك وحدك.</string>
+    <string name="acct_one_time_use_each_code_can_only_be">استخدام لمرة واحدة — لا يمكن استخدام كل رمز إلا مرة واحدة.</string>
+    <string name="acct_saved_codes_confirm">لقد حفظت هذه الرموز في مكان آمن.</string>
+    <string name="acct_copy_them_into_your_password_manager">انسخها إلى مدير كلمات المرور، أو دوّنها.</string>
+    <string name="acct_codes_not_shown_again">لن تظهر هذه الرموز مرة أخرى</string>
+    <string name="acct_leave_now_and_the_list_is_gone_you">إذا غادرت الآن فستختفي القائمة. يمكنك إنشاء مجموعة جديدة لاحقًا، لكن الرموز القديمة ستتوقف عن العمل.</string>
+    <string name="acct_leave_anyway">المغادرة على أي حال</string>
+    <string name="acct_stay">البقاء</string>
+
+    <!-- security/DeleteAccountScreen.kt -->
+    <string name="acct_delete_account">حذف الحساب</string>
+    <string name="acct_deleting_this_account_is_permanent">حذف هذا الحساب نهائي. يُرجى قراءة ما سيُحذف قبل المتابعة.</string>
+    <string name="acct_delete_my_account">حذف حسابي</string>
+    <string name="acct_enter_your_password_period">أدخل كلمة المرور.</string>
+    <string name="acct_that_password_is_not_correct">كلمة المرور هذه غير صحيحة.</string>
+    <string name="acct_the_request_could_not_be_confirmed">تعذّر تأكيد الطلب.</string>
+    <string name="acct_what_is_deleted">ما الذي سيُحذف</string>
+    <string name="acct_delete_removes_mailbox">صندوق بريدك على GrapMail — العنوان نفسه، فلن تصل الرسائل المرسلة إليه إلى أي أحد بعد الآن.</string>
+    <string name="acct_every_message_sent_received_drafted">كل الرسائل: المُرسلة والمستلمة والمسودات والمؤرشفة والمحذوفة.</string>
+    <string name="acct_your_aliases_the_extra_addresses">أسماؤك المستعارة — العناوين الإضافية التي كانت تصل رسائلها إلى هذا الصندوق.</string>
+    <string name="acct_delete_cannot_be_undone">لا يمكن التراجع عن ذلك ولا استرداده. لن يُحجز العنوان لك — وقد لا يمكن إعادة إنشاء عنوان محذوف.</string>
+    <string name="acct_enter_your_password_to_confirm">أدخل كلمة المرور للتأكيد</string>
+    <string name="acct_only_the_password_on_this_account">لا يمكن بدء الحذف إلا بكلمة مرور هذا الحساب.</string>
+
+    <!-- security/NotificationPrefsScreen.kt -->
+    <string name="acct_notification_preferences">تفضيلات الإشعارات</string>
+    <string name="acct_choose_what_this_account_sends_and">اختر ما يرسله هذا الحساب، ومتى تهدأ إشعارات البريد.</string>
+    <string name="acct_apply_quiet_hours">تطبيق ساعات الهدوء</string>
+    <string name="acct_back_to_account_security">العودة إلى أمان الحساب</string>
+    <string name="acct_alerts">التنبيهات</string>
+    <string name="acct_mail_notifications">إشعارات البريد</string>
+    <string name="acct_new_mail_that_reaches_your_inbox">البريد الجديد الذي يصل إلى بريدك الوارد.</string>
+    <string name="acct_security_alerts">التنبيهات الأمنية</string>
+    <string name="acct_sign_ins_password_changes_trusted">عمليات تسجيل الدخول وتغييرات كلمة المرور وأحداث الأجهزة الموثوقة. تُرسل دائمًا — ولا يمكن كتمها.</string>
+    <string name="acct_account_alerts">تنبيهات الحساب</string>
+    <string name="acct_lifecycle_notices_about_your_account">إشعارات حول دورة حياة حسابك.</string>
+    <string name="acct_quiet_hours_mail_only">ساعات الهدوء — للبريد فقط</string>
+    <string name="acct_paused">متوقفة مؤقتًا</string>
+    <string name="acct_while_quiet_hours_are_on_mail">أثناء تفعيل ساعات الهدوء، تُؤجَّل إشعارات البريد حتى انتهاء الفترة. لا تتوقف التنبيهات الأمنية أبدًا.</string>
+    <string name="acct_quiet_from">الهدوء من</string>
+    <string name="acct_quiet_until">الهدوء حتى</string>
+    <string name="acct_clear_quiet_hours">مسح ساعات الهدوء</string>
+    <string name="acct_security_alerts_state">حالة التنبيهات الأمنية</string>
+    <string name="acct_security_alerts_are_on_for_this">التنبيهات الأمنية مفعّلة لهذا الحساب، كما ينبغي.</string>
+    <string name="acct_the_account_row_reports_security">يشير سجل الحساب إلى أن التنبيهات الأمنية متوقفة. لا يمكن لهذه الشاشة تغيير إرسال التنبيهات الأمنية المهمة.</string>
+    <string name="acct_preferences_apply_to_every_device">تنطبق التفضيلات على كل جهاز يستخدم هذا الحساب.</string>
+    <string name="acct_not_set">غير محدد</string>
+
+    <!-- security/PasskeysScreen.kt -->
+    <string name="acct_passkey_name_on_device">GrapMail على %1$s</string>
+    <string name="acct_passkey_added_use_it_the_next_time">تمت إضافة مفتاح المرور. استخدمه في المرة القادمة التي تسجّل فيها الدخول.</string>
+    <string name="acct_no_passkey_was_created_on_this">لم يتم إنشاء مفتاح مرور على هذا الجهاز. تأكد من إعداد قفل للشاشة.</string>
+    <string name="acct_the_passkey_could_not_be_added_try">تعذّرت إضافة مفتاح المرور. حاول مرة أخرى.</string>
+    <string name="acct_passkeys">مفاتيح المرور</string>
+    <string name="acct_sign_in_with_a_biometric_credential">سجّل الدخول ببصمتك أو وجهك بدلًا من كلمة المرور. يبقى مفتاح المرور على الجهاز الذي أنشأه.</string>
+    <string name="acct_add_passkey">إضافة مفتاح مرور</string>
+    <string name="acct_no_passkeys_yet_add_one_and_you_can">لا توجد مفاتيح مرور بعد. أضف مفتاحًا لتتمكن من تسجيل الدخول بدون كلمة المرور.</string>
+    <string name="acct_what_a_passkey_is">ما هو مفتاح المرور</string>
+    <string name="acct_a_passkey_is_a_credential_this">مفتاح المرور هو بيانات اعتماد يحتفظ بها هذا الجهاز في عتاده ويثبتها ببصمتك أو وجهك. إزالته من هنا تمنعه من تسجيل الدخول إلى هذا الحساب — أما النسخة الموجودة على الجهاز نفسه فتُزال من إعدادات الجهاز.</string>
+    <string name="acct_remove_passkey">إزالة مفتاح المرور؟</string>
+    <string name="acct_remove_passkey_body">لن يتمكن «%1$s» بعد الآن من تسجيل دخولك إلى هذا الحساب.</string>
+    <string name="acct_this_passkey">مفتاح المرور هذا</string>
+    <string name="acct_remove">إزالة</string>
+    <string name="acct_keep">الإبقاء</string>
+    <string name="acct_passkey">مفتاح مرور</string>
+    <string name="acct_added_at">أُضيف %1$s</string>
+    <string name="acct_last_used_at">آخر استخدام %1$s</string>
+    <string name="acct_this_credential_signs_you_in_without">تتيح لك بيانات الاعتماد هذه تسجيل الدخول بدون كلمة مرور.</string>
+    <string name="acct_removing">جارٍ الإزالة…</string>
+    <string name="acct_remove_passkey_2">إزالة مفتاح المرور</string>
+
+    <!-- security/PasswordScreens.kt -->
+    <string name="acct_after_suspicious_activity">بعد نشاط مريب</string>
+    <string name="acct_change_your_password">غيّر كلمة المرور</string>
+    <string name="acct_your_account_was_accessed_from_an">تم الوصول إلى حسابك من جهاز غير مألوف. للحفاظ على أمان حسابك على GrapMail، يُرجى تحديث كلمة المرور الآن.</string>
+    <string name="acct_choose_a_strong_password_you_have">اختر كلمة مرور قوية لم تستخدمها هنا من قبل.</string>
+    <string name="acct_update_password">تحديث كلمة المرور</string>
+    <string name="acct_enter_your_current_password">أدخل كلمة المرور الحالية.</string>
+    <string name="acct_use_at_least_8_characters">استخدم 8 أحرف على الأقل.</string>
+    <string name="acct_add_at_least_one_letter">أضف حرفًا واحدًا على الأقل.</string>
+    <string name="acct_add_at_least_one_number">أضف رقمًا واحدًا على الأقل.</string>
+    <string name="acct_add_at_least_one_symbol">أضف رمزًا واحدًا على الأقل.</string>
+    <string name="acct_the_two_new_passwords_do_not_match">كلمتا المرور الجديدتان غير متطابقتين.</string>
+    <string name="acct_unrecognized_activity_was_found_on">تم رصد نشاط غير معروف على حسابك.</string>
+    <string name="acct_current_password">كلمة المرور الحالية</string>
+    <string name="acct_new_password_2">كلمة المرور الجديدة</string>
+    <string name="acct_confirm_new_password_2">تأكيد كلمة المرور الجديدة</string>
+    <string name="acct_passwords_do_not_match">كلمتا المرور غير متطابقتين.</string>
+    <string name="acct_password_requirements_2">متطلبات كلمة المرور</string>
+    <string name="acct_contains_a_letter">تحتوي على حرف</string>
+    <string name="acct_contains_a_number">تحتوي على رقم</string>
+    <string name="acct_contains_a_symbol">تحتوي على رمز</string>
+    <string name="acct_password_updated_successfully">تم تحديث كلمة المرور بنجاح</string>
+    <string name="acct_password_changed_successfully">تم تغيير كلمة المرور بنجاح</string>
+    <string name="acct_your_password_has_been_updated">تم تحديث كلمة المرور بنجاح. تم تسجيل خروج الأجهزة الأخرى، ويبقى هذا الجهاز مسجّل الدخول.</string>
+    <string name="acct_if_you_did_not_make_this_change">إذا لم تُجرِ هذا التغيير، فتواصل مع فريق الدعم فورًا.</string>
+    <string name="acct_whats_next_title">ما التالي؟</string>
+    <string name="acct_youll_need_to_sign_in_again_on_your">ستحتاج إلى تسجيل الدخول مرة أخرى على أجهزتك الأخرى، بما فيها تطبيقات الجوال وسطح المكتب والمتصفحات الأخرى.</string>
+    <string name="acct_this_helps_keep_your_account_secure">يساعد ذلك على الحفاظ على أمان حسابك ويمنع الوصول غير المصرّح به.</string>
+
+    <!-- security/RecoveryCodesScreen.kt -->
+    <string name="acct_the_server_returned_no_codes_try">لم يُرجع الخادم أي رموز. حاول مرة أخرى.</string>
+    <string name="acct_recovery_codes">رموز الاسترداد</string>
+    <string name="acct_one_time_codes_that_unlock_password">رموز لمرة واحدة تتيح استرداد كلمة المرور عندما لا يكون هاتفك ولا جهازك الموثوق متاحَين.</string>
+    <string name="acct_download_codes">تنزيل الرموز</string>
+    <string name="acct_generating_a_new_set_retires_every">إنشاء مجموعة جديدة يُبطل جميع الرموز في هذه القائمة.</string>
+    <string name="acct_recovery_codes_available">رموز الاسترداد متاحة</string>
+    <string name="acct_could_not_be_read_try_again">تعذّرت القراءة. حاول مرة أخرى.</string>
+    <string name="acct_yes_a_usable_set_exists_on_the">نعم — توجد مجموعة صالحة للاستخدام في الحساب.</string>
+    <string name="acct_no_generate_a_set_to_keep_a_recovery">لا — أنشئ مجموعة لإبقاء طريق الاسترداد متاحًا.</string>
+    <string name="acct_the_accounts_status_could_not_be">تعذّرت قراءة حالة الحساب.</string>
+    <string name="acct_retry">إعادة المحاولة</string>
+    <string name="acct_yes">نعم</string>
+    <string name="acct_no">لا</string>
+    <string name="acct_each_code_resets_the_password_once">كل رمز يعيد تعيين كلمة المرور مرة واحدة.</string>
+    <string name="acct_use_at_forgot_password">استخدمه في «نسيت كلمة المرور»</string>
+    <string name="acct_enter_a_code_instead_of_the_texted">أدخل رمزًا بدلًا من الرمز المُرسل في رسالة نصية.</string>
+    <string name="acct_regenerate_anytime">أعد الإنشاء في أي وقت</string>
+    <string name="acct_a_new_set_retires_the_old_one">المجموعة الجديدة تُبطل القديمة فورًا.</string>
+    <string name="acct_not_the_same_as_backup_codes">ليست مثل الرموز الاحتياطية</string>
+    <string name="acct_two_step_backup_codes_prove_a_sign">الرموز الاحتياطية للتحقق بخطوتين تُثبت تسجيل الدخول، أما رموز الاسترداد فتعيد تعيين كلمة المرور. احتفظ بكليهما، ولا تخزّنهما في المكان نفسه.</string>
+    <string name="acct_your_recovery_codes">رموز الاسترداد الخاصة بك</string>
+    <string name="acct_one_time_use_each_code_resets_the">استخدام لمرة واحدة — كل رمز يعيد تعيين كلمة المرور مرة واحدة فقط.</string>
+    <string name="acct_codes_are_stored_as_hashes_this_list">تُخزَّن الرموز بصيغة مُجزّأة — هذه القائمة هي النسخة الوحيدة القابلة للقراءة.</string>
+    <string name="acct_generating_a_new_set_retires_every_2">إنشاء مجموعة جديدة يُبطل جميع الرموز المعروضة هنا.</string>
+    <string name="acct_leave_now_and_the_list_is_gone_the">إذا غادرت الآن فستختفي القائمة. ستبقى الرموز نفسها صالحة — لكن فقط إذا كنت قد حفظتها.</string>
+</resources>

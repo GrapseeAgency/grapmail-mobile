@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -46,7 +47,9 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -96,8 +99,21 @@ fun PuzzleSlider(
         drag.snapTo(0f)
         failed = false
     }
+    // Rotation, a fold/unfold, a split-screen or desktop-window resize changes
+    // the track width: keep the piece on the (re-scaled) notch once verified,
+    // and inside the track otherwise.
+    val measuredTrack = trackWidth.floatValue
+    LaunchedEffect(measuredTrack) {
+        if (verified) drag.snapTo(targetX())
+        else if (drag.value > maxX()) drag.snapTo(maxX())
+    }
+    // At large font sizes the label moves clear of the handle and stays on one line.
+    val largeFont = androidx.compose.ui.platform.LocalDensity.current.fontScale > 1.3f
 
-    Column(modifier.fillMaxWidth()) {
+    // Capped to the form width on tablets / desktop windows / landscape, so the
+    // photo strip (2.9:1) never grows taller than the window can show and the
+    // drag distance stays thumb-sized. No effect on a phone in portrait.
+    Column(modifier.gmMaxWidth(GMLayout.Form)) {
         // ── Photo strip with the notch ──────────────────────────────────────
         Box(
             Modifier
@@ -164,11 +180,23 @@ fun PuzzleSlider(
                     }
                 }
         ) {
-            Row(Modifier.align(Alignment.Center), verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                Modifier
+                    .align(Alignment.Center)
+                    .padding(start = if (largeFont && !verified) 56.dp else 0.dp, end = if (largeFont) 8.dp else 0.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
                 if (verified) {
                     Icon(Icons.Rounded.Check, contentDescription = null, tint = palette.success, modifier = Modifier.size(20.dp))
                     Spacer(Modifier.size(8.dp))
-                    Text("Verified — you're human!", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = palette.success)
+                    Text(
+                        stringResource(R.string.mail_puzzle_verified),
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = palette.success,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
                 } else {
                     Icon(
                         Icons.AutoMirrored.Rounded.ArrowForward,
@@ -178,10 +206,13 @@ fun PuzzleSlider(
                     )
                     Spacer(Modifier.size(8.dp))
                     Text(
-                        if (failed) "Almost — try again" else "Slide to verify",
+                        if (failed) stringResource(R.string.mail_puzzle_try_again)
+                        else stringResource(R.string.mail_puzzle_slide_to_verify),
                         fontSize = 14.sp,
                         fontWeight = FontWeight.Medium,
                         color = if (failed) palette.error else palette.textSecondary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                     )
                 }
             }

@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -23,7 +24,7 @@ import androidx.compose.material.icons.rounded.DevicesOther
 import androidx.compose.material.icons.rounded.Fingerprint
 import androidx.compose.material.icons.rounded.HeadsetMic
 import androidx.compose.material.icons.rounded.Lock
-import androidx.compose.material.icons.rounded.Logout
+import androidx.compose.material.icons.automirrored.rounded.Logout
 import androidx.compose.material.icons.rounded.Password
 import androidx.compose.material.icons.rounded.PhoneAndroid
 import androidx.compose.material.icons.rounded.PhoneIphone
@@ -70,6 +71,9 @@ import com.grapsee.grapmail.ui.components.StatusChip
 import com.grapsee.grapmail.ui.theme.LocalPalette
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.pluralStringResource
+import com.grapsee.grapmail.R
 
 /**
  * 01 / 02 — the hub the whole sector hangs from.
@@ -96,6 +100,14 @@ fun AccountSecurityScreen(
     onSignOutAll: () -> Unit,
     onDeleteAccount: () -> Unit,
     onSupport: () -> Unit,
+    /**
+     * Round 8 — C (round8-spec §4.3 A): when set, the safety-score header and
+     * the "Devices & security" row (which calls this) head the hub. Null
+     * (feature off, or the snapshot walk) keeps the hub exactly as it was.
+     */
+    onSecurityCenter: (() -> Unit)? = null,
+    /** A checklist step tapped in that header (two-step, passkeys, …). */
+    onSafetyAction: (SafetyAction) -> Unit = {},
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -163,32 +175,35 @@ fun AccountSecurityScreen(
         onBack = onBack,
         illustration = if (secure) "ill_sec_hub_secure" else "ill_sec_hub",
         illustrationWidth = 120,
-        title = "Account Security",
-        body = "Manage your security settings to keep your account safe and secure.",
+        title = stringResource(R.string.acct_account_security),
+        body = stringResource(R.string.acct_manage_your_security_settings_to),
         footer = {
             FooterNote(
-                text = "Your security matters. We're here to help.",
+                text = stringResource(R.string.acct_your_security_matters_were_here_to),
                 divider = true,
             )
         },
     ) {
+        // Round 8 — C: the account's safety score heads the hub (§4.3 A).
+        if (onSecurityCenter != null) {
+            SecurityHubSafetyHeader(onOpenCenter = onSecurityCenter, onAction = onSafetyAction)
+        }
         resetPending?.let { pending ->
             InfoCard {
-                StatusChip("Password reset requested", ChipTone.Warning)
+                StatusChip(stringResource(R.string.acct_password_reset_requested), ChipTone.Warning)
                 Spacer(Modifier.height(10.dp))
                 Text(
-                    (pending.availableAt?.let { at ->
+                    pending.availableAt?.let { at ->
                         val shown = runCatching {
                             java.time.format.DateTimeFormatter.ofLocalizedDateTime(java.time.format.FormatStyle.MEDIUM)
                                 .format(java.time.Instant.parse(at).atZone(java.time.ZoneId.systemDefault()))
                         }.getOrDefault(at)
-                        "A link to reset your password was sent to your recovery email. It works from $shown. "
-                    } ?: "A link to reset your password was sent to your recovery email. ") +
-                        "If this was not you, cancel it now and change your recovery email.",
+                        stringResource(R.string.acct_reset_pending_works_from, shown)
+                    } ?: stringResource(R.string.acct_reset_pending_generic),
                     fontSize = 12.sp, lineHeight = 17.sp, color = LocalPalette.current.textSecondary,
                 )
                 Spacer(Modifier.height(4.dp))
-                AccountLink(if (cancelling) "Cancelling…" else "Cancel the reset", {
+                AccountLink(if (cancelling) stringResource(R.string.acct_cancelling) else stringResource(R.string.acct_cancel_the_reset), {
                     if (!cancelling) {
                         cancelling = true
                         scope.launch {
@@ -201,9 +216,9 @@ fun AccountSecurityScreen(
                             cancelling = false
                             if (result?.success == true) {
                                 resetPending = null
-                                resetNote = result.message ?: "The password reset was cancelled."
+                                resetNote = result.message ?: context.getString(R.string.acct_the_password_reset_was_cancelled)
                             } else {
-                                resetNote = result?.error ?: "The reset could not be cancelled. Try again."
+                                resetNote = result?.error ?: context.getString(R.string.acct_the_reset_could_not_be_cancelled_try)
                             }
                         }
                     }
@@ -215,32 +230,67 @@ fun AccountSecurityScreen(
             Text(it, fontSize = 12.sp, color = LocalPalette.current.textSecondary)
             Spacer(Modifier.height(12.dp))
         }
+        // Rooted-device note (security/RootCheck.kt): local heuristics only,
+        // dismissible, never blocking. Play Integrity's verdict is the server's
+        // (security/IntegrityClient.kt) and is not re-judged here.
+        var rootResult by remember { mutableStateOf<com.grapsee.grapmail.security.RootCheck.Result?>(null) }
+        var rootDismissed by remember { mutableStateOf(com.grapsee.grapmail.security.RootCheck.isDismissed(context)) }
+        LaunchedEffect(Unit) {
+            rootResult = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                runCatching { com.grapsee.grapmail.security.RootCheck.probe() }.getOrNull()
+            }
+        }
+        if (com.grapsee.grapmail.security.RootCheck.shouldWarn(rootResult, rootDismissed)) {
+            InfoCard {
+                StatusChip(stringResource(R.string.acct_root_warning_title), ChipTone.Warning)
+                Spacer(Modifier.height(10.dp))
+                Text(
+                    stringResource(R.string.acct_root_warning_body),
+                    fontSize = 12.sp, lineHeight = 17.sp, color = LocalPalette.current.textSecondary,
+                )
+                Spacer(Modifier.height(4.dp))
+                AccountLink(stringResource(R.string.acct_root_warning_dismiss), {
+                    com.grapsee.grapmail.security.RootCheck.dismiss(context)
+                    rootDismissed = true
+                })
+            }
+            Spacer(Modifier.height(12.dp))
+        }
         // The reference puts the account's verdict above the feature list: it is
         // the answer to "am I safe?", and burying it under the switches makes
         // the person read six rows to learn one thing.
+        // Screen states: the offline notice above the verdict (the cached
+        // profile, when held, stays on screen under it).
+        val online = com.grapsee.grapmail.ui.components.rememberOnline()
+        com.grapsee.grapmail.ui.components.OfflineBanner(online = online)
         InfoCard {
             when {
-                loading -> Text("Checking your account…", fontSize = 13.sp, color = LocalPalette.current.textSecondary)
+                loading -> com.grapsee.grapmail.ui.components.ListSkeleton(rows = 2, avatar = false,
+                    label = stringResource(R.string.acct_checking_your_account))
                 failed -> {
-                    Text("We couldn't load your security settings.", fontSize = 13.sp, color = LocalPalette.current.textSecondary)
+                    Text(stringResource(R.string.acct_we_couldnt_load_your_security), fontSize = 13.sp, color = LocalPalette.current.textSecondary)
+                    if (online == false) {
+                        Spacer(Modifier.height(4.dp))
+                        Text(stringResource(R.string.states_error_offline_body), fontSize = 13.sp, color = LocalPalette.current.textSecondary)
+                    }
                     Spacer(Modifier.height(4.dp))
-                    AccountLink("Try again", { reload += 1 })
+                    AccountLink(stringResource(R.string.states_retry), { reload += 1 })
                 }
                 else -> {
                     StatusChip(
                         when {
-                            secure -> "Your account is secure"
-                            !recoveryVerified -> "Add a recovery email"
-                            else -> "One thing left to do"
+                            secure -> stringResource(R.string.acct_your_account_is_secure)
+                            !recoveryVerified -> stringResource(R.string.acct_add_a_recovery_email)
+                            else -> stringResource(R.string.acct_one_thing_left_to_do)
                         },
                         if (secure) ChipTone.Success else ChipTone.Warning,
                     )
                     Spacer(Modifier.height(10.dp))
                     Text(
                         when {
-                            secure -> "All essential security features are active and your account is protected."
-                            !recoveryVerified -> "Without a verified recovery email, a forgotten password can lock you out. It takes a minute to add one."
-                            else -> "Turn on two-step verification to protect your account even if your password is ever exposed."
+                            secure -> stringResource(R.string.acct_all_essential_security_features_are)
+                            !recoveryVerified -> stringResource(R.string.acct_without_a_verified_recovery_email_a)
+                            else -> stringResource(R.string.acct_turn_on_two_step_verification_to)
                         },
                         fontSize = 12.sp,
                         lineHeight = 17.sp,
@@ -253,7 +303,7 @@ fun AccountSecurityScreen(
                     if (twoFactorOn && profile?.backupCodesRemaining == 0) {
                         Spacer(Modifier.height(8.dp))
                         Text(
-                            "Add backup codes so losing access to your recovery email does not lock you out.",
+                            stringResource(R.string.acct_add_backup_codes_so_losing_access_to),
                             fontSize = 12.sp,
                             lineHeight = 17.sp,
                             color = LocalPalette.current.warnInk,
@@ -263,18 +313,18 @@ fun AccountSecurityScreen(
             }
         }
         Spacer(Modifier.height(16.dp))
-        SectionLabel("Security Features")
+        SectionLabel(stringResource(R.string.acct_security_features))
         // The reference shows a real on/off switch on the 2FA row, not just a
         // pill. Toggling routes into the flow that proves the change (password,
         // then code) rather than flipping a flag blind — the switch is the entry
         // point, not the write.
         ToggleRow(
             icon = Icons.Rounded.Security,
-            title = "Two-Step Verification",
-            subtitle = "Add an extra layer of security to your account with a verification code.",
+            title = stringResource(R.string.acct_two_step_verification_title),
+            subtitle = stringResource(R.string.acct_add_an_extra_layer_of_security_to),
             checked = twoFactorOn && !loading && !failed,
             enabled = !loading && !failed,
-            chip = if (loading || failed) null else if (twoFactorOn) "Enabled" else "Off",
+            chip = if (loading || failed) null else if (twoFactorOn) stringResource(R.string.acct_enabled) else stringResource(R.string.acct_off),
             chipTone = if (twoFactorOn) ChipTone.Success else ChipTone.Warning,
             onToggle = { if (twoFactorOn) onDisableTwoFactor() else onTwoFactor() },
         )
@@ -284,12 +334,12 @@ fun AccountSecurityScreen(
             RowDivider()
             SecurityRow(
                 icon = Icons.Rounded.PhoneAndroid,
-                title = "Phone Number",
+                title = stringResource(R.string.acct_phone_number_title),
                 subtitle = profile?.phone ?: "",
                 chip = when {
                     loading || failed -> null
-                    phoneVerified -> "Verified"
-                    profile?.phoneVerified == false -> "Unverified"
+                    phoneVerified -> stringResource(R.string.acct_verified)
+                    profile?.phoneVerified == false -> stringResource(R.string.acct_unverified)
                     else -> null
                 },
                 chipTone = if (phoneVerified) ChipTone.Success else ChipTone.Warning,
@@ -299,37 +349,40 @@ fun AccountSecurityScreen(
         RowDivider()
         SecurityRow(
             icon = Icons.Rounded.Email,
-            title = "Recovery Email",
+            title = stringResource(R.string.acct_recovery_email_title),
             subtitle = profile?.recoveryEmail?.takeIf { it.isNotBlank() }
-                ?: if (loading) null else "Where we send a link if you forget your password.",
+                ?: if (loading) null else stringResource(R.string.acct_where_we_send_a_link_if_you_forget),
             chip = when {
                 loading || failed -> null
-                !hasRecoveryEmail -> "Add"
-                recoveryVerified -> "Verified"
-                else -> "Unverified"
+                !hasRecoveryEmail -> stringResource(R.string.acct_add)
+                recoveryVerified -> stringResource(R.string.acct_verified)
+                else -> stringResource(R.string.acct_unverified)
             },
             chipTone = if (recoveryVerified) ChipTone.Success else ChipTone.Warning,
             onClick = onRecoveryEmail,
         )
-        SectionLabel("Account Management")
+        SectionLabel(stringResource(R.string.acct_account_management))
         SecurityRow(
             icon = Icons.Rounded.Password,
-            title = "Change Password",
-            subtitle = "Update your account password for better security.",
+            title = stringResource(R.string.acct_change_password),
+            subtitle = stringResource(R.string.acct_update_your_account_password_for),
             onClick = onPassword,
         )
         RowDivider()
         SecurityRow(
             icon = Icons.Rounded.AlternateEmail,
-            title = "Backup Codes",
-            subtitle = if ((profile?.backupCodesRemaining ?: 0) > 0) "${profile!!.backupCodesRemaining} codes unused." else "Generate and manage backup codes for 2FA.",
+            title = stringResource(R.string.acct_backup_codes_title),
+            subtitle = (profile?.backupCodesRemaining ?: 0).let { remaining ->
+                if (remaining > 0) pluralStringResource(R.plurals.acct_backup_codes_unused, remaining, remaining)
+                else stringResource(R.string.acct_generate_and_manage_backup_codes)
+            },
             onClick = onBackupCodes,
         )
         RowDivider()
         SecurityRow(
-            icon = Icons.Rounded.Logout,
-            title = "Sign Out All Devices",
-            subtitle = "Log out from all devices except this one.",
+            icon = Icons.AutoMirrored.Rounded.Logout,
+            title = stringResource(R.string.acct_sign_out_all_devices_title),
+            subtitle = stringResource(R.string.acct_log_out_from_all_devices_except_this),
             onClick = onSignOutAll,
         )
         RowDivider()
@@ -338,17 +391,29 @@ fun AccountSecurityScreen(
         // account itself rather than a session.
         SecurityRow(
             icon = Icons.Rounded.DeleteForever,
-            title = "Delete Account",
-            subtitle = "Permanently delete this account and its mailbox.",
+            title = stringResource(R.string.acct_delete_account),
+            subtitle = stringResource(R.string.acct_permanently_delete_this_account_and),
             tint = LocalPalette.current.error,
             onClick = onDeleteAccount,
         )
         RowDivider()
         // Two rows the reference hub does not draw but the sector needs a
         // reachable entry for; kept here rather than orphaning those screens.
-        SecurityRow(icon = Icons.Rounded.Devices, title = "Active Sessions", subtitle = "Devices signed in to this account.", onClick = onSessions)
+        // Round 8 - C (round8-spec section 3): with the Device & Security Center on,
+        // it is the default destination for sessions and activity; the older
+        // Sessions / Activity screens stay registered for deep links (and the
+        // hardware-key screen stays one tap away inside the center).
+        val openSessions: () -> Unit = onSecurityCenter ?: onSessions
+        val openActivity: () -> Unit = onSecurityCenter?.let { center ->
+            {
+                // Arrive scrolled to the timeline (or its first "Review" row).
+                SecurityCenterNav.requestFocus(SafetyAction.Activity)
+                center()
+            }
+        } ?: onActivity
+        SecurityRow(icon = Icons.Rounded.Devices, title = stringResource(R.string.acct_active_sessions), subtitle = stringResource(R.string.acct_devices_signed_in_to_this_account), onClick = openSessions)
         RowDivider()
-        SecurityRow(icon = Icons.Rounded.VerifiedUser, title = "Recent Security Activity", subtitle = "Sign-ins and changes to this account.", onClick = onActivity)
+        SecurityRow(icon = Icons.Rounded.VerifiedUser, title = stringResource(R.string.acct_recent_security_activity), subtitle = stringResource(R.string.acct_sign_ins_and_changes_to_this_account), onClick = openActivity)
         RowDivider()
         // The device-key sector's entries. Trusted devices are the rows the
         // server holds public keys for; recovery codes and notification
@@ -356,8 +421,8 @@ fun AccountSecurityScreen(
         // screen rather than being crammed into a hub row.
         SecurityRow(
             icon = Icons.Rounded.PhonelinkLock,
-            title = "Trusted Devices",
-            subtitle = "Devices whose hardware key can prove this account.",
+            title = stringResource(R.string.acct_trusted_devices),
+            subtitle = stringResource(R.string.acct_devices_whose_hardware_key_can_prove),
             onClick = onTrustedDevices,
         )
         RowDivider()
@@ -366,29 +431,29 @@ fun AccountSecurityScreen(
         // this row is the only place a credential is offered or removed.
         SecurityRow(
             icon = Icons.Rounded.Fingerprint,
-            title = "Passkeys",
-            subtitle = "Sign in with a biometric credential instead of a password.",
+            title = stringResource(R.string.acct_passkeys),
+            subtitle = stringResource(R.string.acct_sign_in_with_a_biometric_credential_2),
             onClick = onPasskeys,
         )
         RowDivider()
         SecurityRow(
             icon = Icons.Rounded.Password,
-            title = "Recovery Codes",
-            subtitle = "One-time codes that unlock password recovery.",
+            title = stringResource(R.string.acct_recovery_codes),
+            subtitle = stringResource(R.string.acct_one_time_codes_that_unlock_password_2),
             onClick = onRecoveryCodes,
         )
         RowDivider()
         SecurityRow(
             icon = Icons.Rounded.Timer,
-            title = "Notification Preferences",
-            subtitle = "Which alerts this account sends, and when.",
+            title = stringResource(R.string.acct_notification_preferences),
+            subtitle = stringResource(R.string.acct_which_alerts_this_account_sends_and),
             onClick = onNotificationPrefs,
         )
         RowDivider()
         SecurityRow(
             icon = Icons.Rounded.HeadsetMic,
-            title = "Help & Support",
-            subtitle = "Visit our support center for security assistance.",
+            title = stringResource(R.string.acct_help_support),
+            subtitle = stringResource(R.string.acct_visit_our_support_center_for),
             onClick = onSupport,
         )
     }
@@ -413,31 +478,31 @@ fun TwoFactorEnableScreen(onBack: () -> Unit, onContinue: () -> Unit) {
         onBack = onBack,
         illustration = "ill_sec_2fa",
         illustrationWidth = 180,
-        title = "Enable Two-Step Verification",
-        body = "Add an extra layer of security to your account.",
+        title = stringResource(R.string.acct_enable_two_step_verification),
+        body = stringResource(R.string.acct_add_an_extra_layer_of_security_to_2),
         footer = {
             Column {
                 GradientButton(
-                    "Continue",
+                    stringResource(R.string.acct_continue),
                     trailing = { Icon(Icons.AutoMirrored.Rounded.ArrowForward, contentDescription = null, modifier = Modifier.padding(start = 6.dp)) },
                     onClick = onContinue,
                 )
                 Spacer(Modifier.height(4.dp))
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
-                    AccountLink("Cancel", onBack)
+                    AccountLink(stringResource(R.string.acct_cancel), onBack)
                 }
             }
         },
     ) {
         InfoCard {
-            NeedRow(Icons.Rounded.Security, "More Protection", "Prevents unauthorized access, even if your password is compromised.")
+            NeedRow(Icons.Rounded.Security, stringResource(R.string.acct_more_protection), stringResource(R.string.acct_prevents_unauthorized_access_even_if))
             RowDivider()
-            NeedRow(Icons.Rounded.Email, "Codes by Email", "We'll email a 6-digit code to your verified recovery email when you sign in.")
+            NeedRow(Icons.Rounded.Email, stringResource(R.string.acct_codes_by_email), stringResource(R.string.acct_well_email_a_6_digit_code_to_your))
             RowDivider()
-            NeedRow(Icons.Rounded.Lock, "Easy to Manage", "You can turn it off anytime from account security settings.")
+            NeedRow(Icons.Rounded.Lock, stringResource(R.string.acct_easy_to_manage), stringResource(R.string.acct_you_can_turn_it_off_anytime_from))
         }
         Spacer(Modifier.height(14.dp))
-        InfoNoteCard(body = "You'll need a verified recovery email to enable two-step verification.")
+        InfoNoteCard(body = stringResource(R.string.acct_youll_need_a_verified_recovery_email))
     }
 }
 
@@ -477,18 +542,18 @@ fun ConfirmPasswordScreen(
         onBack = onBack,
         illustration = "ill_sec_password_confirm",
         illustrationWidth = 150,
-        title = "Confirm Your Password",
-        body = "Enter your password to continue.",
+        title = stringResource(R.string.acct_confirm_your_password),
+        body = stringResource(R.string.acct_enter_your_password_to_continue),
         footer = {
             Column {
                 GradientButton(
-                    "Continue",
+                    stringResource(R.string.acct_continue),
                     onClick = {
-                        if (password.isBlank()) { error = "Enter your password."; return@GradientButton }
+                        if (password.isBlank()) { error = context.getString(R.string.acct_enter_your_password_period); return@GradientButton }
                         busy = true; error = null
                         scope.launch {
                             try {
-                                val token = SessionStore.token(context) ?: throw IllegalStateException("Sign in again.")
+                                val token = SessionStore.token(context) ?: throw IllegalStateException(context.getString(R.string.acct_sign_in_again))
                                 val resp = Api.verifyPassword(token, password)
                                 // The server hands back a short-lived proof; the
                                 // enable call spends it. Keeping it here is what
@@ -507,7 +572,7 @@ fun ConfirmPasswordScreen(
                 )
                 Spacer(Modifier.height(4.dp))
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
-                    AccountLink("Back", onBack)
+                    AccountLink(stringResource(R.string.acct_back), onBack)
                 }
             }
         },
@@ -517,14 +582,15 @@ fun ConfirmPasswordScreen(
             Spacer(Modifier.height(8.dp))
         }
         com.grapsee.grapmail.ui.components.AppTextField(
-            label = "Password",
+            label = stringResource(R.string.acct_password),
             value = password,
             onValueChange = { password = it; error = null },
             password = true,
-            hint = "Enter your password",
+            hint = stringResource(R.string.acct_enter_your_password),
+            autofill = com.grapsee.grapmail.ui.components.GMAutofill.Password,
         )
         Spacer(Modifier.height(14.dp))
-        InfoNoteCard(body = "Your password is never stored on our servers and is only used for verification.")
+        InfoNoteCard(body = stringResource(R.string.acct_your_password_is_never_stored_on_our))
     }
 }
 
@@ -560,7 +626,7 @@ fun VerifyPhoneScreen(
         // profile on entry, and a second GET on every send and every resend was
         // two round trips to read a field already in hand.
         val token = SessionStore.token(context) ?: return
-        if (number.isNullOrBlank()) { needsPhone = true; error = "Add a phone number first."; return }
+        if (number.isNullOrBlank()) { needsPhone = true; error = context.getString(R.string.acct_add_a_phone_number_first); return }
         val sent = Api.startPhoneVerification(number)
         challengeId = sent.challengeId
         expiresAt = sent.expiresAt ?: 0L
@@ -578,20 +644,20 @@ fun VerifyPhoneScreen(
         onBack = onBack,
         illustration = "ill_sec_phone",
         illustrationWidth = 170,
-        title = "Verify Your Phone",
-        body = profile?.phone?.let { "We'll text a code to $it." } ?: "We'll text a code to the number on this account.",
+        title = stringResource(R.string.acct_verify_your_phone),
+        body = profile?.phone?.let { stringResource(R.string.acct_well_text_a_code_to, it) } ?: stringResource(R.string.acct_well_text_a_code_to_account_number),
         footer = {
             Column {
                 GradientButton(
-                    "Continue",
+                    stringResource(R.string.acct_continue),
                     trailing = { Icon(Icons.AutoMirrored.Rounded.ArrowForward, contentDescription = null, modifier = Modifier.padding(start = 6.dp)) },
                     onClick = {
                         val id = challengeId ?: return@GradientButton
-                        if (code.length < 6) { error = "Enter the 6-digit code."; return@GradientButton }
+                        if (code.length < 6) { error = context.getString(R.string.acct_enter_the_6_digit_code_period); return@GradientButton }
                         busy = true; error = null
                         scope.launch {
                             try {
-                                val token = SessionStore.token(context) ?: throw IllegalStateException("Sign in again.")
+                                val token = SessionStore.token(context) ?: throw IllegalStateException(context.getString(R.string.acct_sign_in_again))
                                 val verified = Api.verifyPhone(id, code, token)
                                 // The code's own proof, kept for the enable call.
                                 // Without it the server refuses the change, which is
@@ -635,7 +701,7 @@ fun VerifyPhoneScreen(
                 )
                 Spacer(Modifier.height(4.dp))
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
-                    AccountLink("Resend code", {
+                    AccountLink(stringResource(R.string.acct_resend_code), {
                         error = null
                         scope.launch { runCatching { send(profile?.phone) }.onFailure { error = it.message } }
                     })
@@ -647,40 +713,42 @@ fun VerifyPhoneScreen(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Rounded.PhoneAndroid, contentDescription = null, tint = palette.primarySolid, modifier = Modifier.size(18.dp))
                 Text(
-                    "  Phone Number",
+                    stringResource(R.string.acct_phone_number_2),
                     fontSize = 13.sp,
                     fontWeight = FontWeight.Medium,
                     color = palette.textSecondary,
+                    // Takes the slack (wraps at large font sizes) so the chip stays on the card.
+                    modifier = Modifier.weight(1f),
                 )
-                Spacer(Modifier.weight(1f))
-                StatusChip("Verified", ChipTone.Success)
+                StatusChip(stringResource(R.string.acct_verified), ChipTone.Success)
             }
             Spacer(Modifier.height(4.dp))
             Text(profile?.phone ?: "—", fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = palette.textPrimary)
             Spacer(Modifier.height(16.dp))
-            Text("Verification Code", fontSize = 13.sp, fontWeight = FontWeight.Medium, color = palette.textSecondary)
+            Text(stringResource(R.string.acct_verification_code_title), fontSize = 13.sp, fontWeight = FontWeight.Medium, color = palette.textSecondary)
             Spacer(Modifier.height(8.dp))
-            CodeCells(length = 6, value = code, onValueChange = { code = it; error = null })
+            CodeCells(length = 6, value = code, onValueChange = { code = it; error = null },
+                autofill = com.grapsee.grapmail.ui.components.GMAutofill.OneTimeCode)
         }
         Spacer(Modifier.height(10.dp))
         if (expiresAt > 0) CodeExpiry(expiresAt)
         Spacer(Modifier.height(10.dp))
-        InfoNoteCard(body = "Didn't receive the code? Check your spam folder or make sure your phone is on and has signal.")
+        InfoNoteCard(body = stringResource(R.string.acct_didnt_receive_the_code_check_your_2))
         if (error != null) {
             Spacer(Modifier.height(8.dp))
             Text(error!!, fontSize = 12.sp, color = palette.error)
         }
         if (needsPhone) {
             Spacer(Modifier.height(6.dp))
-            AccountLink("Add a phone number", onAddPhone)
+            AccountLink(stringResource(R.string.acct_add_a_phone_number), onAddPhone)
         }
         if (needsProof) {
             Spacer(Modifier.height(6.dp))
-            AccountLink("Enter your password again", onBack)
+            AccountLink(stringResource(R.string.acct_enter_your_password_again), onBack)
         }
         if (needsPhoneProof) {
             Spacer(Modifier.height(6.dp))
-            AccountLink("Send me a new code", {
+            AccountLink(stringResource(R.string.acct_send_me_a_new_code), {
                 needsPhoneProof = false
                 error = null
                 scope.launch { runCatching { send(profile?.phone) }.onFailure { error = it.message } }
@@ -720,7 +788,7 @@ fun TwoFactorEmailScreen(
     var needsProof by remember { mutableStateOf(false) }
 
     suspend fun send() {
-        val token = SessionStore.token(context) ?: throw IllegalStateException("Sign in again.")
+        val token = SessionStore.token(context) ?: throw IllegalStateException(context.getString(R.string.acct_sign_in_again))
         val to = address ?: return
         val sent = Api.startRecoveryEmail(token, to)
         verificationToken = sent.token
@@ -731,7 +799,7 @@ fun TwoFactorEmailScreen(
 
     LaunchedEffect(Unit) {
         runCatching {
-            val token = SessionStore.token(context) ?: throw IllegalStateException("Sign in again.")
+            val token = SessionStore.token(context) ?: throw IllegalStateException(context.getString(R.string.acct_sign_in_again))
             val profile = Api.profile(token).profile
             val email = profile?.recoveryEmail?.takeIf { it.isNotBlank() }
             if (email == null || profile?.recoveryEmailVerified != true) {
@@ -748,31 +816,31 @@ fun TwoFactorEmailScreen(
         onBack = onBack,
         illustration = "ill_sec_phone",
         illustrationWidth = 170,
-        title = if (needsEmail) "Add a Recovery Email" else "Check Your Email",
+        title = if (needsEmail) stringResource(R.string.acct_add_a_recovery_email_2) else stringResource(R.string.acct_check_your_email),
         body = when {
-            needsEmail -> "Two-step verification emails your sign-in codes to a verified recovery email. Add one first."
-            maskedEmail != null -> "We've emailed a 6-digit code to $maskedEmail."
-            else -> "We'll email a code to the recovery email on this account."
+            needsEmail -> stringResource(R.string.acct_two_step_verification_emails_your)
+            maskedEmail != null -> stringResource(R.string.acct_weve_emailed_a_6_digit_code_to, maskedEmail.orEmpty())
+            else -> stringResource(R.string.acct_well_email_a_code_to_the_recovery)
         },
         footer = {
             Column {
                 if (needsEmail) {
                     GradientButton(
-                        "Add Recovery Email",
+                        stringResource(R.string.acct_add_recovery_email),
                         trailing = { Icon(Icons.AutoMirrored.Rounded.ArrowForward, contentDescription = null, modifier = Modifier.padding(start = 6.dp)) },
                         onClick = onAddRecoveryEmail,
                     )
                 } else {
                     GradientButton(
-                        "Turn On",
+                        stringResource(R.string.acct_turn_on),
                         trailing = { Icon(Icons.AutoMirrored.Rounded.ArrowForward, contentDescription = null, modifier = Modifier.padding(start = 6.dp)) },
                         onClick = {
                             val vt = verificationToken ?: return@GradientButton
-                            if (code.length < 6) { error = "Enter the 6-digit code."; return@GradientButton }
+                            if (code.length < 6) { error = context.getString(R.string.acct_enter_the_6_digit_code_period); return@GradientButton }
                             busy = true; error = null
                             scope.launch {
                                 try {
-                                    val token = SessionStore.token(context) ?: throw IllegalStateException("Sign in again.")
+                                    val token = SessionStore.token(context) ?: throw IllegalStateException(context.getString(R.string.acct_sign_in_again))
                                     val confirmed = Api.confirmRecoveryEmail(token, vt, code)
                                     Api.enableTwoFactor(token, SecurityFlow.enableProof, null, confirmed.emailProof)
                                     SecurityFlow.enableProof = null
@@ -803,7 +871,7 @@ fun TwoFactorEmailScreen(
                     )
                     Spacer(Modifier.height(4.dp))
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
-                        AccountLink("Resend code", {
+                        AccountLink(stringResource(R.string.acct_resend_code), {
                             error = null
                             scope.launch { runCatching { send() }.onFailure { error = it.message } }
                         })
@@ -817,25 +885,27 @@ fun TwoFactorEmailScreen(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Rounded.Email, contentDescription = null, tint = palette.primarySolid, modifier = Modifier.size(18.dp))
                     Text(
-                        "  Recovery Email",
+                        stringResource(R.string.acct_recovery_email_2),
                         fontSize = 13.sp,
                         fontWeight = FontWeight.Medium,
                         color = palette.textSecondary,
+                        // Takes the slack (wraps at large font sizes) so the chip stays on the card.
+                        modifier = Modifier.weight(1f),
                     )
-                    Spacer(Modifier.weight(1f))
-                    StatusChip("Verified", ChipTone.Success)
+                    StatusChip(stringResource(R.string.acct_verified), ChipTone.Success)
                 }
                 Spacer(Modifier.height(4.dp))
                 Text(address ?: "—", fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = palette.textPrimary)
                 Spacer(Modifier.height(16.dp))
-                Text("Verification Code", fontSize = 13.sp, fontWeight = FontWeight.Medium, color = palette.textSecondary)
+                Text(stringResource(R.string.acct_verification_code_title), fontSize = 13.sp, fontWeight = FontWeight.Medium, color = palette.textSecondary)
                 Spacer(Modifier.height(8.dp))
-                CodeCells(length = 6, value = code, onValueChange = { code = it.filter(Char::isDigit).take(6); error = null })
+                CodeCells(length = 6, value = code, onValueChange = { code = it.filter(Char::isDigit).take(6); error = null },
+                    autofill = com.grapsee.grapmail.ui.components.GMAutofill.OneTimeCode)
             }
             Spacer(Modifier.height(10.dp))
             if (expiresAt > 0) CodeExpiry(expiresAt)
             Spacer(Modifier.height(10.dp))
-            InfoNoteCard(body = "Didn't get it? Check your spam folder. From now on, sign-in codes will go to this address.")
+            InfoNoteCard(body = stringResource(R.string.acct_didnt_get_it_check_your_spam_folder_2))
         }
         if (error != null) {
             Spacer(Modifier.height(8.dp))
@@ -843,7 +913,7 @@ fun TwoFactorEmailScreen(
         }
         if (needsProof) {
             Spacer(Modifier.height(6.dp))
-            AccountLink("Enter your password again", onBack)
+            AccountLink(stringResource(R.string.acct_enter_your_password_again), onBack)
         }
     }
 }
@@ -856,28 +926,28 @@ fun TwoFactorEnabledScreen(onContinue: () -> Unit, onBackHome: () -> Unit) {
         onBack = onContinue,
         illustration = "ill_sec_2fa_on",
         illustrationWidth = 160,
-        title = "Two-Step Verification Enabled",
-        body = "Your account is now protected with an extra layer of security.",
+        title = stringResource(R.string.acct_two_step_verification_enabled),
+        body = stringResource(R.string.acct_your_account_is_now_protected_with),
         footer = {
             Column {
-                GradientButton("Continue", onContinue)
+                GradientButton(stringResource(R.string.acct_continue), onContinue)
                 Spacer(Modifier.height(4.dp))
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
-                    AccountLink("Back to Security Settings", onBackHome)
+                    AccountLink(stringResource(R.string.acct_back_to_security_settings), onBackHome)
                 }
             }
         },
     ) {
-        StatusChip("2-Step Verification Enabled", ChipTone.Success)
+        StatusChip(stringResource(R.string.acct_2_step_verification_enabled), ChipTone.Success)
         Spacer(Modifier.height(16.dp))
         InfoCard {
-            Text("What's Next?", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = palette.textPrimary)
+            Text(stringResource(R.string.acct_whats_next_title), fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = palette.textPrimary)
             Spacer(Modifier.height(10.dp))
-            NeedRow(Icons.Rounded.VerifiedUser, "Keep Backup Codes Safe", "Use them if you ever lose access to your phone.")
-            NeedRow(Icons.Rounded.PhoneAndroid, "Update Your Phone Number", "Keep it current so codes always reach you.")
+            NeedRow(Icons.Rounded.VerifiedUser, stringResource(R.string.acct_keep_backup_codes_safe), stringResource(R.string.acct_use_them_if_you_ever_lose_access_to))
+            NeedRow(Icons.Rounded.PhoneAndroid, stringResource(R.string.acct_update_your_phone_number), stringResource(R.string.acct_keep_it_current_so_codes_always))
         }
         Spacer(Modifier.height(12.dp))
-        Text("You'll be asked for a code each time you sign in on a new device.", fontSize = 12.sp, color = palette.textSecondary)
+        Text(stringResource(R.string.acct_youll_be_asked_for_a_code_each_time), fontSize = 12.sp, color = palette.textSecondary)
     }
 }
 
@@ -895,18 +965,18 @@ fun DisableTwoFactorScreen(onBack: () -> Unit, onDisabled: () -> Unit) {
         onBack = onBack,
         illustration = "ill_sec_2fa_off_confirm",
         illustrationWidth = 150,
-        title = "Disable Two-Step Verification?",
-        body = "This will remove the extra layer of security from your account.",
+        title = stringResource(R.string.acct_disable_two_step_verification),
+        body = stringResource(R.string.acct_this_will_remove_the_extra_layer_of),
         footer = {
             Column {
                 GradientButton(
-                    "Continue",
+                    stringResource(R.string.acct_continue),
                     onClick = {
-                        if (password.isBlank()) { error = "Enter your password."; return@GradientButton }
+                        if (password.isBlank()) { error = context.getString(R.string.acct_enter_your_password_period); return@GradientButton }
                         busy = true; error = null
                         scope.launch {
                             try {
-                                val token = SessionStore.token(context) ?: throw IllegalStateException("Sign in again.")
+                                val token = SessionStore.token(context) ?: throw IllegalStateException(context.getString(R.string.acct_sign_in_again))
                                 Api.disableTwoFactor(token, password)
                                 onDisabled()
                             } catch (e: Exception) {
@@ -921,7 +991,7 @@ fun DisableTwoFactorScreen(onBack: () -> Unit, onDisabled: () -> Unit) {
                 )
                 Spacer(Modifier.height(6.dp))
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
-                    AccountLink("Back", onBack)
+                    AccountLink(stringResource(R.string.acct_back), onBack)
                 }
             }
         },
@@ -931,15 +1001,16 @@ fun DisableTwoFactorScreen(onBack: () -> Unit, onDisabled: () -> Unit) {
             Spacer(Modifier.height(8.dp))
         }
         com.grapsee.grapmail.ui.components.AppTextField(
-            label = "Password",
+            label = stringResource(R.string.acct_password),
             value = password,
             onValueChange = { password = it; error = null },
             password = true,
-            hint = "Enter your password",
+            hint = stringResource(R.string.acct_enter_your_password),
+            autofill = com.grapsee.grapmail.ui.components.GMAutofill.Password,
         )
         Spacer(Modifier.height(14.dp))
         Text(
-            "Without two-step verification, a password alone is enough to sign in to this account.",
+            stringResource(R.string.acct_without_two_step_verification_a),
             fontSize = 12.sp,
             lineHeight = 17.sp,
             color = palette.textSecondary,
@@ -955,27 +1026,27 @@ fun TwoFactorDisabledScreen(onDone: () -> Unit, onSecureNow: () -> Unit) {
         onBack = onDone,
         illustration = "ill_sec_2fa_off",
         illustrationWidth = 160,
-        title = "Two-Step Verification Disabled",
-        body = "Two-step verification has been disabled. Your account is now protected by your password only.",
+        title = stringResource(R.string.acct_two_step_verification_disabled),
+        body = stringResource(R.string.acct_two_step_verification_has_been),
         footer = {
             Column {
-                GradientButton("Continue", onDone)
+                GradientButton(stringResource(R.string.acct_continue), onDone)
                 Spacer(Modifier.height(4.dp))
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
-                    AccountLink("Turn it back on", onSecureNow)
+                    AccountLink(stringResource(R.string.acct_turn_it_back_on), onSecureNow)
                 }
             }
         },
     ) {
         InfoCard {
-            Text("What happens now?", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = palette.textPrimary)
+            Text(stringResource(R.string.acct_what_happens_now), fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = palette.textPrimary)
             Spacer(Modifier.height(8.dp))
-            NeedRow(Icons.Rounded.Password, "Password Only", "Signing in no longer asks for a code.")
-            NeedRow(Icons.Rounded.Textsms, "Backup Codes Retired", "The codes you saved no longer apply.")
+            NeedRow(Icons.Rounded.Password, stringResource(R.string.acct_password_only), stringResource(R.string.acct_signing_in_no_longer_asks_for_a_code))
+            NeedRow(Icons.Rounded.Textsms, stringResource(R.string.acct_backup_codes_retired), stringResource(R.string.acct_the_codes_you_saved_no_longer_apply))
         }
         Spacer(Modifier.height(12.dp))
         FooterNote(
-            text = "You can turn two-step verification back on at any time from Account Security.",
+            text = stringResource(R.string.acct_you_can_turn_two_step_verification),
             divider = false,
         )
     }
@@ -1049,7 +1120,7 @@ fun TrustedDevicesScreen(onBack: () -> Unit) {
         scope.launch {
             busyId = device.id
             try {
-                val active = SessionStore.snapshot(context) ?: throw IllegalStateException("Sign in again.")
+                val active = SessionStore.snapshot(context) ?: throw IllegalStateException(context.getString(R.string.acct_sign_in_again))
                 Api.revokeDevice(active.token, device.id)
                 if (!SessionStore.isCurrent(context, active.id)) return@launch
                 if (device.id == ownRowId) {
@@ -1073,7 +1144,7 @@ fun TrustedDevicesScreen(onBack: () -> Unit) {
             enrolling = true
             error = null
             try {
-                val active = SessionStore.snapshot(context) ?: throw IllegalStateException("Sign in again.")
+                val active = SessionStore.snapshot(context) ?: throw IllegalStateException(context.getString(R.string.acct_sign_in_again))
                 TrustedDeviceManager.enroll(context, active.token, active.address)
                 load()
             } catch (e: kotlinx.coroutines.CancellationException) {
@@ -1090,21 +1161,21 @@ fun TrustedDevicesScreen(onBack: () -> Unit) {
         onBack = onBack,
         illustration = "ill_sec_sessions",
         illustrationWidth = 150,
-        title = "Trusted Devices",
-        body = "Devices whose hardware-backed key can prove this account and unlock password recovery." +
-            if (keyWithoutBiometricLock) " Device key (no biometric lock)." else "",
+        title = stringResource(R.string.acct_trusted_devices),
+        body = stringResource(R.string.acct_trusted_devices_body) +
+            if (keyWithoutBiometricLock) stringResource(R.string.acct_trusted_devices_no_biometric_suffix) else "",
         footer = {
             Column {
                 if (hasLocalKey && devices != null && devices?.none { it.id == ownRowId } == true) {
                     GradientButton(
-                        "Trust this device",
+                        stringResource(R.string.acct_trust_this_device),
                         onClick = { reEnroll() },
                         busy = enrolling,
                     )
                     Spacer(Modifier.height(4.dp))
                 }
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
-                    AccountLink("Back to Account Security", onBack)
+                    AccountLink(stringResource(R.string.acct_back_to_account_security), onBack)
                 }
             }
         },
@@ -1113,7 +1184,7 @@ fun TrustedDevicesScreen(onBack: () -> Unit) {
             val rows = devices ?: return@LoadStateBlock
             if (rows.isEmpty()) {
                 Text(
-                    "No trusted devices yet. This device enrolls itself the next time you sign in.",
+                    stringResource(R.string.acct_no_trusted_devices_yet_this_device),
                     fontSize = 13.sp,
                     lineHeight = 18.sp,
                     color = palette.textSecondary,
@@ -1137,20 +1208,21 @@ fun TrustedDevicesScreen(onBack: () -> Unit) {
         }
         Spacer(Modifier.height(12.dp))
         InfoNoteCard(
-            title = "What trusted means",
-            body = "A trusted device can prove itself with a key stored in its hardware — it never sends the key, only a signature. Revoke a device the moment you stop holding it.",
+            title = stringResource(R.string.acct_what_trusted_means),
+            body = stringResource(R.string.acct_a_trusted_device_can_prove_itself),
         )
     }
 
     revokeTarget?.let { device ->
         AlertDialog(
             onDismissRequest = { if (busyId == null) revokeTarget = null },
-            title = { Text("Remove trusted device?") },
+            title = { Text(stringResource(R.string.acct_remove_trusted_device)) },
             text = {
                 Text(
-                    "“" + device.displayName.ifBlank { "This device" } + "” will lose its key as a credential. " +
-                        if (device.id == ownRowId) "This is the device you are holding — password recovery from it will stop working until you sign in again."
-                        else "It will need to sign in again before it can be trusted once more.",
+                    stringResource(
+                        if (device.id == ownRowId) R.string.acct_remove_trusted_device_own else R.string.acct_remove_trusted_device_other,
+                        device.displayName.ifBlank { stringResource(R.string.acct_this_device) },
+                    ),
                     fontSize = 14.sp,
                     lineHeight = 20.sp,
                 )
@@ -1159,10 +1231,10 @@ fun TrustedDevicesScreen(onBack: () -> Unit) {
                 TextButton(
                     enabled = busyId == null,
                     onClick = { revoke(device) },
-                ) { Text("Remove trust", color = palette.error) }
+                ) { Text(stringResource(R.string.acct_remove_trust), color = palette.error) }
             },
             dismissButton = {
-                TextButton(enabled = busyId == null, onClick = { revokeTarget = null }) { Text("Keep") }
+                TextButton(enabled = busyId == null, onClick = { revokeTarget = null }) { Text(stringResource(R.string.acct_keep)) }
             },
         )
     }
@@ -1186,7 +1258,7 @@ private fun TrustedDeviceCard(
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
-                device.displayName.ifBlank { "Unknown device" },
+                device.displayName.ifBlank { stringResource(R.string.acct_unknown_device) },
                 fontSize = 15.sp,
                 fontWeight = FontWeight.SemiBold,
                 color = palette.textPrimary,
@@ -1196,7 +1268,7 @@ private fun TrustedDeviceCard(
             )
             if (isThisDevice) {
                 Text(
-                    "This device",
+                    stringResource(R.string.acct_this_device),
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Bold,
                     color = palette.successInk,
@@ -1216,14 +1288,15 @@ private fun TrustedDeviceCard(
                 color = palette.textSecondary,
             )
             device.lastSeenAt?.takeIf { it.isNotBlank() }?.let {
-                Text("·  Last seen ${relativeTime(it)}", fontSize = 12.sp, color = palette.textSecondary)
+                // Wraps under its own width at large font sizes instead of being clipped.
+                Text(stringResource(R.string.acct_last_seen_dot, relativeTime(it)), fontSize = 12.sp, color = palette.textSecondary, modifier = Modifier.weight(1f, fill = false))
             }
         }
         Spacer(Modifier.height(3.dp))
         Text(
             listOfNotNull(
                 device.trustState.replaceFirstChar { it.uppercaseChar() }.takeIf { it.isNotBlank() },
-                device.createdAt?.takeIf(String::isNotBlank)?.let { "Added ${absoluteDateTime(it)}" },
+                device.createdAt?.takeIf(String::isNotBlank)?.let { stringResource(R.string.acct_added_at, absoluteDateTime(it)) },
             ).joinToString(" · "),
             fontSize = 11.sp,
             color = palette.textTertiary,
@@ -1232,13 +1305,15 @@ private fun TrustedDeviceCard(
             Spacer(Modifier.height(10.dp))
             Row(
                 Modifier
+                    // 48dp touch target for a destructive action.
+                    .heightIn(min = 48.dp)
                     .clip(RoundedCornerShape(10.dp))
-                    .clickable(enabled = !busy, onClick = onRevoke)
+                    .clickable(enabled = !busy, role = androidx.compose.ui.semantics.Role.Button, onClick = onRevoke)
                     .padding(vertical = 6.dp, horizontal = 4.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
-                    if (busy) "Removing…" else "Remove trust",
+                    if (busy) stringResource(R.string.acct_removing) else stringResource(R.string.acct_remove_trust),
                     fontSize = 13.sp,
                     fontWeight = FontWeight.SemiBold,
                     color = if (busy) palette.textTertiary else palette.error,
@@ -1246,7 +1321,7 @@ private fun TrustedDeviceCard(
             }
         } else {
             Spacer(Modifier.height(10.dp))
-            StatusChip("Revoked", ChipTone.Warning)
+            StatusChip(stringResource(R.string.acct_revoked), ChipTone.Warning)
         }
     }
 }
@@ -1258,8 +1333,9 @@ private fun trustedDeviceIcon(platform: String): ImageVector = when (platform.lo
     else -> Icons.Rounded.DevicesOther
 }
 
+@Composable
 private fun trustedPlatformLabel(platform: String): String = when (platform.lowercase()) {
     "android" -> "Android"
     "ios" -> "iPhone / iPad"
-    else -> platform.replaceFirstChar { it.uppercaseChar() }.ifBlank { "Unknown platform" }
+    else -> platform.replaceFirstChar { it.uppercaseChar() }.ifBlank { stringResource(R.string.acct_unknown_platform) }
 }

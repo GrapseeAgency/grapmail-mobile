@@ -192,6 +192,24 @@ window.insertImage = (cid, preview, alt, width) => {
   }
   publish();
 };
+// Called by the app with text dropped on the compose screen. Typed as plain
+// text where the cursor was (the end when there was none), like a paste.
+window.insertText = (text) => {
+  if (typeof text !== 'string' || !text) return;
+  message.focus();
+  const selection = window.getSelection();
+  selection.removeAllRanges();
+  if (lastSelection && message.contains(lastSelection.commonAncestorContainer)) {
+    selection.addRange(lastSelection);
+  } else {
+    const end = document.createRange();
+    end.selectNodeContents(message);
+    end.collapse(false);
+    selection.addRange(end);
+  }
+  document.execCommand('insertText', false, text);
+  publish();
+};
 toolbar.addEventListener('change', event => {
   const select = event.target.closest('select');
   if (select?.value) applyFormat(select.dataset.command, select.value);

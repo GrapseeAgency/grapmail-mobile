@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="mail_receipt_read_at">%1$s에 읽음</string>
+    <string name="mail_receipt_requested_pending">읽음 확인 요청됨 · 아직 읽지 않음</string>
+    <string name="mail_receipt_server_sent">읽음 확인 보냄</string>
+    <string name="mail_receipt_ask_title">발신자가 읽음 확인을 요청했습니다</string>
+    <string name="mail_receipt_ask_body">이 메일을 열었다는 읽음 확인을 %1$s에게 보낼까요? 메일을 연 시간만 전달되며 다른 정보는 전달되지 않습니다.</string>
+    <string name="mail_receipt_ask_send">읽음 확인 보내기</string>
+    <string name="mail_receipt_ask_decline">보내지 않음</string>
+    <string name="mail_receipt_mode_title">읽음 확인 보내기</string>
+    <string name="mail_receipt_mode_body">메일에서 읽음 확인을 요청할 때 적용됩니다. 항상을 선택하지 않으면 스팸, 차단한 발신자, 암호화된 메일에는 읽음 확인을 보내지 않습니다.</string>
+    <string name="mail_receipt_mode_never">보내지 않음</string>
+    <string name="mail_receipt_mode_ask">매번 묻기</string>
+    <string name="mail_receipt_mode_always">항상</string>
+    <string name="mail_receipt_mode_always_note">항상을 선택하면 스팸, 차단한 발신자, 암호화된 메일에도 읽음 확인을 보냅니다.</string>
+    <string name="mail_receipt_mode_unavailable">이 설정을 불러올 수 없습니다. 연결을 확인하세요.</string>
+    <string name="mail_compose_request_receipt">읽음 확인 요청</string>
+</resources>

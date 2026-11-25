@@ -3,7 +3,7 @@ name: Android
 on:
   push:
     branches: [main]
-    tags: ["v0.0.1"]
+    tags: ["v0.7.0"]
   pull_request:
     branches: [main]
   workflow_dispatch:
@@ -24,6 +24,119 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Are the files that let grapsee.com vouch for the app actually served?
+  # The App Link filter (android:autoVerify) and the iOS associated domains
+  # only work while https://grapsee.com/.well-known/assetlinks.json and
+  # apple-app-site-association answer 200 with the JSON committed in
+  # well-known/. mail-honesty.py §39 proves the COMMITTED files match the app;
+  # only the network can prove they are LIVE, and this says so on every run.
+  # Warning only, by design: a website hiccup must never fail an app build.
+  # The same step runs in ios.yml. Publishing steps: well-known/README.md.
+  well-known-live:
+    name: Well-known link files (live check, warning only)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Well-known link files are live (warning only)
+        continue-on-error: true
+        run: |
+          set +e
+          # One URL: 200 with no redirect (neither platform follows one),
+          # served as JSON, parses as JSON, and names this app.
+          check() {
+            url="$1"; must="$2"; body="$(mktemp)"
+            headers="$(curl -sS --max-time 20 -o "$body" -D - "$url" | tr -d '\r')"
+            code="$(printf '%s\n' "$headers" | awk 'toupper($1) ~ /^HTTP\// { c = $2 } END { print c }')"
+            ctype="$(printf '%s\n' "$headers" | awk -F': *' 'tolower($1) == "content-type" { print tolower($2) }' | tail -n 1)"
+            if [ "$code" != "200" ]; then
+              echo "::warning title=Well-known file not live::$url answered ${code:-no response} (redirects are not followed and count as failures). Web links will open the browser, not the app, until it is published - see well-known/README.md."
+              return
+            fi
+            case "$ctype" in
+              application/json*) ;;
+              *) echo "::warning title=Well-known file content type::$url is served as '${ctype:-none}', not application/json - see the .htaccess lines in well-known/README.md." ;;
+            esac
+            if ! python3 -c 'import json, sys; json.load(open(sys.argv[1]))' "$body" 2>/dev/null; then
+              echo "::warning title=Well-known file is not JSON::$url does not parse as JSON (an HTML fallback page is the usual cause)."
+              return
+            fi
+            if ! grep -q "$must" "$body"; then
+              echo "::warning title=Well-known file names another app::$url does not mention $must."
+              return
+            fi
+            echo "ok: $url"
+          }
+          check "https://grapsee.com/.well-known/assetlinks.json" "com.grapsee.grapmail"
+          check "https://grapsee.com/.well-known/apple-app-site-association" "com.grapsee.grapmail"
+          # The committed AASA carries a TEAMID placeholder; the served one must not.
+          if curl -sS --max-time 20 "https://grapsee.com/.well-known/apple-app-site-association" 2>/dev/null | grep -q 'TEAMID\.'; then
+            echo "::warning title=AASA still has the placeholder::The served apple-app-site-association still says TEAMID - replace it with the Apple Team ID before uploading."
+          fi
+          # Play App Signing: the served file should list more than the upload key.
+          n="$(curl -sS --max-time 20 "https://grapsee.com/.well-known/assetlinks.json" 2>/dev/null | grep -oE '([0-9A-F]{2}:){31}[0-9A-F]{2}' | sort -u | wc -l)"
+          if [ "${n:-0}" = "1" ]; then
+            echo "::warning title=assetlinks.json lists one fingerprint::Only one signing fingerprint is served. If Play App Signing is on, add the app-signing key's SHA-256 from Play Console (well-known/README.md)."
+          fi
+          exit 0
+
+  # Fast JVM unit suite (android/app/src/test, see TESTING.md): pure logic,
+  # Api request/response shapes against MockWebServer, and the E2E crypto
+  # vectors. No emulator, so it reports in minutes on every push, PR, tag and
+  # dispatch, independent of the long walk below; the release job will not
+  # build a signed artifact unless it is green.
+  unit-tests:
+    name: Unit tests (JVM)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      # Same guard as build.yml: compileSdk 36 may be missing from the image.
+      - name: Ensure the compile SDK is installed
+        run: |
+          SDK="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
+          echo "ANDROID_HOME=$SDK" >> "$GITHUB_ENV"
+          if [ ! -d "$SDK/platforms/android-36" ]; then
+            yes | "$SDK/cmdline-tools/latest/bin/sdkmanager" "platforms;android-36" >/dev/null
+          fi
+
+      - name: Run the unit tests
+        working-directory: android
+        run: |
+          chmod +x gradlew
+          ./gradlew :app:testDebugUnitTest --no-daemon --stacktrace
+
+      - name: Summarise failures
+        if: failure()
+        run: |
+          python3 - <<'PY'
+          import glob, xml.etree.ElementTree as ET
+          for f in sorted(glob.glob("android/app/build/test-results/testDebugUnitTest/*.xml")):
+              for case in ET.parse(f).getroot().iter("testcase"):
+                  for bad in list(case.findall("failure")) + list(case.findall("error")):
+                      msg = (bad.get("message") or "").splitlines()[0][:300] if bad.get("message") else ""
+                      print(f"::error title={case.get('classname')}.{case.get('name')}::{msg}")
+          PY
+
+      - name: Upload the unit-test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-unit-test-report
+          path: |
+            android/app/build/reports/tests/testDebugUnitTest/
+            android/app/build/test-results/testDebugUnitTest/
+          if-no-files-found: warn
+
   build-test-screenshot:
     if: github.ref_type != 'tag' && !(github.event_name == 'workflow_dispatch' && inputs.signed_candidate)
     name: Build, live-test & screenshot (${{ matrix.device }})
@@ -206,6 +319,9 @@ jobs:
 
   release:
     name: Build and verify production APK and AAB
+    # No signed artifact is built unless the JVM unit suite passed on this
+    # commit (android/app/src/test; TESTING.md).
+    needs: unit-tests
     if: github.ref_name == 'v0.0.1' && github.ref_type == 'tag' || (github.event_name == 'workflow_dispatch' && inputs.signed_candidate)
     runs-on: ubuntu-latest
     timeout-minutes: 60
@@ -308,13 +424,13 @@ jobs:
           head -2 /tmp/badging.txt
           grep -q "package: name='com.grapsee.grapmail'" /tmp/badging.txt \
             || { echo "::error::wrong applicationId in the release APK"; exit 1; }
-          WANT=0.0.1
+          WANT=0.7.0
           if [[ "$GITHUB_REF_TYPE" == tag && "${GITHUB_REF_NAME#v}" != "$WANT" ]]; then
             echo "::error::This release must use tag v$WANT"
             exit 1
           fi
-          grep -q "versionCode='1'" /tmp/badging.txt \
-            || { echo "::error::APK versionCode is not 1"; exit 1; }
+          grep -q "versionCode='13'" /tmp/badging.txt \
+            || { echo "::error::APK versionCode is not 13"; exit 1; }
           grep -q "versionName='$WANT'" /tmp/badging.txt \
             || { echo "::error::APK versionName is not $WANT — the tag and the build disagree"; exit 1; }
           if "$AAPT" dump xmltree "$APK" AndroidManifest.xml | grep -Ew "debuggable"; then
@@ -407,7 +523,7 @@ jobs:
         with:
           name: GrapMail ${{ github.ref_name }}
           body: |
-            GrapMail 0.0.1 (version code 1).
+            GrapMail 0.7.0 (version code 13).
 
             Use the AAB for Play Console and the APK for direct installation.
             Both artifacts are signed with the configured production upload key.

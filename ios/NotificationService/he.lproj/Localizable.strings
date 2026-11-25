@@ -1,0 +1,21 @@
+/* GrapMailNotificationService — Hebrew. */
+
+"New encrypted message" = "הודעה מוצפנת חדשה";
+"New mail" = "דואר חדש";
+"1 new message" = "הודעה חדשה אחת";
+"%lld new messages" = "%lld הודעות חדשות";
+"%lld unread in the inbox" = "%lld שלא נקראו בדואר הנכנס";
+"Encrypted message" = "הודעה מוצפנת";
+"Unknown sender" = "שולח לא ידוע";
+"No subject" = "אין נושא";
+"This was me" = "זה הייתי אני";
+"Secure account" = "אבטחת החשבון";
+"Archive" = "העברה לארכיון";
+"Mark as read" = "סימון כנקראה";
+"Reply" = "תשובה";
+"Send" = "שליחה";
+"Reply…" = "תשובה…";
+"Reply in app" = "תשובה באפליקציה";
+"More" = "עוד";
+/* Notification title: a sign-in code, then the sender */
+"%@ · %@" = "%@ · %@";

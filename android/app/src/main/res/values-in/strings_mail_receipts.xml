@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="mail_receipt_read_at">Dibaca %1$s</string>
+    <string name="mail_receipt_requested_pending">Tanda terima baca diminta · belum dibaca</string>
+    <string name="mail_receipt_server_sent">Tanda terima baca terkirim</string>
+    <string name="mail_receipt_ask_title">Pengirim meminta tanda terima baca</string>
+    <string name="mail_receipt_ask_body">Kirim tanda terima ke %1$s bahwa Anda telah membuka pesan ini? Mereka hanya tahu kapan Anda membukanya, tidak lebih.</string>
+    <string name="mail_receipt_ask_send">Kirim tanda terima</string>
+    <string name="mail_receipt_ask_decline">Jangan kirim</string>
+    <string name="mail_receipt_mode_title">Kirim tanda terima baca</string>
+    <string name="mail_receipt_mode_body">Saat pesan meminta tanda terima baca. Tanda terima tidak pernah dikirim untuk spam, pengirim yang diblokir, atau email terenkripsi, kecuali Anda memilih Selalu.</string>
+    <string name="mail_receipt_mode_never">Tidak pernah</string>
+    <string name="mail_receipt_mode_ask">Tanyakan</string>
+    <string name="mail_receipt_mode_always">Selalu</string>
+    <string name="mail_receipt_mode_always_note">Selalu juga mengirim tanda terima untuk spam, pengirim yang diblokir, dan email terenkripsi.</string>
+    <string name="mail_receipt_mode_unavailable">Tidak dapat memuat setelan ini. Periksa koneksi Anda.</string>
+    <string name="mail_compose_request_receipt">Minta tanda terima baca</string>
+</resources>

@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
@@ -16,20 +17,39 @@
     -->
     <uses-permission android:name="android.permission.USE_BIOMETRIC" />
 
+    <!--
+        Backups: nothing leaves the device. allowBackup="false" covers cloud
+        backup on every version; dataExtractionRules (Android 12+) also blocks
+        the device-to-device copy, which allowBackup alone does not stop there
+        (see res/xml/data_extraction_rules.xml). networkSecurityConfig states
+        the HTTPS-only rule (res/xml/network_security_config.xml).
+    -->
     <application
         android:name=".GrapMailApp"
         android:allowBackup="false"
+        android:fullBackupContent="false"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:networkSecurityConfig="@xml/network_security_config"
         android:enableOnBackInvokedCallback="true"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:localeConfig="@xml/locales_config"
         android:roundIcon="@mipmap/ic_launcher"
         android:supportsRtl="true"
-        android:theme="@style/Theme.GrapMail">
+        android:theme="@style/Theme.GrapMail"
+        tools:targetApi="33">
+        <!--
+            configChanges: rotation, a fold / unfold, split-screen resizing and
+            a keyboard change are handled by Compose in place (the root reads
+            the window width live), so the activity is not torn down and
+            rebuilt for them; anything else (language, dark mode, font size)
+            still recreates it and the state comes back from the saved
+            navigation stack.
+        -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
-            android:configChanges="orientation|screenSize|keyboardHidden"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden"
             android:windowSoftInputMode="adjustResize"
             android:theme="@style/Theme.GrapMail.Splash">
             <intent-filter>
@@ -37,14 +57,83 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
             <!--
-                The home-screen "Compose mail" shortcut resolves to this
-                activity with its own action, declared here so the system will
-                deliver it. See res/xml/shortcuts.xml for what it promises and
-                MainActivity for the one time it is consumed.
+                The home-screen shortcuts (Compose mail, Scheduled sends,
+                Subscriptions) and the widget's "New message" row resolve to
+                this activity with their own actions, declared here so the
+                system will deliver them: newer Android versions refuse an
+                explicit intent whose action the target never declared. See
+                res/xml/shortcuts.xml for what they promise and MainActivity
+                for the one time each is consumed.
             -->
             <intent-filter>
                 <action android:name="com.grapsee.grapmail.COMPOSE" />
+                <action android:name="com.grapsee.grapmail.SCHEDULED" />
+                <action android:name="com.grapsee.grapmail.SUBSCRIPTIONS" />
                 <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+            <!--
+                Deep links into the mailbox, parsed and validated by
+                logic/DeepLinks.kt and opened by MainActivity only once a
+                session exists and the app lock's door is open.
+
+                The app's own scheme first: grapmail://thread/<threadId>,
+                grapmail://message/<messageId>, grapmail://scheduled,
+                grapmail://inbox and grapmail://compose?to=<address>. A custom scheme needs no
+                website file, so these work the day the build ships. Each host
+                is listed on its own so the system never offers this app for a
+                grapmail:// host it does not answer (the notification's own
+                grapmail://notification data URI rides an explicit intent and
+                is deliberately not advertised here).
+            -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="grapmail" android:host="thread" />
+                <data android:scheme="grapmail" android:host="message" />
+                <data android:scheme="grapmail" android:host="scheduled" />
+                <data android:scheme="grapmail" android:host="inbox" />
+                <data android:scheme="grapmail" android:host="compose" />
+                <!-- No pathPrefix here: path attributes merge across every <data> of this
+                     filter and would restrict thread/message/... too. ProviderOAuth.isCallback checks /callback. -->
+                <data android:scheme="grapmail" android:host="providers" />
+            </intent-filter>
+            <!--
+                The web form of a thread link: https://grapsee.com/mail/thread/<id>.
+                Its own filter, https only, so autoVerify covers exactly one
+                host. Verification passes only while
+                https://grapsee.com/.well-known/assetlinks.json serves the file
+                committed at well-known/assetlinks.json with this build's
+                signing fingerprint(s); until then the system shows a chooser
+                or opens the browser, which is a degraded link, not a broken
+                app. See well-known/README.md for publishing it, and the
+                non-failing "well-known files are live" step in android.yml for
+                the check that says so on every CI run.
+            -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data
+                    android:scheme="https"
+                    android:host="grapsee.com"
+                    android:pathPrefix="/mail/thread/" />
+            </intent-filter>
+            <!--
+                Another app's "send email" (SENDTO) and a tapped mailto: link
+                (VIEW) open the composer addressed to the first recipient, in
+                the composer's existing prefilled-recipient slot, nothing more.
+            -->
+            <intent-filter>
+                <action android:name="android.intent.action.SENDTO" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:scheme="mailto" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="mailto" />
             </intent-filter>
             <meta-data
                 android:name="android.app.shortcuts"
@@ -70,14 +159,9 @@
                 android:resource="@xml/file_paths" />
         </provider>
         <!--
-            The push receiver. The backend wakes the device through the
-            platform's push service; this service registers the device token
-            (onNewToken) and, on a signal, shows the placeholder notification
-            and runs the same read the poll runs — the payload carries no
-            message content, so nothing here displays anything the server
-            could not know. Without google-services.json the Firebase app is
-            never initialized and this service simply never fires; the poll
-            remains the delivery the person actually gets.
+            The mail notification's own buttons (Archive, Mark as read, the
+            inline Reply, Copy code) and its swipe-away. Non-exported: only
+            the PendingIntents this app built can reach it.
         -->
         <receiver
             android:name=".logic.MailNotificationActionReceiver"
@@ -110,6 +194,16 @@
                 android:resource="@xml/unread_widget_info" />
         </receiver>
 
+        <!--
+            The push receiver. The backend wakes the device through the
+            platform's push service; this service registers the device token
+            (onNewToken) and, on a signal, runs the same read the poll runs.
+            The payload carries no message content. Without
+            google-services.json the Firebase app is never initialized and
+            this service simply never fires; the poll remains the delivery.
+            Exported="false" is right: Firebase delivers through its own
+            exported receiver inside the library, which then starts this one.
+        -->
         <service
             android:name=".logic.PushService"
             android:exported="false">

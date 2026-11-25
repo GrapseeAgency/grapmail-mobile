@@ -80,56 +80,56 @@ enum ApiError: Error, LocalizedError {
             if let code, Self.serverWordedCodes.contains(code),
                !message.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return message }
             switch code {
-            case "TOO_MANY_ATTEMPTS": return "Too many failed attempts. Try again in about 15 minutes."
-            case "RATE_LIMITED": return "Too many requests. Try again in a few minutes."
-            case "WRONG_PASSWORD": return "Check your password and try again."
-            case "INVALID_CREDENTIALS": return "Check your email address and password."
-            case "WEAK_PASSWORD": return "Use at least 8 characters with a letter, a number and a symbol."
-            case "INVALID_RESET_CHALLENGE": return "Request a new password reset code and try again."
-            case "TWO_FACTOR_REJECTED": return "Check your verification code and try again."
-            case "INVALID_PHONE": return "Check the phone number and country code."
-            case "PHONE_IN_USE": return "That phone number is already linked to another account."
-            case "PHONE_NOT_VERIFIED": return "Verify your phone number to continue."
-            case "PHONE_PROOF_REQUIRED": return "Verify your phone number to continue."
-            case "NO_RECOVERY_CHANNEL": return "This account has no verified recovery email, so it can't be reset here. Contact support and we'll help."
-            case "BAD_RECOVERY_EMAIL": return "Check the email address and try again."
-            case "RECOVERY_SAME_AS_PRIMARY": return "Use an email address outside GrapMail, so you can still reach it if you lose access to this account."
-            case "EMAIL_DELIVERY_UNAVAILABLE": return "We couldn't send the email right now. Try again shortly."
-            case "CODE_REJECTED": return "That code is not correct."
-            case "CODE_EXPIRED": return "That code has expired. Request a new one."
-            case "EMAIL_PROOF_REQUIRED": return "Enter the code we emailed you to turn on two-step verification."
-            case "TWO_FACTOR_NEEDS_RECOVERY_EMAIL": return "Add and confirm a recovery email before turning on two-step verification."
-            case "RECOVERY_EMAIL_IN_USE": return "Two-step verification sends its codes to your recovery email. Confirm a new address with a code instead."
-            case "SMS_DELIVERY_UNAVAILABLE": return "The code could not be sent. Try again in a moment."
-            case "BAD_ADDRESS": return "Check the email address and try again."
-            case "ADDRESS_REJECTED": return "That email address is unavailable."
-            case "ALIAS_REJECTED": return "That email address is unavailable."
-            case "NO_RECIPIENT": return "Add at least one recipient."
-            case "TOO_MANY_RECIPIENTS": return "Remove some recipients and try again."
-            case "EMPTY_BODY": return "Write a message before sending."
-            case "QUOTA_EXCEEDED": return "Your mailbox is full. Free up some storage and try again."
-            case "BODY_TOO_LARGE": return "Shorten your message or remove large attachments."
-            case "TOO_LARGE": return "Choose a smaller file and try again."
-            case "CANNOT_REVOKE_CURRENT": return "Sign out to end this session."
-            case "TWOFA_REQUIRED_FOR_BACKUP_CODES": return "Turn on two-step verification to use backup codes."
-            case "NO_MAILBOX": return "Your GrapMail inbox is not ready yet."
-            case "HUMAN_VERIFICATION_REQUIRED": return "Your verification expired or was already used — complete the check again."
+            case "TOO_MANY_ATTEMPTS": return String(localized: "Too many failed attempts. Try again in about 15 minutes.")
+            case "RATE_LIMITED": return String(localized: "Too many requests. Try again in a few minutes.")
+            case "WRONG_PASSWORD": return String(localized: "Check your password and try again.")
+            case "INVALID_CREDENTIALS": return String(localized: "Check your email address and password.")
+            case "WEAK_PASSWORD": return String(localized: "Use at least 8 characters with a letter, a number and a symbol.")
+            case "INVALID_RESET_CHALLENGE": return String(localized: "Request a new password reset code and try again.")
+            case "TWO_FACTOR_REJECTED": return String(localized: "Check your verification code and try again.")
+            case "INVALID_PHONE": return String(localized: "Check the phone number and country code.")
+            case "PHONE_IN_USE": return String(localized: "That phone number is already linked to another account.")
+            case "PHONE_NOT_VERIFIED": return String(localized: "Verify your phone number to continue.")
+            case "PHONE_PROOF_REQUIRED": return String(localized: "Verify your phone number to continue.")
+            case "NO_RECOVERY_CHANNEL": return String(localized: "This account has no verified recovery email, so it can't be reset here. Contact support and we'll help.")
+            case "BAD_RECOVERY_EMAIL": return String(localized: "Check the email address and try again.")
+            case "RECOVERY_SAME_AS_PRIMARY": return String(localized: "Use an email address outside GrapMail, so you can still reach it if you lose access to this account.")
+            case "EMAIL_DELIVERY_UNAVAILABLE": return String(localized: "We couldn't send the email right now. Try again shortly.")
+            case "CODE_REJECTED": return String(localized: "That code is not correct.")
+            case "CODE_EXPIRED": return String(localized: "That code has expired. Request a new one.")
+            case "EMAIL_PROOF_REQUIRED": return String(localized: "Enter the code we emailed you to turn on two-step verification.")
+            case "TWO_FACTOR_NEEDS_RECOVERY_EMAIL": return String(localized: "Add and confirm a recovery email before turning on two-step verification.")
+            case "RECOVERY_EMAIL_IN_USE": return String(localized: "Two-step verification sends its codes to your recovery email. Confirm a new address with a code instead.")
+            case "SMS_DELIVERY_UNAVAILABLE": return String(localized: "The code could not be sent. Try again in a moment.")
+            case "BAD_ADDRESS": return String(localized: "Check the email address and try again.")
+            case "ADDRESS_REJECTED": return String(localized: "That email address is unavailable.")
+            case "ALIAS_REJECTED": return String(localized: "That email address is unavailable.")
+            case "NO_RECIPIENT": return String(localized: "Add at least one recipient.")
+            case "TOO_MANY_RECIPIENTS": return String(localized: "Remove some recipients and try again.")
+            case "EMPTY_BODY": return String(localized: "Write a message before sending.")
+            case "QUOTA_EXCEEDED": return String(localized: "Your mailbox is full. Free up some storage and try again.")
+            case "BODY_TOO_LARGE": return String(localized: "Shorten your message or remove large attachments.")
+            case "TOO_LARGE": return String(localized: "Choose a smaller file and try again.")
+            case "CANNOT_REVOKE_CURRENT": return String(localized: "Sign out to end this session.")
+            case "TWOFA_REQUIRED_FOR_BACKUP_CODES": return String(localized: "Turn on two-step verification to use backup codes.")
+            case "NO_MAILBOX": return String(localized: "Your GrapMail inbox is not ready yet.")
+            case "HUMAN_VERIFICATION_REQUIRED": return String(localized: "Your verification expired or was already used — complete the check again.")
             default: break
             }
             switch status {
-            case 401: return "Check your sign-in details or sign in again."
-            case 403: return "This action is unavailable for your account."
-            case 404: return "This item is no longer available."
-            case 409: return "Refresh and try again."
-            case 413: return "Choose a smaller file and try again."
-            case 429: return "Too many requests. Try again in a few minutes."
-            case 500...599: return "GrapMail is temporarily unavailable. Try again in a moment."
-            default: return "Please try again."
+            case 401: return String(localized: "Check your sign-in details or sign in again.")
+            case 403: return String(localized: "This action is unavailable for your account.")
+            case 404: return String(localized: "This item is no longer available.")
+            case 409: return String(localized: "Refresh and try again.")
+            case 413: return String(localized: "Choose a smaller file and try again.")
+            case 429: return String(localized: "Too many requests. Try again in a few minutes.")
+            case 500...599: return String(localized: "GrapMail is temporarily unavailable. Try again in a moment.")
+            default: return String(localized: "Please try again.")
             }
         case .network:
-            return "Check your connection and try again."
+            return String(localized: "Check your connection and try again.")
         case .emailVerificationRequired:
-            return "Email verification is required to finish signing in."
+            return String(localized: "Email verification is required to finish signing in.")
         }
     }
 
@@ -790,6 +790,10 @@ struct ProfileSettingsPatch {
     /// Sent whole: the server checks the switch, the window and the message together.
     var vacation: VacationInfo? = nil
     var forwarding: ForwardingInfo? = nil
+    /// Sent whole, every key present (`NotificationSettingsInfo.dictionary`): the
+    /// server keeps any key that is not sent. The same `settings.notifications`
+    /// key `NotificationPolicy.update` writes and `ProfileSettings` reads back.
+    var notifications: NotificationSettingsInfo? = nil
 }
 
 struct ProfileDto: Codable {
@@ -1919,7 +1923,7 @@ struct ApiClient {
             req.httpBody = try? encoder.encode(RefreshBody(refreshToken: refresh))
             // Device-bound sessions (DeviceKey.swift): signed by a key that never leaves this phone.
             DeviceKey.attach(to: &req)
-            guard let (data, response) = try? await URLSession.shared.data(for: req),
+            guard let (data, response) = try? await PinnedSession.shared.data(for: req),
                   let http = response as? HTTPURLResponse else { return .unavailable }
             if http.statusCode == 401 || http.statusCode == 403 { return .rejected }
             guard (200..<300).contains(http.statusCode),
@@ -2000,7 +2004,7 @@ struct ApiClient {
             let data: Data
             let response: URLResponse
             do {
-                (data, response) = try await URLSession.shared.data(for: request)
+                (data, response) = try await PinnedSession.shared.data(for: request)
             } catch {
                 try Task.checkCancellation()
                 throw networkFailure(error)
@@ -2044,7 +2048,7 @@ struct ApiClient {
             let file: URL
             let response: URLResponse
             do {
-                (file, response) = try await URLSession.shared.download(for: request)
+                (file, response) = try await PinnedSession.shared.download(for: request)
             } catch {
                 try Task.checkCancellation()
                 throw networkFailure(error)
@@ -2094,7 +2098,7 @@ struct ApiClient {
             let data: Data
             let response: URLResponse
             do {
-                (data, response) = try await URLSession.shared.upload(for: request, fromFile: file)
+                (data, response) = try await PinnedSession.shared.upload(for: request, fromFile: file)
             } catch {
                 try Task.checkCancellation()
                 throw networkFailure(error)
@@ -2157,7 +2161,11 @@ struct ApiClient {
         do {
             return try decoder.decode(T.self, from: data)
         } catch let e as DecodingError {
+            // Debug builds only: a decoding error's description can quote the
+            // coding path and fragments of the response, which may be mail.
+            #if DEBUG
             print("Api decode error: \(e)")
+            #endif
             throw ApiError.http(status: http.statusCode, code: nil, message: "Unexpected server response. Please try again.")
         }
     }
@@ -2262,7 +2270,7 @@ struct ApiClient {
         var request = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 5)
         request.httpMethod = "DELETE"
         request.setValue("GrapMailDevice \(registration)", forHTTPHeaderField: "Authorization")
-        guard let (_, response) = try? await URLSession.shared.data(for: request) else { return false }
+        guard let (_, response) = try? await PinnedSession.shared.data(for: request) else { return false }
         return (response as? HTTPURLResponse)?.statusCode == 204
     }
 

@@ -1,0 +1,158 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Brazilian Portuguese translation of values/strings_account.xml (part 3 of 4).
+  Covers security/BackupCodeScreens.kt through security/RecoveryCodesScreen.kt.
+-->
+<resources>
+
+    <!-- security/BackupCodeScreens.kt -->
+    <string name="acct_generate_save_backup_codes">Gerar e salvar códigos de backup</string>
+    <string name="acct_create_one_time_backup_codes_to">Crie códigos de backup de uso único para acessar sua conta se perder o celular.</string>
+    <string name="acct_generate_codes">Gerar códigos</string>
+    <string name="acct_cancel">Cancelar</string>
+    <string name="acct_whats_included">O que está incluído</string>
+    <string name="acct_10_one_time_codes">10 códigos de uso único</string>
+    <string name="acct_each_code_can_be_used_once">Cada código pode ser usado uma vez.</string>
+    <string name="acct_use_when_needed">Use quando precisar</string>
+    <string name="acct_sign_in_when_your_phone_is">Entre quando seu celular não estiver disponível.</string>
+    <string name="acct_each_code_is_unique">Cada código é exclusivo</string>
+    <string name="acct_generating_a_new_set_retires_the_old">Gerar um novo conjunto invalida o anterior.</string>
+    <string name="acct_store_the_codes_somewhere_only_you">Guarde os códigos em um lugar que só você acesse. Quem tiver um código pode passar pela sua segunda etapa de verificação.</string>
+    <string name="acct_backup_codes_saved">Códigos de backup salvos</string>
+    <string name="acct_store_these_codes_somewhere_safe">Guarde estes códigos em um lugar seguro. Eles não serão exibidos novamente.</string>
+    <string name="acct_download_backup_codes">Baixar códigos de backup</string>
+    <string name="acct_done">Concluído</string>
+    <string name="acct_each_code_can_be_used_once_2">Cada código pode ser usado uma vez. Gerar novos códigos invalida todos os códigos desta lista.</string>
+    <string name="acct_your_backup_codes">Seus códigos de backup</string>
+    <string name="acct_copied">Copiado</string>
+    <string name="acct_copy_all">Copiar tudo</string>
+    <string name="acct_copy_code">Copiar %1$s</string>
+    <string name="acct_keep_them_safe">Mantenha-os seguros</string>
+    <string name="acct_store_safely_use_a_password_manager">Guarde com segurança — use um gerenciador de senhas ou imprima.</string>
+    <string name="acct_dont_share_backup_codes_are_for_your">Não compartilhe — os códigos de backup são só para você.</string>
+    <string name="acct_one_time_use_each_code_can_only_be">Uso único — cada código só pode ser usado uma vez.</string>
+    <string name="acct_saved_codes_confirm">Salvei estes códigos em um lugar seguro.</string>
+    <string name="acct_copy_them_into_your_password_manager">Copie-os para seu gerenciador de senhas ou anote-os.</string>
+    <string name="acct_codes_not_shown_again">Estes códigos não serão exibidos novamente</string>
+    <string name="acct_leave_now_and_the_list_is_gone_you">Se você sair agora, a lista será perdida. Você pode gerar um novo conjunto depois, mas os códigos antigos deixarão de funcionar.</string>
+    <string name="acct_leave_anyway">Sair mesmo assim</string>
+    <string name="acct_stay">Ficar</string>
+
+    <!-- security/DeleteAccountScreen.kt -->
+    <string name="acct_delete_account">Excluir conta</string>
+    <string name="acct_deleting_this_account_is_permanent">A exclusão desta conta é permanente. Leia o que será removido antes de continuar.</string>
+    <string name="acct_delete_my_account">Excluir minha conta</string>
+    <string name="acct_enter_your_password_period">Digite sua senha.</string>
+    <string name="acct_that_password_is_not_correct">Essa senha está incorreta.</string>
+    <string name="acct_the_request_could_not_be_confirmed">Não foi possível confirmar a solicitação.</string>
+    <string name="acct_what_is_deleted">O que será excluído</string>
+    <string name="acct_delete_removes_mailbox">Sua caixa de correio GrapMail — o próprio endereço, então os e-mails enviados para ele não chegarão mais a ninguém.</string>
+    <string name="acct_every_message_sent_received_drafted">Todas as mensagens: enviadas, recebidas, rascunhos, arquivadas e na lixeira.</string>
+    <string name="acct_your_aliases_the_extra_addresses">Seus aliases — os endereços extras que entregavam e-mails nesta caixa de correio.</string>
+    <string name="acct_delete_cannot_be_undone">Isso não pode ser desfeito nem recuperado. O endereço não fica reservado para você — um endereço excluído pode não ser recriado.</string>
+    <string name="acct_enter_your_password_to_confirm">Digite sua senha para confirmar</string>
+    <string name="acct_only_the_password_on_this_account">Somente a senha desta conta pode iniciar a exclusão.</string>
+
+    <!-- security/NotificationPrefsScreen.kt -->
+    <string name="acct_notification_preferences">Preferências de notificação</string>
+    <string name="acct_choose_what_this_account_sends_and">Escolha o que esta conta envia e quando as notificações de e-mail ficam em silêncio.</string>
+    <string name="acct_apply_quiet_hours">Aplicar horário silencioso</string>
+    <string name="acct_back_to_account_security">Voltar para Segurança da conta</string>
+    <string name="acct_alerts">Alertas</string>
+    <string name="acct_mail_notifications">Notificações de e-mail</string>
+    <string name="acct_new_mail_that_reaches_your_inbox">Novos e-mails que chegam à sua caixa de entrada.</string>
+    <string name="acct_security_alerts">Alertas de segurança</string>
+    <string name="acct_sign_ins_password_changes_trusted">Logins, trocas de senha e eventos de dispositivos confiáveis. Sempre entregues — não podem ser silenciados.</string>
+    <string name="acct_account_alerts">Alertas da conta</string>
+    <string name="acct_lifecycle_notices_about_your_account">Avisos sobre o ciclo de vida da sua conta.</string>
+    <string name="acct_quiet_hours_mail_only">Horário silencioso — apenas e-mails</string>
+    <string name="acct_paused">Pausado</string>
+    <string name="acct_while_quiet_hours_are_on_mail">Durante o horário silencioso, as notificações de e-mail ficam retidas até o fim do período. Os alertas de segurança nunca são pausados.</string>
+    <string name="acct_quiet_from">Silenciar a partir de</string>
+    <string name="acct_quiet_until">Silenciar até</string>
+    <string name="acct_clear_quiet_hours">Limpar horário silencioso</string>
+    <string name="acct_security_alerts_state">Status dos alertas de segurança</string>
+    <string name="acct_security_alerts_are_on_for_this">Os alertas de segurança estão ativados para esta conta, como deveriam.</string>
+    <string name="acct_the_account_row_reports_security">O registro da conta indica que os alertas de segurança estão desativados. Esta tela não pode alterar a entrega de alertas de segurança críticos.</string>
+    <string name="acct_preferences_apply_to_every_device">As preferências valem para todos os dispositivos que acessam esta conta.</string>
+    <string name="acct_not_set">Não definido</string>
+
+    <!-- security/PasskeysScreen.kt -->
+    <string name="acct_passkey_name_on_device">GrapMail no %1$s</string>
+    <string name="acct_passkey_added_use_it_the_next_time">Chave de acesso adicionada. Use-a na próxima vez que entrar.</string>
+    <string name="acct_no_passkey_was_created_on_this">Nenhuma chave de acesso foi criada neste dispositivo. Verifique se há um bloqueio de tela configurado.</string>
+    <string name="acct_the_passkey_could_not_be_added_try">Não foi possível adicionar a chave de acesso. Tente novamente.</string>
+    <string name="acct_passkeys">Chaves de acesso</string>
+    <string name="acct_sign_in_with_a_biometric_credential">Entre com biometria em vez de senha. A chave de acesso fica no dispositivo que a criou.</string>
+    <string name="acct_add_passkey">Adicionar chave de acesso</string>
+    <string name="acct_no_passkeys_yet_add_one_and_you_can">Nenhuma chave de acesso ainda. Adicione uma para entrar sem senha.</string>
+    <string name="acct_what_a_passkey_is">O que é uma chave de acesso</string>
+    <string name="acct_a_passkey_is_a_credential_this">Uma chave de acesso é uma credencial que este dispositivo guarda no hardware e confirma com sua digital ou rosto. Removê-la aqui impede que ela entre nesta conta — a cópia no próprio dispositivo é removida pelas configurações do dispositivo.</string>
+    <string name="acct_remove_passkey">Remover chave de acesso?</string>
+    <string name="acct_remove_passkey_body">“%1$s” deixará de fazer seu login nesta conta.</string>
+    <string name="acct_this_passkey">Esta chave de acesso</string>
+    <string name="acct_remove">Remover</string>
+    <string name="acct_keep">Manter</string>
+    <string name="acct_passkey">Chave de acesso</string>
+    <string name="acct_added_at">Adicionada %1$s</string>
+    <string name="acct_last_used_at">Último uso %1$s</string>
+    <string name="acct_this_credential_signs_you_in_without">Esta credencial permite entrar sem senha.</string>
+    <string name="acct_removing">Removendo…</string>
+    <string name="acct_remove_passkey_2">Remover chave de acesso</string>
+
+    <!-- security/PasswordScreens.kt -->
+    <string name="acct_after_suspicious_activity">Após atividade suspeita</string>
+    <string name="acct_change_your_password">Troque sua senha</string>
+    <string name="acct_your_account_was_accessed_from_an">Sua conta foi acessada de um dispositivo desconhecido. Para manter sua conta GrapMail segura, atualize sua senha agora.</string>
+    <string name="acct_choose_a_strong_password_you_have">Escolha uma senha forte que você ainda não tenha usado aqui.</string>
+    <string name="acct_update_password">Atualizar senha</string>
+    <string name="acct_enter_your_current_password">Digite sua senha atual.</string>
+    <string name="acct_use_at_least_8_characters">Use pelo menos 8 caracteres.</string>
+    <string name="acct_add_at_least_one_letter">Adicione pelo menos uma letra.</string>
+    <string name="acct_add_at_least_one_number">Adicione pelo menos um número.</string>
+    <string name="acct_add_at_least_one_symbol">Adicione pelo menos um símbolo.</string>
+    <string name="acct_the_two_new_passwords_do_not_match">As duas novas senhas não são iguais.</string>
+    <string name="acct_unrecognized_activity_was_found_on">Foi encontrada atividade não reconhecida na sua conta.</string>
+    <string name="acct_current_password">Senha atual</string>
+    <string name="acct_new_password_2">Nova senha</string>
+    <string name="acct_confirm_new_password_2">Confirmar nova senha</string>
+    <string name="acct_passwords_do_not_match">As senhas não são iguais.</string>
+    <string name="acct_password_requirements_2">Requisitos da senha</string>
+    <string name="acct_contains_a_letter">Contém uma letra</string>
+    <string name="acct_contains_a_number">Contém um número</string>
+    <string name="acct_contains_a_symbol">Contém um símbolo</string>
+    <string name="acct_password_updated_successfully">Senha atualizada com sucesso</string>
+    <string name="acct_password_changed_successfully">Senha alterada com sucesso</string>
+    <string name="acct_your_password_has_been_updated">Sua senha foi atualizada com sucesso. Os outros dispositivos foram desconectados; este continua conectado.</string>
+    <string name="acct_if_you_did_not_make_this_change">Se não foi você quem fez essa alteração, fale com a equipe de suporte imediatamente.</string>
+    <string name="acct_whats_next_title">E agora?</string>
+    <string name="acct_youll_need_to_sign_in_again_on_your">Você precisará entrar novamente nos seus outros dispositivos, incluindo apps para celular, computador e outros navegadores.</string>
+    <string name="acct_this_helps_keep_your_account_secure">Isso ajuda a manter sua conta segura e impede acessos não autorizados.</string>
+
+    <!-- security/RecoveryCodesScreen.kt -->
+    <string name="acct_the_server_returned_no_codes_try">O servidor não retornou nenhum código. Tente novamente.</string>
+    <string name="acct_recovery_codes">Códigos de recuperação</string>
+    <string name="acct_one_time_codes_that_unlock_password">Códigos de uso único que liberam a recuperação de senha quando seu celular e seu dispositivo confiável estão indisponíveis.</string>
+    <string name="acct_download_codes">Baixar códigos</string>
+    <string name="acct_generating_a_new_set_retires_every">Gerar um novo conjunto invalida todos os códigos desta lista.</string>
+    <string name="acct_recovery_codes_available">Códigos de recuperação disponíveis</string>
+    <string name="acct_could_not_be_read_try_again">Não foi possível ler. Tente novamente.</string>
+    <string name="acct_yes_a_usable_set_exists_on_the">Sim — há um conjunto válido na conta.</string>
+    <string name="acct_no_generate_a_set_to_keep_a_recovery">Não — gere um conjunto para manter uma forma de recuperação disponível.</string>
+    <string name="acct_the_accounts_status_could_not_be">Não foi possível ler o status da conta.</string>
+    <string name="acct_retry">Tentar novamente</string>
+    <string name="acct_yes">Sim</string>
+    <string name="acct_no">Não</string>
+    <string name="acct_each_code_resets_the_password_once">Cada código redefine a senha uma vez.</string>
+    <string name="acct_use_at_forgot_password">Use em Esqueci a senha</string>
+    <string name="acct_enter_a_code_instead_of_the_texted">Digite um código em vez do enviado por SMS.</string>
+    <string name="acct_regenerate_anytime">Gere novamente quando quiser</string>
+    <string name="acct_a_new_set_retires_the_old_one">Um novo conjunto invalida o anterior na hora.</string>
+    <string name="acct_not_the_same_as_backup_codes">Não são o mesmo que códigos de backup</string>
+    <string name="acct_two_step_backup_codes_prove_a_sign">Os códigos de backup da verificação em duas etapas confirmam um login. Os códigos de recuperação redefinem a senha. Guarde os dois, mas não no mesmo lugar.</string>
+    <string name="acct_your_recovery_codes">Seus códigos de recuperação</string>
+    <string name="acct_one_time_use_each_code_resets_the">Uso único — cada código redefine a senha exatamente uma vez.</string>
+    <string name="acct_codes_are_stored_as_hashes_this_list">Os códigos são armazenados como hashes — esta lista é a única cópia legível.</string>
+    <string name="acct_generating_a_new_set_retires_every_2">Gerar um novo conjunto invalida todos os códigos mostrados aqui.</string>
+    <string name="acct_leave_now_and_the_list_is_gone_the">Se você sair agora, a lista será perdida. Os códigos continuam funcionando — mas só se você já os tiver salvo.</string>
+</resources>

@@ -19,7 +19,11 @@ WHAT IT COMPARES
 ----------------
   * every `mail*` function name (Android's suspend fns, iOS's static funcs),
   * every field of every DTO whose name exists on both sides, after normalising
-    Kotlin's `...Dto` suffix.
+    Kotlin's `...Dto` suffix,
+  * the 2026-11 mailbox features (send later, original colours, the Good
+    morning card, code chips, Inbox Zero, swipe actions, grapmail://scheduled):
+    one code anchor per platform each, plus the values the shared spec fixes
+    (ask phrases, code-chip boxes, swipe keys and defaults) compared outright.
 
 WHAT IT DELIBERATELY DOES NOT COMPARE
 -------------------------------------
@@ -37,6 +41,16 @@ ANDROID = os.path.join(ROOT, "android/app/src/main/java/com/grapsee/grapmail/dat
 ANDROID_DTO = os.path.join(ROOT, "android/app/src/main/java/com/grapsee/grapmail/data/MailDto.kt")
 IOS_API = os.path.join(ROOT, "ios/GrapMail/MailAPI.swift")
 IOS_ACCOUNT = os.path.join(ROOT, "ios/GrapMail/APIClient.swift")
+# `ApiClient` extensions declared outside MailAPI.swift, read as part of the iOS
+# mail surface. Each needs a sentence: a file the gate does not read is a call it
+# reports as "only on Android" while iOS compiles and uses it, and the obvious
+# "fix" of adding it to MailAPI.swift is an invalid redeclaration -- a false
+# asymmetry here pushes toward a broken build, not a closed gap.
+IOS_API_EXTRA = {
+    # `mailStorage` and `MailStorageResponse` sit with the storage banner, their
+    # only reader; the call is the same `GET /grapmail/storage` Android makes.
+    "ios/GrapMail/StorageBanner.swift": "the storage banner's GET /storage call and its response",
+}
 QUIET = "--quiet" in sys.argv
 
 
@@ -317,6 +331,10 @@ SPEC_CALLS = {
     "screener": ["mailScreener"],
     "screenerSetEnabled": ["mailScreenerSet"],
     "screenerDecision": ["mailScreenerDecision"],
+    # Send later (2026-11): the list and the take-back. Scheduling itself is
+    # `mailSend` with `sendAt` on the request (compared with the DTO fields).
+    "scheduledList": ["mailScheduledList"],
+    "scheduledCancel": ["mailScheduledCancel"],
 }
 
 # The routes those calls must actually reach. Names can be argued about; a path
@@ -326,7 +344,7 @@ SPEC_ROUTES = [
     "/me", "/stats", "/inbox", "/thread", "/send", "/draft",
     "/labels", "/labels/assignments", "/labels/message/",
     "/aliases", "/attachments", "/screener", "/screener/enabled",
-    "/screener/decision",
+    "/screener/decision", "/scheduled",
 ]
 
 
@@ -366,14 +384,156 @@ def spec_check(af, _if, android_src, ios_src, problems):
         f"{len(SPEC_ROUTES)} routes, both platforms")
 
 
+# ── mailbox features: the same feature set on both clients ──────────────────
+#
+# The name diff above sees the wire; it cannot see that a feature shipped on one
+# phone and not the other. The 2026-11 mailbox wave (send later, "Show original
+# colours", the Good morning card, sign-in code chips, Inbox Zero, choosable
+# swipes, the grapmail://scheduled link) was specified once and built twice, so
+# each feature is pinned here by one code-level anchor per platform -- read with
+# comments stripped, so a doc comment cannot stand in for the code -- and, where
+# the spec fixes a VALUE both sides must hold (the ask phrases, the boxes that
+# show a code chip, the swipe keys), the two values are compared outright.
+ANDROID_SRC = os.path.join(ROOT, "android/app/src/main/java/com/grapsee/grapmail")
+IOS_SRC = os.path.join(ROOT, "ios/GrapMail")
+ANDROID_MANIFEST = os.path.join(ROOT, "android/app/src/main/AndroidManifest.xml")
+
+# feature -> ([(Android path under ANDROID_SRC, anchor)], [(iOS path under IOS_SRC, anchor)])
+FEATURES = {
+    "send later": (
+        [("data/Api.kt", "val sendAt: String?"),
+         ("data/Api.kt", "suspend fun mailScheduledList("),
+         ("data/Api.kt", "suspend fun mailScheduledCancel("),
+         ("ui/screens/mail/SendLaterSheet.kt", "ModalBottomSheet(")],
+        [("MailAPI.swift", "var sendAt: String?"),
+         ("MailAPI.swift", "static func mailScheduledList("),
+         ("MailAPI.swift", "static func mailScheduledCancel("),
+         ("SendLaterSheet.swift", "struct SendLaterSheet")],
+    ),
+    "original colours": (
+        [("ui/screens/mail/ReaderColourPrefs.kt", "fun setShowsOriginal("),
+         ("MainActivity.kt", "ReaderColourPrefs.clear(")],
+        [("ReaderColourPrefs.swift", "enum ReaderColourPrefs"),
+         ("SessionStore.swift", "ReaderColourPrefs.clear(")],
+    ),
+    "morning card": (
+        [("ui/mailfeatures/MorningCard.kt", "fun GoodMorningCard("),
+         ("ui/mailfeatures/MorningCard.kt", "fun needsReply(")],
+        [("MailboxInsights.swift", "enum InboxInsightKind"),
+         ("MailboxInsights.swift", "static func needsReply(")],
+    ),
+    "code chips": (
+        [("ui/mailfeatures/MorningCard.kt", "CodeFinder.find(row)"),
+         ("ui/components/Mail.kt", "signInCode: String? = null")],
+        [("MailboxInsights.swift", "static func freshCode("),
+         ("MailboxView.swift", "MailboxInsights.freshCode(")],
+    ),
+    "inbox zero": (
+        [("ui/mailfeatures/InboxZero.kt", "fun InboxZeroState(")],
+        [("InboxZeroView.swift", "struct InboxZeroView")],
+    ),
+    "swipe actions": (
+        [("logic/MailSwipePrefs.kt", "object MailSwipePrefs")],
+        [("SwipePreferences.swift", "enum SwipePreferences")],
+    ),
+    "grapmail://scheduled": (
+        [("logic/DeepLinks.kt", '"scheduled" ->'),
+         ("MainActivity.kt", "Routes.MAIL_SCHEDULED")],
+        [("DeepLinks.swift", 'case "scheduled"?:')],
+    ),
+}
+
+
+def _quoted(text):
+    return re.findall(r'"([^"\\]*)"', text)
+
+
+def feature_check(problems):
+    """Every mailbox feature present on BOTH clients, and the shared values equal."""
+    cache = {}
+
+    def src_of(base, rel):
+        path = os.path.join(base, rel)
+        if path not in cache:
+            cache[path] = code_only(read(path)) if os.path.exists(path) else None
+        return cache[path]
+
+    for feature, (on_android, on_ios) in FEATURES.items():
+        for side, base, anchors in (("Android", ANDROID_SRC, on_android), ("iOS", IOS_SRC, on_ios)):
+            for rel, anchor in anchors:
+                code = src_of(base, rel)
+                if code is None:
+                    problems.append(f"feature `{feature}`: {side} file missing: {rel}")
+                elif anchor not in code:
+                    problems.append(f"feature `{feature}`: {side} {rel} lost `{anchor}`")
+
+    # The deep link must also be declared, or Android never receives it.
+    manifest = read(ANDROID_MANIFEST) if os.path.exists(ANDROID_MANIFEST) else ""
+    if 'android:scheme="grapmail" android:host="scheduled"' not in manifest:
+        problems.append("feature `grapmail://scheduled`: AndroidManifest.xml declares no grapmail://scheduled filter")
+
+    # "Needs a reply": the phrases that count as asking something, one list.
+    kt = src_of(ANDROID_SRC, "ui/mailfeatures/MorningCard.kt") or ""
+    sw = src_of(IOS_SRC, "MailboxInsights.swift") or ""
+    m_kt = re.search(r"val ASK_PHRASES\s*=\s*listOf\(([^)]*)\)", kt)
+    m_sw = re.search(r"static let askPhrases\s*=\s*\[([^\]]*)\]", sw)
+    if not m_kt or not m_sw:
+        problems.append("needs-a-reply ask phrases not found on "
+                        + ("Android" if not m_kt else "iOS"))
+    elif _quoted(m_kt.group(1)) != _quoted(m_sw.group(1)):
+        problems.append("needs-a-reply ask phrases differ: Android "
+                        f"{_quoted(m_kt.group(1))} vs iOS {_quoted(m_sw.group(1))}")
+
+    # The boxes whose rows offer a sign-in code chip. Android's All mail is
+    # iOS's `.others` (both are the server's `others` box).
+    m_kt = re.search(r"val codeBox\s*=([\s\S]*?)\n\s*val ", kt)
+    mv = src_of(IOS_SRC, "MailboxView.swift") or ""
+    m_sw = re.search(r"codeBoxes\s*:\s*Set<MailBox>\s*=\s*\[([^\]]*)\]", mv)
+    if not m_kt or not m_sw:
+        problems.append("code-chip boxes not found on " + ("Android" if not m_kt else "iOS"))
+    else:
+        a_boxes = {("others" if b == "All" else b.lower()) for b in re.findall(r"MailBox\.(\w+)", m_kt.group(1))}
+        i_boxes = {b.lower() for b in re.findall(r"\.(\w+)", m_sw.group(1))}
+        if a_boxes != i_boxes:
+            problems.append(f"code-chip boxes differ: Android {sorted(a_boxes)} vs iOS {sorted(i_boxes)}")
+
+    # Swipe choices: the stored keys and the two defaults.
+    ksw = src_of(ANDROID_SRC, "logic/MailSwipePrefs.kt") or ""
+    isw = src_of(IOS_SRC, "SwipePreferences.swift") or ""
+    m_kt = re.search(r"enum class SwipeAction[^{]*\{([\s\S]*?);", ksw)
+    m_sw = re.search(r"enum SwipeChoice[^{]*\{([\s\S]*?)\n\s*var ", isw)
+    if not m_kt or not m_sw:
+        problems.append("swipe choices not found on " + ("Android" if not m_kt else "iOS"))
+    else:
+        a_keys = re.findall(r'\w+\("(\w+)"\)', m_kt.group(1))
+        i_keys = [raw or name for name, raw in
+                  re.findall(r'case\s+(\w+)(?:\s*=\s*"(\w+)")?', m_sw.group(1))]
+        if a_keys != i_keys:
+            problems.append(f"swipe choices differ: Android {a_keys} vs iOS {i_keys}")
+        d_kt = (re.search(r"DefaultRight\s*=\s*SwipeAction\.(\w+)", ksw),
+                re.search(r"DefaultLeft\s*=\s*SwipeAction\.(\w+)", ksw))
+        d_sw = (re.search(r"defaultRight\s*:\s*SwipeChoice\s*=\s*\.(\w+)", isw),
+                re.search(r"defaultLeft\s*:\s*SwipeChoice\s*=\s*\.(\w+)", isw))
+        if not all(d_kt) or not all(d_sw):
+            problems.append("swipe defaults not found on " + ("Android" if not all(d_kt) else "iOS"))
+        elif [d.group(1).lower() for d in d_kt] != [d.group(1).lower() for d in d_sw]:
+            problems.append("swipe defaults differ: Android right/left "
+                            f"{[d.group(1) for d in d_kt]} vs iOS {[d.group(1) for d in d_sw]}")
+
+    say(f"mailbox features — {len(FEATURES)} named, both platforms, "
+        "ask phrases / code-chip boxes / swipe keys compared")
+
+
 def main():
-    missing = [p for p in (ANDROID, ANDROID_DTO, IOS_API, IOS_ACCOUNT) if not os.path.exists(p)]
+    ios_extra = [os.path.join(ROOT, rel) for rel in sorted(IOS_API_EXTRA)]
+    missing = [p for p in (ANDROID, ANDROID_DTO, IOS_API, IOS_ACCOUNT, *ios_extra)
+               if not os.path.exists(p)]
     if missing:
         print("api-parity: source file(s) not found: " + ", ".join(missing))
         return 2
 
     android_src = read(ANDROID) + "\n" + read(ANDROID_DTO)
-    ios_src = read(IOS_API)
+    ios_src = "\n".join([read(IOS_API)] + [read(p) for p in ios_extra])
 
     problems = []
 
@@ -386,6 +546,7 @@ def main():
         f"shared {len(af & _if)}")
 
     spec_check(af, _if, android_src, ios_src, problems)
+    feature_check(problems)
 
     a_types = _types(android_src, ANDROID_DECL, "(", ")", android_fields)
     i_types = _types(ios_src, SWIFT_DECL, "{", "}", swift_fields)

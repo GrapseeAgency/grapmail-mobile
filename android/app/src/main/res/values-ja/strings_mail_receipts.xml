@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="mail_receipt_read_at">%1$s に既読</string>
+    <string name="mail_receipt_requested_pending">開封確認をリクエスト済み · 未読</string>
+    <string name="mail_receipt_server_sent">開封確認を送信しました</string>
+    <string name="mail_receipt_ask_title">送信者が開封確認をリクエストしています</string>
+    <string name="mail_receipt_ask_body">このメッセージを開いたことを %1$s に知らせる開封確認を送信しますか？伝わるのは開いた日時だけです。</string>
+    <string name="mail_receipt_ask_send">開封確認を送信</string>
+    <string name="mail_receipt_ask_decline">送信しない</string>
+    <string name="mail_receipt_mode_title">開封確認を送信</string>
+    <string name="mail_receipt_mode_body">開封確認を求めるメッセージを受け取ったときの動作です。「常に送信」を選ばない限り、迷惑メール、ブロックした送信者、暗号化メールには開封確認を送信しません。</string>
+    <string name="mail_receipt_mode_never">送信しない</string>
+    <string name="mail_receipt_mode_ask">毎回確認</string>
+    <string name="mail_receipt_mode_always">常に送信</string>
+    <string name="mail_receipt_mode_always_note">「常に送信」では、迷惑メール、ブロックした送信者、暗号化メールにも開封確認を送信します。</string>
+    <string name="mail_receipt_mode_unavailable">この設定を読み込めませんでした。接続を確認してください。</string>
+    <string name="mail_compose_request_receipt">開封確認をリクエスト</string>
+</resources>

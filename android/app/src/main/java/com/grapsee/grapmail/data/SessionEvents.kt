@@ -45,4 +45,37 @@ object SessionEvents {
     fun resetExpired() {
         _expired.resetReplayCache()
     }
+
+    // ── Round 8 — B: why a session ended (welcome-back banner) ─────────────
+    //
+    // The 401 above carries only the bearer, and the server sends no
+    // "revoked" code on it. The layer that learns WHY — the refresh that was
+    // refused (SessionRefresh) — notes it here against the dead bearer, and
+    // SessionStore.clearIfToken takes it when the collector drops that
+    // session, writing it onto the remembered-account record. In memory
+    // only, a handful of entries, keyed by a bearer that is already dead.
+
+    private val endings = object : java.util.LinkedHashMap<String, RememberedAccounts.Ending>(8, 0.75f, false) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, RememberedAccounts.Ending>?): Boolean =
+            size > 8
+    }
+
+    /** Record why the session holding [token] is ending. Non-suspending, any thread. */
+    fun noteEnding(token: String, ending: RememberedAccounts.Ending) {
+        synchronized(endings) { endings[token] = ending }
+    }
+
+    /** The reason noted for [token], removed as it is read; null when nothing was noted. */
+    fun takeEnding(token: String): RememberedAccounts.Ending? =
+        synchronized(endings) { endings.remove(token) }
+
+    /**
+     * For a caller that knows the session was ended elsewhere (another
+     * device, "This wasn't me", "Sign out everywhere"): the same signal as
+     * [signalExpired], with the reason the welcome-back banner shows.
+     */
+    fun signalRevoked(rejectedToken: String) {
+        noteEnding(rejectedToken, RememberedAccounts.Ending.Revoked)
+        signalExpired(rejectedToken)
+    }
 }

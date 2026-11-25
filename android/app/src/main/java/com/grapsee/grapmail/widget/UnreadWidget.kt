@@ -31,6 +31,7 @@ import androidx.glance.text.Text
 import androidx.glance.text.TextStyle
 import androidx.glance.unit.ColorProvider
 import com.grapsee.grapmail.MainActivity
+import com.grapsee.grapmail.R
 
 /**
  * The home-screen widget — unread count, the newest three messages (sender and
@@ -91,7 +92,8 @@ private class WidgetPalette(context: Context) {
 
 @Composable
 private fun UnreadContent(snapshot: MailWidgetState.Snapshot) {
-    val palette = WidgetPalette(LocalContext.current)
+    val context = LocalContext.current
+    val palette = WidgetPalette(context)
     val canvas = palette.canvas
     val ink = palette.ink
     val sub = palette.sub
@@ -117,24 +119,25 @@ private fun UnreadContent(snapshot: MailWidgetState.Snapshot) {
         Spacer(GlanceModifier.height(6.dp))
         Text(
             when (snapshot.unread) {
-                null -> "not read yet"
-                0 -> "no unread mail"
-                1 -> "1 unread message"
-                else -> snapshot.unread.toString() + " unread messages"
+                null -> context.getString(R.string.mail_widget_not_read_yet)
+                0 -> context.getString(R.string.mail_widget_no_unread)
+                else -> (snapshot.unread ?: 0).let { n ->
+                    context.resources.getQuantityString(R.plurals.mail_widget_unread_count, n, n)
+                }
             },
             style = TextStyle(color = ink, fontSize = 12.sp),
         )
         Spacer(GlanceModifier.height(6.dp))
         if (snapshot.recent.isEmpty()) {
             Text(
-                snapshot.latest ?: "Open GrapMail to check",
+                snapshot.latest ?: context.getString(R.string.mail_widget_open_to_check),
                 style = TextStyle(color = sub, fontSize = 11.sp),
                 maxLines = 2,
             )
         } else {
             snapshot.recent.forEach { pair ->
                 Text(
-                    pair.first + " — " + pair.second,
+                    context.getString(R.string.mail_widget_recent_row, pair.first, pair.second),
                     style = TextStyle(color = ink, fontSize = 11.sp),
                     maxLines = 1,
                 )
@@ -143,7 +146,7 @@ private fun UnreadContent(snapshot: MailWidgetState.Snapshot) {
         }
         Spacer(GlanceModifier.height(6.dp))
         Text(
-            "✉  New message",
+            context.getString(R.string.mail_widget_new_message),
             style = TextStyle(color = accent, fontSize = 12.sp, fontWeight = FontWeight.Bold),
             modifier = GlanceModifier
                 .fillMaxWidth()

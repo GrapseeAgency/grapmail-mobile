@@ -1,0 +1,73 @@
+{
+ "android": {
+  "strings_r9_reader.xml": {
+   "reader_earlier_messages": {"one": "%d предыдущее сообщение", "few": "%d предыдущих сообщения", "many": "%d предыдущих сообщений", "other": "%d предыдущего сообщения"},
+   "reader_participants": {"one": "%d человек", "few": "%d человека", "many": "%d человек", "other": "%d человека"},
+   "reader_message_count": {"one": "%d сообщение", "few": "%d сообщения", "many": "%d сообщений", "other": "%d сообщения"},
+   "reader_you": "Вы",
+   "reader_unread": "Не прочитано",
+   "reader_earlier_action": "показать свёрнутые сообщения",
+   "reader_open_message_action": "открыть это сообщение",
+   "reader_quoted_show": "Показать цитируемый текст",
+   "reader_quoted_hide": "Скрыть цитируемый текст",
+   "reader_state_expanded": "Развёрнуто",
+   "reader_state_collapsed": "Свёрнуто",
+   "reader_reply_to": "Ответить %1$s…",
+   "reader_reply_fallback": "Ответить…",
+   "reader_reply_options": "Параметры ответа",
+   "reader_quick_reply": "Быстрый ответ",
+   "reader_attach_share_chooser": "Поделиться вложением",
+   "reader_attach_view_image": "посмотреть изображение",
+   "reader_attach_save_named": "Сохранить %1$s",
+   "reader_attach_share_named": "Поделиться %1$s",
+   "reader_attach_share_nothing": "Ни одно приложение на этом устройстве не может поделиться этим файлом.",
+   "reader_viewer_position": "%1$d из %2$d",
+   "reader_viewer_too_large": "Это изображение нельзя показать здесь.",
+   "compose_r9_leave_title": "Выйти из этого сообщения?",
+   "compose_r9_leave_attachments": "Черновики пока не сохраняют вложения. Сохраните текст без них или продолжите редактирование.",
+   "compose_r9_save_text_only": "Сохранить только текст",
+   "compose_r9_draft_failed_title": "Черновик не сохранён",
+   "compose_r9_leave_without_saving": "Выйти без сохранения",
+   "compose_r9_encrypt_failed": "Это сообщение не удалось зашифровать, поэтому ничего не отправлено.",
+   "compose_editor_toolbar": "Форматирование текста",
+   "compose_editor_bold": "Полужирный",
+   "compose_editor_italic": "Курсив",
+   "compose_editor_underline": "Подчёркнутый",
+   "compose_editor_strike": "Зачёркнутый",
+   "compose_editor_bullets": "Маркированный список",
+   "compose_editor_numbered": "Нумерованный список",
+   "compose_editor_text_colour": "Цвет текста",
+   "compose_editor_black": "Чёрный",
+   "compose_editor_blue": "Синий",
+   "compose_editor_red": "Красный",
+   "compose_editor_green": "Зелёный",
+   "compose_editor_highlight": "Выделить",
+   "compose_editor_highlight_colour": "Цвет выделения",
+   "compose_editor_yellow": "Жёлтый",
+   "compose_editor_pink": "Розовый",
+   "compose_editor_font": "Шрифт",
+   "compose_editor_sans": "Без засечек",
+   "compose_editor_larger": "Крупнее",
+   "compose_editor_clear": "Очистить формат",
+   "compose_editor_image": "Изображение",
+   "compose_editor_insert_image": "Вставить изображение"
+  },
+  "strings_r9_platform.xml": {
+   "r9_platform_notif_channel_new_mail_desc": "Сообщает о новых письмах во входящих.",
+   "r9_platform_price_per_week": "%1$s в неделю",
+   "r9_platform_price_per_month": "%1$s в месяц",
+   "r9_platform_price_per_3_months": "%1$s каждые 3 месяца",
+   "r9_platform_price_per_6_months": "%1$s каждые 6 месяцев",
+   "r9_platform_price_per_year": "%1$s в год"
+  },
+  "strings_r9_mailbox.xml": {
+   "mail_sendlater_channel_name": "Отложенная отправка",
+   "mail_sendlater_channel_desc": "Обратный отсчёт для писем, ожидающих отправки"
+  },
+  "strings_identity.xml": {
+   "identity_settings_appearance": "Оформление",
+   "identity_match_wallpaper_title": "Подстроить под обои",
+   "identity_match_wallpaper_subtitle": "Использовать цвета обоев для кнопок и выделений. Аватары, цвета состояний и текст остаются фирменными."
+  }
+ }
+}

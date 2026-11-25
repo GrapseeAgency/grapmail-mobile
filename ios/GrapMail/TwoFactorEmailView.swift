@@ -26,7 +26,7 @@ struct TwoFactorEmailView: View {
     @State private var needsProof = false
 
     private func load() async {
-        guard let token = SessionStore.token else { error = "Sign in again."; return }
+        guard let token = SessionStore.token else { error = String(localized: "Sign in again.", comment: "Error when the session has expired"); return }
         do {
             let profile = try await ApiClient.profile(token: token).profile
             guard let email = profile?.recoveryEmail, !email.isEmpty, profile?.recoveryEmailVerified == true else {
@@ -36,7 +36,7 @@ struct TwoFactorEmailView: View {
             address = email
             await send()
         } catch {
-            self.error = apiMessage(error, fallback: "We couldn't load your account. Try again.")
+            self.error = apiMessage(error, fallback: String(localized: "We couldn't load your account. Try again.", comment: "Error message shown when the server gives no reason (two factor email screen)"))
         }
     }
 
@@ -49,7 +49,7 @@ struct TwoFactorEmailView: View {
             expiresAt = sent.expiresAt.map { Date(timeIntervalSince1970: $0 / 1000) }
             code = ""
         } catch {
-            self.error = apiMessage(error, fallback: "We couldn't send the code. Try again.")
+            self.error = apiMessage(error, fallback: String(localized: "We couldn't send the code. Try again.", comment: "Error message shown when the server gives no reason (two factor email screen)"))
         }
     }
 
@@ -77,7 +77,7 @@ struct TwoFactorEmailView: View {
                     code = ""
                 }
                 if failure == "TWO_FACTOR_NEEDS_RECOVERY_EMAIL" { needsEmail = true }
-                self.error = apiMessage(error, fallback: "We couldn't turn on two-step verification. Try again.")
+                self.error = apiMessage(error, fallback: String(localized: "We couldn't turn on two-step verification. Try again.", comment: "Error message shown when the server gives no reason (two factor email screen)"))
             }
         }
     }
@@ -87,57 +87,59 @@ struct TwoFactorEmailView: View {
             onBack: onBack,
             illustration: "ill_sec_phone",
             illustrationWidth: 170,
-            title: needsEmail ? "Add a Recovery Email" : "Check Your Email",
+            title: needsEmail ? String(localized: "Add a Recovery Email", comment: "Screen title (two factor email screen)") : String(localized: "Check Your Email", comment: "Screen title (two factor email screen)"),
             subtitle: needsEmail
-                ? "Two-step verification emails your sign-in codes to a verified recovery email. Add one first."
-                : (maskedEmail.map { "We've emailed a 6-digit code to \($0)." }
-                    ?? "We'll email a code to the recovery email on this account.")
+                ? String(localized: "Two-step verification emails your sign-in codes to a verified recovery email. Add one first.", comment: "Screen description under the title (two factor email screen)")
+                : (maskedEmail.map { String(localized: "We've emailed a 6-digit code to \($0).", comment: "Screen description under the title (two factor email screen)") }
+                    ?? String(localized: "We'll email a code to the recovery email on this account.", comment: "Screen description under the title (two factor email screen)"))
         ) {
             if !needsEmail {
                 InfoCard {
-                    HStack(spacing: 8) {
-                        Image(systemName: "envelope").font(.system(size: 14)).foregroundColor(GM.primarySolid)
-                        Text("Recovery Email").font(.system(size: 13, weight: .medium)).foregroundColor(GM.textSecondary)
+                    GMAdaptiveStack(spacing: 8) {
+                        Image(systemName: "envelope").gmFont(14).foregroundColor(GM.primarySolid)
+                        Text("Recovery Email").gmFont(13, .medium).foregroundColor(GM.textSecondary)
                         Spacer()
-                        StatusChip(text: "Verified", tone: .success)
+                        StatusChip(text: String(localized: "Verified", comment: "Status chip (two factor email screen)"), tone: .success)
                     }
                     Text(address ?? "—")
-                        .font(.system(size: 16, weight: .semibold))
+                        .gmFont(16, .semibold)
                         .foregroundColor(GM.textPrimary)
                         .padding(.top, 4)
                     Text("Verification Code")
-                        .font(.system(size: 13, weight: .medium))
+                        .gmFont(13, .medium)
                         .foregroundColor(GM.textSecondary)
                         .padding(.top, 14)
                     CodeCells(length: 6, value: $code)
+                        // Round 8 — B: the emailed code is offered above the keyboard.
+                        .textContentType(.oneTimeCode)
                         .padding(.top, 6)
                 }
                 CodeExpiry(expiresAt: expiresAt)
                     .padding(.top, 10)
                 Text("Didn't get it? Check your spam folder. From now on, sign-in codes will go to this address.")
-                    .font(.system(size: 12))
+                    .gmFont(12)
                     .foregroundColor(GM.textSecondary)
                     .fixedSize(horizontal: false, vertical: true)
                     .padding(.top, 10)
             }
             if let error {
-                Text(error).font(.system(size: 12)).foregroundColor(GM.error).padding(.top, 6)
+                Text(error).gmFont(12).foregroundColor(GM.error).padding(.top, 6)
             }
             if needsProof {
-                AccountLink(title: "Enter your password again", action: onBack)
+                AccountLink(title: String(localized: "Enter your password again", comment: "Link-style button (two factor email screen)"), action: onBack)
             }
         } footer: {
             VStack(spacing: 4) {
                 if needsEmail {
-                    GradientButton(title: "Add Recovery Email", action: onAddRecoveryEmail)
+                    GradientButton(title: String(localized: "Add Recovery Email", comment: "Button title (two factor email screen)"), action: onAddRecoveryEmail)
                 } else {
                     GradientButton(
-                        title: "Turn On",
+                        title: String(localized: "Turn On", comment: "Button title (two factor email screen)"),
                         enabled: code.count == 6 && verificationToken != nil,
                         busy: busy || !loaded,
                         action: { turnOn() }
                     )
-                    AccountLink(title: "Resend code", action: {
+                    AccountLink(title: String(localized: "Resend code", comment: "Link-style button (two factor email screen)"), action: {
                         error = nil
                         Task { await send() }
                     })

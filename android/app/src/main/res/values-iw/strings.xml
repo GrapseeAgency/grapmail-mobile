@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">GrapMail</string>
+    <string name="shortcut_compose_short">כתיבת הודעה</string>
+    <string name="shortcut_compose_long">כתיבת הודעת GrapMail חדשה</string>
+    <string name="shortcut_scheduled_short">שליחות מתוזמנות</string>
+    <string name="shortcut_scheduled_long">צפייה בדואר שממתין לשליחה וביטולו</string>
+    <string name="shortcut_subscriptions_short">מינויים</string>
+    <string name="shortcut_subscriptions_long">סקירת שולחים וביטול מינויים במקום אחד</string>
+    <string name="notif_channel_new_mail">דואר חדש</string>
+    <string name="notif_channel_new_mail_desc">מודיע כשבדיקה ברקע מצאה הודעות שעדיין לא קראת. ל-GrapMail אין שירות התראות Push, ולכן ההתראות מגיעות מהאפליקציה עצמה כשהיא פונה לשרת, כשהמערכת מעירה אותה.</string>
+    <string name="notif_channel_security">התראות אבטחה</string>
+    <string name="notif_channel_security_desc">מודיע ברגע שמשהו קורה בחשבון שלך: כניסה ממכשיר חדש, שינוי סיסמה, שינוי במכשיר מהימן. התראות אלה אף פעם לא מושתקות בשעות השקט.</string>
+    <string name="widget_description">דואר שלא נקרא במבט אחד: ספירות מהבדיקות של GrapMail ברקע</string>
+</resources>

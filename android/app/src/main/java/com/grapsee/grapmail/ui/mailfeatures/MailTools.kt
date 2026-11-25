@@ -26,6 +26,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
+import com.grapsee.grapmail.R
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -80,9 +83,9 @@ fun FollowUpCenterScreen(onClose: () -> Unit) {
     var items by remember { mutableStateOf(prefs.overdueAwaitingReplies(days)) }
 
     MailFeatureScreenDialog(onClose = onClose) {
-        Text("Follow-up reminders", fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
+        Text(stringResource(R.string.mail_features_followups_title), fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
         Text(
-            "Threads where you replied and no answer has arrived within " + days + " day(s).",
+            pluralStringResource(R.plurals.mail_followup_window_intro, days, days),
             fontSize = 12.sp,
         )
         Row(
@@ -93,48 +96,48 @@ fun FollowUpCenterScreen(onClose: () -> Unit) {
                 days = (days - 1).coerceAtLeast(1)
                 prefs.followUpDays = days
                 items = prefs.overdueAwaitingReplies(days)
-            }) { Text("−1 day") }
-            Text("Window: " + days + " day(s)", fontSize = 12.sp)
+            }) { Text(stringResource(R.string.mail_followup_minus_day)) }
+            Text(pluralStringResource(R.plurals.mail_followup_window, days, days), fontSize = 12.sp)
             TextButton(onClick = {
                 days = (days + 1).coerceAtMost(30)
                 prefs.followUpDays = days
                 items = prefs.overdueAwaitingReplies(days)
-            }) { Text("+1 day") }
+            }) { Text(stringResource(R.string.mail_followup_plus_day)) }
         }
         if (items.isEmpty()) {
-            Text("Nothing overdue right now.", fontSize = 13.sp)
+            Text(stringResource(R.string.mail_followup_nothing_overdue), fontSize = 13.sp)
         }
+        val nudgeText = stringResource(R.string.mail_followup_nudge_text)
         items.forEach { pair ->
             val key = pair.first
             val title = pair.second
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
                     Text(
-                        title.ifBlank { "Awaiting reply" },
+                        title.ifBlank { stringResource(R.string.mail_followup_awaiting_reply) },
                         fontSize = 14.sp,
                         fontWeight = FontWeight.Medium,
                     )
-                    Text("No reply received yet", fontSize = 11.sp)
+                    Text(stringResource(R.string.mail_followup_no_reply_yet), fontSize = 11.sp)
                 }
                 TextButton(onClick = {
                     MailFeatureIntents.copyText(
                         context,
                         "follow-up",
-                        "Just checking in on this — any update on your side?",
+                        nudgeText,
                     )
-                }) { Text("Nudge") }
+                }) { Text(stringResource(R.string.mail_followup_nudge)) }
                 TextButton(onClick = {
                     prefs.clearAwaitingReply(key)
                     items = prefs.overdueAwaitingReplies(days)
-                }) { Text("Clear") }
+                }) { Text(stringResource(R.string.mail_common_clear)) }
             }
         }
         Text(
-            "Reminders are tracked locally: GrapMail marks a thread when you " +
-                "reply and clears it when an answer arrives.",
+            stringResource(R.string.mail_followup_local_note),
             fontSize = 11.sp,
         )
-        TextButton(onClick = onClose) { Text("Close") }
+        TextButton(onClick = onClose) { Text(stringResource(R.string.mail_common_close)) }
     }
 }
 
@@ -162,14 +165,18 @@ object SendLaterWatchdog {
         val cancelIntent = PendingIntent.getActivity(context, notificationId, open, flags)
         val remaining = (sendAtMillis - System.currentTimeMillis() - 60_000L).coerceAtLeast(60_000L)
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
-            .setSmallIcon(context.applicationInfo.icon)
-            .setContentTitle("Scheduled to send " + whenText)
+            // The monochrome mark every other GrapMail notification uses. The
+            // launcher icon is a full-colour adaptive icon, which the status
+            // bar draws as a blank square (and some Android 8 builds refuse).
+            .setSmallIcon(R.mipmap.ic_launcher_monochrome)
+            .setContentTitle(context.getString(R.string.mail_sendlater_title, whenText))
             .setContentText(subject.take(90))
+            .setContentIntent(cancelIntent)
             .setOngoing(true)
             .setOnlyAlertOnce(true)
             .setShowWhen(false)
             .setTimeoutAfter(remaining)
-            .addAction(0, "Cancel send", cancelIntent)
+            .addAction(0, context.getString(R.string.mail_sendlater_cancel), cancelIntent)
             .build()
         runCatching { NotificationManagerCompat.from(context).notify(notificationId, notification) }
     }
@@ -184,10 +191,10 @@ object SendLaterWatchdog {
             manager.createNotificationChannel(
                 NotificationChannel(
                     CHANNEL_ID,
-                    "Scheduled sends",
+                    context.getString(R.string.mail_sendlater_channel_name),
                     NotificationManager.IMPORTANCE_LOW,
                 ).apply {
-                    description = "Countdown for messages waiting to be sent"
+                    description = context.getString(R.string.mail_sendlater_channel_desc)
                 },
             )
         }
@@ -200,31 +207,29 @@ object SendLaterWatchdog {
 
 @Composable
 fun ImportAssistantScreen(onClose: () -> Unit) {
+    val context = androidx.compose.ui.platform.LocalContext.current
     var pasted by remember { mutableStateOf("") }
     var result by remember { mutableStateOf<String?>(null) }
 
     MailFeatureScreenDialog(onClose = onClose) {
-        Text("Import & migration assistant", fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
-        Text("Bring your world to GrapMail in three steps:", fontSize = 13.sp, fontWeight = FontWeight.Medium)
+        Text(stringResource(R.string.mail_import_assistant_title), fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
+        Text(stringResource(R.string.mail_import_assistant_intro), fontSize = 13.sp, fontWeight = FontWeight.Medium)
         Text(
-            "1. In your old provider, turn on automatic forwarding to your GrapMail address " +
-                "(usually Settings → Forwarding).",
+            stringResource(R.string.mail_import_assistant_step1),
             fontSize = 12.sp,
         )
         Text(
-            "2. Export contacts as vCard (.vcf) and calendars as iCal (.ics), paste their " +
-                "contents below and validate before importing.",
+            stringResource(R.string.mail_import_assistant_step2),
             fontSize = 12.sp,
         )
         Text(
-            "3. Send one test message from the old address to confirm forwarding, then switch " +
-                "your daily flow here.",
+            stringResource(R.string.mail_import_assistant_step3),
             fontSize = 12.sp,
         )
         OutlinedTextField(
             value = pasted,
             onValueChange = { pasted = it },
-            label = { Text("Paste .vcf or .ics text") },
+            label = { Text(stringResource(R.string.mail_import_assistant_paste)) },
             modifier = Modifier.fillMaxWidth().height(160.dp),
         )
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -232,21 +237,23 @@ fun ImportAssistantScreen(onClose: () -> Unit) {
                 val contacts = Regex("(?im)^BEGIN:VCARD").findAll(pasted).count()
                 val events = Regex("(?im)^BEGIN:VEVENT").findAll(pasted).count()
                 result = when {
-                    pasted.isBlank() -> "Nothing pasted yet."
+                    pasted.isBlank() -> context.getString(R.string.mail_import_assistant_nothing)
                     contacts == 0 && events == 0 ->
-                        "No vCard or iCal blocks found — check the export file."
-                    else -> "Validated: " + contacts + " contact(s), " + events +
-                        " calendar event(s). Ready to import."
+                        context.getString(R.string.mail_import_assistant_none_found)
+                    else -> context.getString(
+                        R.string.mail_import_assistant_validated,
+                        context.resources.getQuantityString(R.plurals.mail_import_contacts, contacts, contacts),
+                        context.resources.getQuantityString(R.plurals.mail_import_events, events, events),
+                    )
                 }
-            }) { Text("Validate") }
-            TextButton(onClick = { pasted = ""; result = null }) { Text("Clear") }
+            }) { Text(stringResource(R.string.mail_import_assistant_validate)) }
+            TextButton(onClick = { pasted = ""; result = null }) { Text(stringResource(R.string.mail_common_clear)) }
         }
         result?.let { Text(it, fontSize = 13.sp) }
         Text(
-            "Your contacts and calendars stay yours — the assistant only reads what you paste " +
-                "here, on this device.",
+            stringResource(R.string.mail_import_assistant_privacy),
             fontSize = 11.sp,
         )
-        TextButton(onClick = onClose) { Text("Close") }
+        TextButton(onClick = onClose) { Text(stringResource(R.string.mail_common_close)) }
     }
 }

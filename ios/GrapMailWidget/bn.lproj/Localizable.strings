@@ -1,0 +1,29 @@
+/* GrapMailWidget — Bengali. */
+
+"Unread mail" = "অপঠিত মেল";
+"The unread count your app last saw, and the newest message." = "অ্যাপ শেষবার যত অপঠিত দেখেছে, এবং সবচেয়ে নতুন বার্তা।";
+"GrapMail — not signed in" = "GrapMail — সাইন ইন করা নেই";
+"GrapMail — no read yet" = "GrapMail — এখনও যাচাই হয়নি";
+"%lld unread · %@" = "%lld অপঠিত · %@";
+"%lld unread" = "%lld অপঠিত";
+"unread" = "অপঠিত";
+"No subject" = "কোনো বিষয় নেই";
+"No read yet" = "এখনও যাচাই হয়নি";
+"Open the app to sign in" = "সাইন ইন করতে অ্যাপ খুলুন";
+"Scheduled send" = "নির্ধারিত পাঠানো";
+"(no subject)" = "(কোনো বিষয় নেই)";
+"Scheduled" = "নির্ধারিত";
+"To %@" = "প্রাপক: %@";
+"Sending…" = "পাঠানো হচ্ছে…";
+
+/* Home Screen widget row buttons (iOS 17+), read by VoiceOver */
+"Mark as read" = "পঠিত হিসেবে চিহ্নিত করুন";
+"Archive" = "আর্কাইভ";
+"Star" = "তারকাচিহ্ন দিন";
+"Unstar" = "তারকাচিহ্ন সরান";
+/* The widget row buttons' App Intent and its parameters (hidden from Shortcuts) */
+"Update message" = "বার্তা আপডেট করুন";
+"Message" = "বার্তা";
+"Action" = "কাজ";
+/* Widget placeholder when no account is signed in */
+"Open GrapMail to sign in" = "সাইন ইন করতে GrapMail খুলুন";

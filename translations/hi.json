@@ -1,0 +1,73 @@
+{
+ "android": {
+  "strings_r9_reader.xml": {
+   "reader_earlier_messages": {"one": "%d पुराना संदेश", "other": "%d पुराने संदेश"},
+   "reader_participants": {"one": "%d व्यक्ति", "other": "%d लोग"},
+   "reader_message_count": {"one": "%d संदेश", "other": "%d संदेश"},
+   "reader_you": "आप",
+   "reader_unread": "अपठित",
+   "reader_earlier_action": "मोड़े गए संदेश दिखाएँ",
+   "reader_open_message_action": "यह संदेश खोलें",
+   "reader_quoted_show": "उद्धृत टेक्स्ट दिखाएँ",
+   "reader_quoted_hide": "उद्धृत टेक्स्ट छिपाएँ",
+   "reader_state_expanded": "खुला",
+   "reader_state_collapsed": "मोड़ा गया",
+   "reader_reply_to": "%1$s को जवाब दें…",
+   "reader_reply_fallback": "जवाब दें…",
+   "reader_reply_options": "जवाब के विकल्प",
+   "reader_quick_reply": "त्वरित जवाब",
+   "reader_attach_share_chooser": "अटैचमेंट साझा करें",
+   "reader_attach_view_image": "तस्वीर देखें",
+   "reader_attach_save_named": "%1$s सहेजें",
+   "reader_attach_share_named": "%1$s साझा करें",
+   "reader_attach_share_nothing": "इस डिवाइस पर कोई ऐप यह फ़ाइल साझा नहीं कर सकता।",
+   "reader_viewer_position": "%1$d / %2$d",
+   "reader_viewer_too_large": "यह तस्वीर यहाँ नहीं दिखाई जा सकती।",
+   "compose_r9_leave_title": "यह संदेश छोड़ें?",
+   "compose_r9_leave_attachments": "ड्राफ़्ट अभी अटैचमेंट नहीं रखते। टेक्स्ट को बिना अटैचमेंट के ड्राफ़्ट में सहेजें या संपादन जारी रखें।",
+   "compose_r9_save_text_only": "सिर्फ़ टेक्स्ट सहेजें",
+   "compose_r9_draft_failed_title": "यह ड्राफ़्ट सहेजा नहीं गया",
+   "compose_r9_leave_without_saving": "बिना सहेजे छोड़ें",
+   "compose_r9_encrypt_failed": "यह संदेश एन्क्रिप्ट नहीं हो सका, इसलिए कुछ भी नहीं भेजा गया।",
+   "compose_editor_toolbar": "टेक्स्ट फ़ॉर्मैटिंग",
+   "compose_editor_bold": "बोल्ड",
+   "compose_editor_italic": "इटैलिक",
+   "compose_editor_underline": "रेखांकित",
+   "compose_editor_strike": "काटा हुआ",
+   "compose_editor_bullets": "बुलेट",
+   "compose_editor_numbered": "क्रमांकित",
+   "compose_editor_text_colour": "टेक्स्ट का रंग",
+   "compose_editor_black": "काला",
+   "compose_editor_blue": "नीला",
+   "compose_editor_red": "लाल",
+   "compose_editor_green": "हरा",
+   "compose_editor_highlight": "हाइलाइट",
+   "compose_editor_highlight_colour": "हाइलाइट का रंग",
+   "compose_editor_yellow": "पीला",
+   "compose_editor_pink": "गुलाबी",
+   "compose_editor_font": "फ़ॉन्ट",
+   "compose_editor_sans": "बिना सेरिफ़",
+   "compose_editor_larger": "बड़ा",
+   "compose_editor_clear": "फ़ॉर्मैटिंग हटाएँ",
+   "compose_editor_image": "तस्वीर",
+   "compose_editor_insert_image": "तस्वीर डालें"
+  },
+  "strings_r9_platform.xml": {
+   "r9_platform_notif_channel_new_mail_desc": "जब इनबॉक्स में नए संदेश आते हैं तो बताता है।",
+   "r9_platform_price_per_week": "%1$s/हफ़्ता",
+   "r9_platform_price_per_month": "%1$s/महीना",
+   "r9_platform_price_per_3_months": "हर 3 महीने %1$s",
+   "r9_platform_price_per_6_months": "हर 6 महीने %1$s",
+   "r9_platform_price_per_year": "%1$s/साल"
+  },
+  "strings_r9_mailbox.xml": {
+   "mail_sendlater_channel_name": "निर्धारित भेजे गए",
+   "mail_sendlater_channel_desc": "भेजे जाने की प्रतीक्षा कर रहे संदेशों की उलटी गिनती"
+  },
+  "strings_identity.xml": {
+   "identity_settings_appearance": "रूप",
+   "identity_match_wallpaper_title": "वॉलपेपर से मिलाएँ",
+   "identity_match_wallpaper_subtitle": "बटन और हाइलाइट के लिए अपने वॉलपेपर के रंग इस्तेमाल करें। अवतार, स्थिति के रंग और टेक्स्ट GrapMail के ही रहते हैं।"
+  }
+ }
+}

@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.waterfall
 import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.width
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.ExperimentalComposeUiApi
@@ -33,6 +34,15 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.animation.SharedTransitionLayout
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.togetherWith
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.SideEffect
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -74,7 +84,14 @@ import com.grapsee.grapmail.ui.screens.mail.MailSnapshotScreen
 import com.grapsee.grapmail.ui.screens.mail.ScreenerScreen
 import com.grapsee.grapmail.ui.screens.mail.ScheduledScreen
 import com.grapsee.grapmail.ui.screens.mail.SubscriptionsScreen
+import com.grapsee.grapmail.ui.screens.mail.ReaderPaneEmptyState
+import com.grapsee.grapmail.ui.screens.mail.ThreadContent
 import com.grapsee.grapmail.ui.screens.mail.ThreadScreen
+import com.grapsee.grapmail.ui.screens.mail.LocalMailAnimatedScope
+import com.grapsee.grapmail.ui.screens.mail.LocalMailSharedScope
+import com.grapsee.grapmail.ui.screens.mail.MailOpenMillis
+import com.grapsee.grapmail.ui.screens.mail.MailOpenTransition
+import com.grapsee.grapmail.ui.screens.mail.rememberReducedMotion
 import com.grapsee.grapmail.ui.screens.AccountCreatedAltScreen
 import com.grapsee.grapmail.ui.screens.AccountCreatedScreen
 import com.grapsee.grapmail.ui.screens.OnboardingScreen
@@ -152,6 +169,13 @@ class MainActivity : FragmentActivity() {
      *  like the shortcuts' because a cold start may have no graph yet. */
     private val openSecurityRequest = androidx.compose.runtime.mutableStateOf(false)
     private val notificationTarget = androidx.compose.runtime.mutableStateOf<com.grapsee.grapmail.logic.Notifications.MailTarget?>(null)
+    /** A tapped link -- grapmail://thread/<id>, grapmail://message/<id>,
+     *  grapmail://scheduled, grapmail://inbox, grapmail://compose,
+     *  https://grapsee.com/mail/thread/<id>
+     *  or mailto: (logic/DeepLinks.kt). Parked like the shortcut requests: it
+     *  is opened by the graph only once a session exists and the app lock's
+     *  door is open, and cleared the moment it is opened. */
+    private val deepLinkRequest = androidx.compose.runtime.mutableStateOf<com.grapsee.grapmail.logic.DeepLinks.Link?>(null)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         // The system splash, before the window content exists at all. The
@@ -165,12 +189,28 @@ class MainActivity : FragmentActivity() {
         if (BuildConfig.DEBUG) WebView.setWebContentsDebuggingEnabled(true)
         enableEdgeToEdge()
         takeComposeRequest(intent)
+        // Only a fresh launch carries a link. A recreate (theme, locale,
+        // process restore) hands back the SAME launch intent, and replaying
+        // it would reopen a thread the person already navigated away from.
+        if (savedInstanceState == null) takeDeepLink(intent)
         lifecycleScope.launch {
             com.grapsee.grapmail.logic.AppUpdate.checkOnOpen(this@MainActivity)
         }
         // The server's configuration: minimum build, paused features, notice.
         com.grapsee.grapmail.logic.RemoteConfig.loadCached(this)
         lifecycleScope.launch { com.grapsee.grapmail.logic.RemoteConfig.refresh(this@MainActivity, force = true) }
+        // App-switcher / screenshot privacy (security/ScreenPrivacy.kt):
+        // FLAG_SECURE while a session exists, unless "Allow screenshots" is on.
+        // Secured before the first frame when a session is already stored.
+        lifecycleScope.launch {
+            kotlinx.coroutines.flow.combine(
+                SessionStore.sessionIds(this@MainActivity),
+                com.grapsee.grapmail.security.ScreenPrivacy.allowScreenshotsFlow(this@MainActivity),
+            ) { id, allow -> (id != null) to allow }
+                .collect { (signedIn, allow) ->
+                    com.grapsee.grapmail.security.ScreenPrivacy.apply(this@MainActivity, signedIn, allow)
+                }
+        }
         setContent {
             GrapMailTheme {
                 // Edge-to-edge with the design's background behind the system
@@ -234,6 +274,8 @@ class MainActivity : FragmentActivity() {
                             onOpenSecurityConsumed = { openSecurityRequest.value = false },
                             notificationTarget = notificationTarget.value,
                             onNotificationConsumed = { notificationTarget.value = null },
+                            deepLink = deepLinkRequest.value,
+                            onDeepLinkConsumed = { deepLinkRequest.value = null },
                         )
 
                         // The Play-driven update overlay: drawn above whatever
@@ -277,6 +319,10 @@ class MainActivity : FragmentActivity() {
         // The review ask rides this moment: a person returning to the app
         // after their third send is exactly who the store's flow is for.
         com.grapsee.grapmail.logic.AppReview.maybeAsk(this)
+        // Round 8 — B (§2.4): "lastUsedAt is updated on every foreground of
+        // that account" — and the remembered record's name/photo refresh when
+        // stale. Display data only; it never signs anyone in.
+        com.grapsee.grapmail.data.RememberedAccounts.touchActiveAsync(this)
     }
 
     override fun onNewIntent(intent: android.content.Intent) {
@@ -286,6 +332,7 @@ class MainActivity : FragmentActivity() {
         // actually made rather than the launch that happened first.
         setIntent(intent)
         takeComposeRequest(intent)
+        takeDeepLink(intent)
     }
 
     private fun takeComposeRequest(intent: android.content.Intent?) {
@@ -313,6 +360,28 @@ class MainActivity : FragmentActivity() {
             notificationTarget.value = it
             intent?.action = null
         }
+    }
+
+    /**
+     * A tapped link, parsed and validated by [com.grapsee.grapmail.logic.DeepLinks]:
+     * anything that is not one of its exact formats -- including a thread or
+     * message id that is not the server's uuid -- parses to null and does
+     * nothing. Called from onCreate (fresh launches only) and onNewIntent, so
+     * a link reaches a running app and a cold one the same way.
+     *
+     * A launch from Recents replays the intent that first started the task;
+     * that is history, not a tap, so it is ignored. Once taken, the intent's
+     * action and data are cleared, like the notification target above, so a
+     * later recreate cannot reopen it.
+     */
+    private fun takeDeepLink(intent: android.content.Intent?) {
+        intent ?: return
+        if (com.grapsee.grapmail.logic.ProviderOAuth.capture(intent)) { intent.data = null; return }
+        if (intent.flags and android.content.Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY != 0) return
+        val link = com.grapsee.grapmail.logic.DeepLinks.parse(intent) ?: return
+        deepLinkRequest.value = link
+        intent.action = null
+        intent.data = null
     }
 
     companion object {
@@ -440,6 +509,7 @@ object Routes {
     const val MAIL_PLAN = "mail/settings/plan"
     const val MAIL_ADDRESSES = "mail/settings/addresses"
     const val MAIL_CONNECTIONS = "mail/settings/connections"
+    const val MAIL_PROVIDERS = "mail/settings/providers"
     const val MAIL_CONNECTION_DETAIL = "mail/settings/connections/{product}"
     const val ACCOUNT_PROFILE = "mail/settings/profile"
     const val ACCOUNT_PRIVACY = "mail/settings/privacy"
@@ -477,12 +547,33 @@ object Routes {
     fun revokeFromAlert(id: String, device: String) = "security/alert/revoke/${encode(id)}/${encode(device)}"
     fun revokedFromAlert(device: String) = "security/alert/revoked/${encode(device)}"
 
+    // Round 8 — B (welcome-back sign-in, docs/design/round8-spec.md §2). Which
+    // remembered account the screen is for rides AccountFlowViewModel, never
+    // the route: the back stack is written to disk.
+    const val WELCOME_BACK = "signin/welcome-back"
+    const val ACCOUNT_CHOOSER = "signin/choose"
+
+    // Round 8 — C (Device & Security Center, docs/design/round8-spec.md §3–4).
+    const val SEC_CENTER = "security/center"
+    const val SEC_NOT_ME_DONE = "security/not-me/done/{device}"
+    const val SEC_RECOVERY_REVIEW = "security/recovery-review"
+    /** The existing change-password screen in §3.4 "required mode" (back asks first). */
+    const val SEC_PASSWORD_REQUIRED = "security/password/required"
+
+    /**
+     * A blank label still needs a non-empty path segment for the route to
+     * match; a single encoded space decodes to a blank label, which
+     * NotMeSecuredScreen replaces with the label the sheet recorded.
+     */
+    fun notMeDone(device: String?) = "security/not-me/done/${encode(device?.takeIf { it.isNotBlank() } ?: " ")}"
+
     /** The help link the footer notes carry. Opens the real support page. */
     const val SUPPORT_URL = "https://grapsee.com/contact"
 
     private fun encode(v: String) = android.net.Uri.encode(v)
 }
 
+@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 fun GrapMailNav(
     composeRequest: Boolean = false,
@@ -495,6 +586,8 @@ fun GrapMailNav(
     onOpenSecurityConsumed: () -> Unit = {},
     notificationTarget: com.grapsee.grapmail.logic.Notifications.MailTarget? = null,
     onNotificationConsumed: () -> Unit = {},
+    deepLink: com.grapsee.grapmail.logic.DeepLinks.Link? = null,
+    onDeepLinkConsumed: () -> Unit = {},
 ) {
     val nav = rememberNavController()
     // Compose hands the nav controller a themed ContextWrapper, not the
@@ -523,6 +616,17 @@ fun GrapMailNav(
     // about whether this device can seal.
     val e2e: com.grapsee.grapmail.logic.E2eViewModel = viewModel()
     val scope = androidx.compose.runtime.rememberCoroutineScope()
+    // The phone's "email grows out of its row" opening
+    // (ui/screens/mail/MailOpenTransition.kt): which row the reader is being
+    // opened from, and the system "Remove animations" switch that turns the
+    // whole thing (and the reader route's slide) into an instant switch.
+    val mailOpen = remember { MailOpenTransition() }
+    val reducedMotion = rememberReducedMotion()
+    SideEffect { mailOpen.reducedMotion = reducedMotion }
+    // grapmail://inbox, handed to the mailbox home: [openDeepLink] pops back to
+    // HOME and raises it; HOME clears its two-pane selection and the list's
+    // multi-select, opens the Inbox, and lowers it again.
+    var inboxRequest by remember { mutableStateOf(false) }
 
     fun openSupport() {
         val intent = android.content.Intent(
@@ -540,6 +644,87 @@ fun GrapMailNav(
         }
     }
 
+    // ── Round 8 — B: welcome-back sign-in (docs/design/round8-spec.md §2) ──
+    //
+    // Where a signed-out device lands (§2.1): the account chooser when two or
+    // more remembered accounts have no session, welcome-back for exactly one,
+    // otherwise [fallback]. A remembered account only pre-fills the address
+    // and shows the name and photo: the password or passkey, and any second
+    // step, are always asked by the server's normal sign-in.
+    suspend fun signedOutRoute(context: android.content.Context, fallback: String): String {
+        val entry = try {
+            com.grapsee.grapmail.data.RememberedAccounts.entry(context)
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            com.grapsee.grapmail.data.RememberedAccounts.Entry.None
+        }
+        return when (entry) {
+            is com.grapsee.grapmail.data.RememberedAccounts.Entry.One -> {
+                flow.openWelcomeBack(entry.address)
+                Routes.WELCOME_BACK
+            }
+            com.grapsee.grapmail.data.RememberedAccounts.Entry.Chooser -> {
+                flow.openWelcomeBack(null)
+                Routes.ACCOUNT_CHOOSER
+            }
+            com.grapsee.grapmail.data.RememberedAccounts.Entry.None -> fallback
+        }
+    }
+
+    // "Use another account", or nothing remembered is left: the standard
+    // sign-in form. Signed in elsewhere on this device (the account sheet's
+    // "Add account"), the mailbox stays underneath; signed out, the welcome
+    // screen does, exactly as a plain "Sign in" tap would have left it.
+    fun standardSignIn() {
+        val signedInStack = runCatching { nav.getBackStackEntry(Routes.HOME) }.isSuccess
+        if (signedInStack) {
+            nav.navigate(Routes.SIGN_IN) { popUpTo(Routes.HOME) }
+        } else {
+            nav.navigate(Routes.WELCOME) { popUpTo(0) { inclusive = true } }
+            nav.navigate(Routes.SIGN_IN)
+        }
+    }
+
+    // ── Round 8 — C: Device & Security Center (docs/design/round8-spec.md §3–4) ──
+    //
+    // RemoteConfig `security_center`: on in debug, off in release until QA (§7).
+    // Off, Security opens exactly what it opened before.
+    val securityCenterOn = remember {
+        com.grapsee.grapmail.logic.RemoteConfig.flag("security_center", BuildConfig.DEBUG)
+    }
+
+    // A checklist step (§4.2 "Action") or a recovery-review row (§3.4 step 5),
+    // to the existing screen that does it. Devices and Activity stay inside
+    // the Security Center, scrolled to that section.
+    fun openSafetyAction(action: com.grapsee.grapmail.ui.screens.security.SafetyAction) {
+        when (action) {
+            com.grapsee.grapmail.ui.screens.security.SafetyAction.TwoStep -> nav.navigate(Routes.SEC_2FA_ENABLE)
+            com.grapsee.grapmail.ui.screens.security.SafetyAction.TwoStepManage ->
+                nav.navigate(Routes.SECURITY) { launchSingleTop = true; popUpTo(Routes.SECURITY) }
+            com.grapsee.grapmail.ui.screens.security.SafetyAction.Passkeys -> nav.navigate(Routes.SEC_PASSKEYS)
+            com.grapsee.grapmail.ui.screens.security.SafetyAction.RecoveryCodes -> nav.navigate(Routes.SEC_RECOVERY_CODES)
+            com.grapsee.grapmail.ui.screens.security.SafetyAction.RecoveryEmail -> nav.navigate(Routes.RECOVERY_EMAIL)
+            com.grapsee.grapmail.ui.screens.security.SafetyAction.Password -> nav.navigate(Routes.SEC_PASSWORD)
+            com.grapsee.grapmail.ui.screens.security.SafetyAction.Phone -> nav.navigate(Routes.PHONE_VERIFY)
+            com.grapsee.grapmail.ui.screens.security.SafetyAction.Devices,
+            com.grapsee.grapmail.ui.screens.security.SafetyAction.Activity -> {
+                com.grapsee.grapmail.ui.screens.security.SecurityCenterNav.requestFocus(action)
+                nav.navigate(Routes.SEC_CENTER) { launchSingleTop = true; popUpTo(Routes.SEC_CENTER) }
+            }
+        }
+    }
+
+    // What the mailbox's §3.6 banner and §4.3 B nudge open. Null while the
+    // feature is off, which keeps the mailbox slot empty.
+    val securityLinks = remember(securityCenterOn) {
+        if (!securityCenterOn) null
+        else com.grapsee.grapmail.ui.screens.security.SecurityCenterLinks(
+            openCenter = { nav.navigate(Routes.SEC_CENTER) { launchSingleTop = true } },
+            changePassword = { nav.navigate(Routes.SEC_PASSWORD_REQUIRED) { launchSingleTop = true } },
+        )
+    }
+
     // The one honest moment to ask for the notification permission is when mail
     // is about to start arriving: a completed sign-in, or the first cold start
     // into a session that already exists. Once per install — the flag records
@@ -555,6 +740,41 @@ fun GrapMailNav(
         askNotifications.launch(android.Manifest.permission.POST_NOTIFICATIONS)
     }
 
+    // The one door into the reader for anything that names a conversation from
+    // outside the list: a notification tap and a deep link both come through
+    // here, so they land on the same screen with the same back stack. The
+    // isThread flag decides the route exactly as the list's tap does -- a
+    // message id on the thread route answers 404.
+    fun openMailTarget(id: String, isThread: Boolean, focus: String? = null, more: Boolean = false) {
+        // No list row to grow out of: the reader arrives with the plain slide + fade.
+        mailOpen.clear()
+        nav.navigate(Routes.mailThread(id, isThread, focus, more)) { launchSingleTop = true }
+    }
+
+    // A validated link, opened. Callers guarantee a session exists (and, from
+    // the parked path, that the app lock's door is open). Every destination is
+    // a signed-in screen whose models hang off HOME (signedInViewModel), so
+    // HOME is made the root first if it is not already on the stack.
+    fun openDeepLink(link: com.grapsee.grapmail.logic.DeepLinks.Link) {
+        if (runCatching { nav.getBackStackEntry(Routes.HOME) }.isFailure) {
+            nav.navigate(Routes.HOME) { popUpTo(0) { inclusive = true } }
+        }
+        when (link) {
+            is com.grapsee.grapmail.logic.DeepLinks.Link.Thread -> openMailTarget(link.threadId, isThread = true)
+            is com.grapsee.grapmail.logic.DeepLinks.Link.Message -> openMailTarget(link.messageId, isThread = false)
+            com.grapsee.grapmail.logic.DeepLinks.Link.Scheduled -> nav.navigate(Routes.MAIL_SCHEDULED)
+            // The mailbox home on the Inbox (iOS: DeepLink.inbox): whatever is
+            // stacked above HOME goes, then HOME's own effect resets the list.
+            com.grapsee.grapmail.logic.DeepLinks.Link.Inbox -> {
+                nav.popBackStack(Routes.HOME, inclusive = false)
+                inboxRequest = true
+            }
+            // The composer already takes a prefilled recipient (the contact
+            // screen's "Write" uses the same slot); nothing else is carried.
+            is com.grapsee.grapmail.logic.DeepLinks.Link.Compose -> nav.navigate(Routes.mailCompose("", "reply", link.to))
+        }
+    }
+
     // One place for a completed sign-in, whichever door finished it (password,
     // factor code, email code, backup code, the wizard's auto sign-in): the
     // session is stored by the door itself; this announces the device to the
@@ -568,15 +788,23 @@ fun GrapMailNav(
         // asynchronous — a refused enroll never blocks the sign-in itself,
         // and the next sign-in retries.
         com.grapsee.grapmail.security.TrustedDeviceManager.enrollAfterSignInAsync(nav.context.applicationContext)
+        // A password the sign-in screen held across a second step (code,
+        // backup code) is offered to the password manager now that the
+        // sign-in is complete. No-op for every other door; never blocks.
+        com.grapsee.grapmail.security.PasswordCredentials.offerHeldSave(nav.context, address)
         maybeAskNotifications()
         val replacingAccount = runCatching { nav.getBackStackEntry(Routes.HOME) }.isSuccess
         if (replacingAccount) {
             e2e.clearForSignOut()
             com.grapsee.grapmail.ui.screens.security.SecurityFlow.reset()
         }
+        // Round 8 — B: a sign-in from welcome-back or the account chooser has
+        // no welcome screen under it; the whole signed-out stack goes instead.
+        val welcomeUnder = runCatching { nav.getBackStackEntry(Routes.WELCOME) }.isSuccess
         nav.navigate(Routes.HOME) {
             if (replacingAccount) popUpTo(Routes.HOME) { inclusive = true }
-            else popUpTo(Routes.WELCOME)
+            else if (welcomeUnder) popUpTo(Routes.WELCOME)
+            else popUpTo(0) { inclusive = true }
         }
         if (composeRequest) {
             onComposeRequestConsumed()
@@ -594,6 +822,14 @@ fun GrapMailNav(
             onOpenSecurityConsumed()
             nav.navigate(Routes.SECURITY) { launchSingleTop = true }
         }
+        // A link that arrived signed out was parked, not dropped: the person
+        // who just proved the account is theirs gets the thread they tapped.
+        // The gate is necessarily open here -- the sign-in screen under a
+        // closed door cannot be tapped.
+        if (deepLink != null) {
+            onDeepLinkConsumed()
+            openDeepLink(deepLink)
+        }
     }
 
     // Sign-out and deletion share the same teardown: the push registration is
@@ -605,6 +841,12 @@ fun GrapMailNav(
     fun leaveSignedInState(onCleared: (() -> Unit)? = null) {
         com.grapsee.grapmail.ui.screens.security.SecurityFlow.reset()
         e2e.clearForSignOut()
+        // The reader's per-sender "Show original colours" memory goes with the
+        // account, as on iOS (SessionStore.clear): the next person on this
+        // device must not inherit, or be able to read, whose design was kept.
+        // On the main thread, before the launch: the store's in-memory map is
+        // snapshot state.
+        com.grapsee.grapmail.ui.screens.mail.ReaderColourPrefs.clear(nav.context.applicationContext)
         scope.launch {
             val context = nav.context.applicationContext
             val session = SessionStore.snapshot(context) ?: return@launch
@@ -620,15 +862,53 @@ fun GrapMailNav(
         scope.launch {
             val next = SessionStore.snapshot(context)
             if (next != null) com.grapsee.grapmail.logic.PushSync.registerAsync(context)
-            nav.navigate(if (next != null) Routes.HOME else emptyDestination) {
+            // Round 8 — B: with no account left signed in, a remembered one
+            // greets the person by name (welcome-back / chooser) instead.
+            val target = if (next != null) Routes.HOME else signedOutRoute(context, emptyDestination)
+            nav.navigate(target) {
                 popUpTo(0) { inclusive = true }
             }
         }
     }
 
-    fun signOutOfMailbox() {
+    /**
+     * Round 8 — B: [removeFromDevice] is the sign-out sheet's "Also remove
+     * from this device" (§2.4). The session goes first — which marks the
+     * remembered record `signed_out` — then, when ticked, the record and its
+     * photo go too, before the next screen decides whether to greet anyone.
+     */
+    fun signOutOfMailbox(removeFromDevice: Boolean = false, address: String? = null) {
         val context = nav.context.applicationContext
-        leaveSignedInState { showRemainingAccount(context, Routes.WELCOME) }
+        leaveSignedInState {
+            scope.launch {
+                if (removeFromDevice && address != null) {
+                    try {
+                        com.grapsee.grapmail.data.RememberedAccounts.forget(context, address)
+                    } catch (e: kotlinx.coroutines.CancellationException) {
+                        throw e
+                    } catch (_: Exception) {
+                        // Best-effort: the sign-out itself has already happened.
+                    }
+                }
+                showRemainingAccount(context, Routes.WELCOME)
+            }
+        }
+    }
+
+    // Round 8 — B: every sign-out control (drawer, account sheet, settings, the
+    // Security Center's "Sign out" on this device) asks first, with the
+    // "Also remove from this device" choice (SignOutConfirmDialog). With the
+    // feature off it signs out at once, as before.
+    var signOutAsk by remember { mutableStateOf<String?>(null) }
+    fun requestSignOut() {
+        scope.launch {
+            val active = SessionStore.snapshot(nav.context.applicationContext)
+            if (active != null && com.grapsee.grapmail.data.RememberedAccounts.enabled()) {
+                signOutAsk = active.address
+            } else {
+                signOutOfMailbox()
+            }
+        }
     }
 
     // A stored session opens the app signed-in as soon as the encrypted local
@@ -651,7 +931,10 @@ fun GrapMailNav(
             // the same moment as a completed sign-in — mail is already chosen.
             maybeAskNotifications()
         } else {
-            startDest = Routes.WELCOME
+            // Round 8 — B (§2.1): a cold start with remembered, signed-out
+            // accounts opens on welcome-back (or the chooser); otherwise the
+            // welcome screen, as before.
+            startDest = signedOutRoute(ctx, Routes.WELCOME)
         }
         if (stored != null && !stored.unexpired) {
             // A child task, not another await in the navigation gate: returning
@@ -738,6 +1021,10 @@ fun GrapMailNav(
 
     LaunchedEffect(notificationTarget, dest) {
         val target = notificationTarget ?: return@LaunchedEffect
+        // Same door as a deep link: nothing behind a closed app lock moves --
+        // not the account switch, not the reader. The tap stays parked until
+        // the person has unlocked.
+        com.grapsee.grapmail.logic.AppLock.awaitOpen()
         val context = nav.context.applicationContext
         val session = SessionStore.snapshot(context)
         if (session?.id != target.sessionId) {
@@ -752,12 +1039,30 @@ fun GrapMailNav(
         }
         when (target.action) {
             "reply" -> nav.navigate(Routes.mailCompose(target.messageId, "reply")) { launchSingleTop = true }
-            "open", "more" -> nav.navigate(
-                Routes.mailThread(target.threadId ?: target.messageId, target.threadId != null,
-                    target.messageId, more = target.action == "more"),
-            ) { launchSingleTop = true }
+            "open", "more" -> openMailTarget(target.threadId ?: target.messageId, target.threadId != null,
+                target.messageId, more = target.action == "more")
         }
         onNotificationConsumed()
+    }
+
+    // A tapped link (logic/DeepLinks.kt), consumed the way the shortcuts are:
+    // signed out, it stays pending and [signedIn] opens it after sign-in; signed
+    // in, it waits for the app lock's door before anything is fetched -- a
+    // thread opened under the overlay would still load and mark itself read
+    // for whoever is holding the phone. Consumed only when actually opened.
+    LaunchedEffect(deepLink, dest) {
+        val link = deepLink ?: return@LaunchedEffect
+        val ctx = nav.context.applicationContext
+        val stored = SessionStore.snapshot(ctx)
+        val ready = stored?.unexpired == true ||
+            (stored != null && com.grapsee.grapmail.data.SessionRefresh.refresh(ctx))
+        if (!ready) {
+            nav.navigate(Routes.SIGN_IN) { popUpTo(Routes.WELCOME) }
+            return@LaunchedEffect
+        }
+        com.grapsee.grapmail.logic.AppLock.awaitOpen()
+        onDeepLinkConsumed()
+        openDeepLink(link)
     }
 
     // The device's feel of an action landing. The model publishes the result
@@ -843,10 +1148,11 @@ fun GrapMailNav(
             // (SignUpModel): without it the wizard strands a new user on the
             // sign-in screen instead of the created -> onboarding flow the
             // design shows, and the CI walk loses those screens.
+            val password = vm.state.value.password
             for (attempt in 0 until 4) {
                 if (attempt > 0) { kotlinx.coroutines.delay(1_200) }
                 try {
-                    val resp = Api.signIn(address, vm.state.value.password)
+                    val resp = Api.signIn(address, password)
                     val token = resp.sessionToken ?: resp.accessToken ?: resp.token
                     if (token != null) {
                         SessionStore.save(
@@ -854,6 +1160,12 @@ fun GrapMailNav(
                             token, resp.refreshToken, address, name, resp.expiresAtMillis,
                         )
                         com.grapsee.grapmail.logic.PushSync.registerAsync(nav.context.applicationContext)
+                        // The same device-key enrollment every other completed
+                        // sign-in runs (signedIn): best-effort, asynchronous.
+                        com.grapsee.grapmail.security.TrustedDeviceManager.enrollAfterSignInAsync(nav.context.applicationContext)
+                        // The account exists and its password just signed in:
+                        // offer it to the password manager. Fire-and-forget.
+                        com.grapsee.grapmail.security.PasswordCredentials.offerToSave(nav.context, address, password)
                         signedIn = true
                         break
                     }
@@ -903,32 +1215,66 @@ fun GrapMailNav(
     val activityLifecycle = LocalLifecycleOwner.current.lifecycle
     BackHandler(enabled = onHome) { hostActivity?.moveTaskToBack(true) }
 
+    // Reader-route helpers for the per-destination transitions below. They
+    // read [mailOpen] when a transition starts, so a thread opened from a
+    // notification or a deep link (holder cleared) keeps the plain slide.
+    fun isThreadRoute(entry: androidx.navigation.NavBackStackEntry) =
+        entry.destination.route == Routes.MAIL_THREAD
+    fun opensFromRow(entry: androidx.navigation.NavBackStackEntry) = isThreadRoute(entry) &&
+        mailOpen.opensFromRow(entry.arguments?.getString("id")?.let(android.net.Uri::decode))
+
+    // The list's tap on a phone. The row is named first, so it -- and only it --
+    // carries the shared-bounds modifier; navigation waits two frames so that
+    // row has been composed and placed with the modifier before the reader
+    // appears (otherwise the transition can start with no source bounds).
+    fun openFromRow(threadId: String, isThread: Boolean, rowId: String) {
+        if (mailOpen.navigating) return
+        val route = Routes.mailThread(threadId, isThread, focus = rowId.takeIf { isThread })
+        if (mailOpen.reducedMotion) {
+            mailOpen.clear()
+            nav.navigate(route)
+            return
+        }
+        mailOpen.fromRow(threadId, rowId)
+        mailOpen.navigating = true
+        scope.launch {
+            try {
+                androidx.compose.runtime.withFrameNanos { }
+                androidx.compose.runtime.withFrameNanos { }
+                nav.navigate(route)
+            } finally {
+                mailOpen.navigating = false
+            }
+        }
+    }
+
+    // One SharedTransitionLayout around the whole graph, at every width: it is
+    // what lets the phone's list row and reader share bounds across two
+    // destinations. Wrapping it only on compact widths would rebuild the
+    // NavHost (and lose the back stack) on every fold / unfold; on medium and
+    // wider windows nothing inside asks for a shared element, so it is inert.
+    // Round 8: welcome-back, the account chooser and the Security Center draw
+    // their own tablet layouts (two panes / two columns, §2.2, §2.6, §3.1), so
+    // they get the window's width like the mailbox home does.
+    val currentRoute = backStack?.destination?.route ?: dest
+    val ownsWidth = onHome || currentRoute == Routes.WELCOME_BACK ||
+        currentRoute == Routes.ACCOUNT_CHOOSER || currentRoute == Routes.SEC_CENTER
+    SharedTransitionLayout {
+    CompositionLocalProvider(
+        LocalMailSharedScope provides this,
+        // Round 8 — C: what the mailbox's safety slot opens (null: feature off).
+        com.grapsee.grapmail.ui.screens.security.LocalSecurityCenterLinks provides securityLinks,
+    ) {
     NavHost(
         navController = nav,
         startDestination = dest,
-        modifier = Modifier.widthIn(max = if (onHome) Dp.Unspecified else 520.dp),
+        modifier = Modifier.widthIn(max = if (ownsWidth) Dp.Unspecified else 520.dp),
         // The design's motion contract: 320ms slide + fade between wizard
         // steps (forward slides in from the right, back from the left).
-        enterTransition = {
-            slideInHorizontally(
-                animationSpec = androidx.compose.animation.core.tween(320),
-            ) { it / 4 } + fadeIn(androidx.compose.animation.core.tween(320))
-        },
-        exitTransition = {
-            slideOutHorizontally(
-                animationSpec = androidx.compose.animation.core.tween(320),
-            ) { -it / 4 } + fadeOut(androidx.compose.animation.core.tween(320))
-        },
-        popEnterTransition = {
-            slideInHorizontally(
-                animationSpec = androidx.compose.animation.core.tween(320),
-            ) { -it / 4 } + fadeIn(androidx.compose.animation.core.tween(320))
-        },
-        popExitTransition = {
-            slideOutHorizontally(
-                animationSpec = androidx.compose.animation.core.tween(320),
-            ) { it / 4 } + fadeOut(androidx.compose.animation.core.tween(320))
-        },
+        enterTransition = { navEnter() },
+        exitTransition = { navExit() },
+        popEnterTransition = { navPopEnter() },
+        popExitTransition = { navPopExit() },
     ) {
         composable(Routes.WELCOME) {
             WelcomeScreen(
@@ -951,6 +1297,51 @@ fun GrapMailNav(
                 onSignUp = { nav.navigate(Routes.STEP_NAME) },
                 onForgotPassword = { nav.navigate(Routes.FORGOT_PASSWORD) },
                 onNeedSecondFactor = { nav.navigate(Routes.TWO_FACTOR) },
+                // Round 8 — B: a remembered, signed-out account takes over
+                // before the form is drawn (§2.1); none, and the form stays.
+                onRememberedAccount = { entry ->
+                    val target = when (entry) {
+                        is com.grapsee.grapmail.data.RememberedAccounts.Entry.One -> {
+                            flow.openWelcomeBack(entry.address)
+                            Routes.WELCOME_BACK
+                        }
+                        com.grapsee.grapmail.data.RememberedAccounts.Entry.Chooser -> {
+                            flow.openWelcomeBack(null)
+                            Routes.ACCOUNT_CHOOSER
+                        }
+                        com.grapsee.grapmail.data.RememberedAccounts.Entry.None -> null
+                    }
+                    if (target != null) {
+                        nav.navigate(target) {
+                            popUpTo(Routes.SIGN_IN) { inclusive = true }
+                            launchSingleTop = true
+                        }
+                    }
+                },
+            )
+        }
+        // ── Round 8 — B: welcome-back sign-in (docs/design/round8-spec.md §2) ──
+        composable(Routes.WELCOME_BACK) {
+            com.grapsee.grapmail.ui.screens.account.WelcomeBackScreen(
+                flow = flow,
+                onSignedIn = { signedIn(it) },
+                onNeedSecondFactor = { nav.navigate(Routes.TWO_FACTOR) },
+                onForgotPassword = { nav.navigate(Routes.FORGOT_PASSWORD) },
+                onUseAnotherAccount = { standardSignIn() },
+                onStandardSignIn = { standardSignIn() },
+                onChooseAccount = {
+                    nav.navigate(Routes.ACCOUNT_CHOOSER) { popUpTo(Routes.WELCOME_BACK) { inclusive = true } }
+                },
+            )
+        }
+        composable(Routes.ACCOUNT_CHOOSER) {
+            com.grapsee.grapmail.ui.screens.account.AccountChooserScreen(
+                flow = flow,
+                onSignedIn = { signedIn(it) },
+                onNeedSecondFactor = { nav.navigate(Routes.TWO_FACTOR) },
+                onForgotPassword = { nav.navigate(Routes.FORGOT_PASSWORD) },
+                onUseAnotherAccount = { standardSignIn() },
+                onStandardSignIn = { standardSignIn() },
             )
         }
         composable(Routes.TWO_FACTOR) {
@@ -1060,7 +1451,13 @@ fun GrapMailNav(
                 onRecoveryEmail = { nav.navigate(Routes.RECOVERY_EMAIL) },
                 onSessions = { nav.navigate(Routes.SEC_SESSIONS) },
                 onActivity = { nav.navigate(Routes.SEC_ACTIVITY) },
-                onTrustedDevices = { nav.navigate(Routes.SEC_DEVICES) },
+                // Round 8 — C (§3, §7.4): the devices entry opens the Device &
+                // Security Center; the hardware-key screen stays one tap away
+                // inside it (its "device keys" link), and Sessions / Activity
+                // keep their own rows here so every older screen stays reachable.
+                onTrustedDevices = {
+                    nav.navigate(if (securityCenterOn) Routes.SEC_CENTER else Routes.SEC_DEVICES)
+                },
                 onPasskeys = { nav.navigate(Routes.SEC_PASSKEYS) },
                 onRecoveryCodes = { nav.navigate(Routes.SEC_RECOVERY_CODES) },
                 onNotificationPrefs = { nav.navigate(Routes.MAIL_NOTIFY_PREFS) },
@@ -1069,6 +1466,54 @@ fun GrapMailNav(
                 onSignOutAll = { nav.navigate(Routes.SEC_SIGNOUT_ALL) },
                 onDeleteAccount = { nav.navigate(Routes.SEC_DELETE_ACCOUNT) },
                 onSupport = { openSupport() },
+                // Round 8 — C (§4.3 A): the safety-score header and the
+                // "Devices & security" row at the top of the hub.
+                onSecurityCenter = if (securityCenterOn) ({ nav.navigate(Routes.SEC_CENTER) }) else null,
+                onSafetyAction = { openSafetyAction(it) },
+            )
+        }
+        // ── Round 8 — C: Device & Security Center (docs/design/round8-spec.md §3–4) ──
+        composable(Routes.SEC_CENTER) {
+            com.grapsee.grapmail.ui.screens.security.SecurityCenterScreen(
+                onBack = { nav.popBackStack() },
+                onAction = { openSafetyAction(it) },
+                onNotMeSecured = { outcome -> nav.navigate(Routes.notMeDone(outcome.deviceLabel)) },
+                onSignOutThisDevice = { requestSignOut() },
+                onChangePassword = { nav.navigate(Routes.SEC_PASSWORD_REQUIRED) { launchSingleTop = true } },
+                onDeviceKeys = { nav.navigate(Routes.SEC_DEVICES) },
+            )
+        }
+        composable(Routes.SEC_NOT_ME_DONE) { entry ->
+            val device = entry.arguments?.getString("device")?.let(android.net.Uri::decode) ?: ""
+            com.grapsee.grapmail.ui.screens.security.NotMeSecuredScreen(
+                deviceLabel = device,
+                onChangePassword = {
+                    nav.navigate(Routes.SEC_PASSWORD_REQUIRED) { popUpTo(Routes.SEC_NOT_ME_DONE) { inclusive = true } }
+                },
+                onClose = {
+                    if (!nav.popBackStack(Routes.SEC_CENTER, false)) nav.popBackStack()
+                },
+            )
+        }
+        composable(Routes.SEC_PASSWORD_REQUIRED) {
+            com.grapsee.grapmail.ui.screens.security.RequiredChangePasswordScreen(
+                onLeave = { nav.popBackStack() },
+                onForgot = { nav.navigate(Routes.FORGOT_PASSWORD) },
+                onChanged = {
+                    nav.navigate(Routes.SEC_RECOVERY_REVIEW) { popUpTo(Routes.SEC_PASSWORD_REQUIRED) { inclusive = true } }
+                },
+            )
+        }
+        composable(Routes.SEC_RECOVERY_REVIEW) {
+            com.grapsee.grapmail.ui.screens.security.RecoveryReviewScreen(
+                onAction = { openSafetyAction(it) },
+                onDone = {
+                    // Back to the Security Center, which refetches on resume.
+                    nav.navigate(Routes.SEC_CENTER) {
+                        launchSingleTop = true
+                        popUpTo(Routes.SEC_CENTER)
+                    }
+                },
             )
         }
         composable(Routes.SEC_DEVICES) {
@@ -1191,8 +1636,22 @@ fun GrapMailNav(
                     // sign-out runs, because everything the device still holds
                     // for this account is now material about an account that
                     // no longer exists.
-                    leaveSignedInState()
-                    nav.navigate(Routes.WELCOME) { popUpTo(0) { inclusive = true } }
+                    // Round 8 — B (§2.4 clearing rule 3): a deleted account is
+                    // not remembered either. Forgotten after the session is
+                    // cleared, so the sign-out's own "signed_out" mark cannot
+                    // write the record back.
+                    val context = nav.context.applicationContext
+                    scope.launch {
+                        val deleted = SessionStore.snapshot(context)?.address
+                        leaveSignedInState {
+                            if (deleted != null) {
+                                scope.launch {
+                                    runCatching { com.grapsee.grapmail.data.RememberedAccounts.forget(context, deleted) }
+                                }
+                            }
+                        }
+                        nav.navigate(Routes.WELCOME) { popUpTo(0) { inclusive = true } }
+                    }
                 },
             )
         }
@@ -1415,7 +1874,26 @@ fun GrapMailNav(
                 },
             )
         }
-        composable(Routes.HOME) { entry ->
+        composable(
+            Routes.HOME,
+            // Phone, list row -> reader: the list dims away while the tapped
+            // row grows into the reader (the row itself is drawn in the shared
+            // overlay, so this fade does not touch it). Reduced motion: instant.
+            exitTransition = {
+                when {
+                    isThreadRoute(targetState) && mailOpen.reducedMotion -> ExitTransition.None
+                    opensFromRow(targetState) -> fadeOut(tween(MailOpenMillis))
+                    else -> navExit()
+                }
+            },
+            popEnterTransition = {
+                when {
+                    isThreadRoute(initialState) && mailOpen.reducedMotion -> EnterTransition.None
+                    opensFromRow(initialState) -> fadeIn(tween(MailOpenMillis))
+                    else -> navPopEnter()
+                }
+            },
+        ) { entry ->
             val profile = viewModel<com.grapsee.grapmail.logic.ProfileViewModel>(entry)
             val personal by profile.state.collectAsStateWithLifecycle()
             LaunchedEffect(profile) {
@@ -1442,87 +1920,153 @@ fun GrapMailNav(
                 if (!personal.busy) profile.loadAvatar()
             }
             val mailbox: MailboxViewModel = viewModel(entry)
+            // ── adaptive two-pane home ─────────────────────────────────────
+            // Compact windows (< 600dp: phones, folded foldables) keep the
+            // single-pane flow: a tap pushes Routes.MAIL_THREAD. Medium and
+            // expanded windows (tablets, unfolded foldables, large landscape)
+            // show the list and the reader side by side, and a tap only
+            // selects. The selection is saveable, so it survives rotation and
+            // the recreate a fold / unfold causes; if the window shrinks to
+            // compact with a thread selected, that reader is shown full screen.
+            // The width comes from the configuration (the window's own width,
+            // multi-window included), so no adaptive library is needed.
+            val twoPane = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp >= 600
             var selectedId by rememberSaveable { mutableStateOf<String?>(null) }
             var selectedThread by rememberSaveable { mutableStateOf(false) }
             var selectedFocus by rememberSaveable { mutableStateOf<String?>(null) }
 
-            fun selectMessage(id: String, isThread: Boolean, focus: String) {
+            fun selectMessage(id: String, isThread: Boolean, focus: String?) {
                 selectedId = id
                 selectedThread = isThread
-                selectedFocus = focus.takeIf { isThread }
+                selectedFocus = focus?.takeIf { isThread }
             }
 
-            BoxWithConstraints(Modifier.fillMaxSize()) {
-                val expanded = maxWidth >= 840.dp
-                val id = selectedId
-                BackHandler(enabled = id != null) { selectedId = null }
-                Row(Modifier.fillMaxSize()) {
-                    if (expanded || id == null) {
-                        Box(
-                            if (expanded) Modifier.weight(0.42f).fillMaxHeight()
-                            else Modifier.fillMaxSize(),
-                        ) {
-                            MailboxScreen(
-                                vm = mailbox,
-                                accountPhoto = personal.avatar,
-                                onOpenThread = { id, isThread, messageId ->
-                                    if (expanded) selectMessage(id, isThread, messageId)
-                                    else nav.navigate(Routes.mailThread(id, isThread, focus = messageId.takeIf { isThread }))
-                                },
-                                onCompose = { nav.navigate(Routes.mailCompose("", "reply")) },
-                                // A draft opens in the composer, not the reader: the row is
-                                // the person's own unfinished mail, and the only useful tap
-                                // is the one that lets them finish it.
-                                onOpenDraft = { id -> nav.navigate(Routes.mailCompose(id, "draft")) },
-                                onProfile = { nav.navigate(Routes.ACCOUNT_PROFILE) },
-                                onSettings = { nav.navigate(Routes.MAIL_SETTINGS) },
-                                onSecurity = { nav.navigate(Routes.SECURITY) },
-                                onHelp = { openSupport() },
-                                onLabels = { nav.navigate(Routes.MAIL_LABELS) },
-                                onContacts = { nav.navigate(Routes.MAIL_CONTACTS) },
-                                onFiles = { nav.navigate(Routes.MAIL_FILES) },
-                                onScreener = { nav.navigate(Routes.MAIL_SCREENER) },
-                                onSubscriptions = { nav.navigate(Routes.MAIL_SUBSCRIPTIONS) },
-                                onScheduled = { nav.navigate(Routes.MAIL_SCHEDULED) },
-                                onAddAccount = { nav.navigate(Routes.SIGN_IN) },
-                                onAccountSwitched = {
-                                    com.grapsee.grapmail.ui.screens.security.SecurityFlow.reset()
-                                    e2e.clearForSignOut()
-                                    nav.navigate(Routes.HOME) { popUpTo(Routes.HOME) { inclusive = true } }
-                                },
-                                onSignOut = ::signOutOfMailbox,
-                            )
-                        }
-                    }
-                    if (expanded) VerticalDivider()
-                    if (id != null) {
-                        Box(Modifier.weight(0.58f).fillMaxHeight()) {
-                            key(id, selectedThread, selectedFocus) {
-                                ThreadScreen(
-                                    vm = mailbox,
-                                    e2e = e2e,
-                                    threadId = id,
-                                    isThread = selectedThread,
-                                    initialMessageId = selectedFocus,
-                                    openMessageActions = false,
-                                    onBack = { selectedId = null },
-                                    onContacts = { nav.navigate(Routes.MAIL_CONTACTS) },
-                                    onReply = { message, mode -> nav.navigate(Routes.mailCompose(message.id, mode)) },
-                                    onStepPrev = { step -> selectMessage(step.id, step.isThread, step.messageId) },
-                                    onStepNext = { step -> selectMessage(step.id, step.isThread, step.messageId) },
-                                )
+            fun clearSelection() {
+                selectedId = null
+                selectedThread = false
+                selectedFocus = null
+            }
+
+            // Back clears the selection first; with nothing selected it is
+            // disabled and back behaves as it always has. Handlers the list
+            // registers later (drawer, search, multi-select) still win while
+            // they are active.
+            val openId = selectedId
+            BackHandler(enabled = openId != null) { clearSelection() }
+
+            // grapmail://inbox (openDeepLink): the Inbox, with no reader
+            // selected beside it and no multi-select left over.
+            LaunchedEffect(inboxRequest) {
+                if (!inboxRequest) return@LaunchedEffect
+                inboxRequest = false
+                clearSelection()
+                mailbox.clearSelection()
+                mailbox.open(MailBox.Inbox)
+            }
+
+            val mailList: @Composable () -> Unit = {
+                MailboxScreen(
+                    vm = mailbox,
+                    accountPhoto = personal.avatar,
+                    highlightedId = if (twoPane) openId else null,
+                    // Phones only: the one row the reader is growing out of.
+                    sharedRowId = if (twoPane || reducedMotion) null else mailOpen.rowId,
+                    onOpenThread = { threadId, isThread, messageId ->
+                        if (twoPane) selectMessage(threadId, isThread, messageId)
+                        else openFromRow(threadId, isThread, messageId)
+                    },
+                    onCompose = { nav.navigate(Routes.mailCompose("", "reply")) },
+                    // A draft opens in the composer, not the reader: the row is
+                    // the person's own unfinished mail, and the only useful tap
+                    // is the one that lets them finish it.
+                    onOpenDraft = { id -> nav.navigate(Routes.mailCompose(id, "draft")) },
+                    onProfile = { nav.navigate(Routes.ACCOUNT_PROFILE) },
+                    onSettings = { nav.navigate(Routes.MAIL_SETTINGS) },
+                    onSecurity = { nav.navigate(Routes.SECURITY) },
+                    onHelp = { openSupport() },
+                    onLabels = { nav.navigate(Routes.MAIL_LABELS) },
+                    onContacts = { nav.navigate(Routes.MAIL_CONTACTS) },
+                    onFiles = { nav.navigate(Routes.MAIL_FILES) },
+                    onScreener = { nav.navigate(Routes.MAIL_SCREENER) },
+                    onSubscriptions = { nav.navigate(Routes.MAIL_SUBSCRIPTIONS) },
+                    onScheduled = { nav.navigate(Routes.MAIL_SCHEDULED) },
+                    onAddAccount = { nav.navigate(Routes.SIGN_IN) },
+                    onAccountSwitched = {
+                        clearSelection()
+                        com.grapsee.grapmail.ui.screens.security.SecurityFlow.reset()
+                        e2e.clearForSignOut()
+                        nav.navigate(Routes.HOME) { popUpTo(Routes.HOME) { inclusive = true } }
+                    },
+                    // Round 8 — B: asks first, with "Also remove from this device".
+                    onSignOut = { requestSignOut() },
+                )
+            }
+
+            // The reader takes the whole selection as one value: in the
+            // two-pane crossfade the outgoing pane must keep ITS thread's flags
+            // and focus, not the incoming selection's (it would otherwise be
+            // recomposed as the old id with the new flags and reload).
+            val reader: @Composable (PaneSelection, Boolean) -> Unit = { sel, inPane ->
+                key(sel) {
+                    ThreadContent(
+                        vm = mailbox,
+                        e2e = e2e,
+                        threadId = sel.id,
+                        isThread = sel.isThread,
+                        initialMessageId = sel.focus,
+                        openMessageActions = false,
+                        showBackButton = !inPane,
+                        onBack = { clearSelection() },
+                        onContacts = { nav.navigate(Routes.MAIL_CONTACTS) },
+                        onReply = { message, mode -> nav.navigate(Routes.mailCompose(message.id, mode)) },
+                        onStepPrev = { step -> selectMessage(step.id, step.isThread, step.messageId) },
+                        onStepNext = { step -> selectMessage(step.id, step.isThread, step.messageId) },
+                    )
+                }
+            }
+            val openSelection = openId?.let { PaneSelection(it, selectedThread, selectedFocus) }
+
+            // The list rows read this destination's AnimatedContentScope for the
+            // phone's shared-bounds opening (MailOpenTransition.kt).
+            CompositionLocalProvider(LocalMailAnimatedScope provides this) {
+            when {
+                twoPane -> BoxWithConstraints(Modifier.fillMaxSize()) {
+                    // About 40% of the window, kept between 300dp and 400dp so
+                    // the rows stay readable at 600dp and do not sprawl at 1200dp.
+                    val listWidth = maxOf(300.dp, minOf(400.dp, maxWidth * 0.4f))
+                    Row(Modifier.fillMaxSize()) {
+                        Box(Modifier.width(listWidth).fillMaxHeight()) { mailList() }
+                        VerticalDivider(color = com.grapsee.grapmail.ui.theme.LocalPalette.current.border)
+                        Box(Modifier.weight(1f).fillMaxHeight()) {
+                            // Two-pane: no shared element. A changed selection
+                            // fades / slides the pane's content instead; the
+                            // outgoing pane leaves quickly because the reader's
+                            // thread state is shared and already loading the
+                            // next mail. Reduced motion: an instant switch.
+                            if (reducedMotion) {
+                                if (openSelection != null) reader(openSelection, true) else ReaderPaneEmptyState()
+                            } else {
+                                AnimatedContent(
+                                    targetState = openSelection,
+                                    transitionSpec = {
+                                        (fadeIn(tween(200, delayMillis = 40)) +
+                                            slideInHorizontally(tween(200)) { it / 24 }) togetherWith
+                                            fadeOut(tween(90))
+                                    },
+                                    label = "reader-pane",
+                                ) { sel ->
+                                    if (sel != null) reader(sel, true) else ReaderPaneEmptyState()
+                                }
                             }
-                        }
-                    } else if (expanded) {
-                        Box(Modifier.weight(0.58f).fillMaxHeight(), contentAlignment = Alignment.Center) {
-                            androidx.compose.material3.Text(
-                                "Select a message to read",
-                                color = com.grapsee.grapmail.ui.theme.LocalPalette.current.textSecondary,
-                            )
                         }
                     }
                 }
+                // The window shrank (fold, split screen) while a thread was
+                // selected: the reader full screen, exactly as on a phone.
+                openSelection != null -> reader(openSelection, false)
+                else -> mailList()
             }
+            } // CompositionLocalProvider
         }
         composable(Routes.MAIL_THREAD, arguments = listOf(androidx.navigation.navArgument("focus") {
             type = androidx.navigation.NavType.StringType
@@ -1531,13 +2075,36 @@ fun GrapMailNav(
         }, androidx.navigation.navArgument("more") {
             type = androidx.navigation.NavType.BoolType
             defaultValue = false
-        })) { entry ->
+        }),
+            // Opened from a list row: the reader is the row's container growing
+            // (shared bounds), so the route itself only fades. From anywhere
+            // else (notification, deep link, widget, previous / next): the
+            // usual slide + fade. Reduced motion: an instant switch both ways.
+            enterTransition = {
+                when {
+                    mailOpen.reducedMotion -> EnterTransition.None
+                    opensFromRow(targetState) -> fadeIn(tween(MailOpenMillis))
+                    else -> navEnter()
+                }
+            },
+            exitTransition = { if (mailOpen.reducedMotion) ExitTransition.None else navExit() },
+            popEnterTransition = { if (mailOpen.reducedMotion) EnterTransition.None else navPopEnter() },
+            popExitTransition = {
+                when {
+                    mailOpen.reducedMotion -> ExitTransition.None
+                    opensFromRow(initialState) -> fadeOut(tween(MailOpenMillis))
+                    else -> navPopExit()
+                }
+            },
+        ) { entry ->
             val mail: MailboxViewModel = signedInViewModel(nav, entry)
             val id = entry.arguments?.getString("id")?.let(android.net.Uri::decode) ?: ""
             // A row that has no thread id is opened through the message route;
             // the thread route answers a message id with a 404, and a tap that
             // opens nothing is the bug the flag exists to prevent.
             val isThread = entry.arguments?.getString("thread") != "0"
+            // This destination's scope, for the reader side of the shared bounds.
+            CompositionLocalProvider(LocalMailAnimatedScope provides this) {
             ThreadScreen(
                 vm = mail,
                 e2e = e2e,
@@ -1545,6 +2112,9 @@ fun GrapMailNav(
                 isThread = isThread,
                 initialMessageId = entry.arguments?.getString("focus"),
                 openMessageActions = entry.arguments?.getBoolean("more") == true,
+                // Non-null only when this reader was opened from its list row
+                // on a phone, with animations on (MailOpenTransition.kt).
+                sharedElementKey = mailOpen.readerKey(id),
                 onBack = { nav.popBackStack() },
                 onContacts = { nav.navigate(Routes.MAIL_CONTACTS) },
                 onReply = { m, mode -> nav.navigate(Routes.mailCompose(m.id, mode)) },
@@ -1555,16 +2125,21 @@ fun GrapMailNav(
                 // list's tap does — a neighbour that is a single message would
                 // otherwise be opened on the thread route and 404.
                 onStepPrev = { step ->
+                    // A neighbour has no source row in the list: plain slide,
+                    // and Back from it is plain too.
+                    mailOpen.clear()
                     nav.navigate(Routes.mailThread(step.id, step.isThread, focus = step.messageId.takeIf { step.isThread })) {
                         popUpTo(Routes.MAIL_THREAD) { inclusive = true }
                     }
                 },
                 onStepNext = { step ->
+                    mailOpen.clear()
                     nav.navigate(Routes.mailThread(step.id, step.isThread, focus = step.messageId.takeIf { step.isThread })) {
                         popUpTo(Routes.MAIL_THREAD) { inclusive = true }
                     }
                 },
             )
+            } // CompositionLocalProvider
         }
         composable(Routes.MAIL_COMPOSE) { entry ->
             val profile: com.grapsee.grapmail.logic.ProfileViewModel = signedInViewModel(nav, entry)
@@ -1645,8 +2220,9 @@ fun GrapMailNav(
                 onNotificationPrefs = { nav.navigate(Routes.MAIL_NOTIFY_PREFS) },
                 onPerAccountNotifications = { nav.navigate(Routes.MAIL_PER_ACCOUNT_NOTIFY) },
                 onHelp = { nav.navigate(Routes.MAIL_SUPPORT) },
-                onSignOut = ::signOutOfMailbox,
+                onSignOut = { requestSignOut() },
                 onPlan = { nav.navigate(Routes.MAIL_PLAN) },
+                onProviders = { nav.navigate(Routes.MAIL_PROVIDERS) },
             )
         }
         composable(Routes.MAIL_PER_ACCOUNT_NOTIFY) {
@@ -1656,6 +2232,9 @@ fun GrapMailNav(
         }
         composable(Routes.MAIL_PLAN) {
             com.grapsee.grapmail.ui.screens.mail.PlanScreen(onBack = { nav.popBackStack() })
+        }
+        composable(Routes.MAIL_PROVIDERS) {
+            com.grapsee.grapmail.ui.screens.mail.ConnectedAccountsScreen(onBack = { nav.popBackStack() })
         }
         composable(Routes.MAIL_NOTES) { entry ->
             val profile: com.grapsee.grapmail.logic.ProfileViewModel = signedInViewModel(nav, entry)
@@ -1793,8 +2372,43 @@ fun GrapMailNav(
             ScheduledScreen(vm = mail, onBack = { nav.popBackStack() })
         }
     }
+    } // CompositionLocalProvider
+    } // SharedTransitionLayout
+
+    // Round 8 — B (§2.4): the sign-out confirmation, over whichever screen
+    // asked. Unticked, the account stays remembered for welcome-back
+    // (reason `signed_out`); ticked, the record and its photo are removed.
+    signOutAsk?.let { address ->
+        com.grapsee.grapmail.ui.screens.account.SignOutConfirmDialog(
+            address = address,
+            onConfirm = { removeFromDevice ->
+                signOutAsk = null
+                signOutOfMailbox(removeFromDevice = removeFromDevice, address = address)
+            },
+            onDismiss = { signOutAsk = null },
+        )
+    }
 }
 
+
+// The design's motion contract: 320ms slide + fade between destinations
+// (forward slides in from the right, back from the left). Named so the reader
+// route can fall back to exactly these when it has no list row to grow from.
+private fun navEnter(): EnterTransition =
+    slideInHorizontally(animationSpec = tween(320)) { it / 4 } + fadeIn(tween(320))
+
+private fun navExit(): ExitTransition =
+    slideOutHorizontally(animationSpec = tween(320)) { -it / 4 } + fadeOut(tween(320))
+
+private fun navPopEnter(): EnterTransition =
+    slideInHorizontally(animationSpec = tween(320)) { -it / 4 } + fadeIn(tween(320))
+
+private fun navPopExit(): ExitTransition =
+    slideOutHorizontally(animationSpec = tween(320)) { it / 4 } + fadeOut(tween(320))
+
+/** The two-pane reader's selection as one value, so the pane can animate
+ *  from one selection to the next and each side keeps its own flags. */
+private data class PaneSelection(val id: String, val isThread: Boolean, val focus: String?)
 
 // Popping the signed-in home clears its models and cancels their requests.
 @Composable

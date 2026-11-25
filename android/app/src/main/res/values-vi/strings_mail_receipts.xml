@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="mail_receipt_read_at">Đã đọc %1$s</string>
+    <string name="mail_receipt_requested_pending">Đã yêu cầu xác nhận đã đọc · chưa đọc</string>
+    <string name="mail_receipt_server_sent">Đã gửi xác nhận đã đọc</string>
+    <string name="mail_receipt_ask_title">Người gửi yêu cầu xác nhận đã đọc</string>
+    <string name="mail_receipt_ask_body">Gửi xác nhận tới %1$s rằng bạn đã mở thư này? Họ chỉ biết thời điểm bạn mở thư, không gì khác.</string>
+    <string name="mail_receipt_ask_send">Gửi xác nhận</string>
+    <string name="mail_receipt_ask_decline">Không gửi</string>
+    <string name="mail_receipt_mode_title">Gửi xác nhận đã đọc</string>
+    <string name="mail_receipt_mode_body">Khi thư yêu cầu xác nhận đã đọc. Xác nhận không bao giờ được gửi cho thư rác, người gửi bị chặn hoặc thư được mã hóa, trừ khi bạn chọn Luôn luôn.</string>
+    <string name="mail_receipt_mode_never">Không bao giờ</string>
+    <string name="mail_receipt_mode_ask">Hỏi</string>
+    <string name="mail_receipt_mode_always">Luôn luôn</string>
+    <string name="mail_receipt_mode_always_note">Luôn luôn cũng gửi xác nhận cho thư rác, người gửi bị chặn và thư được mã hóa.</string>
+    <string name="mail_receipt_mode_unavailable">Không thể tải cài đặt này. Hãy kiểm tra kết nối.</string>
+    <string name="mail_compose_request_receipt">Yêu cầu xác nhận đã đọc</string>
+</resources>

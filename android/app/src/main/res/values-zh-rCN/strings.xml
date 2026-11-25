@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">GrapMail</string>
+    <string name="shortcut_compose_short">写邮件</string>
+    <string name="shortcut_compose_long">撰写新的 GrapMail 邮件</string>
+    <string name="shortcut_scheduled_short">定时发送</string>
+    <string name="shortcut_scheduled_long">查看和取消等待发送的邮件</string>
+    <string name="shortcut_subscriptions_short">订阅</string>
+    <string name="shortcut_subscriptions_long">集中查看发件人并退订</string>
+    <string name="notif_channel_new_mail">新邮件</string>
+    <string name="notif_channel_new_mail_desc">后台检查发现未读邮件时通知您。GrapMail 没有推送服务，这些通知来自系统唤醒应用后由应用自行向服务器查询。</string>
+    <string name="notif_channel_security">安全提醒</string>
+    <string name="notif_channel_security_desc">账号发生变化时立即通知您：新设备登录、密码更改、受信任设备变更。这些通知不受免打扰时段影响。</string>
+    <string name="widget_description">一眼查看未读邮件：来自 GrapMail 后台检查的计数</string>
+</resources>

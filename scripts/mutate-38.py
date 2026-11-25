@@ -24,9 +24,11 @@ MUTATIONS = [
      "vm.markUnread(message.id) { outcome ->",
      "vm.actOn(message.id, MailAction.Unread) { outcome ->",
      "the reader can mark its own message unread"),
-    ("android/app/src/main/java/com/grapsee/grapmail/ui/screens/mail/ThreadScreen.kt",
-     '"Loading them tells the sender this message was opened.",',
-     '"Images load from the sender.",',
+    # The reader's wording moved to the mail string table (localization), so the
+    # sentence is mutated where it now lives.
+    ("android/app/src/main/res/values/strings_mail.xml",
+     '>Loading them tells the sender this message was opened.<',
+     '>Images load from the sender.<',
      "remote images are named and gated"),
     ("android/app/src/main/java/com/grapsee/grapmail/ui/screens/mail/MessageHandoff.kt",
      'if (scheme != "http" && scheme != "https") return null',

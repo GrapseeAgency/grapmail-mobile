@@ -1,5 +1,14 @@
 package com.grapsee.grapmail.ui.screens.mail
 
+import androidx.compose.foundation.layout.offset
+import com.grapsee.grapmail.ui.components.gmPrefersStackedRows
+import com.grapsee.grapmail.ui.components.gmMaxWidth
+import com.grapsee.grapmail.ui.components.GMLayout
+import androidx.compose.ui.unit.Dp
+import androidx.compose.material3.minimumInteractiveComponentSize
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.imePadding
 import com.grapsee.grapmail.logic.PushSync
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -20,12 +29,14 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
+import androidx.compose.material.icons.automirrored.rounded.Label
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.AttachFile
 import androidx.compose.material.icons.rounded.Check
@@ -37,6 +48,7 @@ import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.MailOutline
 import androidx.compose.material.icons.rounded.NotificationsActive
 import androidx.compose.material.icons.rounded.NotificationsOff
+import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.PersonAddAlt1
 import androidx.compose.material.icons.rounded.Settings
@@ -60,6 +72,7 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -85,7 +98,15 @@ import com.grapsee.grapmail.ui.components.CountBadge
 import com.grapsee.grapmail.ui.components.GradientButton
 import com.grapsee.grapmail.ui.components.OutlineButton
 import com.grapsee.grapmail.ui.components.SenderAvatar
+import com.grapsee.grapmail.ui.components.EmptyState
+import com.grapsee.grapmail.ui.components.ErrorState
+import com.grapsee.grapmail.ui.components.ListSkeleton
+import com.grapsee.grapmail.ui.components.OfflineBanner
 import com.grapsee.grapmail.ui.theme.LocalPalette
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.pluralStringResource
+import com.grapsee.grapmail.R
+import com.grapsee.grapmail.ui.i18n.CoreStrings
 
 /**
  * The mailbox's secondary destinations — reference 72, 73, 77, 78, 79, 80, 81
@@ -98,8 +119,21 @@ import com.grapsee.grapmail.ui.theme.LocalPalette
  * difference between a partial view and a false one.
  */
 
+/**
+ * The secondary screens' frame. [maxContentWidth] caps the content and centres
+ * it on wide windows (tablets, unfolded foldables, desktop / freeform windows);
+ * on a phone in portrait it changes nothing. Lists keep the readable width,
+ * forms and settings pass [GMLayout.Form]. The content area also sits above
+ * the keyboard (the root pads only the system bars and cutout), so a field and
+ * its button stay reachable while typing.
+ */
 @Composable
-internal fun MailScaffold(title: String, onBack: () -> Unit, content: @Composable () -> Unit) {
+internal fun MailScaffold(
+    title: String,
+    onBack: () -> Unit,
+    maxContentWidth: Dp = GMLayout.Readable,
+    content: @Composable () -> Unit,
+) {
     val palette = LocalPalette.current
     Column(Modifier.fillMaxSize().background(palette.bg).statusBarsPadding()) {
         Row(
@@ -107,12 +141,17 @@ internal fun MailScaffold(title: String, onBack: () -> Unit, content: @Composabl
             verticalAlignment = Alignment.CenterVertically,
         ) {
             IconButton(onClick = onBack) {
-                Icon(Icons.AutoMirrored.Rounded.ArrowBack, "Back", tint = palette.textPrimary)
+                Icon(Icons.AutoMirrored.Rounded.ArrowBack, stringResource(R.string.mail_common_back), tint = palette.textPrimary)
             }
             Spacer(Modifier.width(4.dp))
             Text(title, modifier = Modifier.weight(1f), fontSize = 17.sp, fontWeight = FontWeight.SemiBold, color = palette.textPrimary)
         }
-        Box(Modifier.weight(1f)) { content() }
+        // Every secondary screen says when the device is offline, over whatever
+        // it is still showing (ScreenStates.kt). Draws nothing while online.
+        OfflineBanner()
+        Box(Modifier.weight(1f).fillMaxWidth().imePadding()) {
+            Box(Modifier.gmMaxWidth(maxContentWidth).fillMaxHeight()) { content() }
+        }
     }
 }
 
@@ -124,9 +163,11 @@ private fun EmptyNote(title: String, body: String) {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
-        Text(title, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = palette.textPrimary)
+        Text(title, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = palette.textPrimary,
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center)
         Spacer(Modifier.height(8.dp))
-        Text(body, fontSize = 13.sp, color = palette.textSecondary)
+        Text(body, fontSize = 13.sp, color = palette.textSecondary,
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center)
     }
 }
 
@@ -149,30 +190,47 @@ fun LabelsScreen(vm: MailboxViewModel, onBack: () -> Unit, onCreate: () -> Unit,
     val palette = LocalPalette.current
     val state by vm.labelState.collectAsStateWithLifecycle()
     var notice by remember { mutableStateOf<String?>(null) }
+    val largeText = gmPrefersStackedRows()
 
     LaunchedEffect(Unit) { vm.refreshLabels() }
 
-    MailScaffold("Labels", onBack) {
+    MailScaffold(stringResource(R.string.mail_labels_labels), onBack) {
         Column(Modifier.fillMaxSize()) {
-            NoteBar("Labels are the real filter: the reference's Personal and " +
-                "Work chips have no backing in the API, so these are what the " +
-                "chip row is built from.")
+            NoteBar(stringResource(R.string.mail_labels_labels_real_filter_references))
             notice?.let {
                 Text(it, fontSize = 12.sp, color = palette.textSecondary,
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp))
             }
-            Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+            // At large text the count and the button share no line: the count
+            // sits above a full-width button instead of being squeezed to a
+            // column of single words.
+            if (largeText) {
+                Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(pluralStringResource(R.plurals.mail_labels_count, state.labels.size, state.labels.size),
+                        fontSize = 13.sp, color = palette.textSecondary)
+                    OutlineButton(stringResource(R.string.mail_labels_new_label), onClick = onCreate,
+                        trailing = { Icon(Icons.Rounded.Add, null, tint = palette.primarySolid,
+                            modifier = Modifier.size(16.dp)) })
+                }
+            } else Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically) {
-                Text("${state.labels.size} label${if (state.labels.size == 1) "" else "s"}",
+                Text(pluralStringResource(R.plurals.mail_labels_count, state.labels.size, state.labels.size),
                     fontSize = 13.sp, color = palette.textSecondary, modifier = Modifier.weight(1f))
-                OutlineButton("New label", onClick = onCreate, fill = false,
+                OutlineButton(stringResource(R.string.mail_labels_new_label), onClick = onCreate, fill = false,
                     trailing = { Icon(Icons.Rounded.Add, null, tint = palette.primarySolid,
                         modifier = Modifier.size(16.dp)) })
             }
+            // A refresh that failed over labels already shown keeps them and
+            // says so; only a failure with nothing to show is the error state.
+            if (state.error != null && state.labels.isNotEmpty()) NoteBar(state.error!!)
             if (state.loading && state.labels.isEmpty()) {
-                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator(color = palette.primarySolid)
-                }
+                ListSkeleton(Modifier.fillMaxSize(), rows = 5, avatar = false,
+                    label = stringResource(R.string.states_labels_loading))
+            } else if (state.labels.isEmpty() && state.error != null) {
+                ErrorState(onRetry = { vm.refreshLabels(force = true) },
+                    title = stringResource(R.string.states_labels_failed_title),
+                    message = state.error)
             } else if (state.labels.isEmpty()) {
                 // Not “becomes a filter on the inbox”, which is what this said on
                 // both platforms. The listing returns no label field per row and
@@ -180,8 +238,9 @@ fun LabelsScreen(vm: MailboxViewModel, onBack: () -> Unit, onCreate: () -> Unit,
                 // promise the app cannot keep is the same defect as a control that
                 // goes nowhere, and the parity gate cannot see it because both
                 // sides agreed on the wrong words.
-                EmptyNote("No labels yet",
-                    "Create one and it becomes available in the Label sheet.")
+                EmptyState(Icons.AutoMirrored.Rounded.Label, stringResource(R.string.mail_labels_no_labels_yet),
+                    body = stringResource(R.string.mail_labels_create_one_becomes_available),
+                    actionLabel = stringResource(R.string.mail_labels_new_label), onAction = onCreate)
             } else {
                 LazyColumn(Modifier.fillMaxSize()) {
                     items(state.labels, key = { it.id }) { label ->
@@ -191,21 +250,28 @@ fun LabelsScreen(vm: MailboxViewModel, onBack: () -> Unit, onCreate: () -> Unit,
                         // a label's own row should mean, and now it is.
                         Row(
                             Modifier.fillMaxWidth().clickable { onEdit(label) }
-                                .padding(horizontal = 16.dp, vertical = 12.dp),
+                                .padding(start = 16.dp, end = 1.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             Box(Modifier.size(12.dp).clip(CircleShape)
                                 .background(com.grapsee.grapmail.ui.components.labelSwatch(label.color)))
                             Spacer(Modifier.width(12.dp))
                             Text(label.name, fontSize = 15.sp, color = palette.textPrimary,
-                                maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                                maxLines = if (largeText) 3 else 1, overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f).padding(vertical = 12.dp))
                             CountBadge(label.unread)
-                            Spacer(Modifier.width(10.dp))
-                            Icon(Icons.Rounded.Delete, "Remove label ${label.name}",
-                                tint = palette.textTertiary,
-                                modifier = Modifier.size(18.dp).clickable {
+                            // The delete glyph stays 18dp; its touch target is the full 48dp.
+                            Box(
+                                Modifier.size(48.dp).clip(CircleShape).clickable(
+                                    role = androidx.compose.ui.semantics.Role.Button,
+                                ) {
                                     vm.deleteLabel(label.id) { notice = it }
-                                })
+                                },
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Icon(Icons.Rounded.Delete, stringResource(R.string.mail_labels_remove_label, label.name),
+                                    tint = palette.textTertiary, modifier = Modifier.size(18.dp))
+                            }
                         }
                         Box(Modifier.fillMaxWidth().padding(horizontal = 16.dp).height(1.dp)
                             .background(palette.border))
@@ -238,9 +304,10 @@ fun LabelCreateScreen(vm: MailboxViewModel, onDone: () -> Unit,
 
     var saving by remember { mutableStateOf(false) }
 
-    MailScaffold(if (editing == null) "New label" else "Edit label", onDone) {
+    MailScaffold(if (editing == null) stringResource(R.string.mail_labels_new_label) else stringResource(R.string.mail_labels_edit_label), onDone,
+        maxContentWidth = GMLayout.Form) {
         Column(Modifier.fillMaxSize().padding(horizontal = 20.dp).verticalScroll(rememberScrollState())) {
-            Text("Name", fontSize = 13.sp, color = palette.textSecondary)
+            Text(stringResource(R.string.mail_labels_name), fontSize = 13.sp, color = palette.textSecondary)
             Spacer(Modifier.height(8.dp))
             BasicTextField(
                 cursorBrush = androidx.compose.ui.graphics.SolidColor(LocalPalette.current.cursor),
@@ -252,7 +319,7 @@ fun LabelCreateScreen(vm: MailboxViewModel, onDone: () -> Unit,
                     .padding(horizontal = 14.dp, vertical = 12.dp),
                 decorationBox = { inner ->
                     Box {
-                        if (name.isEmpty()) Text("Work, Travel, Receipts…",
+                        if (name.isEmpty()) Text(stringResource(R.string.mail_labels_work_travel_receipts),
                             fontSize = 16.sp, color = palette.textTertiary)
                         inner()
                     }
@@ -260,30 +327,37 @@ fun LabelCreateScreen(vm: MailboxViewModel, onDone: () -> Unit,
             )
 
             Spacer(Modifier.height(20.dp))
-            Text("Colour", fontSize = 13.sp, color = palette.textSecondary)
-            Spacer(Modifier.height(10.dp))
+            Text(stringResource(R.string.mail_labels_colour), fontSize = 13.sp, color = palette.textSecondary)
+            Spacer(Modifier.height(3.dp))
             // Two rows of four: eight swatches on one line does not fit a 360dp
             // phone once the screen's own 40dp of padding is taken off.
+            // Each 34dp swatch sits in a 48dp touch target; the -7dp offset and
+            // the zero gap keep the swatches where the 12dp gap put them.
             com.grapsee.grapmail.ui.components.LABEL_COLOUR_KEYS.chunked(4).forEach { row ->
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Row(Modifier.offset(x = (-7).dp)) {
                     row.forEach { key ->
                         val picked = key == chosen
                         val swatch = com.grapsee.grapmail.ui.components.labelSwatch(key)
                         Box(
-                            Modifier.size(34.dp).clip(CircleShape).background(swatch)
-                                .border(if (picked) 3.dp else 1.dp,
-                                    if (picked) palette.textPrimary else palette.border, CircleShape)
-                                .clickable { chosen = key }
+                            Modifier.size(48.dp).clip(CircleShape)
+                                .clickable(role = androidx.compose.ui.semantics.Role.RadioButton) { chosen = key }
                                 .testTag("label-colour-$key"),
                             contentAlignment = Alignment.Center,
                         ) {
-                            if (picked) Icon(Icons.Rounded.Check, null, tint = androidx.compose.ui.graphics.Color.White,
-                                modifier = Modifier.size(16.dp))
+                            Box(
+                                Modifier.size(34.dp).clip(CircleShape).background(swatch)
+                                    .border(if (picked) 3.dp else 1.dp,
+                                        if (picked) palette.textPrimary else palette.border, CircleShape),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                if (picked) Icon(Icons.Rounded.Check, null, tint = androidx.compose.ui.graphics.Color.White,
+                                    modifier = Modifier.size(16.dp))
+                            }
                         }
                     }
                 }
-                Spacer(Modifier.height(12.dp))
             }
+            Spacer(Modifier.height(5.dp))
 
             result?.let {
                 Spacer(Modifier.height(16.dp))
@@ -291,8 +365,8 @@ fun LabelCreateScreen(vm: MailboxViewModel, onDone: () -> Unit,
             }
 
             Spacer(Modifier.height(24.dp))
-            GradientButton(if (editing == null) "Create label" else "Save changes", onClick = {
-                if (name.isBlank()) { result = "A label needs a name."; return@GradientButton }
+            GradientButton(if (editing == null) stringResource(R.string.mail_labels_create_label) else stringResource(R.string.mail_labels_save_changes), onClick = {
+                if (name.isBlank()) { result = CoreStrings.get(R.string.mail_labels_label_needs_name) { "A label needs a name." }; return@GradientButton }
                 saving = true
                 val done: (Boolean, String) -> Unit = { saved, outcome ->
                     saving = false
@@ -306,6 +380,7 @@ fun LabelCreateScreen(vm: MailboxViewModel, onDone: () -> Unit,
                 if (editing == null) vm.createLabel(name.trim(), chosen, done)
                 else vm.renameLabel(editing.id, name.trim(), chosen, done)
             }, enabled = name.isNotBlank() && !saving)
+            Spacer(Modifier.height(16.dp))
         }
     }
 }
@@ -320,7 +395,10 @@ fun ContactsScreen(vm: MailboxViewModel, onBack: () -> Unit, onOpen: (String) ->
 
     var matches by remember { mutableStateOf<List<MailboxViewModel.Person>?>(null) }
     val needle = query.trim()
-    LaunchedEffect(vm) { people = vm.people() }
+    // Until the first read of the device's mail settles, "No people yet" would
+    // be a claim nobody checked; the skeleton holds the place instead.
+    var peopleLoaded by remember { mutableStateOf(false) }
+    LaunchedEffect(vm) { people = vm.people(); peopleLoaded = true }
     LaunchedEffect(needle, people) {
         if (needle.isEmpty()) {
             matches = null
@@ -335,12 +413,11 @@ fun ContactsScreen(vm: MailboxViewModel, onBack: () -> Unit, onOpen: (String) ->
         }
     }
     val shown = if (needle.isEmpty()) people else matches.orEmpty()
+    val largeText = gmPrefersStackedRows()
 
-    MailScaffold("Contacts", onBack) {
+    MailScaffold(stringResource(R.string.mail_contacts_contacts), onBack) {
         Column(Modifier.fillMaxSize()) {
-            NoteBar("People are read out of the mail you have received and sent. " +
-                "There is no separate contacts store in GrapMail, so this list " +
-                "grows with your mailbox rather than being edited by hand.")
+            NoteBar(stringResource(R.string.mail_contacts_people_read_out_mail))
             Row(
                 Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp)
                     .clip(RoundedCornerShape(12.dp)).background(palette.card)
@@ -357,19 +434,24 @@ fun ContactsScreen(vm: MailboxViewModel, onBack: () -> Unit, onOpen: (String) ->
                     modifier = Modifier.weight(1f).testTag("contacts-search"),
                     decorationBox = { inner ->
                         Box {
-                            if (query.isEmpty()) Text("Search people", fontSize = 14.sp,
+                            if (query.isEmpty()) Text(stringResource(R.string.mail_contacts_search_people), fontSize = 14.sp,
                                 color = palette.textTertiary)
                             inner()
                         }
                     },
                 )
             }
-            if (people.isEmpty()) {
-                EmptyNote("No people yet", "Contacts appear here as mail arrives from or to them.")
+            if (!peopleLoaded) {
+                ListSkeleton(Modifier.fillMaxSize(), rows = 6,
+                    label = stringResource(R.string.states_contacts_loading))
+            } else if (people.isEmpty()) {
+                EmptyState(Icons.Rounded.Contacts, stringResource(R.string.mail_contacts_no_people_yet),
+                    body = stringResource(R.string.mail_contacts_contacts_appear_here_mail))
             } else if (needle.isNotEmpty() && matches == null) {
-                EmptyNote("Searching…", "")
+                EmptyNote(stringResource(R.string.mail_contacts_searching), "")
             } else if (shown.isEmpty()) {
-                EmptyNote("No matching contacts", "Try another name or email address.")
+                EmptyState(Icons.Rounded.Contacts, stringResource(R.string.mail_contacts_no_matching_contacts),
+                    body = stringResource(R.string.mail_contacts_try_another_name_email))
             } else {
                 LazyColumn(Modifier.fillMaxSize()) {
                     items(shown, key = { it.address }) { p ->
@@ -382,10 +464,10 @@ fun ContactsScreen(vm: MailboxViewModel, onBack: () -> Unit, onOpen: (String) ->
                             Spacer(Modifier.width(12.dp))
                             Column(Modifier.weight(1f)) {
                                 Text(p.name ?: p.address, fontSize = 15.sp, color = palette.textPrimary,
-                                    maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                    maxLines = if (largeText) 3 else 1, overflow = TextOverflow.Ellipsis)
                                 if (!p.name.isNullOrBlank()) {
                                     Text(p.address, fontSize = 12.sp, color = palette.textSecondary,
-                                        maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                        maxLines = if (largeText) 3 else 1, overflow = TextOverflow.Ellipsis)
                                 }
                             }
                             if (p.seen > 0) CountBadge(p.seen)
@@ -405,8 +487,10 @@ fun ContactDetailScreen(vm: MailboxViewModel, address: String, onBack: () -> Uni
     var person by remember { mutableStateOf<MailboxViewModel.Person?>(null) }
     LaunchedEffect(address) { person = vm.people().firstOrNull { it.address == address } }
 
-    MailScaffold("Contact", onBack) {
-        Column(Modifier.fillMaxSize().padding(horizontal = 20.dp)) {
+    MailScaffold(stringResource(R.string.mail_contacts_contact), onBack, maxContentWidth = GMLayout.Form) {
+        // Scrolls: a landscape phone or 200% text would otherwise push Write
+        // below the window with no way to reach it.
+        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp)) {
             Spacer(Modifier.height(12.dp))
             SenderAvatar(person?.name ?: "", address, size = 72.dp)
             Spacer(Modifier.height(14.dp))
@@ -414,19 +498,33 @@ fun ContactDetailScreen(vm: MailboxViewModel, address: String, onBack: () -> Uni
                 color = palette.textPrimary)
             Text(address, fontSize = 14.sp, color = palette.textSecondary)
             Spacer(Modifier.height(18.dp))
-            DetailLine("Messages seen", person?.seen?.toString() ?: "Not loaded", palette)
-            DetailLine("In this build", "Derived from loaded mail", palette)
+            DetailLine(stringResource(R.string.mail_contacts_messages_seen), person?.seen?.toString() ?: stringResource(R.string.mail_contacts_not_loaded), palette)
+            DetailLine(stringResource(R.string.mail_contacts_build), stringResource(R.string.mail_contacts_derived_from_loaded_mail), palette)
             Spacer(Modifier.height(22.dp))
-            GradientButton("Write", onClick = onWrite)
+            GradientButton(stringResource(R.string.mail_contacts_write), onClick = onWrite)
+            Spacer(Modifier.height(16.dp))
         }
     }
 }
 
 @Composable
 private fun DetailLine(label: String, value: String, palette: com.grapsee.grapmail.ui.theme.Palette) {
-    Row(Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
-        Text(label, fontSize = 13.sp, color = palette.textSecondary, modifier = Modifier.weight(1f))
-        Text(value, fontSize = 14.sp, fontWeight = FontWeight.Medium, color = palette.textPrimary)
+    // At large text the value goes under its label; side by side, a long
+    // value (a subject, a MIME type) used to take the whole row and squeeze
+    // the label to nothing.
+    if (gmPrefersStackedRows()) {
+        Column(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(label, fontSize = 13.sp, color = palette.textSecondary)
+            Text(value, fontSize = 14.sp, fontWeight = FontWeight.Medium, color = palette.textPrimary)
+        }
+        return
+    }
+    Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+        Text(label, fontSize = 13.sp, color = palette.textSecondary, modifier = Modifier.weight(1f, fill = false))
+        Spacer(Modifier.width(12.dp))
+        Text(value, fontSize = 14.sp, fontWeight = FontWeight.Medium, color = palette.textPrimary,
+            textAlign = androidx.compose.ui.text.style.TextAlign.End,
+            modifier = Modifier.weight(1.4f, fill = false))
     }
 }
 
@@ -437,15 +535,19 @@ fun FilesScreen(vm: MailboxViewModel, onBack: () -> Unit, onOpen: (String) -> Un
     val palette = LocalPalette.current
     var files by remember { mutableStateOf<List<MailboxViewModel.FileEntry>>(emptyList()) }
     val filesRevision by vm.filesRevision.collectAsStateWithLifecycle()
-    LaunchedEffect(vm, filesRevision) { files = vm.files() }
+    var filesLoaded by remember { mutableStateOf(false) }
+    LaunchedEffect(vm, filesRevision) { files = vm.files(); filesLoaded = true }
+    val largeText = gmPrefersStackedRows()
 
-    MailScaffold("Files", onBack) {
+    MailScaffold(stringResource(R.string.mail_files_files), onBack) {
         Column(Modifier.fillMaxSize()) {
-            NoteBar("This lists the attachments of messages you have opened. " +
-                "GrapMail has no endpoint that lists every file in a mailbox, so " +
-                "a file inside mail you have not read is not shown here.")
-            if (files.isEmpty()) {
-                EmptyNote("No files yet", "Open a message with an attachment and it appears here.")
+            NoteBar(stringResource(R.string.mail_files_lists_attachments_messages_have))
+            if (!filesLoaded) {
+                ListSkeleton(Modifier.fillMaxSize(), rows = 5,
+                    label = stringResource(R.string.states_files_loading))
+            } else if (files.isEmpty()) {
+                EmptyState(Icons.Rounded.AttachFile, stringResource(R.string.mail_files_no_files_yet),
+                    body = stringResource(R.string.mail_files_open_message_attachment_appears))
             } else {
                 LazyColumn(Modifier.fillMaxSize()) {
                     items(files, key = { it.attachment.id }) { entry ->
@@ -465,15 +567,16 @@ fun FilesScreen(vm: MailboxViewModel, onBack: () -> Unit, onOpen: (String) -> Un
                             }
                             Spacer(Modifier.width(12.dp))
                             Column(Modifier.weight(1f)) {
-                                Text(entry.attachment.name ?: "Attachment", fontSize = 15.sp,
-                                    color = palette.textPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                Text(entry.attachment.name ?: stringResource(R.string.mail_files_attachment), fontSize = 15.sp,
+                                    color = palette.textPrimary, maxLines = if (largeText) 3 else 1,
+                                    overflow = TextOverflow.Ellipsis)
                                 Text(
                                     listOfNotNull(
                                         entry.attachment.sizeBytes?.let { humanBytes(it) },
-                                        entry.fromMessage?.let { "in: $it" },
-                                    ).joinToString(" · ").ifBlank { "Size not recorded" },
+                                        entry.fromMessage?.let { stringResource(R.string.mail_files_in, it) },
+                                    ).joinToString(" · ").ifBlank { stringResource(R.string.mail_files_size_not_recorded) },
                                     fontSize = 12.sp, color = palette.textSecondary,
-                                    maxLines = 1, overflow = TextOverflow.Ellipsis,
+                                    maxLines = if (largeText) 3 else 1, overflow = TextOverflow.Ellipsis,
                                 )
                             }
                         }
@@ -516,17 +619,23 @@ fun AttachmentPreviewScreen(vm: MailboxViewModel, attachmentId: String, onBack: 
         loaded = true
     }
 
-    MailScaffold("Attachment", onBack) {
-        Column(Modifier.fillMaxSize().padding(horizontal = 20.dp)) {
+    MailScaffold(stringResource(R.string.mail_attach_attachment), onBack, maxContentWidth = GMLayout.Form) {
+        // Scrolls, so Save / Open / Remove stay reachable in a landscape or
+        // split-screen window and at 200% text. The viewport height keeps the
+        // loading / removed note centred as it was.
+        BoxWithConstraints(Modifier.fillMaxSize()) {
+        val viewport = maxHeight
+        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp)) {
             val a = entry?.attachment
             if (a == null || deleted) {
-                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Box(Modifier.fillMaxWidth().height(viewport), contentAlignment = Alignment.Center) {
                     Text(when {
-                        !loaded -> "Loading attachment…"
-                        deleted -> "This attachment has been removed from the message."
-                        else -> "This attachment is no longer listed. Open its message again."
+                        !loaded -> stringResource(R.string.mail_attach_loading_attachment)
+                        deleted -> stringResource(R.string.mail_attach_attachment_has_been_removed)
+                        else -> stringResource(R.string.mail_attach_attachment_no_longer_listed)
                     },
-                        fontSize = 14.sp, color = palette.textSecondary)
+                        fontSize = 14.sp, color = palette.textSecondary,
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center)
                 }
                 return@Column
             }
@@ -540,21 +649,22 @@ fun AttachmentPreviewScreen(vm: MailboxViewModel, attachmentId: String, onBack: 
                 Icon(Icons.Rounded.AttachFile, null, tint = palette.primarySolid, modifier = Modifier.size(34.dp))
             }
             Spacer(Modifier.height(16.dp))
-            Text(a.name ?: "Attachment", fontSize = 19.sp, fontWeight = FontWeight.Bold,
+            Text(a.name ?: stringResource(R.string.mail_attach_attachment), fontSize = 19.sp, fontWeight = FontWeight.Bold,
                 color = palette.textPrimary)
             Spacer(Modifier.height(10.dp))
-            DetailLine("Type", a.mimeType?.takeIf { it.isNotBlank() } ?: "Not recorded", palette)
-            DetailLine("Size", a.sizeBytes?.let { humanBytes(it) } ?: "Not recorded", palette)
-            entry?.fromMessage?.let { DetailLine("From message", it, palette) }
+            DetailLine(stringResource(R.string.mail_attach_type), a.mimeType?.takeIf { it.isNotBlank() } ?: stringResource(R.string.mail_attach_not_recorded), palette)
+            DetailLine(stringResource(R.string.mail_attach_size), a.sizeBytes?.let { humanBytes(it) } ?: stringResource(R.string.mail_attach_not_recorded), palette)
+            entry?.fromMessage?.let { DetailLine(stringResource(R.string.mail_attach_from_message), it, palette) }
 
             outcome?.let {
                 Spacer(Modifier.height(12.dp))
-                Text(it, fontSize = 12.sp, color = palette.textSecondary, maxLines = 3,
+                Text(it, fontSize = 12.sp, color = palette.textSecondary,
+                    maxLines = if (gmPrefersStackedRows()) 8 else 3,
                     overflow = TextOverflow.Ellipsis)
             }
 
             Spacer(Modifier.height(22.dp))
-            GradientButton(if (saving) "Saving…" else "Save to this device", onClick = {
+            GradientButton(if (saving) stringResource(R.string.mail_common_saving) else stringResource(R.string.mail_attach_save_device), onClick = {
                 saving = true
                 vm.downloadAttachment(a) { r -> saving = false; outcome = r }
             }, enabled = !saving && !opening && !deleting)
@@ -563,7 +673,7 @@ fun AttachmentPreviewScreen(vm: MailboxViewModel, attachmentId: String, onBack: 
             // open the file. Handing it to a viewer is the point of an
             // attachment.
             Spacer(Modifier.height(12.dp))
-            OutlineButton(if (opening) "Opening…" else "Open in another app",
+            OutlineButton(if (opening) stringResource(R.string.mail_attach_opening) else stringResource(R.string.mail_attach_open_another_app),
                 onClick = {
                     if (!opening && !saving && !deleting) {
                         opening = true
@@ -574,27 +684,28 @@ fun AttachmentPreviewScreen(vm: MailboxViewModel, attachmentId: String, onBack: 
             )
             Spacer(Modifier.height(12.dp))
             if (!confirmDelete) {
-                Text("Remove from this message", fontSize = 14.sp,
+                Text(stringResource(R.string.mail_attach_remove_from_message), fontSize = 14.sp,
                     fontWeight = FontWeight.SemiBold, color = palette.error,
                     modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(24.dp))
                         .border(1.dp, palette.error, RoundedCornerShape(24.dp))
                         .clickable(enabled = !deleting && !deleted) { confirmDelete = true }
-                        .padding(vertical = 12.dp).testTag("mail-attachment-delete"),
+                        .padding(vertical = 14.dp).testTag("mail-attachment-delete"),
                     textAlign = androidx.compose.ui.text.style.TextAlign.Center)
             } else {
                 Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
                     .background(palette.warnChipBg).padding(16.dp)
                     .testTag("mail-attachment-confirm")) {
-                    Text("Remove ${a.name ?: "this file"} from the message? The message keeps " +
-                        "everything else; this file is gone from it for good.",
+                    Text(stringResource(R.string.mail_attach_remove_confirm, a.name ?: stringResource(R.string.mail_attach_this_file)),
                         fontSize = 13.sp, color = palette.textPrimary)
-                    Row(Modifier.padding(top = 12.dp)) {
-                        Text("Cancel", fontSize = 14.sp, color = palette.textSecondary,
-                            modifier = Modifier.clickable { confirmDelete = false })
+                    // 48dp targets; the top padding shrinks by the target's own
+                    // slack so the pair sits where it did.
+                    Row(Modifier.padding(top = 2.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Text(stringResource(R.string.mail_common_cancel), fontSize = 14.sp, color = palette.textSecondary,
+                            modifier = Modifier.minimumInteractiveComponentSize().clickable { confirmDelete = false })
                         Spacer(Modifier.width(24.dp))
-                        Text(if (deleting) "Removing…" else "Remove", fontSize = 14.sp,
+                        Text(if (deleting) stringResource(R.string.mail_attach_removing) else stringResource(R.string.mail_common_remove), fontSize = 14.sp,
                             fontWeight = FontWeight.SemiBold, color = palette.error,
-                            modifier = Modifier.clickable(enabled = !deleting) {
+                            modifier = Modifier.minimumInteractiveComponentSize().clickable(enabled = !deleting) {
                                 deleting = true
                                 vm.deleteAttachment(a.id) { removed, message ->
                                     deleting = false; confirmDelete = false
@@ -605,6 +716,8 @@ fun AttachmentPreviewScreen(vm: MailboxViewModel, attachmentId: String, onBack: 
                     }
                 }
             }
+            Spacer(Modifier.height(16.dp))
+        }
         }
     }
 }
@@ -632,6 +745,7 @@ fun MailSettingsScreen(
     onHelp: () -> Unit,
     onSignOut: () -> Unit,
     onPlan: () -> Unit = {},
+    onProviders: () -> Unit = {},
 ) {
     val palette = LocalPalette.current
     // The alias list is a read with a state, not a value that appears: `GET
@@ -649,16 +763,16 @@ fun MailSettingsScreen(
     )
     LaunchedEffect(Unit) { vm.loadAliases() }
 
-    MailScaffold("Settings", onBack) {
+    MailScaffold(stringResource(R.string.mail_settings_settings), onBack, maxContentWidth = GMLayout.Form) {
         Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
-            SectionLabel("Account", palette)
-            SettingRow(Icons.Rounded.MailOutline, "GrapMail address", account.first ?: "Not loaded", palette)
-            SettingRow(Icons.Rounded.Star, "Mailbox status",
-                account.second ?: "Not reported", palette)
-            SettingRow(Icons.Rounded.Lock, "Member since",
-                account.third ?: "Not reported", palette)
+            SectionLabel(stringResource(R.string.mail_settings_account), palette)
+            SettingRow(Icons.Rounded.MailOutline, stringResource(R.string.mail_settings_grapmail_address), account.first ?: stringResource(R.string.mail_settings_not_loaded), palette)
+            SettingRow(Icons.Rounded.Star, stringResource(R.string.mail_settings_mailbox_status),
+                account.second ?: stringResource(R.string.mail_settings_not_reported), palette)
+            SettingRow(Icons.Rounded.Lock, stringResource(R.string.mail_settings_member_since),
+                account.third ?: stringResource(R.string.mail_settings_not_reported), palette)
 
-            SectionLabel("Sending as", palette)
+            SectionLabel(stringResource(R.string.mail_settings_sending), palette)
             // Three answers, not two: while the read is outstanding the screen
             // must not claim the mailbox has no aliases — "nobody answered yet"
             // and "there are none" are different sentences (the same rule the
@@ -666,15 +780,14 @@ fun MailSettingsScreen(
             when {
                 aliases.read == com.grapsee.grapmail.data.AssignmentsRead.Reading ||
                     aliases.read == com.grapsee.grapmail.data.AssignmentsRead.NotRead ->
-                    Text("Checking…", fontSize = 13.sp, color = palette.textTertiary,
+                    Text(stringResource(R.string.mail_settings_checking), fontSize = 13.sp, color = palette.textTertiary,
                         modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp))
                 aliases.read == com.grapsee.grapmail.data.AssignmentsRead.Failed && aliases.list.isEmpty() ->
-                    Text(aliases.error ?: "The alias list did not load.",
+                    Text(aliases.error ?: stringResource(R.string.mail_settings_alias_list_did_not),
                         fontSize = 13.sp, color = palette.textSecondary,
                         modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp))
                 aliases.list.isEmpty() ->
-                    Text("No aliases on this mailbox. An alias is a second address " +
-                        "that delivers into the same inbox.",
+                    Text(stringResource(R.string.mail_settings_no_aliases_mailbox_alias),
                         fontSize = 13.sp, color = palette.textSecondary,
                         modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp))
                 else -> aliases.list.forEach { a ->
@@ -687,33 +800,35 @@ fun MailSettingsScreen(
                 }
             }
 
-            SectionLabel("Mailbox", palette)
-            SettingRow(Icons.Rounded.Shield, "Account security",
-                "Password, two-step, sessions", palette, onClick = onSecurity)
-            SettingRow(Icons.Rounded.Lock, "Screener",
-                "Approval for unknown senders", palette, onClick = onScreener)
-            SettingRow(Icons.Rounded.Settings, "Labels",
-                "Filters for the inbox", palette, onClick = onLabels)
-            SettingRow(Icons.Rounded.MailOutline, "Mail settings",
-                "Signature, auto-reply, forwarding, dates, senders", palette, onClick = onPrefs)
-            SettingRow(Icons.Rounded.Star, "Your plan",
-                "Monthly sending allowance and upgrades", palette, onClick = onPlan)
-            SettingRow(Icons.Rounded.PersonAddAlt1, "Addresses",
-                "Primary and aliases", palette, onClick = onAddresses)
-            SettingRow(Icons.Rounded.Person, "Connected accounts",
-                "Apps that can use this sign-in", palette, onClick = onConnections)
-            SettingRow(Icons.Rounded.MailOutline, "Subscriptions",
-                "Senders that mail you most", palette, onClick = onSubscriptions)
+            SectionLabel(stringResource(R.string.mail_settings_mailbox), palette)
+            SettingRow(Icons.Rounded.Shield, stringResource(R.string.mail_settings_account_security),
+                stringResource(R.string.mail_settings_password_two_step_sessions), palette, onClick = onSecurity)
+            SettingRow(Icons.Rounded.Lock, stringResource(R.string.mail_settings_screener),
+                stringResource(R.string.mail_settings_approval_unknown_senders), palette, onClick = onScreener)
+            SettingRow(Icons.Rounded.Settings, stringResource(R.string.mail_settings_labels),
+                stringResource(R.string.mail_settings_filters_inbox), palette, onClick = onLabels)
+            SettingRow(Icons.Rounded.MailOutline, stringResource(R.string.mail_settings_mail_settings),
+                stringResource(R.string.mail_settings_signature_auto_reply_forwarding), palette, onClick = onPrefs)
+            SettingRow(Icons.Rounded.Star, stringResource(R.string.mail_settings_plan),
+                stringResource(R.string.mail_settings_monthly_sending_allowance_upgrades), palette, onClick = onPlan)
+            SettingRow(Icons.Rounded.PersonAddAlt1, stringResource(R.string.mail_settings_addresses),
+                stringResource(R.string.mail_settings_primary_aliases), palette, onClick = onAddresses)
+            SettingRow(Icons.Rounded.Person, stringResource(R.string.mail_settings_connected_accounts),
+                stringResource(R.string.mail_settings_apps_can_use_sign), palette, onClick = onConnections)
+            SettingRow(Icons.Rounded.MailOutline, stringResource(R.string.mail_providers_title),
+                stringResource(R.string.mail_providers_settings_subtitle), palette, onClick = onProviders)
+            SettingRow(Icons.Rounded.MailOutline, stringResource(R.string.mail_settings_subscriptions),
+                stringResource(R.string.mail_settings_senders_mail_most), palette, onClick = onSubscriptions)
             var showImport by remember { mutableStateOf(false) }
-            SettingRow(Icons.Rounded.MailOutline, "Import mail",
-                "From Gmail, Yahoo, iCloud or another IMAP account", palette, onClick = { showImport = true })
+            SettingRow(Icons.Rounded.MailOutline, stringResource(R.string.mail_settings_import_mail),
+                stringResource(R.string.mail_settings_from_gmail_yahoo_icloud), palette, onClick = { showImport = true })
             if (showImport) ImportMailDialog(onDismiss = { showImport = false })
-            SettingRow(Icons.Rounded.Star, "Notes",
-                "Kept on the account", palette, onClick = onNotes)
-            SettingRow(Icons.Rounded.Check, "Tasks",
-                "The list beside the mailbox", palette, onClick = onTasks)
+            SettingRow(Icons.Rounded.Star, stringResource(R.string.mail_settings_notes),
+                stringResource(R.string.mail_settings_kept_account), palette, onClick = onNotes)
+            SettingRow(Icons.Rounded.Check, stringResource(R.string.mail_settings_tasks),
+                stringResource(R.string.mail_settings_list_beside_mailbox), palette, onClick = onTasks)
 
-            SectionLabel("This account", palette)
+            SectionLabel(stringResource(R.string.mail_settings_this_account), palette)
             // New-mail alerts have two wake paths: FCM for the immediate signal and
             // WorkManager polling as the reliability fallback. Both converge on the
             // same authenticated `GET /stats` read before the app claims a count;
@@ -749,9 +864,9 @@ fun MailSettingsScreen(
                     com.grapsee.grapmail.logic.PushSync.registerAsync(notifyContext.applicationContext)
                 }
             }
-            SettingRow(Icons.Rounded.NotificationsActive, "New mail notifications",
-                if (notifyAllowed) "On — GrapMail checks for new mail in the background"
-                else "Off — tap to allow new-mail alerts",
+            SettingRow(Icons.Rounded.NotificationsActive, stringResource(R.string.mail_settings_new_mail_notifications),
+                if (notifyAllowed) stringResource(R.string.mail_settings_grapmail_checks_new_mail)
+                else stringResource(R.string.mail_settings_off_tap_allow_new),
                 palette,
                 onClick = {
                     val needsPermission = android.os.Build.VERSION.SDK_INT >= 33 &&
@@ -769,8 +884,8 @@ fun MailSettingsScreen(
             var hideMailPreviews by remember {
                 mutableStateOf(PushSync.genericPreviews(notifyContext))
             }
-            SettingRow(Icons.Rounded.Lock, "Mail notification previews",
-                if (hideMailPreviews) "Hidden on this device" else "Show sender and subject",
+            SettingRow(Icons.Rounded.Lock, stringResource(R.string.mail_settings_mail_notification_previews),
+                if (hideMailPreviews) stringResource(R.string.mail_settings_hidden_device) else stringResource(R.string.mail_settings_show_sender_subject),
                 palette,
                 onClick = {
                     hideMailPreviews = !hideMailPreviews
@@ -779,20 +894,20 @@ fun MailSettingsScreen(
             // The account-level rows: what the server sends for this account
             // (mail, security, account scopes) and its quiet-hours window —
             // per-account state, unlike the two rows above, which are per-device.
-            SettingRow(Icons.Rounded.NotificationsActive, "Notification preferences",
-                "Mail, security and account alerts, plus quiet hours",
+            SettingRow(Icons.Rounded.NotificationsActive, stringResource(R.string.mail_settings_notification_preferences),
+                stringResource(R.string.mail_settings_mail_security_account_alerts),
                 palette, onClick = onNotificationPrefs)
             // The per-account mute: which signed-in account may alert at all
             // on this handset. The row above shapes the alerts one account
             // sends; this one is the off switch per account.
-            SettingRow(Icons.Rounded.NotificationsOff, "Per-account notifications",
-                "Silence one signed-in account on this device",
+            SettingRow(Icons.Rounded.NotificationsOff, stringResource(R.string.mail_settings_per_account_notifications),
+                stringResource(R.string.mail_settings_silence_one_signed_account),
                 palette, onClick = onPerAccountNotifications)
             // Client-side filtering (priority only, VIP senders, lock-screen
             // previews) — a different layer from the server's per-scope alerts.
             var showNotificationFilters by remember { mutableStateOf(false) }
-            SettingRow(Icons.Rounded.NotificationsActive, "Notification filters",
-                "Priority only, VIP senders, quiet hours, lock-screen previews",
+            SettingRow(Icons.Rounded.NotificationsActive, stringResource(R.string.mail_settings_notification_filters),
+                stringResource(R.string.mail_settings_priority_only_vip_senders),
                 palette, onClick = { showNotificationFilters = true })
             if (showNotificationFilters) NotificationFiltersDialog(onDismiss = { showNotificationFilters = false })
             // The app lock is a preference on this handset, not an account
@@ -828,22 +943,36 @@ fun MailSettingsScreen(
                 }
             }
             SettingRow(
-                Icons.Rounded.Lock, "App lock",
+                Icons.Rounded.Lock, stringResource(R.string.mail_settings_app_lock),
                 when {
-                    !appLockUsable -> "Not available on this device"
-                    appLockOn -> "On — asks for your fingerprint or face when opened"
-                    else -> "Require unlock when GrapMail is opened"
+                    !appLockUsable -> stringResource(R.string.mail_settings_not_available_device)
+                    appLockOn -> stringResource(R.string.mail_settings_asks_fingerprint_face_when)
+                    else -> stringResource(R.string.mail_settings_require_unlock_when_grapmail)
                 },
                 palette,
                 onClick = toggleAppLock.takeIf { appLockUsable },
+            )
+            // FLAG_SECURE while signed in (security/ScreenPrivacy.kt). Per
+            // device, default off; MainActivity applies it to the window.
+            val allowShots by com.grapsee.grapmail.security.ScreenPrivacy
+                .allowScreenshotsFlow(notifyContext).collectAsState()
+            SettingRow(
+                Icons.Rounded.Lock,
+                androidx.compose.ui.res.stringResource(com.grapsee.grapmail.R.string.acct_allow_screenshots_title),
+                if (allowShots) androidx.compose.ui.res.stringResource(com.grapsee.grapmail.R.string.acct_allow_screenshots_on)
+                else androidx.compose.ui.res.stringResource(com.grapsee.grapmail.R.string.acct_allow_screenshots_off),
+                palette,
+                onClick = {
+                    com.grapsee.grapmail.security.ScreenPrivacy.setAllowScreenshots(notifyContext, !allowShots)
+                },
             )
             // Crash and hang reports to GrapMail's own server (logic/CrashReporter.kt):
             // app version, device model and the stack trace, never the account or mail.
             var crashReports by remember { mutableStateOf(com.grapsee.grapmail.logic.CrashReporter.enabled(notifyContext)) }
             SettingRow(
-                Icons.Rounded.Shield, "Send crash reports",
-                if (crashReports) "On — app version, device and the error, never your mail"
-                else "Off — crashes are not reported",
+                Icons.Rounded.Shield, stringResource(R.string.mail_settings_send_crash_reports),
+                if (crashReports) stringResource(R.string.mail_settings_app_version_device_error)
+                else stringResource(R.string.mail_settings_off_crashes_not_reported),
                 palette,
                 onClick = {
                     crashReports = !crashReports
@@ -855,8 +984,8 @@ fun MailSettingsScreen(
             // the app actually ships copy for — res/xml/locales_config.xml.
             if (android.os.Build.VERSION.SDK_INT >= 33) {
                 SettingRow(
-                    Icons.Rounded.Language, "App language",
-                    "Opens the system's page for this app's language",
+                    Icons.Rounded.Language, stringResource(R.string.mail_settings_app_language),
+                    stringResource(R.string.mail_settings_opens_systems_page_apps),
                     palette,
                     onClick = {
                         val open = android.content.Intent(android.provider.Settings.ACTION_APP_LOCALE_SETTINGS)
@@ -865,24 +994,35 @@ fun MailSettingsScreen(
                     },
                 )
             }
-            SettingRow(Icons.Rounded.Person, "Personal info",
-                "Name, birthday, photo", palette, onClick = onProfile)
-            SettingRow(Icons.Rounded.Shield, "Data & privacy",
-                "What is kept, what you control", palette, onClick = onPrivacy)
-            SettingRow(Icons.Rounded.Lock, "Encryption",
-                "Your end-to-end key, on this device", palette, onClick = onEncryption)
+            SettingRow(Icons.Rounded.Person, stringResource(R.string.mail_settings_personal_info),
+                stringResource(R.string.mail_settings_name_birthday_photo), palette, onClick = onProfile)
+            SettingRow(Icons.Rounded.Shield, stringResource(R.string.mail_settings_data_privacy),
+                stringResource(R.string.mail_settings_what_kept_what_control), palette, onClick = onPrivacy)
+            SettingRow(Icons.Rounded.Lock, stringResource(R.string.mail_settings_encryption),
+                stringResource(R.string.mail_settings_end_end_key_device), palette, onClick = onEncryption)
 
             com.grapsee.grapmail.ui.mailfeatures.MailFeatureSettingsSection()
 
-            SectionLabel("Support", palette)
-            SettingRow(Icons.Rounded.HelpOutline, "Help & Support",
-                "Questions this product actually raises", palette, onClick = onHelp)
+            // Round 8 — identity (round8-spec §1.11). Material You is opt-in: the
+            // row exists only where the platform has wallpaper colours (Android
+            // 12+), and below that it is absent rather than disabled.
+            if (android.os.Build.VERSION.SDK_INT >= 31) {
+                SectionLabel(stringResource(R.string.identity_settings_appearance), palette)
+                MatchWallpaperRow(palette)
+            }
 
-            Spacer(Modifier.height(20.dp))
-            Text("Sign out", fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = palette.error,
-                modifier = Modifier.padding(horizontal = 20.dp).clickable(onClick = onSignOut)
+            SectionLabel(stringResource(R.string.mail_settings_support), palette)
+            SettingRow(Icons.Rounded.HelpOutline, stringResource(R.string.mail_settings_help_support),
+                stringResource(R.string.mail_settings_questions_product_actually_raises), palette, onClick = onHelp)
+
+            // 48dp target; the spacers give back the target's slack so the
+            // line sits where it did.
+            Spacer(Modifier.height(6.dp))
+            Text(stringResource(R.string.mail_settings_sign_out), fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = palette.error,
+                modifier = Modifier.padding(horizontal = 20.dp).minimumInteractiveComponentSize()
+                    .clickable(role = androidx.compose.ui.semantics.Role.Button, onClick = onSignOut)
                     .testTag("mail-sign-out"))
-            Spacer(Modifier.height(30.dp))
+            Spacer(Modifier.height(16.dp))
         }
     }
 }
@@ -935,9 +1075,9 @@ fun PerAccountNotificationsScreen(onBack: () -> Unit) {
             try {
                 val stored = SessionStore.snapshotAll(context)
                     .firstOrNull { it.address.equals(row.email, ignoreCase = true) }
-                    ?: throw IllegalStateException("Sign in again.")
+                    ?: throw IllegalStateException(CoreStrings.get(R.string.mail_peracct_sign_again) { "Sign in again." })
                 val session = SessionRefresh.forAccount(context, stored.id)
-                    ?: throw IllegalStateException("Sign in again.")
+                    ?: throw IllegalStateException(CoreStrings.get(R.string.mail_peracct_sign_again) { "Sign in again." })
                 val answer = Api.setAccountPushPreferences(
                     session.token, deviceRowId,
                     enabled = !muted,
@@ -950,31 +1090,32 @@ fun PerAccountNotificationsScreen(onBack: () -> Unit) {
                 throw e
             } catch (e: Exception) {
                 rows = previous
-                error = e.message ?: "The change did not save. Try again."
+                error = e.message ?: CoreStrings.get(R.string.mail_peracct_change_did_not_save) { "The change did not save. Try again." }
             } finally {
                 busyEmail = null
             }
         }
     }
 
-    MailScaffold("Per-account notifications", onBack) {
+    MailScaffold(stringResource(R.string.mail_peracct_per_account_notifications), onBack,
+        maxContentWidth = GMLayout.Form) {
         Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
-            SectionLabel("Signed-in accounts", palette)
+            SectionLabel(stringResource(R.string.mail_peracct_signed_accounts), palette)
             val current = rows
             when {
                 current == null && !failed ->
-                    Text("Checking…", fontSize = 13.sp, color = palette.textTertiary,
+                    Text(stringResource(R.string.mail_peracct_checking), fontSize = 13.sp, color = palette.textTertiary,
                         modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp))
                 current == null -> {
-                    Text("The account list did not load.", fontSize = 13.sp,
+                    Text(stringResource(R.string.mail_peracct_account_list_did_not), fontSize = 13.sp,
                         color = palette.textSecondary,
                         modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp))
                     androidx.compose.material3.TextButton(onClick = { scope.launch { load() } }) {
-                        Text("Retry")
+                        Text(stringResource(R.string.mail_common_retry))
                     }
                 }
                 current.isEmpty() ->
-                    Text("No accounts are signed in on this device.", fontSize = 13.sp,
+                    Text(stringResource(R.string.mail_peracct_no_accounts_signed_device), fontSize = 13.sp,
                         color = palette.textSecondary,
                         modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp))
                 else -> current.forEach { row ->
@@ -991,9 +1132,9 @@ fun PerAccountNotificationsScreen(onBack: () -> Unit) {
                                 color = palette.textPrimary)
                             Text(
                                 when {
-                                    row.deviceRowId == null -> "Not registered for push on this device"
-                                    row.muted -> "Muted — this account's alerts are silenced"
-                                    else -> "Alerts arrive normally"
+                                    row.deviceRowId == null -> stringResource(R.string.mail_peracct_not_registered_push_device)
+                                    row.muted -> stringResource(R.string.mail_peracct_muted_accounts_alerts_silenced)
+                                    else -> stringResource(R.string.mail_peracct_alerts_arrive_normally)
                                 },
                                 fontSize = 13.sp, color = palette.textSecondary,
                             )
@@ -1017,8 +1158,7 @@ fun PerAccountNotificationsScreen(onBack: () -> Unit) {
                     modifier = Modifier.padding(horizontal = 20.dp))
             }
             Spacer(Modifier.height(14.dp))
-            NoteBar("Silencing one account stops its mail alerts on this device. " +
-                "Mandatory security alerts still arrive — the server keeps those on for every account.")
+            NoteBar(stringResource(R.string.mail_peracct_silencing_one_account_stops))
             Spacer(Modifier.height(20.dp))
         }
     }
@@ -1059,6 +1199,48 @@ internal fun SettingRow(
     }
 }
 
+/**
+ * Settings → Appearance → "Match wallpaper" (round8-spec §1.11).
+ *
+ * Off by default. On, the accent family — buttons, links, highlights — follows
+ * the wallpaper through Material You, while avatars, status colours, neutrals
+ * and text stay GrapMail's. The value lives on the device
+ * (MailDisplayPrefs.matchWallpaper) and GrapMailTheme reads it as snapshot
+ * state, so the app repaints the moment the switch flips. The whole row is the
+ * toggle, with switch semantics, so TalkBack reads the title, the subtitle and
+ * the on/off state as one control.
+ */
+@Composable
+private fun MatchWallpaperRow(palette: com.grapsee.grapmail.ui.theme.Palette) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    remember(context) { com.grapsee.grapmail.data.MailDisplayPrefs.ensureAppearanceLoaded(context) }
+    val on = com.grapsee.grapmail.data.MailDisplayPrefs.matchWallpaper
+    Row(
+        Modifier.fillMaxWidth()
+            .toggleable(value = on, role = androidx.compose.ui.semantics.Role.Switch) { want ->
+                com.grapsee.grapmail.data.MailDisplayPrefs.setMatchWallpaper(context, want)
+            }
+            .padding(horizontal = 20.dp, vertical = 12.dp)
+            .testTag("settings-match-wallpaper"),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(Icons.Rounded.Palette, null, tint = palette.textSecondary, modifier = Modifier.size(20.dp))
+        Spacer(Modifier.width(14.dp))
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(stringResource(R.string.identity_match_wallpaper_title), fontSize = 15.sp,
+                fontWeight = FontWeight.Medium, color = palette.textPrimary)
+            Text(stringResource(R.string.identity_match_wallpaper_subtitle), fontSize = 13.sp,
+                color = palette.textSecondary)
+        }
+        Spacer(Modifier.width(12.dp))
+        Switch(
+            checked = on,
+            onCheckedChange = null,
+            colors = SwitchDefaults.colors(checkedTrackColor = palette.primarySolid),
+        )
+    }
+}
+
 // ── 81 screener ──────────────────────────────────────────────────────────────
 
 /**
@@ -1076,21 +1258,22 @@ fun ScreenerScreen(vm: MailboxViewModel, onBack: () -> Unit, onOpenQueue: () -> 
 
     LaunchedEffect(Unit) { vm.loadScreener() }
 
-    MailScaffold("Screener", onBack) {
-        Column(Modifier.fillMaxSize().padding(horizontal = 20.dp)) {
+    MailScaffold(stringResource(R.string.mail_screener_screener), onBack, maxContentWidth = GMLayout.Form) {
+        // Scrolls, so the switch and Open queue stay reachable in a short
+        // window or at large text.
+        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp)) {
             Spacer(Modifier.height(12.dp))
-            Box(Modifier.size(70.dp).clip(RoundedCornerShape(18.dp)).background(palette.softFill),
+            Box(Modifier.size(if (com.grapsee.grapmail.ui.components.gmIsShortWindow()) 52.dp else 70.dp)
+                .clip(RoundedCornerShape(18.dp)).background(palette.softFill),
                 contentAlignment = Alignment.Center) {
                 Icon(Icons.Rounded.Lock, null, tint = palette.primarySolid, modifier = Modifier.size(30.dp))
             }
             Spacer(Modifier.height(16.dp))
-            Text("Unknown sender approval", fontSize = 19.sp, fontWeight = FontWeight.Bold,
+            Text(stringResource(R.string.mail_screener_unknown_sender_approval), fontSize = 19.sp, fontWeight = FontWeight.Bold,
                 color = palette.textPrimary)
             Spacer(Modifier.height(8.dp))
             Text(
-                "Mail from senders you have not approved waits in a queue instead " +
-                    "of reaching the inbox. The queue is a real folder, so a mail " +
-                    "client sees it too.",
+                stringResource(R.string.mail_screener_mail_from_senders_have),
                 fontSize = 14.sp, color = palette.textSecondary, lineHeight = 21.sp,
             )
 
@@ -1102,13 +1285,13 @@ fun ScreenerScreen(vm: MailboxViewModel, onBack: () -> Unit, onOpenQueue: () -> 
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Column(Modifier.weight(1f)) {
-                    Text("Screener enabled", fontSize = 15.sp, color = palette.textPrimary)
+                    Text(stringResource(R.string.mail_screener_screener_enabled), fontSize = 15.sp, color = palette.textPrimary)
                     Text(
                         when {
-                            !state.loaded -> "Checking with your mailbox…"
-                            state.enabled == null -> "Status not reported"
-                            else -> if (state.enabled == true) "Unknown senders are held"
-                            else "Off — all senders reach the inbox"
+                            !state.loaded -> stringResource(R.string.mail_screener_checking_mailbox)
+                            state.enabled == null -> stringResource(R.string.mail_screener_status_not_reported)
+                            else -> if (state.enabled == true) stringResource(R.string.mail_screener_unknown_senders_held)
+                            else stringResource(R.string.mail_screener_off_all_senders_reach)
                         },
                         fontSize = 12.sp, color = palette.textSecondary,
                     )
@@ -1125,16 +1308,17 @@ fun ScreenerScreen(vm: MailboxViewModel, onBack: () -> Unit, onOpenQueue: () -> 
                 Spacer(Modifier.height(10.dp))
                 Text(it, fontSize = 12.sp, color = palette.error)
                 if (!state.busy) androidx.compose.material3.TextButton(onClick = vm::loadScreener) {
-                    Text("Retry")
+                    Text(stringResource(R.string.mail_common_retry))
                 }
             }
 
             Spacer(Modifier.height(18.dp))
-            DetailLine("Waiting in the queue",
-                state.pending?.toString() ?: "Not loaded", palette)
+            DetailLine(stringResource(R.string.mail_screener_waiting_queue),
+                state.pending?.toString() ?: stringResource(R.string.mail_screener_not_loaded), palette)
 
             Spacer(Modifier.height(18.dp))
-            GradientButton("Open the queue", onClick = onOpenQueue)
+            GradientButton(stringResource(R.string.mail_screener_open_queue), onClick = onOpenQueue)
+            Spacer(Modifier.height(16.dp))
         }
     }
 }

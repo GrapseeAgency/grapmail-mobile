@@ -3,11 +3,13 @@ package com.grapsee.grapmail.logic
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.grapsee.grapmail.R
 import com.grapsee.grapmail.data.Api
 import com.grapsee.grapmail.data.MailE2e
 import com.grapsee.grapmail.data.MailE2eKeysDto
 import com.grapsee.grapmail.data.MailE2eLookupEntryDto
 import com.grapsee.grapmail.data.SessionStore
+import com.grapsee.grapmail.ui.i18n.CoreStrings
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -107,6 +109,7 @@ class E2eViewModel @JvmOverloads constructor(
      */
     private suspend fun loadIdentityFile(): MailE2e.Identity? {
         val k = identityKey() ?: return null
+        cachedIdentityKey = k
         withContext(Dispatchers.IO) { MailE2e.loadIdentity(getApplication(), k) }?.let { return it }
         val legacy = token() ?: return null
         if (legacy == k) return null
@@ -171,7 +174,7 @@ class E2eViewModel @JvmOverloads constructor(
     fun createRecoveryKey() {
         if (snapshotMode) return
         val unlocked = session ?: run {
-            note("Unlock your key first: the recovery kit is made from it.", true)
+            note(CoreStrings.get(R.string.core_e2e_unlock_first_for_kit) { "Unlock your key first: the recovery kit is made from it." }, true)
             return
         }
         viewModelScope.launch {
@@ -183,7 +186,7 @@ class E2eViewModel @JvmOverloads constructor(
             }
             if (kit.isFailure) {
                 _state.update { it.copy(busy = false) }
-                note(kit.exceptionOrNull()?.message ?: "The recovery kit could not be made.", true)
+                note(kit.exceptionOrNull()?.message ?: CoreStrings.get(R.string.core_e2e_kit_not_made) { "The recovery kit could not be made." }, true)
                 return@launch
             }
             runCatching { Api.e2eRecoverySave(t, kit.getOrNull()!!) }
@@ -195,7 +198,7 @@ class E2eViewModel @JvmOverloads constructor(
                         }
                     } else {
                         _state.update { it.copy(busy = false) }
-                        note(r.error ?: "The recovery kit was not saved.", true)
+                        note(r.error ?: CoreStrings.get(R.string.core_e2e_kit_not_saved) { "The recovery kit was not saved." }, true)
                     }
                 }
                 .onFailure { e ->
@@ -217,8 +220,8 @@ class E2eViewModel @JvmOverloads constructor(
             runCatching { Api.e2eRecoveryRemove(t) }
                 .onSuccess { r ->
                     _state.update { it.copy(busy = false, recoveryKitExists = if (r.success) false else it.recoveryKitExists) }
-                    note(if (r.success) "The recovery key was removed. Keep this device safe: it now holds the only copy of your key."
-                        else r.error ?: "The recovery kit was not removed.", !r.success)
+                    note(if (r.success) CoreStrings.get(R.string.core_e2e_kit_removed) { "The recovery key was removed. Keep this device safe: it now holds the only copy of your key." }
+                        else r.error ?: CoreStrings.get(R.string.core_e2e_kit_not_removed) { "The recovery kit was not removed." }, !r.success)
                 }
                 .onFailure { e ->
                     _state.update { it.copy(busy = false) }
@@ -238,15 +241,15 @@ class E2eViewModel @JvmOverloads constructor(
             val t = token() ?: return@launch
             val k = identityKey() ?: return@launch
             if (newPassphrase.length < MailE2e.MIN_PASSPHRASE_LENGTH) {
-                note("Use at least ${MailE2e.MIN_PASSPHRASE_LENGTH} characters for the passphrase.", true)
+                note(CoreStrings.get(R.string.core_e2e_passphrase_too_short, MailE2e.MIN_PASSPHRASE_LENGTH) { "Use at least ${MailE2e.MIN_PASSPHRASE_LENGTH} characters for the passphrase." }, true)
                 return@launch
             }
             if (newPassphrase != confirm) {
-                note("The two passphrases do not match.", true)
+                note(CoreStrings.get(R.string.core_e2e_passphrase_mismatch) { "The two passphrases do not match." }, true)
                 return@launch
             }
             if (MailE2e.normalizeRecoveryKey(recoveryKey) == null) {
-                note("That recovery key is not valid. It has 28 letters and numbers.", true)
+                note(CoreStrings.get(R.string.core_e2e_recovery_key_invalid) { "That recovery key is not valid. It has 28 letters and numbers." }, true)
                 return@launch
             }
             _state.update { it.copy(busy = true) }
@@ -259,7 +262,7 @@ class E2eViewModel @JvmOverloads constructor(
             val stored = kit.kit
             if (!kit.success || stored == null) {
                 _state.update { it.copy(busy = false, recoveryKitExists = if (kit.success) false else it.recoveryKitExists) }
-                note(kit.error ?: "There is no recovery kit for this account.", true)
+                note(kit.error ?: CoreStrings.get(R.string.core_e2e_no_kit) { "There is no recovery kit for this account." }, true)
                 return@launch
             }
             val restored = runCatching {
@@ -270,7 +273,7 @@ class E2eViewModel @JvmOverloads constructor(
             }
             if (restored.isFailure) {
                 _state.update { it.copy(busy = false) }
-                note(restored.exceptionOrNull()?.message ?: "The key could not be restored.", true)
+                note(restored.exceptionOrNull()?.message ?: CoreStrings.get(R.string.core_e2e_restore_failed) { "The key could not be restored." }, true)
                 return@launch
             }
             val (identity, unlocked) = restored.getOrNull()!!
@@ -278,7 +281,7 @@ class E2eViewModel @JvmOverloads constructor(
             session = unlocked
             val fp = runCatching { withContext(Dispatchers.Default) { MailE2e.fingerprint(identity.encryption.publicKey) } }.getOrNull()
             _state.update { it.copy(busy = false, record = identity, fingerprint = fp, unlocked = true) }
-            note("Your key is back on this device and unlocked. Encrypted mail opens here again.", false)
+            note(CoreStrings.get(R.string.core_e2e_restored) { "Your key is back on this device and unlocked. Encrypted mail opens here again." }, false)
         }
     }
 
@@ -308,7 +311,7 @@ class E2eViewModel @JvmOverloads constructor(
                             published = if (r.success && r.published) r.keys else null,
                             publishedLoaded = r.success,
                             publishedError = if (r.success) null
-                                else (r.error ?: "The key directory did not answer."),
+                                else (r.error ?: CoreStrings.get(R.string.core_e2e_key_directory_silent) { "The key directory did not answer." }),
                         )
                     }
                 }
@@ -334,11 +337,11 @@ class E2eViewModel @JvmOverloads constructor(
         viewModelScope.launch {
             val t = identityKey() ?: return@launch
             if (passphrase.length < MailE2e.MIN_PASSPHRASE_LENGTH) {
-                note("Use at least ${MailE2e.MIN_PASSPHRASE_LENGTH} characters for the passphrase.", true)
+                note(CoreStrings.get(R.string.core_e2e_passphrase_too_short, MailE2e.MIN_PASSPHRASE_LENGTH) { "Use at least ${MailE2e.MIN_PASSPHRASE_LENGTH} characters for the passphrase." }, true)
                 return@launch
             }
             if (passphrase != confirm) {
-                note("The two passphrases do not match.", true)
+                note(CoreStrings.get(R.string.core_e2e_passphrase_mismatch) { "The two passphrases do not match." }, true)
                 return@launch
             }
             _state.update { it.copy(busy = true) }
@@ -349,7 +352,7 @@ class E2eViewModel @JvmOverloads constructor(
             }
             if (made.isFailure) {
                 _state.update { it.copy(busy = false) }
-                note(made.exceptionOrNull()?.message ?: "This device could not create the keys.", true)
+                note(made.exceptionOrNull()?.message ?: CoreStrings.get(R.string.core_e2e_create_failed) { "This device could not create the keys." }, true)
                 return@launch
             }
             val identity = made.getOrNull()!!
@@ -364,7 +367,7 @@ class E2eViewModel @JvmOverloads constructor(
                 publishNow()
             } else {
                 _state.update { it.copy(busy = false) }
-                note("Encryption is on. Your key is private to this device until you publish it.", false)
+                note(CoreStrings.get(R.string.core_e2e_on_private) { "Encryption is on. Your key is private to this device until you publish it." }, false)
             }
         }
     }
@@ -383,13 +386,15 @@ class E2eViewModel @JvmOverloads constructor(
                 if (r.success) {
                     loadPublished()
                     note(if (r.discoverable)
-                        "Encryption is on, and your key is published so others can find it."
+                        CoreStrings.get(R.string.core_e2e_on_published) { "Encryption is on, and your key is published so others can find it." }
                     else
-                        "Your key is saved on this device and stored on the server, but it is not " +
-                            "findable by senders yet. That happens when the mailbox is not active. " +
-                            "Mail sent to you stays unencrypted until that is fixed.", !r.discoverable)
+                        CoreStrings.get(R.string.core_e2e_stored_not_discoverable) {
+                            "Your key is saved on this device and stored on the server, but it is not " +
+                                "findable by senders yet. That happens when the mailbox is not active. " +
+                                "Mail sent to you stays unencrypted until that is fixed."
+                        }, !r.discoverable)
                 } else {
-                    note(r.error ?: "The directory refused those keys.", true)
+                    note(r.error ?: CoreStrings.get(R.string.core_e2e_directory_refused) { "The directory refused those keys." }, true)
                 }
             }.onFailure { e ->
                 _state.update { it.copy(busy = false) }
@@ -413,9 +418,11 @@ class E2eViewModel @JvmOverloads constructor(
                     _state.update { it.copy(busy = false) }
                     loadPublished()
                     note(if (r.success)
-                        "Unpublished. New mail to you will not be encrypted. Messages already " +
-                            "encrypted stay readable on this device."
-                    else r.error ?: "The directory did not remove the key.", !r.success)
+                        CoreStrings.get(R.string.core_e2e_unpublished) {
+                            "Unpublished. New mail to you will not be encrypted. Messages already " +
+                                "encrypted stay readable on this device."
+                        }
+                    else r.error ?: CoreStrings.get(R.string.core_e2e_unpublish_failed) { "The directory did not remove the key." }, !r.success)
                 }
                 .onFailure { e ->
                     _state.update { it.copy(busy = false) }
@@ -439,10 +446,64 @@ class E2eViewModel @JvmOverloads constructor(
             opened.onSuccess {
                 session = it
                 _state.update { s -> s.copy(unlocked = true) }
-                note("Unlocked for this session. It locks again when the app is closed.", false)
+                note(CoreStrings.get(R.string.core_e2e_unlocked) { "Unlocked for this session. It locks again when the app is closed." }, false)
             }.onFailure { e ->
                 note((e as? IllegalStateException)?.message
-                    ?: "That passphrase did not unlock this key. Check it and try again.", true)
+                    ?: CoreStrings.get(R.string.core_e2e_wrong_passphrase) { "That passphrase did not unlock this key. Check it and try again." }, true)
+            }
+        }
+    }
+
+    // ── biometric-bound unlock (security/BiometricKeyWrap.kt) ───────────────
+    // Additive: the passphrase record is never touched. With app lock on, a
+    // passphrase unlock is followed by a re-wrap under a Keystore key that
+    // needs the biometric/credential prompt; later unlocks can use the prompt.
+
+    /** True when a biometric unlock can be offered for the stored record. */
+    fun canBiometricUnlock(): Boolean {
+        if (snapshotMode || _state.value.record == null) return false
+        val ctx = getApplication<Application>()
+        if (!AppLock.isEnabled(ctx)) return false
+        val k = cachedIdentityKey ?: return false
+        return com.grapsee.grapmail.security.BiometricKeyWrap.hasBoundCopy(ctx, k)
+    }
+
+    @Volatile private var cachedIdentityKey: String? = null
+
+    /** Called by the unlock screen after a passphrase unlock succeeded. */
+    fun bindAfterPassphraseUnlock(activity: androidx.fragment.app.FragmentActivity) {
+        if (snapshotMode) return
+        val unlocked = session ?: return
+        if (!AppLock.isEnabled(activity)) return
+        viewModelScope.launch {
+            val k = identityKey() ?: return@launch
+            cachedIdentityKey = k
+            if (com.grapsee.grapmail.security.BiometricKeyWrap.hasBoundCopy(activity, k)) return@launch
+            // Failure here is silent by design: the passphrase path still works.
+            com.grapsee.grapmail.security.BiometricKeyWrap.bind(activity, k, unlocked) { }
+        }
+    }
+
+    fun unlockWithBiometrics(activity: androidx.fragment.app.FragmentActivity) {
+        if (snapshotMode) return
+        val record = _state.value.record ?: return
+        viewModelScope.launch {
+            val k = identityKey() ?: return@launch
+            cachedIdentityKey = k
+            com.grapsee.grapmail.security.BiometricKeyWrap.open(activity, k, record.encryption.publicKey) { outcome ->
+                when (outcome) {
+                    is com.grapsee.grapmail.security.BiometricKeyWrap.Outcome.Opened -> {
+                        session = outcome.unlocked
+                        _state.update { s -> s.copy(unlocked = true) }
+                        note(CoreStrings.get(R.string.core_e2e_unlocked) { "Unlocked for this session. It locks again when the app is closed." }, false)
+                    }
+                    com.grapsee.grapmail.security.BiometricKeyWrap.Outcome.Invalidated ->
+                        note(CoreStrings.get(R.string.core_e2e_bio_invalidated) {
+                            "Your fingerprint or face settings changed, so biometric unlock was turned off for this key. " +
+                                "Unlock with your passphrase. If you have forgotten it, use your recovery key."
+                        }, true)
+                    com.grapsee.grapmail.security.BiometricKeyWrap.Outcome.Unavailable -> Unit
+                }
             }
         }
     }
@@ -451,7 +512,7 @@ class E2eViewModel @JvmOverloads constructor(
         if (snapshotMode) return
         session = null
         _state.update { it.copy(unlocked = false) }
-        note("Locked.", false)
+        note(CoreStrings.get(R.string.core_e2e_locked) { "Locked." }, false)
     }
 
     /** Sign-out and session expiry go through this. The doc on `session`
@@ -463,6 +524,7 @@ class E2eViewModel @JvmOverloads constructor(
      *  key. This is that promised leg, finally true. */
     fun clearForSignOut() {
         localLoad?.cancel()
+        cachedIdentityKey = null
         session = null
         _state.value = State()
     }
@@ -475,7 +537,7 @@ class E2eViewModel @JvmOverloads constructor(
             val t = identityKey() ?: return@launch
             val record = _state.value.record ?: return@launch
             if (newPhrase.length < MailE2e.MIN_PASSPHRASE_LENGTH) {
-                note("Use at least ${MailE2e.MIN_PASSPHRASE_LENGTH} characters for the new passphrase.", true)
+                note(CoreStrings.get(R.string.core_e2e_new_passphrase_too_short, MailE2e.MIN_PASSPHRASE_LENGTH) { "Use at least ${MailE2e.MIN_PASSPHRASE_LENGTH} characters for the new passphrase." }, true)
                 return@launch
             }
             _state.update { it.copy(busy = true) }
@@ -496,10 +558,10 @@ class E2eViewModel @JvmOverloads constructor(
             _state.update { it.copy(busy = false) }
             if (done.isSuccess) {
                 refreshAfterRewrap(t)
-                note("Passphrase changed. The key itself is unchanged, so old messages still open.", false)
+                note(CoreStrings.get(R.string.core_e2e_passphrase_changed) { "Passphrase changed. The key itself is unchanged, so old messages still open." }, false)
             } else {
                 note(done.exceptionOrNull()?.message
-                    ?: "The old passphrase did not unlock the key.", true)
+                    ?: CoreStrings.get(R.string.core_e2e_old_passphrase_wrong) { "The old passphrase did not unlock the key." }, true)
             }
         }
     }
@@ -523,13 +585,17 @@ class E2eViewModel @JvmOverloads constructor(
             withContext(Dispatchers.IO) {
                 MailE2e.clearIdentity(getApplication(), k)
                 token()?.let { MailE2e.clearIdentity(getApplication(), it) }
+                // The biometric-bound copy goes with the key it wraps.
+                com.grapsee.grapmail.security.BiometricKeyWrap.forgetAccount(getApplication(), k)
             }
             session = null
             _state.update {
                 it.copy(busy = false, record = null, unlocked = false, fingerprint = null)
             }
-            note("The key has been removed from this device. Any message encrypted to it can " +
-                "no longer be read here.", false)
+            note(CoreStrings.get(R.string.core_e2e_key_removed) {
+                "The key has been removed from this device. Any message encrypted to it can " +
+                    "no longer be read here."
+            }, false)
         }
     }
 
@@ -547,7 +613,7 @@ class E2eViewModel @JvmOverloads constructor(
                     _state.update {
                         it.copy(busy = false, lookup = r.results, lookupFor = addresses,
                             note = if (r.success) null
-                                else (r.error ?: "The directory did not answer."),
+                                else (r.error ?: CoreStrings.get(R.string.core_e2e_directory_silent) { "The directory did not answer." }),
                             noteIsBad = !r.success)
                     }
                 }
@@ -564,7 +630,7 @@ class E2eViewModel @JvmOverloads constructor(
      *  during an encrypt is indistinguishable from a hang. */
     suspend fun seal(plaintext: String, recipientKeys: List<String>): String? {
         val s = session ?: run {
-            note("Your key is locked — unlock it before sending encrypted mail.", true)
+            note(CoreStrings.get(R.string.core_e2e_locked_before_send) { "Your key is locked — unlock it before sending encrypted mail." }, true)
             return null
         }
         val signing = s.signingPrivateKey?.let {
@@ -576,7 +642,7 @@ class E2eViewModel @JvmOverloads constructor(
             }
         }
         if (result.isFailure) {
-            note(result.exceptionOrNull()?.message ?: "The message could not be sealed.", true)
+            note(result.exceptionOrNull()?.message ?: CoreStrings.get(R.string.core_e2e_seal_failed) { "The message could not be sealed." }, true)
             return null
         }
         return MailE2e.SealedEnvelopeAny.V2(result.getOrNull()!!).toJson().toString()
@@ -591,11 +657,11 @@ class E2eViewModel @JvmOverloads constructor(
     suspend fun decrypt(envelopeJson: String, passphrase: String): String? {
         localLoad?.join()
         val record = _state.value.record ?: run {
-            note("This device has no key to open messages with.", true)
+            note(CoreStrings.get(R.string.core_e2e_no_key_to_open) { "This device has no key to open messages with." }, true)
             return null
         }
         val parsed = MailE2e.parseEnvelope(envelopeJson) ?: run {
-            note("This message's envelope is not readable.", true)
+            note(CoreStrings.get(R.string.core_e2e_envelope_unreadable) { "This message's envelope is not readable." }, true)
             return null
         }
         val result = runCatching {
@@ -606,7 +672,7 @@ class E2eViewModel @JvmOverloads constructor(
         }
         if (result.isFailure) {
             note(result.exceptionOrNull()?.message
-                ?: "That passphrase did not unlock this key. Check it and try again.", true)
+                ?: CoreStrings.get(R.string.core_e2e_wrong_passphrase) { "That passphrase did not unlock this key. Check it and try again." }, true)
             return null
         }
         return result.getOrNull()
@@ -615,9 +681,11 @@ class E2eViewModel @JvmOverloads constructor(
     fun canSealWithThisDevice(): Boolean = session != null
 
     fun openpgpExportNote(): String =
-        "OpenPGP export lives on the web client — this device holds the key, but " +
-            "the gpg-shaped file is built in the browser. Nothing here is missing " +
-            "from your key; it is one action the phone does not offer."
+        CoreStrings.get(R.string.core_e2e_openpgp_export_note) {
+            "OpenPGP export lives on the web client — this device holds the key, but " +
+                "the gpg-shaped file is built in the browser. Nothing here is missing " +
+                "from your key; it is one action the phone does not offer."
+        }
 
     fun clearNote() = _state.update { it.copy(note = null) }
 
@@ -626,5 +694,5 @@ class E2eViewModel @JvmOverloads constructor(
 
     private fun reason(e: Throwable): String =
         (e as? com.grapsee.grapmail.data.ApiException)?.message?.takeIf { it.isNotBlank() }
-            ?: "That did not go through."
+            ?: CoreStrings.get(R.string.core_did_not_go_through) { "That did not go through." }
 }

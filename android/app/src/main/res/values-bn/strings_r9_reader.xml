@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <plurals name="reader_earlier_messages">
+        <item quantity="one">%d আগের বার্তা</item>
+        <item quantity="other">%d আগের বার্তা</item>
+    </plurals>
+    <plurals name="reader_participants">
+        <item quantity="one">%d জন</item>
+        <item quantity="other">%d জন</item>
+    </plurals>
+    <plurals name="reader_message_count">
+        <item quantity="one">%dটি বার্তা</item>
+        <item quantity="other">%dটি বার্তা</item>
+    </plurals>
+    <string name="reader_you">আপনি</string>
+    <string name="reader_unread">অপঠিত</string>
+    <string name="reader_earlier_action">ভাঁজ করা বার্তাগুলো দেখান</string>
+    <string name="reader_open_message_action">এই বার্তাটি খুলুন</string>
+    <string name="reader_quoted_show">উদ্ধৃত লেখা দেখান</string>
+    <string name="reader_quoted_hide">উদ্ধৃত লেখা লুকান</string>
+    <string name="reader_state_expanded">খোলা</string>
+    <string name="reader_state_collapsed">ভাঁজ করা</string>
+    <string name="reader_reply_to">%1$s-কে উত্তর দিন…</string>
+    <string name="reader_reply_fallback">উত্তর দিন…</string>
+    <string name="reader_reply_options">উত্তরের বিকল্প</string>
+    <string name="reader_quick_reply">দ্রুত উত্তর</string>
+    <string name="reader_attach_share_chooser">সংযুক্তি শেয়ার করুন</string>
+    <string name="reader_attach_view_image">ছবিটি দেখুন</string>
+    <string name="reader_attach_save_named">%1$s সংরক্ষণ করুন</string>
+    <string name="reader_attach_share_named">%1$s শেয়ার করুন</string>
+    <string name="reader_attach_share_nothing">এই ডিভাইসে কোনো অ্যাপ এই ফাইল শেয়ার করতে পারে না।</string>
+    <string name="reader_viewer_position">%1$d / %2$d</string>
+    <string name="reader_viewer_too_large">এই ছবিটি এখানে দেখা যাবে না।</string>
+    <string name="compose_r9_leave_title">এই বার্তা থেকে বেরোবেন?</string>
+    <string name="compose_r9_leave_attachments">খসড়ায় এখনও সংযুক্তি রাখা যায় না। লেখাটি সংযুক্তি ছাড়াই খসড়া হিসেবে সংরক্ষণ করুন, বা সম্পাদনা চালিয়ে যান।</string>
+    <string name="compose_r9_save_text_only">শুধু লেখা সংরক্ষণ করুন</string>
+    <string name="compose_r9_draft_failed_title">এই খসড়াটি সংরক্ষণ হয়নি</string>
+    <string name="compose_r9_leave_without_saving">সংরক্ষণ না করে বেরোন</string>
+    <string name="compose_r9_encrypt_failed">এই বার্তাটি এনক্রিপ্ট করা যায়নি, তাই কিছু পাঠানো হয়নি।</string>
+    <string name="compose_editor_toolbar">লেখার ফরম্যাটিং</string>
+    <string name="compose_editor_bold">বোল্ড</string>
+    <string name="compose_editor_italic">ইটালিক</string>
+    <string name="compose_editor_underline">আন্ডারলাইন</string>
+    <string name="compose_editor_strike">স্ট্রাইকথ্রু</string>
+    <string name="compose_editor_bullets">বুলেট</string>
+    <string name="compose_editor_numbered">সংখ্যাযুক্ত</string>
+    <string name="compose_editor_text_colour">লেখার রং</string>
+    <string name="compose_editor_black">কালো</string>
+    <string name="compose_editor_blue">নীল</string>
+    <string name="compose_editor_red">লাল</string>
+    <string name="compose_editor_green">সবুজ</string>
+    <string name="compose_editor_highlight">হাইলাইট</string>
+    <string name="compose_editor_highlight_colour">হাইলাইটের রং</string>
+    <string name="compose_editor_yellow">হলুদ</string>
+    <string name="compose_editor_pink">গোলাপি</string>
+    <string name="compose_editor_font">ফন্ট</string>
+    <string name="compose_editor_sans">সেরিফ ছাড়া</string>
+    <string name="compose_editor_serif">Serif</string>
+    <string name="compose_editor_mono">Monospace</string>
+    <string name="compose_editor_larger">বড়</string>
+    <string name="compose_editor_clear">ফরম্যাটিং মুছুন</string>
+    <string name="compose_editor_image">ছবি</string>
+    <string name="compose_editor_insert_image">ছবি ঢোকান</string>
+</resources>

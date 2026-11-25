@@ -1,0 +1,95 @@
+/* ko translation of en.lproj/Reader.strings (round 9, ios_translations_b). Keys stay English; values translated. */
+/* Round 8 — Workstream D (reader & conversation polish, round8-spec §5). English base table "Reader".
+   Looked up with String(localized: "…", table: "Reader") / Text("…", tableName: "Reader").
+   Counted keys also have an entry in Reader.stringsdict, which wins over the entry here.
+   Other languages fall back to these English keys until they are translated. */
+
+/* Conversation: sender name on one's own message */
+"You" = "나";
+
+/* Conversation: recipients line when the message went only to the reader */
+"to me" = "받는사람: 나";
+
+/* Conversation: recipients line with one recipient. Value: their name or address */
+"to %@" = "받는사람: %@";
+
+/* Conversation: recipients line with several recipients (plural in Reader.stringsdict) */
+"to %lld people" = "받는사람: %lld명";
+
+/* Conversation: VoiceOver value on a folded card of an unread message */
+"Unread" = "읽지 않음";
+
+/* Conversation: the bar that stands in for folded messages (plural in Reader.stringsdict) */
+"%lld earlier messages" = "이전 메일 %lld개";
+
+/* Conversation: VoiceOver hint on the earlier-messages bar */
+"Shows the folded messages" = "접힌 메일을 표시합니다";
+
+/* Conversation: chip under the subject, people in the conversation (plural in Reader.stringsdict) */
+"%lld people" = "%lld명";
+
+/* Conversation: chip under the subject, messages in the conversation (plural in Reader.stringsdict) */
+"%lld messages" = "메일 %lld개";
+
+/* Quoted history: button that shows the folded earlier text */
+"Show quoted text" = "인용문 표시";
+
+/* Quoted history: button that folds it again */
+"Hide quoted text" = "인용문 숨기기";
+
+/* Quoted history: VoiceOver state of the button */
+"Collapsed" = "접힘";
+
+/* Quoted history: VoiceOver state of the button */
+"Expanded" = "펼쳐짐";
+
+/* Quick reply bar: placeholder. Value: the first name of the person the reply goes to */
+"Reply to %@…" = "%@에게 답장…";
+
+/* Quick reply bar: placeholder when nobody can be named */
+"Reply…" = "답장…";
+
+/* Quick reply bar: VoiceOver hint */
+"Opens the editor" = "편집기를 엽니다";
+
+/* Quick reply bar: VoiceOver label of the menu with Reply all and Forward */
+"Reply options" = "답장 옵션";
+
+/* Quick reply bar: VoiceOver name of the region */
+"Quick reply" = "빠른 답장";
+
+/* Attachments: section title (plural in Reader.stringsdict) */
+"%lld attachments" = "첨부파일 %lld개";
+
+/* Attachments: link that opens the share sheet for every attachment */
+"Save all" = "모두 저장";
+
+/* Attachments: shown while every attachment is being fetched for Save all */
+"Preparing…" = "준비 중…";
+
+/* Attachments: VoiceOver hint on Save all */
+"Opens the share sheet, where Save to Files keeps every attachment" = "공유 시트를 엽니다. '파일에 저장'으로 모든 첨부파일을 보관할 수 있습니다";
+
+/* Attachments: VoiceOver label of a picture in the grid. Values: its position, the number of files, its file name */
+"Image %lld of %lld, %@" = "이미지 %1$lld/%2$lld, %3$@";
+
+/* Attachments: meta line of a file with no known type or size */
+"File" = "파일";
+
+/* Attachments: VoiceOver hint on a file row */
+"Opens a preview" = "미리보기를 엽니다";
+
+/* Attachments: VoiceOver label of the save button. Value: the file name */
+"Save %@" = "%@ 저장";
+
+/* Attachments: VoiceOver label of the share button. Value: the file name */
+"Share %@" = "%@ 공유";
+
+/* Attachments: context-menu action */
+"Open" = "열기";
+
+/* Attachments: context-menu action */
+"Save" = "저장";
+
+/* Attachments: context-menu action */
+"Share" = "공유";

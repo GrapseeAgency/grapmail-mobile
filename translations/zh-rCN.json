@@ -1,0 +1,73 @@
+{
+ "android": {
+  "strings_r9_reader.xml": {
+   "reader_earlier_messages": {"one": "较早的 %d 封邮件", "other": "较早的 %d 封邮件"},
+   "reader_participants": {"one": "%d 人", "other": "%d 人"},
+   "reader_message_count": {"one": "%d 封邮件", "other": "%d 封邮件"},
+   "reader_you": "我",
+   "reader_unread": "未读",
+   "reader_earlier_action": "显示折叠的邮件",
+   "reader_open_message_action": "打开这封邮件",
+   "reader_quoted_show": "显示引用内容",
+   "reader_quoted_hide": "隐藏引用内容",
+   "reader_state_expanded": "已展开",
+   "reader_state_collapsed": "已折叠",
+   "reader_reply_to": "回复 %1$s…",
+   "reader_reply_fallback": "回复…",
+   "reader_reply_options": "回复选项",
+   "reader_quick_reply": "快速回复",
+   "reader_attach_share_chooser": "分享附件",
+   "reader_attach_view_image": "查看图片",
+   "reader_attach_save_named": "保存 %1$s",
+   "reader_attach_share_named": "分享 %1$s",
+   "reader_attach_share_nothing": "此设备上没有可分享该文件的应用。",
+   "reader_viewer_position": "第 %1$d 张，共 %2$d 张",
+   "reader_viewer_too_large": "无法在此预览这张图片。",
+   "compose_r9_leave_title": "离开这封邮件？",
+   "compose_r9_leave_attachments": "草稿暂时无法保留附件。请保存不含附件的正文，或继续编辑。",
+   "compose_r9_save_text_only": "仅保存正文",
+   "compose_r9_draft_failed_title": "此草稿未保存",
+   "compose_r9_leave_without_saving": "不保存并离开",
+   "compose_r9_encrypt_failed": "这封邮件无法加密，因此没有发送。",
+   "compose_editor_toolbar": "文本格式",
+   "compose_editor_bold": "加粗",
+   "compose_editor_italic": "倾斜",
+   "compose_editor_underline": "下划线",
+   "compose_editor_strike": "删除线",
+   "compose_editor_bullets": "项目符号",
+   "compose_editor_numbered": "编号",
+   "compose_editor_text_colour": "文字颜色",
+   "compose_editor_black": "黑色",
+   "compose_editor_blue": "蓝色",
+   "compose_editor_red": "红色",
+   "compose_editor_green": "绿色",
+   "compose_editor_highlight": "高亮",
+   "compose_editor_highlight_colour": "高亮颜色",
+   "compose_editor_yellow": "黄色",
+   "compose_editor_pink": "粉色",
+   "compose_editor_font": "字体",
+   "compose_editor_sans": "无衬线",
+   "compose_editor_larger": "更大",
+   "compose_editor_clear": "清除格式",
+   "compose_editor_image": "图片",
+   "compose_editor_insert_image": "插入图片"
+  },
+  "strings_r9_platform.xml": {
+   "r9_platform_notif_channel_new_mail_desc": "收件箱收到新邮件时通知你。",
+   "r9_platform_price_per_week": "%1$s/周",
+   "r9_platform_price_per_month": "%1$s/月",
+   "r9_platform_price_per_3_months": "每 3 个月 %1$s",
+   "r9_platform_price_per_6_months": "每 6 个月 %1$s",
+   "r9_platform_price_per_year": "%1$s/年"
+  },
+  "strings_r9_mailbox.xml": {
+   "mail_sendlater_channel_name": "定时发送",
+   "mail_sendlater_channel_desc": "等待发送的邮件倒计时"
+  },
+  "strings_identity.xml": {
+   "identity_settings_appearance": "外观",
+   "identity_match_wallpaper_title": "匹配壁纸",
+   "identity_match_wallpaper_subtitle": "按钮和高亮使用壁纸的颜色。头像、状态颜色和文字仍使用 GrapMail 的配色。"
+  }
+ }
+}

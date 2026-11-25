@@ -1,0 +1,21 @@
+/* GrapMailNotificationService — Bengali. */
+
+"New encrypted message" = "নতুন এনক্রিপ্ট করা বার্তা";
+"New mail" = "নতুন মেল";
+"1 new message" = "১টি নতুন বার্তা";
+"%lld new messages" = "%lldটি নতুন বার্তা";
+"%lld unread in the inbox" = "ইনবক্সে %lldটি অপঠিত";
+"Encrypted message" = "এনক্রিপ্ট করা বার্তা";
+"Unknown sender" = "অজানা প্রেরক";
+"No subject" = "কোনো বিষয় নেই";
+"This was me" = "এটি আমি ছিলাম";
+"Secure account" = "অ্যাকাউন্ট সুরক্ষিত করুন";
+"Archive" = "আর্কাইভ";
+"Mark as read" = "পঠিত হিসেবে চিহ্নিত করুন";
+"Reply" = "উত্তর দিন";
+"Send" = "পাঠান";
+"Reply…" = "উত্তর দিন…";
+"Reply in app" = "অ্যাপে উত্তর দিন";
+"More" = "আরও";
+/* Notification title: a sign-in code, then the sender */
+"%@ · %@" = "%@ · %@";

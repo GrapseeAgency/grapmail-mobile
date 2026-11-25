@@ -1,0 +1,73 @@
+{
+ "android": {
+  "strings_r9_reader.xml": {
+   "reader_earlier_messages": {"one": "較早的 %d 封郵件", "other": "較早的 %d 封郵件"},
+   "reader_participants": {"one": "%d 人", "other": "%d 人"},
+   "reader_message_count": {"one": "%d 封郵件", "other": "%d 封郵件"},
+   "reader_you": "我",
+   "reader_unread": "未讀",
+   "reader_earlier_action": "顯示收合的郵件",
+   "reader_open_message_action": "開啟這封郵件",
+   "reader_quoted_show": "顯示引用內容",
+   "reader_quoted_hide": "隱藏引用內容",
+   "reader_state_expanded": "已展開",
+   "reader_state_collapsed": "已收合",
+   "reader_reply_to": "回覆 %1$s…",
+   "reader_reply_fallback": "回覆…",
+   "reader_reply_options": "回覆選項",
+   "reader_quick_reply": "快速回覆",
+   "reader_attach_share_chooser": "分享附件",
+   "reader_attach_view_image": "檢視圖片",
+   "reader_attach_save_named": "儲存 %1$s",
+   "reader_attach_share_named": "分享 %1$s",
+   "reader_attach_share_nothing": "此裝置上沒有可以分享這個檔案的應用程式。",
+   "reader_viewer_position": "第 %1$d 張，共 %2$d 張",
+   "reader_viewer_too_large": "無法在這裡預覽這張圖片。",
+   "compose_r9_leave_title": "要離開這封郵件嗎？",
+   "compose_r9_leave_attachments": "草稿目前無法保留附件。請儲存不含附件的內文，或繼續編輯。",
+   "compose_r9_save_text_only": "只儲存內文",
+   "compose_r9_draft_failed_title": "這份草稿沒有儲存",
+   "compose_r9_leave_without_saving": "不儲存並離開",
+   "compose_r9_encrypt_failed": "這封郵件無法加密，因此沒有送出。",
+   "compose_editor_toolbar": "文字格式",
+   "compose_editor_bold": "粗體",
+   "compose_editor_italic": "斜體",
+   "compose_editor_underline": "底線",
+   "compose_editor_strike": "刪除線",
+   "compose_editor_bullets": "項目符號",
+   "compose_editor_numbered": "編號",
+   "compose_editor_text_colour": "文字顏色",
+   "compose_editor_black": "黑色",
+   "compose_editor_blue": "藍色",
+   "compose_editor_red": "紅色",
+   "compose_editor_green": "綠色",
+   "compose_editor_highlight": "醒目提示",
+   "compose_editor_highlight_colour": "醒目提示顏色",
+   "compose_editor_yellow": "黃色",
+   "compose_editor_pink": "粉紅色",
+   "compose_editor_font": "字型",
+   "compose_editor_sans": "無襯線",
+   "compose_editor_larger": "放大",
+   "compose_editor_clear": "清除格式",
+   "compose_editor_image": "圖片",
+   "compose_editor_insert_image": "插入圖片"
+  },
+  "strings_r9_platform.xml": {
+   "r9_platform_notif_channel_new_mail_desc": "收件匣收到新郵件時通知你。",
+   "r9_platform_price_per_week": "%1$s/週",
+   "r9_platform_price_per_month": "%1$s/月",
+   "r9_platform_price_per_3_months": "每 3 個月 %1$s",
+   "r9_platform_price_per_6_months": "每 6 個月 %1$s",
+   "r9_platform_price_per_year": "%1$s/年"
+  },
+  "strings_r9_mailbox.xml": {
+   "mail_sendlater_channel_name": "排程傳送",
+   "mail_sendlater_channel_desc": "等待傳送的郵件倒數"
+  },
+  "strings_identity.xml": {
+   "identity_settings_appearance": "外觀",
+   "identity_match_wallpaper_title": "配合桌布",
+   "identity_match_wallpaper_subtitle": "按鈕與醒目提示使用桌布的顏色。大頭貼、狀態顏色與文字仍使用 GrapMail 的配色。"
+  }
+ }
+}

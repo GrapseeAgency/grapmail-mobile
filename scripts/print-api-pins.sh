@@ -5,7 +5,12 @@
 #
 # Reads the certificate chain the server presents right now and prints the
 # SHA-256 of each certificate's public key (SPKI), which is what OkHttp's
-# CertificatePinner and iOS's NSPinnedDomains compare. Needs only openssl.
+# CertificatePinner and the iOS PinnedSessionDelegate compare. Needs only openssl.
+#
+# The pins themselves live in security/api-pins.json (one file for both apps;
+# the "sha256" values there are these hashes WITHOUT the "sha256/" prefix).
+# scripts/check-api-pins.py checks that file against the live chains and its
+# expiry; run it after every edit, then python3 scripts/generate-pins.py.
 #
 # Which to pin (OWASP MASTG-TEST-0022 / 0068):
 #   - pin the INTERMEDIATE (issuing CA) key, not the leaf: the leaf changes every
@@ -45,14 +50,14 @@ if [ "${#pins[@]}" -lt 2 ]; then
   echo "root above the intermediate, or of a second CA you could switch to. Do not ship one pin."
 fi
 joined="$(IFS=,; echo "${pins[*]}")"
-echo "Android (CA keys from this chain; add a backup if fewer than two):"
+echo "Both apps: put the CA keys into security/api-pins.json (pins[].sha256, without"
+echo "the sha256/ prefix; keep the old ones until old installs have updated), then:"
+echo "  python3 scripts/generate-pins.py && python3 scripts/check-api-pins.py"
+echo
+echo "Android one-off override of the JSON (CA keys from this chain):"
 echo "  ./gradlew assembleRelease -PgrapmailApiPins=\"$joined\""
 echo "  or GRAPMAIL_API_PINS=\"$joined\" in the release workflow's environment"
 echo
-echo "iOS: under info.properties in ios/project.yml (XcodeGen), add:"
-echo "  NSAppTransportSecurity:"
-echo "    NSPinnedDomains:"
-echo "      $host:"
-echo "        NSIncludesSubdomains: true"
-echo "        NSPinnedCAIdentities:"
-for p in "${pins[@]}"; do echo "          - SPKI-SHA256-BASE64: \"${p#sha256/}\""; done
+echo "iOS: do NOT add NSPinnedDomains to ios/project.yml. ATS pins never expire, so"
+echo "a stale set locks old installs out for good; PinnedSessionDelegate.swift reads"
+echo "the same JSON (via ApiPins.swift) and honours its expiry."

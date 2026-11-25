@@ -26,21 +26,53 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.grapsee.grapmail.ui.screens.mail.MailScaffold
 import com.grapsee.grapmail.ui.theme.LocalPalette
+import androidx.compose.ui.res.stringResource
+import com.grapsee.grapmail.R
+import androidx.annotation.StringRes
 
-enum class GrapMailLegalDocument(val title: String, val url: String) {
-    Terms("Terms of Service", "https://grapsee.com/legal/terms-of-service"),
-    Privacy("Privacy Policy", "https://grapsee.com/legal/privacy-policy"),
+enum class GrapMailLegalDocument(
+    /** English name, kept for callers outside this file that have not moved to [titleRes] yet. */
+    val title: String,
+    @StringRes val titleRes: Int,
+    val url: String,
+) {
+    Terms("Terms of Service", R.string.acct_terms_of_service, "https://grapsee.com/legal/terms-of-service"),
+    Privacy("Privacy Policy", R.string.acct_privacy_policy, "https://grapsee.com/legal/privacy-policy"),
 }
 
 internal fun AnnotatedString.Builder.appendLegalLink(
     document: GrapMailLegalDocument,
     color: Color,
     onOpen: (GrapMailLegalDocument) -> Unit,
+    title: String = document.title,
 ) {
     withLink(LinkAnnotation.Clickable(document.name, legalLinkStyles(color)) { onOpen(document) }) {
-        append(document.title)
+        append(title)
     }
 }
+
+/**
+ * Appends a translated sentence whose `%1$s` / `%2$s` placeholders stand for the
+ * legal links, so a translation can move the links inside the sentence instead of
+ * the sentence being glued together from English fragments around them.
+ */
+internal fun AnnotatedString.Builder.appendWithLegalLinks(
+    template: String,
+    color: Color,
+    onOpen: (GrapMailLegalDocument) -> Unit,
+    vararg links: Pair<GrapMailLegalDocument, String>,
+) {
+    var last = 0
+    for (m in LEGAL_LINK_TOKEN.findAll(template)) {
+        append(template.substring(last, m.range.first))
+        val link = links.getOrNull(m.groupValues[1].toInt() - 1)
+        if (link != null) appendLegalLink(link.first, color, onOpen, link.second) else append(m.value)
+        last = m.range.last + 1
+    }
+    append(template.substring(last))
+}
+
+private val LEGAL_LINK_TOKEN = Regex("%(\\d+)\\\$s")
 
 private fun legalLinkStyles(color: Color) = TextLinkStyles(
     style = SpanStyle(color = color, fontWeight = FontWeight.Medium, textDecoration = TextDecoration.Underline),
@@ -49,22 +81,23 @@ private fun legalLinkStyles(color: Color) = TextLinkStyles(
 @Composable
 fun GrapMailLegalScreen(document: GrapMailLegalDocument, onBack: () -> Unit) {
     val palette = LocalPalette.current
+    val docTitle = stringResource(document.titleRes)
     val sections = when (document) {
         GrapMailLegalDocument.Terms -> listOf(
-            "Your account" to "You must be at least 13 to create a GrapMail account. Keep your password private and use the account recovery and security settings if you think someone else has accessed your mailbox.",
-            "Using GrapMail" to "Use your mailbox for lawful communication. Do not send spam, bulk unsolicited messages, phishing, malware, or messages that harass others. Accounts that misuse the service may be suspended.",
-            "Sending and receiving" to "A message can be queued, sent, or fail. Check Sent and any delivery notice when timing matters. A queued message is still waiting to be sent.",
-            "Leaving GrapMail" to "You can sign out on this device or request account deletion from Settings → Data & privacy. Save any mail you need before deleting your account.",
+            stringResource(R.string.acct_your_account) to stringResource(R.string.acct_you_must_be_at_least_13_to_create_a),
+            stringResource(R.string.acct_using_grapmail) to stringResource(R.string.acct_use_your_mailbox_for_lawful),
+            stringResource(R.string.acct_sending_and_receiving) to stringResource(R.string.acct_a_message_can_be_queued_sent_or_fail),
+            stringResource(R.string.acct_leaving_grapmail) to stringResource(R.string.acct_you_can_sign_out_on_this_device_or),
         )
         GrapMailLegalDocument.Privacy -> listOf(
-            "Account and mailbox data" to "GrapMail uses your account details to create and secure your mailbox. The service stores the addresses, messages, and attachments needed to send, receive, and sync your mail.",
-            "Security and notifications" to "Google reCAPTCHA helps protect signup from abuse. If you enable new-mail alerts, GrapMail can register a Firebase device token to deliver notifications to your device. You can change notification access in Android Settings.",
-            "Images and device storage" to "Remote images are hidden by default in the message reader. Showing them can contact the sender’s image host. The app also keeps a local mailbox cache so recently loaded mail is available more quickly.",
-            "Encryption choices" to "GrapMail offers end-to-end encryption for supported messages. Ordinary email and encrypted messages have different privacy properties. You can manage encryption and review your account details in Settings.",
-            "Control and deletion" to "In Settings → Data & privacy, you can review your profile and request deletion. For questions about retention, access, or other privacy requests, use the Grapsee contact link below.",
+            stringResource(R.string.acct_account_and_mailbox_data) to stringResource(R.string.acct_grapmail_uses_your_account_details),
+            stringResource(R.string.acct_security_and_notifications) to stringResource(R.string.acct_google_recaptcha_helps_protect),
+            stringResource(R.string.acct_images_and_device_storage) to stringResource(R.string.acct_remote_images_are_hidden_by_default),
+            stringResource(R.string.acct_encryption_choices) to stringResource(R.string.acct_grapmail_offers_end_to_end),
+            stringResource(R.string.acct_control_and_deletion) to stringResource(R.string.acct_in_settings_data_privacy_you_can),
         )
     }
-    MailScaffold(document.title, onBack) {
+    MailScaffold(docTitle, onBack) {
         Column(
             Modifier.fillMaxSize().verticalScroll(rememberScrollState()).testTag("grapmail-legal-${document.name.lowercase()}"),
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -73,8 +106,8 @@ fun GrapMailLegalScreen(document: GrapMailLegalDocument, onBack: () -> Unit) {
                 Modifier.widthIn(max = 640.dp).fillMaxWidth().padding(horizontal = 24.dp, vertical = 16.dp),
                 verticalArrangement = Arrangement.spacedBy(20.dp),
             ) {
-                Text("GrapMail guide", fontSize = 21.sp, fontWeight = FontWeight.SemiBold, color = palette.textPrimary)
-                Text("This guide explains how GrapMail works. For Grapsee’s current legal information, use the official page below.",
+                Text(stringResource(R.string.acct_grapmail_guide), fontSize = 21.sp, fontWeight = FontWeight.SemiBold, color = palette.textPrimary)
+                Text(stringResource(R.string.acct_this_guide_explains_how_grapmail),
                     fontSize = 14.sp, lineHeight = 21.sp, color = palette.textSecondary)
                 for ((heading, paragraph) in sections) {
                     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -84,12 +117,12 @@ fun GrapMailLegalScreen(document: GrapMailLegalDocument, onBack: () -> Unit) {
                 }
                 Text(buildAnnotatedString {
                     withLink(LinkAnnotation.Url(document.url, legalLinkStyles(palette.primarySolid))) {
-                        append("Read the official ${document.title}")
+                        append(stringResource(R.string.acct_legal_read_official, docTitle))
                     }
                 }, fontSize = 14.sp)
                 Text(buildAnnotatedString {
                     withLink(LinkAnnotation.Url("https://grapsee.com/contact", legalLinkStyles(palette.primarySolid))) {
-                        append("Contact Grapsee")
+                        append(stringResource(R.string.acct_contact_grapsee))
                     }
                 }, fontSize = 14.sp)
             }

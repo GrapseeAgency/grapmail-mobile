@@ -2,6 +2,8 @@ package com.grapsee.grapmail.data
 
 import android.os.Build
 import android.content.Context
+import com.grapsee.grapmail.R
+import com.grapsee.grapmail.ui.i18n.CoreStrings
 import java.io.File
 import java.security.KeyFactory
 import java.security.KeyPairGenerator
@@ -80,15 +82,25 @@ object MailE2e {
     const val MIN_PASSPHRASE_LENGTH = 8
     private const val KDF_SALT_BYTES = 16
 
+    /**
+     * Test seam ONLY: the JVM unit tests run against the stub android.jar, where
+     * `Build.VERSION.SDK_INT` reads 0, while the JDK itself has X25519/Ed25519.
+     * MailE2eTest sets this to 29+; the app never touches it.
+     */
+    @Volatile
+    internal var sdkIntOverrideForTests: Int? = null
+
     /** Whether this device's crypto provider can do the scheme at all. */
-    fun available(): Boolean = Build.VERSION.SDK_INT >= 29
+    fun available(): Boolean = (sdkIntOverrideForTests ?: Build.VERSION.SDK_INT) >= 29
 
     /** The version to name when it cannot: users know "Android 10", not "API 29". */
     val unavailableReason: String?
         get() = if (available()) null else
-            "This version of Android cannot create the X25519 key end-to-end " +
-                "encryption needs (it arrived in Android 10), so this app will " +
-                "not publish a key it could never use to open mail."
+            CoreStrings.get(R.string.core_e2e_android_too_old) {
+                "This version of Android cannot create the X25519 key end-to-end " +
+                    "encryption needs (it arrived in Android 10), so this app will " +
+                    "not publish a key it could never use to open mail."
+            }
 
     // ── bytes ────────────────────────────────────────────────────────────────
 
@@ -201,11 +213,14 @@ object MailE2e {
             // `getAlgorithm()` is a String on the JCA key types; there is no
             // `.name` on it (the TS/WebCrypto naming that got copied here
             // resolves on nothing, and CI said so).
-            require(key.algorithm == "X25519") { "not X25519" }
+            // Android's provider names the key "X25519"; the desktop JDK that runs
+            // these unit tests names the same key by its family, "XDH". Both are the
+            // curve this envelope is defined over; anything else (EC, RSA) is not.
+            require(key.algorithm == "X25519" || key.algorithm == "XDH") { "not X25519" }
             key
         } catch (e: Exception) {
             throw IllegalArgumentException(
-                "That recipient's public key is not a usable X25519 key.", e,
+                CoreStrings.get(R.string.core_e2e_recipient_key_unusable) { "That recipient's public key is not a usable X25519 key." }, e,
             )
         }
 
@@ -316,10 +331,10 @@ object MailE2e {
         signing: KeyPairB64? = null,
     ): SealedEnvelopeV2 {
         if (recipientPublicKeys.isEmpty()) {
-            throw IllegalArgumentException("An encrypted message needs at least one recipient, or nobody can open it.")
+            throw IllegalArgumentException(CoreStrings.get(R.string.core_e2e_needs_recipient) { "An encrypted message needs at least one recipient, or nobody can open it." })
         }
         if (recipientPublicKeys.size > MAX_RECIPIENTS) {
-            throw IllegalArgumentException("That is ${recipientPublicKeys.size} recipients; the limit is $MAX_RECIPIENTS.")
+            throw IllegalArgumentException(CoreStrings.get(R.string.core_e2e_too_many_recipients, recipientPublicKeys.size, MAX_RECIPIENTS) { "That is ${recipientPublicKeys.size} recipients; the limit is $MAX_RECIPIENTS." })
         }
         val data = utf8(plaintext)
         val contentKey = randomBytes(CONTENT_KEY_BYTES)
@@ -505,12 +520,12 @@ object MailE2e {
 
     /** Authenticity before plaintext, as the browser does it. */
     private fun verify(signerPub: String?, sig: String?, expectedKey: String, signed: ByteArray) {
-        if (signerPub == null || sig == null) throw IllegalArgumentException("This message is not signed.")
-        if (signerPub != expectedKey) throw IllegalArgumentException("This message is signed by an unexpected key.")
+        if (signerPub == null || sig == null) throw IllegalArgumentException(CoreStrings.get(R.string.core_e2e_not_signed) { "This message is not signed." })
+        if (signerPub != expectedKey) throw IllegalArgumentException(CoreStrings.get(R.string.core_e2e_unexpected_signer) { "This message is signed by an unexpected key." })
         val s = Signature.getInstance("Ed25519")
         s.initVerify(ed25519Public(expectedKey))
         s.update(signed)
-        if (!s.verify(unbase64(sig))) throw IllegalArgumentException("This message's signature did not verify.")
+        if (!s.verify(unbase64(sig))) throw IllegalArgumentException(CoreStrings.get(R.string.core_e2e_signature_invalid) { "This message's signature did not verify." })
     }
 
     private fun openV1(envelope: SealedEnvelopeV1, privateKeyB64: String): String {
@@ -523,7 +538,7 @@ object MailE2e {
                 unbase64(envelope.ct), unbase64(envelope.tag),
             )
         } catch (e: Exception) {
-            throw IllegalStateException("Could not open this message: the wrong key, or the ciphertext is damaged.", e)
+            throw IllegalStateException(CoreStrings.get(R.string.core_e2e_open_failed) { "Could not open this message: the wrong key, or the ciphertext is damaged." }, e)
         }
         return String(plain, Charsets.UTF_8)
     }
@@ -545,7 +560,7 @@ object MailE2e {
             }
         }
         if (contentKey == null) {
-            throw IllegalStateException("This message was not encrypted to your key, so it cannot be opened here.")
+            throw IllegalStateException(CoreStrings.get(R.string.core_e2e_not_for_this_key) { "This message was not encrypted to your key, so it cannot be opened here." })
         }
         val plain = try {
             aesGcmDecrypt(
@@ -554,7 +569,7 @@ object MailE2e {
                 unbase64(envelope.ct), unbase64(envelope.tag),
             )
         } catch (e: Exception) {
-            throw IllegalStateException("Could not open this message: the wrong key, or the ciphertext is damaged.", e)
+            throw IllegalStateException(CoreStrings.get(R.string.core_e2e_open_failed) { "Could not open this message: the wrong key, or the ciphertext is damaged." }, e)
         }
         return String(plain, Charsets.UTF_8)
     }
@@ -614,7 +629,7 @@ object MailE2e {
         iterations: Int = PBKDF2_ITERATIONS,
     ): ProtectedPrivateKey {
         if (passphrase.length < MIN_PASSPHRASE_LENGTH) {
-            throw IllegalArgumentException("Use at least $MIN_PASSPHRASE_LENGTH characters for the passphrase.")
+            throw IllegalArgumentException(CoreStrings.get(R.string.core_e2e_passphrase_too_short, MIN_PASSPHRASE_LENGTH) { "Use at least $MIN_PASSPHRASE_LENGTH characters for the passphrase." })
         }
         val salt = randomBytes(KDF_SALT_BYTES)
         val iv = randomBytes(IV_BYTES)
@@ -639,7 +654,7 @@ object MailE2e {
      */
     fun unlockPrivateKey(record: ProtectedPrivateKey, passphrase: String): String {
         if (record.kind != "X25519" && record.kind != "Ed25519") {
-            throw IllegalArgumentException("That is not a GrapMail key record.")
+            throw IllegalArgumentException(CoreStrings.get(R.string.core_e2e_not_key_record) { "That is not a GrapMail key record." })
         }
         val kek = derivePassphraseKey(passphrase, unbase64(record.salt), record.iterations)
         val cipher = Cipher.getInstance("AES/GCM/NoPadding")
@@ -648,7 +663,7 @@ object MailE2e {
         val der = try {
             cipher.doFinal(unbase64(record.ct))
         } catch (e: Exception) {
-            throw IllegalStateException("That passphrase did not unlock this key. Check it and try again.", e)
+            throw IllegalStateException(CoreStrings.get(R.string.core_e2e_wrong_passphrase) { "That passphrase did not unlock this key. Check it and try again." }, e)
         }
         return base64(der)
     }
@@ -751,7 +766,7 @@ object MailE2e {
         val why = unavailableReason
         if (why != null) throw IllegalStateException(why)
         if (passphrase.length < MIN_PASSPHRASE_LENGTH) {
-            throw IllegalArgumentException("Use at least $MIN_PASSPHRASE_LENGTH characters for the passphrase.")
+            throw IllegalArgumentException(CoreStrings.get(R.string.core_e2e_passphrase_too_short, MIN_PASSPHRASE_LENGTH) { "Use at least $MIN_PASSPHRASE_LENGTH characters for the passphrase." })
         }
         val encryption = generateKeyPair("X25519")
         val signing = generateKeyPair("Ed25519")
@@ -762,9 +777,11 @@ object MailE2e {
         )
         if (!saveIdentity(context, accountKey, identity)) {
             throw IllegalStateException(
-                "This device would not store the key. Without storage the key is " +
-                    "lost when the app closes, making every message sealed to it " +
-                    "unreadable — so nothing was published.",
+                CoreStrings.get(R.string.core_e2e_store_failed_unpublished) {
+                    "This device would not store the key. Without storage the key is " +
+                        "lost when the app closes, making every message sealed to it " +
+                        "unreadable — so nothing was published."
+                },
             )
         }
         return identity
@@ -824,7 +841,7 @@ object MailE2e {
     /** Lock both unlocked private halves under [recoveryKey], in the kit the server stores. */
     fun buildRecoveryKit(unlocked: Unlocked, recoveryKey: String): JsonObject {
         val key = normalizeRecoveryKey(recoveryKey)
-            ?: throw IllegalArgumentException("That recovery key is not valid. It has 28 letters and numbers.")
+            ?: throw IllegalArgumentException(CoreStrings.get(R.string.core_e2e_recovery_key_invalid) { "That recovery key is not valid. It has 28 letters and numbers." })
         val encryption = protectPrivateKey(unlocked.encryptionPrivateKey, key, "X25519", unlocked.encryptionPublicKey)
         val signing = if (unlocked.signingPrivateKey != null && unlocked.signingPublicKey != null) {
             protectPrivateKey(unlocked.signingPrivateKey, key, "Ed25519", unlocked.signingPublicKey)
@@ -850,17 +867,17 @@ object MailE2e {
         newPassphrase: String,
     ): Identity {
         if (newPassphrase.length < MIN_PASSPHRASE_LENGTH) {
-            throw IllegalArgumentException("Use at least $MIN_PASSPHRASE_LENGTH characters for the passphrase.")
+            throw IllegalArgumentException(CoreStrings.get(R.string.core_e2e_passphrase_too_short, MIN_PASSPHRASE_LENGTH) { "Use at least $MIN_PASSPHRASE_LENGTH characters for the passphrase." })
         }
         val key = normalizeRecoveryKey(recoveryKey)
-            ?: throw IllegalArgumentException("That recovery key is not valid. It has 28 letters and numbers.")
+            ?: throw IllegalArgumentException(CoreStrings.get(R.string.core_e2e_recovery_key_invalid) { "That recovery key is not valid. It has 28 letters and numbers." })
         if ((kit["format"] as? JsonPrimitive)?.content != RECOVERY_KIT_FORMAT) {
-            throw IllegalStateException("This recovery kit is not one GrapMail can read.")
+            throw IllegalStateException(CoreStrings.get(R.string.core_e2e_kit_unknown_format) { "This recovery kit is not one GrapMail can read." })
         }
         val enc = (kit["encryption"] as? JsonObject)?.let { protectedFrom(it) }
-            ?: throw IllegalStateException("This recovery kit is damaged.")
+            ?: throw IllegalStateException(CoreStrings.get(R.string.core_e2e_kit_damaged) { "This recovery kit is damaged." })
         val sig = (kit["signing"] as? JsonObject)?.let { protectedFrom(it) }
-        val wrong = "That recovery key does not open this kit. Check it and try again."
+        val wrong = CoreStrings.get(R.string.core_e2e_recovery_key_wrong) { "That recovery key does not open this kit. Check it and try again." }
         val encPrivate = try { unlockPrivateKey(enc, key) } catch (e: Exception) { throw IllegalStateException(wrong, e) }
         val sigPrivate = sig?.let { try { unlockPrivateKey(it, key) } catch (e: Exception) { throw IllegalStateException(wrong, e) } }
         val identity = Identity(
@@ -869,7 +886,7 @@ object MailE2e {
             createdAt = java.time.Instant.now().toString(),
         )
         if (!saveIdentity(context, accountKey, identity)) {
-            throw IllegalStateException("This device would not store the key, so nothing was restored.")
+            throw IllegalStateException(CoreStrings.get(R.string.core_e2e_store_failed_unrestored) { "This device would not store the key, so nothing was restored." })
         }
         return identity
     }

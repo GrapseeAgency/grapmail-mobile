@@ -1,0 +1,62 @@
+/* zh-Hans translation of en.lproj/WelcomeBack.strings (round 9, ios_translations_b). Keys stay English; values translated. */
+/*
+  GrapMail — WelcomeBack string table (zh-Hans). Round 8 — Workstream B.
+  Personal welcome-back sign-in, account chooser, and the sign-out sheet's
+  "Also remove from this device" row (docs/design/round8-spec.md §2).
+  Used through String(localized:table: "WelcomeBack") and
+  Text(_:tableName: "WelcomeBack"). Keys are the English source text;
+  interpolations are %@. Other languages fall back to these English values
+  until translated (spec §7.6).
+*/
+
+/* MARK: - Welcome-back screen */
+/* Primary button; the argument is the person's first name (max 16 characters). */
+"Continue as %@" = "以 %@ 的身份继续";
+/* Primary button while the sign-in is running. */
+"Signing in…" = "正在登录…";
+/* Reason line under the address after a session expired or was refused by the server. */
+"For your security, please sign in again." = "为了您的安全，请重新登录。";
+/* Reason line under the address after another device ended this session. */
+"You were signed out from another device." = "您已在另一台设备上被退出登录。";
+/* Inline banner; the Continue button is disabled while it shows. */
+"You're offline. Connect to sign in." = "您已离线。请联网后登录。";
+/* Field error after a wrong password. */
+"That password isn't right." = "密码不正确。";
+/* Text button: leave welcome-back for the standard sign-in form. */
+"Use another account" = "使用其他账号";
+/* Text button and menu item: forget this account on this device. */
+"Remove from this device" = "从此设备移除";
+/* Back button accessibility label (landscape layout). */
+"Back" = "返回";
+/* VoiceOver label for the masked address: first argument = visible first letters (spelled out), second = last letter, third = domain. */
+"Address beginning %@, ending %@ at %@" = "以 %1$@ 开头、以 %2$@ 结尾的 %3$@ 地址";
+/* VoiceOver label for a short masked address: first argument = visible first letter, second = domain. */
+"Address beginning %@ at %@" = "以 %1$@ 开头的 %2$@ 地址";
+/* Announcement when a passkey signed in a different account than the one chosen; the argument is that account's address. */
+"Signed in as %@" = "已以 %@ 的身份登录";
+
+/* MARK: - Remove from this device */
+/* Confirm dialog title; the argument is the first name or the address. */
+"Remove %@ from this device?" = "要从此设备移除 %@ 吗？";
+/* Confirm dialog body. */
+"Your account and mail aren't affected. You'll need your address and password to sign in here again." = "您的账号和邮件不受影响。之后要在此设备上登录，需要输入地址和密码。";
+/* Snackbar / announcement after removal. */
+"Removed from this device" = "已从此设备移除";
+
+/* MARK: - Account chooser */
+/* Chooser title. */
+"Choose an account" = "选择账号";
+/* Chooser subtitle. */
+"Signed out on this device" = "已在此设备上退出登录";
+/* VoiceOver label for a chooser row: first argument = name, second = masked address. */
+"Continue as %@, %@" = "以 %1$@ 的身份继续，%2$@";
+/* VoiceOver label for a chooser row's overflow menu; the argument is the name. */
+"More options for %@" = "%@ 的更多选项";
+
+/* MARK: - Sign-out confirmation (account switcher) */
+/* Confirmation title; the argument is the account address. */
+"Sign out of %@?" = "要退出 %@ 吗？";
+/* Checkbox row, default off. */
+"Also remove from this device" = "同时从此设备移除";
+/* Helper under the checkbox. */
+"You'll need to type your address next time." = "下次需要输入您的地址。";

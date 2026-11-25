@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <plurals name="reader_earlier_messages">
+        <item quantity="one">以前のメッセージ %d 件</item>
+        <item quantity="other">以前のメッセージ %d 件</item>
+    </plurals>
+    <plurals name="reader_participants">
+        <item quantity="one">%d 人</item>
+        <item quantity="other">%d 人</item>
+    </plurals>
+    <plurals name="reader_message_count">
+        <item quantity="one">%d 件のメッセージ</item>
+        <item quantity="other">%d 件のメッセージ</item>
+    </plurals>
+    <string name="reader_you">自分</string>
+    <string name="reader_unread">未読</string>
+    <string name="reader_earlier_action">折りたたまれたメッセージを表示</string>
+    <string name="reader_open_message_action">このメッセージを開く</string>
+    <string name="reader_quoted_show">引用テキストを表示</string>
+    <string name="reader_quoted_hide">引用テキストを隠す</string>
+    <string name="reader_state_expanded">展開中</string>
+    <string name="reader_state_collapsed">折りたたみ</string>
+    <string name="reader_reply_to">%1$s に返信…</string>
+    <string name="reader_reply_fallback">返信…</string>
+    <string name="reader_reply_options">返信のオプション</string>
+    <string name="reader_quick_reply">クイック返信</string>
+    <string name="reader_attach_share_chooser">添付ファイルを共有</string>
+    <string name="reader_attach_view_image">画像を表示</string>
+    <string name="reader_attach_save_named">%1$s を保存</string>
+    <string name="reader_attach_share_named">%1$s を共有</string>
+    <string name="reader_attach_share_nothing">この端末にはこのファイルを共有できるアプリがありません。</string>
+    <string name="reader_viewer_position">%1$d / %2$d</string>
+    <string name="reader_viewer_too_large">この画像はここではプレビューできません。</string>
+    <string name="compose_r9_leave_title">このメッセージを閉じますか？</string>
+    <string name="compose_r9_leave_attachments">下書きはまだ添付ファイルを保持できません。添付なしで本文だけを下書き保存するか、編集を続けてください。</string>
+    <string name="compose_r9_save_text_only">本文だけ保存</string>
+    <string name="compose_r9_draft_failed_title">この下書きは保存されませんでした</string>
+    <string name="compose_r9_leave_without_saving">保存せずに閉じる</string>
+    <string name="compose_r9_encrypt_failed">このメッセージを暗号化できなかったため、送信されていません。</string>
+    <string name="compose_editor_toolbar">テキストの書式</string>
+    <string name="compose_editor_bold">太字</string>
+    <string name="compose_editor_italic">斜体</string>
+    <string name="compose_editor_underline">下線</string>
+    <string name="compose_editor_strike">取り消し線</string>
+    <string name="compose_editor_bullets">箇条書き</string>
+    <string name="compose_editor_numbered">番号付き</string>
+    <string name="compose_editor_text_colour">文字色</string>
+    <string name="compose_editor_black">黒</string>
+    <string name="compose_editor_blue">青</string>
+    <string name="compose_editor_red">赤</string>
+    <string name="compose_editor_green">緑</string>
+    <string name="compose_editor_highlight">ハイライト</string>
+    <string name="compose_editor_highlight_colour">ハイライトの色</string>
+    <string name="compose_editor_yellow">黄</string>
+    <string name="compose_editor_pink">ピンク</string>
+    <string name="compose_editor_font">フォント</string>
+    <string name="compose_editor_sans">サンセリフ</string>
+    <string name="compose_editor_serif">Serif</string>
+    <string name="compose_editor_mono">Monospace</string>
+    <string name="compose_editor_larger">大きく</string>
+    <string name="compose_editor_clear">書式を解除</string>
+    <string name="compose_editor_image">画像</string>
+    <string name="compose_editor_insert_image">画像を挿入</string>
+</resources>

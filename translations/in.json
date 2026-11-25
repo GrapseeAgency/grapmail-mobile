@@ -1,0 +1,73 @@
+{
+ "android": {
+  "strings_r9_reader.xml": {
+   "reader_earlier_messages": {"one": "%d pesan sebelumnya", "other": "%d pesan sebelumnya"},
+   "reader_participants": {"one": "%d orang", "other": "%d orang"},
+   "reader_message_count": {"one": "%d pesan", "other": "%d pesan"},
+   "reader_you": "Anda",
+   "reader_unread": "Belum dibaca",
+   "reader_earlier_action": "tampilkan pesan yang dilipat",
+   "reader_open_message_action": "buka pesan ini",
+   "reader_quoted_show": "Tampilkan teks kutipan",
+   "reader_quoted_hide": "Sembunyikan teks kutipan",
+   "reader_state_expanded": "Terbuka",
+   "reader_state_collapsed": "Dilipat",
+   "reader_reply_to": "Balas ke %1$s…",
+   "reader_reply_fallback": "Balas…",
+   "reader_reply_options": "Opsi balasan",
+   "reader_quick_reply": "Balasan cepat",
+   "reader_attach_share_chooser": "Bagikan lampiran",
+   "reader_attach_view_image": "lihat gambar",
+   "reader_attach_save_named": "Simpan %1$s",
+   "reader_attach_share_named": "Bagikan %1$s",
+   "reader_attach_share_nothing": "Tidak ada aplikasi di perangkat ini yang dapat membagikan file ini.",
+   "reader_viewer_position": "%1$d dari %2$d",
+   "reader_viewer_too_large": "Gambar ini tidak dapat dipratinjau di sini.",
+   "compose_r9_leave_title": "Tinggalkan pesan ini?",
+   "compose_r9_leave_attachments": "Draf belum dapat menyimpan lampiran. Simpan teksnya tanpa lampiran, atau lanjutkan menyunting.",
+   "compose_r9_save_text_only": "Simpan teks saja",
+   "compose_r9_draft_failed_title": "Draf ini tidak tersimpan",
+   "compose_r9_leave_without_saving": "Tinggalkan tanpa menyimpan",
+   "compose_r9_encrypt_failed": "Pesan ini tidak dapat dienkripsi, jadi tidak ada yang terkirim.",
+   "compose_editor_toolbar": "Pemformatan teks",
+   "compose_editor_bold": "Tebal",
+   "compose_editor_italic": "Miring",
+   "compose_editor_underline": "Garis bawah",
+   "compose_editor_strike": "Coret",
+   "compose_editor_bullets": "Poin",
+   "compose_editor_numbered": "Bernomor",
+   "compose_editor_text_colour": "Warna teks",
+   "compose_editor_black": "Hitam",
+   "compose_editor_blue": "Biru",
+   "compose_editor_red": "Merah",
+   "compose_editor_green": "Hijau",
+   "compose_editor_highlight": "Sorot",
+   "compose_editor_highlight_colour": "Warna sorotan",
+   "compose_editor_yellow": "Kuning",
+   "compose_editor_pink": "Merah muda",
+   "compose_editor_font": "Font",
+   "compose_editor_sans": "Tanpa kait",
+   "compose_editor_larger": "Lebih besar",
+   "compose_editor_clear": "Hapus format",
+   "compose_editor_image": "Gambar",
+   "compose_editor_insert_image": "Sisipkan gambar"
+  },
+  "strings_r9_platform.xml": {
+   "r9_platform_notif_channel_new_mail_desc": "Memberi tahu saat pesan baru masuk ke kotak masuk Anda.",
+   "r9_platform_price_per_week": "%1$s/minggu",
+   "r9_platform_price_per_month": "%1$s/bulan",
+   "r9_platform_price_per_3_months": "%1$s setiap 3 bulan",
+   "r9_platform_price_per_6_months": "%1$s setiap 6 bulan",
+   "r9_platform_price_per_year": "%1$s/tahun"
+  },
+  "strings_r9_mailbox.xml": {
+   "mail_sendlater_channel_name": "Pengiriman terjadwal",
+   "mail_sendlater_channel_desc": "Hitung mundur untuk pesan yang menunggu dikirim"
+  },
+  "strings_identity.xml": {
+   "identity_settings_appearance": "Tampilan",
+   "identity_match_wallpaper_title": "Samakan dengan wallpaper",
+   "identity_match_wallpaper_subtitle": "Gunakan warna wallpaper Anda untuk tombol dan sorotan. Avatar, warna status, dan teks tetap warna GrapMail."
+  }
+ }
+}

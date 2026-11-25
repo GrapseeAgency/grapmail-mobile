@@ -1,0 +1,262 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Urdu translation of values/strings_account.xml (part 1 of 4).
+  Remaining keys are in strings_account_2.xml, strings_account_3.xml and strings_account_4.xml.
+-->
+<resources>
+
+    <!-- WizardScaffold.kt -->
+    <string name="acct_back">واپس</string>
+    <string name="acct_wizard_step_of">مرحلہ %1$d از 5</string>
+    <string name="acct_create_account">اکاؤنٹ بنائیں</string>
+    <string name="acct_already_have_an_account">"پہلے سے اکاؤنٹ ہے؟  "</string>
+    <string name="acct_sign_in">سائن ان</string>
+
+    <!-- NameStepScreen.kt -->
+    <string name="acct_whats_your_name">آپ کا نام کیا ہے؟</string>
+    <string name="acct_this_name_appears_on_your_grapmail">یہ نام آپ کی GrapMail پروفائل پر دکھائی دے گا۔</string>
+    <string name="acct_next">آگے</string>
+    <string name="acct_first_name">پہلا نام</string>
+    <string name="acct_first_name_is_required">پہلا نام ضروری ہے</string>
+    <string name="acct_last_name">آخری نام</string>
+    <string name="acct_last_name_is_required">آخری نام ضروری ہے</string>
+
+    <!-- AddressStepScreen.kt -->
+    <string name="acct_choose_your_grapmail_address">اپنا GrapMail پتہ منتخب کریں</string>
+    <string name="acct_pick_an_available_address_or_create">دستیاب پتہ منتخب کریں یا اپنا پتہ بنائیں۔ آپ اسی سے سائن ان کریں گے اور ای میلز وصول کریں گے۔</string>
+    <string name="acct_suggested_for_you">آپ کے لیے تجاویز</string>
+    <string name="acct_based_on_your_name_you_can_change_it">آپ کے نام کی بنیاد پر۔ آپ اسے بعد میں بدل سکتے ہیں۔</string>
+    <string name="acct_finding_available_addresses">دستیاب پتے تلاش کیے جا رہے ہیں…</string>
+    <string name="acct_no_suggestions_from_your_name_create">آپ کے نام سے کوئی تجویز نہیں ملی — نیچے اپنا پتہ بنائیں۔</string>
+    <string name="acct_create_your_own">اپنا پتہ بنائیں</string>
+    <string name="acct_choose_a_unique_address_3_30">ایک منفرد پتہ منتخب کریں (3 سے 30 حروف)۔</string>
+    <string name="acct_choose_your_own_address">اپنا پتہ خود منتخب کریں</string>
+    <string name="acct_yourname">آپ_کا_نام</string>
+    <string name="acct_domain">ڈومین</string>
+    <string name="acct_this_address_is_available">یہ پتہ دستیاب ہے!</string>
+    <string name="acct_checking">جانچ ہو رہی ہے…</string>
+    <string name="acct_address_taken_try">یہ پتہ پہلے سے لیا جا چکا ہے — %1$s آزمائیں</string>
+    <string name="acct_address_taken">یہ پتہ پہلے سے لیا جا چکا ہے</string>
+    <string name="acct_that_address_cannot_be_used">یہ پتہ استعمال نہیں کیا جا سکتا۔</string>
+    <string name="acct_could_not_check_right_now_confirmed">ابھی جانچ نہیں ہو سکی — اکاؤنٹ بنتے وقت تصدیق ہو جائے گی۔</string>
+    <string name="acct_use_letters_numbers_dots_dashes_or">حروف، اعداد، نقطے (.)، ڈیش (-) یا انڈر اسکور (_) استعمال کریں۔\nadmin، support، postmaster وغیرہ جیسے مخصوص نام استعمال نہ کریں۔</string>
+    <string name="acct_available">دستیاب</string>
+
+    <!-- BasicInfoStepScreen.kt -->
+    <string-array name="acct_months">
+        <item>جنوری</item>
+        <item>فروری</item>
+        <item>مارچ</item>
+        <item>اپریل</item>
+        <item>مئی</item>
+        <item>جون</item>
+        <item>جولائی</item>
+        <item>اگست</item>
+        <item>ستمبر</item>
+        <item>اکتوبر</item>
+        <item>نومبر</item>
+        <item>دسمبر</item>
+    </string-array>
+    <string name="acct_basic_info">بنیادی معلومات</string>
+    <string name="acct_tell_us_a_little_more_about_yourself">ہمیں اپنے بارے میں تھوڑا اور بتائیں۔ اس سے ہم آپ کے تجربے کو مزید ذاتی بنا سکتے ہیں۔</string>
+    <string name="acct_couldnt_open_that_photo_choose">یہ تصویر نہیں کھل سکی۔ کوئی اور تصویر منتخب کریں۔</string>
+    <string name="acct_profile_photo">پروفائل تصویر</string>
+    <string name="acct_profile_photo_2">"پروفائل تصویر "</string>
+    <string name="acct_optional">(اختیاری)</string>
+    <string name="acct_add_a_photo_to_make_your_account">اپنے اکاؤنٹ کو ذاتی بنانے کے لیے تصویر شامل کریں۔ آپ اسے بعد میں سیٹنگز سے بدل سکتے ہیں۔</string>
+    <string name="acct_change_photo">تصویر بدلیں</string>
+    <string name="acct_choose_photo">تصویر منتخب کریں</string>
+    <string name="acct_birthday">"تاریخ پیدائش "</string>
+    <string name="acct_required">(ضروری)</string>
+    <string name="acct_month">مہینہ</string>
+    <string name="acct_day">دن</string>
+    <string name="acct_year">سال</string>
+    <string name="acct_you_must_be_13_or_older_to_create_an">اکاؤنٹ بنانے کے لیے آپ کی عمر 13 سال یا اس سے زیادہ ہونی چاہیے۔</string>
+    <string name="acct_gender">"جنس "</string>
+    <string name="acct_female">خاتون</string>
+    <string name="acct_male">مرد</string>
+    <string name="acct_rather_not_say">بتانا نہیں چاہتے</string>
+    <string name="acct_custom">حسب منشا</string>
+
+    <!-- CreatedScreens.kt -->
+    <string name="acct_account_created">اکاؤنٹ بن گیا</string>
+    <string name="acct_youre_all_set">سب تیار ہے!</string>
+    <string name="acct_your_grapmail_account_has_been">آپ کا GrapMail اکاؤنٹ کامیابی سے\nبن گیا ہے اور آپ سائن ان ہو چکے ہیں۔</string>
+    <string name="acct_active">فعال</string>
+    <string name="acct_whats_next">آگے کیا ہے؟</string>
+    <string name="acct_explore_your_mailbox">اپنا میل باکس دیکھیں</string>
+    <string name="acct_check_your_inbox_send_emails_and">اپنا ان باکس دیکھیں، ای میلز بھیجیں اور بہت کچھ۔</string>
+    <string name="acct_add_your_contacts">اپنے رابطے شامل کریں</string>
+    <string name="acct_stay_connected_with_friends_and">دوستوں اور ساتھیوں سے جڑے رہیں۔</string>
+    <string name="acct_personalize_your_experience">اپنا تجربہ ذاتی بنائیں</string>
+    <string name="acct_set_up_your_preferences_and_get_the">اپنی ترجیحات سیٹ کریں اور GrapMail سے بھرپور فائدہ اٹھائیں۔</string>
+    <string name="acct_continue_to_onboarding">آن بورڈنگ جاری رکھیں</string>
+    <string name="acct_well_take_you_through_a_quick_setup">شروع کرنے کے لیے ہم آپ کو ایک فوری سیٹ اپ سے گزاریں گے۔</string>
+    <string name="acct_copy_address">پتہ کاپی کریں</string>
+    <string name="acct_your_secure_inbox">آپ کا محفوظ ان باکس</string>
+    <string name="acct_send_receive_and_manage_your_emails">اپنی ای میلز بھیجیں، وصول کریں اور منظم کریں۔</string>
+    <string name="acct_built_for_your_privacy">آپ کی رازداری کے لیے بنایا گیا</string>
+    <string name="acct_your_data_stays_yours">آپ کا ڈیٹا آپ ہی کا رہتا ہے۔</string>
+    <string name="acct_ready_for_whats_next">اگلے قدم کے لیے تیار</string>
+    <string name="acct_lets_get_you_set_up_and_personalized">آئیے آپ کا اکاؤنٹ سیٹ اپ اور ذاتی بنائیں۔</string>
+    <string name="acct_go_to_mailbox">میل باکس پر جائیں</string>
+
+    <!-- GrapMailLegalScreen.kt -->
+    <string name="acct_terms_of_service">سروس کی شرائط</string>
+    <string name="acct_privacy_policy">رازداری کی پالیسی</string>
+    <string name="acct_your_account">آپ کا اکاؤنٹ</string>
+    <string name="acct_you_must_be_at_least_13_to_create_a">GrapMail اکاؤنٹ بنانے کے لیے آپ کی عمر کم از کم 13 سال ہونی چاہیے۔ اپنا پاس ورڈ خفیہ رکھیں، اور اگر آپ کو لگے کہ کسی اور نے آپ کے میل باکس تک رسائی حاصل کی ہے تو اکاؤنٹ ریکوری اور سیکیورٹی سیٹنگز استعمال کریں۔</string>
+    <string name="acct_using_grapmail">GrapMail کا استعمال</string>
+    <string name="acct_use_your_mailbox_for_lawful">اپنا میل باکس جائز رابطے کے لیے استعمال کریں۔ اسپام، بڑی تعداد میں غیر مطلوبہ پیغامات، فشنگ، مالویئر یا دوسروں کو ہراساں کرنے والے پیغامات نہ بھیجیں۔ سروس کا غلط استعمال کرنے والے اکاؤنٹس معطل کیے جا سکتے ہیں۔</string>
+    <string name="acct_sending_and_receiving">بھیجنا اور وصول کرنا</string>
+    <string name="acct_a_message_can_be_queued_sent_or_fail">پیغام قطار میں ہو سکتا ہے، بھیجا جا سکتا ہے یا ناکام ہو سکتا ہے۔ جب وقت اہم ہو تو \"بھیجے گئے\" اور ڈیلیوری کا کوئی نوٹس چیک کریں۔ قطار میں موجود پیغام ابھی بھیجے جانے کا منتظر ہے۔</string>
+    <string name="acct_leaving_grapmail">GrapMail چھوڑنا</string>
+    <string name="acct_you_can_sign_out_on_this_device_or">آپ اس ڈیوائس پر سائن آؤٹ کر سکتے ہیں یا سیٹنگز ← ڈیٹا اور رازداری سے اکاؤنٹ حذف کرنے کی درخواست دے سکتے ہیں۔ اکاؤنٹ حذف کرنے سے پہلے اپنی ضرورت کی ای میلز محفوظ کر لیں۔</string>
+    <string name="acct_account_and_mailbox_data">اکاؤنٹ اور میل باکس کا ڈیٹا</string>
+    <string name="acct_grapmail_uses_your_account_details">GrapMail آپ کے اکاؤنٹ کی تفصیلات آپ کا میل باکس بنانے اور محفوظ رکھنے کے لیے استعمال کرتا ہے۔ سروس وہ پتے، پیغامات اور اٹیچمنٹس محفوظ کرتی ہے جو آپ کی ای میل بھیجنے، وصول کرنے اور سنک کرنے کے لیے ضروری ہیں۔</string>
+    <string name="acct_security_and_notifications">سیکیورٹی اور اطلاعات</string>
+    <string name="acct_google_recaptcha_helps_protect">Google reCAPTCHA سائن اپ کو غلط استعمال سے بچانے میں مدد کرتا ہے۔ اگر آپ نئی ای میل کے الرٹس آن کرتے ہیں تو GrapMail آپ کی ڈیوائس پر اطلاعات پہنچانے کے لیے Firebase ڈیوائس ٹوکن رجسٹر کر سکتا ہے۔ آپ Android سیٹنگز میں اطلاعات کی اجازت بدل سکتے ہیں۔</string>
+    <string name="acct_images_and_device_storage">تصاویر اور ڈیوائس اسٹوریج</string>
+    <string name="acct_remote_images_are_hidden_by_default">پیغام ریڈر میں بیرونی تصاویر بطور ڈیفالٹ چھپی رہتی ہیں۔ انہیں دکھانے سے بھیجنے والے کے امیج سرور سے رابطہ ہو سکتا ہے۔ ایپ ایک مقامی میل باکس کیش بھی رکھتی ہے تاکہ حال ہی میں لوڈ ہونے والی ای میلز جلدی دستیاب ہوں۔</string>
+    <string name="acct_encryption_choices">انکرپشن کے انتخاب</string>
+    <string name="acct_grapmail_offers_end_to_end">GrapMail معاون پیغامات کے لیے اینڈ ٹو اینڈ انکرپشن فراہم کرتا ہے۔ عام ای میل اور انکرپٹڈ پیغامات کی رازداری کی خصوصیات مختلف ہوتی ہیں۔ آپ سیٹنگز میں انکرپشن کا انتظام اور اپنے اکاؤنٹ کی تفصیلات کا جائزہ لے سکتے ہیں۔</string>
+    <string name="acct_control_and_deletion">کنٹرول اور حذف کرنا</string>
+    <string name="acct_in_settings_data_privacy_you_can">سیٹنگز ← ڈیٹا اور رازداری میں آپ اپنی پروفائل دیکھ سکتے ہیں اور حذف کرنے کی درخواست دے سکتے ہیں۔ ڈیٹا رکھنے کی مدت، رسائی یا رازداری کی دیگر درخواستوں کے لیے نیچے دیا گیا Grapsee رابطہ لنک استعمال کریں۔</string>
+    <string name="acct_grapmail_guide">GrapMail گائیڈ</string>
+    <string name="acct_this_guide_explains_how_grapmail">یہ گائیڈ بتاتی ہے کہ GrapMail کیسے کام کرتا ہے۔ Grapsee کی موجودہ قانونی معلومات کے لیے نیچے دیا گیا سرکاری صفحہ دیکھیں۔</string>
+    <string name="acct_legal_read_official">سرکاری %1$s پڑھیں</string>
+    <string name="acct_contact_grapsee">Grapsee سے رابطہ کریں</string>
+
+    <!-- WelcomeScreen.kt -->
+    <string name="acct_welcome_legal_line">%1$s اور %2$s پڑھیں۔</string>
+    <string name="acct_welcome_to">خوش آمدید</string>
+    <string name="acct_a_faster_safer_and_more_private_way">جڑے رہنے کا تیز، محفوظ اور زیادہ نجی طریقہ۔</string>
+    <string name="acct_create_account_button">اکاؤنٹ بنائیں</string>
+
+    <!-- TermsStepScreen.kt -->
+    <string name="acct_terms_privacy">شرائط اور رازداری</string>
+    <string name="acct_please_read_and_agree_to_our_terms">جاری رکھنے کے لیے براہ کرم ہماری سروس کی شرائط اور رازداری کی پالیسی پڑھیں اور ان سے اتفاق کریں۔</string>
+    <string name="acct_creating">بنایا جا رہا ہے…</string>
+    <string name="acct_grapmail_terms_of_service">GrapMail سروس کی شرائط</string>
+    <string name="acct_1_your_account">"1.  آپ کا اکاؤنٹ"</string>
+    <string name="acct_terms_section_account_body">اکاؤنٹ بنا کر آپ ہماری %1$s سے اتفاق کرتے ہیں اور تصدیق کرتے ہیں کہ آپ کی عمر کم از کم 13 سال ہے۔ اپنے اکاؤنٹ کو محفوظ رکھنا اور اس میں ہونے والی ہر سرگرمی آپ کی ذمہ داری ہے۔</string>
+    <string name="acct_2_privacy_policy">"2.  رازداری کی پالیسی"</string>
+    <string name="acct_terms_section_privacy_body">GrapMail سروس چلانے کے لیے آپ کے اکاؤنٹ اور میل باکس کا ڈیٹا استعمال کرتا ہے۔ اکاؤنٹ ڈیٹا، اطلاعات، بیرونی تصاویر اور حذف کرنے کے بارے میں %1$s میں پڑھیں۔</string>
+    <string name="acct_i_agree_to_the_terms_of_service_and">میں سروس کی شرائط اور رازداری کی پالیسی سے متفق ہوں۔</string>
+    <string name="acct_you_must_scroll_to_the_bottom_of">چیک باکس فعال کرنے کے لیے اس دستاویز کے آخر تک اسکرول کریں۔</string>
+
+    <!-- HumanVerifyScreen.kt -->
+    <string name="acct_cancel_verification">تصدیق منسوخ کریں</string>
+    <string name="acct_verify_your_account">اپنے اکاؤنٹ کی تصدیق کریں</string>
+    <string name="acct_complete_a_quick_security_check_to">جاری رکھنے کے لیے ایک فوری سیکیورٹی جانچ مکمل کریں۔</string>
+    <string name="acct_verification_complete">تصدیق مکمل</string>
+    <string name="acct_security_check">سیکیورٹی جانچ</string>
+    <string name="acct_try_again">دوبارہ کوشش کریں</string>
+    <string name="acct_verify_im_human">تصدیق کریں کہ میں انسان ہوں</string>
+    <string name="acct_the_challenge_couldnt_load_please">چیلنج لوڈ نہیں ہو سکا۔ براہ کرم دوبارہ کوشش کریں۔</string>
+    <string name="acct_checking_verification">تصدیق کی جانچ ہو رہی ہے…</string>
+    <string name="acct_continue">جاری رکھیں</string>
+
+    <!-- OnboardingScreen.kt -->
+    <string name="acct_welcome">خوش آمدید</string>
+    <string name="acct_welcome_to_your_sanctuary">اپنی پناہ گاہ میں خوش آمدید</string>
+    <string name="acct_your_new_address_is_ready_welcome_to">آپ کا نیا پتہ تیار ہے؛ رابطے کے ایک صاف ستھرے طریقے میں خوش آمدید۔</string>
+    <string name="acct_get_started">شروع کریں</string>
+    <string name="acct_screener_gate">اسکرینر گیٹ</string>
+    <string name="acct_you_decide_who_reaches_you">آپ طے کریں کون آپ تک پہنچے</string>
+    <string name="acct_unknown_senders_wait_in_the_screener">نامعلوم بھیجنے والے آپ کے فیصلے تک اسکرینر میں انتظار کرتے ہیں۔</string>
+    <string name="acct_subscriptions">سبسکرپشنز</string>
+    <string name="acct_tame_the_clutter">بے ترتیبی پر قابو پائیں</string>
+    <string name="acct_unsubscribe_snooze_and_return_to">ان سبسکرائب کریں، اسنوز کریں اور اہم چیزوں کی طرف لوٹیں۔</string>
+    <string name="acct_quiet_by_default">بطور ڈیفالٹ خاموش</string>
+    <string name="acct_choose_your_rhythm">اپنی رفتار منتخب کریں</string>
+    <string name="acct_set_your_theme_and_decide_when">اپنی تھیم سیٹ کریں اور طے کریں کہ GrapMail کب آپ کو مخاطب کر سکتا ہے۔</string>
+    <string name="acct_your_sanctuary">آپ کی پناہ گاہ</string>
+    <string name="acct_your_inbox_is_yours_again">آپ کا ان باکس پھر سے آپ کا ہے</string>
+    <string name="acct_welcome_home_your_new_mailbox_is">گھر میں خوش آمدید؛ آپ کا نیا میل باکس تیار ہے۔</string>
+    <string name="acct_open_my_mailbox">میرا میل باکس کھولیں</string>
+    <string name="acct_onboarding_animated_scene">متحرک منظر: %1$s</string>
+    <string name="acct_skip">چھوڑیں</string>
+
+    <!-- PasswordStepScreen.kt -->
+    <string name="acct_both_passwords_must_match_period">دونوں پاس ورڈ ایک جیسے ہونے چاہئیں۔</string>
+    <string name="acct_create_a_strong_password">ایک مضبوط پاس ورڈ بنائیں</string>
+    <string name="acct_your_password_keeps_your_account">آپ کا پاس ورڈ آپ کے اکاؤنٹ کو محفوظ رکھتا ہے۔ اسے منفرد، مضبوط اور یاد رکھنے میں آسان بنائیں۔</string>
+    <string name="acct_your_grapmail_address">آپ کا GrapMail پتہ</string>
+    <string name="acct_edit">ترمیم کریں</string>
+    <string name="acct_password_label">"پاس ورڈ "</string>
+    <string name="acct_password">پاس ورڈ</string>
+    <string name="acct_strong">مضبوط</string>
+    <string name="acct_good">اچھا</string>
+    <string name="acct_fair">مناسب</string>
+    <string name="acct_weak">کمزور</string>
+    <string name="acct_confirm_password_label">"پاس ورڈ کی تصدیق کریں "</string>
+    <string name="acct_confirm_password">پاس ورڈ کی تصدیق کریں</string>
+    <string name="acct_re_enter_your_password">اپنا پاس ورڈ دوبارہ درج کریں</string>
+    <string name="acct_password_requirements">پاس ورڈ کی شرائط</string>
+    <string name="acct_at_least_8_characters">کم از کم 8 حروف</string>
+    <string name="acct_a_mix_of_letters_numbers_and_symbols">حروف، اعداد اور علامات کا امتزاج</string>
+    <string name="acct_both_passwords_must_match">دونوں پاس ورڈ ایک جیسے ہونے چاہئیں</string>
+
+    <!-- account/AddressRecoveryScreens.kt -->
+    <string name="acct_we_couldnt_find_a_grapmail_account">ہمیں اس نمبر سے منسلک کوئی GrapMail اکاؤنٹ نہیں ملا۔</string>
+    <string name="acct_too_many_lookups_try_again_in_a">بہت زیادہ تلاشیں ہو گئیں۔ کچھ دیر بعد دوبارہ کوشش کریں۔</string>
+    <string name="acct_we_couldnt_check_that_number_try">ہم اس نمبر کی جانچ نہیں کر سکے۔ دوبارہ کوشش کریں۔</string>
+    <string name="acct_network_error">نیٹ ورک کی خرابی۔ براہ کرم دوبارہ کوشش کریں۔</string>
+    <string name="acct_recover_your_grapmail_address">اپنا GrapMail پتہ بازیافت کریں</string>
+    <string name="acct_find_your_grapmail_address">اپنا GrapMail پتہ تلاش کریں</string>
+    <string name="acct_enter_the_phone_number_linked_to">اپنے GrapMail اکاؤنٹ سے منسلک فون نمبر درج کریں۔ ہم اپنا ریکارڈ دیکھ کر اس سے منسلک ای میل پتہ آپ کو دکھائیں گے۔</string>
+    <string name="acct_find_my_email">میری ای میل تلاش کریں</string>
+    <string name="acct_need_help_contact_support">مدد چاہیے؟ ہماری سپورٹ ٹیم سے رابطہ کریں۔</string>
+    <string name="acct_support_team">سپورٹ ٹیم</string>
+    <string name="acct_phone_number">فون نمبر</string>
+    <string name="acct_enter_your_verified_phone_number">اپنا تصدیق شدہ فون نمبر درج کریں</string>
+    <string name="acct_back_to_sign_in">سائن ان پر واپس جائیں</string>
+    <string name="acct_for_your_security_this_address_is">آپ کی حفاظت کے لیے یہ پتہ جزوی طور پر چھپایا گیا ہے۔ آپ اسے سائن ان کے لیے کاپی کر سکتے ہیں۔</string>
+    <string name="acct_email_found">ای میل مل گئی</string>
+    <string name="acct_your_grapmail_address_has_been_found">آپ کا GrapMail پتہ\nمل گیا ہے!</string>
+    <string name="acct_here_is_the_email_address_associated">یہ آپ کے اکاؤنٹ سے منسلک ای میل پتہ ہے۔ آپ اسے کاپی کر سکتے ہیں یا سائن ان کے لیے استعمال کر سکتے ہیں۔</string>
+    <string name="acct_copy">کاپی کریں</string>
+
+    <!-- account/PhoneScreens.kt -->
+    <string name="acct_bangladesh">بنگلہ دیش</string>
+    <string name="acct_india">بھارت</string>
+    <string name="acct_pakistan">پاکستان</string>
+    <string name="acct_united_states">امریکہ</string>
+    <string name="acct_united_kingdom">برطانیہ</string>
+    <string name="acct_united_arab_emirates">متحدہ عرب امارات</string>
+    <string name="acct_saudi_arabia">سعودی عرب</string>
+    <string name="acct_malaysia">ملائیشیا</string>
+    <string name="acct_enter_a_valid_phone_number">درست فون نمبر درج کریں۔</string>
+    <string name="acct_we_couldnt_send_a_code_to_that">ہم اس نمبر پر کوڈ نہیں بھیج سکے۔</string>
+    <string name="acct_that_number_is_already_linked_to">یہ نمبر پہلے سے کسی اور اکاؤنٹ سے منسلک ہے۔</string>
+    <string name="acct_please_wait_a_moment_before_asking">نیا کوڈ مانگنے سے پہلے براہ کرم تھوڑا انتظار کریں۔</string>
+    <string name="acct_we_couldnt_send_your_code_try_again">ہم آپ کا کوڈ نہیں بھیج سکے۔ دوبارہ کوشش کریں۔</string>
+    <string name="acct_sign_in_first_so_the_number_can_be">پہلے سائن ان کریں تاکہ نمبر آپ کے اکاؤنٹ میں محفوظ ہو سکے۔</string>
+    <string name="acct_that_code_is_not_correct">یہ کوڈ درست نہیں ہے۔</string>
+    <string name="acct_we_couldnt_verify_that_code_try">ہم اس کوڈ کی تصدیق نہیں کر سکے۔ دوبارہ کوشش کریں۔</string>
+    <string name="acct_phone_verification">فون کی تصدیق</string>
+    <string name="acct_verify_your_phone_number">اپنے فون نمبر کی تصدیق کریں</string>
+    <string name="acct_enter_the_6_digit_code">6 ہندسوں کا کوڈ درج کریں</string>
+    <string name="acct_well_send_you_a_6_digit_code_by_sms">ہم آپ کو SMS کے ذریعے 6 ہندسوں کا کوڈ بھیجیں گے۔</string>
+    <string name="acct_sms_sent_to">SMS %1$s پر بھیج دیا گیا۔ کوڈ پانچ منٹ میں ختم ہو جائے گا۔</string>
+    <string name="acct_send_verification_code">تصدیقی کوڈ بھیجیں</string>
+    <string name="acct_your_phone_number_is_only_used_for">آپ کا فون نمبر صرف سیکیورٹی مقاصد کے لیے استعمال ہوتا ہے اور کسی سے شیئر نہیں کیا جائے گا۔</string>
+    <string name="acct_verify_and_continue">تصدیق کریں اور جاری رکھیں</string>
+    <string name="acct_if_the_text_message_hasnt_arrived">اگر ٹیکسٹ پیغام نہیں آیا تو آپ ایک منٹ بعد نیا کوڈ مانگ سکتے ہیں۔</string>
+    <string name="acct_sms_code">SMS کوڈ</string>
+    <string name="acct_country_code">ملک کا کوڈ</string>
+    <string name="acct_verification_code">تصدیقی کوڈ</string>
+    <string name="acct_6_digit_sms_code">6 ہندسوں کا SMS کوڈ</string>
+    <string name="acct_sending">بھیجا جا رہا ہے…</string>
+    <string name="acct_resend_code">کوڈ دوبارہ بھیجیں</string>
+    <string name="acct_close">بند کریں</string>
+    <string name="acct_go_to_account_security">اکاؤنٹ سیکیورٹی پر جائیں</string>
+    <string name="acct_back_to_home">ہوم پر واپس جائیں</string>
+    <string name="acct_your_phone_number_is_securely_stored">آپ کا فون نمبر محفوظ طریقے سے رکھا جاتا ہے اور صرف اکاؤنٹ ریکوری اور دو مرحلہ تصدیق کے لیے استعمال ہوتا ہے۔</string>
+    <string name="acct_phone_verified">فون کی تصدیق ہو گئی</string>
+    <string name="acct_your_phone_number_has_been_verified">آپ کے فون نمبر کی\nتصدیق ہو گئی ہے!</string>
+    <string name="acct_phone_now_linked">آپ کا فون نمبر %1$s اب آپ کے GrapMail اکاؤنٹ سے منسلک ہے۔ آپ اسے اکاؤنٹ ریکوری اور دو مرحلہ تصدیق کے لیے استعمال کر سکتے ہیں۔</string>
+    <string name="acct_verified_phone_number">تصدیق شدہ فون نمبر</string>
+    <string name="acct_verified">تصدیق شدہ</string>
+</resources>

@@ -1,0 +1,21 @@
+/* GrapMailNotificationService — Vietnamese (vi). */
+
+"New encrypted message" = "Thư mã hóa mới";
+"New mail" = "Thư mới";
+"1 new message" = "1 thư mới";
+"%lld new messages" = "%lld thư mới";
+"%lld unread in the inbox" = "%lld thư chưa đọc trong Hộp thư đến";
+"Encrypted message" = "Thư đã mã hóa";
+"Unknown sender" = "Người gửi không xác định";
+"No subject" = "Không có tiêu đề";
+"This was me" = "Đây là tôi";
+"Secure account" = "Bảo vệ tài khoản";
+"Archive" = "Lưu trữ";
+"Mark as read" = "Đánh dấu là đã đọc";
+"Reply" = "Trả lời";
+"Send" = "Gửi";
+"Reply…" = "Trả lời…";
+"Reply in app" = "Trả lời trong ứng dụng";
+"More" = "Thêm";
+/* Notification title: a sign-in code, then the sender */
+"%@ · %@" = "%@ · %@";

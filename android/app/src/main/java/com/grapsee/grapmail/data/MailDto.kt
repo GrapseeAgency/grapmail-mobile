@@ -1,6 +1,8 @@
 package com.grapsee.grapmail.data
 
 import androidx.compose.runtime.Immutable
+import com.grapsee.grapmail.R
+import com.grapsee.grapmail.ui.i18n.CoreStrings
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
@@ -162,12 +164,16 @@ data class MailMessageDto(
     val isE2eEncrypted: Boolean = false,
     /** ISO instant. Null means the row has no trustworthy time to show. */
     val createdAt: String? = null,
+    /** Sent list only: `none` | `requested` | `read` (routes/grapmail-sent-receipts.ts). Null elsewhere. */
+    val readReceiptStatus: String? = null,
+    /** ISO time of the first recorded receipt, or null. */
+    val readReceiptReadAt: String? = null,
 ) {
     /**
      * The line the row shows where a subject is absent. Not a guess about the
      * message — a statement that it has no subject.
      */
-    val subjectOrNone: String get() = subject?.takeIf { it.isNotBlank() } ?: "(no subject)"
+    val subjectOrNone: String get() = subject?.takeIf { it.isNotBlank() } ?: CoreStrings.get(R.string.core_notif_no_subject) { "(no subject)" }
 }
 
 /**
@@ -732,6 +738,12 @@ data class MailSendResponse(
     val error: String? = null,
     val code: String? = null,
     val message: String? = null,
+    /**
+     * Present only when `status` is `scheduled`: the instant the server recorded
+     * (`scheduledFor.toISOString()`, grapmail.ts), so the composer confirms the
+     * time the server will send at rather than echoing the one it asked for.
+     */
+    val scheduledFor: String? = null,
 )
 
 /** `POST /grapmail/draft` — `grapmail.ts:1160`. */
@@ -764,12 +776,25 @@ data class MailScreenerResponse(
  * which is why the set has four entries and not three verbs.
  */
 enum class MailDecision(
-    val apiValue: String, val title: String, val done: String, val note: String,
+    val apiValue: String,
+    private val titleRes: Int, private val titleEn: String,
+    private val doneRes: Int, private val doneEn: String,
+    private val noteRes: Int, private val noteEn: String,
 ) {
-    Approved("approved", "Approve", "Approved", "Their future mail goes straight to the inbox."),
-    Muted("muted", "Mute", "Muted", "It arrives, but quietly — held out of the unread count."),
-    Later("later", "Keep waiting", "Kept waiting", "Nothing is decided. It stays in this queue."),
-    Blocked("blocked", "Block", "Blocked", "Future mail from them is refused at the door."),
+    Approved("approved", R.string.core_decision_approve, "Approve", R.string.core_decision_approved, "Approved",
+        R.string.core_decision_approved_note, "Their future mail goes straight to the inbox."),
+    Muted("muted", R.string.core_decision_mute, "Mute", R.string.core_decision_muted, "Muted",
+        R.string.core_decision_muted_note, "It arrives, but quietly — held out of the unread count."),
+    Later("later", R.string.core_decision_later, "Keep waiting", R.string.core_decision_kept_waiting, "Kept waiting",
+        R.string.core_decision_later_note, "Nothing is decided. It stays in this queue."),
+    Blocked("blocked", R.string.core_decision_block, "Block", R.string.core_decision_blocked, "Blocked",
+        R.string.core_decision_blocked_note_text, "Future mail from them is refused at the door."),
+    ;
+
+    // Display text only; `apiValue` is the server's word and is never localized.
+    val title: String get() = CoreStrings.get(titleRes) { titleEn }
+    val done: String get() = CoreStrings.get(doneRes) { doneEn }
+    val note: String get() = CoreStrings.get(noteRes) { noteEn }
 }
 
 /**
@@ -780,9 +805,18 @@ enum class MailDecision(
  * next year. The sheet says so on the option rather than leaving the choice to
  * be inferred from a radio button.
  */
-enum class MailSenderScope(val apiValue: String, val title: String, val warning: String) {
-    Address("address", "Just this address", ""),
-    Domain("domain", "The whole domain", "Applies to every address at this domain, including ones created later."),
+enum class MailSenderScope(
+    val apiValue: String,
+    private val titleRes: Int, private val titleEn: String,
+    private val warningRes: Int?, private val warningEn: String,
+) {
+    Address("address", R.string.core_scope_address, "Just this address", null, ""),
+    Domain("domain", R.string.core_scope_domain, "The whole domain",
+        R.string.core_scope_domain_warning, "Applies to every address at this domain, including ones created later."),
+    ;
+
+    val title: String get() = CoreStrings.get(titleRes) { titleEn }
+    val warning: String get() = warningRes?.let { id -> CoreStrings.get(id) { warningEn } } ?: warningEn
 }
 
 /** `PUT /screener/decision` body: three strings, validated upstream, not here. */
@@ -855,17 +889,17 @@ enum class MailBox(val apiValue: String) {
     /** The label the drawer and tab row show. `Screener` is named for what it
      *  is — a queue the sender has no standing in — not "Updates". */
     val title: String get() = when (this) {
-        Inbox -> "Inbox"
-        Starred -> "Starred"
-        Sent -> "Sent"
-        Drafts -> "Drafts"
-        Snoozed -> "Snoozed"
-        Archive -> "Archive"
-        Spam -> "Spam"
-        Trash -> "Trash"
-        Screener -> "Pending approval"
-        All -> "All Mail"
-        None -> "Inbox"
+        Inbox -> CoreStrings.get(R.string.core_box_inbox) { "Inbox" }
+        Starred -> CoreStrings.get(R.string.core_box_starred) { "Starred" }
+        Sent -> CoreStrings.get(R.string.core_box_sent) { "Sent" }
+        Drafts -> CoreStrings.get(R.string.core_box_drafts) { "Drafts" }
+        Snoozed -> CoreStrings.get(R.string.core_box_snoozed) { "Snoozed" }
+        Archive -> CoreStrings.get(R.string.core_box_archive) { "Archive" }
+        Spam -> CoreStrings.get(R.string.core_box_spam) { "Spam" }
+        Trash -> CoreStrings.get(R.string.core_box_trash) { "Trash" }
+        Screener -> CoreStrings.get(R.string.core_box_screener) { "Pending approval" }
+        All -> CoreStrings.get(R.string.core_box_all) { "All Mail" }
+        None -> CoreStrings.get(R.string.core_box_inbox) { "Inbox" }
     }
 
     companion object {
@@ -932,15 +966,17 @@ fun MailAction.inverse(): MailAction? = when (this) {
 /** The banner's past tense, in the same words for the same fact on both
  *  platforms: what the app just did to the selection. */
 fun MailAction.pastLine(count: Int): String {
+    // Each line is one whole sentence per count, so a language can inflect the
+    // verb and the noun together; the English is unchanged.
     val noun = if (count == 1) "1 message" else "$count messages"
     return when (this) {
-        MailAction.Archive -> "Archived $noun"
-        MailAction.Unarchive -> "Moved $noun back to the inbox"
-        MailAction.Spam -> "Reported $noun as spam"
-        MailAction.Unspam -> "Moved $noun out of Spam"
-        MailAction.Trash -> "Moved $noun to Trash"
-        MailAction.Restore -> "Restored $noun"
-        else -> noun
+        MailAction.Archive -> CoreStrings.plural(R.plurals.core_past_archived, count, count) { "Archived $noun" }
+        MailAction.Unarchive -> CoreStrings.plural(R.plurals.core_past_unarchived, count, count) { "Moved $noun back to the inbox" }
+        MailAction.Spam -> CoreStrings.plural(R.plurals.core_past_spam, count, count) { "Reported $noun as spam" }
+        MailAction.Unspam -> CoreStrings.plural(R.plurals.core_past_unspam, count, count) { "Moved $noun out of Spam" }
+        MailAction.Trash -> CoreStrings.plural(R.plurals.core_past_trash, count, count) { "Moved $noun to Trash" }
+        MailAction.Restore -> CoreStrings.plural(R.plurals.core_past_restored, count, count) { "Restored $noun" }
+        else -> CoreStrings.plural(R.plurals.core_count_messages, count, count) { noun }
     }
 }
 
@@ -951,12 +987,12 @@ enum class MailSort { Newest, Oldest, SenderAsc, SenderDesc, SubjectAsc, Subject
 
 /** Labels for the sort sheet, in the wording the reference uses. */
 val MailSort.title: String get() = when (this) {
-    MailSort.Newest -> "Newest first"
-    MailSort.Oldest -> "Oldest first"
-    MailSort.SenderAsc -> "Sender (A → Z)"
-    MailSort.SenderDesc -> "Sender (Z → A)"
-    MailSort.SubjectAsc -> "Subject (A → Z)"
-    MailSort.SubjectDesc -> "Subject (Z → A)"
+    MailSort.Newest -> CoreStrings.get(R.string.core_sort_newest) { "Newest first" }
+    MailSort.Oldest -> CoreStrings.get(R.string.core_sort_oldest) { "Oldest first" }
+    MailSort.SenderAsc -> CoreStrings.get(R.string.core_sort_sender_asc) { "Sender (A → Z)" }
+    MailSort.SenderDesc -> CoreStrings.get(R.string.core_sort_sender_desc) { "Sender (Z → A)" }
+    MailSort.SubjectAsc -> CoreStrings.get(R.string.core_sort_subject_asc) { "Subject (A → Z)" }
+    MailSort.SubjectDesc -> CoreStrings.get(R.string.core_sort_subject_desc) { "Subject (Z → A)" }
 }
 
 /**
@@ -970,6 +1006,64 @@ val MailSort.isServerSide: Boolean get() = this == MailSort.Newest
 enum class MailFilter { All, Unread }
 
 val MailFilter.title: String get() = when (this) {
-    MailFilter.All -> "All"
-    MailFilter.Unread -> "Unread"
+    MailFilter.All -> CoreStrings.get(R.string.core_filter_all) { "All" }
+    MailFilter.Unread -> CoreStrings.get(R.string.core_filter_unread) { "Unread" }
+}
+
+/**
+ * Scheduled send, the client half of backend `lib/mail-schedule.ts`.
+ *
+ * The server's rule, mirrored exactly so the compose box refuses what the route
+ * would refuse instead of finding out from a 400:
+ *
+ *  - `sendAt` is an ISO 8601 timestamp WITH a zone (`Z` or `±hh:mm`). A bare
+ *    local time is refused. This client always writes UTC (`...Z`), converted
+ *    from the person's local date and time with java.time, so no time zone or
+ *    DST rule is guessed on either side.
+ *  - at least [MIN_AHEAD_MS] (one minute) after the server's "now";
+ *  - at most [MAX_AHEAD_DAYS] days (exactly `30 * 86 400 000` ms) after it.
+ *
+ * A refused `sendAt` is never turned into an immediate send by the server, and
+ * this client never does that either.
+ */
+object MailSchedule {
+    const val MIN_AHEAD_MS: Long = 60_000L
+    const val MAX_AHEAD_DAYS: Int = 30
+    const val MAX_AHEAD_MS: Long = MAX_AHEAD_DAYS * 86_400_000L
+
+    /**
+     * The undo-send hold (logic/MailboxViewModel.send): the request leaves this
+     * long after the tap, so a time is checked against "now + hold", the moment
+     * the server will actually see it.
+     */
+    const val UNDO_WINDOW_MS: Long = 5_000L
+
+    enum class Verdict { OK, TOO_SOON, TOO_FAR }
+
+    /** The server's own comparison (`at < now + MIN` / `at > now + MAX`), in ms. */
+    fun check(at: java.time.Instant, nowMs: Long): Verdict {
+        val ms = at.toEpochMilli()
+        return when {
+            ms < nowMs + MIN_AHEAD_MS -> Verdict.TOO_SOON
+            ms > nowMs + MAX_AHEAD_MS -> Verdict.TOO_FAR
+            else -> Verdict.OK
+        }
+    }
+
+    /** The latest instant the server accepts for a request made at [nowMs]. */
+    fun latest(nowMs: Long): java.time.Instant = java.time.Instant.ofEpochMilli(nowMs + MAX_AHEAD_MS)
+
+    /**
+     * The wire form: UTC, whole seconds, no fraction (`2026-11-25T02:00:00Z`),
+     * which the route's `ISO_WITH_ZONE` pattern accepts.
+     */
+    fun toWire(at: java.time.Instant): String =
+        java.time.format.DateTimeFormatter.ISO_INSTANT.format(at.truncatedTo(java.time.temporal.ChronoUnit.SECONDS))
+
+    /** Reads the wire form, or the server's `toISOString()` echo; null when unreadable. */
+    fun parse(value: String?): java.time.Instant? {
+        val text = value?.trim()?.takeIf { it.isNotEmpty() } ?: return null
+        return runCatching { java.time.OffsetDateTime.parse(text).toInstant() }.getOrNull()
+            ?: runCatching { java.time.Instant.parse(text) }.getOrNull()
+    }
 }

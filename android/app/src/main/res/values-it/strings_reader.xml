@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    values-it/strings_reader.xml: translation of values/strings_reader.xml (same keys, same order).
+    Comments below are kept from the English source for context.
+-->
+<resources>
+    <!-- The inline pill above an HTML body in a dark reader. It names what a tap switches TO. -->
+    <string name="reader_colours_original">Colori originali</string>
+    <string name="reader_colours_dark">Colori scuri</string>
+
+    <!-- The message overflow menu items (same toggle as the pill). -->
+    <string name="reader_colours_menu_original">Mostra colori originali</string>
+    <string name="reader_colours_menu_dark">Mostra colori scuri</string>
+
+    <!-- TalkBack: the pill's click action ("double-tap to …") and its current state. -->
+    <string name="reader_colours_action_original">mostra i colori originali di questo mittente</string>
+    <string name="reader_colours_action_dark">mostra con colori scuri</string>
+    <string name="reader_colours_state_original">Colori originali visualizzati</string>
+    <string name="reader_colours_state_dark">Colori scuri visualizzati</string>
+
+    <!-- The note under the message after a change, so the per-sender memory is not a surprise later. -->
+    <string name="reader_colours_remembered_original">La posta di %1$s si aprirà con i colori originali su questo dispositivo.</string>
+    <string name="reader_colours_remembered_dark">La posta di %1$s si aprirà con colori scuri su questo dispositivo.</string>
+</resources>

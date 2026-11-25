@@ -50,6 +50,8 @@ import com.grapsee.grapmail.ui.components.OutlineButton
 import com.grapsee.grapmail.ui.components.StatusChip
 import com.grapsee.grapmail.ui.theme.LocalPalette
 import kotlinx.coroutines.launch
+import androidx.compose.ui.res.stringResource
+import com.grapsee.grapmail.R
 
 /**
  * 18 — the account's own history.
@@ -70,17 +72,24 @@ fun SecurityActivityScreen(
     var suspicious by remember { mutableStateOf(false) }
     var loading by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf<String?>(null) }
+    // Bumped by Retry; the read below re-runs for each value.
+    var attempt by remember { mutableStateOf(0) }
 
-    LaunchedEffect(Unit) {
+    LaunchedEffect(attempt) {
+        loading = true
+        error = null
         try {
-            val token = SessionStore.token(context) ?: throw IllegalStateException("Sign in again.")
+            val token = SessionStore.token(context) ?: throw IllegalStateException(context.getString(R.string.acct_sign_in_again))
             val resp = Api.activity(token)
             events = resp.events
             suspicious = resp.suspicious
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
         } catch (e: Exception) {
-            error = e.message
+            // A null message must not fall through to "nothing has happened".
+            error = e.message ?: context.getString(R.string.states_error_body)
         } finally {
-            loading = false
+            if (kotlinx.coroutines.currentCoroutineContext()[kotlinx.coroutines.Job]?.isActive != false) loading = false
         }
     }
 
@@ -88,11 +97,11 @@ fun SecurityActivityScreen(
         onBack = onBack,
         illustration = "ill_sec_activity",
         illustrationWidth = 150,
-        title = "Recent Security Activity",
-        body = "Sign-ins and changes to your account, newest first.",
+        title = stringResource(R.string.acct_recent_security_activity),
+        body = stringResource(R.string.acct_sign_ins_and_changes_to_your_account),
         footer = {
             Column {
-                AccountLink("Manage active sessions", onOpenSessions)
+                AccountLink(stringResource(R.string.acct_manage_active_sessions), onOpenSessions)
             }
         },
     ) {
@@ -109,20 +118,30 @@ fun SecurityActivityScreen(
             ) {
                 Icon(Icons.Rounded.WarningAmber, contentDescription = null, tint = palette.error, modifier = Modifier.size(17.dp))
                 Column(Modifier.weight(1f)) {
-                    Text("Unrecognized activity", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = palette.error)
+                    Text(stringResource(R.string.acct_unrecognized_activity), fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = palette.error)
                     Spacer(Modifier.height(2.dp))
-                    Text("A device signed in that this account had not used before.", fontSize = 12.sp, lineHeight = 17.sp, color = palette.textSecondary)
+                    Text(stringResource(R.string.acct_a_device_signed_in_that_this_account), fontSize = 12.sp, lineHeight = 17.sp, color = palette.textSecondary)
                     Spacer(Modifier.height(6.dp))
-                    AccountLink("Review it now", onOpenAlert)
+                    AccountLink(stringResource(R.string.acct_review_it_now), onOpenAlert)
                 }
             }
             Spacer(Modifier.height(14.dp))
         }
 
         when {
-            loading -> Text("Loading activity…", fontSize = 13.sp, color = palette.textSecondary)
-            error != null -> Text(error!!, fontSize = 13.sp, color = palette.error)
-            events.isEmpty() -> Text("Nothing has happened on this account yet.", fontSize = 13.sp, color = palette.textSecondary)
+            loading -> com.grapsee.grapmail.ui.components.ListSkeleton(
+                rows = 4, avatar = false, label = stringResource(R.string.acct_loading_activity))
+            error != null -> Column {
+                // A failed read is said as a failure with its way back, never
+                // left looking like an empty history.
+                Text(stringResource(R.string.states_activity_failed_title), fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold, color = palette.textPrimary)
+                Spacer(Modifier.height(4.dp))
+                Text(error!!, fontSize = 13.sp, color = palette.error)
+                Spacer(Modifier.height(6.dp))
+                AccountLink(stringResource(R.string.states_retry), { attempt++ })
+            }
+            events.isEmpty() -> Text(stringResource(R.string.acct_nothing_has_happened_on_this_account), fontSize = 13.sp, color = palette.textSecondary)
             else -> InfoCard {
                 events.forEachIndexed { index, event ->
                     ActivityRow(event)
@@ -169,25 +188,25 @@ fun SuspiciousSignInAlertScreen(
         onBack = onBack,
         illustration = "ill_sec_alert",
         illustrationWidth = 170,
-        eyebrow = "Security Alert",
-        title = "Suspicious Sign-In Alert",
-        body = "We noticed a sign-in to your account from a device we do not recognise.",
+        eyebrow = stringResource(R.string.acct_security_alert),
+        title = stringResource(R.string.acct_suspicious_sign_in_alert),
+        body = stringResource(R.string.acct_we_noticed_a_sign_in_to_your_account),
         footer = {
             Column {
-                GradientButton("Secure My Account", onSecure)
+                GradientButton(stringResource(R.string.acct_secure_my_account), onSecure)
                 Spacer(Modifier.height(6.dp))
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
-                    AccountLink("This was me", {
+                    AccountLink(stringResource(R.string.acct_this_was_me), {
                         // Dismissing is a write, not a navigation. The old handler
                         // popped back whether the write landed or not, so a failed
                         // acknowledgement looked like success and the warning stayed
                         // lit on the next load. Navigate only when the server agreed.
                         scope.launch {
                             val token = SessionStore.token(context)
-                            if (token == null) { ackError = "Sign in again to record that."; return@launch }
+                            if (token == null) { ackError = context.getString(R.string.acct_sign_in_again_to_record_that); return@launch }
                             runCatching { Api.acknowledgeSignIn(token) }
                                 .onSuccess { onThisWasMe() }
-                                .onFailure { ackError = it.message ?: "We couldn't record that. Try again." }
+                                .onFailure { ackError = it.message ?: context.getString(R.string.acct_we_couldnt_record_that_try_again) }
                         }
                     })
                 }
@@ -199,24 +218,24 @@ fun SuspiciousSignInAlertScreen(
         },
     ) {
         InfoCard {
-            Text("Sign-in details", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = palette.textPrimary)
+            Text(stringResource(R.string.acct_sign_in_details), fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = palette.textPrimary)
             Spacer(Modifier.height(8.dp))
             // Never a guess. Before the fetch lands, or when there is no open
             // alert, the honest answer is "not available" — not "Just now", which
             // could push someone to revoke their own current device.
             if (!loaded) {
-                Text("Checking your account…", fontSize = 13.sp, color = palette.textSecondary)
+                Text(stringResource(R.string.acct_checking_your_account), fontSize = 13.sp, color = palette.textSecondary)
             } else {
-                Detail("Device", event?.device?.ifBlank { "Not recorded" } ?: "Not recorded")
-                Detail("When", event?.at?.let { absoluteDateTime(it) } ?: "Not available")
-                Detail("Address", event?.ip?.ifBlank { "Not recorded" } ?: "Not recorded")
+                Detail(stringResource(R.string.acct_device), event?.device?.ifBlank { stringResource(R.string.acct_not_recorded) } ?: stringResource(R.string.acct_not_recorded))
+                Detail(stringResource(R.string.acct_when), event?.at?.let { absoluteDateTime(it) } ?: stringResource(R.string.acct_not_available))
+                Detail(stringResource(R.string.acct_address), event?.ip?.ifBlank { stringResource(R.string.acct_not_recorded) } ?: stringResource(R.string.acct_not_recorded))
                 Spacer(Modifier.height(10.dp))
-                StatusChip("Not recognised", ChipTone.Warning)
+                StatusChip(stringResource(R.string.acct_not_recognised), ChipTone.Warning)
             }
         }
         Spacer(Modifier.height(12.dp))
         CannotBeUndoneCard(
-            "This wasn't you? Someone may have gained access to your account. Take action now to keep your data safe.",
+            stringResource(R.string.acct_this_wasnt_you_someone_may_have),
         )
     }
 }
@@ -288,21 +307,21 @@ fun SecureMyAccountScreen(
         onBack = onBackToActivity,
         illustration = "ill_sec_secure",
         illustrationWidth = 170,
-        title = "Secure My Account",
-        body = "We found a suspicious sign-in to your account. Review the details, revoke the access if it wasn't you, and change your password.",
+        title = stringResource(R.string.acct_secure_my_account),
+        body = stringResource(R.string.acct_we_found_a_suspicious_sign_in_to),
         footer = {
             Column {
                 if (flaggedSession != null) {
                     GradientButton(
-                        "Revoke This Session",
+                        stringResource(R.string.acct_revoke_this_session),
                         onClick = {
                             revokeBusy = true; revokeError = null
                             scope.launch {
                                 val token = SessionStore.token(context)
-                                if (token == null) { revokeError = "Sign in again to continue."; revokeBusy = false; return@launch }
+                                if (token == null) { revokeError = context.getString(R.string.acct_sign_in_again_to_continue); revokeBusy = false; return@launch }
                                 runCatching { Api.revokeSession(token, flaggedSession.id) }
                                     .onSuccess { reload() }
-                                    .onFailure { revokeError = it.message ?: "We couldn't sign that device out." }
+                                    .onFailure { revokeError = it.message ?: context.getString(R.string.acct_we_couldnt_sign_that_device_out) }
                                 revokeBusy = false
                             }
                         },
@@ -313,38 +332,38 @@ fun SecureMyAccountScreen(
                         Text(revokeError!!, fontSize = 12.sp, color = palette.error)
                     }
                     Spacer(Modifier.height(8.dp))
-                    OutlineButton("Change Password", onClick = onChangePassword)
+                    OutlineButton(stringResource(R.string.acct_change_password), onClick = onChangePassword)
                 } else if (!checking) {
                     // No live session on the flagged device: say so honestly rather
                     // than offer a revoke that would do nothing.
                     Text(
-                        "That device is already signed out. Change your password to end any other session.",
+                        stringResource(R.string.acct_that_device_is_already_signed_out),
                         fontSize = 12.sp, lineHeight = 17.sp, color = palette.textSecondary,
                     )
                     Spacer(Modifier.height(8.dp))
-                    GradientButton("Change Password", onClick = onChangePassword)
+                    GradientButton(stringResource(R.string.acct_change_password), onClick = onChangePassword)
                 }
                 Spacer(Modifier.height(6.dp))
-                BackLink("Back to Security Activity", onBackToActivity)
+                BackLink(stringResource(R.string.acct_back_to_security_activity), onBackToActivity)
             }
         },
     ) {
         if (checking) {
-            Text("Checking your account…", fontSize = 13.sp, color = palette.textSecondary)
+            Text(stringResource(R.string.acct_checking_your_account), fontSize = 13.sp, color = palette.textSecondary)
             return@AccountScreen
         }
         InfoCard {
-            Text("Suspicious Sign-In Details", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = palette.textPrimary)
+            Text(stringResource(R.string.acct_suspicious_sign_in_details), fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = palette.textPrimary)
             Spacer(Modifier.height(8.dp))
             // Location is the masked IP only — there is no GeoIP source, so no city
             // is invented. The caption says so plainly.
-            DetailRow(Icons.Rounded.Place, "Location", alertIp.ifBlank { "Not recorded" }, "Approximate location based on IP")
-            DetailRow(Icons.Rounded.Devices, "Device", alertDevice.ifBlank { "Not recorded" })
-            DetailRow(Icons.Rounded.Schedule, "Time", alertAt?.let { absoluteDateTime(it) } ?: "Not available", "Your local time")
+            DetailRow(Icons.Rounded.Place, stringResource(R.string.acct_location), alertIp.ifBlank { stringResource(R.string.acct_not_recorded) }, stringResource(R.string.acct_approximate_location_based_on_ip))
+            DetailRow(Icons.Rounded.Devices, stringResource(R.string.acct_device), alertDevice.ifBlank { stringResource(R.string.acct_not_recorded) })
+            DetailRow(Icons.Rounded.Schedule, stringResource(R.string.acct_time), alertAt?.let { absoluteDateTime(it) } ?: stringResource(R.string.acct_not_available), stringResource(R.string.acct_your_local_time))
         }
         Spacer(Modifier.height(12.dp))
         CannotBeUndoneCard(
-            "This looks suspicious. If this wasn't you, we recommend revoking the access and changing your password immediately.",
+            stringResource(R.string.acct_this_looks_suspicious_if_this_wasnt),
         )
     }
 }

@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>%lld new messages</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@n@</string>
+		<key>n</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>zero</key>
+			<string>لا رسائل جديدة</string>
+			<key>one</key>
+			<string>رسالة جديدة واحدة</string>
+			<key>two</key>
+			<string>رسالتان جديدتان</string>
+			<key>few</key>
+			<string>%lld رسائل جديدة</string>
+			<key>many</key>
+			<string>%lld رسالة جديدة</string>
+			<key>other</key>
+			<string>%lld رسالة جديدة</string>
+		</dict>
+	</dict>
+</dict>
+</plist>

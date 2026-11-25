@@ -1,0 +1,1 @@
+Faster mailbox, clearer send receipts, and fixes from the beta. If something misbehaves, Settings › Send crash reports helps us find it.

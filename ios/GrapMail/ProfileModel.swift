@@ -188,11 +188,19 @@ final class ProfileModel: ObservableObject {
             guard let self, !Task.isCancelled else { return }
             defer { if !Task.isCancelled { self.profileLoad = nil } }
             do {
-                if self.state.profile == nil, self.state.avatar == nil,
+                if self.state.profile == nil,
+                   let cached = await MailStore.shared.cachedProfile(generation: generation) {
+                    guard !Task.isCancelled, generation == SessionStore.generation else { return }
+                    self.state.profile = cached
+                    self.state.loading = false
+                    self.state.fatal = nil
+                    MailDisplay.shared.apply(cached.settings)
+                }
+                if self.state.avatar == nil, self.state.avatar == nil,
                    let cached = await AccountPhotoCache.read(token: token),
                    await AvatarThumbnail.decode(cached) != nil {
                     guard !Task.isCancelled, generation == SessionStore.generation else { return }
-                    if self.state.profile == nil, self.state.avatar == nil, !self.state.busy {
+                    if self.state.avatar == nil, !self.state.busy {
                         self.state.avatar = cached
                     }
                 }
@@ -211,9 +219,10 @@ final class ProfileModel: ObservableObject {
                     MailDisplay.shared.apply(fresh.settings)
                 }
                 updated.loading = false
-                updated.fatal = updated.profile == nil ? "The account record is unavailable." : nil
+                updated.fatal = updated.profile == nil ? String(localized: "The account record is unavailable.", comment: "Account settings error when the profile could not be read") : nil
                 updated.staleError = nil
                 self.state = updated
+                if let fresh = resp.profile { await MailStore.shared.putProfile(fresh, generation: generation) }
                 if self.avatarLoad == nil { self.loadAvatar() }
             } catch {
                 guard !Task.isCancelled, generation == SessionStore.generation else { return }
@@ -301,6 +310,7 @@ final class ProfileModel: ObservableObject {
                 let text = resp.message?.trimmingCharacters(in: .whitespacesAndNewlines)
                 state.note = (text?.isEmpty == false) ? text! : label
                 state.noteIsBad = false
+                if let fresh = resp.profile { await MailStore.shared.putProfile(fresh, generation: generation) }
             } catch {
                 guard generation == SessionStore.generation else { return }
                 state.busy = false
@@ -337,7 +347,10 @@ final class ProfileModel: ObservableObject {
                 settings[key] = obj
             }
         }
-        save(label: "Saved.", settings: settings)
+        // Sent whole, every key present (the server keeps any key not sent) —
+        // the same `settings.notifications` object NotificationPolicy writes.
+        if let v = patch.notifications { settings["notifications"] = v.dictionary }
+        save(label: String(localized: "Saved.", comment: "Confirmation after saving account settings"), settings: settings)
     }
 
     /// The keep-list after one disconnect. `removeConnection` is what the
@@ -348,7 +361,7 @@ final class ProfileModel: ObservableObject {
             ["product": c.product, "host": c.host, "scopes": c.scopes,
              "connectedAt": c.connectedAt]
         }
-        save(label: "Removed.", connections: rows)
+        save(label: String(localized: "Removed.", comment: "Confirmation after removing a connected app"), connections: rows)
     }
 
     /// Mint or retire an alias — the two routes the mailbox API already
@@ -370,21 +383,21 @@ final class ProfileModel: ObservableObject {
                     guard generation == SessionStore.generation else { return }
                     guard r.success else {
                         state.busy = false
-                        state.note = r.error ?? "That alias could not be removed."
+                        state.note = r.error ?? String(localized: "That alias could not be removed.", comment: "Alias error")
                         state.noteIsBad = true
                         return
                     }
-                    msg = r.message ?? "Alias removed."
+                    msg = r.message ?? String(localized: "Alias removed.", comment: "Alias confirmation")
                 } else {
                     let r = try await ApiClient.mailCreateAlias(token, label: value)
                     guard generation == SessionStore.generation else { return }
                     guard r.success else {
                         state.busy = false
-                        state.note = r.error ?? r.message ?? "The alias could not be created."
+                        state.note = r.error ?? r.message ?? String(localized: "The alias could not be created.", comment: "Alias error")
                         state.noteIsBad = true
                         return
                     }
-                    msg = r.message ?? "Alias created."
+                    msg = r.message ?? String(localized: "Alias created.", comment: "Alias confirmation")
                 }
                 state.busy = false
                 state.noteIsBad = false
@@ -423,14 +436,14 @@ final class ProfileModel: ObservableObject {
                 state.avatarTried = true
                 if let url = resp.avatarUrl { state.profile?.avatarUrl = url }
                 let text = resp.message?.trimmingCharacters(in: .whitespacesAndNewlines)
-                state.note = (text?.isEmpty == false) ? text! : "Profile photo updated."
+                state.note = (text?.isEmpty == false) ? text! : String(localized: "Profile photo updated.", comment: "Profile photo confirmation")
                 state.noteIsBad = false
                 onSaved()
                 load(force: true)
             } catch {
                 guard generation == SessionStore.generation else { return }
                 state.busy = false
-                state.note = "Couldn’t confirm your profile photo. Try again."
+                state.note = String(localized: "Couldn’t confirm your profile photo. Try again.", comment: "Profile photo error")
                 state.noteIsBad = true
             }
         }
@@ -450,7 +463,7 @@ final class ProfileModel: ObservableObject {
                 state.avatarTried = true
                 state.profile?.avatarUrl = nil
                 let text = resp.message?.trimmingCharacters(in: .whitespacesAndNewlines)
-                state.note = (text?.isEmpty == false) ? text! : "Profile photo removed."
+                state.note = (text?.isEmpty == false) ? text! : String(localized: "Profile photo removed.", comment: "Profile photo confirmation")
                 state.noteIsBad = false
             } catch {
                 guard generation == SessionStore.generation else { return }
@@ -472,6 +485,6 @@ final class ProfileModel: ObservableObject {
            !message.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             return message
         }
-        return "That change did not go through."
+        return String(localized: "That change did not go through.", comment: "Account settings error when the server gives no reason")
     }
 }

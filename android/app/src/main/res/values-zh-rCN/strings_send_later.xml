@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    values-zh-rCN/strings_send_later.xml: translation of values/strings_send_later.xml (same keys, same order).
+    Comments below are kept from the English source for context.
+-->
+<resources>
+    <!-- The clock button next to Send (TalkBack label and click action). -->
+    <string name="compose_send_later_button">定时发送</string>
+    <string name="compose_send_later_button_action">选择发送时间</string>
+
+    <!-- The sheet. -->
+    <string name="compose_send_later_title">稍后发送</string>
+    <string name="compose_send_later_later_today">今天晚些时候</string>
+    <string name="compose_send_later_tomorrow_morning">明天上午</string>
+    <string name="compose_send_later_monday_morning">周一上午</string>
+    <string name="compose_send_later_pick">选择日期和时间</string>
+    <string name="compose_send_later_pick_hint">最多可提前 30 天</string>
+    <!-- %1$s: the device time zone's name, e.g. "Bangladesh Standard Time". -->
+    <string name="compose_send_later_zone_note">时间以您所在的时区显示：%1$s</string>
+    <!-- TalkBack for one option row. %1$s: option name, %2$s: its day and time. -->
+    <string name="compose_send_later_option_description">%1$s，%2$s</string>
+
+    <!-- Date and time dialogs. -->
+    <string name="compose_send_later_date_title">选择日期</string>
+    <string name="compose_send_later_time_title">选择时间</string>
+    <string name="compose_send_later_next">下一步</string>
+    <string name="compose_send_later_schedule">安排</string>
+    <string name="compose_send_later_cancel">取消</string>
+    <string name="compose_send_later_type_time">输入时间</string>
+    <string name="compose_send_later_use_clock">使用表盘</string>
+    <string name="compose_send_later_too_soon">请选择至少 1 分钟之后的时间。</string>
+    <string name="compose_send_later_too_far">请选择 30 天以内的时间。</string>
+
+    <!-- In-flight and failure lines in the composer. -->
+    <string name="compose_send_later_scheduling">正在安排…</string>
+    <string name="compose_send_later_offline">未连接网络，因此未安排发送。您的邮件仍在这里。</string>
+
+    <!-- The receipt snackbar shown after compose closes. %1$s: e.g. "Tue 8:00 AM". -->
+    <string name="compose_send_later_scheduled_for">定时于 %1$s 发送</string>
+    <string name="compose_send_later_undo">撤销</string>
+    <string name="compose_send_later_view">查看</string>
+    <string name="compose_send_later_undoing">正在取消…</string>
+    <string name="compose_send_later_undone">已取消定时发送。邮件已退回草稿箱。</string>
+    <!-- %1$s: the server's reason. -->
+    <string name="compose_send_later_undo_failed">无法取消：%1$s</string>
+    <string name="compose_send_later_dismiss">关闭</string>
+</resources>

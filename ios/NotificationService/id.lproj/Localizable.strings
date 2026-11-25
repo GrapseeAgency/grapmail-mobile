@@ -1,0 +1,21 @@
+/* GrapMailNotificationService — Indonesian (id). */
+
+"New encrypted message" = "Pesan terenkripsi baru";
+"New mail" = "Email baru";
+"1 new message" = "1 pesan baru";
+"%lld new messages" = "%lld pesan baru";
+"%lld unread in the inbox" = "%lld belum dibaca di Kotak Masuk";
+"Encrypted message" = "Pesan terenkripsi";
+"Unknown sender" = "Pengirim tidak dikenal";
+"No subject" = "Tanpa subjek";
+"This was me" = "Ini saya";
+"Secure account" = "Amankan akun";
+"Archive" = "Arsipkan";
+"Mark as read" = "Tandai sudah dibaca";
+"Reply" = "Balas";
+"Send" = "Kirim";
+"Reply…" = "Balas…";
+"Reply in app" = "Balas di aplikasi";
+"More" = "Lainnya";
+/* Notification title: a sign-in code, then the sender */
+"%@ · %@" = "%@ · %@";

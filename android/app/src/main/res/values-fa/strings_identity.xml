@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="identity_settings_appearance">ظاهر</string>
+    <string name="identity_match_wallpaper_title">هم‌رنگ با تصویر پس‌زمینه</string>
+    <string name="identity_match_wallpaper_subtitle">رنگ‌های تصویر پس‌زمینه را برای دکمه‌ها و برجسته‌سازی‌ها به کار ببرید. تصاویر نمایه، رنگ‌های وضعیت و متن به رنگ‌های GrapMail می‌مانند.</string>
+</resources>

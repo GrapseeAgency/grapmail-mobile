@@ -96,7 +96,7 @@ final class SignUpModel: ObservableObject {
                         $0.chosenHandle = ""
                         _ = suggestion
                     } else {
-                        $0.handleStatus = .invalid(resp.reason ?? "That address cannot be used.")
+                        $0.handleStatus = .invalid(resp.reason ?? String(localized: "That address cannot be used.", comment: "Sign-up: the chosen address is not allowed"))
                         $0.chosenHandle = ""
                     }
                 }
@@ -115,13 +115,13 @@ final class SignUpModel: ObservableObject {
     /// Step 5: create the real account, then sign it in immediately.
     func createAccount(onCreated: @escaping (String, String) -> Void, onError: @escaping (String) -> Void) {
         guard state.termsAgreed else {
-            onError("Please read and agree to the terms to continue.")
+            onError(String(localized: "Please read and agree to the terms to continue.", comment: "Sign-up error: terms not accepted"))
             return
         }
         let s = state
         guard s.humanVerified, let verificationId = s.humanVerificationId,
               !verificationId.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-            onError("Complete the human verification check to continue.")
+            onError(String(localized: "Complete the human verification check to continue.", comment: "Sign-up error: human verification not done"))
             return
         }
         update { $0.creating = true; $0.error = nil }
@@ -183,18 +183,18 @@ final class SignUpModel: ObservableObject {
                     update { $0.humanVerified = false; $0.humanVerificationId = nil; $0.humanVerifyError = nil }
                 }
                 switch code {
-                case "HANDLE_TAKEN": onError("That GrapMail address is already taken. Try another one.")
+                case "HANDLE_TAKEN": onError(String(localized: "That GrapMail address is already taken. Try another one.", comment: "Sign-up error: address taken"))
                 // The server names which rule failed and the message is already in
                 // hand; a hardcoded length string is wrong for a missing letter or
                 // symbol now that the whole policy is enforced.
-                case "WEAK_PASSWORD": onError(message.isEmpty ? "Use at least 8 characters with a letter, a number and a symbol." : message)
-                case "INVALID_NAME": onError("Enter your full name (at least 2 characters).")
-                case "HUMAN_VERIFICATION_REQUIRED": onError("Your verification expired or was already used — complete the check again.")
-                default: onError(message.isEmpty ? "Could not create the account. Please try again." : message)
+                case "WEAK_PASSWORD": onError(message.isEmpty ? String(localized: "Use at least 8 characters with a letter, a number and a symbol.", comment: "Sign-up error: weak password") : message)
+                case "INVALID_NAME": onError(String(localized: "Enter your full name (at least 2 characters).", comment: "Sign-up error: invalid name"))
+                case "HUMAN_VERIFICATION_REQUIRED": onError(String(localized: "Your verification expired or was already used — complete the check again.", comment: "Sign-up error: human verification expired"))
+                default: onError(message.isEmpty ? String(localized: "Could not create the account. Please try again.", comment: "Sign-up error: generic") : message)
                 }
             } catch {
                 update { $0.creating = false }
-                onError(apiMessage(error, fallback: "Could not create your account. Try again."))
+                onError(apiMessage(error, fallback: String(localized: "Could not create your account. Try again.", comment: "Sign-up error when the server gives no reason")))
             }
         }
     }
@@ -218,21 +218,21 @@ final class SignUpModel: ObservableObject {
                         $0.humanVerificationId = verificationId
                     }
                 } else {
-                    update { $0.humanVerifying = false; $0.humanVerifyError = "Verification failed — please try again." }
+                    update { $0.humanVerifying = false; $0.humanVerifyError = String(localized: "Verification failed — please try again.", comment: "Human verification error") }
                 }
             } catch ApiError.http(let status, _, _) {
                 let message: String
                 switch status {
                 case 500...599:
-                    message = "The verification service is temporarily unavailable. Try a new challenge in a moment."
+                    message = String(localized: "The verification service is temporarily unavailable. Try a new challenge in a moment.", comment: "Human verification error: service unavailable")
                 case 429:
-                    message = "Too many verification attempts. Wait a moment and try again."
+                    message = String(localized: "Too many verification attempts. Wait a moment and try again.", comment: "Human verification error: rate limited")
                 default:
-                    message = "Verification failed. Get a new challenge and try again."
+                    message = String(localized: "Verification failed. Get a new challenge and try again.", comment: "Human verification error: challenge rejected")
                 }
                 update { $0.humanVerifying = false; $0.humanVerifyError = message }
             } catch {
-                update { $0.humanVerifying = false; $0.humanVerifyError = "Could not complete verification. Get a new challenge and try again." }
+                update { $0.humanVerifying = false; $0.humanVerifyError = String(localized: "Could not complete verification. Get a new challenge and try again.", comment: "Human verification error: network or unknown failure") }
             }
         }
     }

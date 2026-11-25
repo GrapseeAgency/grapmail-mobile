@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Loading / empty / error / offline states (translated from values/strings_states.xml). -->
+<resources>
+    <string name="states_loading">लोड हो रहा है…</string>
+    <string name="states_offline_banner">आप ऑफ़लाइन हैं। पिछली बार लोड की गई चीज़ें दिखाई जा रही हैं — जिन कामों के लिए नेटवर्क चाहिए, वे दोबारा कनेक्ट होने तक रुके रहेंगे।</string>
+    <string name="states_error_title">कुछ गड़बड़ हो गई</string>
+    <string name="states_error_body">इसे अभी लोड नहीं किया जा सका। अपना कनेक्शन जाँचें और फिर से कोशिश करें।</string>
+    <string name="states_error_offline_body">आप ऑफ़लाइन हैं। वाई-फ़ाई या मोबाइल डेटा से कनेक्ट करें, फिर से कोशिश करें।</string>
+    <string name="states_retry">फिर से कोशिश करें</string>
+    <string name="states_labels_loading">लेबल लोड हो रहे हैं…</string>
+    <string name="states_labels_failed_title">लेबल लोड नहीं हो सके</string>
+    <string name="states_scheduled_loading">शेड्यूल किए गए मेल लोड हो रहे हैं…</string>
+    <string name="states_scheduled_failed_title">शेड्यूल किए गए मेल लोड नहीं हो सके</string>
+    <string name="states_scheduled_empty_title">कुछ भी शेड्यूल नहीं है</string>
+    <string name="states_contacts_loading">आपके मेल से लोग इकट्ठा किए जा रहे हैं…</string>
+    <string name="states_files_loading">अटैचमेंट इकट्ठा किए जा रहे हैं…</string>
+    <string name="states_providers_loading">कनेक्ट किए गए मेलबॉक्स लोड हो रहे हैं…</string>
+    <string name="states_thread_loading">यह बातचीत खोली जा रही है…</string>
+    <string name="states_activity_failed_title">गतिविधि लोड नहीं हो सकी</string>
+    <string name="states_sessions_failed_title">सत्र लोड नहीं हो सके</string>
+</resources>

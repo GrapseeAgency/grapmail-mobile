@@ -1,0 +1,73 @@
+{
+ "android": {
+  "strings_r9_reader.xml": {
+   "reader_earlier_messages": {"one": "%d tin nhắn trước", "other": "%d tin nhắn trước"},
+   "reader_participants": {"one": "%d người", "other": "%d người"},
+   "reader_message_count": {"one": "%d tin nhắn", "other": "%d tin nhắn"},
+   "reader_you": "Bạn",
+   "reader_unread": "Chưa đọc",
+   "reader_earlier_action": "hiện các tin nhắn đã thu gọn",
+   "reader_open_message_action": "mở tin nhắn này",
+   "reader_quoted_show": "Hiện văn bản trích dẫn",
+   "reader_quoted_hide": "Ẩn văn bản trích dẫn",
+   "reader_state_expanded": "Đang mở",
+   "reader_state_collapsed": "Đã thu gọn",
+   "reader_reply_to": "Trả lời %1$s…",
+   "reader_reply_fallback": "Trả lời…",
+   "reader_reply_options": "Tùy chọn trả lời",
+   "reader_quick_reply": "Trả lời nhanh",
+   "reader_attach_share_chooser": "Chia sẻ tệp đính kèm",
+   "reader_attach_view_image": "xem ảnh",
+   "reader_attach_save_named": "Lưu %1$s",
+   "reader_attach_share_named": "Chia sẻ %1$s",
+   "reader_attach_share_nothing": "Không ứng dụng nào trên thiết bị này chia sẻ được tệp này.",
+   "reader_viewer_position": "%1$d / %2$d",
+   "reader_viewer_too_large": "Không thể xem trước ảnh này tại đây.",
+   "compose_r9_leave_title": "Rời khỏi tin nhắn này?",
+   "compose_r9_leave_attachments": "Bản nháp chưa giữ được tệp đính kèm. Hãy lưu phần văn bản mà không có tệp, hoặc tiếp tục soạn.",
+   "compose_r9_save_text_only": "Chỉ lưu văn bản",
+   "compose_r9_draft_failed_title": "Bản nháp này chưa được lưu",
+   "compose_r9_leave_without_saving": "Rời đi không lưu",
+   "compose_r9_encrypt_failed": "Không thể mã hóa tin nhắn này nên chưa có gì được gửi.",
+   "compose_editor_toolbar": "Định dạng văn bản",
+   "compose_editor_bold": "Đậm",
+   "compose_editor_italic": "Nghiêng",
+   "compose_editor_underline": "Gạch chân",
+   "compose_editor_strike": "Gạch ngang",
+   "compose_editor_bullets": "Dấu đầu dòng",
+   "compose_editor_numbered": "Đánh số",
+   "compose_editor_text_colour": "Màu chữ",
+   "compose_editor_black": "Đen",
+   "compose_editor_blue": "Xanh dương",
+   "compose_editor_red": "Đỏ",
+   "compose_editor_green": "Xanh lá",
+   "compose_editor_highlight": "Tô sáng",
+   "compose_editor_highlight_colour": "Màu tô sáng",
+   "compose_editor_yellow": "Vàng",
+   "compose_editor_pink": "Hồng",
+   "compose_editor_font": "Phông chữ",
+   "compose_editor_sans": "Không chân",
+   "compose_editor_larger": "Lớn hơn",
+   "compose_editor_clear": "Xóa định dạng",
+   "compose_editor_image": "Hình ảnh",
+   "compose_editor_insert_image": "Chèn ảnh"
+  },
+  "strings_r9_platform.xml": {
+   "r9_platform_notif_channel_new_mail_desc": "Báo khi có tin nhắn mới đến hộp thư đến.",
+   "r9_platform_price_per_week": "%1$s/tuần",
+   "r9_platform_price_per_month": "%1$s/tháng",
+   "r9_platform_price_per_3_months": "%1$s mỗi 3 tháng",
+   "r9_platform_price_per_6_months": "%1$s mỗi 6 tháng",
+   "r9_platform_price_per_year": "%1$s/năm"
+  },
+  "strings_r9_mailbox.xml": {
+   "mail_sendlater_channel_name": "Gửi theo lịch",
+   "mail_sendlater_channel_desc": "Đếm ngược cho các tin nhắn đang chờ gửi"
+  },
+  "strings_identity.xml": {
+   "identity_settings_appearance": "Giao diện",
+   "identity_match_wallpaper_title": "Khớp hình nền",
+   "identity_match_wallpaper_subtitle": "Dùng màu của hình nền cho nút và phần tô sáng. Ảnh đại diện, màu trạng thái và chữ vẫn theo GrapMail."
+  }
+ }
+}

@@ -1,0 +1,4632 @@
+[
+  {
+    "key": "Welcome back 👋",
+    "comment": "Label (sign in screen)",
+    "file": "ios/GrapMail/AccountAuthViews.swift"
+  },
+  {
+    "key": "Sign in to your GrapMail account and get back to what matters.",
+    "comment": "Label (sign in screen)",
+    "file": "ios/GrapMail/AccountAuthViews.swift"
+  },
+  {
+    "key": "Email address or phone number",
+    "comment": "Text field label (sign in screen)",
+    "file": "ios/GrapMail/AccountAuthViews.swift"
+  },
+  {
+    "key": "you@grapsee.com or +8801XXXXXXXX",
+    "comment": "Sign-in field placeholder; keep the example email address and phone number unchanged",
+    "file": "ios/GrapMail/AccountAuthViews.swift"
+  },
+  {
+    "key": "Password",
+    "comment": "Text field label (sign in screen)",
+    "file": "ios/GrapMail/AccountAuthViews.swift"
+  },
+  {
+    "key": "Enter your password",
+    "comment": "Text field placeholder (sign in screen)",
+    "file": "ios/GrapMail/AccountAuthViews.swift"
+  },
+  {
+    "key": "Forgot password?",
+    "comment": "Label (sign in screen)",
+    "file": "ios/GrapMail/AccountAuthViews.swift"
+  },
+  {
+    "key": "Sign In",
+    "comment": "Button title (sign in screen)",
+    "file": "ios/GrapMail/AccountAuthViews.swift"
+  },
+  {
+    "key": "Waiting for the passkey…",
+    "comment": "Link-style button (sign in screen)",
+    "file": "ios/GrapMail/AccountAuthViews.swift"
+  },
+  {
+    "key": "Use a passkey",
+    "comment": "Link-style button (sign in screen)",
+    "file": "ios/GrapMail/AccountAuthViews.swift"
+  },
+  {
+    "key": "Don't have an account?  ",
+    "comment": "Label (sign in screen)",
+    "file": "ios/GrapMail/AccountAuthViews.swift"
+  },
+  {
+    "key": "Create one",
+    "comment": "Label (sign in screen)",
+    "file": "ios/GrapMail/AccountAuthViews.swift"
+  },
+  {
+    "key": "Sign-in did not return a complete session. Please try again.",
+    "comment": "Sign-in error",
+    "file": "ios/GrapMail/AccountAuthViews.swift"
+  },
+  {
+    "key": "Could not complete the account request. Try again.",
+    "comment": "Error message shown when the server gives no reason (sign in screen)",
+    "file": "ios/GrapMail/AccountAuthViews.swift"
+  },
+  {
+    "key": "Passkey sign-in is not available right now. Use your password instead.",
+    "comment": "Passkey sign-in error",
+    "file": "ios/GrapMail/AccountAuthViews.swift"
+  },
+  {
+    "key": "The passkey was not accepted. Use your password instead.",
+    "comment": "Passkey sign-in error",
+    "file": "ios/GrapMail/AccountAuthViews.swift"
+  },
+  {
+    "key": "Could not sign in with the passkey. Try again.",
+    "comment": "Passkey sign-in error when the server gives no reason",
+    "file": "ios/GrapMail/AccountAuthViews.swift"
+  },
+  {
+    "key": "Email verification",
+    "comment": "Small label above the screen title (email verification screen)",
+    "file": "ios/GrapMail/AccountAuthViews.swift"
+  },
+  {
+    "key": "Enter the email code",
+    "comment": "Screen title (email verification screen)",
+    "file": "ios/GrapMail/AccountAuthViews.swift"
+  },
+  {
+    "key": "Verify & Continue",
+    "comment": "Button title (email verification screen)",
+    "file": "ios/GrapMail/AccountAuthViews.swift"
+  },
+  {
+    "key": "Resend code",
+    "comment": "Link-style button (email verification screen)",
+    "file": "ios/GrapMail/AccountAuthViews.swift"
+  },
+  {
+    "key": "A pending code stays valid. A resend request does not confirm a new delivery.",
+    "comment": "Label (email verification screen)",
+    "file": "ios/GrapMail/AccountAuthViews.swift"
+  },
+  {
+    "key": "Verification did not return a complete session. Sign in again.",
+    "comment": "Email verification error",
+    "file": "ios/GrapMail/AccountAuthViews.swift"
+  },
+  {
+    "key": "The request was not accepted.",
+    "comment": "Error when the server refused to resend a code",
+    "file": "ios/GrapMail/AccountAuthViews.swift"
+  },
+  {
+    "key": "Request accepted. Check for an existing code; a new delivery is not confirmed.",
+    "comment": "Notice after asking for a code to be resent",
+    "file": "ios/GrapMail/AccountAuthViews.swift"
+  },
+  {
+    "key": "Two-step verification",
+    "comment": "Small label above the screen title (two factor screen)",
+    "file": "ios/GrapMail/AccountAuthViews.swift"
+  },
+  {
+    "key": "Use a backup code",
+    "comment": "Screen title (two factor screen)",
+    "file": "ios/GrapMail/AccountAuthViews.swift"
+  },
+  {
+    "key": "Enter your 6-digit code",
+    "comment": "Screen title (two factor screen)",
+    "file": "ios/GrapMail/AccountAuthViews.swift"
+  },
+  {
+    "key": "A verification text is unavailable. Use one of your saved backup codes to continue.",
+    "comment": "Screen description under the title (two factor screen)",
+    "file": "ios/GrapMail/AccountAuthViews.swift"
+  },
+  {
+    "key": "We've emailed a 6-digit code to %@. Enter it to finish signing in.",
+    "comment": "Screen description under the title (two factor screen)",
+    "file": "ios/GrapMail/AccountAuthViews.swift"
+  },
+  {
+    "key": "We've sent you a verification code. Please enter the 6-digit code to continue.",
+    "comment": "Screen description under the title (two factor screen)",
+    "file": "ios/GrapMail/AccountAuthViews.swift"
+  },
+  {
+    "key": "Sending…",
+    "comment": "Link-style button (two factor screen)",
+    "file": "ios/GrapMail/AccountAuthViews.swift"
+  },
+  {
+    "key": "Back to sign in",
+    "comment": "Link-style button (two factor screen)",
+    "file": "ios/GrapMail/AccountAuthViews.swift"
+  },
+  {
+    "key": "That code is not correct.",
+    "comment": "Verification code error",
+    "file": "ios/GrapMail/AccountAuthViews.swift"
+  },
+  {
+    "key": "That code has expired. Resend it to get a new one.",
+    "comment": "Verification code error",
+    "file": "ios/GrapMail/AccountAuthViews.swift"
+  },
+  {
+    "key": "Network error. Please try again.",
+    "comment": "Verification code error when the server could not be reached",
+    "file": "ios/GrapMail/AccountAuthViews.swift"
+  },
+  {
+    "key": "A new code is on its way.",
+    "comment": "Notice after a verification code was resent",
+    "file": "ios/GrapMail/AccountAuthViews.swift"
+  },
+  {
+    "key": "That sign-in no longer needs a code. Start again.",
+    "comment": "Two-step sign-in error",
+    "file": "ios/GrapMail/AccountAuthViews.swift"
+  },
+  {
+    "key": "Enter your backup code",
+    "comment": "Screen title (backup code screen)",
+    "file": "ios/GrapMail/AccountAuthViews.swift"
+  },
+  {
+    "key": "If you don't have access to your 2-step verification method, you can use a backup code to get back into your account.",
+    "comment": "Screen description under the title (backup code screen)",
+    "file": "ios/GrapMail/AccountAuthViews.swift"
+  },
+  {
+    "key": "Backup codes are 10 characters long and can only be used once.",
+    "comment": "Label (backup code screen)",
+    "file": "ios/GrapMail/AccountAuthViews.swift"
+  },
+  {
+    "key": "Continue",
+    "comment": "Button title (backup code screen)",
+    "file": "ios/GrapMail/AccountAuthViews.swift"
+  },
+  {
+    "key": "Try another method",
+    "comment": "Link-style button (backup code screen)",
+    "file": "ios/GrapMail/AccountAuthViews.swift"
+  },
+  {
+    "key": "Sign in again to use a backup code.",
+    "comment": "Backup code error",
+    "file": "ios/GrapMail/AccountAuthViews.swift"
+  },
+  {
+    "key": "That backup code is not valid, or it has already been used.",
+    "comment": "Backup code error",
+    "file": "ios/GrapMail/AccountAuthViews.swift"
+  },
+  {
+    "key": "This account does not use two-step verification.",
+    "comment": "Backup code error",
+    "file": "ios/GrapMail/AccountAuthViews.swift"
+  },
+  {
+    "key": "That backup code is not valid.",
+    "comment": "Backup code error",
+    "file": "ios/GrapMail/AccountAuthViews.swift"
+  },
+  {
+    "key": "expired",
+    "comment": "Verification code countdown once the code has run out",
+    "file": "ios/GrapMail/AccountComponents.swift"
+  },
+  {
+    "key": "Code expires in %@",
+    "comment": "Label (verification code countdown)",
+    "file": "ios/GrapMail/AccountComponents.swift"
+  },
+  {
+    "key": " OR ",
+    "comment": "Label (divider between sign-in options)",
+    "file": "ios/GrapMail/AccountComponents.swift"
+  },
+  {
+    "key": "%lld",
+    "comment": "A step number inside a circle. Do not translate.",
+    "file": "ios/GrapMail/AccountComponents.swift"
+  },
+  {
+    "key": "Bangladesh",
+    "comment": "Country name in the phone number picker",
+    "file": "ios/GrapMail/AccountComponents.swift"
+  },
+  {
+    "key": "India",
+    "comment": "Country name in the phone number picker",
+    "file": "ios/GrapMail/AccountComponents.swift"
+  },
+  {
+    "key": "Pakistan",
+    "comment": "Country name in the phone number picker",
+    "file": "ios/GrapMail/AccountComponents.swift"
+  },
+  {
+    "key": "United States",
+    "comment": "Country name in the phone number picker",
+    "file": "ios/GrapMail/AccountComponents.swift"
+  },
+  {
+    "key": "United Kingdom",
+    "comment": "Country name in the phone number picker",
+    "file": "ios/GrapMail/AccountComponents.swift"
+  },
+  {
+    "key": "United Arab Emirates",
+    "comment": "Country name in the phone number picker",
+    "file": "ios/GrapMail/AccountComponents.swift"
+  },
+  {
+    "key": "Saudi Arabia",
+    "comment": "Country name in the phone number picker",
+    "file": "ios/GrapMail/AccountComponents.swift"
+  },
+  {
+    "key": "Malaysia",
+    "comment": "Country name in the phone number picker",
+    "file": "ios/GrapMail/AccountComponents.swift"
+  },
+  {
+    "key": "Forgot password",
+    "comment": "Small label above the screen title (forgot password screen)",
+    "file": "ios/GrapMail/AccountRecoveryViews.swift"
+  },
+  {
+    "key": "Reset your password",
+    "comment": "Screen title (forgot password screen)",
+    "file": "ios/GrapMail/AccountRecoveryViews.swift"
+  },
+  {
+    "key": "Enter your GrapMail address and we'll email a reset link to the recovery email on your account.",
+    "comment": "Screen description under the title (forgot password screen)",
+    "file": "ios/GrapMail/AccountRecoveryViews.swift"
+  },
+  {
+    "key": "GrapMail address",
+    "comment": "Text field placeholder (forgot password screen)",
+    "file": "ios/GrapMail/AccountRecoveryViews.swift"
+  },
+  {
+    "key": "Continue",
+    "comment": "Button title (forgot password screen)",
+    "file": "ios/GrapMail/AccountRecoveryViews.swift"
+  },
+  {
+    "key": "Find your GrapMail address",
+    "comment": "Link-style button (forgot password screen)",
+    "file": "ios/GrapMail/AccountRecoveryViews.swift"
+  },
+  {
+    "key": "Use a trusted device instead",
+    "comment": "Link-style button (forgot password screen)",
+    "file": "ios/GrapMail/AccountRecoveryViews.swift"
+  },
+  {
+    "key": "Need help? Contact our support team.",
+    "comment": "Footer note (forgot password screen)",
+    "file": "ios/GrapMail/AccountRecoveryViews.swift"
+  },
+  {
+    "key": "support team",
+    "comment": "Tappable words in the footer note; must appear verbatim in the note's translation (forgot password screen)",
+    "file": "ios/GrapMail/AccountRecoveryViews.swift"
+  },
+  {
+    "key": "We could not start the reset. Try again.",
+    "comment": "Error message shown when the server gives no reason (forgot password screen)",
+    "file": "ios/GrapMail/AccountRecoveryViews.swift"
+  },
+  {
+    "key": "Verify recovery code",
+    "comment": "Small label above the screen title (recovery code screen)",
+    "file": "ios/GrapMail/AccountRecoveryViews.swift"
+  },
+  {
+    "key": "Enter the 6-digit code",
+    "comment": "Screen title (recovery code screen)",
+    "file": "ios/GrapMail/AccountRecoveryViews.swift"
+  },
+  {
+    "key": "We've sent a 6-digit verification code to your verified phone number. Please enter the code to continue.",
+    "comment": "Screen description under the title (recovery code screen)",
+    "file": "ios/GrapMail/AccountRecoveryViews.swift"
+  },
+  {
+    "key": "Sending…",
+    "comment": "Link-style button (recovery code screen)",
+    "file": "ios/GrapMail/AccountRecoveryViews.swift"
+  },
+  {
+    "key": "Resend code",
+    "comment": "Link-style button (recovery code screen)",
+    "file": "ios/GrapMail/AccountRecoveryViews.swift"
+  },
+  {
+    "key": "Didn't receive the code? Check your spam folder.",
+    "comment": "Footer note (recovery code screen)",
+    "file": "ios/GrapMail/AccountRecoveryViews.swift"
+  },
+  {
+    "key": "A new code is on its way.",
+    "comment": "Notice after a verification code was resent",
+    "file": "ios/GrapMail/AccountRecoveryViews.swift"
+  },
+  {
+    "key": "We couldn't send another code. Contact support and we'll help.",
+    "comment": "Recovery code resend error",
+    "file": "ios/GrapMail/AccountRecoveryViews.swift"
+  },
+  {
+    "key": "Could not resend the code. Try again.",
+    "comment": "Error message shown when the server gives no reason (recovery code screen)",
+    "file": "ios/GrapMail/AccountRecoveryViews.swift"
+  },
+  {
+    "key": "Create new password",
+    "comment": "Small label above the screen title (new password screen)",
+    "file": "ios/GrapMail/AccountRecoveryViews.swift"
+  },
+  {
+    "key": "Set a new password",
+    "comment": "Screen title (new password screen)",
+    "file": "ios/GrapMail/AccountRecoveryViews.swift"
+  },
+  {
+    "key": "Your new password must be strong and secure. Make sure it's something you haven't used before.",
+    "comment": "Screen description under the title (new password screen)",
+    "file": "ios/GrapMail/AccountRecoveryViews.swift"
+  },
+  {
+    "key": "New password",
+    "comment": "Text field placeholder (new password screen)",
+    "file": "ios/GrapMail/AccountRecoveryViews.swift"
+  },
+  {
+    "key": "Password strength",
+    "comment": "Label (new password screen)",
+    "file": "ios/GrapMail/AccountRecoveryViews.swift"
+  },
+  {
+    "key": "Confirm new password",
+    "comment": "Text field placeholder (new password screen)",
+    "file": "ios/GrapMail/AccountRecoveryViews.swift"
+  },
+  {
+    "key": "At least 8 characters",
+    "comment": "Password requirement (new password screen)",
+    "file": "ios/GrapMail/AccountRecoveryViews.swift"
+  },
+  {
+    "key": "Include a letter",
+    "comment": "Password requirement (new password screen)",
+    "file": "ios/GrapMail/AccountRecoveryViews.swift"
+  },
+  {
+    "key": "Include a number",
+    "comment": "Password requirement (new password screen)",
+    "file": "ios/GrapMail/AccountRecoveryViews.swift"
+  },
+  {
+    "key": "Include a special character",
+    "comment": "Password requirement (new password screen)",
+    "file": "ios/GrapMail/AccountRecoveryViews.swift"
+  },
+  {
+    "key": "Not commonly used",
+    "comment": "Password requirement (new password screen)",
+    "file": "ios/GrapMail/AccountRecoveryViews.swift"
+  },
+  {
+    "key": "Both passwords must match.",
+    "comment": "Label (new password screen)",
+    "file": "ios/GrapMail/AccountRecoveryViews.swift"
+  },
+  {
+    "key": "Reset Password",
+    "comment": "Button title (new password screen)",
+    "file": "ios/GrapMail/AccountRecoveryViews.swift"
+  },
+  {
+    "key": "Enter the code again",
+    "comment": "Link-style button (new password screen)",
+    "file": "ios/GrapMail/AccountRecoveryViews.swift"
+  },
+  {
+    "key": "Your password will be encrypted and kept secure.",
+    "comment": "Footer note (new password screen)",
+    "file": "ios/GrapMail/AccountRecoveryViews.swift"
+  },
+  {
+    "key": "That reset link expired. Start again.",
+    "comment": "Password reset error",
+    "file": "ios/GrapMail/AccountRecoveryViews.swift"
+  },
+  {
+    "key": "Use at least 8 characters with a letter, a number and a symbol.",
+    "comment": "Error message shown when the server gives no reason (new password screen)",
+    "file": "ios/GrapMail/AccountRecoveryViews.swift"
+  },
+  {
+    "key": "That code is not correct, or it has expired.",
+    "comment": "Password reset error",
+    "file": "ios/GrapMail/AccountRecoveryViews.swift"
+  },
+  {
+    "key": "We could not reset the password. Try again.",
+    "comment": "Error message shown when the server gives no reason (new password screen)",
+    "file": "ios/GrapMail/AccountRecoveryViews.swift"
+  },
+  {
+    "key": "Password Reset Successful",
+    "comment": "Status chip (reset done screen)",
+    "file": "ios/GrapMail/AccountRecoveryViews.swift"
+  },
+  {
+    "key": "Your password\nhas been reset",
+    "comment": "Label (reset done screen)",
+    "file": "ios/GrapMail/AccountRecoveryViews.swift"
+  },
+  {
+    "key": "Your GrapMail account is now secure with your new password. You can now sign in and continue using all the features.",
+    "comment": "Label (reset done screen)",
+    "file": "ios/GrapMail/AccountRecoveryViews.swift"
+  },
+  {
+    "key": "Back to Sign In",
+    "comment": "Button title (reset done screen)",
+    "file": "ios/GrapMail/AccountRecoveryViews.swift"
+  },
+  {
+    "key": "For your security, we recommend keeping your password private and using two-step verification.",
+    "comment": "Footer note (reset done screen)",
+    "file": "ios/GrapMail/AccountRecoveryViews.swift"
+  },
+  {
+    "key": "Reset link sent",
+    "comment": "Status chip (recovery pending screen)",
+    "file": "ios/GrapMail/AccountRecoveryViews.swift"
+  },
+  {
+    "key": "Account Recovery Pending",
+    "comment": "Status chip (recovery pending screen)",
+    "file": "ios/GrapMail/AccountRecoveryViews.swift"
+  },
+  {
+    "key": "Check your\nrecovery email",
+    "comment": "Label (recovery pending screen)",
+    "file": "ios/GrapMail/AccountRecoveryViews.swift"
+  },
+  {
+    "key": "We're still working\non your recovery",
+    "comment": "Label (recovery pending screen)",
+    "file": "ios/GrapMail/AccountRecoveryViews.swift"
+  },
+  {
+    "key": "We sent a password reset link to the recovery email on your account. Open it on any device to choose a new password.",
+    "comment": "Label (recovery pending screen)",
+    "file": "ios/GrapMail/AccountRecoveryViews.swift"
+  },
+  {
+    "key": "There might be a short delay while we verify your information. You'll get an update soon at your verified phone number or email.",
+    "comment": "Label (recovery pending screen)",
+    "file": "ios/GrapMail/AccountRecoveryViews.swift"
+  },
+  {
+    "key": "Didn't get it?",
+    "comment": "Info panel title (recovery pending screen)",
+    "file": "ios/GrapMail/AccountRecoveryViews.swift"
+  },
+  {
+    "key": "What's happening?",
+    "comment": "Info panel title (recovery pending screen)",
+    "file": "ios/GrapMail/AccountRecoveryViews.swift"
+  },
+  {
+    "key": "The link works for 1 hour. Check your spam folder, or tap Send again for a new one.",
+    "comment": "Info panel text (recovery pending screen)",
+    "file": "ios/GrapMail/AccountRecoveryViews.swift"
+  },
+  {
+    "key": "We're verifying your recovery request. This usually takes a few minutes, but can take up to 24 hours in some cases.",
+    "comment": "Info panel text (recovery pending screen)",
+    "file": "ios/GrapMail/AccountRecoveryViews.swift"
+  },
+  {
+    "key": "Send again",
+    "comment": "Button title (recovery pending screen)",
+    "file": "ios/GrapMail/AccountRecoveryViews.swift"
+  },
+  {
+    "key": "Try Again",
+    "comment": "Button title (recovery pending screen)",
+    "file": "ios/GrapMail/AccountRecoveryViews.swift"
+  },
+  {
+    "key": "A code is on its way. Check your phone.",
+    "comment": "Account recovery status notice",
+    "file": "ios/GrapMail/AccountRecoveryViews.swift"
+  },
+  {
+    "key": "A new reset link is on its way. Check your recovery email.",
+    "comment": "Account recovery status notice",
+    "file": "ios/GrapMail/AccountRecoveryViews.swift"
+  },
+  {
+    "key": "Still in review. We'll message you as soon as it clears.",
+    "comment": "Account recovery status notice",
+    "file": "ios/GrapMail/AccountRecoveryViews.swift"
+  },
+  {
+    "key": "We couldn't check again. Try in a minute.",
+    "comment": "Error message shown when the server gives no reason (recovery pending screen)",
+    "file": "ios/GrapMail/AccountRecoveryViews.swift"
+  },
+  {
+    "key": "Recover your GrapMail address",
+    "comment": "Small label above the screen title (find address screen)",
+    "file": "ios/GrapMail/AccountRecoveryViews.swift"
+  },
+  {
+    "key": "Enter the phone number linked to your GrapMail account. We'll check our records and show you the email address associated with it.",
+    "comment": "Screen description under the title (find address screen)",
+    "file": "ios/GrapMail/AccountRecoveryViews.swift"
+  },
+  {
+    "key": "Enter your verified phone number",
+    "comment": "Text field placeholder (find address screen)",
+    "file": "ios/GrapMail/AccountRecoveryViews.swift"
+  },
+  {
+    "key": "Find My Email",
+    "comment": "Button title (find address screen)",
+    "file": "ios/GrapMail/AccountRecoveryViews.swift"
+  },
+  {
+    "key": "We couldn't find a GrapMail account with that number.",
+    "comment": "Find-address error",
+    "file": "ios/GrapMail/AccountRecoveryViews.swift"
+  },
+  {
+    "key": "Too many lookups. Try again in a little while.",
+    "comment": "Find-address error",
+    "file": "ios/GrapMail/AccountRecoveryViews.swift"
+  },
+  {
+    "key": "We couldn't check that number. Try again.",
+    "comment": "Error message shown when the server gives no reason (find address screen)",
+    "file": "ios/GrapMail/AccountRecoveryViews.swift"
+  },
+  {
+    "key": "Email Found",
+    "comment": "Status chip (address found screen)",
+    "file": "ios/GrapMail/AccountRecoveryViews.swift"
+  },
+  {
+    "key": "Your GrapMail address\nhas been found!",
+    "comment": "Label (address found screen)",
+    "file": "ios/GrapMail/AccountRecoveryViews.swift"
+  },
+  {
+    "key": "Here is the email address associated with your account. You can copy it or use it to sign in.",
+    "comment": "Label (address found screen)",
+    "file": "ios/GrapMail/AccountRecoveryViews.swift"
+  },
+  {
+    "key": "Your GrapMail address",
+    "comment": "Label (address found screen)",
+    "file": "ios/GrapMail/AccountRecoveryViews.swift"
+  },
+  {
+    "key": "Copied",
+    "comment": "Copy button title (address found screen)",
+    "file": "ios/GrapMail/AccountRecoveryViews.swift"
+  },
+  {
+    "key": "Copy",
+    "comment": "Copy button title (address found screen)",
+    "file": "ios/GrapMail/AccountRecoveryViews.swift"
+  },
+  {
+    "key": "For your security, this address is partially hidden. You can copy it to use for sign in.",
+    "comment": "Footer note (address found screen)",
+    "file": "ios/GrapMail/AccountRecoveryViews.swift"
+  },
+  {
+    "key": "Phone verification",
+    "comment": "Small label above the screen title (phone verify screen)",
+    "file": "ios/GrapMail/AccountRecoveryViews.swift"
+  },
+  {
+    "key": "Verify your phone number",
+    "comment": "Screen title (phone verify screen)",
+    "file": "ios/GrapMail/AccountRecoveryViews.swift"
+  },
+  {
+    "key": "We’ll send you a 6-digit code by SMS.",
+    "comment": "Screen description under the title (phone verify screen)",
+    "file": "ios/GrapMail/AccountRecoveryViews.swift"
+  },
+  {
+    "key": "SMS sent to %@. The code expires in five minutes.",
+    "comment": "Phone verification description; the argument is a phone number",
+    "file": "ios/GrapMail/AccountRecoveryViews.swift"
+  },
+  {
+    "key": "Phone number",
+    "comment": "Phone verification step 1 label",
+    "file": "ios/GrapMail/AccountRecoveryViews.swift"
+  },
+  {
+    "key": "SMS code",
+    "comment": "Phone verification step 2 label",
+    "file": "ios/GrapMail/AccountRecoveryViews.swift"
+  },
+  {
+    "key": "6-digit SMS code",
+    "comment": "Text field placeholder (phone verify screen)",
+    "file": "ios/GrapMail/AccountRecoveryViews.swift"
+  },
+  {
+    "key": "Verification code",
+    "comment": "Accessibility label (phone verify screen)",
+    "file": "ios/GrapMail/AccountRecoveryViews.swift"
+  },
+  {
+    "key": "Send Verification Code",
+    "comment": "Button title (phone verify screen)",
+    "file": "ios/GrapMail/AccountRecoveryViews.swift"
+  },
+  {
+    "key": "Your phone number is only used for security purposes and won't be shared with anyone.",
+    "comment": "Footer note (phone verify screen)",
+    "file": "ios/GrapMail/AccountRecoveryViews.swift"
+  },
+  {
+    "key": "Verify & Continue",
+    "comment": "Button title (phone verify screen)",
+    "file": "ios/GrapMail/AccountRecoveryViews.swift"
+  },
+  {
+    "key": "If the text message hasn’t arrived, you can request another code after one minute.",
+    "comment": "Footer note (phone verify screen)",
+    "file": "ios/GrapMail/AccountRecoveryViews.swift"
+  },
+  {
+    "key": "%@ %@ %@",
+    "comment": "Country picker row: flag, country name and dialling code. Do not translate.",
+    "file": "ios/GrapMail/AccountRecoveryViews.swift"
+  },
+  {
+    "key": "01XXXXXXXXX",
+    "comment": "Text field placeholder (phone verify screen)",
+    "file": "ios/GrapMail/AccountRecoveryViews.swift"
+  },
+  {
+    "key": "Enter a valid phone number.",
+    "comment": "Phone verification error",
+    "file": "ios/GrapMail/AccountRecoveryViews.swift"
+  },
+  {
+    "key": "We couldn't send a code to that number.",
+    "comment": "Phone verification error",
+    "file": "ios/GrapMail/AccountRecoveryViews.swift"
+  },
+  {
+    "key": "That number is already linked to another account.",
+    "comment": "Phone verification error",
+    "file": "ios/GrapMail/AccountRecoveryViews.swift"
+  },
+  {
+    "key": "We couldn't send your code. Try again.",
+    "comment": "Error message shown when the server gives no reason (phone verify screen)",
+    "file": "ios/GrapMail/AccountRecoveryViews.swift"
+  },
+  {
+    "key": "Sign in first so the number can be saved to your account.",
+    "comment": "Phone verification error",
+    "file": "ios/GrapMail/AccountRecoveryViews.swift"
+  },
+  {
+    "key": "That code is not correct.",
+    "comment": "Verification code error",
+    "file": "ios/GrapMail/AccountRecoveryViews.swift"
+  },
+  {
+    "key": "We couldn't verify that code. Try again.",
+    "comment": "Error message shown when the server gives no reason (phone verify screen)",
+    "file": "ios/GrapMail/AccountRecoveryViews.swift"
+  },
+  {
+    "key": "Phone Verified",
+    "comment": "Status chip (phone verified screen)",
+    "file": "ios/GrapMail/AccountRecoveryViews.swift"
+  },
+  {
+    "key": "Your phone number\nhas been verified!",
+    "comment": "Label (phone verified screen)",
+    "file": "ios/GrapMail/AccountRecoveryViews.swift"
+  },
+  {
+    "key": "Your phone number %@ is now linked to your GrapMail account. You can use it for account recovery and two-step verification.",
+    "comment": "Label (phone verified screen)",
+    "file": "ios/GrapMail/AccountRecoveryViews.swift"
+  },
+  {
+    "key": "Verified Phone Number",
+    "comment": "Label (phone verified screen)",
+    "file": "ios/GrapMail/AccountRecoveryViews.swift"
+  },
+  {
+    "key": "Verified",
+    "comment": "Label (phone verified screen)",
+    "file": "ios/GrapMail/AccountRecoveryViews.swift"
+  },
+  {
+    "key": "Go to Account Security",
+    "comment": "Button title (phone verified screen)",
+    "file": "ios/GrapMail/AccountRecoveryViews.swift"
+  },
+  {
+    "key": "Back to Home",
+    "comment": "Link-style button (phone verified screen)",
+    "file": "ios/GrapMail/AccountRecoveryViews.swift"
+  },
+  {
+    "key": "Your phone number is securely stored and only used for account recovery and two-step verification.",
+    "comment": "Footer note (phone verified screen)",
+    "file": "ios/GrapMail/AccountRecoveryViews.swift"
+  },
+  {
+    "key": "GrapMail Account",
+    "comment": "Label (account switcher screen)",
+    "file": "ios/GrapMail/AccountSwitcher.swift"
+  },
+  {
+    "key": "Hide accounts",
+    "comment": "Label (account switcher screen)",
+    "file": "ios/GrapMail/AccountSwitcher.swift"
+  },
+  {
+    "key": "Show accounts",
+    "comment": "Label (account switcher screen)",
+    "file": "ios/GrapMail/AccountSwitcher.swift"
+  },
+  {
+    "key": "Add another account",
+    "comment": "Account menu item (account switcher screen)",
+    "file": "ios/GrapMail/AccountSwitcher.swift"
+  },
+  {
+    "key": "Profile",
+    "comment": "Account menu item (account switcher screen)",
+    "file": "ios/GrapMail/AccountSwitcher.swift"
+  },
+  {
+    "key": "Settings",
+    "comment": "Account menu item (account switcher screen)",
+    "file": "ios/GrapMail/AccountSwitcher.swift"
+  },
+  {
+    "key": "Sign out",
+    "comment": "Account menu item (account switcher screen)",
+    "file": "ios/GrapMail/AccountSwitcher.swift"
+  },
+  {
+    "key": "%lld unread",
+    "comment": "Accessibility label (account switcher screen)",
+    "file": "ios/GrapMail/AccountSwitcher.swift"
+  },
+  {
+    "key": "Turn on app lock",
+    "comment": "Face ID / passcode prompt reason when enabling app lock",
+    "file": "ios/GrapMail/AppLock.swift"
+  },
+  {
+    "key": "Turn off app lock",
+    "comment": "Face ID / passcode prompt reason when disabling app lock",
+    "file": "ios/GrapMail/AppLock.swift"
+  },
+  {
+    "key": "Unlock GrapMail",
+    "comment": "Face ID / passcode prompt reason when unlocking the app",
+    "file": "ios/GrapMail/AppLock.swift"
+  },
+  {
+    "key": "Cancel",
+    "comment": "Cancel button on the Face ID / passcode prompt",
+    "file": "ios/GrapMail/AppLock.swift"
+  },
+  {
+    "key": "Set a device passcode to use app lock.",
+    "comment": "App lock error when the device has no passcode",
+    "file": "ios/GrapMail/AppLock.swift"
+  },
+  {
+    "key": "GrapMail is locked",
+    "comment": "Label (app lock screen)",
+    "file": "ios/GrapMail/AppLock.swift"
+  },
+  {
+    "key": "Unlock to see your mailbox.",
+    "comment": "Label (app lock screen)",
+    "file": "ios/GrapMail/AppLock.swift"
+  },
+  {
+    "key": "Unlock",
+    "comment": "Label (app lock screen)",
+    "file": "ios/GrapMail/AppLock.swift"
+  },
+  {
+    "key": "App lock",
+    "comment": "Label (app lock settings row)",
+    "file": "ios/GrapMail/AppLock.swift"
+  },
+  {
+    "key": "On — the mailbox needs Face ID when locked",
+    "comment": "App lock settings row status when on",
+    "file": "ios/GrapMail/AppLock.swift"
+  },
+  {
+    "key": "Off — tap to require Face ID or passcode",
+    "comment": "App lock settings row status when off",
+    "file": "ios/GrapMail/AppLock.swift"
+  },
+  {
+    "key": "Could not change app lock.",
+    "comment": "App lock settings row error",
+    "file": "ios/GrapMail/AppLock.swift"
+  },
+  {
+    "key": "Welcome to",
+    "comment": "Label (welcome screen)",
+    "file": "ios/GrapMail/AuthScreens.swift"
+  },
+  {
+    "key": "A faster, safer and more private way to stay connected.",
+    "comment": "Label (welcome screen)",
+    "file": "ios/GrapMail/AuthScreens.swift"
+  },
+  {
+    "key": "Create Account",
+    "comment": "Welcome screen primary button",
+    "file": "ios/GrapMail/AuthScreens.swift"
+  },
+  {
+    "key": "Sign In",
+    "comment": "Welcome screen secondary button",
+    "file": "ios/GrapMail/AuthScreens.swift"
+  },
+  {
+    "key": "By continuing, you agree to our %@\nand %@.",
+    "comment": "Label (welcome screen)",
+    "file": "ios/GrapMail/AuthScreens.swift"
+  },
+  {
+    "key": "Terms of Service",
+    "comment": "Label (welcome screen)",
+    "file": "ios/GrapMail/AuthScreens.swift"
+  },
+  {
+    "key": "Privacy Policy",
+    "comment": "Label (welcome screen)",
+    "file": "ios/GrapMail/AuthScreens.swift"
+  },
+  {
+    "key": "Name",
+    "comment": "Sign-up stepper label: step 1",
+    "file": "ios/GrapMail/Components.swift"
+  },
+  {
+    "key": "Details",
+    "comment": "Sign-up stepper label: step 2",
+    "file": "ios/GrapMail/Components.swift"
+  },
+  {
+    "key": "Address",
+    "comment": "Sign-up stepper label: step 3",
+    "file": "ios/GrapMail/Components.swift"
+  },
+  {
+    "key": "Password",
+    "comment": "Sign-up stepper label: step 4",
+    "file": "ios/GrapMail/Components.swift"
+  },
+  {
+    "key": "Terms",
+    "comment": "Sign-up stepper label: step 5",
+    "file": "ios/GrapMail/Components.swift"
+  },
+  {
+    "key": "%lld",
+    "comment": "A step number inside a circle. Do not translate.",
+    "file": "ios/GrapMail/Components.swift"
+  },
+  {
+    "key": "Hide password",
+    "comment": "Label (text field)",
+    "file": "ios/GrapMail/Components.swift"
+  },
+  {
+    "key": "Show password",
+    "comment": "Label (text field)",
+    "file": "ios/GrapMail/Components.swift"
+  },
+  {
+    "key": "Step %lld of 5",
+    "comment": "Label (sign-up wizard)",
+    "file": "ios/GrapMail/Components.swift"
+  },
+  {
+    "key": "CREATE ACCOUNT",
+    "comment": "Label (sign-up wizard)",
+    "file": "ios/GrapMail/Components.swift"
+  },
+  {
+    "key": "Already have an account?  ",
+    "comment": "Label (sign-up wizard)",
+    "file": "ios/GrapMail/Components.swift"
+  },
+  {
+    "key": "Sign In",
+    "comment": "Label (sign-up wizard)",
+    "file": "ios/GrapMail/Components.swift"
+  },
+  {
+    "key": "Cancel",
+    "comment": "Cancel button on the Face ID / passcode prompt",
+    "file": "ios/GrapMail/DeviceKeyManager.swift"
+  },
+  {
+    "key": "Sign with this device's key",
+    "comment": "Face ID / passcode prompt reason when signing with the device key",
+    "file": "ios/GrapMail/DeviceKeyManager.swift"
+  },
+  {
+    "key": "Device key (biometric lock)",
+    "comment": "Device key status: protected by Face ID / Touch ID",
+    "file": "ios/GrapMail/DeviceKeyManager.swift"
+  },
+  {
+    "key": "Device key (passcode lock)",
+    "comment": "Device key status: protected by the device passcode",
+    "file": "ios/GrapMail/DeviceKeyManager.swift"
+  },
+  {
+    "key": "Device key (no biometric lock)",
+    "comment": "Device key status: not protected by a lock",
+    "file": "ios/GrapMail/DeviceKeyManager.swift"
+  },
+  {
+    "key": "The device key stayed locked.",
+    "comment": "Error when the Face ID / passcode prompt was refused",
+    "file": "ios/GrapMail/DeviceKeyManager.swift"
+  },
+  {
+    "key": "Trusted Devices",
+    "comment": "Screen title (trusted devices screen)",
+    "file": "ios/GrapMail/DeviceSecurityViews.swift"
+  },
+  {
+    "key": "Devices that can sign in to your account with their own key if you ever lose your password.",
+    "comment": "Screen description under the title (trusted devices screen)",
+    "file": "ios/GrapMail/DeviceSecurityViews.swift"
+  },
+  {
+    "key": "Loading devices…",
+    "comment": "Label (trusted devices screen)",
+    "file": "ios/GrapMail/DeviceSecurityViews.swift"
+  },
+  {
+    "key": "Try again",
+    "comment": "Link-style button (trusted devices screen)",
+    "file": "ios/GrapMail/DeviceSecurityViews.swift"
+  },
+  {
+    "key": "No trusted devices are recorded yet. This device is enrolled the first time you sign in.",
+    "comment": "Label (trusted devices screen)",
+    "file": "ios/GrapMail/DeviceSecurityViews.swift"
+  },
+  {
+    "key": "If a device on this list is not yours, revoke it immediately — a trusted device can reset your password without a code.",
+    "comment": "Label (trusted devices screen)",
+    "file": "ios/GrapMail/DeviceSecurityViews.swift"
+  },
+  {
+    "key": "Revoking a device stops its recovery key from working and removes its push registration.",
+    "comment": "Footer note (trusted devices screen)",
+    "file": "ios/GrapMail/DeviceSecurityViews.swift"
+  },
+  {
+    "key": "Revoke %@?",
+    "comment": "Label (trusted devices screen)",
+    "file": "ios/GrapMail/DeviceSecurityViews.swift"
+  },
+  {
+    "key": "Revoke this device?",
+    "comment": "Label (trusted devices screen)",
+    "file": "ios/GrapMail/DeviceSecurityViews.swift"
+  },
+  {
+    "key": "Cancel",
+    "comment": "Button (trusted devices screen)",
+    "file": "ios/GrapMail/DeviceSecurityViews.swift"
+  },
+  {
+    "key": "Revoke Device",
+    "comment": "Button (trusted devices screen)",
+    "file": "ios/GrapMail/DeviceSecurityViews.swift"
+  },
+  {
+    "key": "This device will no longer be able to reset your password with its key. This cannot be undone from here.",
+    "comment": "Label (trusted devices screen)",
+    "file": "ios/GrapMail/DeviceSecurityViews.swift"
+  },
+  {
+    "key": "Could not load the device list. Try again.",
+    "comment": "Error message shown when the server gives no reason (trusted devices screen)",
+    "file": "ios/GrapMail/DeviceSecurityViews.swift"
+  },
+  {
+    "key": "The device could not be revoked. Try again.",
+    "comment": "Error message shown when the server gives no reason (trusted devices screen)",
+    "file": "ios/GrapMail/DeviceSecurityViews.swift"
+  },
+  {
+    "key": "Device",
+    "comment": "Trusted device card: platform when it is not known",
+    "file": "ios/GrapMail/DeviceSecurityViews.swift"
+  },
+  {
+    "key": "Unknown device",
+    "comment": "Session card title when the device name is not known",
+    "file": "ios/GrapMail/DeviceSecurityViews.swift"
+  },
+  {
+    "key": "This device",
+    "comment": "Label (trusted device card)",
+    "file": "ios/GrapMail/DeviceSecurityViews.swift"
+  },
+  {
+    "key": "Revoked",
+    "comment": "Label (trusted device card)",
+    "file": "ios/GrapMail/DeviceSecurityViews.swift"
+  },
+  {
+    "key": "Trusted",
+    "comment": "Label (trusted device card)",
+    "file": "ios/GrapMail/DeviceSecurityViews.swift"
+  },
+  {
+    "key": "·",
+    "comment": "Label (trusted device card)",
+    "file": "ios/GrapMail/DeviceSecurityViews.swift"
+  },
+  {
+    "key": "Last seen %@",
+    "comment": "Trusted device card; the argument is a date and time",
+    "file": "ios/GrapMail/DeviceSecurityViews.swift"
+  },
+  {
+    "key": "Revoke this device",
+    "comment": "Label (trusted device card)",
+    "file": "ios/GrapMail/DeviceSecurityViews.swift"
+  },
+  {
+    "key": "Your Recovery Codes",
+    "comment": "Screen title (recovery codes screen)",
+    "file": "ios/GrapMail/DeviceSecurityViews.swift"
+  },
+  {
+    "key": "Account Recovery Codes",
+    "comment": "Screen title (recovery codes screen)",
+    "file": "ios/GrapMail/DeviceSecurityViews.swift"
+  },
+  {
+    "key": "Store these codes somewhere safe. They won't be shown again.",
+    "comment": "Screen description under the title (recovery codes screen)",
+    "file": "ios/GrapMail/DeviceSecurityViews.swift"
+  },
+  {
+    "key": "One-time codes that sign you back in if you lose every trusted device and your password.",
+    "comment": "Screen description under the title (recovery codes screen)",
+    "file": "ios/GrapMail/DeviceSecurityViews.swift"
+  },
+  {
+    "key": "Done",
+    "comment": "Button title (recovery codes screen)",
+    "file": "ios/GrapMail/DeviceSecurityViews.swift"
+  },
+  {
+    "key": "Each code can be used once. Generating new codes retires every code on this list.",
+    "comment": "Footer note (recovery codes screen)",
+    "file": "ios/GrapMail/DeviceSecurityViews.swift"
+  },
+  {
+    "key": "Generate New Codes",
+    "comment": "Button title (recovery codes screen)",
+    "file": "ios/GrapMail/DeviceSecurityViews.swift"
+  },
+  {
+    "key": "Generate Codes",
+    "comment": "Button title (recovery codes screen)",
+    "file": "ios/GrapMail/DeviceSecurityViews.swift"
+  },
+  {
+    "key": "Generating a new set retires every code you have saved.",
+    "comment": "Footer note (recovery codes screen)",
+    "file": "ios/GrapMail/DeviceSecurityViews.swift"
+  },
+  {
+    "key": "Generate a set and keep it with the documents you would reach for in an emergency.",
+    "comment": "Footer note (recovery codes screen)",
+    "file": "ios/GrapMail/DeviceSecurityViews.swift"
+  },
+  {
+    "key": "These codes will not be shown again",
+    "comment": "Alert title (recovery codes screen)",
+    "file": "ios/GrapMail/DeviceSecurityViews.swift"
+  },
+  {
+    "key": "Leave anyway",
+    "comment": "Button (recovery codes screen)",
+    "file": "ios/GrapMail/DeviceSecurityViews.swift"
+  },
+  {
+    "key": "Stay",
+    "comment": "Button (recovery codes screen)",
+    "file": "ios/GrapMail/DeviceSecurityViews.swift"
+  },
+  {
+    "key": "Leave now and the list is gone. You can generate a new set later, but the old codes stop working.",
+    "comment": "Label (recovery codes screen)",
+    "file": "ios/GrapMail/DeviceSecurityViews.swift"
+  },
+  {
+    "key": "Checking for saved codes…",
+    "comment": "Label (recovery codes screen)",
+    "file": "ios/GrapMail/DeviceSecurityViews.swift"
+  },
+  {
+    "key": "You have unused recovery codes saved.",
+    "comment": "Label (recovery codes screen)",
+    "file": "ios/GrapMail/DeviceSecurityViews.swift"
+  },
+  {
+    "key": "No unused recovery codes on this account.",
+    "comment": "Label (recovery codes screen)",
+    "file": "ios/GrapMail/DeviceSecurityViews.swift"
+  },
+  {
+    "key": "A code is spent the moment it signs you in. Anyone holding an unused code can pass recovery, so the list belongs somewhere only you can reach.",
+    "comment": "Label (recovery codes screen)",
+    "file": "ios/GrapMail/DeviceSecurityViews.swift"
+  },
+  {
+    "key": "Copied",
+    "comment": "Label (recovery codes screen)",
+    "file": "ios/GrapMail/DeviceSecurityViews.swift"
+  },
+  {
+    "key": "Copy all",
+    "comment": "Label (recovery codes screen)",
+    "file": "ios/GrapMail/DeviceSecurityViews.swift"
+  },
+  {
+    "key": "I have saved these codes somewhere safe.",
+    "comment": "Label (recovery codes screen)",
+    "file": "ios/GrapMail/DeviceSecurityViews.swift"
+  },
+  {
+    "key": "Could not check the codes. Try again.",
+    "comment": "Error message shown when the server gives no reason (recovery codes screen)",
+    "file": "ios/GrapMail/DeviceSecurityViews.swift"
+  },
+  {
+    "key": "Sign in again.",
+    "comment": "Message (recovery codes screen)",
+    "file": "ios/GrapMail/DeviceSecurityViews.swift"
+  },
+  {
+    "key": "Could not generate codes. Try again.",
+    "comment": "Error message shown when the server gives no reason (recovery codes screen)",
+    "file": "ios/GrapMail/DeviceSecurityViews.swift"
+  },
+  {
+    "key": "New mail alerts",
+    "comment": "Notification preference title",
+    "file": "ios/GrapMail/DeviceSecurityViews.swift"
+  },
+  {
+    "key": "Security alerts",
+    "comment": "Notification preference title",
+    "file": "ios/GrapMail/DeviceSecurityViews.swift"
+  },
+  {
+    "key": "Account alerts",
+    "comment": "Notification preference title",
+    "file": "ios/GrapMail/DeviceSecurityViews.swift"
+  },
+  {
+    "key": "When a new message reaches the inbox",
+    "comment": "Notification preference description",
+    "file": "ios/GrapMail/DeviceSecurityViews.swift"
+  },
+  {
+    "key": "Sign-ins, blocks and recovery on the account",
+    "comment": "Notification preference description",
+    "file": "ios/GrapMail/DeviceSecurityViews.swift"
+  },
+  {
+    "key": "Profile and account changes",
+    "comment": "Notification preference description",
+    "file": "ios/GrapMail/DeviceSecurityViews.swift"
+  },
+  {
+    "key": "Notification Preferences",
+    "comment": "Screen title (notification preferences screen)",
+    "file": "ios/GrapMail/DeviceSecurityViews.swift"
+  },
+  {
+    "key": "Choose which alerts reach this account and when the mail ones go quiet.",
+    "comment": "Screen description under the title (notification preferences screen)",
+    "file": "ios/GrapMail/DeviceSecurityViews.swift"
+  },
+  {
+    "key": "Loading preferences…",
+    "comment": "Label (notification preferences screen)",
+    "file": "ios/GrapMail/DeviceSecurityViews.swift"
+  },
+  {
+    "key": "We couldn't load your notification preferences.",
+    "comment": "Label (notification preferences screen)",
+    "file": "ios/GrapMail/DeviceSecurityViews.swift"
+  },
+  {
+    "key": "Alerts",
+    "comment": "Label (notification preferences screen)",
+    "file": "ios/GrapMail/DeviceSecurityViews.swift"
+  },
+  {
+    "key": "Security alerts ignore quiet hours by design — a sign-in the account did not make is never held until morning.",
+    "comment": "Label (notification preferences screen)",
+    "file": "ios/GrapMail/DeviceSecurityViews.swift"
+  },
+  {
+    "key": "Preferences apply to this account on every signed-in device.",
+    "comment": "Footer note (notification preferences screen)",
+    "file": "ios/GrapMail/DeviceSecurityViews.swift"
+  },
+  {
+    "key": "Quiet hours",
+    "comment": "Switch label (notification preferences screen)",
+    "file": "ios/GrapMail/DeviceSecurityViews.swift"
+  },
+  {
+    "key": "From",
+    "comment": "Label (notification preferences screen)",
+    "file": "ios/GrapMail/DeviceSecurityViews.swift"
+  },
+  {
+    "key": "Until",
+    "comment": "Label (notification preferences screen)",
+    "file": "ios/GrapMail/DeviceSecurityViews.swift"
+  },
+  {
+    "key": "Mail alerts hold until the window ends. Security alerts do not.",
+    "comment": "Label (notification preferences screen)",
+    "file": "ios/GrapMail/DeviceSecurityViews.swift"
+  },
+  {
+    "key": "Could not load the preferences. Try again.",
+    "comment": "Error message shown when the server gives no reason (notification preferences screen)",
+    "file": "ios/GrapMail/DeviceSecurityViews.swift"
+  },
+  {
+    "key": "The preference was not saved. Try again.",
+    "comment": "Message (notification preferences screen)",
+    "file": "ios/GrapMail/DeviceSecurityViews.swift"
+  },
+  {
+    "key": "Quiet hours were not saved. Try again.",
+    "comment": "Error message shown when the server gives no reason (notification preferences screen)",
+    "file": "ios/GrapMail/DeviceSecurityViews.swift"
+  },
+  {
+    "key": "Forgot password",
+    "comment": "Small label above the screen title (trusted device recovery screen)",
+    "file": "ios/GrapMail/DeviceSecurityViews.swift"
+  },
+  {
+    "key": "Verify with this device",
+    "comment": "Screen title (trusted device recovery screen)",
+    "file": "ios/GrapMail/DeviceSecurityViews.swift"
+  },
+  {
+    "key": "Set a new password",
+    "comment": "Screen title (trusted device recovery screen)",
+    "file": "ios/GrapMail/DeviceSecurityViews.swift"
+  },
+  {
+    "key": "This device holds a key your account trusts. We'll use it to verify you — no code needed.",
+    "comment": "Screen description under the title (trusted device recovery screen)",
+    "file": "ios/GrapMail/DeviceSecurityViews.swift"
+  },
+  {
+    "key": "Your device is verified. Choose a new password for your account.",
+    "comment": "Screen description under the title (trusted device recovery screen)",
+    "file": "ios/GrapMail/DeviceSecurityViews.swift"
+  },
+  {
+    "key": "Reset Password",
+    "comment": "Button title (trusted device recovery screen)",
+    "file": "ios/GrapMail/DeviceSecurityViews.swift"
+  },
+  {
+    "key": "Use the code instead",
+    "comment": "Link-style button (trusted device recovery screen)",
+    "file": "ios/GrapMail/DeviceSecurityViews.swift"
+  },
+  {
+    "key": "The device key proves it's you. The new password still follows every rule the reset flow checks.",
+    "comment": "Footer note (trusted device recovery screen)",
+    "file": "ios/GrapMail/DeviceSecurityViews.swift"
+  },
+  {
+    "key": "Signing with this device's key",
+    "comment": "Label (trusted device recovery screen)",
+    "file": "ios/GrapMail/DeviceSecurityViews.swift"
+  },
+  {
+    "key": "One moment…",
+    "comment": "Label (trusted device recovery screen)",
+    "file": "ios/GrapMail/DeviceSecurityViews.swift"
+  },
+  {
+    "key": "Ready to verify",
+    "comment": "Label (trusted device recovery screen)",
+    "file": "ios/GrapMail/DeviceSecurityViews.swift"
+  },
+  {
+    "key": "GrapMail address",
+    "comment": "Text field placeholder (trusted device recovery screen)",
+    "file": "ios/GrapMail/DeviceSecurityViews.swift"
+  },
+  {
+    "key": "Verify This Device",
+    "comment": "Button title (trusted device recovery screen)",
+    "file": "ios/GrapMail/DeviceSecurityViews.swift"
+  },
+  {
+    "key": "New password",
+    "comment": "Text field placeholder (trusted device recovery screen)",
+    "file": "ios/GrapMail/DeviceSecurityViews.swift"
+  },
+  {
+    "key": "Confirm new password",
+    "comment": "Text field placeholder (trusted device recovery screen)",
+    "file": "ios/GrapMail/DeviceSecurityViews.swift"
+  },
+  {
+    "key": "At least 8 characters",
+    "comment": "Password requirement (trusted device recovery screen)",
+    "file": "ios/GrapMail/DeviceSecurityViews.swift"
+  },
+  {
+    "key": "Include a letter",
+    "comment": "Password requirement (trusted device recovery screen)",
+    "file": "ios/GrapMail/DeviceSecurityViews.swift"
+  },
+  {
+    "key": "Include a number",
+    "comment": "Password requirement (trusted device recovery screen)",
+    "file": "ios/GrapMail/DeviceSecurityViews.swift"
+  },
+  {
+    "key": "Include a special character",
+    "comment": "Password requirement (trusted device recovery screen)",
+    "file": "ios/GrapMail/DeviceSecurityViews.swift"
+  },
+  {
+    "key": "Not commonly used",
+    "comment": "Password requirement (trusted device recovery screen)",
+    "file": "ios/GrapMail/DeviceSecurityViews.swift"
+  },
+  {
+    "key": "Both passwords must match.",
+    "comment": "Label (trusted device recovery screen)",
+    "file": "ios/GrapMail/DeviceSecurityViews.swift"
+  },
+  {
+    "key": "Recovery is not available for this account right now.",
+    "comment": "Message (trusted device recovery screen)",
+    "file": "ios/GrapMail/DeviceSecurityViews.swift"
+  },
+  {
+    "key": "This device cannot prove custody of its key. Reset with a code instead.",
+    "comment": "Message (trusted device recovery screen)",
+    "file": "ios/GrapMail/DeviceSecurityViews.swift"
+  },
+  {
+    "key": "Recovery proof was not accepted. This device may not be trusted for that account.",
+    "comment": "Message (trusted device recovery screen)",
+    "file": "ios/GrapMail/DeviceSecurityViews.swift"
+  },
+  {
+    "key": "Could not verify this device. Try again.",
+    "comment": "Error message shown when the server gives no reason (trusted device recovery screen)",
+    "file": "ios/GrapMail/DeviceSecurityViews.swift"
+  },
+  {
+    "key": "That recovery grant is not valid. Start again.",
+    "comment": "Message (trusted device recovery screen)",
+    "file": "ios/GrapMail/DeviceSecurityViews.swift"
+  },
+  {
+    "key": "That recovery grant is not valid.",
+    "comment": "Message (trusted device recovery screen)",
+    "file": "ios/GrapMail/DeviceSecurityViews.swift"
+  },
+  {
+    "key": "Use at least 8 characters with a letter, a number and a symbol.",
+    "comment": "Error message shown when the server gives no reason (trusted device recovery screen)",
+    "file": "ios/GrapMail/DeviceSecurityViews.swift"
+  },
+  {
+    "key": "We could not reset the password. Try again.",
+    "comment": "Error message shown when the server gives no reason (trusted device recovery screen)",
+    "file": "ios/GrapMail/DeviceSecurityViews.swift"
+  },
+  {
+    "key": "Unlock your key first: the recovery kit is made from it.",
+    "comment": "End-to-end encryption status note",
+    "file": "ios/GrapMail/E2eModel.swift"
+  },
+  {
+    "key": "The recovery kit was not saved.",
+    "comment": "End-to-end encryption status note",
+    "file": "ios/GrapMail/E2eModel.swift"
+  },
+  {
+    "key": "The recovery key was removed. Keep this device safe: it now holds the only copy of your key.",
+    "comment": "End-to-end encryption status note",
+    "file": "ios/GrapMail/E2eModel.swift"
+  },
+  {
+    "key": "The recovery kit was not removed.",
+    "comment": "End-to-end encryption status note",
+    "file": "ios/GrapMail/E2eModel.swift"
+  },
+  {
+    "key": "Use at least %lld characters for the passphrase.",
+    "comment": "End-to-end encryption status note",
+    "file": "ios/GrapMail/E2eModel.swift"
+  },
+  {
+    "key": "The two passphrases do not match.",
+    "comment": "End-to-end encryption status note",
+    "file": "ios/GrapMail/E2eModel.swift"
+  },
+  {
+    "key": "That recovery key is not valid. It has 28 letters and numbers.",
+    "comment": "End-to-end encryption status note",
+    "file": "ios/GrapMail/E2eModel.swift"
+  },
+  {
+    "key": "There is no recovery kit for this account.",
+    "comment": "End-to-end encryption status note",
+    "file": "ios/GrapMail/E2eModel.swift"
+  },
+  {
+    "key": "Your key is back on this device and unlocked. Encrypted mail opens here again.",
+    "comment": "End-to-end encryption status note",
+    "file": "ios/GrapMail/E2eModel.swift"
+  },
+  {
+    "key": "The key directory did not answer.",
+    "comment": "End-to-end encryption: error reading the published key",
+    "file": "ios/GrapMail/E2eModel.swift"
+  },
+  {
+    "key": "Encryption is on. Your key is private to this device until you publish it.",
+    "comment": "End-to-end encryption status note",
+    "file": "ios/GrapMail/E2eModel.swift"
+  },
+  {
+    "key": "Encryption is on, and your key is published so others can find it.",
+    "comment": "End-to-end encryption status note",
+    "file": "ios/GrapMail/E2eModel.swift"
+  },
+  {
+    "key": "Your key is saved on this device and stored on the server, but it is not findable by senders yet. That happens when the mailbox is not active. Mail sent to you stays unencrypted until that is fixed.",
+    "comment": "End-to-end encryption status note",
+    "file": "ios/GrapMail/E2eModel.swift"
+  },
+  {
+    "key": "The directory refused those keys.",
+    "comment": "End-to-end encryption status note",
+    "file": "ios/GrapMail/E2eModel.swift"
+  },
+  {
+    "key": "Unpublished. New mail to you will not be encrypted. Messages already encrypted stay readable on this device.",
+    "comment": "End-to-end encryption status note",
+    "file": "ios/GrapMail/E2eModel.swift"
+  },
+  {
+    "key": "The directory did not remove the key.",
+    "comment": "End-to-end encryption status note",
+    "file": "ios/GrapMail/E2eModel.swift"
+  },
+  {
+    "key": "Unlocked for this session. It locks again when the app is closed.",
+    "comment": "End-to-end encryption status note",
+    "file": "ios/GrapMail/E2eModel.swift"
+  },
+  {
+    "key": "Locked.",
+    "comment": "End-to-end encryption status note",
+    "file": "ios/GrapMail/E2eModel.swift"
+  },
+  {
+    "key": "Use at least %lld characters for the new passphrase.",
+    "comment": "End-to-end encryption status note",
+    "file": "ios/GrapMail/E2eModel.swift"
+  },
+  {
+    "key": "This device would not store the updated key.",
+    "comment": "End-to-end encryption error when saving the re-encrypted key fails",
+    "file": "ios/GrapMail/E2eModel.swift"
+  },
+  {
+    "key": "Passphrase changed. The key itself is unchanged, so old messages still open.",
+    "comment": "End-to-end encryption status note",
+    "file": "ios/GrapMail/E2eModel.swift"
+  },
+  {
+    "key": "The key has been removed from this device. Any message encrypted to it can no longer be read here.",
+    "comment": "End-to-end encryption status note",
+    "file": "ios/GrapMail/E2eModel.swift"
+  },
+  {
+    "key": "The directory did not answer.",
+    "comment": "End-to-end encryption status note",
+    "file": "ios/GrapMail/E2eModel.swift"
+  },
+  {
+    "key": "Your key is locked — unlock it before sending encrypted mail.",
+    "comment": "End-to-end encryption status note",
+    "file": "ios/GrapMail/E2eModel.swift"
+  },
+  {
+    "key": "This device has no key to open messages with.",
+    "comment": "End-to-end encryption status note",
+    "file": "ios/GrapMail/E2eModel.swift"
+  },
+  {
+    "key": "OpenPGP export lives on the web client — this device holds the key, but the gpg-shaped file is built in the browser. Nothing here is missing from your key; it is one action the phone does not offer.",
+    "comment": "End-to-end encryption: why there is no OpenPGP export on the phone",
+    "file": "ios/GrapMail/E2eModel.swift"
+  },
+  {
+    "key": "That did not go through.",
+    "comment": "End-to-end encryption status note",
+    "file": "ios/GrapMail/E2eModel.swift"
+  },
+  {
+    "key": "Encryption",
+    "comment": "Screen title (end-to-end encryption status screen)",
+    "file": "ios/GrapMail/E2eViews.swift"
+  },
+  {
+    "key": "Checking this device…",
+    "comment": "Label (end-to-end encryption status screen)",
+    "file": "ios/GrapMail/E2eViews.swift"
+  },
+  {
+    "key": "Encryption is not available on this device",
+    "comment": "Card title (end-to-end encryption status screen)",
+    "file": "ios/GrapMail/E2eViews.swift"
+  },
+  {
+    "key": "Nothing is wrong with your account. Your mail is unaffected; it simply cannot be encrypted from here.",
+    "comment": "Explanatory paragraph (end-to-end encryption status screen)",
+    "file": "ios/GrapMail/E2eViews.swift"
+  },
+  {
+    "key": "Create my key",
+    "comment": "Button title (end-to-end encryption status screen)",
+    "file": "ios/GrapMail/E2eViews.swift"
+  },
+  {
+    "key": "Unlock",
+    "comment": "Button title (end-to-end encryption status screen)",
+    "file": "ios/GrapMail/E2eViews.swift"
+  },
+  {
+    "key": "Lock now",
+    "comment": "Button title (end-to-end encryption status screen)",
+    "file": "ios/GrapMail/E2eViews.swift"
+  },
+  {
+    "key": "Restore your key from your recovery key",
+    "comment": "Card title (end-to-end encryption status screen)",
+    "file": "ios/GrapMail/E2eViews.swift"
+  },
+  {
+    "key": "A recovery kit for this account is stored, locked with your recovery key. Enter it to put your key back on this device and read your encrypted mail again.",
+    "comment": "Explanatory paragraph (end-to-end encryption status screen)",
+    "file": "ios/GrapMail/E2eViews.swift"
+  },
+  {
+    "key": "Use my recovery key",
+    "comment": "Button title (end-to-end encryption status screen)",
+    "file": "ios/GrapMail/E2eViews.swift"
+  },
+  {
+    "key": "Recovery key",
+    "comment": "Card title (end-to-end encryption status screen)",
+    "file": "ios/GrapMail/E2eViews.swift"
+  },
+  {
+    "key": "Replace the recovery key",
+    "comment": "Button title (end-to-end encryption status screen)",
+    "file": "ios/GrapMail/E2eViews.swift"
+  },
+  {
+    "key": "Create a recovery key",
+    "comment": "Button title (end-to-end encryption status screen)",
+    "file": "ios/GrapMail/E2eViews.swift"
+  },
+  {
+    "key": "Unlock your key to replace the recovery key.",
+    "comment": "End-to-end encryption recovery key card",
+    "file": "ios/GrapMail/E2eViews.swift"
+  },
+  {
+    "key": "Unlock your key to create the recovery key.",
+    "comment": "End-to-end encryption recovery key card",
+    "file": "ios/GrapMail/E2eViews.swift"
+  },
+  {
+    "key": "Remove the recovery key",
+    "comment": "Button title (end-to-end encryption status screen)",
+    "file": "ios/GrapMail/E2eViews.swift"
+  },
+  {
+    "key": "Fingerprint",
+    "comment": "Key detail row label (end-to-end encryption status screen)",
+    "file": "ios/GrapMail/E2eViews.swift"
+  },
+  {
+    "key": "Key details",
+    "comment": "Button title (end-to-end encryption status screen)",
+    "file": "ios/GrapMail/E2eViews.swift"
+  },
+  {
+    "key": "Who can find your key",
+    "comment": "Button title (end-to-end encryption status screen)",
+    "file": "ios/GrapMail/E2eViews.swift"
+  },
+  {
+    "key": "Change passphrase",
+    "comment": "Button title (end-to-end encryption status screen)",
+    "file": "ios/GrapMail/E2eViews.swift"
+  },
+  {
+    "key": "Recipient keys",
+    "comment": "Button title (end-to-end encryption status screen)",
+    "file": "ios/GrapMail/E2eViews.swift"
+  },
+  {
+    "key": "Remove the key from this device",
+    "comment": "Button title (end-to-end encryption status screen)",
+    "file": "ios/GrapMail/E2eViews.swift"
+  },
+  {
+    "key": "Your recovery key",
+    "comment": "Alert title (end-to-end encryption status screen)",
+    "file": "ios/GrapMail/E2eViews.swift"
+  },
+  {
+    "key": "Copy",
+    "comment": "Button (end-to-end encryption status screen)",
+    "file": "ios/GrapMail/E2eViews.swift"
+  },
+  {
+    "key": "I have saved it",
+    "comment": "Button (end-to-end encryption status screen)",
+    "file": "ios/GrapMail/E2eViews.swift"
+  },
+  {
+    "key": "%@\n\nWrite it down or keep it in a password manager. GrapMail cannot show it again, and without it a lost device means lost encrypted mail. A copied key leaves the clipboard after two minutes.",
+    "comment": "Label (end-to-end encryption status screen)",
+    "file": "ios/GrapMail/E2eViews.swift"
+  },
+  {
+    "key": "Remove the recovery key?",
+    "comment": "Alert title (end-to-end encryption status screen)",
+    "file": "ios/GrapMail/E2eViews.swift"
+  },
+  {
+    "key": "Remove",
+    "comment": "Button (end-to-end encryption status screen)",
+    "file": "ios/GrapMail/E2eViews.swift"
+  },
+  {
+    "key": "Keep it",
+    "comment": "Button (end-to-end encryption status screen)",
+    "file": "ios/GrapMail/E2eViews.swift"
+  },
+  {
+    "key": "If you then lose this device, your encrypted mail cannot be recovered anywhere.",
+    "comment": "Label (end-to-end encryption status screen)",
+    "file": "ios/GrapMail/E2eViews.swift"
+  },
+  {
+    "key": "Checking whether a recovery key is set up…",
+    "comment": "End-to-end encryption recovery key status",
+    "file": "ios/GrapMail/E2eViews.swift"
+  },
+  {
+    "key": "Set up on %@. If you lose this device, it restores your key on a new one.",
+    "comment": "End-to-end encryption recovery key status; the argument is a date and time",
+    "file": "ios/GrapMail/E2eViews.swift"
+  },
+  {
+    "key": "Set up. If you lose this device, it restores your key on a new one.",
+    "comment": "End-to-end encryption recovery key status when the date is unknown",
+    "file": "ios/GrapMail/E2eViews.swift"
+  },
+  {
+    "key": "Not set up. If you lose this device, your encrypted mail cannot be recovered.",
+    "comment": "End-to-end encryption recovery key status",
+    "file": "ios/GrapMail/E2eViews.swift"
+  },
+  {
+    "key": "Your key is unlocked for this session",
+    "comment": "End-to-end encryption status headline",
+    "file": "ios/GrapMail/E2eViews.swift"
+  },
+  {
+    "key": "Your key is locked",
+    "comment": "End-to-end encryption status headline",
+    "file": "ios/GrapMail/E2eViews.swift"
+  },
+  {
+    "key": "Encryption is not set up on this device",
+    "comment": "End-to-end encryption status headline",
+    "file": "ios/GrapMail/E2eViews.swift"
+  },
+  {
+    "key": "It is held in memory only and is never written down. Closing the app locks it.",
+    "comment": "End-to-end encryption status explanation",
+    "file": "ios/GrapMail/E2eViews.swift"
+  },
+  {
+    "key": "It locks again whenever the app is closed. Unlock it to send or read encrypted mail.",
+    "comment": "End-to-end encryption status explanation",
+    "file": "ios/GrapMail/E2eViews.swift"
+  },
+  {
+    "key": "Without a key, mail to you cannot be encrypted and encrypted mail cannot be read here.",
+    "comment": "End-to-end encryption status explanation",
+    "file": "ios/GrapMail/E2eViews.swift"
+  },
+  {
+    "key": "Create your key",
+    "comment": "Screen title (end-to-end encryption setup screen)",
+    "file": "ios/GrapMail/E2eViews.swift"
+  },
+  {
+    "key": "The key is made here, on this device. The private half never leaves it: that is what makes this end-to-end rather than a promise. It is stored encrypted under a passphrase you choose.",
+    "comment": "Explanatory paragraph (end-to-end encryption setup screen)",
+    "file": "ios/GrapMail/E2eViews.swift"
+  },
+  {
+    "key": "There is no way to recover a forgotten passphrase.",
+    "comment": "Label (end-to-end encryption setup screen)",
+    "file": "ios/GrapMail/E2eViews.swift"
+  },
+  {
+    "key": "Not by us, and not by you. After setup you can create a recovery key: it restores your key on a new device with a new passphrase. Without the passphrase or the recovery key, nobody can open your encrypted mail, us included.",
+    "comment": "Explanatory paragraph (end-to-end encryption setup screen)",
+    "file": "ios/GrapMail/E2eViews.swift"
+  },
+  {
+    "key": "Passphrase",
+    "comment": "Text field label (end-to-end encryption setup screen)",
+    "file": "ios/GrapMail/E2eViews.swift"
+  },
+  {
+    "key": "Repeat passphrase",
+    "comment": "Text field label (end-to-end encryption setup screen)",
+    "file": "ios/GrapMail/E2eViews.swift"
+  },
+  {
+    "key": "✓",
+    "comment": "Label (end-to-end encryption setup screen)",
+    "file": "ios/GrapMail/E2eViews.swift"
+  },
+  {
+    "key": "Publish the public half, so other people can send me encrypted mail.",
+    "comment": "Label (end-to-end encryption setup screen)",
+    "file": "ios/GrapMail/E2eViews.swift"
+  },
+  {
+    "key": "This shares your public key. Your private key is not shared, and never leaves this device.",
+    "comment": "Label (end-to-end encryption setup screen)",
+    "file": "ios/GrapMail/E2eViews.swift"
+  },
+  {
+    "key": "Creating…",
+    "comment": "Button title (end-to-end encryption setup screen)",
+    "file": "ios/GrapMail/E2eViews.swift"
+  },
+  {
+    "key": "Unlock your key",
+    "comment": "Screen title (end-to-end encryption unlock screen)",
+    "file": "ios/GrapMail/E2eViews.swift"
+  },
+  {
+    "key": "Your passphrase decrypts the key on this device. It is never sent anywhere.",
+    "comment": "Explanatory paragraph (end-to-end encryption unlock screen)",
+    "file": "ios/GrapMail/E2eViews.swift"
+  },
+  {
+    "key": "Unlocking…",
+    "comment": "Button title (end-to-end encryption unlock screen)",
+    "file": "ios/GrapMail/E2eViews.swift"
+  },
+  {
+    "key": "This device's key",
+    "comment": "Screen title (end-to-end encryption details screen)",
+    "file": "ios/GrapMail/E2eViews.swift"
+  },
+  {
+    "key": "Read the fingerprint aloud, or send it through another channel, and have the other person confirm it. If the two do not match, the key you have is not theirs.",
+    "comment": "Explanatory paragraph (end-to-end encryption details screen)",
+    "file": "ios/GrapMail/E2eViews.swift"
+  },
+  {
+    "key": "Created",
+    "comment": "Key detail row label (end-to-end encryption details screen)",
+    "file": "ios/GrapMail/E2eViews.swift"
+  },
+  {
+    "key": "Signing key",
+    "comment": "Key detail row label (end-to-end encryption details screen)",
+    "file": "ios/GrapMail/E2eViews.swift"
+  },
+  {
+    "key": "Yes: recipients can verify it was you",
+    "comment": "Key detail row value (end-to-end encryption details screen)",
+    "file": "ios/GrapMail/E2eViews.swift"
+  },
+  {
+    "key": "None",
+    "comment": "Key detail row value (end-to-end encryption details screen)",
+    "file": "ios/GrapMail/E2eViews.swift"
+  },
+  {
+    "key": "Checking…",
+    "comment": "Label (end-to-end encryption publish screen)",
+    "file": "ios/GrapMail/E2eViews.swift"
+  },
+  {
+    "key": "Your public key is published, so anyone sending you mail can encrypt to it. Your private key is not published and never will be.",
+    "comment": "Explanatory paragraph (end-to-end encryption publish screen)",
+    "file": "ios/GrapMail/E2eViews.swift"
+  },
+  {
+    "key": "Published fingerprint",
+    "comment": "Key detail row label (end-to-end encryption publish screen)",
+    "file": "ios/GrapMail/E2eViews.swift"
+  },
+  {
+    "key": "Updated",
+    "comment": "Key detail row label (end-to-end encryption publish screen)",
+    "file": "ios/GrapMail/E2eViews.swift"
+  },
+  {
+    "key": "The key published for your account is NOT the key on this device. Anyone encrypting to you right now is encrypting to a key this device cannot open. If you did not expect this — for example if you set encryption up on another device — publish from this one, or restore that device's key.",
+    "comment": "Warning note (end-to-end encryption publish screen)",
+    "file": "ios/GrapMail/E2eViews.swift"
+  },
+  {
+    "key": "Unpublish",
+    "comment": "Button title (end-to-end encryption publish screen)",
+    "file": "ios/GrapMail/E2eViews.swift"
+  },
+  {
+    "key": "Nothing is published for this account, so senders cannot encrypt to you yet. Publishing shares only the public half.",
+    "comment": "Explanatory paragraph (end-to-end encryption publish screen)",
+    "file": "ios/GrapMail/E2eViews.swift"
+  },
+  {
+    "key": "Publishing…",
+    "comment": "Button title (end-to-end encryption publish screen)",
+    "file": "ios/GrapMail/E2eViews.swift"
+  },
+  {
+    "key": "Publish my public key",
+    "comment": "Button title (end-to-end encryption publish screen)",
+    "file": "ios/GrapMail/E2eViews.swift"
+  },
+  {
+    "key": "A key on this device comes first — create one from the Encryption screen.",
+    "comment": "Label (end-to-end encryption publish screen)",
+    "file": "ios/GrapMail/E2eViews.swift"
+  },
+  {
+    "key": "Change your passphrase",
+    "comment": "Screen title (end-to-end encryption passphrase screen)",
+    "file": "ios/GrapMail/E2eViews.swift"
+  },
+  {
+    "key": "This re-locks the same key under a new passphrase. It does not change the key, so messages already encrypted to you stay readable.",
+    "comment": "Explanatory paragraph (end-to-end encryption passphrase screen)",
+    "file": "ios/GrapMail/E2eViews.swift"
+  },
+  {
+    "key": "Current passphrase",
+    "comment": "Text field label (end-to-end encryption passphrase screen)",
+    "file": "ios/GrapMail/E2eViews.swift"
+  },
+  {
+    "key": "New passphrase",
+    "comment": "Text field label (end-to-end encryption passphrase screen)",
+    "file": "ios/GrapMail/E2eViews.swift"
+  },
+  {
+    "key": "Changing…",
+    "comment": "Button title (end-to-end encryption passphrase screen)",
+    "file": "ios/GrapMail/E2eViews.swift"
+  },
+  {
+    "key": "Unlocking the key comes first — the re-wrap needs the old passphrase to open it.",
+    "comment": "Label (end-to-end encryption passphrase screen)",
+    "file": "ios/GrapMail/E2eViews.swift"
+  },
+  {
+    "key": "This deletes the private key here. Every message already encrypted to it becomes unreadable — here and anywhere else, permanently. Do this only if you have the key somewhere else, or you accept losing access to that mail.",
+    "comment": "Explanatory paragraph (end-to-end encryption remove screen)",
+    "file": "ios/GrapMail/E2eViews.swift"
+  },
+  {
+    "key": "Remove from this device",
+    "comment": "Button title (end-to-end encryption remove screen)",
+    "file": "ios/GrapMail/E2eViews.swift"
+  },
+  {
+    "key": "Removing…",
+    "comment": "Button title (end-to-end encryption remove screen)",
+    "file": "ios/GrapMail/E2eViews.swift"
+  },
+  {
+    "key": "Yes, delete the key from this device",
+    "comment": "Button title (end-to-end encryption remove screen)",
+    "file": "ios/GrapMail/E2eViews.swift"
+  },
+  {
+    "key": "Check that the people you are about to write to have published keys. A found entry shows the fingerprint to compare; an unavailable one says why, in the directory's own words.",
+    "comment": "Explanatory paragraph (end-to-end encryption recipients screen)",
+    "file": "ios/GrapMail/E2eViews.swift"
+  },
+  {
+    "key": "Check",
+    "comment": "Button title (end-to-end encryption recipients screen)",
+    "file": "ios/GrapMail/E2eViews.swift"
+  },
+  {
+    "key": "Back to compose",
+    "comment": "Button title (end-to-end encryption recipients screen)",
+    "file": "ios/GrapMail/E2eViews.swift"
+  },
+  {
+    "key": "The directory answered nothing for that check.",
+    "comment": "Label (end-to-end encryption recipients screen)",
+    "file": "ios/GrapMail/E2eViews.swift"
+  },
+  {
+    "key": "Found",
+    "comment": "Label (end-to-end encryption recipients screen)",
+    "file": "ios/GrapMail/E2eViews.swift"
+  },
+  {
+    "key": "Cannot encrypt",
+    "comment": "Label (end-to-end encryption recipients screen)",
+    "file": "ios/GrapMail/E2eViews.swift"
+  },
+  {
+    "key": "Signing fingerprint %@",
+    "comment": "Label (end-to-end encryption recipients screen)",
+    "file": "ios/GrapMail/E2eViews.swift"
+  },
+  {
+    "key": "That is not an address the directory can look up.",
+    "comment": "Why a recipient's encryption key could not be found",
+    "file": "ios/GrapMail/E2eViews.swift"
+  },
+  {
+    "key": "Not a GrapMail address — the directory only knows GrapMail keys.",
+    "comment": "Why a recipient's encryption key could not be found",
+    "file": "ios/GrapMail/E2eViews.swift"
+  },
+  {
+    "key": "There is no GrapMail account at that address.",
+    "comment": "Why a recipient's encryption key could not be found",
+    "file": "ios/GrapMail/E2eViews.swift"
+  },
+  {
+    "key": "This person has not published an encryption key yet.",
+    "comment": "Why a recipient's encryption key could not be found",
+    "file": "ios/GrapMail/E2eViews.swift"
+  },
+  {
+    "key": "The directory gave no reason.",
+    "comment": "Why a recipient's encryption key could not be found",
+    "file": "ios/GrapMail/E2eViews.swift"
+  },
+  {
+    "key": "Enter the recovery key you saved when you set it up. It has 28 letters and numbers; dashes and spaces do not matter.",
+    "comment": "Explanatory paragraph (end-to-end encryption restore sheet)",
+    "file": "ios/GrapMail/E2eViews.swift"
+  },
+  {
+    "key": "Then choose a passphrase for this device. It protects the key here, like the one you set the first time.",
+    "comment": "Explanatory paragraph (end-to-end encryption restore sheet)",
+    "file": "ios/GrapMail/E2eViews.swift"
+  },
+  {
+    "key": "Restoring…",
+    "comment": "Button title (end-to-end encryption restore sheet)",
+    "file": "ios/GrapMail/E2eViews.swift"
+  },
+  {
+    "key": "Restore my key",
+    "comment": "Button title (end-to-end encryption restore sheet)",
+    "file": "ios/GrapMail/E2eViews.swift"
+  },
+  {
+    "key": "Restore your key",
+    "comment": "Navigation title (end-to-end encryption restore sheet)",
+    "file": "ios/GrapMail/E2eViews.swift"
+  },
+  {
+    "key": "Cancel",
+    "comment": "Button (end-to-end encryption restore sheet)",
+    "file": "ios/GrapMail/E2eViews.swift"
+  },
+  {
+    "key": "ACCOUNT PROTECTION",
+    "comment": "Label (human verification screen)",
+    "file": "ios/GrapMail/FinishScreens.swift"
+  },
+  {
+    "key": "Just one more step!",
+    "comment": "Label (human verification screen)",
+    "file": "ios/GrapMail/FinishScreens.swift"
+  },
+  {
+    "key": "To keep GrapMail safe and spam-free, we need to make sure you're a real person. Complete the challenge below to continue.",
+    "comment": "Label (human verification screen)",
+    "file": "ios/GrapMail/FinishScreens.swift"
+  },
+  {
+    "key": "Get a new challenge",
+    "comment": "Label (human verification screen)",
+    "file": "ios/GrapMail/FinishScreens.swift"
+  },
+  {
+    "key": "Continue",
+    "comment": "Label (human verification screen)",
+    "file": "ios/GrapMail/FinishScreens.swift"
+  },
+  {
+    "key": "This app is protected by reCAPTCHA and the Google Privacy Policy and Terms of Service apply.",
+    "comment": "Label (human verification screen)",
+    "file": "ios/GrapMail/FinishScreens.swift"
+  },
+  {
+    "key": "🔒",
+    "comment": "Label (human verification screen)",
+    "file": "ios/GrapMail/FinishScreens.swift"
+  },
+  {
+    "key": "Security check",
+    "comment": "Label (human verification screen)",
+    "file": "ios/GrapMail/FinishScreens.swift"
+  },
+  {
+    "key": "Complete the challenge to verify you're a real person.",
+    "comment": "Label (human verification screen)",
+    "file": "ios/GrapMail/FinishScreens.swift"
+  },
+  {
+    "key": "Verified — thank you!",
+    "comment": "Label (human verification screen)",
+    "file": "ios/GrapMail/FinishScreens.swift"
+  },
+  {
+    "key": "Checking…",
+    "comment": "Label (human verification screen)",
+    "file": "ios/GrapMail/FinishScreens.swift"
+  },
+  {
+    "key": "ACCOUNT CREATED",
+    "comment": "Label (account created screen)",
+    "file": "ios/GrapMail/FinishScreens.swift"
+  },
+  {
+    "key": "You're all set!",
+    "comment": "Label (account created screen)",
+    "file": "ios/GrapMail/FinishScreens.swift"
+  },
+  {
+    "key": "Your GrapMail account has been successfully\ncreated and you're now signed in.",
+    "comment": "Label (account created screen)",
+    "file": "ios/GrapMail/FinishScreens.swift"
+  },
+  {
+    "key": "Active",
+    "comment": "Label (account created screen)",
+    "file": "ios/GrapMail/FinishScreens.swift"
+  },
+  {
+    "key": "WHAT'S NEXT?",
+    "comment": "Label (account created screen)",
+    "file": "ios/GrapMail/FinishScreens.swift"
+  },
+  {
+    "key": "Continue to Onboarding",
+    "comment": "Button title (account created screen)",
+    "file": "ios/GrapMail/FinishScreens.swift"
+  },
+  {
+    "key": "We'll take you through a quick setup to get you started.",
+    "comment": "Label (account created screen)",
+    "file": "ios/GrapMail/FinishScreens.swift"
+  },
+  {
+    "key": "Go to Mailbox",
+    "comment": "Button title (account created screen)",
+    "file": "ios/GrapMail/FinishScreens.swift"
+  },
+  {
+    "key": "WELCOME",
+    "comment": "Onboarding scene: small label above the title",
+    "file": "ios/GrapMail/OnboardingViews.swift"
+  },
+  {
+    "key": "Welcome to Your Sanctuary",
+    "comment": "Onboarding scene title",
+    "file": "ios/GrapMail/OnboardingViews.swift"
+  },
+  {
+    "key": "Your new address is ready; welcome to a cleaner way to communicate.",
+    "comment": "Onboarding scene description",
+    "file": "ios/GrapMail/OnboardingViews.swift"
+  },
+  {
+    "key": "Get Started",
+    "comment": "Onboarding scene button",
+    "file": "ios/GrapMail/OnboardingViews.swift"
+  },
+  {
+    "key": "SCREENER GATE",
+    "comment": "Onboarding scene: small label above the title",
+    "file": "ios/GrapMail/OnboardingViews.swift"
+  },
+  {
+    "key": "You Decide Who Reaches You",
+    "comment": "Onboarding scene title",
+    "file": "ios/GrapMail/OnboardingViews.swift"
+  },
+  {
+    "key": "Unknown senders wait in the Screener until you decide.",
+    "comment": "Onboarding scene description",
+    "file": "ios/GrapMail/OnboardingViews.swift"
+  },
+  {
+    "key": "Next",
+    "comment": "Onboarding scene button",
+    "file": "ios/GrapMail/OnboardingViews.swift"
+  },
+  {
+    "key": "SUBSCRIPTIONS",
+    "comment": "Onboarding scene: small label above the title",
+    "file": "ios/GrapMail/OnboardingViews.swift"
+  },
+  {
+    "key": "Tame the Clutter",
+    "comment": "Onboarding scene title",
+    "file": "ios/GrapMail/OnboardingViews.swift"
+  },
+  {
+    "key": "Unsubscribe, snooze, and return to what matters.",
+    "comment": "Onboarding scene description",
+    "file": "ios/GrapMail/OnboardingViews.swift"
+  },
+  {
+    "key": "QUIET BY DEFAULT",
+    "comment": "Onboarding scene: small label above the title",
+    "file": "ios/GrapMail/OnboardingViews.swift"
+  },
+  {
+    "key": "Choose Your Rhythm",
+    "comment": "Onboarding scene title",
+    "file": "ios/GrapMail/OnboardingViews.swift"
+  },
+  {
+    "key": "Set your theme and decide when GrapMail can interrupt you.",
+    "comment": "Onboarding scene description",
+    "file": "ios/GrapMail/OnboardingViews.swift"
+  },
+  {
+    "key": "YOUR SANCTUARY",
+    "comment": "Onboarding scene: small label above the title",
+    "file": "ios/GrapMail/OnboardingViews.swift"
+  },
+  {
+    "key": "Your Inbox Is Yours Again",
+    "comment": "Onboarding scene title",
+    "file": "ios/GrapMail/OnboardingViews.swift"
+  },
+  {
+    "key": "Welcome home; your new mailbox is ready.",
+    "comment": "Onboarding scene description",
+    "file": "ios/GrapMail/OnboardingViews.swift"
+  },
+  {
+    "key": "Open My Mailbox",
+    "comment": "Onboarding scene button",
+    "file": "ios/GrapMail/OnboardingViews.swift"
+  },
+  {
+    "key": "Animated scene: %@",
+    "comment": "Accessibility label (onboarding screen)",
+    "file": "ios/GrapMail/OnboardingViews.swift"
+  },
+  {
+    "key": "Skip",
+    "comment": "Button (onboarding screen)",
+    "file": "ios/GrapMail/OnboardingViews.swift"
+  },
+  {
+    "key": "Passkey sign-in was cancelled.",
+    "comment": "Passkey error: the person closed the sheet",
+    "file": "ios/GrapMail/PasskeyManager.swift"
+  },
+  {
+    "key": "The passkey challenge was unreadable. Try again.",
+    "comment": "Passkey error",
+    "file": "ios/GrapMail/PasskeyManager.swift"
+  },
+  {
+    "key": "The passkey account reference was unreadable. Try again.",
+    "comment": "Passkey error",
+    "file": "ios/GrapMail/PasskeyManager.swift"
+  },
+  {
+    "key": "The passkey could not be created on this device.",
+    "comment": "Passkey error",
+    "file": "ios/GrapMail/PasskeyManager.swift"
+  },
+  {
+    "key": "The passkey response was not a platform credential.",
+    "comment": "Passkey error",
+    "file": "ios/GrapMail/PasskeyManager.swift"
+  },
+  {
+    "key": "Passkey sign-in failed. Try again.",
+    "comment": "Passkey error",
+    "file": "ios/GrapMail/PasskeyManager.swift"
+  },
+  {
+    "key": "Passkeys",
+    "comment": "Screen title (passkeys screen)",
+    "file": "ios/GrapMail/PasskeysView.swift"
+  },
+  {
+    "key": "Sign in with your face, fingerprint or device passcode — no password to type, leak or reuse.",
+    "comment": "Screen description under the title (passkeys screen)",
+    "file": "ios/GrapMail/PasskeysView.swift"
+  },
+  {
+    "key": "Loading passkeys…",
+    "comment": "Label (passkeys screen)",
+    "file": "ios/GrapMail/PasskeysView.swift"
+  },
+  {
+    "key": "Try again",
+    "comment": "Link-style button (passkeys screen)",
+    "file": "ios/GrapMail/PasskeysView.swift"
+  },
+  {
+    "key": "No passkeys are registered for this account yet. Add one below and this device can sign you in without your password.",
+    "comment": "Label (passkeys screen)",
+    "file": "ios/GrapMail/PasskeysView.swift"
+  },
+  {
+    "key": "A passkey works only where your iCloud Keychain is — revoking a device does not remove its passkey, and deleting a passkey does not revoke the device that made it.",
+    "comment": "Label (passkeys screen)",
+    "file": "ios/GrapMail/PasskeysView.swift"
+  },
+  {
+    "key": "Add Passkey",
+    "comment": "Button title (passkeys screen)",
+    "file": "ios/GrapMail/PasskeysView.swift"
+  },
+  {
+    "key": "Registering a passkey signs a challenge with this device's credential manager. The private key never leaves it.",
+    "comment": "Footer note (passkeys screen)",
+    "file": "ios/GrapMail/PasskeysView.swift"
+  },
+  {
+    "key": "Delete %@?",
+    "comment": "Label (passkeys screen)",
+    "file": "ios/GrapMail/PasskeysView.swift"
+  },
+  {
+    "key": "Delete this passkey?",
+    "comment": "Label (passkeys screen)",
+    "file": "ios/GrapMail/PasskeysView.swift"
+  },
+  {
+    "key": "Cancel",
+    "comment": "Button (passkeys screen)",
+    "file": "ios/GrapMail/PasskeysView.swift"
+  },
+  {
+    "key": "Delete Passkey",
+    "comment": "Button (passkeys screen)",
+    "file": "ios/GrapMail/PasskeysView.swift"
+  },
+  {
+    "key": "This passkey can no longer sign you in. This cannot be undone from here.",
+    "comment": "Label (passkeys screen)",
+    "file": "ios/GrapMail/PasskeysView.swift"
+  },
+  {
+    "key": "Could not load the passkey list. Try again.",
+    "comment": "Error message shown when the server gives no reason (passkeys screen)",
+    "file": "ios/GrapMail/PasskeysView.swift"
+  },
+  {
+    "key": "Sign in again.",
+    "comment": "Error when the session has expired",
+    "file": "ios/GrapMail/PasskeysView.swift"
+  },
+  {
+    "key": "Passkey registration is not available right now. Try again.",
+    "comment": "Error when passkey registration cannot start",
+    "file": "ios/GrapMail/PasskeysView.swift"
+  },
+  {
+    "key": "The passkey was not verified. Try again.",
+    "comment": "Error when the server did not verify a new passkey",
+    "file": "ios/GrapMail/PasskeysView.swift"
+  },
+  {
+    "key": "The passkey could not be added. Try again.",
+    "comment": "Error message shown when the server gives no reason (passkeys screen)",
+    "file": "ios/GrapMail/PasskeysView.swift"
+  },
+  {
+    "key": "The passkey could not be deleted. Try again.",
+    "comment": "Error message shown when the server gives no reason (passkeys screen)",
+    "file": "ios/GrapMail/PasskeysView.swift"
+  },
+  {
+    "key": "Passkey",
+    "comment": "Passkey card title when the passkey has no name",
+    "file": "ios/GrapMail/PasskeysView.swift"
+  },
+  {
+    "key": "Delete passkey",
+    "comment": "Label (passkey card)",
+    "file": "ios/GrapMail/PasskeysView.swift"
+  },
+  {
+    "key": "Last used %@",
+    "comment": "Passkey card: when it was last used; the argument is a date and time",
+    "file": "ios/GrapMail/PasskeysView.swift"
+  },
+  {
+    "key": "Registered %@ · never used",
+    "comment": "Passkey card: when it was registered; the argument is a date and time",
+    "file": "ios/GrapMail/PasskeysView.swift"
+  },
+  {
+    "key": "Never used",
+    "comment": "Passkey card: the passkey has never been used",
+    "file": "ios/GrapMail/PasskeysView.swift"
+  },
+  {
+    "key": "Current plan",
+    "comment": "Section header (plan screen)",
+    "file": "ios/GrapMail/PlanView.swift"
+  },
+  {
+    "key": "Renews %@",
+    "comment": "Label (plan screen)",
+    "file": "ios/GrapMail/PlanView.swift"
+  },
+  {
+    "key": "Ends %@",
+    "comment": "Label (plan screen)",
+    "file": "ios/GrapMail/PlanView.swift"
+  },
+  {
+    "key": "Your messages show a Subscriber badge to other GrapMail users. It means you support GrapMail; it is not identity verification.",
+    "comment": "Label (plan screen)",
+    "file": "ios/GrapMail/PlanView.swift"
+  },
+  {
+    "key": "This month",
+    "comment": "Section header (plan screen)",
+    "file": "ios/GrapMail/PlanView.swift"
+  },
+  {
+    "key": "%lld of %lld outside recipients",
+    "comment": "Label (plan screen)",
+    "file": "ios/GrapMail/PlanView.swift"
+  },
+  {
+    "key": "Counts people outside GrapMail. Mail to GrapMail addresses is never limited. Resets %@.",
+    "comment": "Label (plan screen)",
+    "file": "ios/GrapMail/PlanView.swift"
+  },
+  {
+    "key": "Your plan",
+    "comment": "Navigation title (plan screen)",
+    "file": "ios/GrapMail/PlanView.swift"
+  },
+  {
+    "key": "Done",
+    "comment": "Button (plan screen)",
+    "file": "ios/GrapMail/PlanView.swift"
+  },
+  {
+    "key": "Sign in again.",
+    "comment": "Plan screen error when the session has expired",
+    "file": "ios/GrapMail/PlanView.swift"
+  },
+  {
+    "key": "Your plan could not be read. Try again later.",
+    "comment": "Plan screen error when the plan could not be loaded",
+    "file": "ios/GrapMail/PlanView.swift"
+  },
+  {
+    "key": "The account record is unavailable.",
+    "comment": "Account settings error when the profile could not be read",
+    "file": "ios/GrapMail/ProfileModel.swift"
+  },
+  {
+    "key": "Saved.",
+    "comment": "Confirmation after saving account settings",
+    "file": "ios/GrapMail/ProfileModel.swift"
+  },
+  {
+    "key": "Removed.",
+    "comment": "Confirmation after removing a connected app",
+    "file": "ios/GrapMail/ProfileModel.swift"
+  },
+  {
+    "key": "That alias could not be removed.",
+    "comment": "Alias error",
+    "file": "ios/GrapMail/ProfileModel.swift"
+  },
+  {
+    "key": "Alias removed.",
+    "comment": "Alias confirmation",
+    "file": "ios/GrapMail/ProfileModel.swift"
+  },
+  {
+    "key": "The alias could not be created.",
+    "comment": "Alias error",
+    "file": "ios/GrapMail/ProfileModel.swift"
+  },
+  {
+    "key": "Alias created.",
+    "comment": "Alias confirmation",
+    "file": "ios/GrapMail/ProfileModel.swift"
+  },
+  {
+    "key": "Profile photo updated.",
+    "comment": "Profile photo confirmation",
+    "file": "ios/GrapMail/ProfileModel.swift"
+  },
+  {
+    "key": "Couldn’t confirm your profile photo. Try again.",
+    "comment": "Profile photo error",
+    "file": "ios/GrapMail/ProfileModel.swift"
+  },
+  {
+    "key": "Profile photo removed.",
+    "comment": "Profile photo confirmation",
+    "file": "ios/GrapMail/ProfileModel.swift"
+  },
+  {
+    "key": "That change did not go through.",
+    "comment": "Account settings error when the server gives no reason",
+    "file": "ios/GrapMail/ProfileModel.swift"
+  },
+  {
+    "key": "Recovery email",
+    "comment": "Small label above the screen title (recovery email screen)",
+    "file": "ios/GrapMail/RecoveryEmailView.swift"
+  },
+  {
+    "key": "Add a recovery email",
+    "comment": "Screen title (recovery email screen)",
+    "file": "ios/GrapMail/RecoveryEmailView.swift"
+  },
+  {
+    "key": "If you ever forget your password, we'll send a reset link here. Use an address outside GrapMail.",
+    "comment": "Screen description under the title (recovery email screen)",
+    "file": "ios/GrapMail/RecoveryEmailView.swift"
+  },
+  {
+    "key": "Why it matters",
+    "comment": "Info panel title (recovery email screen)",
+    "file": "ios/GrapMail/RecoveryEmailView.swift"
+  },
+  {
+    "key": "GrapMail resets passwords by email only. Without a verified recovery email, a forgotten password can lock you out.",
+    "comment": "Info panel text (recovery email screen)",
+    "file": "ios/GrapMail/RecoveryEmailView.swift"
+  },
+  {
+    "key": "Send code",
+    "comment": "Button title (recovery email screen)",
+    "file": "ios/GrapMail/RecoveryEmailView.swift"
+  },
+  {
+    "key": "Skip for now",
+    "comment": "Link-style button (recovery email screen)",
+    "file": "ios/GrapMail/RecoveryEmailView.swift"
+  },
+  {
+    "key": "You can add it later in Settings → Account Security.",
+    "comment": "Footer note (recovery email screen)",
+    "file": "ios/GrapMail/RecoveryEmailView.swift"
+  },
+  {
+    "key": "Verify recovery email",
+    "comment": "Small label above the screen title (recovery email screen)",
+    "file": "ios/GrapMail/RecoveryEmailView.swift"
+  },
+  {
+    "key": "Enter the 6-digit code",
+    "comment": "Screen title (recovery email screen)",
+    "file": "ios/GrapMail/RecoveryEmailView.swift"
+  },
+  {
+    "key": "We sent a code to %@. Enter it to confirm this address.",
+    "comment": "Screen description under the title; the argument is the masked recovery email",
+    "file": "ios/GrapMail/RecoveryEmailView.swift"
+  },
+  {
+    "key": "your email",
+    "comment": "Used in place of the masked address when it is not known",
+    "file": "ios/GrapMail/RecoveryEmailView.swift"
+  },
+  {
+    "key": "Confirm",
+    "comment": "Button title (recovery email screen)",
+    "file": "ios/GrapMail/RecoveryEmailView.swift"
+  },
+  {
+    "key": "Sending…",
+    "comment": "Link-style button (recovery email screen)",
+    "file": "ios/GrapMail/RecoveryEmailView.swift"
+  },
+  {
+    "key": "Resend code",
+    "comment": "Link-style button (recovery email screen)",
+    "file": "ios/GrapMail/RecoveryEmailView.swift"
+  },
+  {
+    "key": "Didn't get it? Check your spam folder.",
+    "comment": "Footer note (recovery email screen)",
+    "file": "ios/GrapMail/RecoveryEmailView.swift"
+  },
+  {
+    "key": "Recovery email confirmed",
+    "comment": "Status chip (recovery email screen)",
+    "file": "ios/GrapMail/RecoveryEmailView.swift"
+  },
+  {
+    "key": "You're covered",
+    "comment": "Label (recovery email screen)",
+    "file": "ios/GrapMail/RecoveryEmailView.swift"
+  },
+  {
+    "key": "If you ever forget your password, we'll send a reset link to %@.",
+    "comment": "Label (recovery email screen)",
+    "file": "ios/GrapMail/RecoveryEmailView.swift"
+  },
+  {
+    "key": "Continue",
+    "comment": "Button title (recovery email screen)",
+    "file": "ios/GrapMail/RecoveryEmailView.swift"
+  },
+  {
+    "key": "Your session has expired. Sign in again.",
+    "comment": "Error when the session has expired",
+    "file": "ios/GrapMail/RecoveryEmailView.swift"
+  },
+  {
+    "key": "We couldn't send the code. Try again.",
+    "comment": "Message (recovery email screen)",
+    "file": "ios/GrapMail/RecoveryEmailView.swift"
+  },
+  {
+    "key": "A new code is on its way.",
+    "comment": "Notice after a verification code was resent",
+    "file": "ios/GrapMail/RecoveryEmailView.swift"
+  },
+  {
+    "key": "That code is not correct.",
+    "comment": "Error message shown when the server gives no reason (recovery email screen)",
+    "file": "ios/GrapMail/RecoveryEmailView.swift"
+  },
+  {
+    "key": "This action cannot be undone. The device will be signed out immediately and will need to sign in again to access your account.",
+    "comment": "Warning shown before signing a device out",
+    "file": "ios/GrapMail/SecurityComponents.swift"
+  },
+  {
+    "key": "Unknown device",
+    "comment": "Session card title when the device name is not known",
+    "file": "ios/GrapMail/SecurityComponents.swift"
+  },
+  {
+    "key": "This device",
+    "comment": "Label (session card)",
+    "file": "ios/GrapMail/SecurityComponents.swift"
+  },
+  {
+    "key": "Sign out this device",
+    "comment": "Label (session card)",
+    "file": "ios/GrapMail/SecurityComponents.swift"
+  },
+  {
+    "key": "Signed in",
+    "comment": "Security activity event title",
+    "file": "ios/GrapMail/SecurityComponents.swift"
+  },
+  {
+    "key": "Password changed",
+    "comment": "Security activity event title",
+    "file": "ios/GrapMail/SecurityComponents.swift"
+  },
+  {
+    "key": "Two-step verification turned on",
+    "comment": "Security activity event title",
+    "file": "ios/GrapMail/SecurityComponents.swift"
+  },
+  {
+    "key": "Two-step verification turned off",
+    "comment": "Security activity event title",
+    "file": "ios/GrapMail/SecurityComponents.swift"
+  },
+  {
+    "key": "Backup codes regenerated",
+    "comment": "Security activity event title",
+    "file": "ios/GrapMail/SecurityComponents.swift"
+  },
+  {
+    "key": "A backup code was used",
+    "comment": "Security activity event title",
+    "file": "ios/GrapMail/SecurityComponents.swift"
+  },
+  {
+    "key": "A device was signed out",
+    "comment": "Security activity event title",
+    "file": "ios/GrapMail/SecurityComponents.swift"
+  },
+  {
+    "key": "Signed out of all devices",
+    "comment": "Security activity event title",
+    "file": "ios/GrapMail/SecurityComponents.swift"
+  },
+  {
+    "key": "Phone number changed",
+    "comment": "Security activity event title",
+    "file": "ios/GrapMail/SecurityComponents.swift"
+  },
+  {
+    "key": "Account activity",
+    "comment": "Security activity event title for an unrecognised event",
+    "file": "ios/GrapMail/SecurityComponents.swift"
+  },
+  {
+    "key": "recently",
+    "comment": "Relative time when the exact time is unknown",
+    "file": "ios/GrapMail/SecurityComponents.swift"
+  },
+  {
+    "key": "just now",
+    "comment": "Relative time for less than a minute ago",
+    "file": "ios/GrapMail/SecurityComponents.swift"
+  },
+  {
+    "key": "%lld min ago",
+    "comment": "Relative time in minutes",
+    "file": "ios/GrapMail/SecurityComponents.swift"
+  },
+  {
+    "key": "%lld hr ago",
+    "comment": "Relative time in hours",
+    "file": "ios/GrapMail/SecurityComponents.swift"
+  },
+  {
+    "key": "yesterday",
+    "comment": "Relative time for the previous day",
+    "file": "ios/GrapMail/SecurityComponents.swift"
+  },
+  {
+    "key": "%lld days ago",
+    "comment": "Relative time in days",
+    "file": "ios/GrapMail/SecurityComponents.swift"
+  },
+  {
+    "key": "Unknown snapshot: %@",
+    "comment": "Debug-only snapshot host; the argument is a snapshot name",
+    "file": "ios/GrapMail/SecuritySnapshot.swift"
+  },
+  {
+    "key": "Add",
+    "comment": "Security hub row chip: nothing set up yet",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "Verified",
+    "comment": "Security hub row chip",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "Unverified",
+    "comment": "Security hub row chip",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "Account Security",
+    "comment": "Screen title (account security screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "Manage your security settings to keep your account safe and secure.",
+    "comment": "Screen description under the title (account security screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "Password reset requested",
+    "comment": "Status chip (account security screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "Cancelling…",
+    "comment": "Link-style button (account security screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "Cancel the reset",
+    "comment": "Link-style button (account security screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "Checking your account…",
+    "comment": "Label (account security screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "We couldn't load your security settings.",
+    "comment": "Label (account security screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "Try again",
+    "comment": "Link-style button (account security screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "Your account is secure",
+    "comment": "Status chip (account security screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "One thing left to do",
+    "comment": "Status chip (account security screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "All essential security features are active and your account is protected.",
+    "comment": "Message (account security screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "Add a recovery email. It is the only way back into your account if you forget your password.",
+    "comment": "Message (account security screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "Turn on two-step verification to protect your account even if your password is ever exposed.",
+    "comment": "Message (account security screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "Add backup codes so losing access to your recovery email does not lock you out.",
+    "comment": "Label (account security screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "Security Features",
+    "comment": "Section header (account security screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "Two-Step Verification",
+    "comment": "Settings switch row title (account security screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "Add an extra layer of security to your account with a verification code.",
+    "comment": "Settings switch row description (account security screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "Enabled",
+    "comment": "Settings row status chip (account security screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "Off",
+    "comment": "Settings row status chip (account security screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "Recovery Email",
+    "comment": "Settings row title (account security screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "Where your password reset link and sign-in codes are sent.",
+    "comment": "Settings row description (account security screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "Account Management",
+    "comment": "Section header (account security screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "Change Password",
+    "comment": "Settings row title (account security screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "Update your account password for better security.",
+    "comment": "Settings row description (account security screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "Backup Codes",
+    "comment": "Settings row title (account security screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "%lld codes unused.",
+    "comment": "Settings row description (account security screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "Generate and manage backup codes for 2FA.",
+    "comment": "Settings row description (account security screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "Account Recovery Codes",
+    "comment": "Settings row title (account security screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "One-time codes for signing in if you lose your password.",
+    "comment": "Settings row description (account security screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "Trusted Devices",
+    "comment": "Settings row title (account security screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "Devices that hold a key this account trusts.",
+    "comment": "Settings row description (account security screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "Passkeys",
+    "comment": "Settings row title (account security screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "Sign in with your face, fingerprint or passcode instead of a password.",
+    "comment": "Settings row description (account security screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "Sign Out All Devices",
+    "comment": "Settings row title (account security screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "Log out from all devices except this one.",
+    "comment": "Settings row description (account security screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "Active Sessions",
+    "comment": "Settings row title (account security screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "Devices signed in to this account.",
+    "comment": "Settings row description (account security screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "Recent Security Activity",
+    "comment": "Settings row title (account security screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "Sign-ins and changes to this account.",
+    "comment": "Settings row description (account security screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "Help & Support",
+    "comment": "Settings row title (account security screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "Visit our support center for security assistance.",
+    "comment": "Settings row description (account security screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "Your security matters. We're here to help.",
+    "comment": "Footer note (account security screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "A link to reset your password was sent to your recovery email.",
+    "comment": "Security hub: pending password reset notice",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "It works from %@.",
+    "comment": "Security hub: pending password reset notice; the argument is a date and time",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "If this was not you, cancel it now and change your recovery email.",
+    "comment": "Security hub: pending password reset notice",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "The password reset was cancelled.",
+    "comment": "Message (account security screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "The reset could not be cancelled. Try again.",
+    "comment": "Message (account security screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "Enable Two-Step Verification",
+    "comment": "Screen title (two factor enable screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "Add an extra layer of security to your account.",
+    "comment": "Screen description under the title (two factor enable screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "More Protection",
+    "comment": "Feature row title (two factor enable screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "Prevents unauthorized access, even if your password is compromised.",
+    "comment": "Feature row description (two factor enable screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "Use Your Phone",
+    "comment": "Feature row title (two factor enable screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "We'll send a 6-digit code to your verified phone number.",
+    "comment": "Feature row description (two factor enable screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "Easy to Manage",
+    "comment": "Feature row title (two factor enable screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "You can turn it off anytime from account security settings.",
+    "comment": "Feature row description (two factor enable screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "You'll need a verified phone number to enable two-step verification.",
+    "comment": "Label (two factor enable screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "Continue",
+    "comment": "Button title (two factor enable screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "Cancel",
+    "comment": "Link-style button (two factor enable screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "Confirm Your Password",
+    "comment": "Screen title (confirm password screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "Enter your password to continue.",
+    "comment": "Screen description under the title (confirm password screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "Password",
+    "comment": "Text field label (confirm password screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "Enter your password",
+    "comment": "Text field placeholder (confirm password screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "Sign in again.",
+    "comment": "Message (confirm password screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "Could not complete the security request. Try again.",
+    "comment": "Error message shown when the server gives no reason (confirm password screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "Back",
+    "comment": "Link-style button (confirm password screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "Add a phone number first.",
+    "comment": "Message (verify phone screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "Verify Your Phone",
+    "comment": "Screen title (verify phone screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "We'll text a code to %@.",
+    "comment": "Screen description under the title (verify phone screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "We'll text a code to the number on this account.",
+    "comment": "Screen description under the title (verify phone screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "Phone Number",
+    "comment": "Label (verify phone screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "Verification Code",
+    "comment": "Label (verify phone screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "Didn't receive the code? Check your spam folder or make sure your phone is on and has signal.",
+    "comment": "Label (verify phone screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "Add a phone number",
+    "comment": "Link-style button (verify phone screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "Enter your password again",
+    "comment": "Link-style button (verify phone screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "Send me a new code",
+    "comment": "Link-style button (verify phone screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "Resend code",
+    "comment": "Link-style button (verify phone screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "Two-Step Verification Enabled",
+    "comment": "Screen title (two factor enabled screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "Your account is now protected with an extra layer of security.",
+    "comment": "Screen description under the title (two factor enabled screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "2-Step Verification Enabled",
+    "comment": "Status chip (two factor enabled screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "What's Next?",
+    "comment": "Label (two factor enabled screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "Keep Backup Codes Safe",
+    "comment": "Feature row title (two factor enabled screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "Use them if you ever lose access to your phone.",
+    "comment": "Feature row description (two factor enabled screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "Update Your Phone Number",
+    "comment": "Feature row title (two factor enabled screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "Keep it current so codes always reach you.",
+    "comment": "Feature row description (two factor enabled screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "You'll be asked for a code each time you sign in on a new device.",
+    "comment": "Label (two factor enabled screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "Back to Security Settings",
+    "comment": "Link-style button (two factor enabled screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "Disable Two-Step Verification?",
+    "comment": "Screen title (disable two factor screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "This will remove the extra layer of security from your account.",
+    "comment": "Screen description under the title (disable two factor screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "Disabling two-step verification will make your account less secure. You can enable it again anytime from Account Security settings.",
+    "comment": "Label (disable two factor screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "Two-Step Verification Disabled",
+    "comment": "Screen title (two factor disabled screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "Two-step verification has been disabled. Your account is now protected by your password only.",
+    "comment": "Screen description under the title (two factor disabled screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "What happens now?",
+    "comment": "Label (two factor disabled screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "Password Only",
+    "comment": "Feature row title (two factor disabled screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "Signing in no longer asks for a code.",
+    "comment": "Feature row description (two factor disabled screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "Backup Codes Retired",
+    "comment": "Feature row title (two factor disabled screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "The codes you saved no longer apply.",
+    "comment": "Feature row description (two factor disabled screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "You can turn two-step verification back on at any time from Account Security.",
+    "comment": "Label (two factor disabled screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "Turn it back on",
+    "comment": "Link-style button (two factor disabled screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "Generate & Save Backup Codes",
+    "comment": "Screen title (generate backup codes screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "Create one-time backup codes to access your account if you lose your phone.",
+    "comment": "Screen description under the title (generate backup codes screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "What's Included",
+    "comment": "Label (generate backup codes screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "10 One-Time Codes",
+    "comment": "Feature row title (generate backup codes screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "Each code can be used once.",
+    "comment": "Feature row description (generate backup codes screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "Use When Needed",
+    "comment": "Feature row title (generate backup codes screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "Sign in when your phone is unavailable.",
+    "comment": "Feature row description (generate backup codes screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "Each Code is Unique",
+    "comment": "Feature row title (generate backup codes screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "Generating a new set retires the old one.",
+    "comment": "Feature row description (generate backup codes screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "Store the codes somewhere only you can reach. Anyone with a code can pass your second factor.",
+    "comment": "Label (generate backup codes screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "Generate Codes",
+    "comment": "Button title (generate backup codes screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "Backup Codes Saved",
+    "comment": "Screen title (backup codes saved screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "Store these codes somewhere safe. They won't be shown again.",
+    "comment": "Screen description under the title (backup codes saved screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "Your Backup Codes",
+    "comment": "Label (backup codes saved screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "Copied",
+    "comment": "Label (backup codes saved screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "Copy all",
+    "comment": "Label (backup codes saved screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "Store Safely",
+    "comment": "Feature row title (backup codes saved screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "Use a password manager or print them out.",
+    "comment": "Feature row description (backup codes saved screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "Don't Share",
+    "comment": "Feature row title (backup codes saved screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "Backup codes are for your eyes only.",
+    "comment": "Feature row description (backup codes saved screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "One Time Use",
+    "comment": "Feature row title (backup codes saved screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "Each code can only be used once.",
+    "comment": "Feature row description (backup codes saved screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "Copy them into your password manager, or write them down.",
+    "comment": "Label (backup codes saved screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "I have saved these codes somewhere safe.",
+    "comment": "Label (backup codes saved screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "Download Backup Codes",
+    "comment": "Label (backup codes saved screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "Done",
+    "comment": "Button title (backup codes saved screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "Each code can be used once. Generating new codes retires every code on this list.",
+    "comment": "Footer note (backup codes saved screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "These codes will not be shown again",
+    "comment": "Alert title (backup codes saved screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "Leave anyway",
+    "comment": "Button (backup codes saved screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "Stay",
+    "comment": "Button (backup codes saved screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "Leave now and the list is gone. You can generate a new set later, but the old codes stop working.",
+    "comment": "Label (backup codes saved screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "After Suspicious Activity",
+    "comment": "Small label above the screen title (change password screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "Change Your Password",
+    "comment": "Screen title (change password screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "Your account was accessed from an unfamiliar device. To keep your GrapMail account secure, please update your password now.",
+    "comment": "Screen description under the title (change password screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "Choose a strong password you have not used here before.",
+    "comment": "Screen description under the title (change password screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "Unrecognized activity was found on your account.",
+    "comment": "Label (change password screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "Current Password",
+    "comment": "Text field label (change password screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "New Password",
+    "comment": "Text field label (change password screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "Confirm New Password",
+    "comment": "Text field label (change password screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "Passwords do not match.",
+    "comment": "Text field error (change password screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "Password Requirements",
+    "comment": "Label (change password screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "At least 8 characters",
+    "comment": "Password requirement (change password screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "Contains a letter",
+    "comment": "Password requirement (change password screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "Contains a number",
+    "comment": "Password requirement (change password screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "Contains a symbol",
+    "comment": "Password requirement (change password screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "Update Password",
+    "comment": "Button title (change password screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "Password Updated Successfully",
+    "comment": "Screen title (password changed screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "Password Changed Successfully",
+    "comment": "Screen title (password changed screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "Your password has been updated successfully. Other devices were signed out; this one stays signed in.",
+    "comment": "Screen description under the title (password changed screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "This device stays signed in",
+    "comment": "Feature row title (password changed screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "You can carry on where you are.",
+    "comment": "Feature row description (password changed screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "Other devices are signed out",
+    "comment": "Feature row title (password changed screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "You'll need to sign in again on them, including mobile apps, desktop, and other browsers.",
+    "comment": "Feature row description (password changed screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "This helps keep your account secure and prevents unauthorized access.",
+    "comment": "Label (password changed screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "If you did not make this change, contact the support team immediately.",
+    "comment": "Footer note (password changed screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "support team",
+    "comment": "Tappable words in the footer note; must appear verbatim in the note's translation (password changed screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "This will sign you out of all devices except this one.",
+    "comment": "Screen description under the title (sign out all devices screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "You'll stay signed in here",
+    "comment": "Label (sign out all devices screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "Every other phone, tablet and browser is signed out immediately. This device keeps working, so you can carry on.",
+    "comment": "Label (sign out all devices screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "Use this when a device is lost, borrowed or sold — not instead of changing a leaked password.",
+    "comment": "Label (sign out all devices screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "Signed Out of All Devices",
+    "comment": "Screen title (signed out all devices screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "You have been signed out of all devices except this one.",
+    "comment": "Screen description under the title (signed out all devices screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "What happens next?",
+    "comment": "Label (signed out all devices screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "This device stays signed in. Every other device has to sign in again, and anyone who had a session can no longer read this mailbox.",
+    "comment": "Label (signed out all devices screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "Only this device is signed in",
+    "comment": "Status chip (signed out all devices screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "Anyone using this account on another device now needs your password again.",
+    "comment": "Footer note (signed out all devices screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "Manage Active Sessions",
+    "comment": "Screen title (manage sessions screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "Devices currently signed in to this account.",
+    "comment": "Screen description under the title (manage sessions screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "Loading sessions…",
+    "comment": "Label (manage sessions screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "No sessions are recorded yet.",
+    "comment": "Label (manage sessions screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "%lld Active Sessions",
+    "comment": "Label (manage sessions screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "Revoke All",
+    "comment": "Label (manage sessions screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "Keep Your Account Secure",
+    "comment": "Label (manage sessions screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "If you see a device you don't recognize, revoke the session immediately. This will prevent unauthorized access.",
+    "comment": "Label (manage sessions screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "Sign out all devices",
+    "comment": "Link-style button (manage sessions screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "Revoke Session Access?",
+    "comment": "Screen title (revoke session screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "This device will be signed out of your GrapMail account and will need to sign in again.",
+    "comment": "Screen description under the title (revoke session screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "Device",
+    "comment": "Label (revoke session screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "That device",
+    "comment": "Session revocation: stands in for an unnamed device",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "Revoke Session",
+    "comment": "Button title (revoke session screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "Suspicious Access Detected",
+    "comment": "Small label above the screen title (confirm session revocation screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "Confirm Session Revocation",
+    "comment": "Screen title (confirm session revocation screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "This will immediately sign this session out and no longer have access to your GrapMail account.",
+    "comment": "Screen description under the title (confirm session revocation screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "Unverified activity",
+    "comment": "Label (confirm session revocation screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "This session showed activity that did not match your usual sign-in pattern.",
+    "comment": "Session revocation: why the session is flagged",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "%@ · This session showed activity that did not match your usual sign-in pattern.",
+    "comment": "Session revocation: why the session is flagged; the argument is the device name",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "Session Revoked Successfully",
+    "comment": "Screen title (session revoked screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "The session has been revoked and this device can no longer access your account.",
+    "comment": "Screen description under the title (session revoked screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "Revoked Session",
+    "comment": "Label (session revoked screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "The device will need your password to sign in again.",
+    "comment": "Footer note (session revoked screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "The suspicious session has been revoked and can no longer access your GrapMail account.",
+    "comment": "Screen description under the title (session revoked suspicious screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "Revoked Session Details",
+    "comment": "Label (session revoked suspicious screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "This device is signed out",
+    "comment": "Label (session revoked suspicious screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "Unknown device",
+    "comment": "Session card title when the device name is not known",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "Change your password too — a revoked session does not change a leaked one.",
+    "comment": "Footer note (session revoked suspicious screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "Sign-ins and changes to your account, newest first.",
+    "comment": "Screen description under the title (security activity screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "Unrecognized activity",
+    "comment": "Label (security activity screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "A device signed in that this account had not used before.",
+    "comment": "Label (security activity screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "Review it now",
+    "comment": "Link-style button (security activity screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "Loading activity…",
+    "comment": "Label (security activity screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "Nothing has happened on this account yet.",
+    "comment": "Label (security activity screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "Manage active sessions",
+    "comment": "Link-style button (security activity screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "Security Alert",
+    "comment": "Small label above the screen title (suspicious sign in alert screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "Suspicious Sign-In Alert",
+    "comment": "Screen title (suspicious sign in alert screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "We noticed a sign-in to your account from a device we do not recognise.",
+    "comment": "Screen description under the title (suspicious sign in alert screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "Sign-in details",
+    "comment": "Label (suspicious sign in alert screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "Checking your account\\u{2026}",
+    "comment": "Label (suspicious sign in alert screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "Not recorded",
+    "comment": "Security alert detail value when the server did not record it",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "When",
+    "comment": "Detail row label (suspicious sign in alert screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "Not available",
+    "comment": "Security alert detail value when it is unknown",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "Address",
+    "comment": "Detail row label (suspicious sign in alert screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "Not recognised",
+    "comment": "Status chip (suspicious sign in alert screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "This wasn't you? Someone may have gained access to your account. Take action now to keep your data safe.",
+    "comment": "Irreversible-action warning (suspicious sign in alert screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "Secure My Account",
+    "comment": "Button title (suspicious sign in alert screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "This was me",
+    "comment": "Link-style button (suspicious sign in alert screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "Sign in again to record that.",
+    "comment": "Message (suspicious sign in alert screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "We found a suspicious sign-in to your account. Review the details, revoke the access if it wasn't you, and change your password.",
+    "comment": "Screen description under the title (secure my account screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "Suspicious Sign-In Details",
+    "comment": "Label (secure my account screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "Location",
+    "comment": "Detail row label (secure my account screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "Approximate location based on IP",
+    "comment": "Security alert detail caption",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "Time",
+    "comment": "Detail row label (secure my account screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "Your local time",
+    "comment": "Security alert detail caption",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "This looks suspicious. If this wasn't you, we recommend revoking the access and changing your password immediately.",
+    "comment": "Irreversible-action warning (secure my account screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "Revoke This Session",
+    "comment": "Button title (secure my account screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "That device is already signed out. Change your password to end any other session.",
+    "comment": "Label (secure my account screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "Back to Security Activity",
+    "comment": "Link-style button (secure my account screen)",
+    "file": "ios/GrapMail/SecurityViews.swift"
+  },
+  {
+    "key": "That address cannot be used.",
+    "comment": "Sign-up: the chosen address is not allowed",
+    "file": "ios/GrapMail/SignUpModel.swift"
+  },
+  {
+    "key": "Please read and agree to the terms to continue.",
+    "comment": "Sign-up error: terms not accepted",
+    "file": "ios/GrapMail/SignUpModel.swift"
+  },
+  {
+    "key": "Complete the human verification check to continue.",
+    "comment": "Sign-up error: human verification not done",
+    "file": "ios/GrapMail/SignUpModel.swift"
+  },
+  {
+    "key": "That GrapMail address is already taken. Try another one.",
+    "comment": "Sign-up error: address taken",
+    "file": "ios/GrapMail/SignUpModel.swift"
+  },
+  {
+    "key": "Use at least 8 characters with a letter, a number and a symbol.",
+    "comment": "Sign-up error: weak password",
+    "file": "ios/GrapMail/SignUpModel.swift"
+  },
+  {
+    "key": "Enter your full name (at least 2 characters).",
+    "comment": "Sign-up error: invalid name",
+    "file": "ios/GrapMail/SignUpModel.swift"
+  },
+  {
+    "key": "Your verification expired or was already used — complete the check again.",
+    "comment": "Sign-up error: human verification expired",
+    "file": "ios/GrapMail/SignUpModel.swift"
+  },
+  {
+    "key": "Could not create the account. Please try again.",
+    "comment": "Sign-up error: generic",
+    "file": "ios/GrapMail/SignUpModel.swift"
+  },
+  {
+    "key": "Could not create your account. Try again.",
+    "comment": "Sign-up error when the server gives no reason",
+    "file": "ios/GrapMail/SignUpModel.swift"
+  },
+  {
+    "key": "Verification failed — please try again.",
+    "comment": "Human verification error",
+    "file": "ios/GrapMail/SignUpModel.swift"
+  },
+  {
+    "key": "The verification service is temporarily unavailable. Try a new challenge in a moment.",
+    "comment": "Human verification error: service unavailable",
+    "file": "ios/GrapMail/SignUpModel.swift"
+  },
+  {
+    "key": "Too many verification attempts. Wait a moment and try again.",
+    "comment": "Human verification error: rate limited",
+    "file": "ios/GrapMail/SignUpModel.swift"
+  },
+  {
+    "key": "Verification failed. Get a new challenge and try again.",
+    "comment": "Human verification error: challenge rejected",
+    "file": "ios/GrapMail/SignUpModel.swift"
+  },
+  {
+    "key": "Could not complete verification. Get a new challenge and try again.",
+    "comment": "Human verification error: network or unknown failure",
+    "file": "ios/GrapMail/SignUpModel.swift"
+  },
+  {
+    "key": "Sign in again.",
+    "comment": "Error when the session has expired",
+    "file": "ios/GrapMail/TwoFactorEmailView.swift"
+  },
+  {
+    "key": "We couldn't load your account. Try again.",
+    "comment": "Error message shown when the server gives no reason (two factor email screen)",
+    "file": "ios/GrapMail/TwoFactorEmailView.swift"
+  },
+  {
+    "key": "We couldn't send the code. Try again.",
+    "comment": "Error message shown when the server gives no reason (two factor email screen)",
+    "file": "ios/GrapMail/TwoFactorEmailView.swift"
+  },
+  {
+    "key": "We couldn't turn on two-step verification. Try again.",
+    "comment": "Error message shown when the server gives no reason (two factor email screen)",
+    "file": "ios/GrapMail/TwoFactorEmailView.swift"
+  },
+  {
+    "key": "Add a Recovery Email",
+    "comment": "Screen title (two factor email screen)",
+    "file": "ios/GrapMail/TwoFactorEmailView.swift"
+  },
+  {
+    "key": "Check Your Email",
+    "comment": "Screen title (two factor email screen)",
+    "file": "ios/GrapMail/TwoFactorEmailView.swift"
+  },
+  {
+    "key": "Two-step verification emails your sign-in codes to a verified recovery email. Add one first.",
+    "comment": "Screen description under the title (two factor email screen)",
+    "file": "ios/GrapMail/TwoFactorEmailView.swift"
+  },
+  {
+    "key": "We've emailed a 6-digit code to %@.",
+    "comment": "Screen description under the title (two factor email screen)",
+    "file": "ios/GrapMail/TwoFactorEmailView.swift"
+  },
+  {
+    "key": "We'll email a code to the recovery email on this account.",
+    "comment": "Screen description under the title (two factor email screen)",
+    "file": "ios/GrapMail/TwoFactorEmailView.swift"
+  },
+  {
+    "key": "Recovery Email",
+    "comment": "Label (two factor email screen)",
+    "file": "ios/GrapMail/TwoFactorEmailView.swift"
+  },
+  {
+    "key": "Verified",
+    "comment": "Status chip (two factor email screen)",
+    "file": "ios/GrapMail/TwoFactorEmailView.swift"
+  },
+  {
+    "key": "Verification Code",
+    "comment": "Label (two factor email screen)",
+    "file": "ios/GrapMail/TwoFactorEmailView.swift"
+  },
+  {
+    "key": "Didn't get it? Check your spam folder. From now on, sign-in codes will go to this address.",
+    "comment": "Label (two factor email screen)",
+    "file": "ios/GrapMail/TwoFactorEmailView.swift"
+  },
+  {
+    "key": "Enter your password again",
+    "comment": "Link-style button (two factor email screen)",
+    "file": "ios/GrapMail/TwoFactorEmailView.swift"
+  },
+  {
+    "key": "Add Recovery Email",
+    "comment": "Button title (two factor email screen)",
+    "file": "ios/GrapMail/TwoFactorEmailView.swift"
+  },
+  {
+    "key": "Turn On",
+    "comment": "Button title (two factor email screen)",
+    "file": "ios/GrapMail/TwoFactorEmailView.swift"
+  },
+  {
+    "key": "Resend code",
+    "comment": "Link-style button (two factor email screen)",
+    "file": "ios/GrapMail/TwoFactorEmailView.swift"
+  },
+  {
+    "key": "Please enter your first name (2+ characters).",
+    "comment": "Sign-up validation error for the first name",
+    "file": "ios/GrapMail/Validators.swift"
+  },
+  {
+    "key": "Please enter your last name (2+ characters).",
+    "comment": "Sign-up validation error for the last name",
+    "file": "ios/GrapMail/Validators.swift"
+  },
+  {
+    "key": "Enter a real birthday.",
+    "comment": "Sign-up validation error for an impossible birthday",
+    "file": "ios/GrapMail/Validators.swift"
+  },
+  {
+    "key": "You must be at least 13 years old to create a GrapMail account.",
+    "comment": "Sign-up validation error for users under 13",
+    "file": "ios/GrapMail/Validators.swift"
+  },
+  {
+    "key": "First name is required",
+    "comment": "Sign-up name step: field error",
+    "file": "ios/GrapMail/WizardSteps.swift"
+  },
+  {
+    "key": "Last name is required",
+    "comment": "Sign-up name step: field error",
+    "file": "ios/GrapMail/WizardSteps.swift"
+  },
+  {
+    "key": "What's your name?",
+    "comment": "Title (sign-up name step)",
+    "file": "ios/GrapMail/WizardSteps.swift"
+  },
+  {
+    "key": "This name appears on your GrapMail profile.",
+    "comment": "Label (sign-up name step)",
+    "file": "ios/GrapMail/WizardSteps.swift"
+  },
+  {
+    "key": "First name",
+    "comment": "Label (sign-up name step)",
+    "file": "ios/GrapMail/WizardSteps.swift"
+  },
+  {
+    "key": " *",
+    "comment": "Label (sign-up name step)",
+    "file": "ios/GrapMail/WizardSteps.swift"
+  },
+  {
+    "key": "Last name",
+    "comment": "Label (sign-up name step)",
+    "file": "ios/GrapMail/WizardSteps.swift"
+  },
+  {
+    "key": "Next",
+    "comment": "Button title (sign-up name step)",
+    "file": "ios/GrapMail/WizardSteps.swift"
+  },
+  {
+    "key": "January",
+    "comment": "Month name in the birthday picker",
+    "file": "ios/GrapMail/WizardSteps.swift"
+  },
+  {
+    "key": "February",
+    "comment": "Month name in the birthday picker",
+    "file": "ios/GrapMail/WizardSteps.swift"
+  },
+  {
+    "key": "March",
+    "comment": "Month name in the birthday picker",
+    "file": "ios/GrapMail/WizardSteps.swift"
+  },
+  {
+    "key": "April",
+    "comment": "Month name in the birthday picker",
+    "file": "ios/GrapMail/WizardSteps.swift"
+  },
+  {
+    "key": "May",
+    "comment": "Month name in the birthday picker",
+    "file": "ios/GrapMail/WizardSteps.swift"
+  },
+  {
+    "key": "June",
+    "comment": "Month name in the birthday picker",
+    "file": "ios/GrapMail/WizardSteps.swift"
+  },
+  {
+    "key": "July",
+    "comment": "Month name in the birthday picker",
+    "file": "ios/GrapMail/WizardSteps.swift"
+  },
+  {
+    "key": "August",
+    "comment": "Month name in the birthday picker",
+    "file": "ios/GrapMail/WizardSteps.swift"
+  },
+  {
+    "key": "September",
+    "comment": "Month name in the birthday picker",
+    "file": "ios/GrapMail/WizardSteps.swift"
+  },
+  {
+    "key": "October",
+    "comment": "Month name in the birthday picker",
+    "file": "ios/GrapMail/WizardSteps.swift"
+  },
+  {
+    "key": "November",
+    "comment": "Month name in the birthday picker",
+    "file": "ios/GrapMail/WizardSteps.swift"
+  },
+  {
+    "key": "December",
+    "comment": "Month name in the birthday picker",
+    "file": "ios/GrapMail/WizardSteps.swift"
+  },
+  {
+    "key": "Basic Info",
+    "comment": "Title (sign-up details step)",
+    "file": "ios/GrapMail/WizardSteps.swift"
+  },
+  {
+    "key": "Tell us a little more about yourself. This helps us make your experience more personal.",
+    "comment": "Label (sign-up details step)",
+    "file": "ios/GrapMail/WizardSteps.swift"
+  },
+  {
+    "key": "Profile Photo ",
+    "comment": "Label (sign-up details step)",
+    "file": "ios/GrapMail/WizardSteps.swift"
+  },
+  {
+    "key": "(Optional)",
+    "comment": "Label (sign-up details step)",
+    "file": "ios/GrapMail/WizardSteps.swift"
+  },
+  {
+    "key": "Add a photo to make your account more personal. You can change this later in settings.",
+    "comment": "Label (sign-up details step)",
+    "file": "ios/GrapMail/WizardSteps.swift"
+  },
+  {
+    "key": "Choose Photo",
+    "comment": "Label (sign-up details step)",
+    "file": "ios/GrapMail/WizardSteps.swift"
+  },
+  {
+    "key": "Change Photo",
+    "comment": "Label (sign-up details step)",
+    "file": "ios/GrapMail/WizardSteps.swift"
+  },
+  {
+    "key": "Couldn’t open that photo. Choose another image.",
+    "comment": "Label (sign-up details step)",
+    "file": "ios/GrapMail/WizardSteps.swift"
+  },
+  {
+    "key": "Birthday ",
+    "comment": "Label (sign-up details step)",
+    "file": "ios/GrapMail/WizardSteps.swift"
+  },
+  {
+    "key": "(Required)",
+    "comment": "Label (sign-up details step)",
+    "file": "ios/GrapMail/WizardSteps.swift"
+  },
+  {
+    "key": "Month",
+    "comment": "Birthday picker placeholder",
+    "file": "ios/GrapMail/WizardSteps.swift"
+  },
+  {
+    "key": "Day",
+    "comment": "Birthday picker placeholder",
+    "file": "ios/GrapMail/WizardSteps.swift"
+  },
+  {
+    "key": "Year",
+    "comment": "Birthday picker placeholder",
+    "file": "ios/GrapMail/WizardSteps.swift"
+  },
+  {
+    "key": "You must be 13 or older to create an account.",
+    "comment": "Label (sign-up details step)",
+    "file": "ios/GrapMail/WizardSteps.swift"
+  },
+  {
+    "key": "Gender ",
+    "comment": "Label (sign-up details step)",
+    "file": "ios/GrapMail/WizardSteps.swift"
+  },
+  {
+    "key": "Choose your GrapMail address",
+    "comment": "Title (sign-up address step)",
+    "file": "ios/GrapMail/WizardSteps.swift"
+  },
+  {
+    "key": "Pick an available address or create your own. You'll use this to sign in and receive emails.",
+    "comment": "Label (sign-up address step)",
+    "file": "ios/GrapMail/WizardSteps.swift"
+  },
+  {
+    "key": "Suggested for you",
+    "comment": "Label (sign-up address step)",
+    "file": "ios/GrapMail/WizardSteps.swift"
+  },
+  {
+    "key": "Based on your name. You can change it later.",
+    "comment": "Label (sign-up address step)",
+    "file": "ios/GrapMail/WizardSteps.swift"
+  },
+  {
+    "key": "Finding available addresses…",
+    "comment": "Label (sign-up address step)",
+    "file": "ios/GrapMail/WizardSteps.swift"
+  },
+  {
+    "key": "No suggestions from your name — create your own below.",
+    "comment": "Label (sign-up address step)",
+    "file": "ios/GrapMail/WizardSteps.swift"
+  },
+  {
+    "key": "Create your own",
+    "comment": "Label (sign-up address step)",
+    "file": "ios/GrapMail/WizardSteps.swift"
+  },
+  {
+    "key": "Choose a unique address (3-30 characters).",
+    "comment": "Label (sign-up address step)",
+    "file": "ios/GrapMail/WizardSteps.swift"
+  },
+  {
+    "key": "yourname",
+    "comment": "Sign-up address step: placeholder for the part before @grapsee.com",
+    "file": "ios/GrapMail/WizardSteps.swift"
+  },
+  {
+    "key": "@grapsee.com",
+    "comment": "Label (sign-up address step)",
+    "file": "ios/GrapMail/WizardSteps.swift"
+  },
+  {
+    "key": "Use letters, numbers, dots (.), dashes (-) or underscores (_).\nAvoid reserved names like admin, support, postmaster, etc.",
+    "comment": "Label (sign-up address step)",
+    "file": "ios/GrapMail/WizardSteps.swift"
+  },
+  {
+    "key": "Checking…",
+    "comment": "Label (sign-up address step)",
+    "file": "ios/GrapMail/WizardSteps.swift"
+  },
+  {
+    "key": "This address is available!",
+    "comment": "Label (sign-up address step)",
+    "file": "ios/GrapMail/WizardSteps.swift"
+  },
+  {
+    "key": "That address is taken. Try %@1@grapsee.com",
+    "comment": "Label (sign-up address step)",
+    "file": "ios/GrapMail/WizardSteps.swift"
+  },
+  {
+    "key": "That address cannot be used.",
+    "comment": "Sign-up address step: the chosen address is not allowed",
+    "file": "ios/GrapMail/WizardSteps.swift"
+  },
+  {
+    "key": "Could not check right now — confirmed when the account is created.",
+    "comment": "Label (sign-up address step)",
+    "file": "ios/GrapMail/WizardSteps.swift"
+  },
+  {
+    "key": "Available",
+    "comment": "Label (sign-up address step)",
+    "file": "ios/GrapMail/WizardSteps.swift"
+  },
+  {
+    "key": "Create a strong password",
+    "comment": "Title (sign-up password step)",
+    "file": "ios/GrapMail/WizardSteps.swift"
+  },
+  {
+    "key": "Your password keeps your account safe. Make it unique, strong and easy for you to remember.",
+    "comment": "Label (sign-up password step)",
+    "file": "ios/GrapMail/WizardSteps.swift"
+  },
+  {
+    "key": "Your GrapMail address",
+    "comment": "Label (sign-up password step)",
+    "file": "ios/GrapMail/WizardSteps.swift"
+  },
+  {
+    "key": "%@@grapsee.com",
+    "comment": "A GrapMail address; the argument is the chosen handle. Do not translate.",
+    "file": "ios/GrapMail/WizardSteps.swift"
+  },
+  {
+    "key": "Edit",
+    "comment": "Label (sign-up password step)",
+    "file": "ios/GrapMail/WizardSteps.swift"
+  },
+  {
+    "key": "Password ",
+    "comment": "Label (sign-up password step)",
+    "file": "ios/GrapMail/WizardSteps.swift"
+  },
+  {
+    "key": "*",
+    "comment": "Label (sign-up password step)",
+    "file": "ios/GrapMail/WizardSteps.swift"
+  },
+  {
+    "key": "Confirm password ",
+    "comment": "Label (sign-up password step)",
+    "file": "ios/GrapMail/WizardSteps.swift"
+  },
+  {
+    "key": "Re-enter your password",
+    "comment": "Text field placeholder (sign-up password step)",
+    "file": "ios/GrapMail/WizardSteps.swift"
+  },
+  {
+    "key": "Password requirements",
+    "comment": "Label (sign-up password step)",
+    "file": "ios/GrapMail/WizardSteps.swift"
+  },
+  {
+    "key": "At least 8 characters",
+    "comment": "Password requirement (sign-up password step)",
+    "file": "ios/GrapMail/WizardSteps.swift"
+  },
+  {
+    "key": "A mix of letters, numbers and symbols",
+    "comment": "Password requirement (sign-up password step)",
+    "file": "ios/GrapMail/WizardSteps.swift"
+  },
+  {
+    "key": "Both passwords must match",
+    "comment": "Password requirement (sign-up password step)",
+    "file": "ios/GrapMail/WizardSteps.swift"
+  },
+  {
+    "key": "Strong",
+    "comment": "Password strength",
+    "file": "ios/GrapMail/WizardSteps.swift"
+  },
+  {
+    "key": "Good",
+    "comment": "Password strength",
+    "file": "ios/GrapMail/WizardSteps.swift"
+  },
+  {
+    "key": "Fair",
+    "comment": "Password strength",
+    "file": "ios/GrapMail/WizardSteps.swift"
+  },
+  {
+    "key": "Weak",
+    "comment": "Password strength",
+    "file": "ios/GrapMail/WizardSteps.swift"
+  },
+  {
+    "key": "Terms & Privacy",
+    "comment": "Title (sign-up terms step)",
+    "file": "ios/GrapMail/WizardSteps.swift"
+  },
+  {
+    "key": "Please read and agree to our Terms of Service and Privacy Policy to continue.",
+    "comment": "Label (sign-up terms step)",
+    "file": "ios/GrapMail/WizardSteps.swift"
+  },
+  {
+    "key": "GrapMail Terms of Service",
+    "comment": "Label (sign-up terms step)",
+    "file": "ios/GrapMail/WizardSteps.swift"
+  },
+  {
+    "key": "1.  Your Account",
+    "comment": "Label (sign-up terms step)",
+    "file": "ios/GrapMail/WizardSteps.swift"
+  },
+  {
+    "key": "By creating an account, you agree to our %@ and confirm that you are at least 13 years old. You are responsible for keeping your account secure and for all activity that happens under your account.",
+    "comment": "Label (sign-up terms step)",
+    "file": "ios/GrapMail/WizardSteps.swift"
+  },
+  {
+    "key": "Terms of Service",
+    "comment": "Label (sign-up terms step)",
+    "file": "ios/GrapMail/WizardSteps.swift"
+  },
+  {
+    "key": "2.  Privacy Policy",
+    "comment": "Label (sign-up terms step)",
+    "file": "ios/GrapMail/WizardSteps.swift"
+  },
+  {
+    "key": "We collect and process your data to provide and improve GrapMail services. Your information will not be shared with third parties without your consent, except as required by law. You can read the full details in our %@.",
+    "comment": "Label (sign-up terms step)",
+    "file": "ios/GrapMail/WizardSteps.swift"
+  },
+  {
+    "key": "Privacy Policy",
+    "comment": "Label (sign-up terms step)",
+    "file": "ios/GrapMail/WizardSteps.swift"
+  },
+  {
+    "key": "Read our Terms of Service ↗",
+    "comment": "Link (sign-up terms step)",
+    "file": "ios/GrapMail/WizardSteps.swift"
+  },
+  {
+    "key": "Read our Privacy Policy ↗",
+    "comment": "Link (sign-up terms step)",
+    "file": "ios/GrapMail/WizardSteps.swift"
+  },
+  {
+    "key": "I agree to the %@ and %@",
+    "comment": "Label (sign-up terms step)",
+    "file": "ios/GrapMail/WizardSteps.swift"
+  },
+  {
+    "key": "You must scroll to the bottom of this document to enable the checkbox.",
+    "comment": "Label (sign-up terms step)",
+    "file": "ios/GrapMail/WizardSteps.swift"
+  },
+  {
+    "key": "Create Account",
+    "comment": "Button title (sign-up terms step)",
+    "file": "ios/GrapMail/WizardSteps.swift"
+  },
+  {
+    "key": "Female",
+    "comment": "Gender option (sign-up details step)",
+    "file": "ios/GrapMail/WizardSteps.swift"
+  },
+  {
+    "key": "Male",
+    "comment": "Gender option (sign-up details step)",
+    "file": "ios/GrapMail/WizardSteps.swift"
+  },
+  {
+    "key": "Rather not say",
+    "comment": "Gender option (sign-up details step)",
+    "file": "ios/GrapMail/WizardSteps.swift"
+  },
+  {
+    "key": "Custom",
+    "comment": "Gender option (sign-up details step)",
+    "file": "ios/GrapMail/WizardSteps.swift"
+  },
+  {
+    "key": "Explore your mailbox",
+    "comment": "Next-step tile title (account created screen)",
+    "file": "ios/GrapMail/FinishScreens.swift"
+  },
+  {
+    "key": "Check your inbox, send emails, and more.",
+    "comment": "Next-step tile description (account created screen)",
+    "file": "ios/GrapMail/FinishScreens.swift"
+  },
+  {
+    "key": "Add your contacts",
+    "comment": "Next-step tile title (account created screen)",
+    "file": "ios/GrapMail/FinishScreens.swift"
+  },
+  {
+    "key": "Stay connected with friends and colleagues.",
+    "comment": "Next-step tile description (account created screen)",
+    "file": "ios/GrapMail/FinishScreens.swift"
+  },
+  {
+    "key": "Personalize your experience",
+    "comment": "Next-step tile title (account created screen)",
+    "file": "ios/GrapMail/FinishScreens.swift"
+  },
+  {
+    "key": "Set up your preferences and get the most out of GrapMail.",
+    "comment": "Next-step tile description (account created screen)",
+    "file": "ios/GrapMail/FinishScreens.swift"
+  },
+  {
+    "key": "Your secure inbox",
+    "comment": "Feature row title (account created screen)",
+    "file": "ios/GrapMail/FinishScreens.swift"
+  },
+  {
+    "key": "Send, receive and manage your emails.",
+    "comment": "Feature row description (account created screen)",
+    "file": "ios/GrapMail/FinishScreens.swift"
+  },
+  {
+    "key": "Built for your privacy",
+    "comment": "Feature row title (account created screen)",
+    "file": "ios/GrapMail/FinishScreens.swift"
+  },
+  {
+    "key": "Your data stays yours.",
+    "comment": "Feature row description (account created screen)",
+    "file": "ios/GrapMail/FinishScreens.swift"
+  },
+  {
+    "key": "Ready for what's next",
+    "comment": "Feature row title (account created screen)",
+    "file": "ios/GrapMail/FinishScreens.swift"
+  },
+  {
+    "key": "Let's get you set up and personalized.",
+    "comment": "Feature row description (account created screen)",
+    "file": "ios/GrapMail/FinishScreens.swift"
+  },
+  {
+    "key": "Unlock your encryption key",
+    "comment": "Face ID prompt reason for the end-to-end encryption key",
+    "file": "ios/GrapMail/E2eModel.swift"
+  },
+  {
+    "key": "Your Face ID or Touch ID settings changed, so biometric unlock was turned off for this key. Unlock with your passphrase. If you have forgotten it, use your recovery key.",
+    "comment": "End-to-end encryption status note",
+    "file": "ios/GrapMail/E2eModel.swift"
+  },
+  {
+    "key": "Unlock with Face ID or Touch ID",
+    "comment": "Button title (end-to-end encryption unlock screen)",
+    "file": "ios/GrapMail/E2eViews.swift"
+  },
+  {
+    "key": "Use passphrase",
+    "comment": "Face ID fallback button when unlocking the encryption key",
+    "file": "ios/GrapMail/BiometricKeyWrap.swift"
+  }
+]

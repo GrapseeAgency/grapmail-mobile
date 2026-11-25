@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="identity_settings_appearance">Apparence</string>
+    <string name="identity_match_wallpaper_title">Suivre le fond d’écran</string>
+    <string name="identity_match_wallpaper_subtitle">Reprend les couleurs de votre fond d’écran pour les boutons et les surlignages. Les avatars, les couleurs d’état et le texte restent ceux de GrapMail.</string>
+</resources>

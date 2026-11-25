@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="mail_receipt_read_at">خوانده‌شده %1$s</string>
+    <string name="mail_receipt_requested_pending">رسید خواندن درخواست شده · هنوز خوانده نشده</string>
+    <string name="mail_receipt_server_sent">رسید خواندن ارسال شد</string>
+    <string name="mail_receipt_ask_title">فرستنده رسید خواندن خواسته است</string>
+    <string name="mail_receipt_ask_body">برای %1$s رسیدی بفرستید که این پیام را باز کرده‌اید؟ فقط زمان باز کردن آن را می‌فهمد، نه چیز دیگری.</string>
+    <string name="mail_receipt_ask_send">ارسال رسید</string>
+    <string name="mail_receipt_ask_decline">ارسال نشود</string>
+    <string name="mail_receipt_mode_title">ارسال رسید خواندن</string>
+    <string name="mail_receipt_mode_body">وقتی پیامی رسید خواندن بخواهد. برای هرزنامه، فرستندگان مسدودشده یا ایمیل رمزگذاری‌شده هرگز رسید ارسال نمی‌شود، مگر اینکه «همیشه» را انتخاب کنید.</string>
+    <string name="mail_receipt_mode_never">هرگز</string>
+    <string name="mail_receipt_mode_ask">پرسیده شود</string>
+    <string name="mail_receipt_mode_always">همیشه</string>
+    <string name="mail_receipt_mode_always_note">«همیشه» برای هرزنامه، فرستندگان مسدودشده و ایمیل رمزگذاری‌شده هم رسید می‌فرستد.</string>
+    <string name="mail_receipt_mode_unavailable">این تنظیم بارگیری نشد. اتصال خود را بررسی کنید.</string>
+    <string name="mail_compose_request_receipt">درخواست رسید خواندن</string>
+</resources>

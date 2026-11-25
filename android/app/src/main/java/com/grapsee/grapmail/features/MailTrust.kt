@@ -1,5 +1,7 @@
 package com.grapsee.grapmail.features
 
+import com.grapsee.grapmail.R
+import com.grapsee.grapmail.ui.i18n.CoreStrings
 import java.net.URI
 import java.util.Locale
 
@@ -19,10 +21,13 @@ import java.util.Locale
 // F27 — Actionable message cards
 // ---------------------------------------------------------------------------
 
-enum class CardKind(val label: String) {
-    TRACKING("Tracking"),
-    FLIGHT("Flight"),
-    EVENT("Event"),
+enum class CardKind(private val labelRes: Int, private val englishLabel: String) {
+    TRACKING(R.string.core_card_kind_tracking, "Tracking"),
+    FLIGHT(R.string.core_card_kind_flight, "Flight"),
+    EVENT(R.string.core_card_kind_event, "Event"),
+    ;
+
+    val label: String get() = CoreStrings.get(labelRes) { englishLabel }
 }
 
 data class ActionCard(
@@ -43,7 +48,7 @@ object ActionCardExtractor {
     private val dhlPattern = Regex("""\bJJD\d{16,20}\b""")
     private val dhlNumericPattern = Regex("""\b\d{10}\b""")
     private val fedexPattern = Regex("""\b(?:\d{12}|\d{15})\b""")
-    private val flightPattern = Regex("""\b([A-Z]{2})\s?(\d{1,4})\b""")
+    private val flightPattern = Regex("""\b([A-Z][A-Z0-9]|[0-9][A-Z])\s?(\d{1,4})\b""")
     private val isoDatePattern = Regex("""\b(\d{4})-(\d{2})-(\d{2})\b""")
 
     private val knownAirlineCodes = setOf(
@@ -85,7 +90,7 @@ object ActionCardExtractor {
                     ActionCard(
                         CardKind.FLIGHT,
                         flight,
-                        "Flight $flight — open flight status",
+                        CoreStrings.get(R.string.core_card_flight_label, flight) { "Flight $flight — open flight status" },
                         "https://www.google.com/search?q=flight+" + flight.replace(" ", "+") + "+status",
                     ),
                 )
@@ -100,7 +105,7 @@ object ActionCardExtractor {
                     ActionCard(
                         CardKind.EVENT,
                         iso,
-                        "Date found: $iso — add to calendar",
+                        CoreStrings.get(R.string.core_card_event_label, iso) { "Date found: $iso — add to calendar" },
                         "https://calendar.google.com/calendar/render?action=TEMPLATE&text=Event&dates=$compact/$compact",
                     ),
                 )
@@ -119,7 +124,7 @@ object ActionCardExtractor {
             "FedEx" -> "https://www.fedex.com/fedextrack/?trknbr=" + value
             else -> null
         }
-        return ActionCard(CardKind.TRACKING, value, "$carrier $value — track package", url)
+        return ActionCard(CardKind.TRACKING, value, CoreStrings.get(R.string.core_card_tracking_label, carrier, value) { "$carrier $value — track package" }, url)
     }
 }
 
@@ -127,10 +132,13 @@ object ActionCardExtractor {
 // F23 — QR / URL phishing analysis
 // ---------------------------------------------------------------------------
 
-enum class UrlRisk(val label: String) {
-    LOW("Looks safe"),
-    MEDIUM("Be careful"),
-    HIGH("Dangerous"),
+enum class UrlRisk(private val labelRes: Int, private val englishLabel: String) {
+    LOW(R.string.core_url_risk_low, "Looks safe"),
+    MEDIUM(R.string.core_url_risk_medium, "Be careful"),
+    HIGH(R.string.core_url_risk_high, "Dangerous"),
+    ;
+
+    val label: String get() = CoreStrings.get(labelRes) { englishLabel }
 }
 
 data class UrlVerdict(
@@ -213,31 +221,31 @@ object UrlSafety {
         }
 
         if (host.isEmpty()) {
-            return UrlVerdict(UrlRisk.HIGH, listOf("The link's destination could not be read."), "", url)
+            return UrlVerdict(UrlRisk.HIGH, listOf(CoreStrings.get(R.string.core_url_reason_unreadable) { "The link's destination could not be read." }), "", url)
         }
 
         if (scheme == "http") {
-            reasons.add("Not encrypted (http://) — anything entered on that page can be intercepted.")
+            reasons.add(CoreStrings.get(R.string.core_url_reason_http) { "Not encrypted (http://) — anything entered on that page can be intercepted." })
         }
         if (userInfo) {
-            reasons.add("The address hides a fake login string before the real domain.")
+            reasons.add(CoreStrings.get(R.string.core_url_reason_userinfo) { "The address hides a fake login string before the real domain." })
         }
         if (ipv4Pattern.matches(host)) {
-            reasons.add("The destination is a raw IP address, not a real domain.")
+            reasons.add(CoreStrings.get(R.string.core_url_reason_ip) { "The destination is a raw IP address, not a real domain." })
         }
-        if (host.startsWith("xn--") || host.contains(".xn--")) {
-            reasons.add("The domain uses punycode characters, often used to imitate real letters.")
+        if (host.startsWith("xn--") || host.contains(".xn--") || hasConfusableLabel(host)) {
+            reasons.add(CoreStrings.get(R.string.core_url_reason_punycode) { "The domain uses punycode characters, often used to imitate real letters." })
         }
         if (shortenerHosts.any { host == it || host.endsWith("." + it) }) {
-            reasons.add("This is a shortened link — the true destination is hidden.")
+            reasons.add(CoreStrings.get(R.string.core_url_reason_shortener) { "This is a shortened link — the true destination is hidden." })
         }
         if (riskyTlds.any { host.endsWith(it) }) {
-            reasons.add("This domain uses a top-level domain heavily abused by scams.")
+            reasons.add(CoreStrings.get(R.string.core_url_reason_risky_tld) { "This domain uses a top-level domain heavily abused by scams." })
         }
 
         val labels = host.split('.').filter { it.isNotEmpty() }
         if (labels.size >= 5) {
-            reasons.add("Unusually deep subdomain chain (${labels.size} levels) — common in fake login pages.")
+            reasons.add(CoreStrings.get(R.string.core_url_reason_deep_subdomains, labels.size) { "Unusually deep subdomain chain (${labels.size} levels) — common in fake login pages." })
         }
 
         val registrable = registrableDomain(labels)
@@ -252,7 +260,7 @@ object UrlSafety {
                     t == brand || (brand.length >= 6 && (t.startsWith(brand) || t.endsWith(brand)))
                 }
                 if (subImitates || regImitates) {
-                    reasons.add("\"$registrable\" imitates $brand — the official domain is $official.")
+                    reasons.add(CoreStrings.get(R.string.core_url_reason_imitates, registrable, brand, official) { "\"$registrable\" imitates $brand — the official domain is $official." })
                     break
                 }
             }
@@ -271,6 +279,26 @@ object UrlSafety {
             else -> host
         }
         return UrlVerdict(risk, reasons.distinct(), display, url)
+    }
+
+    /**
+     * True when any non-ASCII label of [host] mixes more than one script
+     * (e.g. Cyrillic "а" + Latin "pple"). Common/Inherited code points are ignored.
+     */
+    private fun hasConfusableLabel(host: String): Boolean {
+        for (label in host.split('.')) {
+            if (label.all { it.code < 128 }) continue
+            val scripts = HashSet<Character.UnicodeScript>()
+            var i = 0
+            while (i < label.length) {
+                val cp = label.codePointAt(i)
+                val s = Character.UnicodeScript.of(cp)
+                if (s != Character.UnicodeScript.COMMON && s != Character.UnicodeScript.INHERITED) scripts.add(s)
+                i += Character.charCount(cp)
+            }
+            if (scripts.size != 1) return true
+        }
+        return false
     }
 
     private fun registrableDomain(labels: List<String>): String {
@@ -321,7 +349,7 @@ object TrackerShield {
             if (!isRemote(src)) continue
             remoteCount += 1
             val host = hostOf(src) ?: continue
-            val isTracker = onePixel.containsMatchIn(tag) || trackerHostHints.any { host.contains(it) }
+            val isTracker = isTrackerTag(tag, src, host)
             if (isTracker) trackerCount += 1
             if (isTracker || !allowRemoteImages) blocked.add(host)
         }
@@ -336,7 +364,7 @@ object TrackerShield {
                 val src = srcAttr.find(tag)?.groupValues?.get(1)?.trim() ?: continue
                 if (!isRemote(src)) continue
                 val host = hostOf(src) ?: continue
-                val isTracker = onePixel.containsMatchIn(tag) || trackerHostHints.any { host.contains(it) }
+                val isTracker = isTrackerTag(tag, src, host)
                 if (isTracker || !allowRemoteImages) removeTags.add(tag)
             }
             if (removeTags.isNotEmpty()) {
@@ -350,6 +378,13 @@ object TrackerShield {
             blockedHosts = blocked.distinct(),
             cleanedHtml = out,
         )
+    }
+
+    private fun isTrackerTag(tag: String, src: String, host: String): Boolean {
+        if (onePixel.containsMatchIn(tag)) return true
+        val path = src.substringAfter("://").substringAfter('/', "").substringBefore('?').substringBefore('#')
+        val hostAndPath = "$host/$path"
+        return trackerHostHints.any { h -> if ('/' in h) hostAndPath.contains(h) else host.contains(h) }
     }
 
     private fun isRemote(src: String): Boolean =

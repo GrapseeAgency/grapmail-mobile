@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">GrapMail</string>
+    <string name="shortcut_compose_short">メールを作成</string>
+    <string name="shortcut_compose_long">GrapMail で新しいメールを作成</string>
+    <string name="shortcut_scheduled_short">送信予定</string>
+    <string name="shortcut_scheduled_long">送信待ちのメールを確認・取り消し</string>
+    <string name="shortcut_subscriptions_short">登録済みの配信</string>
+    <string name="shortcut_subscriptions_long">送信者を確認して、まとめて配信停止</string>
+    <string name="notif_channel_new_mail">新着メール</string>
+    <string name="notif_channel_new_mail_desc">バックグラウンドの確認で未読メールが見つかったときに通知します。GrapMail はプッシュサービスを使用しないため、システムがアプリを起動したときにアプリ自身がサーバーに確認して通知します。</string>
+    <string name="notif_channel_security">セキュリティ通知</string>
+    <string name="notif_channel_security_desc">新しいデバイスからのログイン、パスワードの変更、信頼済みデバイスの変更など、アカウントに何かあったときにすぐに通知します。おやすみ時間中も通知は止まりません。</string>
+    <string name="widget_description">未読メールをひと目で確認: GrapMail のバックグラウンド確認による件数</string>
+</resources>

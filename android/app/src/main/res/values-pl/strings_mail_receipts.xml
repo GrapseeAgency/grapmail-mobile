@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="mail_receipt_read_at">Przeczytano %1$s</string>
+    <string name="mail_receipt_requested_pending">Poproszono o potwierdzenie odczytu · jeszcze nieprzeczytane</string>
+    <string name="mail_receipt_server_sent">Wysłano potwierdzenie odczytu</string>
+    <string name="mail_receipt_ask_title">Nadawca prosi o potwierdzenie odczytu</string>
+    <string name="mail_receipt_ask_body">Wysłać do %1$s potwierdzenie, że otworzono tę wiadomość? Dowie się tylko, kiedy ją otworzono, nic więcej.</string>
+    <string name="mail_receipt_ask_send">Wyślij potwierdzenie</string>
+    <string name="mail_receipt_ask_decline">Nie wysyłaj</string>
+    <string name="mail_receipt_mode_title">Wysyłaj potwierdzenia odczytu</string>
+    <string name="mail_receipt_mode_body">Gdy wiadomość prosi o potwierdzenie odczytu. Potwierdzenia nigdy nie są wysyłane dla spamu, zablokowanych nadawców ani zaszyfrowanej poczty, chyba że wybierzesz Zawsze.</string>
+    <string name="mail_receipt_mode_never">Nigdy</string>
+    <string name="mail_receipt_mode_ask">Pytaj</string>
+    <string name="mail_receipt_mode_always">Zawsze</string>
+    <string name="mail_receipt_mode_always_note">Opcja Zawsze wysyła potwierdzenia także dla spamu, zablokowanych nadawców i zaszyfrowanej poczty.</string>
+    <string name="mail_receipt_mode_unavailable">Nie udało się wczytać tego ustawienia. Sprawdź połączenie.</string>
+    <string name="mail_compose_request_receipt">Poproś o potwierdzenie odczytu</string>
+</resources>

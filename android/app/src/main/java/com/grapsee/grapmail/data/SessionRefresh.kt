@@ -1,6 +1,8 @@
 package com.grapsee.grapmail.data
 
 import android.content.Context
+import com.grapsee.grapmail.R
+import com.grapsee.grapmail.ui.i18n.CoreStrings
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
@@ -71,24 +73,46 @@ object SessionRefresh {
         val unavailable = lastUnavailable
         if (unavailable != null && unavailable.sessionId == original.id && unavailable.bearer == original.token &&
             now - unavailable.atMillis < 2_000
-        ) throw java.io.IOException("The session could not be refreshed. Try again.")
+        ) throw java.io.IOException(CoreStrings.get(R.string.core_session_refresh_failed) { "The session could not be refreshed. Try again." })
         val refresh = original.refreshToken ?: return null
         val pair = try {
             Api.refreshSession(refresh)
         } catch (e: kotlinx.coroutines.CancellationException) {
             throw e
         } catch (e: Exception) {
-            if (e is ApiException && (e.status == 401 || e.status == 403)) return null
+            if (e is ApiException && (e.status == 401 || e.status == 403)) {
+                // Round 8 — B: the reason the welcome-back banner gives once the
+                // 401 collector drops this session (SessionStore.clearIfToken).
+                SessionEvents.noteEnding(original.token, endingFor(e, original))
+                return null
+            }
             lastUnavailable = FailedRotation(original.id, original.token, android.os.SystemClock.elapsedRealtime())
-            throw java.io.IOException("The session could not be refreshed. Try again.", e)
+            throw java.io.IOException(CoreStrings.get(R.string.core_session_refresh_failed) { "The session could not be refreshed. Try again." }, e)
         }
         val renewed = pair.accessToken ?: pair.token
-            ?: throw java.io.IOException("The session refresh returned no access token.")
+            ?: throw java.io.IOException(CoreStrings.get(R.string.core_session_refresh_no_token) { "The session refresh returned no access token." })
         if (!SessionStore.updateTokens(context, renewed, pair.refreshToken, pair.expiresAtMillis, original.token)) {
             return null
         }
         lastUnavailable = null
         lastRotation = Rotation(original.id, original.token, renewed)
         return renewed
+    }
+
+    /**
+     * Why a refused refresh ended the session (round8-spec §2.1). The server
+     * has no "revoked" code, so it is read from the evidence: an access token
+     * still inside its hour that the server would not take was ended by
+     * someone (another device, "This wasn't me", "Sign out everywhere");
+     * one that had simply run out is an expiry, as is the reuse guard's
+     * REFRESH_TOKEN_REUSED ("signed out to protect your account"). A 403
+     * with no code is the gateway's "Account inactive" — the remembered
+     * record goes (clearing rule 4).
+     */
+    private fun endingFor(e: ApiException, original: SessionSnapshot): RememberedAccounts.Ending = when {
+        e.status == 403 && e.code == null -> RememberedAccounts.Ending.Blocked
+        e.code == "REFRESH_TOKEN_REUSED" -> RememberedAccounts.Ending.Expired
+        original.unexpired -> RememberedAccounts.Ending.Revoked
+        else -> RememberedAccounts.Ending.Expired
     }
 }

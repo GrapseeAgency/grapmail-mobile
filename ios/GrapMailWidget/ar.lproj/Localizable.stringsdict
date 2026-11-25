@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>%lld unread</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@unread@</string>
+		<key>unread</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>zero</key>
+			<string>%lld غير مقروءة</string>
+			<key>one</key>
+			<string>%lld غير مقروءة</string>
+			<key>two</key>
+			<string>%lld غير مقروءتين</string>
+			<key>few</key>
+			<string>%lld غير مقروءة</string>
+			<key>many</key>
+			<string>%lld غير مقروءة</string>
+			<key>other</key>
+			<string>%lld غير مقروءة</string>
+		</dict>
+	</dict>
+	<key>%lld unread · %@</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@unread@ · %@</string>
+		<key>unread</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>zero</key>
+			<string>%lld غير مقروءة</string>
+			<key>one</key>
+			<string>%lld غير مقروءة</string>
+			<key>two</key>
+			<string>%lld غير مقروءتين</string>
+			<key>few</key>
+			<string>%lld غير مقروءة</string>
+			<key>many</key>
+			<string>%lld غير مقروءة</string>
+			<key>other</key>
+			<string>%lld غير مقروءة</string>
+		</dict>
+	</dict>
+</dict>
+</plist>

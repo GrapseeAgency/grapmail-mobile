@@ -64,21 +64,24 @@ import com.grapsee.grapmail.ui.components.StatusChip
 import com.grapsee.grapmail.ui.components.TwoStepRibbon
 import com.grapsee.grapmail.ui.theme.LocalPalette
 import kotlinx.coroutines.launch
+import androidx.compose.ui.res.stringResource
+import com.grapsee.grapmail.R
+import androidx.annotation.StringRes
 
-private data class Country(val flag: String, val dial: String, val name: String)
+private data class Country(val flag: String, val dial: String, @StringRes val name: Int)
 
 // The numbers GrapMail actually sees. The picker is a short, honest list rather
 // than an unbounded database nobody maintains; the dial code is the only part
 // that matters to the API, which stores E.164.
 private val COUNTRIES = listOf(
-    Country("\uD83C\uDDE7\uD83C\uDDE9", "+880", "Bangladesh"),
-    Country("\uD83C\uDDEE\uD83C\uDDF3", "+91", "India"),
-    Country("\uD83C\uDDF5\uD83C\uDDF0", "+92", "Pakistan"),
-    Country("\uD83C\uDDFA\uD83C\uDDF8", "+1", "United States"),
-    Country("\uD83C\uDDEC\uD83C\uDDE7", "+44", "United Kingdom"),
-    Country("\uD83C\uDDE6\uD83C\uDDEA", "+971", "United Arab Emirates"),
-    Country("\uD83C\uDDF8\uD83C\uDDE6", "+966", "Saudi Arabia"),
-    Country("\uD83C\uDDF2\uD83C\uDDFE", "+60", "Malaysia"),
+    Country("\uD83C\uDDE7\uD83C\uDDE9", "+880", R.string.acct_bangladesh),
+    Country("\uD83C\uDDEE\uD83C\uDDF3", "+91", R.string.acct_india),
+    Country("\uD83C\uDDF5\uD83C\uDDF0", "+92", R.string.acct_pakistan),
+    Country("\uD83C\uDDFA\uD83C\uDDF8", "+1", R.string.acct_united_states),
+    Country("\uD83C\uDDEC\uD83C\uDDE7", "+44", R.string.acct_united_kingdom),
+    Country("\uD83C\uDDE6\uD83C\uDDEA", "+971", R.string.acct_united_arab_emirates),
+    Country("\uD83C\uDDF8\uD83C\uDDE6", "+966", R.string.acct_saudi_arabia),
+    Country("\uD83C\uDDF2\uD83C\uDDFE", "+60", R.string.acct_malaysia),
 )
 
 /** E.164 from the dial code and what the person typed, the way the API wants it. */
@@ -136,7 +139,7 @@ fun PhoneVerificationScreen(
     fun sendCode(isResend: Boolean) {
         val e164 = if (isResend) state.phone else toE164(country.dial, national)
         if (e164 == null) {
-            error = "Enter a valid phone number."
+            error = context.getString(R.string.acct_enter_a_valid_phone_number)
             return
         }
         if (isResend) resending = true else busy = true
@@ -146,7 +149,7 @@ fun PhoneVerificationScreen(
                 val resp = Api.startPhoneVerification(e164)
                 busy = false; resending = false
                 if (resp.challengeId == null) {
-                    error = resp.message ?: "We couldn't send a code to that number."
+                    error = resp.message ?: context.getString(R.string.acct_we_couldnt_send_a_code_to_that)
                     return@launch
                 }
                 code = ""
@@ -157,13 +160,13 @@ fun PhoneVerificationScreen(
             } catch (e: ApiException) {
                 busy = false; resending = false
                 error = when (e.code) {
-                    "PHONE_IN_USE" -> "That number is already linked to another account."
-                    "RATE_LIMITED" -> e.message ?: "Please wait a moment before asking for another code."
-                    else -> e.message ?: "We couldn't send your code. Try again."
+                    "PHONE_IN_USE" -> context.getString(R.string.acct_that_number_is_already_linked_to)
+                    "RATE_LIMITED" -> e.message ?: context.getString(R.string.acct_please_wait_a_moment_before_asking)
+                    else -> e.message ?: context.getString(R.string.acct_we_couldnt_send_your_code_try_again)
                 }
             } catch (_: Exception) {
                 busy = false; resending = false
-                error = "Network error. Please try again."
+                error = context.getString(R.string.acct_network_error)
             }
         }
     }
@@ -180,14 +183,14 @@ fun PhoneVerificationScreen(
                 val token = SessionStore.token(context)
                 if (token == null) {
                     busy = false
-                    error = "Sign in first so the number can be saved to your account."
+                    error = context.getString(R.string.acct_sign_in_first_so_the_number_can_be)
                     return@launch
                 }
                 val verified = Api.verifyPhone(challenge, code)
                 val proof = verified.phoneToken
                 if (proof == null) {
                     busy = false
-                    error = "That code is not correct."
+                    error = context.getString(R.string.acct_that_code_is_not_correct)
                     return@launch
                 }
                 Api.linkPhone(token, proof)
@@ -198,13 +201,13 @@ fun PhoneVerificationScreen(
             } catch (e: ApiException) {
                 busy = false
                 error = when (e.code) {
-                    "PHONE_IN_USE" -> "That number is already linked to another account."
-                    "VERIFY_FAILED", "BAD_CODE" -> "That code is not correct."
-                    else -> e.message ?: "We couldn't verify that code. Try again."
+                    "PHONE_IN_USE" -> context.getString(R.string.acct_that_number_is_already_linked_to)
+                    "VERIFY_FAILED", "BAD_CODE" -> context.getString(R.string.acct_that_code_is_not_correct)
+                    else -> e.message ?: context.getString(R.string.acct_we_couldnt_verify_that_code_try)
                 }
             } catch (_: Exception) {
                 busy = false
-                error = "Network error. Please try again."
+                error = context.getString(R.string.acct_network_error)
             }
         }
     }
@@ -212,17 +215,17 @@ fun PhoneVerificationScreen(
     AccountScreen(
         onBack = { if (step == 2) step = 1 else onBack() },
         illustration = "account-phone".takeUnless { compact },
-        eyebrow = "Phone verification",
-        title = if (step == 1) "Verify your phone number" else "Enter the 6-digit code",
+        eyebrow = stringResource(R.string.acct_phone_verification),
+        title = if (step == 1) stringResource(R.string.acct_verify_your_phone_number) else stringResource(R.string.acct_enter_the_6_digit_code),
         body = if (step == 1) {
-            "We’ll send you a 6-digit code by SMS."
+            stringResource(R.string.acct_well_send_you_a_6_digit_code_by_sms)
         } else {
-            "SMS sent to ${prettyPhone(state.phone)}. The code expires in five minutes."
+            stringResource(R.string.acct_sms_sent_to, prettyPhone(state.phone))
         },
         footer = {
             if (step == 1) {
                 GradientButton(
-                    "Send Verification Code",
+                    stringResource(R.string.acct_send_verification_code),
                     onClick = { sendCode(false) },
                     enabled = national.isNotBlank(),
                     busy = busy,
@@ -237,12 +240,12 @@ fun PhoneVerificationScreen(
                 }
                 Spacer(Modifier.height(16.dp))
                 FooterNote(
-                    text = "Your phone number is only used for security purposes and won't be shared with anyone.",
+                    text = stringResource(R.string.acct_your_phone_number_is_only_used_for),
                     divider = false,
                 )
             } else {
                 GradientButton(
-                    "Verify & Continue",
+                    stringResource(R.string.acct_verify_and_continue),
                     onClick = { verify() },
                     enabled = code.length == 6,
                     busy = busy,
@@ -257,14 +260,14 @@ fun PhoneVerificationScreen(
                 }
                 Spacer(Modifier.height(14.dp))
                 FooterNote(
-                    text = "If the text message hasn’t arrived, you can request another code after one minute.",
+                    text = stringResource(R.string.acct_if_the_text_message_hasnt_arrived),
                     divider = false,
                 )
             }
             Spacer(Modifier.height(4.dp))
         },
     ) {
-        TwoStepRibbon(current = step, labels = listOf("Phone number", "SMS code"))
+        TwoStepRibbon(current = step, labels = listOf(stringResource(R.string.acct_phone_number), stringResource(R.string.acct_sms_code)))
         Spacer(Modifier.height(20.dp))
 
         if (step == 1) {
@@ -289,7 +292,7 @@ fun PhoneVerificationScreen(
                     Text(country.dial, fontSize = 15.sp, color = palette.textPrimary)
                     Icon(
                         Icons.Rounded.ExpandMore,
-                        contentDescription = "Country code",
+                        contentDescription = stringResource(R.string.acct_country_code),
                         tint = palette.textTertiary,
                         modifier = Modifier.size(18.dp),
                     )
@@ -298,7 +301,7 @@ fun PhoneVerificationScreen(
                 Box(Modifier.width(1.dp).height(28.dp).background(palette.border))
                 Spacer(Modifier.width(12.dp))
                 Column(Modifier.weight(1f).padding(vertical = 9.dp)) {
-                    Text("Phone number", fontSize = 12.sp, color = palette.textTertiary)
+                    Text(stringResource(R.string.acct_phone_number), fontSize = 12.sp, color = palette.textTertiary)
                     BasicTextField(
                         cursorBrush = androidx.compose.ui.graphics.SolidColor(LocalPalette.current.cursor),
                         value = national,
@@ -319,10 +322,11 @@ fun PhoneVerificationScreen(
             Spacer(Modifier.height(8.dp))
         } else {
             AppTextField(
-                label = "Verification code",
+                label = stringResource(R.string.acct_verification_code),
                 value = code,
-                hint = "6-digit SMS code",
+                hint = stringResource(R.string.acct_6_digit_sms_code),
                 keyboard = KeyboardType.NumberPassword,
+                autofill = com.grapsee.grapmail.ui.components.GMAutofill.OneTimeCode,
                 imeAction = androidx.compose.ui.text.input.ImeAction.Done,
                 keyboardActions = androidx.compose.foundation.text.KeyboardActions(onDone = {
                     if (code.length == 6 && !busy) verify()
@@ -335,7 +339,7 @@ fun PhoneVerificationScreen(
             Spacer(Modifier.height(12.dp))
             Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 CodeExpiry(expiresAt = state.phoneExpiresAt, onExpired = { })
-                AccountLink(if (resending) "Sending…" else "Resend code", onClick = { sendCode(true) })
+                AccountLink(if (resending) stringResource(R.string.acct_sending) else stringResource(R.string.acct_resend_code), onClick = { sendCode(true) })
             }
             Spacer(Modifier.height(8.dp))
         }
@@ -344,7 +348,7 @@ fun PhoneVerificationScreen(
     if (pickerOpen) {
         AlertDialog(
             onDismissRequest = { pickerOpen = false },
-            title = { Text("Country code", fontSize = 17.sp, fontWeight = FontWeight.SemiBold) },
+            title = { Text(stringResource(R.string.acct_country_code), fontSize = 17.sp, fontWeight = FontWeight.SemiBold) },
             text = {
                 Column(Modifier.verticalScroll(rememberScrollState())) {
                     COUNTRIES.forEachIndexed { index, c ->
@@ -358,14 +362,14 @@ fun PhoneVerificationScreen(
                         ) {
                             Text(c.flag, fontSize = 18.sp)
                             Spacer(Modifier.width(10.dp))
-                            Text(c.name, fontSize = 15.sp, color = palette.textPrimary, modifier = Modifier.weight(1f))
+                            Text(stringResource(c.name), fontSize = 15.sp, color = palette.textPrimary, modifier = Modifier.weight(1f))
                             Text(c.dial, fontSize = 14.sp, color = palette.textSecondary)
                         }
                     }
                 }
             },
             confirmButton = {
-                TextButton(onClick = { pickerOpen = false }) { Text("Close") }
+                TextButton(onClick = { pickerOpen = false }) { Text(stringResource(R.string.acct_close)) }
             },
         )
     }
@@ -387,7 +391,7 @@ fun PhoneVerifiedScreen(
         illustration = "account-phone-ok",
         footer = {
             GradientButton(
-                "Go to Account Security",
+                stringResource(R.string.acct_go_to_account_security),
                 onClick = onGoToSecurity,
                 trailing = {
                     Spacer(Modifier.size(10.dp))
@@ -396,20 +400,20 @@ fun PhoneVerifiedScreen(
             )
             Spacer(Modifier.height(8.dp))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
-                AccountLink("Back to Home", onClick = onBackHome)
+                AccountLink(stringResource(R.string.acct_back_to_home), onClick = onBackHome)
             }
             Spacer(Modifier.height(14.dp))
             FooterNote(
-                text = "Your phone number is securely stored and only used for account recovery and two-step verification.",
+                text = stringResource(R.string.acct_your_phone_number_is_securely_stored),
                 divider = false,
             )
             Spacer(Modifier.height(4.dp))
         },
     ) {
-        StatusChip("Phone Verified", ChipTone.Success)
+        StatusChip(stringResource(R.string.acct_phone_verified), ChipTone.Success)
         Spacer(Modifier.height(16.dp))
         Text(
-            "Your phone number\nhas been verified!",
+            stringResource(R.string.acct_your_phone_number_has_been_verified),
             fontSize = 28.sp,
             lineHeight = 34.sp,
             fontWeight = FontWeight.Bold,
@@ -418,7 +422,7 @@ fun PhoneVerifiedScreen(
         )
         Spacer(Modifier.height(10.dp))
         Text(
-            "Your phone number ${prettyPhone(phone)} is now linked to your GrapMail account. You can use it for account recovery and two-step verification.",
+            stringResource(R.string.acct_phone_now_linked, prettyPhone(phone)),
             fontSize = 15.sp,
             lineHeight = 23.sp,
             color = palette.textSecondary,
@@ -437,7 +441,7 @@ fun PhoneVerifiedScreen(
                 }
                 Spacer(Modifier.size(12.dp))
                 Column(Modifier.weight(1f)) {
-                    Text("Verified Phone Number", fontSize = 12.sp, color = palette.textSecondary)
+                    Text(stringResource(R.string.acct_verified_phone_number), fontSize = 12.sp, color = palette.textSecondary)
                     Text(prettyPhone(phone), fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = palette.textPrimary)
                 }
                 Row(
@@ -449,7 +453,7 @@ fun PhoneVerifiedScreen(
                     horizontalArrangement = Arrangement.spacedBy(5.dp),
                 ) {
                     Icon(Icons.Rounded.CheckCircle, contentDescription = null, tint = palette.successInk, modifier = Modifier.size(14.dp))
-                    Text("Verified", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = palette.successInk)
+                    Text(stringResource(R.string.acct_verified), fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = palette.successInk)
                 }
             }
         }

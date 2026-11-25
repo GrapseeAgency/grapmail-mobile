@@ -1,0 +1,512 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    User-visible text built outside composables: validators, ViewModels,
+    workers, notifications and the feature engines. Each entry's English is
+    byte-identical to the fallback next to its CoreStrings.get call in the
+    Kotlin source (ui/i18n/UiText.kt explains why both exist). Change both
+    together or neither.
+-->
+<resources>
+    <!-- logic/Validators.kt -->
+    <string name="core_validator_first_name">Please enter your first name (2+ characters).</string>
+    <string name="core_validator_last_name">Please enter your last name (2+ characters).</string>
+    <string name="core_validator_birthday_invalid">Enter a real birthday.</string>
+    <string name="core_validator_birthday_too_young">You must be at least 13 years old to create a GrapMail account.</string>
+    <string name="core_pw_req_length">At least 8 characters</string>
+    <string name="core_pw_req_letter">One letter</string>
+    <string name="core_pw_req_digit">One number</string>
+    <string name="core_pw_req_special">One special character</string>
+
+    <!-- Shared -->
+    <string name="core_sign_in_again">Sign in again.</string>
+
+    <!-- logic/Notifications.kt -->
+    <string name="core_notif_new_sender">New sender</string>
+    <plurals name="core_notif_unread_in_inbox">
+        <item quantity="one">%1$d unread in the inbox</item>
+        <item quantity="other">%1$d unread in the inbox</item>
+    </plurals>
+    <string name="core_notif_open_to_read">Open GrapMail to read it</string>
+    <string name="core_notif_no_subject">(no subject)</string>
+    <string name="core_notif_new_encrypted">New encrypted message</string>
+    <plurals name="core_notif_new_messages">
+        <item quantity="one">%1$d new message</item>
+        <item quantity="other">%1$d new messages</item>
+    </plurals>
+    <string name="core_notif_action_archive">Archive</string>
+    <string name="core_notif_action_mark_read">Mark as read</string>
+    <string name="core_notif_action_reply">Reply</string>
+    <string name="core_notif_action_more">More</string>
+    <string name="core_notif_generic_new_mail">New mail</string>
+    <string name="core_notif_security_signin">New GrapMail sign-in</string>
+    <string name="core_notif_security_password">Your GrapMail password was changed</string>
+    <string name="core_notif_security_device">Trusted device change</string>
+    <string name="core_notif_security_generic">GrapMail security alert</string>
+    <string name="core_notif_security_body">Open GrapMail to review this security alert.</string>
+    <string name="core_notif_action_this_was_me">This was me</string>
+    <string name="core_notif_action_secure_account">Secure account</string>
+
+    <!-- logic/MailPollWorker.kt (home-screen widget lines) -->
+    <string name="core_widget_encrypted_message">Encrypted message</string>
+    <string name="core_widget_unknown_sender">Unknown sender</string>
+
+    <!-- logic/OutboxWorker.kt -->
+    <string name="core_outbox_too_old">It waited too long without a connection.</string>
+    <string name="core_outbox_signed_out">You are signed out of the account it was sent from.</string>
+    <string name="core_outbox_not_accepted">The server did not accept it.</string>
+    <string name="core_outbox_refused">The server refused it.</string>
+    <string name="core_outbox_channel_name">Unsent mail</string>
+    <string name="core_outbox_channel_desc">Mail from the Outbox that could not be sent</string>
+    <!-- %1$s: the reason the send failed (a full sentence). -->
+    <string name="core_outbox_reason_still_in_drafts">%1$s It is still in Drafts.</string>
+    <!-- %1$s: the message subject. -->
+    <string name="core_outbox_not_sent_title">Not sent: %1$s</string>
+
+    <!-- logic/NotificationPolicy.kt -->
+    <string name="core_notify_prefs_read_failed">Your notification settings could not be read. Try again.</string>
+    <string name="core_notify_prefs_save_failed">The change could not be saved. Try again.</string>
+
+    <!-- logic/AppLock.kt (system biometric prompt) -->
+    <string name="core_applock_prompt_title">Unlock GrapMail</string>
+    <string name="core_applock_prompt_subtitle">Confirm it is you to open your mailbox</string>
+    <string name="core_applock_prompt_cancel">Cancel</string>
+
+    <!--
+        logic/MailFeaturePrefs.kt default templates. Seeded once into the
+        person's own template list. {first_name} and {my_name} are
+        TemplateEngine tokens: keep them exactly as written in every language.
+    -->
+    <string name="core_template_thanks_name">Quick thanks</string>
+    <string name="core_template_thanks_body">Hi {first_name},\n\nThanks so much for your note — I appreciate it.\n\nBest,\n{my_name}</string>
+    <string name="core_template_followup_name">Meeting follow-up</string>
+    <string name="core_template_followup_body">Hi {first_name},\n\nThanks for your time earlier. I wanted to follow up on the points we discussed — happy to dig into any of them further.\n\nBest,\n{my_name}</string>
+    <string name="core_template_intro_name">Intro</string>
+    <string name="core_template_intro_body">Hi {first_name},\n\nGood to connect! I am reaching out to introduce myself — looking forward to working together.\n\nBest,\n{my_name}</string>
+    <string name="core_template_checkin_name">Checking in</string>
+    <string name="core_template_checkin_body">Hi {first_name},\n\nJust checking in — any update on this on your side? No rush if you are still working through it.\n\nBest,\n{my_name}</string>
+
+    <!-- features/MailTrust.kt: action cards -->
+    <string name="core_card_kind_tracking">Tracking</string>
+    <string name="core_card_kind_flight">Flight</string>
+    <string name="core_card_kind_event">Event</string>
+    <!-- %1$s: flight code such as "BA 117". -->
+    <string name="core_card_flight_label">Flight %1$s — open flight status</string>
+    <!-- %1$s: ISO date yyyy-MM-dd. -->
+    <string name="core_card_event_label">Date found: %1$s — add to calendar</string>
+    <!-- %1$s: carrier name (UPS, USPS, DHL, FedEx), %2$s: tracking number. -->
+    <string name="core_card_tracking_label">%1$s %2$s — track package</string>
+
+    <!-- features/MailTrust.kt: link safety -->
+    <string name="core_url_risk_low">Looks safe</string>
+    <string name="core_url_risk_medium">Be careful</string>
+    <string name="core_url_risk_high">Dangerous</string>
+    <string name="core_url_reason_unreadable">The link\'s destination could not be read.</string>
+    <string name="core_url_reason_http">Not encrypted (http://) — anything entered on that page can be intercepted.</string>
+    <string name="core_url_reason_userinfo">The address hides a fake login string before the real domain.</string>
+    <string name="core_url_reason_ip">The destination is a raw IP address, not a real domain.</string>
+    <string name="core_url_reason_punycode">The domain uses punycode characters, often used to imitate real letters.</string>
+    <string name="core_url_reason_shortener">This is a shortened link — the true destination is hidden.</string>
+    <string name="core_url_reason_risky_tld">This domain uses a top-level domain heavily abused by scams.</string>
+    <!-- %1$d: number of domain levels. -->
+    <string name="core_url_reason_deep_subdomains">Unusually deep subdomain chain (%1$d levels) — common in fake login pages.</string>
+    <!-- %1$s: the domain seen, %2$s: brand keyword, %3$s: the brand's official domain. -->
+    <string name="core_url_reason_imitates">\"%1$s\" imitates %2$s — the official domain is %3$s.</string>
+
+    <!-- features/MailIntelligence.kt: category display names (ids are the enum constants) -->
+    <string name="core_category_people">People</string>
+    <string name="core_category_transactions">Transactions</string>
+    <string name="core_category_notices">Notices</string>
+    <string name="core_category_newsletters">Newsletters</string>
+
+    <!-- features/MailIntelligence.kt: smart reply suggestions (inserted into the reply) -->
+    <string name="core_reply_welcome">You\'re welcome — happy to help!</string>
+    <string name="core_reply_anytime">Anytime. Thanks for reaching out!</string>
+    <string name="core_reply_glad">Glad I could help!</string>
+    <string name="core_reply_time_works">That time works for me — see you then.</string>
+    <string name="core_reply_check_calendar">Let me check my calendar and confirm shortly.</string>
+    <string name="core_reply_invite">Thanks for the invite — I\'ll be there.</string>
+    <string name="core_reply_yes">Yes, that works for me.</string>
+    <string name="core_reply_no">No, sorry — not this time.</string>
+    <string name="core_reply_check_back">Let me check and get back to you.</string>
+    <string name="core_reply_good_question">Good question — let me get back to you shortly.</string>
+    <string name="core_reply_look_into">Sure, I\'ll look into it and reply soon.</string>
+    <string name="core_reply_eod">Will follow up with an answer by end of day.</string>
+    <string name="core_reply_prioritize">Understood — I\'ll prioritize this today.</string>
+    <string name="core_reply_on_it">On it — expect an update from me shortly.</string>
+    <string name="core_reply_thanks_note">Thanks for the note!</string>
+    <string name="core_reply_got_it">Got it — thanks!</string>
+    <string name="core_reply_sounds_good">Sounds good.</string>
+
+    <!-- features/MailIntelligence.kt: compose assist -->
+    <string name="core_tone_neutral">Neutral</string>
+    <string name="core_tone_professional">Professional</string>
+    <string name="core_tone_friendly">Friendly</string>
+    <string name="core_tone_concise">Concise</string>
+    <string name="core_proof_double_spaces">Double spaces could be removed.</string>
+    <string name="core_proof_space_before_punct">Spaces before punctuation look off.</string>
+    <string name="core_proof_repeated_word">A word appears twice in a row.</string>
+    <string name="core_proof_lowercase_start">A sentence starts with a lowercase letter.</string>
+    <string name="core_proof_final_punct">The message may be missing final punctuation.</string>
+    <!-- Draft templates: TOPIC is a literal token replaced in code. Keep it, untranslated, in every language. -->
+    <string name="core_draft_default_topic">a quick note</string>
+    <string name="core_draft_meeting_subject">Meeting request</string>
+    <string name="core_draft_meeting_body">I would like to set up a short meeting about TOPIC. Would you have time this week? I am happy to work around your calendar — just let me know what suits you.</string>
+    <string name="core_draft_apology_subject">Apologies for the delay</string>
+    <string name="core_draft_apology_body">I want to apologize for the delay regarding TOPIC. I am on it now and will update you as soon as there is news.</string>
+    <string name="core_draft_followup_subject">Following up</string>
+    <string name="core_draft_followup_body">I wanted to follow up on TOPIC. Could you share an update when you get a chance?</string>
+    <string name="core_draft_thanks_subject">Thank you</string>
+    <string name="core_draft_thanks_body">Thank you — TOPIC. I really appreciate it.</string>
+    <string name="core_draft_request_subject">Regarding your request</string>
+    <string name="core_draft_request_body">I am writing about TOPIC. I have attached what you need and am happy to answer any questions.</string>
+    <string name="core_draft_note_subject">Quick note</string>
+    <string name="core_draft_note_body">I wanted to reach out about TOPIC. Let me know your thoughts and I will follow up as needed.</string>
+    <string name="core_draft_greeting">Hi,</string>
+    <string name="core_draft_signoff">Best</string>
+
+    <!-- features/MailIntelligence.kt: natural-language search explanation line -->
+    <string name="core_nl_from">from %1$s</string>
+    <string name="core_nl_to">to %1$s</string>
+    <string name="core_nl_about">about \"%1$s\"</string>
+    <string name="core_nl_in">in %1$s</string>
+    <string name="core_nl_unread">unread</string>
+    <string name="core_nl_flagged">flagged</string>
+    <string name="core_nl_with_attachments">with attachments</string>
+    <plurals name="core_nl_newer_than_days">
+        <item quantity="one">newer than %1$d day(s)</item>
+        <item quantity="other">newer than %1$d day(s)</item>
+    </plurals>
+    <plurals name="core_nl_older_than_days">
+        <item quantity="one">older than %1$d day(s)</item>
+        <item quantity="other">older than %1$d day(s)</item>
+    </plurals>
+    <string name="core_nl_before">before %1$s</string>
+    <string name="core_nl_after">after %1$s</string>
+    <string name="core_nl_matching">matching \"%1$s\"</string>
+    <string name="core_nl_no_filters">No filters recognised — searching all mail.</string>
+    <!-- Joins the filter phrases; quoted so the trailing space survives. -->
+    <string name="core_nl_list_separator">", "</string>
+    <!-- %1$s: the joined filter phrases. -->
+    <string name="core_nl_searching">Searching: %1$s</string>
+
+    <!-- logic/SignUpViewModel.kt -->
+    <string name="core_signup_handle_unusable">That address cannot be used.</string>
+    <string name="core_signup_terms_required">Please read and agree to the terms to continue.</string>
+    <string name="core_signup_human_required">Complete the human verification check to continue.</string>
+    <string name="core_signup_handle_taken">That GrapMail address is already taken. Try another one.</string>
+    <string name="core_signup_weak_password">Use at least 8 characters with a letter, a number and a symbol.</string>
+    <string name="core_signup_invalid_name">Enter your full name (at least 2 characters).</string>
+    <string name="core_signup_verification_expired">Your verification expired or was already used — complete the check again.</string>
+    <string name="core_signup_create_failed">Could not create the account. Please try again.</string>
+    <string name="core_network_error_try_again">Network error. Please try again.</string>
+    <string name="core_signup_verify_failed_retry">Verification failed — please try again.</string>
+    <string name="core_signup_verify_unavailable">The verification service is temporarily unavailable. Try a new challenge in a moment.</string>
+    <string name="core_signup_verify_rate_limited">Too many verification attempts. Wait a moment and try again.</string>
+    <string name="core_signup_verify_failed_new">Verification failed. Get a new challenge and try again.</string>
+    <string name="core_signup_verify_incomplete">Could not complete verification. Get a new challenge and try again.</string>
+
+    <!-- logic/ProfileViewModel.kt -->
+    <string name="core_profile_unavailable">The account record is unavailable.</string>
+    <string name="core_profile_saved">Saved.</string>
+    <string name="core_profile_removed">Removed.</string>
+    <string name="core_alias_remove_failed">That alias could not be removed.</string>
+    <string name="core_alias_removed">Alias removed.</string>
+    <string name="core_alias_create_failed">The alias could not be created.</string>
+    <string name="core_alias_created">Alias created.</string>
+    <string name="core_avatar_updated">Profile photo updated.</string>
+    <string name="core_avatar_unconfirmed">Couldn’t confirm your profile photo. Try again.</string>
+    <string name="core_avatar_removed">Profile photo removed.</string>
+    <string name="core_change_failed">That change did not go through.</string>
+
+    <!-- logic/E2eViewModel.kt -->
+    <string name="core_e2e_unlock_first_for_kit">Unlock your key first: the recovery kit is made from it.</string>
+    <string name="core_e2e_kit_not_made">The recovery kit could not be made.</string>
+    <string name="core_e2e_kit_not_saved">The recovery kit was not saved.</string>
+    <string name="core_e2e_kit_removed">The recovery key was removed. Keep this device safe: it now holds the only copy of your key.</string>
+    <string name="core_e2e_kit_not_removed">The recovery kit was not removed.</string>
+    <!-- %1$d: minimum passphrase length. -->
+    <string name="core_e2e_passphrase_too_short">Use at least %1$d characters for the passphrase.</string>
+    <!-- %1$d: minimum passphrase length. -->
+    <string name="core_e2e_new_passphrase_too_short">Use at least %1$d characters for the new passphrase.</string>
+    <string name="core_e2e_passphrase_mismatch">The two passphrases do not match.</string>
+    <string name="core_e2e_recovery_key_invalid">That recovery key is not valid. It has 28 letters and numbers.</string>
+    <string name="core_e2e_no_kit">There is no recovery kit for this account.</string>
+    <string name="core_e2e_restore_failed">The key could not be restored.</string>
+    <string name="core_e2e_restored">Your key is back on this device and unlocked. Encrypted mail opens here again.</string>
+    <string name="core_e2e_key_directory_silent">The key directory did not answer.</string>
+    <string name="core_e2e_create_failed">This device could not create the keys.</string>
+    <string name="core_e2e_on_private">Encryption is on. Your key is private to this device until you publish it.</string>
+    <string name="core_e2e_on_published">Encryption is on, and your key is published so others can find it.</string>
+    <string name="core_e2e_stored_not_discoverable">Your key is saved on this device and stored on the server, but it is not findable by senders yet. That happens when the mailbox is not active. Mail sent to you stays unencrypted until that is fixed.</string>
+    <string name="core_e2e_directory_refused">The directory refused those keys.</string>
+    <string name="core_e2e_unpublished">Unpublished. New mail to you will not be encrypted. Messages already encrypted stay readable on this device.</string>
+    <string name="core_e2e_unpublish_failed">The directory did not remove the key.</string>
+    <string name="core_e2e_unlocked">Unlocked for this session. It locks again when the app is closed.</string>
+    <string name="core_e2e_wrong_passphrase">That passphrase did not unlock this key. Check it and try again.</string>
+    <string name="core_e2e_locked">Locked.</string>
+    <string name="core_e2e_passphrase_changed">Passphrase changed. The key itself is unchanged, so old messages still open.</string>
+    <string name="core_e2e_old_passphrase_wrong">The old passphrase did not unlock the key.</string>
+    <string name="core_e2e_key_removed">The key has been removed from this device. Any message encrypted to it can no longer be read here.</string>
+    <string name="core_e2e_directory_silent">The directory did not answer.</string>
+    <string name="core_e2e_locked_before_send">Your key is locked — unlock it before sending encrypted mail.</string>
+    <string name="core_e2e_seal_failed">The message could not be sealed.</string>
+    <string name="core_e2e_no_key_to_open">This device has no key to open messages with.</string>
+    <string name="core_e2e_envelope_unreadable">This message\'s envelope is not readable.</string>
+    <string name="core_e2e_openpgp_export_note">OpenPGP export lives on the web client — this device holds the key, but the gpg-shaped file is built in the browser. Nothing here is missing from your key; it is one action the phone does not offer.</string>
+    <string name="core_did_not_go_through">That did not go through.</string>
+
+    <!-- logic/MailboxViewModel.kt -->
+    <string name="core_action_failed">That action didn\'t go through.</string>
+    <string name="core_action_in_progress">A message action is already in progress.</string>
+    <string name="core_signed_out_not_saved">You are signed out, so this could not be saved.</string>
+    <string name="core_snoozed_until">%1$s until %2$s</string>
+    <string name="core_partial_came_back">%1$d of %2$d came back. %3$s</string>
+    <string name="core_partial_reversed">%1$d of %2$d reversed. %3$s</string>
+    <string name="core_partial_saved">%1$d of %2$d saved. %3$s</string>
+    <string name="core_message_not_deleted">That message could not be deleted.</string>
+    <string name="core_labels_not_read">The labels could not be read.</string>
+    <string name="core_label_not_saved">The label was not saved.</string>
+    <string name="core_label_removed_from">Removed \"%1$s\" from %2$d</string>
+    <string name="core_draft_autosaved">Draft saved</string>
+    <string name="core_draft_autosave_failed">Draft not saved — it will be saved on the next change.</string>
+    <string name="core_compose_draft_open_failed">Could not open this draft.</string>
+    <string name="core_compose_original_load_failed">Could not load the original message.</string>
+    <string name="core_compose_draft_formatting_failed">Could not load the draft formatting.</string>
+    <string name="core_forward_header">Forwarded message\nFrom: %1$s\nDate: %2$s\nSubject: %3$s\nTo: %4$s\n\n</string>
+    <string name="core_quote_unknown_date">an unknown date</string>
+    <string name="core_quote_header">On %1$s, %2$s wrote:</string>
+    <string name="core_compose_need_recipient">Add at least one recipient in To.</string>
+    <string name="core_scheduled_no_listing">The server returned no listing.</string>
+    <string name="core_scheduled_cancelled">Cancelled — it will not be sent.</string>
+    <string name="core_compose_envelope_failed">The encrypted envelope could not be prepared — nothing was sent.</string>
+    <string name="core_compose_send_failed_retry">Could not send this message. Try again.</string>
+    <string name="core_compose_saved_to_outbox">No connection. Saved in the Outbox: it sends by itself when you are back online.</string>
+    <string name="core_compose_send_failed">The message could not be sent.</string>
+    <string name="core_compose_saved_to_drafts">Saved to Drafts</string>
+    <string name="core_compose_draft_not_saved">The draft was not saved.</string>
+    <string name="core_sign_in_to_save">Sign in again to save this.</string>
+    <string name="core_attachment_no_storage">No app storage available.</string>
+    <string name="core_attachment_account_changed_save">The account changed before this file could be saved.</string>
+    <string name="core_attachment_saved_to">Saved to %1$s</string>
+    <string name="core_attachment_download_failed">This attachment could not be downloaded.</string>
+    <string name="core_sign_in_to_open">Sign in again to open this.</string>
+    <string name="core_attachment_account_changed_open">The account changed before this file could be opened.</string>
+    <string name="core_attachment_opened">Opened.</string>
+    <string name="core_attachment_no_viewer">Nothing on this device can open a %1$s file. Save it with Save to this device and open it from Files.</string>
+    <string name="core_attachment_handoff_failed">This attachment could not be handed to another app.</string>
+    <string name="core_sign_in_to_attach">Sign in again to attach a file.</string>
+    <string name="core_attachment_account_changed_attach">The account changed before this file could be attached.</string>
+    <string name="core_reader_formatted_empty">The formatted body was empty.</string>
+    <string name="core_reader_formatted_failed">The formatted view could not be loaded.</string>
+    <string name="core_thread_empty">This conversation has no available messages.</string>
+    <string name="core_thread_open_failed">This conversation could not be opened.</string>
+    <string name="core_thread_earlier_failed">Earlier messages could not be loaded.</string>
+    <string name="core_attachment_details_unavailable">Attachment details are unavailable.</string>
+    <string name="core_message_details_failed">The message details could not be loaded.</string>
+    <string name="core_message_open_failed">This message could not be opened.</string>
+    <string name="core_labels_load_failed">Labels could not be loaded.</string>
+    <string name="core_label_create_failed">The label could not be created.</string>
+    <string name="core_label_created">Created %1$s.</string>
+    <string name="core_label_save_failed">The label could not be saved.</string>
+    <string name="core_label_removed">Label removed. Its messages keep their other labels.</string>
+    <string name="core_label_remove_failed">The label could not be removed.</string>
+    <string name="core_mail_session_refused">The mail service did not accept this session. You are still signed in to your account.</string>
+    <string name="core_mailbox_unreachable">Couldn\'t reach your mailbox.</string>
+    <string name="core_sign_in_to_unsubscribe">Sign in again to unsubscribe.</string>
+    <string name="core_unsubscribe_sent">One-click request sent — the list\'s answer is not visible from here.</string>
+    <string name="core_unsubscribe_refused">The one-click request was not accepted.</string>
+    <string name="core_sign_in_to_decide">Sign in again to decide on this sender.</string>
+    <string name="core_decision_blocked_note">Blocked. %1$s</string>
+    <string name="core_decision_refused">The server refused that decision.</string>
+    <string name="core_screener_unavailable">Screener status is unavailable.</string>
+    <string name="core_screener_unconfirmed">The setting could not be confirmed.</string>
+    <string name="core_decision_no_senders">Those messages name no sender to decide on.</string>
+    <string name="core_decision_done_one">%1$s: %2$s</string>
+    <string name="core_sign_in_to_change">Sign in again to change this.</string>
+    <string name="core_decision_no_sender">That message names no sender to change.</string>
+    <string name="core_decision_forgotten">Forgotten — their next message waits in the queue again.</string>
+    <string name="core_decision_nothing_to_forget">No decision was recorded for them, so there was nothing to forget.</string>
+    <string name="core_sign_in_to_remove">Sign in again to remove this.</string>
+    <string name="core_attachment_removed">Removed.</string>
+    <string name="core_attachment_remove_refused">The server refused to remove that file.</string>
+    <string name="core_alias_list_failed">The alias list did not load.</string>
+    <string name="core_sign_in_to_setup_e2e">Sign in again to set up encryption.</string>
+    <string name="core_keys_published_limited">Published — but only people you name can use it.</string>
+    <string name="core_keys_published">Published.</string>
+    <string name="core_keys_removed">Keys removed.</string>
+    <string name="core_keys_none_to_remove">No published key was found to remove.</string>
+    <string name="core_sign_in_to_check">Sign in again to check this.</string>
+    <string name="core_plan_all_sealable">Every recipient has a published key.</string>
+    <string name="core_plan_partial_unsealable">%1$d of %2$d cannot be sealed.</string>
+    <string name="core_server_silent">The server did not answer.</string>
+    <string name="core_sign_in_to_lookup">Sign in again to look this up.</string>
+    <plurals name="core_snoozed_messages">
+        <item quantity="one">Snoozed %1$d message</item>
+        <item quantity="other">Snoozed %1$d messages</item>
+    </plurals>
+    <plurals name="core_labelled_messages">
+        <item quantity="one">Labelled %1$d message</item>
+        <item quantity="other">Labelled %1$d messages</item>
+    </plurals>
+    <plurals name="core_decision_done_many">
+        <item quantity="one">%1$s: %2$d senders</item>
+        <item quantity="other">%1$s: %2$d senders</item>
+    </plurals>
+    <plurals name="core_lookup_checked">
+        <item quantity="one">%1$d addressed checked.</item>
+        <item quantity="other">%1$d addressed checked.</item>
+    </plurals>
+
+    <!-- data/Api.kt (client wording for error codes; server-worded codes pass through untouched) -->
+    <string name="core_api_too_many_attempts">Too many failed attempts. Try again in about 15 minutes.</string>
+    <string name="core_api_rate_limited">Too many requests. Try again in a few minutes.</string>
+    <string name="core_api_wrong_password">Check your password and try again.</string>
+    <string name="core_api_invalid_credentials">Check your email address and password.</string>
+    <string name="core_api_weak_password">Use at least 8 characters with a letter, a number and a symbol.</string>
+    <string name="core_api_invalid_reset_challenge">Request a new password reset code and try again.</string>
+    <string name="core_api_two_factor_rejected">Check your verification code and try again.</string>
+    <string name="core_api_invalid_phone">Check the phone number and country code.</string>
+    <string name="core_api_phone_in_use">That phone number is already linked to another account.</string>
+    <string name="core_api_phone_not_verified">Verify your phone number to continue.</string>
+    <string name="core_api_phone_proof_required">Verify your phone number to continue.</string>
+    <string name="core_api_no_recovery_channel">This account has no verified recovery email, so it can\'t be reset here. Contact support and we\'ll help.</string>
+    <string name="core_api_bad_recovery_email">Check the email address and try again.</string>
+    <string name="core_api_recovery_same_as_primary">Use an email address outside GrapMail, so you can still reach it if you lose access to this account.</string>
+    <string name="core_api_email_delivery_unavailable">We couldn\'t send the email right now. Try again shortly.</string>
+    <string name="core_api_code_rejected">That code is not correct.</string>
+    <string name="core_api_code_expired">That code has expired. Request a new one.</string>
+    <string name="core_api_email_proof_required">Enter the code we emailed you to turn on two-step verification.</string>
+    <string name="core_api_two_factor_needs_recovery_email">Add and confirm a recovery email before turning on two-step verification.</string>
+    <string name="core_api_recovery_email_in_use">Two-step verification sends its codes to your recovery email. Confirm a new address with a code instead.</string>
+    <string name="core_api_sms_delivery_unavailable">The code could not be sent. Try again in a moment.</string>
+    <string name="core_api_bad_address">Check the email address and try again.</string>
+    <string name="core_api_address_rejected">That email address is unavailable.</string>
+    <string name="core_api_alias_rejected">That email address is unavailable.</string>
+    <string name="core_api_no_recipient">Add at least one recipient.</string>
+    <string name="core_api_too_many_recipients">Remove some recipients and try again.</string>
+    <string name="core_api_empty_body">Write a message before sending.</string>
+    <string name="core_api_quota_exceeded">Your mailbox is full. Free up some storage and try again.</string>
+    <string name="core_api_body_too_large">Shorten your message or remove large attachments.</string>
+    <string name="core_api_too_large">Choose a smaller file and try again.</string>
+    <string name="core_api_cannot_revoke_current">Sign out to end this session.</string>
+    <string name="core_api_twofa_required_for_backup_codes">Turn on two-step verification to use backup codes.</string>
+    <string name="core_api_no_mailbox">Your GrapMail inbox is not ready yet.</string>
+    <string name="core_api_human_verification_required">Your verification expired or was already used — complete the check again.</string>
+    <string name="core_api_http_401">Check your sign-in details or sign in again.</string>
+    <string name="core_api_http_403">This action is unavailable for your account.</string>
+    <string name="core_api_http_404">This item is no longer available.</string>
+    <string name="core_api_http_409">Refresh and try again.</string>
+    <string name="core_api_http_413">Choose a smaller file and try again.</string>
+    <string name="core_api_http_429">Too many requests. Try again in a few minutes.</string>
+    <string name="core_api_http_5xx">GrapMail is temporarily unavailable. Try again in a moment.</string>
+    <string name="core_api_generic">Please try again.</string>
+    <string name="core_api_check_connection">Check your connection and try again.</string>
+    <string name="core_api_unreadable_response">Could not read the response. Try again.</string>
+    <string name="core_api_request_failed">Request failed (%1$d)</string>
+
+    <!-- data/MailDto.kt -->
+    <string name="core_decision_approve">Approve</string>
+    <string name="core_decision_approved">Approved</string>
+    <string name="core_decision_approved_note">Their future mail goes straight to the inbox.</string>
+    <string name="core_decision_mute">Mute</string>
+    <string name="core_decision_muted">Muted</string>
+    <string name="core_decision_muted_note">It arrives, but quietly — held out of the unread count.</string>
+    <string name="core_decision_later">Keep waiting</string>
+    <string name="core_decision_kept_waiting">Kept waiting</string>
+    <string name="core_decision_later_note">Nothing is decided. It stays in this queue.</string>
+    <string name="core_decision_block">Block</string>
+    <string name="core_decision_blocked">Blocked</string>
+    <string name="core_decision_blocked_note_text">Future mail from them is refused at the door.</string>
+    <string name="core_scope_address">Just this address</string>
+    <string name="core_scope_domain">The whole domain</string>
+    <string name="core_scope_domain_warning">Applies to every address at this domain, including ones created later.</string>
+    <string name="core_box_inbox">Inbox</string>
+    <string name="core_box_starred">Starred</string>
+    <string name="core_box_sent">Sent</string>
+    <string name="core_box_drafts">Drafts</string>
+    <string name="core_box_snoozed">Snoozed</string>
+    <string name="core_box_archive">Archive</string>
+    <string name="core_box_spam">Spam</string>
+    <string name="core_box_trash">Trash</string>
+    <string name="core_box_screener">Pending approval</string>
+    <string name="core_box_all">All Mail</string>
+    <string name="core_sort_newest">Newest first</string>
+    <string name="core_sort_oldest">Oldest first</string>
+    <string name="core_sort_sender_asc">Sender (A → Z)</string>
+    <string name="core_sort_sender_desc">Sender (Z → A)</string>
+    <string name="core_sort_subject_asc">Subject (A → Z)</string>
+    <string name="core_sort_subject_desc">Subject (Z → A)</string>
+    <string name="core_filter_all">All</string>
+    <string name="core_filter_unread">Unread</string>
+    <plurals name="core_past_archived">
+        <item quantity="one">Archived %1$d message</item>
+        <item quantity="other">Archived %1$d messages</item>
+    </plurals>
+    <plurals name="core_past_unarchived">
+        <item quantity="one">Moved %1$d message back to the inbox</item>
+        <item quantity="other">Moved %1$d messages back to the inbox</item>
+    </plurals>
+    <plurals name="core_past_spam">
+        <item quantity="one">Reported %1$d message as spam</item>
+        <item quantity="other">Reported %1$d messages as spam</item>
+    </plurals>
+    <plurals name="core_past_unspam">
+        <item quantity="one">Moved %1$d message out of Spam</item>
+        <item quantity="other">Moved %1$d messages out of Spam</item>
+    </plurals>
+    <plurals name="core_past_trash">
+        <item quantity="one">Moved %1$d message to Trash</item>
+        <item quantity="other">Moved %1$d messages to Trash</item>
+    </plurals>
+    <plurals name="core_past_restored">
+        <item quantity="one">Restored %1$d message</item>
+        <item quantity="other">Restored %1$d messages</item>
+    </plurals>
+    <plurals name="core_count_messages">
+        <item quantity="one">%1$d message</item>
+        <item quantity="other">%1$d messages</item>
+    </plurals>
+
+    <!-- data/MailE2e.kt -->
+    <string name="core_e2e_android_too_old">This version of Android cannot create the X25519 key end-to-end encryption needs (it arrived in Android 10), so this app will not publish a key it could never use to open mail.</string>
+    <string name="core_e2e_recipient_key_unusable">That recipient\'s public key is not a usable X25519 key.</string>
+    <string name="core_e2e_needs_recipient">An encrypted message needs at least one recipient, or nobody can open it.</string>
+    <string name="core_e2e_too_many_recipients">That is %1$d recipients; the limit is %2$d.</string>
+    <string name="core_e2e_not_signed">This message is not signed.</string>
+    <string name="core_e2e_unexpected_signer">This message is signed by an unexpected key.</string>
+    <string name="core_e2e_signature_invalid">This message\'s signature did not verify.</string>
+    <string name="core_e2e_open_failed">Could not open this message: the wrong key, or the ciphertext is damaged.</string>
+    <string name="core_e2e_not_for_this_key">This message was not encrypted to your key, so it cannot be opened here.</string>
+    <string name="core_e2e_not_key_record">That is not a GrapMail key record.</string>
+    <string name="core_e2e_store_failed_unpublished">This device would not store the key. Without storage the key is lost when the app closes, making every message sealed to it unreadable — so nothing was published.</string>
+    <string name="core_e2e_kit_unknown_format">This recovery kit is not one GrapMail can read.</string>
+    <string name="core_e2e_kit_damaged">This recovery kit is damaged.</string>
+    <string name="core_e2e_recovery_key_wrong">That recovery key does not open this kit. Check it and try again.</string>
+    <string name="core_e2e_store_failed_unrestored">This device would not store the key, so nothing was restored.</string>
+
+    <!-- data/LaunchApi.kt, data/SessionRefresh.kt -->
+    <string name="core_launch_not_confirmed">The server did not confirm the request.</string>
+    <string name="core_launch_auth_refused">Authentication was refused. Check the password or sign in again.</string>
+    <string name="core_launch_rate_limited">Too many attempts. Try again later.</string>
+    <string name="core_launch_unconfirmed_status">The request could not be confirmed (%1$d).</string>
+    <string name="core_session_refresh_failed">The session could not be refreshed. Try again.</string>
+    <string name="core_session_refresh_no_token">The session refresh returned no access token.</string>
+
+    <!-- security/ -->
+    <string name="core_passkey_no_params">The server did not send passkey parameters.</string>
+    <string name="core_passkey_unexpected_credential">The passkey ceremony returned an unexpected credential.</string>
+    <string name="core_passkey_unreadable">The passkey ceremony returned an unreadable result.</string>
+    <string name="core_passkey_not_saved">The passkey was not saved.</string>
+    <string name="core_passkey_not_accepted">The passkey was not accepted.</string>
+    <string name="core_devicekey_prompt_title">Confirm to sign the recovery challenge</string>
+    <string name="core_devicekey_prompt_subtitle">GrapMail uses this device\'s key to prove it is trusted</string>
+    <string name="core_devicekey_create_failed">The device key could not be created.</string>
+
+    <!-- security/BiometricKeyWrap.kt, logic/E2eViewModel.kt (biometric-bound E2E unlock) -->
+    <string name="core_e2e_bio_prompt_title">Unlock your encryption key</string>
+    <string name="core_e2e_bio_prompt_subtitle">Confirm it is you to open encrypted mail on this device</string>
+    <string name="core_e2e_bio_prompt_use_passphrase">Use passphrase</string>
+    <string name="core_e2e_bio_unlock_button">Unlock with fingerprint or face</string>
+    <string name="core_e2e_bio_invalidated">Your fingerprint or face settings changed, so biometric unlock was turned off for this key. Unlock with your passphrase. If you have forgotten it, use your recovery key.</string>
+
+</resources>

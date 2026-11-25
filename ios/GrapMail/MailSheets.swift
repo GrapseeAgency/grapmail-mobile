@@ -8,6 +8,12 @@ import SwiftUI
 /// only the filing actions that exist; and snoozing has no box to read back
 /// from. A sheet that hides any of that is a control whose label promises more
 /// than the system delivers.
+///
+/// Text size: every line follows Dynamic Type (ScaledFont.swift). Each sheet is
+/// drawn exactly as designed while it fits the window and scrolls once larger
+/// text, landscape, Slide Over or a short Stage Manager window makes it taller
+/// than that (`SheetFit` / `SheetScroll` below); on wide windows the content
+/// keeps a form's width.
 struct SortFilterSheet: View {
     let sort: MailSort
     let filter: MailFilter
@@ -17,6 +23,10 @@ struct SortFilterSheet: View {
     let onPick: (MailSort, MailFilter) -> Void
 
     var body: some View {
+        SheetFit { sheet }
+    }
+
+    private var sheet: some View {
         VStack(alignment: .leading, spacing: 0) {
             SheetTitle(text: "Sort & filter")
             groupLabel("Sort by")
@@ -28,9 +38,9 @@ struct SortFilterSheet: View {
                 SheetOption(label: f.title, active: f == filter) { onPick(sort, f) }
             }
             if !sort.isServerSide && sortedCount < total {
-                Text("Sorted across the \(sortedCount) messages loaded so far, " +
-                     "not all \(total) in this box.")
-                    .font(.system(size: 12)).foregroundColor(GM.warnInk)
+                Text("Sorted across the \(sortedCount) messages loaded so far, not all \(total) in this box.")
+                    .gmFont(12).foregroundColor(GM.warnInk)
+                    .fixedSize(horizontal: false, vertical: true)
                     .padding(.horizontal, 20).padding(.vertical, 8)
             }
         }
@@ -38,9 +48,9 @@ struct SortFilterSheet: View {
         .accessibilityIdentifier("gm-sheets-sort")
     }
 
-    @ViewBuilder private func groupLabel(_ t: String) -> some View {
+    @ViewBuilder private func groupLabel(_ t: LocalizedStringKey) -> some View {
         Text(t)
-            .font(.system(size: 12, weight: .bold))
+            .gmFont(12, .bold)
             .foregroundColor(GM.textTertiary)
             .padding(.horizontal, 20).padding(.vertical, 6)
     }
@@ -60,6 +70,7 @@ struct AdvancedSearchSheet: View {
     let onClear: () -> Void
     let onDone: () -> Void
 
+    @Environment(\.dynamicTypeSize) private var dts
     @State private var from = ""
     @State private var to = ""
     @State private var subject = ""
@@ -68,6 +79,13 @@ struct AdvancedSearchSheet: View {
     @State private var before = ""
 
     var body: some View {
+        // Always one scroll view (never a fits/scrolls switch): this sheet
+        // holds text fields, and swapping the view under a focused field as
+        // the keyboard rises would drop the focus and the keyboard with it.
+        SheetScroll { sheet }
+    }
+
+    private var sheet: some View {
         VStack(alignment: .leading, spacing: 0) {
             SheetTitle(text: "Search filters")
             VStack(alignment: .leading, spacing: 10) {
@@ -95,39 +113,40 @@ struct AdvancedSearchSheet: View {
                 } label: {
                     HStack(spacing: 10) {
                         Image(systemName: "paperclip")
-                            .font(.system(size: 15))
+                            .gmFont(15, maxSize: 28)
                             .foregroundColor(files ? GM.primarySolid : GM.textTertiary)
                         Text("Has attachments")
-                            .font(.system(size: 14))
+                            .gmFont(14)
                             .foregroundColor(files ? GM.primarySolid : GM.textPrimary)
                         Spacer()
                     }
                 }
                 .buttonStyle(.plain)
-                HStack(spacing: 12) {
+                // Two date fields side by side need ~300 pt; at the
+                // accessibility sizes each takes the full width instead.
+                GMAdaptiveStack(spacing: dts.isAccessibilitySize ? 10 : 12) {
                     AdvRow(label: "After", placeholder: "YYYY-MM-DD", text: $after)
                     AdvRow(label: "Before", placeholder: "YYYY-MM-DD", text: $before)
                 }
-                HStack(spacing: 16) {
+                GMAdaptiveStack(spacing: dts.isAccessibilitySize ? 10 : 16) {
                     Button("Apply") {
                         onApply(from, to, subject, files, after, before)
                         onDone()
                     }
-                    .font(.system(size: 14, weight: .semibold))
+                    .gmFont(14, .semibold)
                     .foregroundColor(GM.primarySolid)
                     Button("Clear") {
                         onClear()
                         from = ""; to = ""; subject = ""; files = false
                         after = ""; before = ""
                     }
-                    .font(.system(size: 14))
+                    .gmFont(14)
                     .foregroundColor(GM.textSecondary)
                 }
                 // The scope, stated exactly as the sort sheet states its own.
-                Text("These filters run on the \(state.advScope) messages loaded on " +
-                     "this device — not all \(state.total) in this box. The typed " +
-                     "term is the whole-box search.")
-                    .font(.system(size: 12)).foregroundColor(GM.warnInk)
+                Text("These filters run on the \(state.advScope) messages loaded on this device — not all \(state.total) in this box. The typed term is the whole-box search.")
+                    .gmFont(12).foregroundColor(GM.warnInk)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             .padding(.horizontal, 20)
         }
@@ -137,17 +156,19 @@ struct AdvancedSearchSheet: View {
 }
 
 private struct AdvRow: View {
-    let label: String
-    let placeholder: String
+    /// Keys, not Strings: every caller passes a literal, so both the label
+    /// and the placeholder are extracted into the String Catalog.
+    let label: LocalizedStringKey
+    let placeholder: LocalizedStringKey
     @Binding var text: String
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(label)
-                .font(.system(size: 11, weight: .bold))
+                .gmFont(11, .bold)
                 .foregroundColor(GM.textTertiary)
             TextField(placeholder, text: $text)
-                .font(.system(size: 14))
+                .gmFont(14)
                 .foregroundColor(GM.textPrimary)
             Rectangle().fill(GM.border).frame(height: 1)
         }
@@ -163,14 +184,19 @@ struct MoveSheet: View {
     let onPick: (MailAction) -> Void
 
     var body: some View {
+        SheetFit { sheet }
+    }
+
+    private var sheet: some View {
         VStack(alignment: .leading, spacing: 0) {
             SheetTitle(text: "Move to")
-            SheetOption(label: "Archive", active: false) { onPick(.archive) }
-            SheetOption(label: "Trash", active: false) { onPick(.trash) }
-            SheetOption(label: "Spam", active: false) { onPick(.spam) }
-            SheetOption(label: "Back to Inbox", active: false) { onPick(.restore) }
+            SheetOption(label: String(localized: "Archive"), active: false) { onPick(.archive) }
+            SheetOption(label: String(localized: "Trash"), active: false) { onPick(.trash) }
+            SheetOption(label: String(localized: "Spam"), active: false) { onPick(.spam) }
+            SheetOption(label: String(localized: "Back to Inbox"), active: false) { onPick(.restore) }
             Text("Moving out of Spam or Trash returns the message to the inbox.")
-                .font(.system(size: 12)).foregroundColor(GM.textTertiary)
+                .gmFont(12).foregroundColor(GM.textTertiary)
+                .fixedSize(horizontal: false, vertical: true)
                 .padding(.horizontal, 20).padding(.vertical, 6)
         }
         .padding(.bottom, 24)
@@ -191,11 +217,17 @@ struct AssignLabelSheet: View {
     let onPick: (String) -> Void
 
     var body: some View {
+        // A long label list scrolls; a short one is drawn as designed.
+        SheetFit { sheet }
+    }
+
+    private var sheet: some View {
         VStack(alignment: .leading, spacing: 0) {
             SheetTitle(text: "Label")
             if labels.isEmpty {
                 Text(labelListStatus)
-                    .font(.system(size: 13)).foregroundColor(GM.textSecondary)
+                    .gmFont(13).foregroundColor(GM.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
                     .padding(.horizontal, 20).padding(.vertical, 10)
             }
             // What the marks mean, said before a reader puts anything into a tick.
@@ -204,7 +236,8 @@ struct AssignLabelSheet: View {
             // answered, the rows are deliberately unmarked and the sheet says so
             // rather than showing them clean.
             Text(explanation)
-                .font(.system(size: 12)).foregroundColor(GM.textTertiary)
+                .gmFont(12).foregroundColor(GM.textTertiary)
+                .fixedSize(horizontal: false, vertical: true)
                 .padding(.horizontal, 20).padding(.vertical, 6)
             ForEach(labels) { l in
                 let m = marks[l.id] ?? .unknown
@@ -216,7 +249,8 @@ struct AssignLabelSheet: View {
             }
             if let note {
                 Text(note)
-                    .font(.system(size: 13)).foregroundColor(GM.successInk)
+                    .gmFont(13).foregroundColor(GM.successInk)
+                    .fixedSize(horizontal: false, vertical: true)
                     .padding(.horizontal, 20).padding(.vertical, 8)
             }
         }
@@ -226,24 +260,22 @@ struct AssignLabelSheet: View {
 
     private var labelListStatus: String {
         switch labelsRead {
-        case .failed: return "Couldn't read your labels."
-        case .read: return "No labels yet. Create one from the drawer."
-        default: return "Loading labels…"
+        case .failed: return String(localized: "Couldn't read your labels.")
+        case .read: return String(localized: "No labels yet. Create one from the drawer.")
+        default: return String(localized: "Loading labels…")
         }
     }
 
     private var explanation: String {
         switch read {
         case .reading, .notRead:
-            return "Checking which labels these messages carry\u{2026}"
+            return String(localized: "Checking which labels these messages carry\u{2026}")
         case .failed:
-            return "Couldn't read which labels they carry, so nothing is marked here. "
-                + "Tapping adds a label; it won't remove one."
+            return String(localized: "Couldn't read which labels they carry, so nothing is marked here. Tapping adds a label; it won't remove one.")
         case .read:
             return selectedCount > 1
-                ? "Marks show what the \(selectedCount) selected messages carry. "
-                    + "A dash means some but not all."
-                : "Marks show what this message carries."
+                ? String(localized: "Marks show what the \(selectedCount) selected messages carry. A dash means some but not all.")
+                : String(localized: "Marks show what this message carries.")
         }
     }
 }
@@ -263,12 +295,16 @@ struct SnoozeSheet: View {
     }
 
     private let options = [
-        Slot(label: "This evening", hours: 4),
-        Slot(label: "Tomorrow morning", hours: 16),
-        Slot(label: "Next weekend", hours: 96),
+        Slot(label: String(localized: "This evening"), hours: 4),
+        Slot(label: String(localized: "Tomorrow morning"), hours: 16),
+        Slot(label: String(localized: "Next weekend"), hours: 96),
     ]
 
     var body: some View {
+        SheetFit { sheet }
+    }
+
+    private var sheet: some View {
         VStack(alignment: .leading, spacing: 0) {
             SheetTitle(text: "Snooze until")
             ForEach(options) { slot in
@@ -283,10 +319,9 @@ struct SnoozeSheet: View {
             // moment of snoozing is the moment the app knows. This copy is
             // photographed in `84-mail-snooze-sheet`, so a claim this stale ships in
             // the artifact set on both platforms unless both are changed together.
-            Text("Snoozed mail leaves your inbox until it is due. The server has no " +
-                 "box that lists what is postponed, so Undo appears beside the list " +
-                 "for the mail this session snoozed, and for no other mail.")
-                .font(.system(size: 12)).foregroundColor(GM.warnInk)
+            Text("Snoozed mail leaves your inbox until it is due. The server has no box that lists what is postponed, so Undo appears beside the list for the mail this session snoozed, and for no other mail.")
+                .gmFont(12).foregroundColor(GM.warnInk)
+                .fixedSize(horizontal: false, vertical: true)
                 .padding(.horizontal, 20).padding(.vertical, 8)
         }
         .padding(.bottom, 24)
@@ -309,38 +344,64 @@ struct PermanentDeleteSheet: View {
     let cancel: () -> Void
     let confirm: () -> Void
 
+    @Environment(\.dynamicTypeSize) private var dts
+
     var body: some View {
+        SheetFit { sheet }
+    }
+
+    private var sheet: some View {
         VStack(alignment: .leading, spacing: 0) {
             SheetTitle(text: count == 1
                 ? "Delete this message permanently?"
                 : "Delete \(count) messages permanently?")
-            Text("This cannot be undone. Messages in Trash can be restored instead — " +
-                 "this removes them for good, and only works from Trash.")
-                .font(.system(size: 13)).foregroundColor(GM.textSecondary)
+            Text("This cannot be undone. Messages in Trash can be restored instead — this removes them for good, and only works from Trash.")
+                .gmFont(13).foregroundColor(GM.textSecondary)
+                .fixedSize(horizontal: false, vertical: true)
                 .padding(.horizontal, 20).padding(.vertical, 6)
-            HStack(spacing: 12) {
-                Button(action: cancel) {
-                    Text("Cancel")
-                        .font(.system(size: 15, weight: .medium))
-                        .foregroundColor(GM.textSecondary)
-                        .frame(maxWidth: .infinity).padding(.vertical, 14)
+            // Side by side at the design's sizes; at the accessibility sizes
+            // the destructive button takes the first full-width row and
+            // Cancel the second, so neither label is squeezed.
+            Group {
+                if dts.isAccessibilitySize {
+                    VStack(spacing: 8) {
+                        GradientButton(title: String(localized: "Delete permanently"), action: confirm)
+                        cancelButton
+                    }
+                } else {
+                    HStack(spacing: 12) {
+                        cancelButton
+                        GradientButton(title: String(localized: "Delete permanently"), action: confirm)
+                    }
                 }
-                .buttonStyle(.plain)
-                GradientButton(title: "Delete permanently", action: confirm)
             }
             .padding(.horizontal, 20).padding(.top, 12).padding(.bottom, 24)
         }
         .accessibilityIdentifier("gm-sheets-permanent")
     }
+
+    private var cancelButton: some View {
+        Button(action: cancel) {
+            Text("Cancel")
+                .gmFont(15, .medium)
+                .foregroundColor(GM.textSecondary)
+                .frame(maxWidth: .infinity).padding(.vertical, 14)
+        }
+        .buttonStyle(.plain)
+    }
 }
 
+/// A resource: every caller passes a literal (one is an interpolated
+/// plural-style literal), which the String Catalog extracts.
 struct SheetTitle: View {
-    let text: String
+    let text: LocalizedStringResource
     var body: some View {
         Text(text)
-            .font(.system(size: 17, weight: .semibold))
+            .gmFont(17, .semibold)
             .foregroundColor(GM.textPrimary)
+            .fixedSize(horizontal: false, vertical: true)
             .padding(.horizontal, 20).padding(.vertical, 12)
+            .accessibilityAddTraits(.isHeader)
     }
 }
 
@@ -365,11 +426,16 @@ struct SenderDecisionSheet: View {
     @State private var scope: MailSenderScope = .address
 
     var body: some View {
+        SheetFit { sheet }
+    }
+
+    private var sheet: some View {
         VStack(alignment: .leading, spacing: 0) {
             SheetTitle(text: "Decide the sender")
             Text(senders.count == 1 ? "Sender: \(senders[0])"
                                     : "\(senders.count) senders in the selected messages")
-                .font(.system(size: 13)).foregroundColor(GM.textSecondary)
+                .gmFont(13).foregroundColor(GM.textSecondary)
+                .fixedSize(horizontal: false, vertical: true)
                 .padding(.horizontal, 20).padding(.vertical, 6)
 
             groupLabel("APPLIES TO")
@@ -378,7 +444,8 @@ struct SenderDecisionSheet: View {
             }
             if scope == .domain {
                 Text(MailSenderScope.domain.warning)
-                    .font(.system(size: 12)).foregroundColor(GM.warnInk)
+                    .gmFont(12).foregroundColor(GM.warnInk)
+                    .fixedSize(horizontal: false, vertical: true)
                     .padding(.horizontal, 20).padding(.vertical, 4)
             }
 
@@ -388,13 +455,15 @@ struct SenderDecisionSheet: View {
                     if !busy { onPick(scope, d) }
                 }
                 Text(d.note)
-                    .font(.system(size: 12)).foregroundColor(GM.textTertiary)
+                    .gmFont(12).foregroundColor(GM.textTertiary)
+                    .fixedSize(horizontal: false, vertical: true)
                     .padding(.horizontal, 20).padding(.vertical, 2)
             }
 
             if let result {
                 Text(result)
-                    .font(.system(size: 12)).foregroundColor(GM.textPrimary)
+                    .gmFont(12).foregroundColor(GM.textPrimary)
+                    .fixedSize(horizontal: false, vertical: true)
                     .padding(.horizontal, 20).padding(.vertical, 8)
                     .accessibilityIdentifier("mail-decision-receipt")
             }
@@ -403,9 +472,9 @@ struct SenderDecisionSheet: View {
         .accessibilityIdentifier("gm-sheets-sender")
     }
 
-    @ViewBuilder private func groupLabel(_ text: String) -> some View {
+    @ViewBuilder private func groupLabel(_ text: LocalizedStringKey) -> some View {
         Text(text)
-            .font(.system(size: 11, weight: .bold)).foregroundColor(GM.textTertiary)
+            .gmFont(11, .bold).foregroundColor(GM.textTertiary)
             .padding(.horizontal, 20).padding(.vertical, 8)
     }
 }
@@ -419,27 +488,36 @@ struct SheetOption: View {
     var mixed: Bool = false
     let onClick: () -> Void
 
+    @Environment(\.dynamicTypeSize) private var dts
+    /// The mixed ring grows with the label beside it (capped like the tick).
+    @ScaledMetric(relativeTo: .body) private var ring: CGFloat = 18
+
     var body: some View {
         Button(action: onClick) {
             HStack(spacing: 10) {
                 Text(label)
-                    .font(.system(size: 15))
+                    .gmFont(15)
                     .foregroundColor(GM.textPrimary)
-                    .lineLimit(1)
+                    // One line at the design's sizes; at the accessibility
+                    // sizes a long label wraps rather than losing its end.
+                    .lineLimit(dts.isAccessibilitySize ? nil : 1)
+                    .fixedSize(horizontal: false, vertical: dts.isAccessibilitySize)
                 Spacer()
                 if mixed {
                     // A dash inside the ring, not a filled tick: a filled circle is
                     // what `on` already looks like, and the two states must not read
                     // as one.
+                    let side = min(ring, 30)
                     ZStack {
                         Circle().stroke(GM.primarySolid, lineWidth: 1.5)
-                            .frame(width: 18, height: 18)
+                            .frame(width: side, height: side)
                         Rectangle().fill(GM.primarySolid)
-                            .frame(width: 9, height: 2.5)
+                            .frame(width: side / 2, height: side * 2.5 / 18)
                     }
+                    .accessibilityHidden(true)
                 } else if active {
                     Image(systemName: "checkmark.circle.fill")
-                        .font(.system(size: 18))
+                        .gmFont(18, maxSize: 30)
                         .foregroundColor(GM.primarySolid)
                 }
             }
@@ -449,5 +527,55 @@ struct SheetOption: View {
         }
         .buttonStyle(.plain)
         .accessibilityIdentifier("gm-sheet-\(label)")
+    }
+}
+
+// MARK: - Sheet sizing
+
+/// A sheet's content exactly as designed while it fits the window, and the same
+/// content in a scroll view once it does not (large text, landscape, Slide
+/// Over, a short Stage Manager window). Capped at a form's width so a sheet on
+/// a wide window (iPad full screen, Mac, Vision Pro) does not stretch its rows
+/// edge to edge. Only for sheets without text fields: the swap between the two
+/// would drop a field's focus (`SheetScroll` is the field-safe one).
+private struct SheetFit<Content: View>: View {
+    @ViewBuilder var content: () -> Content
+
+    var body: some View {
+        ViewThatFits(in: .vertical) {
+            sized
+            ScrollView(.vertical) { sized }
+        }
+    }
+
+    private var sized: some View {
+        content().frame(maxWidth: GMLayout.form, alignment: .leading)
+    }
+}
+
+/// One scroll view that keeps the content centred while it is shorter than the
+/// window (where the sheet drew it before) and scrolls once it is taller. The
+/// view under a focused text field never changes, so the keyboard stays up.
+private struct SheetScroll<Content: View>: View {
+    @ViewBuilder var content: () -> Content
+
+    var body: some View {
+        GeometryReader { proxy in
+            ScrollView(.vertical) {
+                content()
+                    .frame(maxWidth: GMLayout.form, alignment: .leading)
+                    .frame(maxWidth: .infinity, minHeight: proxy.size.height)
+            }
+            .sheetBounceWhenTall()
+        }
+    }
+}
+
+private extension View {
+    /// No rubber-band on a sheet that fits (iOS 16.4+; earlier it simply bounces).
+    @ViewBuilder
+    func sheetBounceWhenTall() -> some View {
+        if #available(iOS 16.4, *) { scrollBounceBehavior(.basedOnSize) }
+        else { self }
     }
 }

@@ -4,11 +4,11 @@ import Foundation
 /// the server enforces, so no round-trip is ever wasted on a predictable 4xx.
 enum Validators {
     static func firstName(_ v: String) -> String? {
-        v.trimmingCharacters(in: .whitespaces).count < 2 ? "Please enter your first name (2+ characters)." : nil
+        v.trimmingCharacters(in: .whitespaces).count < 2 ? String(localized: "Please enter your first name (2+ characters).", comment: "Sign-up validation error for the first name") : nil
     }
 
     static func lastName(_ v: String) -> String? {
-        v.trimmingCharacters(in: .whitespaces).count < 2 ? "Please enter your last name (2+ characters)." : nil
+        v.trimmingCharacters(in: .whitespaces).count < 2 ? String(localized: "Please enter your last name (2+ characters).", comment: "Sign-up validation error for the last name") : nil
     }
 
     /// ISO yyyy-MM-dd when the date is real and the person is 13+.
@@ -16,7 +16,7 @@ enum Validators {
         guard let year, let month, let day else { return (nil, nil) }
         guard year >= 1900, (1...12).contains(month), (1...31).contains(day),
               let date = Calendar.date(year: year, month: month, day: day) else {
-            return (nil, "Enter a real birthday.")
+            return (nil, String(localized: "Enter a real birthday.", comment: "Sign-up validation error for an impossible birthday"))
         }
         // Calendar.date(from:) rolls Feb 29 → Mar 1 on non-leap years instead
         // of rejecting it: verify the components survive the round-trip.
@@ -26,11 +26,11 @@ enum Validators {
         utcCal.timeZone = TimeZone(identifier: "UTC")!
         let comps = utcCal.dateComponents([.year, .month, .day], from: date)
         guard comps.year == year, comps.month == month, comps.day == day else {
-            return (nil, "Enter a real birthday.")
+            return (nil, String(localized: "Enter a real birthday.", comment: "Sign-up validation error for an impossible birthday"))
         }
-        guard date <= Date() else { return (nil, "Enter a real birthday.") }
+        guard date <= Date() else { return (nil, String(localized: "Enter a real birthday.", comment: "Sign-up validation error for an impossible birthday")) }
         guard age(from: date) >= 13 else {
-            return (nil, "You must be at least 13 years old to create a GrapMail account.")
+            return (nil, String(localized: "You must be at least 13 years old to create a GrapMail account.", comment: "Sign-up validation error for users under 13"))
         }
         return (String(format: "%04d-%02d-%02d", year, month, day), nil)
     }

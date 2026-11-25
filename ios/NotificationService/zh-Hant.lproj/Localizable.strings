@@ -1,0 +1,21 @@
+/* GrapMailNotificationService — 繁體中文 */
+
+"New encrypted message" = "新的加密郵件";
+"New mail" = "新郵件";
+"1 new message" = "1 封新郵件";
+"%lld new messages" = "%lld 封新郵件";
+"%lld unread in the inbox" = "收件匣中有 %lld 封未讀郵件";
+"Encrypted message" = "加密郵件";
+"Unknown sender" = "不明寄件者";
+"No subject" = "無主旨";
+"This was me" = "是我本人";
+"Secure account" = "保護帳戶";
+"Archive" = "封存";
+"Mark as read" = "標示為已讀";
+"Reply" = "回覆";
+"Send" = "傳送";
+"Reply…" = "回覆…";
+"Reply in app" = "在應用程式中回覆";
+"More" = "更多";
+/* Notification title: a sign-in code, then the sender */
+"%@ · %@" = "%@ · %@";

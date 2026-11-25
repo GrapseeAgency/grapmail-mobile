@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Connected accounts (ui/screens/mail/ConnectedAccountsScreen.kt). Persian. -->
+<resources>
+    <string name="mail_providers_title">صندوق‌های پستی متصل</string>
+    <string name="mail_providers_settings_subtitle">Outlook، Yahoo، iCloud و سایر حساب‌های IMAP</string>
+    <string name="mail_providers_intro">نامه‌ها را از Outlook یا حساب IMAP دیگری به GrapMail بیاورید. نامه‌های جدید حساب متصل به صندوق ورودی شما می‌رسند.</string>
+    <string name="mail_providers_empty">هنوز صندوق پستی‌ای متصل نشده است.</string>
+    <string name="mail_providers_add">افزودن حساب</string>
+    <string name="mail_providers_add_outlook">اتصال Outlook</string>
+    <string name="mail_providers_add_imap">اتصال Yahoo، iCloud، AOL یا حساب IMAP دیگر</string>
+    <string name="mail_providers_kind_imap">IMAP</string>
+    <string name="mail_providers_status_syncing">در حال همگام‌سازی برای اولین بار…</string>
+    <string name="mail_providers_status_ok">متصل</string>
+    <string name="mail_providers_status_reauth">نیاز به ورود دوباره</string>
+    <string name="mail_providers_status_error">مشکل همگام‌سازی</string>
+    <string name="mail_providers_status_removed">قطع‌شده</string>
+    <string name="mail_providers_last_sync">آخرین همگام‌سازی: %1$s</string>
+    <string name="mail_providers_never_synced">هنوز همگام‌سازی نشده</string>
+    <string name="mail_providers_sync_now">همگام‌سازی اکنون</string>
+    <string name="mail_providers_reconnect">اتصال دوباره</string>
+    <string name="mail_providers_remove">قطع اتصال</string>
+    <string name="mail_providers_remove_title">اتصال %1$s قطع شود؟</string>
+    <string name="mail_providers_remove_body">GrapMail همگام‌سازی این حساب را متوقف می‌کند. نامه‌هایی که از قبل در GrapMail هستند می‌مانند و در حساب دیگر چیزی تغییر نمی‌کند.</string>
+    <string name="mail_providers_cancel">لغو</string>
+    <string name="mail_providers_continue">ادامه</string>
+    <string name="mail_providers_retry">تلاش دوباره</string>
+    <string name="mail_providers_offline">آفلاین هستید. به اینترنت وصل شوید و دوباره تلاش کنید.</string>
+    <string name="mail_providers_error">حساب‌های متصل بارگیری نشدند.</string>
+    <string name="mail_providers_outlook_title">اتصال Outlook</string>
+    <string name="mail_providers_outlook_body">نشانی Outlook یا Microsoft 365 را که با آن وارد می‌شوید وارد کنید. صفحهٔ ورود Microsoft در مرورگر باز می‌شود.</string>
+    <string name="mail_providers_outlook_unavailable">اکنون نمی‌توان Outlook را در این سرور متصل کرد.</string>
+    <string name="mail_providers_oauth_state">این ورود با ورودی که برنامه آغاز کرد مطابقت نداشت. دوباره شروع کنید.</string>
+    <string name="mail_providers_oauth_denied">Microsoft اجازهٔ دسترسی نداد. چیزی متصل نشد.</string>
+    <string name="mail_providers_imap_title">اتصال حساب IMAP</string>
+    <string name="mail_providers_imap_intro">ارائه‌دهندهٔ خود را انتخاب کنید. بیشتر ارائه‌دهندگان به گذرواژهٔ برنامه نیاز دارند، نه گذرواژهٔ معمولی شما.</string>
+    <string name="mail_providers_preset_custom">سفارشی</string>
+    <string name="mail_providers_help_app_password">در تنظیمات امنیتی ارائه‌دهنده یک گذرواژهٔ برنامه بسازید و اینجا جای‌گذاری کنید. گذرواژهٔ معمولی شما معمولاً کار نمی‌کند.</string>
+    <string name="mail_providers_help_custom">سرورهای IMAP و SMTP را از صفحه‌های راهنمای ارائه‌دهنده وارد کنید.</string>
+    <string name="mail_providers_email">نشانی ایمیل</string>
+    <string name="mail_providers_incoming">ورودی (IMAP)</string>
+    <string name="mail_providers_outgoing">خروجی (SMTP)</string>
+    <string name="mail_providers_host">سرور</string>
+    <string name="mail_providers_port">درگاه</string>
+    <string name="mail_providers_tls">TLS</string>
+    <string name="mail_providers_err_email">نشانی ایمیل کامل را وارد کنید.</string>
+    <string name="mail_providers_err_host">نام سرور را وارد کنید، مانند imap.example.com.</string>
+    <string name="mail_providers_err_port">از درگاهی بین 1 تا 65535 استفاده کنید.</string>
+    <string name="mail_providers_connect">اتصال</string>
+    <string name="mail_providers_connecting">در حال اتصال…</string>
+    <string name="mail_providers_no_probe_note">GrapMail جزئیات را در اولین همگام‌سازی بررسی می‌کند. اگر نادرست باشند، این حساب مشکل همگام‌سازی نشان می‌دهد. گذرواژهٔ شما در این تلفن نگه داشته نمی‌شود.</string>
+</resources>

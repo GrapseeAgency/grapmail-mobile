@@ -1,0 +1,73 @@
+{
+ "android": {
+  "strings_r9_reader.xml": {
+   "reader_earlier_messages": {"one": "%d mensagem anterior", "other": "%d mensagens anteriores"},
+   "reader_participants": {"one": "%d pessoa", "other": "%d pessoas"},
+   "reader_message_count": {"one": "%d mensagem", "other": "%d mensagens"},
+   "reader_you": "Você",
+   "reader_unread": "Não lida",
+   "reader_earlier_action": "mostrar as mensagens recolhidas",
+   "reader_open_message_action": "abrir esta mensagem",
+   "reader_quoted_show": "Mostrar texto citado",
+   "reader_quoted_hide": "Ocultar texto citado",
+   "reader_state_expanded": "Expandida",
+   "reader_state_collapsed": "Recolhida",
+   "reader_reply_to": "Responder a %1$s…",
+   "reader_reply_fallback": "Responder…",
+   "reader_reply_options": "Opções de resposta",
+   "reader_quick_reply": "Resposta rápida",
+   "reader_attach_share_chooser": "Compartilhar anexo",
+   "reader_attach_view_image": "ver a imagem",
+   "reader_attach_save_named": "Salvar %1$s",
+   "reader_attach_share_named": "Compartilhar %1$s",
+   "reader_attach_share_nothing": "Nenhum app neste dispositivo pode compartilhar este arquivo.",
+   "reader_viewer_position": "%1$d de %2$d",
+   "reader_viewer_too_large": "Esta imagem não pode ser pré-visualizada aqui.",
+   "compose_r9_leave_title": "Sair desta mensagem?",
+   "compose_r9_leave_attachments": "Os rascunhos ainda não guardam anexos. Salve o texto sem eles ou continue editando.",
+   "compose_r9_save_text_only": "Salvar somente o texto",
+   "compose_r9_draft_failed_title": "Este rascunho não foi salvo",
+   "compose_r9_leave_without_saving": "Sair sem salvar",
+   "compose_r9_encrypt_failed": "Não foi possível criptografar esta mensagem, então nada foi enviado.",
+   "compose_editor_toolbar": "Formatação de texto",
+   "compose_editor_bold": "Negrito",
+   "compose_editor_italic": "Itálico",
+   "compose_editor_underline": "Sublinhado",
+   "compose_editor_strike": "Tachado",
+   "compose_editor_bullets": "Marcadores",
+   "compose_editor_numbered": "Numerada",
+   "compose_editor_text_colour": "Cor do texto",
+   "compose_editor_black": "Preto",
+   "compose_editor_blue": "Azul",
+   "compose_editor_red": "Vermelho",
+   "compose_editor_green": "Verde",
+   "compose_editor_highlight": "Realçar",
+   "compose_editor_highlight_colour": "Cor de realce",
+   "compose_editor_yellow": "Amarelo",
+   "compose_editor_pink": "Rosa",
+   "compose_editor_font": "Fonte",
+   "compose_editor_sans": "Sem serifa",
+   "compose_editor_larger": "Maior",
+   "compose_editor_clear": "Limpar formatação",
+   "compose_editor_image": "Imagem",
+   "compose_editor_insert_image": "Inserir imagem"
+  },
+  "strings_r9_platform.xml": {
+   "r9_platform_notif_channel_new_mail_desc": "Avisa quando novas mensagens chegam à sua caixa de entrada.",
+   "r9_platform_price_per_week": "%1$s/semana",
+   "r9_platform_price_per_month": "%1$s/mês",
+   "r9_platform_price_per_3_months": "%1$s a cada 3 meses",
+   "r9_platform_price_per_6_months": "%1$s a cada 6 meses",
+   "r9_platform_price_per_year": "%1$s/ano"
+  },
+  "strings_r9_mailbox.xml": {
+   "mail_sendlater_channel_name": "Envios agendados",
+   "mail_sendlater_channel_desc": "Contagem regressiva para mensagens aguardando envio"
+  },
+  "strings_identity.xml": {
+   "identity_settings_appearance": "Aparência",
+   "identity_match_wallpaper_title": "Combinar com o papel de parede",
+   "identity_match_wallpaper_subtitle": "Usa as cores do seu papel de parede em botões e realces. Avatares, cores de status e texto continuam os do GrapMail."
+  }
+ }
+}

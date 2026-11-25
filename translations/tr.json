@@ -1,0 +1,73 @@
+{
+ "android": {
+  "strings_r9_reader.xml": {
+   "reader_earlier_messages": {"one": "%d önceki ileti", "other": "%d önceki ileti"},
+   "reader_participants": {"one": "%d kişi", "other": "%d kişi"},
+   "reader_message_count": {"one": "%d ileti", "other": "%d ileti"},
+   "reader_you": "Siz",
+   "reader_unread": "Okunmadı",
+   "reader_earlier_action": "katlanmış iletileri göster",
+   "reader_open_message_action": "bu iletiyi aç",
+   "reader_quoted_show": "Alıntılanan metni göster",
+   "reader_quoted_hide": "Alıntılanan metni gizle",
+   "reader_state_expanded": "Açık",
+   "reader_state_collapsed": "Katlanmış",
+   "reader_reply_to": "%1$s kişisine yanıtla…",
+   "reader_reply_fallback": "Yanıtla…",
+   "reader_reply_options": "Yanıt seçenekleri",
+   "reader_quick_reply": "Hızlı yanıt",
+   "reader_attach_share_chooser": "Eki paylaş",
+   "reader_attach_view_image": "resmi görüntüle",
+   "reader_attach_save_named": "%1$s kaydet",
+   "reader_attach_share_named": "%1$s paylaş",
+   "reader_attach_share_nothing": "Bu cihazdaki hiçbir uygulama bu dosyayı paylaşamıyor.",
+   "reader_viewer_position": "%1$d / %2$d",
+   "reader_viewer_too_large": "Bu resim burada önizlenemiyor.",
+   "compose_r9_leave_title": "Bu iletiden çıkılsın mı?",
+   "compose_r9_leave_attachments": "Taslaklar henüz ekleri saklamıyor. Metni eksiz taslak olarak kaydedin ya da düzenlemeye devam edin.",
+   "compose_r9_save_text_only": "Yalnızca metni kaydet",
+   "compose_r9_draft_failed_title": "Bu taslak kaydedilmedi",
+   "compose_r9_leave_without_saving": "Kaydetmeden çık",
+   "compose_r9_encrypt_failed": "Bu ileti şifrelenemediği için hiçbir şey gönderilmedi.",
+   "compose_editor_toolbar": "Metin biçimlendirme",
+   "compose_editor_bold": "Kalın",
+   "compose_editor_italic": "İtalik",
+   "compose_editor_underline": "Altı çizili",
+   "compose_editor_strike": "Üstü çizili",
+   "compose_editor_bullets": "Madde işaretleri",
+   "compose_editor_numbered": "Numaralı",
+   "compose_editor_text_colour": "Metin rengi",
+   "compose_editor_black": "Siyah",
+   "compose_editor_blue": "Mavi",
+   "compose_editor_red": "Kırmızı",
+   "compose_editor_green": "Yeşil",
+   "compose_editor_highlight": "Vurgula",
+   "compose_editor_highlight_colour": "Vurgu rengi",
+   "compose_editor_yellow": "Sarı",
+   "compose_editor_pink": "Pembe",
+   "compose_editor_font": "Yazı tipi",
+   "compose_editor_sans": "Serifsiz",
+   "compose_editor_larger": "Daha büyük",
+   "compose_editor_clear": "Biçimi temizle",
+   "compose_editor_image": "Resim",
+   "compose_editor_insert_image": "Resim ekle"
+  },
+  "strings_r9_platform.xml": {
+   "r9_platform_notif_channel_new_mail_desc": "Gelen kutunuza yeni ileti geldiğinde bildirir.",
+   "r9_platform_price_per_week": "%1$s/hafta",
+   "r9_platform_price_per_month": "%1$s/ay",
+   "r9_platform_price_per_3_months": "3 ayda bir %1$s",
+   "r9_platform_price_per_6_months": "6 ayda bir %1$s",
+   "r9_platform_price_per_year": "%1$s/yıl"
+  },
+  "strings_r9_mailbox.xml": {
+   "mail_sendlater_channel_name": "Planlanan gönderimler",
+   "mail_sendlater_channel_desc": "Gönderilmeyi bekleyen iletiler için geri sayım"
+  },
+  "strings_identity.xml": {
+   "identity_settings_appearance": "Görünüm",
+   "identity_match_wallpaper_title": "Duvar kağıdıyla eşleştir",
+   "identity_match_wallpaper_subtitle": "Düğmeler ve vurgular için duvar kağıdınızın renklerini kullanın. Avatarlar, durum renkleri ve metin GrapMail’in kendi renklerinde kalır."
+  }
+ }
+}

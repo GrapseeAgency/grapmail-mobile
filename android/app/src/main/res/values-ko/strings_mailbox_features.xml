@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    values-ko/strings_mailbox_features.xml: translation of values/strings_mailbox_features.xml (same keys, same order).
+    Comments below are kept from the English source for context.
+-->
+<resources>
+    <!-- ui/mailfeatures/MorningCard.kt — greeting by local time; %1$s is the mailbox's first name. -->
+    <string name="mailbox_feat_greeting_morning">좋은 아침입니다</string>
+    <string name="mailbox_feat_greeting_morning_name">%1$s님, 좋은 아침입니다</string>
+    <string name="mailbox_feat_greeting_afternoon">안녕하세요</string>
+    <string name="mailbox_feat_greeting_afternoon_name">%1$s님, 안녕하세요</string>
+    <string name="mailbox_feat_greeting_evening">좋은 저녁입니다</string>
+    <string name="mailbox_feat_greeting_evening_name">%1$s님, 좋은 저녁입니다</string>
+    <!-- Summary parts; only non-zero parts are shown, joined by a middle dot. -->
+    <plurals name="mailbox_feat_digest_reply">
+        <item quantity="other">답장 필요 %1$d개</item>
+    </plurals>
+    <plurals name="mailbox_feat_digest_package">
+        <item quantity="other">배송 중인 택배 %1$d개</item>
+    </plurals>
+    <plurals name="mailbox_feat_digest_code">
+        <item quantity="other">로그인 코드 %1$d개</item>
+    </plurals>
+    <string name="mailbox_feat_digest_caught_up">모두 확인했습니다</string>
+    <!-- TalkBack reads the card as one sentence: %1$s greeting, %2$s the parts joined. -->
+    <string name="mailbox_feat_digest_a11y">%1$s. %2$s.</string>
+    <string name="mailbox_feat_digest_a11y_join">,\u0020</string>
+    <!-- TalkBack actions on the card. -->
+    <string name="mailbox_feat_action_show_reply">답장이 필요한 메일 보기</string>
+    <string name="mailbox_feat_action_show_packages">택배 배송 소식 보기</string>
+    <string name="mailbox_feat_action_show_codes">로그인 코드 보기</string>
+    <string name="mailbox_feat_action_show_all">모든 메일 보기</string>
+    <string name="mailbox_feat_dismiss">닫기</string>
+    <!-- The active filter chip under the card; %1$s is the filter's name. -->
+    <string name="mailbox_feat_filter_reply">답장 필요</string>
+    <string name="mailbox_feat_filter_packages">택배</string>
+    <string name="mailbox_feat_filter_codes">로그인 코드</string>
+    <string name="mailbox_feat_filter_clear">필터 해제: %1$s</string>
+
+    <!-- ui/components/Mail.kt — the code chip on an inbox row; %1$s is the code. -->
+    <string name="mailbox_feat_code_copy">%1$s 복사</string>
+    <!-- The chip's spoken name; the code itself is not read out. -->
+    <string name="mailbox_feat_code_copy_a11y">로그인 코드 복사</string>
+    <!-- Shown on the chip after a copy. The code is not repeated. -->
+    <string name="mailbox_feat_code_copied">코드 복사됨</string>
+    <!-- Clipboard label (shown by some keyboards/clipboard UIs). -->
+    <string name="mailbox_feat_code_clip_label">로그인 코드</string>
+
+    <!-- ui/mailfeatures/InboxZero.kt -->
+    <string name="mailbox_feat_zero_title">모두 처리 완료</string>
+    <plurals name="mailbox_feat_zero_handled">
+        <item quantity="other">오늘 이메일 %1$d개를 처리했습니다.</item>
+    </plurals>
+    <string name="mailbox_feat_zero_nothing">기다리는 메일이 없습니다.</string>
+
+    <!-- ui/screens/mail/SwipeActionsSetting.kt and the row actions in MailboxScreen.kt -->
+    <string name="mailbox_feat_swipe_title">스와이프 동작</string>
+    <string name="mailbox_feat_swipe_body">목록에서 메일을 스와이프할 때의 동작입니다. 이 기기에만 저장됩니다.</string>
+    <string name="mailbox_feat_swipe_right">오른쪽으로 스와이프</string>
+    <string name="mailbox_feat_swipe_left">왼쪽으로 스와이프</string>
+    <!-- %1$s is "Swipe right" or "Swipe left". -->
+    <string name="mailbox_feat_swipe_change">%1$s 변경</string>
+    <string name="mailbox_feat_swipe_archive">보관</string>
+    <string name="mailbox_feat_swipe_trash">휴지통</string>
+    <string name="mailbox_feat_swipe_read">읽음/읽지 않음 표시</string>
+    <string name="mailbox_feat_swipe_star">별표</string>
+    <string name="mailbox_feat_swipe_snooze">다시 알림</string>
+    <string name="mailbox_feat_swipe_move">이동…</string>
+    <string name="mailbox_feat_swipe_none">없음</string>
+</resources>

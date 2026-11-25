@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Round 9: mailbox, settings and shared mail components.
+    English only; the translation pass adds these to the values-<lang> folders.
+    Code: ui/mailfeatures/MailTools.kt (send-later notification channel, shown
+    by Android in Settings > Apps > GrapMail > Notifications).
+-->
+<resources>
+    <!-- Name of the notification channel for the "scheduled send" countdown notice. Shown in Android's app notification settings. -->
+    <string name="mail_sendlater_channel_name">Scheduled sends</string>
+    <!-- Description of the same notification channel, shown under its name in Android's settings. -->
+    <string name="mail_sendlater_channel_desc">Countdown for messages waiting to be sent</string>
+</resources>

@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    values-ru/strings_send_later.xml: translation of values/strings_send_later.xml (same keys, same order).
+    Comments below are kept from the English source for context.
+-->
+<resources>
+    <!-- The clock button next to Send (TalkBack label and click action). -->
+    <string name="compose_send_later_button">Запланировать отправку</string>
+    <string name="compose_send_later_button_action">выбрать время отправки</string>
+
+    <!-- The sheet. -->
+    <string name="compose_send_later_title">Отправить позже</string>
+    <string name="compose_send_later_later_today">Сегодня позже</string>
+    <string name="compose_send_later_tomorrow_morning">Завтра утром</string>
+    <string name="compose_send_later_monday_morning">В понедельник утром</string>
+    <string name="compose_send_later_pick">Выбрать дату и время</string>
+    <string name="compose_send_later_pick_hint">Не более чем на 30 дней вперёд</string>
+    <!-- %1$s: the device time zone's name, e.g. "Bangladesh Standard Time". -->
+    <string name="compose_send_later_zone_note">Время указано в вашем часовом поясе: %1$s</string>
+    <!-- TalkBack for one option row. %1$s: option name, %2$s: its day and time. -->
+    <string name="compose_send_later_option_description">%1$s, %2$s</string>
+
+    <!-- Date and time dialogs. -->
+    <string name="compose_send_later_date_title">Выберите дату</string>
+    <string name="compose_send_later_time_title">Выберите время</string>
+    <string name="compose_send_later_next">Далее</string>
+    <string name="compose_send_later_schedule">Запланировать</string>
+    <string name="compose_send_later_cancel">Отмена</string>
+    <string name="compose_send_later_type_time">Ввести время</string>
+    <string name="compose_send_later_use_clock">Выбрать на циферблате</string>
+    <string name="compose_send_later_too_soon">Выберите время не раньше чем через минуту.</string>
+    <string name="compose_send_later_too_far">Выберите время не позже чем через 30 дней.</string>
+
+    <!-- In-flight and failure lines in the composer. -->
+    <string name="compose_send_later_scheduling">Планирование…</string>
+    <string name="compose_send_later_offline">Нет подключения, поэтому ничего не запланировано. Ваше письмо по-прежнему здесь.</string>
+
+    <!-- The receipt snackbar shown after compose closes. %1$s: e.g. "Tue 8:00 AM". -->
+    <string name="compose_send_later_scheduled_for">Запланировано на %1$s</string>
+    <string name="compose_send_later_undo">Отменить</string>
+    <string name="compose_send_later_view">Открыть</string>
+    <string name="compose_send_later_undoing">Отмена…</string>
+    <string name="compose_send_later_undone">Отправка больше не запланирована. Письмо снова в черновиках.</string>
+    <!-- %1$s: the server's reason. -->
+    <string name="compose_send_later_undo_failed">Не удалось отменить: %1$s</string>
+    <string name="compose_send_later_dismiss">Закрыть</string>
+</resources>

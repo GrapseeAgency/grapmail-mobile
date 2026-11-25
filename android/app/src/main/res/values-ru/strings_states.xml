@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Loading / empty / error / offline states (translated from values/strings_states.xml). -->
+<resources>
+    <string name="states_loading">Загрузка…</string>
+    <string name="states_offline_banner">Нет подключения к сети. Показано то, что было загружено ранее, — всё, что требует сети, подождёт до восстановления подключения.</string>
+    <string name="states_error_title">Что-то пошло не так</string>
+    <string name="states_error_body">Сейчас не удалось загрузить данные. Проверьте подключение и повторите попытку.</string>
+    <string name="states_error_offline_body">Нет подключения к сети. Подключитесь к Wi-Fi или мобильному интернету и повторите попытку.</string>
+    <string name="states_retry">Повторить</string>
+    <string name="states_labels_loading">Загрузка ярлыков…</string>
+    <string name="states_labels_failed_title">Не удалось загрузить ярлыки</string>
+    <string name="states_scheduled_loading">Загрузка запланированных писем…</string>
+    <string name="states_scheduled_failed_title">Не удалось загрузить запланированные письма</string>
+    <string name="states_scheduled_empty_title">Ничего не запланировано</string>
+    <string name="states_contacts_loading">Собираем контакты из вашей почты…</string>
+    <string name="states_files_loading">Собираем вложения…</string>
+    <string name="states_providers_loading">Загрузка подключённых почтовых ящиков…</string>
+    <string name="states_thread_loading">Открываем переписку…</string>
+    <string name="states_activity_failed_title">Не удалось загрузить активность</string>
+    <string name="states_sessions_failed_title">Не удалось загрузить сеансы</string>
+</resources>

@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="mail_receipt_read_at">%1$s को पढ़ा गया</string>
+    <string name="mail_receipt_requested_pending">पढ़ने की रसीद माँगी गई · अभी पढ़ा नहीं गया</string>
+    <string name="mail_receipt_server_sent">पढ़ने की रसीद भेजी गई</string>
+    <string name="mail_receipt_ask_title">प्रेषक ने पढ़ने की रसीद माँगी है</string>
+    <string name="mail_receipt_ask_body">%1$s को रसीद भेजें कि आपने यह संदेश खोला? इससे उन्हें केवल यह पता चलता है कि आपने इसे कब खोला।</string>
+    <string name="mail_receipt_ask_send">रसीद भेजें</string>
+    <string name="mail_receipt_ask_decline">न भेजें</string>
+    <string name="mail_receipt_mode_title">पढ़ने की रसीद भेजें</string>
+    <string name="mail_receipt_mode_body">जब कोई संदेश पढ़ने की रसीद माँगे। स्पैम, ब्लॉक किए गए प्रेषकों या एन्क्रिप्टेड मेल के लिए रसीद कभी नहीं भेजी जाती, जब तक आप \"हमेशा\" न चुनें।</string>
+    <string name="mail_receipt_mode_never">कभी नहीं</string>
+    <string name="mail_receipt_mode_ask">पूछें</string>
+    <string name="mail_receipt_mode_always">हमेशा</string>
+    <string name="mail_receipt_mode_always_note">\"हमेशा\" चुनने पर स्पैम, ब्लॉक किए गए प्रेषकों और एन्क्रिप्टेड मेल के लिए भी रसीद भेजी जाती है।</string>
+    <string name="mail_receipt_mode_unavailable">यह सेटिंग लोड नहीं हो सकी। अपना कनेक्शन जाँचें।</string>
+    <string name="mail_compose_request_receipt">पढ़ने की रसीद माँगें</string>
+</resources>

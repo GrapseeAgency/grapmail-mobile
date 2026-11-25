@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Loading / empty / error / offline states (ui/components/ScreenStates.kt and the
+     screens wired to it). Kept in its own file so the other string files, edited in
+     parallel, are untouched; prefix states_. Translated from values/strings_states.xml. -->
+<resources>
+    <string name="states_loading">正在載入…</string>
+    <string name="states_offline_banner">你目前離線。正在顯示上次載入的內容，需要網路的操作會在重新連線後進行。</string>
+    <string name="states_error_title">發生錯誤</string>
+    <string name="states_error_body">目前無法載入。請檢查網路連線後再試一次。</string>
+    <string name="states_error_offline_body">你目前離線。請連上 Wi-Fi 或行動數據後再試一次。</string>
+    <string name="states_retry">再試一次</string>
+    <string name="states_labels_loading">正在載入標籤…</string>
+    <string name="states_labels_failed_title">無法載入標籤</string>
+    <string name="states_scheduled_loading">正在載入排程郵件…</string>
+    <string name="states_scheduled_failed_title">無法載入排程郵件</string>
+    <string name="states_scheduled_empty_title">沒有排程郵件</string>
+    <string name="states_contacts_loading">正在從你的郵件中收集聯絡人…</string>
+    <string name="states_files_loading">正在收集附件…</string>
+    <string name="states_providers_loading">正在載入已連結的信箱…</string>
+    <string name="states_thread_loading">正在開啟此對話…</string>
+    <string name="states_activity_failed_title">無法載入活動記錄</string>
+    <string name="states_sessions_failed_title">無法載入工作階段</string>
+</resources>

@@ -22,6 +22,7 @@ import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.ErrorOutline
 import androidx.compose.material.icons.rounded.Info
+import androidx.compose.material.icons.rounded.ContentCopy
 import androidx.compose.material.icons.rounded.Schedule
 import androidx.compose.material.icons.rounded.WarningAmber
 import androidx.compose.material3.Icon
@@ -50,6 +51,9 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import java.util.TimeZone
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.pluralStringResource
+import com.grapsee.grapmail.R
 
 /**
  * The security hub's list row: a soft icon tile, a title, an optional second
@@ -149,7 +153,7 @@ fun DestructiveButton(
         contentAlignment = Alignment.Center,
     ) {
         Text(
-            if (busy) "Working…" else text,
+            if (busy) stringResource(R.string.acct_working) else text,
             fontSize = 16.sp,
             fontWeight = FontWeight.SemiBold,
             color = Color.White,
@@ -174,7 +178,7 @@ fun SessionCard(
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
-                session.device.ifBlank { "Unknown device" },
+                session.device.ifBlank { stringResource(R.string.acct_unknown_device) },
                 fontSize = 15.sp,
                 fontWeight = FontWeight.SemiBold,
                 color = palette.textPrimary,
@@ -184,7 +188,7 @@ fun SessionCard(
             )
             if (session.current) {
                 Text(
-                    "This device",
+                    stringResource(R.string.acct_this_device),
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Bold,
                     color = palette.successInk,
@@ -225,7 +229,7 @@ fun SessionCard(
                     .padding(vertical = 6.dp, horizontal = 4.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text("Sign out this device", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = palette.error)
+                Text(stringResource(R.string.acct_sign_out_this_device), fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = palette.error)
             }
         }
     }
@@ -278,17 +282,18 @@ fun ActivityRow(event: ActivityDto) {
 }
 
 /** The event's own name, not the backend's identifier. */
+@Composable
 fun eventTitle(type: String): String = when (type) {
-    "signin" -> "Signed in"
-    "password_changed" -> "Password changed"
-    "two_factor_enabled" -> "Two-step verification turned on"
-    "two_factor_disabled" -> "Two-step verification turned off"
-    "backup_codes_generated" -> "Backup codes regenerated"
-    "backup_code_used" -> "A backup code was used"
-    "session_revoked" -> "A device was signed out"
-    "all_sessions_signed_out" -> "Signed out of all devices"
-    "phone_changed" -> "Phone number changed"
-    else -> "Account activity"
+    "signin" -> stringResource(R.string.acct_signed_in)
+    "password_changed" -> stringResource(R.string.acct_password_changed)
+    "two_factor_enabled" -> stringResource(R.string.acct_two_step_verification_turned_on)
+    "two_factor_disabled" -> stringResource(R.string.acct_two_step_verification_turned_off)
+    "backup_codes_generated" -> stringResource(R.string.acct_backup_codes_regenerated)
+    "backup_code_used" -> stringResource(R.string.acct_a_backup_code_was_used)
+    "session_revoked" -> stringResource(R.string.acct_a_device_was_signed_out)
+    "all_sessions_signed_out" -> stringResource(R.string.acct_signed_out_of_all_devices)
+    "phone_changed" -> stringResource(R.string.acct_phone_number_changed)
+    else -> stringResource(R.string.acct_account_activity)
 }
 
 /**
@@ -299,17 +304,18 @@ fun eventTitle(type: String): String = when (type) {
  * timestamp degrades to "Recently" rather than an exception on a screen that
  * exists to reassure somebody.
  */
+@Composable
 fun relativeTime(iso: String): String {
-    val millis = parseIso(iso) ?: return "recently"
+    val millis = parseIso(iso) ?: return stringResource(R.string.acct_time_recently)
     val diff = System.currentTimeMillis() - millis
-    if (diff < 0) return "just now"
-    val minutes = diff / 60_000
+    if (diff < 0) return stringResource(R.string.acct_time_just_now)
+    val minutes = (diff / 60_000).toInt()
     return when {
-        minutes < 1 -> "just now"
-        minutes < 60 -> "$minutes min ago"
-        minutes < 24 * 60 -> "${minutes / 60} hr ago"
-        minutes < 48 * 60 -> "yesterday"
-        else -> "${minutes / (24 * 60)} days ago"
+        minutes < 1 -> stringResource(R.string.acct_time_just_now)
+        minutes < 60 -> pluralStringResource(R.plurals.acct_time_minutes_ago, minutes, minutes)
+        minutes < 24 * 60 -> pluralStringResource(R.plurals.acct_time_hours_ago, minutes / 60, minutes / 60)
+        minutes < 48 * 60 -> stringResource(R.string.acct_time_yesterday)
+        else -> pluralStringResource(R.plurals.acct_time_days_ago, minutes / (24 * 60), minutes / (24 * 60))
     }
 }
 
@@ -341,7 +347,7 @@ private fun parseIso(iso: String): Long? {
  */
 fun absoluteDateTime(iso: String): String {
     val millis = parseIso(iso) ?: return if (iso.isBlank()) "" else iso
-    val date = SimpleDateFormat("MMM d, yyyy · h:mm a", Locale.US).format(Date(millis))
+    val date = SimpleDateFormat("MMM d, yyyy · h:mm a", Locale.getDefault()).format(Date(millis))
     return date
 }
 
@@ -446,7 +452,7 @@ fun BulletCard(title: String, bullets: List<String>) {
 
 /** The red "this cannot be undone" warning the revoke confirmations show. */
 @Composable
-fun CannotBeUndoneCard(text: String = "This action cannot be undone. The device will be signed out immediately and will need to sign in again to access your account.") {
+fun CannotBeUndoneCard(text: String = stringResource(R.string.acct_cannot_be_undone_default)) {
     val palette = LocalPalette.current
     Row(
         Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp))
@@ -499,15 +505,95 @@ fun BackLink(label: String, onClick: () -> Unit) {
 @Composable
 fun LoadStateBlock(loading: Boolean, failed: Boolean, onRetry: () -> Unit, content: @Composable () -> Unit) {
     val palette = LocalPalette.current
+    // Screen states: one device reading shared by the banner and the failure
+    // copy, so "offline" is said once and the reason is plain. The full-screen
+    // ErrorState cannot nest in AccountScreen's scrolling column, so the
+    // failure stays inline here.
+    val online = com.grapsee.grapmail.ui.components.rememberOnline()
+    com.grapsee.grapmail.ui.components.OfflineBanner(online = online)
     when {
-        loading -> Text("Loading…", fontSize = 13.sp, color = palette.textSecondary)
+        loading -> com.grapsee.grapmail.ui.components.ListSkeleton(
+            rows = 3, avatar = false, label = stringResource(R.string.acct_loading))
         failed -> {
             Column {
-                Text("We couldn't load this right now.", fontSize = 13.sp, color = palette.textSecondary)
+                Text(stringResource(R.string.acct_we_couldnt_load_this_right_now), fontSize = 13.sp, color = palette.textSecondary)
+                if (online == false) {
+                    Spacer(Modifier.height(4.dp))
+                    Text(stringResource(R.string.states_error_offline_body), fontSize = 13.sp, color = palette.textSecondary)
+                }
                 Spacer(Modifier.height(6.dp))
-                AccountLink("Try again", onRetry)
+                AccountLink(stringResource(R.string.states_retry), onRetry)
             }
         }
         else -> content()
+    }
+}
+
+/**
+ * The one-time code list shared by the backup-codes and recovery-codes
+ * screens: two columns of tappable code chips (tap copies one code) on a
+ * phone at the default font size, exactly as designed; one column when the
+ * code would not fit on one line in half the card — a 320dp phone, large
+ * font sizes, a cover screen or a narrow split pane — so a code is never
+ * broken across lines or clipped.
+ */
+@Composable
+fun CodeListGrid(
+    codes: List<String>,
+    copiedOne: String?,
+    onCopy: (String) -> Unit,
+) {
+    val palette = LocalPalette.current
+    val fontScale = androidx.compose.ui.platform.LocalDensity.current.fontScale
+    androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxWidth()) {
+        val longest = codes.maxOfOrNull { it.length } ?: 0
+        // Monospace glyphs are ~0.6em; 13sp grows with the font setting
+        // (1sp == fontScale dp). Plus 16dp side padding, the 14dp copy icon
+        // and a little air between them.
+        val codeWidth = (longest * 0.62f * 13f * fontScale + 16f + 14f + 8f).dp
+        val half = (maxWidth - 12.dp) / 2
+        val perRow = if (codeWidth <= half) 2 else 1
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            codes.chunked(perRow).forEach { rowCodes ->
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    rowCodes.forEach { code ->
+                        Box(
+                            Modifier
+                                .weight(1f)
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(palette.softFill)
+                                .clickable {
+                                    // Per-code copy: grabbing one code to use
+                                    // now should not require copying all ten.
+                                    onCopy(code)
+                                }
+                                .padding(vertical = 9.dp, horizontal = 8.dp),
+                        ) {
+                            Row(
+                                Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                            ) {
+                                Text(
+                                    code,
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                                    color = palette.textPrimary,
+                                    modifier = Modifier.weight(1f, fill = false),
+                                )
+                                Icon(
+                                    if (copiedOne == code) Icons.Rounded.CheckCircle else androidx.compose.material.icons.Icons.Rounded.ContentCopy,
+                                    contentDescription = stringResource(R.string.acct_copy_code, code),
+                                    tint = palette.textTertiary,
+                                    modifier = Modifier.size(14.dp),
+                                )
+                            }
+                        }
+                    }
+                    if (rowCodes.size < perRow) Spacer(Modifier.weight(1f))
+                }
+            }
+        }
     }
 }

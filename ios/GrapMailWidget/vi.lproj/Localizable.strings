@@ -1,0 +1,31 @@
+/* GrapMailWidget — Vietnamese (vi). */
+
+"Unread mail" = "Thư chưa đọc";
+"The unread count your app last saw, and the newest message." = "Số thư chưa đọc mà ứng dụng thấy gần nhất và thư mới nhất.";
+"GrapMail — not signed in" = "GrapMail — chưa đăng nhập";
+"GrapMail — no read yet" = "GrapMail — chưa có dữ liệu";
+/* Lock Screen inline widget: unread count, newest sender */
+"%lld unread · %@" = "%lld chưa đọc · %@";
+/* Lock Screen inline widget: unread count */
+"%lld unread" = "%lld chưa đọc";
+"unread" = "chưa đọc";
+"No subject" = "Không có tiêu đề";
+"No read yet" = "Chưa có dữ liệu";
+"Open the app to sign in" = "Mở ứng dụng để đăng nhập";
+"Scheduled send" = "Thư đã lên lịch";
+"(no subject)" = "(không có tiêu đề)";
+"Scheduled" = "Đã lên lịch";
+"To %@" = "Đến %@";
+"Sending…" = "Đang gửi…";
+
+/* Home Screen widget row buttons (iOS 17+), read by VoiceOver */
+"Mark as read" = "Đánh dấu là đã đọc";
+"Archive" = "Lưu trữ";
+"Star" = "Gắn dấu sao";
+"Unstar" = "Bỏ dấu sao";
+/* The widget row buttons' App Intent and its parameters (hidden from Shortcuts) */
+"Update message" = "Cập nhật thư";
+"Message" = "Thư";
+"Action" = "Thao tác";
+/* Widget placeholder when no account is signed in */
+"Open GrapMail to sign in" = "Mở GrapMail để đăng nhập";

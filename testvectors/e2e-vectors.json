@@ -1,0 +1,84 @@
+{
+  "recipientPublicKey": "MCowBQYDK2VuAyEAJxF4uKWdtYPwZ9XKlHusQEW/tFrrfRpxac9W5g8Y/Ec=",
+  "recipientPrivateKey": "MC4CAQAwBQYDK2VuBCIEIIy/0MJsYDxmn0nwGjS/c4PVY4+zyTSRyf+xIh2cDK3O",
+  "otherPublicKey": "MCowBQYDK2VuAyEA0gWbC1w9Ayn8tb5rsJFC3KR3Y2MCAJHIMijSxAasrCE=",
+  "otherPrivateKey": "MC4CAQAwBQYDK2VuBCIEIK2mj7dzCDsARSHir0f8buQRuzbq0EOUKhqrncXGcIPr",
+  "signerPublicKey": "MCowBQYDK2VwAyEAjsJTTB5gUDIu+4svatZTEj8SHZ6G9755ab3L6ITaLyA=",
+  "signerPrivateKey": "MC4CAQAwBQYDK2VwBCIEIEI3DYv7D09kFURwGsCD8HLH+eW2XUFVQsLPSNCmKcXx",
+  "plaintext": "Meet at 09:30 — café ☕ at the north gate.\nSecond line, ünïcødé.",
+  "recipientFingerprint": "0C:65:58:3F:B5:B9:3D:31:97:B3:A7:A5:F7:40:6F:7C:65:DB:7B:58:A7:5F:21:26:98:A6:6C:A8:D8:6A:DA:B6",
+  "envelopeV1": {
+    "v": 1,
+    "alg": "X25519+HKDF-SHA256+AES-256-GCM",
+    "epk": "MCowBQYDK2VuAyEAQAUZ9qnj6QT/YXbzowoJm5MNENt2jOgKEqha+3ULSlE=",
+    "iv": "6Lox7hxAWS/tLpZY",
+    "ct": "2+iVe12EvtIOFpIe4mhyL3SDf2jAYI2c00bRG8E6bUldp0/Gx1afvkm5JqZq+EWDQ9WdXJwgp1CtwgAUJlNsuyBN04NF/vw/",
+    "tag": "rHrOcpXV7eN1so5w28Z43Q==",
+    "sig": "Nq63X5RYkj34URHU0T+0Yu4G9Zryqfu4zeRAgzk6KEV2oicSNYEirKkhacxatw1L0+Lni+VJkfhu7/o5pFnsCQ==",
+    "signerPub": "MCowBQYDK2VwAyEAjsJTTB5gUDIu+4svatZTEj8SHZ6G9755ab3L6ITaLyA="
+  },
+  "envelopeV2": {
+    "v": 2,
+    "alg": "X25519+HKDF-SHA256+AES-256-GCM (multi-recipient)",
+    "iv": "h/5SHWcWe1jn2dlK",
+    "ct": "4bh7ZbufSca8zpPEHgEYpIl3fgNGuRuopiOzuEV99pdfSTM8RnDffbkZ/u4z+gi07xRCVk0Cf2T2dx3GVcXQYK39wKKYzWvh",
+    "tag": "Q6p/Pf03NCmANfvKH5TaeQ==",
+    "recipients": [
+      {
+        "epk": "MCowBQYDK2VuAyEAkq6pT57HIkluJ4oSjQatO138aqNxLJguWS+cMBAnkH8=",
+        "wrapIv": "rF+YZ0AT1leK0RP4",
+        "wrappedKey": "zjFPc9yX/5ZfnopPRNZ+t+8rDSd4dK1YzcCReXxsJpQ=",
+        "wrapTag": "PgLxhhmFHUEQlOB3voyjjg=="
+      },
+      {
+        "epk": "MCowBQYDK2VuAyEAolusevGBjdl0o/vArcP3/EkuhCcqk6DjAQwz7KdtmXg=",
+        "wrapIv": "LxAzwnJyPz4pktjv",
+        "wrappedKey": "0/Tydn3vfEwTiZ8VvKG1vAax6eQDgLAxYClK+615Tz4=",
+        "wrapTag": "e2M4rvNF1lirKQkrajvLzw=="
+      }
+    ],
+    "sig": "KA43RJLTUor+0iH62PF/q3pamYoT/7UbOM7y26vpD4tAdCdg+TvGq0iRS8EbCdi+9ZoehA1+5PcSKwNIWINjAg==",
+    "signerPub": "MCowBQYDK2VwAyEAjsJTTB5gUDIu+4svatZTEj8SHZ6G9755ab3L6ITaLyA="
+  },
+  "protectedKey": {
+    "passphrase": "correct horse — ключ 🔑",
+    "record": {
+      "format": "grapmail-e2e-protected-key/1",
+      "kind": "X25519",
+      "publicKey": "MCowBQYDK2VuAyEAJxF4uKWdtYPwZ9XKlHusQEW/tFrrfRpxac9W5g8Y/Ec=",
+      "kdf": "PBKDF2-SHA256",
+      "iterations": 1000,
+      "salt": "Ffxvy834du55iqBOId1aGA==",
+      "iv": "5iAcRpOrfsw8LGSC",
+      "ct": "IctAcL868DewjHywRJbR8ebtN8p/1xcpH5Y4I0iKeI+BOdJHB6DkxJ4QxFvLV+sluZIZnjDmV9NZMjOIdtuOeQ=="
+    }
+  },
+  "recoveryKit": {
+    "recoveryKeyTyped": "7k3m 9qxz lOab cdef gh1j kmnp qrst",
+    "recoveryKeyCanonical": "7K3M9QXZ10ABCDEFGH1JKMNPQRST",
+    "kit": {
+      "format": "grapmail-e2e-recovery-kit/1",
+      "createdAt": "2026-11-23T00:00:00Z",
+      "encryption": {
+        "format": "grapmail-e2e-protected-key/1",
+        "kind": "X25519",
+        "publicKey": "MCowBQYDK2VuAyEAJxF4uKWdtYPwZ9XKlHusQEW/tFrrfRpxac9W5g8Y/Ec=",
+        "kdf": "PBKDF2-SHA256",
+        "iterations": 1000,
+        "salt": "CALv2rTyF1P5UmysPxCFeg==",
+        "iv": "KlePp41wrl+5AHk9",
+        "ct": "XDwGg008tz4V2miaEKRBZ7CtUXlewR3Jbe5MQxJ7zxD+b7zwrjQvJlg9IrMvgN9I648fFQYRQv1UeruWW+MI9Q=="
+      },
+      "signing": {
+        "format": "grapmail-e2e-protected-key/1",
+        "kind": "Ed25519",
+        "publicKey": "MCowBQYDK2VwAyEAjsJTTB5gUDIu+4svatZTEj8SHZ6G9755ab3L6ITaLyA=",
+        "kdf": "PBKDF2-SHA256",
+        "iterations": 1000,
+        "salt": "iV59eBwkqphHFTIiEP4mCw==",
+        "iv": "d+Ypcj4d/IRwfld0",
+        "ct": "WX93RwUWI+GcP9aAj8XSiXPzrt8p6Qauf3lVMZTf+eS2gjmCc0FJCLlBuVmaJxmqFEWzaVBbFQwyT1V4zKha0w=="
+      }
+    }
+  }
+}

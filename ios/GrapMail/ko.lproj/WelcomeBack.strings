@@ -1,0 +1,62 @@
+/* ko translation of en.lproj/WelcomeBack.strings (round 9, ios_translations_b). Keys stay English; values translated. */
+/*
+  GrapMail — WelcomeBack string table (ko). Round 8 — Workstream B.
+  Personal welcome-back sign-in, account chooser, and the sign-out sheet's
+  "Also remove from this device" row (docs/design/round8-spec.md §2).
+  Used through String(localized:table: "WelcomeBack") and
+  Text(_:tableName: "WelcomeBack"). Keys are the English source text;
+  interpolations are %@. Other languages fall back to these English values
+  until translated (spec §7.6).
+*/
+
+/* MARK: - Welcome-back screen */
+/* Primary button; the argument is the person's first name (max 16 characters). */
+"Continue as %@" = "%@(으)로 계속";
+/* Primary button while the sign-in is running. */
+"Signing in…" = "로그인 중…";
+/* Reason line under the address after a session expired or was refused by the server. */
+"For your security, please sign in again." = "보안을 위해 다시 로그인하세요.";
+/* Reason line under the address after another device ended this session. */
+"You were signed out from another device." = "다른 기기에서 로그아웃되었습니다.";
+/* Inline banner; the Continue button is disabled while it shows. */
+"You're offline. Connect to sign in." = "오프라인 상태입니다. 로그인하려면 연결하세요.";
+/* Field error after a wrong password. */
+"That password isn't right." = "비밀번호가 올바르지 않습니다.";
+/* Text button: leave welcome-back for the standard sign-in form. */
+"Use another account" = "다른 계정 사용";
+/* Text button and menu item: forget this account on this device. */
+"Remove from this device" = "이 기기에서 삭제";
+/* Back button accessibility label (landscape layout). */
+"Back" = "뒤로";
+/* VoiceOver label for the masked address: first argument = visible first letters (spelled out), second = last letter, third = domain. */
+"Address beginning %@, ending %@ at %@" = "%1$@(으)로 시작하고 %2$@(으)로 끝나는 %3$@ 주소";
+/* VoiceOver label for a short masked address: first argument = visible first letter, second = domain. */
+"Address beginning %@ at %@" = "%1$@(으)로 시작하는 %2$@ 주소";
+/* Announcement when a passkey signed in a different account than the one chosen; the argument is that account's address. */
+"Signed in as %@" = "%@(으)로 로그인됨";
+
+/* MARK: - Remove from this device */
+/* Confirm dialog title; the argument is the first name or the address. */
+"Remove %@ from this device?" = "이 기기에서 %@을(를) 삭제하시겠습니까?";
+/* Confirm dialog body. */
+"Your account and mail aren't affected. You'll need your address and password to sign in here again." = "계정과 메일에는 영향이 없습니다. 이 기기에서 다시 로그인하려면 주소와 비밀번호가 필요합니다.";
+/* Snackbar / announcement after removal. */
+"Removed from this device" = "이 기기에서 삭제됨";
+
+/* MARK: - Account chooser */
+/* Chooser title. */
+"Choose an account" = "계정 선택";
+/* Chooser subtitle. */
+"Signed out on this device" = "이 기기에서 로그아웃됨";
+/* VoiceOver label for a chooser row: first argument = name, second = masked address. */
+"Continue as %@, %@" = "%1$@(으)로 계속, %2$@";
+/* VoiceOver label for a chooser row's overflow menu; the argument is the name. */
+"More options for %@" = "%@ 추가 옵션";
+
+/* MARK: - Sign-out confirmation (account switcher) */
+/* Confirmation title; the argument is the account address. */
+"Sign out of %@?" = "%@에서 로그아웃하시겠습니까?";
+/* Checkbox row, default off. */
+"Also remove from this device" = "이 기기에서도 삭제";
+/* Helper under the checkbox. */
+"You'll need to type your address next time." = "다음에는 주소를 입력해야 합니다.";

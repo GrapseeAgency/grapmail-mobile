@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="r9_platform_notif_channel_new_mail_desc">收件箱收到新邮件时通知你。</string>
+    <string name="r9_platform_price_per_week">%1$s/周</string>
+    <string name="r9_platform_price_per_month">%1$s/月</string>
+    <string name="r9_platform_price_per_3_months">每 3 个月 %1$s</string>
+    <string name="r9_platform_price_per_6_months">每 6 个月 %1$s</string>
+    <string name="r9_platform_price_per_year">%1$s/年</string>
+</resources>

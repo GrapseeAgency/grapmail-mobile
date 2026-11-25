@@ -1,69 +1,146 @@
 package com.grapsee.grapmail.ui.theme
 
 import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 
-// Measured from the founder's design PNGs — see design/DESIGN_TOKENS.md.
+/**
+ * GrapMail's own token table — Round 8 visual identity (docs/design/round8-spec.md §1).
+ *
+ * The neutrals are still the founder-measured values (design/DESIGN_TOKENS.md).
+ * The accent family moved from the old "very good Gmail" blue (#1A6DF0) to
+ * GrapMail **cobalt** (#1F5EFF light / #2F66FF dark), taken from the app-icon
+ * field. The semantic inks were darkened until text passes WCAG AA (§1.5).
+ *
+ * Every name that existed before Round 8 is still here, so nothing that reads
+ * it stops compiling. Where the spec renamed a role, the old name now holds the
+ * new value (`infoFill` = primaryContainer, `successInk` = success,
+ * `swipeTrash` = errorFill). `warnInk` is the warning ink for text on the warn
+ * container (see its note).
+ */
 data class GrapMailColors(
-    // Light theme
+    // ── Light theme ────────────────────────────────────────────────────────
     val bg: Color = Color(0xFFFBFCFE),
     val bgTinted: Color = Color(0xFFF7F9FC),
     val card: Color = Color(0xFFFFFFFF),
+    val inputFill: Color = Color(0xFFFFFFFF),
     val softFill: Color = Color(0xFFEFF5FD),
-    val infoFill: Color = Color(0xFFE3ECFB),
+    /** = primaryContainer (§1.12). Was #E3ECFB. */
+    val infoFill: Color = Color(0xFFE6EDFF),
     val border: Color = Color(0xFFE1E7F2),
     val borderSoft: Color = Color(0xFFD9E6F9),
-    val primaryTop: Color = Color(0xFF206BFD),
-    val primaryBottom: Color = Color(0xFF1560F5),
-    val primarySolid: Color = Color(0xFF1A6DF0),
-    val buttonDisabled: Color = Color(0xFFC4DBFD),
+    /** Button gradient top (spec `primaryGradientTop`). Was #206BFD. */
+    val primaryTop: Color = Color(0xFF2465FF),
+    /** Button gradient bottom (spec `primaryGradientBottom`). Was #1560F5. */
+    val primaryBottom: Color = Color(0xFF1A4FF0),
+    /** Custom filled buttons (spec `primary`). Was #1A6DF0. */
+    val primarySolid: Color = Color(0xFF1F5EFF),
+    val primaryPressed: Color = Color(0xFF1446E0),
+    /** Links, text buttons, selected icons. Same as primary in light. */
+    val primaryText: Color = Color(0xFF1F5EFF),
+    val primaryContainer: Color = Color(0xFFE6EDFF),
+    val onPrimaryContainer: Color = Color(0xFF0B2A8F),
+    val primaryContainerStrong: Color = Color(0xFFD3DEFF),
+    val focusRing: Color = Color(0xFF1F5EFF),
+    /** Was #C4DBFD. */
+    val buttonDisabled: Color = Color(0xFFC7D5FF),
+    val brandViolet: Color = Color(0xFF6A4DF4),
+    val selectedRow: Color = Color(0xFFEEF2FF),
+    val ownMessageFill: Color = Color(0xFFF3F6FF),
     val textPrimary: Color = Color(0xFF0F172A),
     val textSecondary: Color = Color(0xFF5B6B84),
-    val textTertiary: Color = Color(0xFF94A3B8),
-    val success: Color = Color(0xFF10B981),
-    val error: Color = Color(0xFFEF4444),
+    /** Was #94A3B8 (2.6:1, failed AA). */
+    val textTertiary: Color = Color(0xFF657489),
+    /** Success text/ink. Was #10B981 (failed AA as text). */
+    val success: Color = Color(0xFF08734F),
+    /** Check discs, done icons (non-text). */
+    val successFill: Color = Color(0xFF0E9F6E),
+    /** Error text and field stroke. Was #EF4444 (3.8:1). */
+    val error: Color = Color(0xFFD92D2D),
+    /** Destructive filled button, unread badge, trash swipe; white text on it. */
+    val errorFill: Color = Color(0xFFD92D2D),
+    val errorContainer: Color = Color(0xFFFDECEC),
+    /**
+     * Text drawn ON [errorContainer]. Not in the spec's table: `error` #D92D2D on
+     * #FDECEC is ≈4.2:1, under AA for body text, so banner copy uses this
+     * darker red (≈5.8:1). Dark theme keeps `error`, which passes there.
+     */
+    val onErrorContainer: Color = Color(0xFFB42318),
+    /** Warning text on surfaces (§1.5). Was `warnInk` #C2620A (4.2:1). ≈5.0:1 on white. */
+    val warning: Color = Color(0xFFB45309),
     val stepInactive: Color = Color(0xFFDCE6F5),
     val onPrimary: Color = Color(0xFFFFFFFF),
     // Recovery/security sector (sampled from raw-designs/account/)
-    val successChipBg: Color = Color(0xFFDCF8F4),
-    val successInk: Color = Color(0xFF0B8F64),
+    /** = successContainer. Was #DCF8F4. */
+    val successChipBg: Color = Color(0xFFDCF8F0),
+    /** Alias of [success] since Round 8. Was #0B8F64. */
+    val successInk: Color = Color(0xFF08734F),
+    /** = warningContainer. */
     val warnChipBg: Color = Color(0xFFFDF0DE),
-    val warnInk: Color = Color(0xFFC2620A),
+    /**
+     * The warning ink the app draws on [warnChipBg] banners, notes and chips.
+     * The spec maps this name to `warning` #B45309, but that is only ≈4.47:1 on
+     * the #FDF0DE container, just under AA for 12–13 sp text. This value is
+     * slightly darker (≈5.2:1 there, ≈5.9:1 on white), so every place that already
+     * reads `warnInk` passes. Dark keeps #F5A623 (≈7.9:1 on #2B1F0B).
+     */
+    val warnInk: Color = Color(0xFFA44B08),
     val cardAlt: Color = Color(0xFFF5F9FE),
     val otpFill: Color = Color(0xFFFFFFFF),
-    // Mailbox swipe affordances. Two directions, two meanings, so two colours —
-    // and neither is the destructive red: a swipe can only archive or trash, both
-    // of which undo. Permanent destruction stays behind a confirmation sheet, so
-    // no single gesture can erase mail, and the palette has no colour for it on
-    // purpose rather than by omission.
-    val swipeArchive: Color = Color(0xFF1A6DF0),
-    val swipeTrash: Color = Color(0xFFDC2626),
+    // Mailbox swipe affordances. Two directions, two meanings, so two colours.
+    // A swipe can only archive or trash, and both can be undone. Permanent
+    // deletion stays behind a confirmation sheet. Trash now uses errorFill,
+    // as §1.12 says.
+    val swipeArchive: Color = Color(0xFF1F5EFF),
+    val swipeTrash: Color = Color(0xFFD92D2D),
     /**
-     * The starred marker. Both values, because the thread used to draw a single
-     * hardcoded amber (`Color(0xFFF5A623)`) at the call site: in dark mode that is
-     * a light-theme colour on a dark canvas, and no screenshot of the light theme
-     * would ever show it. The light value is the one the app has always drawn; the
-     * dark value is the web theme's lifted star (`--gm-star`, `grapmail.css:111`).
+     * The starred marker. Its state is carried by filled vs outline shape, so
+     * colour is not the only signal.
      */
     val star: Color = Color(0xFFF5A623),
-    // Dark theme. Repainted 2026-11-14 to the founder's mailbox reference: a
-    // neutral near-black canvas with clearly lighter cards, so the rounded card
-    // group the design centres on is actually visible — the old navy pair
-    // (#070F18 / #0C182A) differed by so little the rounding could not read.
-    // Brand blues and accents are untouched; only the neutral surfaces and
-    // their greys moved, from blue-tinted to warm-neutral (matching iOS's
-    // Theme.swift, same values).
+    /** Brand-logo (BIMI) plate behind a sender's logo. */
+    val bimiPlate: Color = Color(0xFFFFFFFF),
+    /** Behind sheets and dialogs: #0F172A at 40 %. */
+    val scrim: Color = Color(0x660F172A),
+
+    // ── Dark theme ─────────────────────────────────────────────────────────
+    // Neutral near-black canvas with clearly lighter cards (repainted
+    // 2026-11-14 to the founder's mailbox reference, same values as iOS).
     val bgDark: Color = Color(0xFF0A0A0C),
+    val bgTintedDark: Color = Color(0xFF0D0D0F),
     val cardDark: Color = Color(0xFF141416),
     val inputFillDark: Color = Color(0xFF1A1A1E),
     val borderDark: Color = Color(0xFF2C2C31),
+    /** Section dividers. Dark value moved from #2C2C31 in Round 8. */
+    val borderSoftDark: Color = Color(0xFF232327),
     val softFillDark: Color = Color(0xFF232327),
-    val buttonDisabledDark: Color = Color(0xFF1E3A66),
+    val primarySolidDark: Color = Color(0xFF2F66FF),
+    val primaryTopDark: Color = Color(0xFF2F66FF),
+    val primaryBottomDark: Color = Color(0xFF2456E8),
+    val primaryPressedDark: Color = Color(0xFF2557EA),
+    val primaryTextDark: Color = Color(0xFF8EA8FF),
+    val primaryContainerDark: Color = Color(0xFF1A2550),
+    val onPrimaryContainerDark: Color = Color(0xFFDCE4FF),
+    val primaryContainerStrongDark: Color = Color(0xFF26326A),
+    val focusRingDark: Color = Color(0xFF8EA8FF),
+    /** Material components' `onPrimary` in dark: they take primaryText #8EA8FF (§1.2). */
+    val m3OnPrimaryDark: Color = Color(0xFF0A1A52),
+    /** Was #1E3A66. */
+    val buttonDisabledDark: Color = Color(0xFF1D2B5C),
+    val brandVioletDark: Color = Color(0xFFB4A6FF),
+    val selectedRowDark: Color = Color(0xFF1E2440),
+    val ownMessageFillDark: Color = Color(0xFF161A26),
     val textPrimaryDark: Color = Color(0xFFEAEAEA),
     val textSecondaryDark: Color = Color(0xFF9E9EA5),
-    val textTertiaryDark: Color = Color(0xFF67676D),
+    /** Was #67676D (3.5:1, failed AA). */
+    val textTertiaryDark: Color = Color(0xFF808088),
     val successDark: Color = Color(0xFF34D399),
+    val successFillDark: Color = Color(0xFF34D399),
     val errorDark: Color = Color(0xFFF87171),
+    val errorFillDark: Color = Color(0xFFD92D2D),
+    val errorContainerDark: Color = Color(0xFF3B1A1A),
+    val onErrorContainerDark: Color = Color(0xFFF87171),
+    val warningDark: Color = Color(0xFFF5A623),
     val stepInactiveDark: Color = Color(0xFF2C2C31),
     val successChipBgDark: Color = Color(0xFF0A2A23),
     val successInkDark: Color = Color(0xFF34D399),
@@ -71,50 +148,59 @@ data class GrapMailColors(
     val warnInkDark: Color = Color(0xFFF5A623),
     val cardAltDark: Color = Color(0xFF1C1C20),
     val otpFillDark: Color = Color(0xFF141418),
-    // Dark variants lifted for the same reason the light pair exists: a swipe
-    // background sits behind a row that is sliding away, so it has to read as a
-    // deliberate colour on both themes rather than as a dark rectangle.
-    val swipeArchiveDark: Color = Color(0xFF3B82F6),
-    val swipeTrashDark: Color = Color(0xFFF87171),
-    /// The starred marker on a dark canvas — see `star` above.
+    /** Was #3B82F6. */
+    val swipeArchiveDark: Color = Color(0xFF2F66FF),
+    /** errorFill in both themes, with white on it (4.8:1). Was #F87171. */
+    val swipeTrashDark: Color = Color(0xFFD92D2D),
+    /** The starred marker on a dark canvas — see `star` above. */
     val starDark: Color = Color(0xFFFDD663),
+    val bimiPlateDark: Color = Color(0xFFF4F5F7),
+    /** Behind sheets and dialogs: black at 60 %. */
+    val scrimDark: Color = Color(0x99000000),
+    /** 1 dp inner hairline on avatar discs in dark only: white at 10 % (§1.6.4). */
+    val avatarRingDark: Color = Color(0x1AFFFFFF),
 )
 
 val LocalGrapMailColors = staticCompositionLocalOf { GrapMailColors() }
 
 /**
- * The sender avatar disc: the web reference's `AVATAR_COLOURS` ramp, in its
- * order, with the value each entry resolves to in each theme
- * (`src/app/(mail)/mail/page.tsx:305` against `grapmail.css:35,42,44,56-63,100,
- * 108,110`).
+ * Brand brushes (§1.3).
  *
- * Three of the eight web entries are not avatar hues at all — they are
- * `--gm-accent`, `--gm-error-strong` and `--gm-warn`, and those three DO change
- * with the theme. That is the fact this table exists to carry: the disc lifts
- * from `#1a73e8` to `#8ab4f8` in the dark canvas exactly as the web does, and the
- * five plain `--gm-avatar-*` slots stay put in both because the reference gives
- * them no dark override. Two values, not one, because a single light hue on a
- * dark canvas is the exact defect that left the starred marker sitting at
- * `#F5A623` in both apps until this sector's dark pin was written.
+ * [signature] is the sky → cobalt → violet gradient for a few brand moments:
+ * compose FAB, safety ring at "strong", welcome-back avatar ring, celebration.
+ * Never put it behind body text. A white glyph on it is ≥3.3:1 at the lightest
+ * stop, which is fine for icons of 24 dp and up. The default start/end points run
+ * from the top-left to the bottom-right corner of whatever it fills, which is
+ * the spec's 135°.
  *
- * It lives in the token table rather than beside the avatar composable because as
- * a hex literal in the mail components file it sat outside the gate that says the
- * mail screens pick no colour of their own — which let that gate's claim print
- * while the most-visited pixel of every row was unaccounted for. A token the file
- * does not name is a token the file cannot drift from.
- *
- * iOS holds the same sixteen values as `GM.avatarRamp` (`Theme.swift`), and
- * `scripts/mail-honesty.py` pins both against the reference's list. The slot a
- * sender lands on is the app's own accumulator (`Mail.kt`'s `rampIndex`), which
- * the two apps share exactly and the web does not: what is copied from the
- * reference is the palette and the determinism, not the hash.
+ * None of these follow "Match wallpaper": the signature gradient is identity.
  */
-val GrapMailAvatarRampLight: List<Color> = listOf(
-    Color(0xFF1A73E8), Color(0xFF0B8043), Color(0xFFA142F4), Color(0xFF455A64),
-    Color(0xFFE37400), Color(0xFF00796B), Color(0xFF8E24AA), Color(0xFF3949AB),
-)
+object GMBrush {
+    val SignatureStart = Color(0xFF3D8BFF)
+    val SignatureMid = Color(0xFF1F5EFF)
+    val SignatureEnd = Color(0xFF5B47E0)
 
-val GrapMailAvatarRampDark: List<Color> = listOf(
-    Color(0xFF8AB4F8), Color(0xFF0B8043), Color(0xFFA142F4), Color(0xFF546E7A),
-    Color(0xFFFBBC04), Color(0xFF00796B), Color(0xFF8E24AA), Color(0xFF3949AB),
-)
+    val signature: Brush = Brush.linearGradient(
+        0f to SignatureStart,
+        0.55f to SignatureMid,
+        1f to SignatureEnd,
+    )
+
+    /** The celebration confetti colours (§4.4), in spec order. */
+    val confetti: List<Color> = listOf(
+        SignatureStart, SignatureMid, SignatureEnd, Color(0xFF0E9F6E), Color(0xFFF5A623),
+    )
+}
+
+/**
+ * The sender avatar ramp, kept under its pre-Round-8 names so every caller
+ * still compiles. The values are now GrapMail's own 10 hues (§1.6.1), held in
+ * ui/theme/AvatarColors.kt next to the hash that picks a slot. This file adds
+ * no hues of its own. `scripts/mail-honesty.py` pins the table there.
+ *
+ * Pick a slot with [avatarIndex], not with a local hash. The light and dark
+ * lists have the same length, so a slot is valid in either.
+ */
+val GrapMailAvatarRampLight: List<Color> get() = AvatarPaletteLight
+
+val GrapMailAvatarRampDark: List<Color> get() = AvatarPaletteDark

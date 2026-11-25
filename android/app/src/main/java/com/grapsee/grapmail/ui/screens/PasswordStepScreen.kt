@@ -37,8 +37,11 @@ import androidx.compose.ui.unit.sp
 import com.grapsee.grapmail.logic.SignUpViewModel
 import com.grapsee.grapmail.logic.Validators
 import com.grapsee.grapmail.ui.components.AppTextField
+import com.grapsee.grapmail.ui.components.GMAutofill
 import com.grapsee.grapmail.ui.components.GradientButton
 import com.grapsee.grapmail.ui.theme.LocalPalette
+import androidx.compose.ui.res.stringResource
+import com.grapsee.grapmail.R
 
 /**
  * Step 4 — "Create a strong password" — founder design verbatim: the address
@@ -60,18 +63,19 @@ fun PasswordStepScreen(vm: SignUpViewModel, onBack: () -> Unit, onSignIn: () -> 
     val acceptable = Validators.passwordAcceptable(state.password)
     val requirementsMet = acceptable && matches
     var confirmError by rememberSaveable { mutableStateOf<String?>(null) }
+    val bothMustMatchMessage = stringResource(R.string.acct_both_passwords_must_match_period)
 
     WizardScaffold(
         step = 4,
-        title = "Create a strong password",
-        subtitle = AnnotatedSubtitle(rest = "Your password keeps your account safe. Make it unique, strong and easy for you to remember."),
+        title = stringResource(R.string.acct_create_a_strong_password),
+        subtitle = AnnotatedSubtitle(rest = stringResource(R.string.acct_your_password_keeps_your_account)),
         onBack = onBack,
         onSignIn = onSignIn,
         bottomBar = {
             GradientButton(
-                "Next",
+                stringResource(R.string.acct_next),
                 onClick = {
-                    confirmError = if (!matches) "Both passwords must match." else null
+                    confirmError = if (!matches) bothMustMatchMessage else null
                     if (requirementsMet) onNext()
                 },
                 enabled = requirementsMet,
@@ -102,11 +106,11 @@ fun PasswordStepScreen(vm: SignUpViewModel, onBack: () -> Unit, onSignIn: () -> 
             }
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
-                Text("Your GrapMail address", fontSize = 13.sp, color = palette.textSecondary)
+                Text(stringResource(R.string.acct_your_grapmail_address), fontSize = 13.sp, color = palette.textSecondary)
                 Text("${state.chosenHandle}@grapsee.com", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = palette.textPrimary)
             }
             Text(
-                "Edit",
+                stringResource(R.string.acct_edit),
                 fontSize = 13.sp,
                 fontWeight = FontWeight.Medium,
                 color = palette.primarySolid,
@@ -120,17 +124,18 @@ fun PasswordStepScreen(vm: SignUpViewModel, onBack: () -> Unit, onSignIn: () -> 
         Spacer(Modifier.height(20.dp))
 
         Row {
-            Text("Password ", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = palette.textPrimary)
+            Text(stringResource(R.string.acct_password_label), fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = palette.textPrimary)
             Text("*", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = palette.error)
         }
         Spacer(Modifier.height(8.dp))
         AppTextField(
-            label = "Password",
+            label = stringResource(R.string.acct_password),
             value = state.password,
             onValueChange = { vm.update { copy(password = it) } },
-            hint = "Create a strong password",
+            hint = stringResource(R.string.acct_create_a_strong_password),
             showLabel = false,
             password = true,
+            autofill = GMAutofill.NewPassword,
         )
         Spacer(Modifier.height(10.dp))
 
@@ -155,10 +160,10 @@ fun PasswordStepScreen(vm: SignUpViewModel, onBack: () -> Unit, onSignIn: () -> 
             Text(
                 when {
                     state.password.isEmpty() -> ""
-                    strength >= 1.0 -> "Strong"
-                    strength >= 0.75 -> "Good"
-                    strength >= 0.5 -> "Fair"
-                    else -> "Weak"
+                    strength >= 1.0 -> stringResource(R.string.acct_strong)
+                    strength >= 0.75 -> stringResource(R.string.acct_good)
+                    strength >= 0.5 -> stringResource(R.string.acct_fair)
+                    else -> stringResource(R.string.acct_weak)
                 },
                 fontSize = 13.sp,
                 fontWeight = FontWeight.SemiBold,
@@ -168,21 +173,22 @@ fun PasswordStepScreen(vm: SignUpViewModel, onBack: () -> Unit, onSignIn: () -> 
 
         Spacer(Modifier.height(16.dp))
         Row {
-            Text("Confirm password ", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = palette.textPrimary)
+            Text(stringResource(R.string.acct_confirm_password_label), fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = palette.textPrimary)
             Text("*", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = palette.error)
         }
         Spacer(Modifier.height(8.dp))
         AppTextField(
-            label = "Confirm password",
+            label = stringResource(R.string.acct_confirm_password),
             value = state.confirm,
             onValueChange = {
                 vm.update { copy(confirm = it) }
                 confirmError = null
             },
-            hint = "Re-enter your password",
+            hint = stringResource(R.string.acct_re_enter_your_password),
             showLabel = false,
             password = true,
             error = confirmError,
+            autofill = GMAutofill.NewPassword,
         )
 
         Spacer(Modifier.height(18.dp))
@@ -198,12 +204,12 @@ fun PasswordStepScreen(vm: SignUpViewModel, onBack: () -> Unit, onSignIn: () -> 
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Rounded.Lock, contentDescription = null, tint = palette.textPrimary, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(8.dp))
-                Text("Password requirements", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = palette.textPrimary)
+                Text(stringResource(R.string.acct_password_requirements), fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = palette.textPrimary)
             }
             Spacer(Modifier.height(10.dp))
-            RequirementLine("At least 8 characters", state.password.length >= 8)
-            RequirementLine("A mix of letters, numbers and symbols", acceptable)
-            RequirementLine("Both passwords must match", matches)
+            RequirementLine(stringResource(R.string.acct_at_least_8_characters), state.password.length >= 8)
+            RequirementLine(stringResource(R.string.acct_a_mix_of_letters_numbers_and_symbols), acceptable)
+            RequirementLine(stringResource(R.string.acct_both_passwords_must_match), matches)
         }
     }
 }

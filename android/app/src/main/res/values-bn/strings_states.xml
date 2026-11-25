@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Loading / empty / error / offline states (translated from values/strings_states.xml). -->
+<resources>
+    <string name="states_loading">লোড হচ্ছে…</string>
+    <string name="states_offline_banner">আপনি অফলাইনে আছেন। শেষবার যা লোড হয়েছিল তা দেখানো হচ্ছে — নেটওয়ার্ক লাগে এমন কাজ আবার সংযুক্ত হওয়া পর্যন্ত অপেক্ষা করবে।</string>
+    <string name="states_error_title">কিছু একটা সমস্যা হয়েছে</string>
+    <string name="states_error_body">এটি এখন লোড করা যায়নি। আপনার সংযোগ দেখে আবার চেষ্টা করুন।</string>
+    <string name="states_error_offline_body">আপনি অফলাইনে আছেন। ওয়াই-ফাই বা মোবাইল ডেটায় সংযুক্ত হয়ে আবার চেষ্টা করুন।</string>
+    <string name="states_retry">আবার চেষ্টা করুন</string>
+    <string name="states_labels_loading">লেবেল লোড হচ্ছে…</string>
+    <string name="states_labels_failed_title">লেবেল লোড করা যায়নি</string>
+    <string name="states_scheduled_loading">নির্ধারিত মেইল লোড হচ্ছে…</string>
+    <string name="states_scheduled_failed_title">নির্ধারিত মেইল লোড করা যায়নি</string>
+    <string name="states_scheduled_empty_title">কিছুই নির্ধারিত নেই</string>
+    <string name="states_contacts_loading">আপনার মেইল থেকে লোকজন সংগ্রহ করা হচ্ছে…</string>
+    <string name="states_files_loading">সংযুক্তি সংগ্রহ করা হচ্ছে…</string>
+    <string name="states_providers_loading">সংযুক্ত মেইলবক্স লোড হচ্ছে…</string>
+    <string name="states_thread_loading">এই কথোপকথন খোলা হচ্ছে…</string>
+    <string name="states_activity_failed_title">কার্যকলাপ লোড করা যায়নি</string>
+    <string name="states_sessions_failed_title">সেশন লোড করা যায়নি</string>
+</resources>

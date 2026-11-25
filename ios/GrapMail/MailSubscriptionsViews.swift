@@ -46,9 +46,9 @@ private func looksLikeAPerson(_ address: String) -> Bool {
 
 /// The web's `frequencyLabel`, same three buckets, same phrases.
 func frequencyLabel(_ count: Int) -> String {
-    if count >= 20 { return "20+ emails recently" }
-    if count >= 10 { return "10-20 emails recently" }
-    return "10 or fewer emails recently"
+    if count >= 20 { return String(localized: "20+ emails recently") }
+    if count >= 10 { return String(localized: "10-20 emails recently") }
+    return String(localized: "10 or fewer emails recently")
 }
 
 /// The web's `detectSubscriptions` over the messages this device has loaded:
@@ -111,22 +111,44 @@ func detectSubscriptions(_ messages: [MailMessage]) -> [SubscriptionRowData] {
     }
 }
 
+/// Layout: every state (skeleton, error, list) keeps the readable column
+/// (`GMLayout.readable`), centred on wide windows; a row's Unsubscribe button
+/// sits beside the sender while it fits and moves under it when it does not.
+/// The offline banner is MailScaffold's own — this screen used to draw a
+/// second one under it.
 struct SubscriptionsView: View {
     @ObservedObject var vm: MailboxModel
     let onBack: () -> Void
+    @Environment(\.dynamicTypeSize) private var dts
     @State private var rows: [MailMessage] = []
     @State private var loaded = false
     @State private var failed = false
     @State private var gone: [String] = []
     @State private var note: String?
     @State private var confirm: SubscriptionRowData?
+    @State private var attempt = 0
+    /// Sender disc beside each row (38 pt at the default text size).
+    @ScaledMetric(relativeTo: .body) private var avatarSide: CGFloat = 38
+    /// The "no unsubscribe offered" sheet (160 pt at the default text size).
+    @ScaledMetric(relativeTo: .body) private var noOfferSheetHeight: CGFloat = 160
 
     var body: some View {
-        MailScaffold(title: "Subscriptions", onBack: onBack) {
+        MailScaffold(title: String(localized: "Subscriptions"), onBack: onBack) {
+            // First read and a failed read use the shared states, outside the
+            // scroll view (they size themselves).
+            if failed {
+                GMErrorState(message: String(localized: "Could not read the mailbox just now. Try again — open the inbox, then come back.")) { attempt += 1 }
+                    .gmMaxWidth(GMLayout.readable)
+                    .accessibilityIdentifier("gm-subs-failed")
+            } else if !loaded {
+                GMSkeletonList(rows: 6)
+                    .gmMaxWidth(GMLayout.readable)
+                    .accessibilityIdentifier("gm-subs-reading")
+            } else {
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
                     Text("Senders that keep mailing this account, with a way to stop each one.")
-                        .font(.system(size: 13)).lineSpacing(5)
+                        .gmFont(13).lineSpacing(5)
                         .foregroundColor(GM.textSecondary)
                         .fixedSize(horizontal: false, vertical: true)
                         .padding(.top, 6)
@@ -134,7 +156,7 @@ struct SubscriptionsView: View {
                     content
                     if let note {
                         Text(note)
-                            .font(.system(size: 13)).lineSpacing(5)
+                            .gmFont(13).lineSpacing(5)
                             .foregroundColor(GM.textPrimary)
                             .fixedSize(horizontal: false, vertical: true)
                             .frame(maxWidth: .infinity, alignment: .leading)
@@ -145,17 +167,21 @@ struct SubscriptionsView: View {
                             .accessibilityIdentifier("gm-subs-note")
                     }
                     Spacer().frame(height: 14)
-                    Text("Nothing was sent to any sender until you press Unsubscribe. This screen "
-                         + "never mails on your behalf on its own.")
-                        .font(.system(size: 12)).lineSpacing(4)
+                    Text("Nothing was sent to any sender until you press Unsubscribe. This screen never mails on your behalf on its own.")
+                        .gmFont(12).lineSpacing(4)
                         .foregroundColor(GM.textTertiary)
                         .fixedSize(horizontal: false, vertical: true)
                     Spacer().frame(height: 24)
                 }
                 .padding(.horizontal, 20)
+                // Wide windows (iPad, landscape, Mac): keep the reading column
+                // comfortable instead of stretching rows across the window.
+                .gmMaxWidth(GMLayout.readable)
+            }
             }
         }
-        .task {
+        .task(id: attempt) {
+            failed = false
             // The cache, not a fresh fetch: the same read the Contacts and
             // Files screens make. An absent inbox is "the mail has not been
             // opened here", not an empty mailbox.
@@ -180,16 +206,16 @@ struct SubscriptionsView: View {
                         // answers, its Bool means the SYSTEM agreed to hand
                         // the link over, and no branch says "unsubscribed".
                         guard let target = URL(string: url) else {
-                            note = "That unsubscribe address could not be opened."
+                            note = String(localized: "That unsubscribe address could not be opened.")
                             confirm = nil
                             return
                         }
                         UIApplication.shared.open(target, options: [:]) { accepted in
-                            note = (accepted
-                                ? "Opened in your browser. GrapMail cannot see what the page said."
-                                : "This device could not open that link.")
-                                + " The row is removed here because this device "
-                                + "cannot see what the page said."
+                            // Whole sentences per outcome, not a translated
+                            // tail appended to a translated head.
+                            note = accepted
+                                ? String(localized: "Opened in your browser. GrapMail cannot see what the page said. The row is removed here because this device cannot see what the page said.")
+                                : String(localized: "This device could not open that link. The row is removed here because this device cannot see what the page said.")
                             gone = gone + [s.address]
                             confirm = nil
                         }
@@ -197,18 +223,26 @@ struct SubscriptionsView: View {
                     onCancel: { confirm = nil }
                 )
             } else {
-                VStack(alignment: .leading, spacing: 12) {
-                    Text(s.name + " does not offer an unsubscribe, so there is nothing "
-                         + "this device can hand off.")
-                        .font(.system(size: 13)).lineSpacing(5)
-                        .foregroundColor(GM.textSecondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                    Button("Close") { confirm = nil }
-                        .font(.system(size: 14))
-                        .foregroundColor(GM.textTertiary)
+                // Scrolls, and its detent grows with the text size, so the
+                // sentence is never clipped at the accessibility sizes; it can
+                // also be pulled up to full height (a long sender name, a
+                // short landscape window).
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("\(s.name) does not offer an unsubscribe, so there is nothing this device can hand off.")
+                            .gmFont(13).lineSpacing(5)
+                            .foregroundColor(GM.textSecondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                        Button("Close") { confirm = nil }
+                            .gmFont(14)
+                            .foregroundColor(GM.textTertiary)
+                            .frame(minHeight: 44)
+                    }
+                    .padding(20)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .gmMaxWidth(GMLayout.form)
                 }
-                .padding(20)
-                .presentationDetents([.height(160)])
+                .presentationDetents([.height(noOfferSheetHeight), .large])
             }
         }
         .accessibilityIdentifier("gm-subs-screen")
@@ -227,44 +261,38 @@ struct SubscriptionsView: View {
 
     @ViewBuilder private var content: some View {
         if failed {
-            Text("Could not read the mailbox just now. Try again — open the inbox, "
-                 + "then come back.")
-                .font(.system(size: 14)).foregroundColor(GM.error)
+            Text("Could not read the mailbox just now. Try again — open the inbox, then come back.")
+                .gmFont(14).foregroundColor(GM.error)
+                .fixedSize(horizontal: false, vertical: true)
                 .padding(.vertical, 16)
                 .accessibilityIdentifier("gm-subs-failed")
         } else if !loaded {
             Text("Reading your mail…")
-                .font(.system(size: 14)).foregroundColor(GM.textTertiary)
+                .gmFont(14).foregroundColor(GM.textTertiary)
                 .padding(.vertical, 16)
                 .accessibilityIdentifier("gm-subs-reading")
         } else if subs.isEmpty {
             VStack(alignment: .leading, spacing: 0) {
                 Text("No subscriptions detected.")
-                    .font(.system(size: 17, weight: .semibold)).foregroundColor(GM.textPrimary)
+                    .gmFont(17, .semibold).foregroundColor(GM.textPrimary)
+                    .fixedSize(horizontal: false, vertical: true)
                     .padding(.top, 48).padding(.bottom, 10)
-                Text("This screen reads the incoming inbox mail the app has loaded on this "
-                     + "device — \(scopeCount) messages — and groups the senders that keep "
-                     + "mailing you. A sender counts with two messages when they offer an "
-                     + "unsubscribe, or three when they do not. Nothing is shown here as "
-                     + "an example; the moment mail arrives, the senders appear with their "
-                     + "frequency and a way to stop them.")
-                    .font(.system(size: 13)).lineSpacing(5)
+                Text("This screen reads the incoming inbox mail the app has loaded on this device — \(scopeCount) messages — and groups the senders that keep mailing you. A sender counts with two messages when they offer an unsubscribe, or three when they do not. Nothing is shown here as an example; the moment mail arrives, the senders appear with their frequency and a way to stop them.")
+                    .gmFont(13).lineSpacing(5)
                     .foregroundColor(GM.textSecondary)
                     .fixedSize(horizontal: false, vertical: true)
                 scopeHint
             }
             .accessibilityIdentifier("gm-subs-empty")
         } else {
-            Text("When you unsubscribe, it can take senders a few days to stop "
-                 + "sending messages.")
-                .font(.system(size: 13)).lineSpacing(5)
+            Text("When you unsubscribe, it can take senders a few days to stop sending messages.")
+                .gmFont(13).lineSpacing(5)
                 .foregroundColor(GM.textSecondary)
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.vertical, 6)
             ForEach(subs) { s in row(s) }
-            Text("This screen grouped the \(scopeCount) incoming messages the app has "
-                 + "loaded; a sender whose mail is not on this device is not on this list.")
-                .font(.system(size: 12)).lineSpacing(4)
+            Text("This screen grouped the \(scopeCount) incoming messages the app has loaded; a sender whose mail is not on this device is not on this list.")
+                .gmFont(12).lineSpacing(4)
                 .foregroundColor(GM.textTertiary)
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.top, 8)
@@ -273,9 +301,8 @@ struct SubscriptionsView: View {
     }
 
     private var scopeHint: some View {
-        Text("When a sender offers a one-click unsubscribe, it is used; otherwise their "
-             + "own unsubscribe page opens.")
-            .font(.system(size: 12)).lineSpacing(4)
+        Text("When a sender offers a one-click unsubscribe, it is used; otherwise their own unsubscribe page opens.")
+            .gmFont(12).lineSpacing(4)
             .foregroundColor(GM.textTertiary)
             .fixedSize(horizontal: false, vertical: true)
             .padding(.top, 8)
@@ -284,30 +311,66 @@ struct SubscriptionsView: View {
     @ViewBuilder private func row(_ s: SubscriptionRowData) -> some View {
         let webTarget = unsubscribeTarget(s.unsubscribe)
         let mailto = unsubscribeMailto(s.unsubscribe)
-        HStack(spacing: 12) {
-            SenderAvatar(display: s.name, address: s.address, size: 38)
+        // The button names the handoff it actually performs. A one-click
+        // offer is advertised, not verified from here, so the label never
+        // says "one-click": the sheet's own lines carry that precision.
+        let action = Button {
+            if webTarget != nil { confirm = s }
+            else if let addr = mailto { mailtoHandoff(addr) }
+        } label: {
+            Text("Unsubscribe")
+                .gmFont(13, .medium)
+                .foregroundColor(.white)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+                .padding(.horizontal, 18).padding(.vertical, 13)
+                .background(Capsule().fill(GM.primarySolid))
+        }
+        .accessibilityIdentifier("gm-subs-action")
+
+        let identity = HStack(spacing: 12) {
+            SenderAvatar(display: s.name, address: s.address, size: min(avatarSide, 56))
             VStack(alignment: .leading, spacing: 2) {
-                Text(s.name).font(.system(size: 14)).foregroundColor(GM.textPrimary)
-                    .lineLimit(1)
-                Text(s.address).font(.system(size: 12)).foregroundColor(GM.textSecondary)
-                    .lineLimit(1)
-                Text(s.frequency).font(.system(size: 12)).foregroundColor(GM.textTertiary)
+                Text(s.name).gmFont(14).foregroundColor(GM.textPrimary)
+                    .lineLimit(2)
+                Text(s.address).gmFont(12).foregroundColor(GM.textSecondary)
+                    .lineLimit(dts.isAccessibilitySize ? 3 : 1)
+                    .truncationMode(.middle)
+                Text(s.frequency).gmFont(12).foregroundColor(GM.textTertiary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            // The button names the handoff it actually performs. A one-click
-            // offer is advertised, not verified from here, so the label never
-            // says "one-click": the sheet's own lines carry that precision.
-            Button {
-                if webTarget != nil { confirm = s }
-                else if let addr = mailto { mailtoHandoff(addr) }
-            } label: {
-                Text("Unsubscribe")
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundColor(.white)
-                    .padding(.horizontal, 18).padding(.vertical, 13)
-                    .background(Capsule().fill(GM.primarySolid))
+        }
+
+        Group {
+            if dts.isAccessibilitySize {
+                // Avatar + name, then the button on its own line: side by side
+                // they leave the name a few letters at the largest sizes.
+                VStack(alignment: .leading, spacing: 10) {
+                    identity
+                    action
+                }
+            } else if dts <= .large {
+                // The design's row, exactly as it was.
+                HStack(spacing: 12) {
+                    identity
+                    action
+                }
+            } else {
+                // Larger (non-accessibility) text, or a narrow Split View /
+                // Slide Over column: beside while the button still fits at
+                // its full size, under the sender once it does not.
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: 12) {
+                        identity
+                        action.fixedSize()
+                    }
+                    VStack(alignment: .leading, spacing: 10) {
+                        identity
+                        action
+                    }
+                }
             }
-            .accessibilityIdentifier("gm-subs-action")
         }
         .padding(.vertical, 14)
         .accessibilityIdentifier("gm-subs-row")
@@ -322,15 +385,13 @@ struct SubscriptionsView: View {
             // The address is sender-controlled; an unbuildable URL must be
             // SAID, not swallowed — a tap that silently does nothing reads as
             // a broken button, and this screen's rule is it says what opened.
-            note = "That unsubscribe address could not be opened, so nothing was drafted."
+            note = String(localized: "That unsubscribe address could not be opened, so nothing was drafted.")
             return
         }
         UIApplication.shared.open(url, options: [:]) { accepted in
             note = accepted
-                ? "The device opened a draft to the sender's unsubscribe address. "
-                    + "Nothing has left this phone until you send it."
-                : "This device has no mail app that can open that address, so "
-                    + "nothing was drafted."
+                ? String(localized: "The device opened a draft to the sender's unsubscribe address. Nothing has left this phone until you send it.")
+                : String(localized: "This device has no mail app that can open that address, so nothing was drafted.")
         }
     }
 }

@@ -4,6 +4,8 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.grapsee.grapmail.R
+import com.grapsee.grapmail.ui.i18n.CoreStrings
 import com.grapsee.grapmail.data.Api
 import com.grapsee.grapmail.data.ApiException
 import com.grapsee.grapmail.data.AssignmentsRead
@@ -613,7 +615,7 @@ class MailboxViewModel @JvmOverloads constructor(
                 // parks an indeterminate spinner over the list for the rest of the
                 // screen's life the moment a session has expired.
                 _state.update { it.copy(loading = false, loadingMore = false,
-                    fatal = "Sign in again.", settleGeneration = it.settleGeneration + 1) }
+                    fatal = CoreStrings.get(R.string.core_sign_in_again) { "Sign in again." }, settleGeneration = it.settleGeneration + 1) }
                 return@launch
             }
 
@@ -834,7 +836,7 @@ class MailboxViewModel @JvmOverloads constructor(
         viewModelScope.launch {
             val app = getApplication<Application>()
             val session = SessionStore.snapshot(app) ?: run {
-                _state.update { it.copy(busy = false, actionError = "Sign in again.") }
+                _state.update { it.copy(busy = false, actionError = CoreStrings.get(R.string.core_sign_in_again) { "Sign in again." }) }
                 return@launch
             }
             // One request per message, run serially, made a selection of twenty
@@ -875,7 +877,7 @@ class MailboxViewModel @JvmOverloads constructor(
                             } catch (e: kotlinx.coroutines.CancellationException) {
                                 throw e
                             } catch (e: Exception) {
-                                failure = failure ?: (e.message ?: "That action didn't go through.")
+                                failure = failure ?: (e.message ?: CoreStrings.get(R.string.core_action_failed) { "That action didn't go through." })
                             }
                         }
                     }
@@ -923,6 +925,9 @@ class MailboxViewModel @JvmOverloads constructor(
                 else s.copy(undoIds = done, undoInverse = inv,
                     undoNote = action.pastLine(done.size))
             }
+            if (done.isNotEmpty() && MailHandledToday.counts(action)) {
+                MailHandledToday.record(app, session.address, done)
+            }
             if (done.isEmpty()) return@launch
             // Every accepted write already patched MailStore and the visible
             // rows above. Re-downloading page 1 here made one toolbar action
@@ -949,8 +954,10 @@ class MailboxViewModel @JvmOverloads constructor(
                         .withZoneSameInstant(java.time.ZoneId.systemDefault()))
             }.getOrNull()
         }
-        val head = if (count == 1) "Snoozed 1 message" else "Snoozed $count messages"
-        return if (when_ != null) "$head until $when_" else head
+        val head = CoreStrings.plural(R.plurals.core_snoozed_messages, count, count) {
+            if (count == 1) "Snoozed 1 message" else "Snoozed $count messages"
+        }
+        return if (when_ != null) CoreStrings.get(R.string.core_snoozed_until, head, when_) { "$head until $when_" } else head
     }
 
     /**
@@ -978,7 +985,7 @@ class MailboxViewModel @JvmOverloads constructor(
         ids: List<String>,
         session: SessionSnapshot?,
         app: android.app.Application,
-        defaultFailure: String = "That action didn't go through.",
+        defaultFailure: String = CoreStrings.get(R.string.core_action_failed) { "That action didn't go through." },
         write: suspend (String) -> Unit,
     ): Pair<List<String>, String?> {
         if (ids.isEmpty()) return emptyList<String>() to null
@@ -1012,7 +1019,7 @@ class MailboxViewModel @JvmOverloads constructor(
         viewModelScope.launch {
             val app = getApplication<Application>()
             val session = SessionStore.snapshot(app) ?: run {
-                _state.update { it.copy(busy = false, actionError = "Sign in again.") }
+                _state.update { it.copy(busy = false, actionError = CoreStrings.get(R.string.core_sign_in_again) { "Sign in again." }) }
                 return@launch
             }
             val (restored, failure) = parallelWrites(ids, session, app) { id ->
@@ -1020,6 +1027,7 @@ class MailboxViewModel @JvmOverloads constructor(
             }
             if (!SessionStore.isCurrent(app, session.id)) return@launch
             if (restored.isNotEmpty()) invalidateFor(MailAction.Unsnooze, session.id)
+            MailHandledToday.forget(app, session.address, restored)
             if (!SessionStore.isCurrent(app, session.id)) return@launch
             _state.update { s ->
                 s.copy(
@@ -1031,7 +1039,7 @@ class MailboxViewModel @JvmOverloads constructor(
                     // them twice.
                     snoozeUndoIds = s.snoozeUndoIds - restored,
                     snoozeUndoNote = when {
-                        failure != null -> "${restored.size} of ${ids.size} came back. $failure"
+                        failure != null -> CoreStrings.get(R.string.core_partial_came_back, restored.size, ids.size, failure.orEmpty()) { "${restored.size} of ${ids.size} came back. $failure" }
                         else -> null
                     },
                     actionError = failure,
@@ -1062,7 +1070,7 @@ class MailboxViewModel @JvmOverloads constructor(
         viewModelScope.launch {
             val app = getApplication<Application>()
             val session = SessionStore.snapshot(app) ?: run {
-                _state.update { it.copy(busy = false, actionError = "Sign in again.") }
+                _state.update { it.copy(busy = false, actionError = CoreStrings.get(R.string.core_sign_in_again) { "Sign in again." }) }
                 return@launch
             }
             val (redone, failure) = parallelWrites(ids, session, app) { id ->
@@ -1071,6 +1079,8 @@ class MailboxViewModel @JvmOverloads constructor(
             }
             if (!SessionStore.isCurrent(app, session.id)) return@launch
             if (redone.isNotEmpty()) invalidateFor(inv, session.id)
+            // Mail that came back is no longer "handled today".
+            MailHandledToday.forget(app, session.address, redone)
             if (!SessionStore.isCurrent(app, session.id)) return@launch
             _state.update { s ->
                 val left = s.undoIds - redone
@@ -1079,7 +1089,7 @@ class MailboxViewModel @JvmOverloads constructor(
                     undoIds = left,
                     undoInverse = if (left.isEmpty()) null else s.undoInverse,
                     undoNote = when {
-                        failure != null -> "${redone.size} of ${ids.size} reversed. $failure"
+                        failure != null -> CoreStrings.get(R.string.core_partial_reversed, redone.size, ids.size, failure.orEmpty()) { "${redone.size} of ${ids.size} reversed. $failure" }
                         else -> null
                     },
                     actionError = failure,
@@ -1119,16 +1129,27 @@ class MailboxViewModel @JvmOverloads constructor(
 
     private val pendingRowActions = mutableSetOf<String>()
 
-    fun actOn(id: String, action: MailAction, onOutcome: ((String?) -> Unit)? = null) {
+    fun actOn(id: String, action: MailAction, onOutcome: ((String?) -> Unit)? = null) =
+        actOnRow(id, action, null, onOutcome)
+
+    /**
+     * One row's snooze, from a swipe set to Snooze (Settings → Swipe actions):
+     * the same optimistic single-row path as [actOn], carrying the instant
+     * the snooze sheet picked. The bulk path ([act]) stays for selections.
+     */
+    fun snoozeOn(id: String, until: String, onOutcome: ((String?) -> Unit)? = null) =
+        actOnRow(id, MailAction.Snooze, until, onOutcome)
+
+    private fun actOnRow(id: String, action: MailAction, until: String?, onOutcome: ((String?) -> Unit)?) {
         viewModelScope.launch {
             val app = getApplication<Application>()
             val session = SessionStore.snapshot(app)
             if (session == null) {
-                onOutcome?.invoke("You are signed out, so this could not be saved.")
+                onOutcome?.invoke(CoreStrings.get(R.string.core_signed_out_not_saved) { "You are signed out, so this could not be saved." })
                 return@launch
             }
             if (_state.value.busy || !pendingRowActions.add(id)) {
-                onOutcome?.invoke("A message action is already in progress.")
+                onOutcome?.invoke(CoreStrings.get(R.string.core_action_in_progress) { "A message action is already in progress." })
                 return@launch
             }
             try {
@@ -1175,8 +1196,11 @@ class MailboxViewModel @JvmOverloads constructor(
                     else -> GMHaptics.filing()
                 }
                 try {
-                    Api.mailAction(session.token, id, action, null)
+                    Api.mailAction(session.token, id, action, until)
                     if (!SessionStore.isCurrent(app, session.id)) return@launch
+                    // Inbox Zero's "You handled N emails today" (MailHandledToday):
+                    // counted once the server accepted, like the haptic's truth.
+                    if (MailHandledToday.counts(action)) MailHandledToday.record(app, session.address, listOf(id))
                     invalidateFor(action, session.id)
                     if (!SessionStore.isCurrent(app, session.id)) return@launch
                     // A single-message action supersedes the undo offer for THAT
@@ -1224,7 +1248,7 @@ class MailboxViewModel @JvmOverloads constructor(
                     loadedBoxes.remove(_state.value.box)
                     MailStore.invalidate(_state.value.box)
                     load(forceCounts = false)
-                    val error = (e as? ApiException)?.message ?: "That action didn't go through."
+                    val error = (e as? ApiException)?.message ?: CoreStrings.get(R.string.core_action_failed) { "That action didn't go through." }
                     _state.update { it.copy(actionError = error) }
                     onOutcome?.invoke(error)
                 }
@@ -1320,10 +1344,10 @@ class MailboxViewModel @JvmOverloads constructor(
         _state.update { it.copy(busy = true) }
         viewModelScope.launch {
             val t = token() ?: run {
-                _state.update { it.copy(busy = false, actionError = "Sign in again.") }
+                _state.update { it.copy(busy = false, actionError = CoreStrings.get(R.string.core_sign_in_again) { "Sign in again." }) }
                 return@launch
             }
-            val (removedIds, failure) = parallelWrites(ids, null, getApplication(), defaultFailure = "That message could not be deleted.") { id ->
+            val (removedIds, failure) = parallelWrites(ids, null, getApplication(), defaultFailure = CoreStrings.get(R.string.core_message_not_deleted) { "That message could not be deleted." }) { id ->
                 Api.mailDeletePermanent(t, id)
                 MailStore.remove(id, MailBox.Trash)
                 MailStore.forgetBody(id)
@@ -1334,6 +1358,11 @@ class MailboxViewModel @JvmOverloads constructor(
                 MailStore.forgetAssignments(id)
             }
             val removed = removedIds.toSet()
+            if (removed.isNotEmpty()) {
+                SessionStore.snapshot(getApplication())?.address?.let {
+                    MailHandledToday.record(getApplication(), it, removed)
+                }
+            }
             _state.update {
                 it.copy(busy = false, selection = it.selection - removed, actionError = failure,
                     rows = it.rows.filterNot { row -> row.id in removed })
@@ -1393,7 +1422,7 @@ class MailboxViewModel @JvmOverloads constructor(
                     _state.update { s ->
                         s.copy(
                             assignmentsRead = if (hadMap) AssignmentsRead.Read else AssignmentsRead.Failed,
-                            staleError = e.message ?: "The labels could not be read.",
+                            staleError = e.message ?: CoreStrings.get(R.string.core_labels_not_read) { "The labels could not be read." },
                         )
                     }
                     if (hadMap) applyMarks()
@@ -1476,7 +1505,7 @@ class MailboxViewModel @JvmOverloads constructor(
                             } catch (e: kotlinx.coroutines.CancellationException) {
                                 throw e
                             } catch (e: Exception) {
-                                false to ((e as? ApiException)?.message ?: "The label was not saved.")
+                                false to ((e as? ApiException)?.message ?: CoreStrings.get(R.string.core_label_not_saved) { "The label was not saved." })
                             }
                         }
                     }
@@ -1493,11 +1522,12 @@ class MailboxViewModel @JvmOverloads constructor(
                     // through to the success wording and render "Labelled 0
                     // messages" over a selection that was not labelled at all.
                     labelNote = when {
-                        done == 0 -> failure ?: "The label was not saved."
-                        failure != null -> "$done of ${targets.size} saved. $failure"
-                        remove -> "Removed \"$labelName\" from $done"
-                        done == 1 -> "Labelled 1 message"
-                        else -> "Labelled $done messages"
+                        done == 0 -> failure ?: CoreStrings.get(R.string.core_label_not_saved) { "The label was not saved." }
+                        failure != null -> CoreStrings.get(R.string.core_partial_saved, done, targets.size, failure.orEmpty()) { "$done of ${targets.size} saved. $failure" }
+                        remove -> CoreStrings.get(R.string.core_label_removed_from, labelName.toString(), done) { "Removed \"$labelName\" from $done" }
+                        else -> CoreStrings.plural(R.plurals.core_labelled_messages, done, done) {
+                            if (done == 1) "Labelled 1 message" else "Labelled $done messages"
+                        }
                     },
                 )
             }
@@ -1536,11 +1566,17 @@ class MailboxViewModel @JvmOverloads constructor(
          *  and a loaded draft fill fields without an edit, so a composer
          *  nobody touched neither autosaves nor saves on close. */
         val userEdited: Boolean = false,
+        /** Send later: the scheduled row the server created, and the instant
+         *  it recorded (its own `scheduledFor` echo). Set together with
+         *  `resultStatus = "scheduled"`, in the same update, so the screen that
+         *  reacts to the status always reads the time with it. */
+        val scheduledId: String? = null,
+        val scheduledFor: String? = null,
     ) {
         /** "outbox": no connection at Send; the message is held encrypted on this
          *  device and goes out on its own when the device is online (data/Outbox.kt).
          *  Accepted, so the composer closes and Send cannot queue it twice. */
-        val accepted: Boolean get() = resultStatus == "sent" || resultStatus == "queued" || resultStatus == "delivered" || resultStatus == "outbox"
+        val accepted: Boolean get() = resultStatus == "sent" || resultStatus == "queued" || resultStatus == "delivered" || resultStatus == "outbox" || resultStatus == "scheduled"
     }
 
     private val _compose = MutableStateFlow(ComposeState())
@@ -1610,7 +1646,7 @@ class MailboxViewModel @JvmOverloads constructor(
                 _compose.update {
                     it.copy(
                         autosaving = false,
-                        autosaveNote = "Draft saved",
+                        autosaveNote = CoreStrings.get(R.string.core_draft_autosaved) { "Draft saved" },
                         draftId = r.id ?: it.draftId,
                     )
                 }
@@ -1619,7 +1655,7 @@ class MailboxViewModel @JvmOverloads constructor(
             } catch (e: Exception) {
                 if (e is kotlinx.coroutines.CancellationException) throw e
                 _compose.update {
-                    it.copy(autosaving = false, autosaveNote = "Draft not saved — it will be saved on the next change.")
+                    it.copy(autosaving = false, autosaveNote = CoreStrings.get(R.string.core_draft_autosave_failed) { "Draft not saved — it will be saved on the next change." })
                 }
             } finally {
                 autosaveInFlight = false
@@ -1663,7 +1699,10 @@ class MailboxViewModel @JvmOverloads constructor(
                 .getOrNull()?.message
             if (generation != composeGeneration) return@launch
             if (full == null) {
-                _compose.update { it.copy(error = if (mode == "draft") "Could not open this draft." else "Could not load the original message.") }
+                _compose.update { it.copy(error = if (mode == "draft")
+                    CoreStrings.get(R.string.core_compose_draft_open_failed) { "Could not open this draft." }
+                else
+                    CoreStrings.get(R.string.core_compose_original_load_failed) { "Could not load the original message." }) }
                 return@launch
             }
             val draftHtml = if (mode == "draft" && full.hasHtml) {
@@ -1673,7 +1712,7 @@ class MailboxViewModel @JvmOverloads constructor(
             } else null
             if (generation != composeGeneration) return@launch
             if (mode == "draft" && full.hasHtml && draftHtml.isNullOrBlank()) {
-                _compose.update { it.copy(error = "Could not load the draft formatting.") }
+                _compose.update { it.copy(error = CoreStrings.get(R.string.core_compose_draft_formatting_failed) { "Could not load the draft formatting." }) }
                 return@launch
             }
             val me = _state.value.accountAddress?.lowercase()
@@ -1714,11 +1753,7 @@ class MailboxViewModel @JvmOverloads constructor(
                     ) }
                 }
                 "forward" -> {
-                    val head = "Forwarded message\n" +
-                        "From: ${full.from?.display ?: full.from?.address ?: ""}\n" +
-                        "Date: ${full.createdAt ?: ""}\n" +
-                        "Subject: ${full.subject ?: "(no subject)"}\n" +
-                        "To: ${full.to.joinToString(", ")}\n\n"
+                    val head = forwardHeader(full)
                     _compose.update { it.copy(
                         to = "", subject = forwardSubject(full.subject),
                         body = head + quoted + signatureBlock(signature),
@@ -1737,16 +1772,30 @@ class MailboxViewModel @JvmOverloads constructor(
         }
     }
 
+    /** The forwarded-message header block that opens a forward's body. */
+    private fun forwardHeader(full: MailMessageFullDto): String {
+        val fwFrom = full.from?.display ?: full.from?.address ?: ""
+        val fwDate = full.createdAt ?: ""
+        val fwSubject = full.subject ?: CoreStrings.get(R.string.core_notif_no_subject) { "(no subject)" }
+        val fwTo = full.to.joinToString(", ")
+        return CoreStrings.get(R.string.core_forward_header, fwFrom, fwDate, fwSubject, fwTo) {
+            "Forwarded message\nFrom: $fwFrom\nDate: $fwDate\nSubject: $fwSubject\nTo: $fwTo\n\n"
+        }
+    }
+
     /** The quote block: every body line prefixed, the way the web's replies
      *  read. An empty body quotes nothing -- inventing a blank line under the
      *  header would claim the message had a body. */
     private fun quoteOf(m: MailMessageFullDto): String {
         val body = m.bodyText?.trim() ?: ""
+        val onDate = m.createdAt ?: CoreStrings.get(R.string.core_quote_unknown_date) { "an unknown date" }
         if (body.isEmpty()) return "\n\n" +
-            "On ${m.createdAt ?: "an unknown date"}, ${(m.from?.display ?: m.from?.address ?: "")} wrote:\n"
+            CoreStrings.get(R.string.core_quote_header, onDate, (m.from?.display ?: m.from?.address ?: "")) {
+                "On $onDate, ${(m.from?.display ?: m.from?.address ?: "")} wrote:"
+            } + "\n"
         val who = (m.from?.display ?: m.from?.address ?: "")
         val lines = body.lines().joinToString("\n") { if (it.isEmpty()) ">" else "> $it" }
-        return "\n\nOn ${m.createdAt ?: "an unknown date"}, $who wrote:\n$lines\n"
+        return "\n\n" + CoreStrings.get(R.string.core_quote_header, onDate, who) { "On $onDate, $who wrote:" } + "\n$lines\n"
     }
 
     /**
@@ -1777,6 +1826,7 @@ class MailboxViewModel @JvmOverloads constructor(
         autosaveNeedsFollowUp = false
         autosaveJob?.cancel()
         autosaveJob = null
+        requestReadReceipt = false
         _compose.value = ComposeState(to = initialRecipient)
     }
 
@@ -1807,7 +1857,13 @@ class MailboxViewModel @JvmOverloads constructor(
         val subject: String, val body: String, val bodyHtml: String?, val inReplyTo: String?,
         val draftId: String, val e2eEnvelope: String?, val attachmentIds: List<String>,
         val generation: Long,
+        val requestReadReceipt: Boolean = false,
+        /** Send later: the wire instant ([com.grapsee.grapmail.data.MailSchedule.toWire]), or null to send now. */
+        val sendAt: String? = null,
     )
+
+    /** Compose toggle "Request read receipt". Sent with /send; reset with each new compose. */
+    var requestReadReceipt: Boolean = false
 
     private var undoSendJob: kotlinx.coroutines.Job? = null
     private var heldSend: HeldSend? = null
@@ -1820,7 +1876,7 @@ class MailboxViewModel @JvmOverloads constructor(
         // the person pressed Send twice is worse than a button that says why
         // it is waiting. Cc and Bcc do not count -- the route requires `to`.
         if (splitAddresses(s.to).isEmpty()) {
-            _compose.update { it.copy(error = "Add at least one recipient in To.") }
+            _compose.update { it.copy(error = CoreStrings.get(R.string.core_compose_need_recipient) { "Add at least one recipient in To." }) }
             return
         }
         val held = HeldSend(
@@ -1828,6 +1884,7 @@ class MailboxViewModel @JvmOverloads constructor(
             inReplyTo = s.inReplyTo, draftId = _compose.value.draftId,
             e2eEnvelope = e2eEnvelope, attachmentIds = attachmentIds,
             generation = composeGeneration,
+            requestReadReceipt = requestReadReceipt && e2eEnvelope == null,
         )
         heldSend = held
         stopAutosaveDebounce()
@@ -1858,6 +1915,96 @@ class MailboxViewModel @JvmOverloads constructor(
         GMHaptics.marking()
     }
 
+    // ── send later ───────────────────────────────────────────────────────────
+    //
+    // Scheduling is the same `POST /send` with a `sendAt`, so it is validated
+    // the way Send is (a To, the screen's own upload / sealing gates) and goes
+    // out through [executeSend]. There is no five-second hold: nothing leaves
+    // the account until the chosen time anyway, and the receipt's Undo
+    // (`DELETE /scheduled/:id`, [undoScheduledSend]) is the take-back.
+    //
+    // Offline it is NOT queued in the Outbox. The Outbox worker counts only
+    // sent/queued/delivered as accepted (OutboxWorker.OutboxRetryPolicy), so a
+    // scheduled answer would be reported to the person as a failure and the
+    // draft left behind, and a time that passes while offline would 400 later
+    // with nobody watching. The composer keeps the message and says why.
+
+    /**
+     * Schedule the composed message for [at]. Refuses here, with the server's
+     * own window ([com.grapsee.grapmail.data.MailSchedule.check]), a time the
+     * route would refuse, so the person learns it in the composer rather than
+     * from a 400.
+     */
+    fun scheduleSend(at: java.time.Instant, e2eEnvelope: String? = null, attachmentIds: List<String> = emptyList()) {
+        val s = _compose.value
+        if (s.sending || s.accepted || s.pendingSend) return
+        if (splitAddresses(s.to).isEmpty()) {
+            _compose.update { it.copy(error = CoreStrings.get(R.string.core_compose_need_recipient) { "Add at least one recipient in To." }) }
+            return
+        }
+        when (com.grapsee.grapmail.data.MailSchedule.check(at, System.currentTimeMillis())) {
+            com.grapsee.grapmail.data.MailSchedule.Verdict.TOO_SOON -> {
+                _compose.update { it.copy(error = CoreStrings.get(R.string.compose_send_later_too_soon) { "Pick a time at least a minute from now." }) }
+                GMHaptics.failure()
+                return
+            }
+            com.grapsee.grapmail.data.MailSchedule.Verdict.TOO_FAR -> {
+                _compose.update { it.copy(error = CoreStrings.get(R.string.compose_send_later_too_far) { "Pick a time no more than 30 days ahead." }) }
+                GMHaptics.failure()
+                return
+            }
+            com.grapsee.grapmail.data.MailSchedule.Verdict.OK -> Unit
+        }
+        undoSendJob?.cancel()
+        undoSendJob = null
+        heldSend = null
+        val generation = composeGeneration
+        val pending = stopAutosaveDebounce()
+        _compose.update { it.copy(sending = true, error = null, result = null, resultStatus = null) }
+        viewModelScope.launch {
+            // As Send does: an in-flight autosave settles first so the draft
+            // cleanup after acceptance targets the row that exists now.
+            pending?.join()
+            if (generation != composeGeneration) return@launch
+            executeSend(HeldSend(
+                to = s.to, cc = s.cc, bcc = s.bcc, subject = s.subject, body = s.body, bodyHtml = s.bodyHtml,
+                inReplyTo = s.inReplyTo, draftId = _compose.value.draftId,
+                e2eEnvelope = e2eEnvelope, attachmentIds = attachmentIds,
+                generation = generation,
+                requestReadReceipt = requestReadReceipt && e2eEnvelope == null,
+                sendAt = com.grapsee.grapmail.data.MailSchedule.toWire(at),
+            ))
+        }
+    }
+
+    /**
+     * The receipt's Undo: `DELETE /scheduled/:id`. The server turns the row
+     * back into a draft (it moves to Drafts, body and attachments kept), so
+     * nothing is lost. [onResult] gets null on success, or the reason. Runs on
+     * this model's scope, which outlives the closed composer (HOME-scoped).
+     */
+    fun undoScheduledSend(id: String, onResult: (String?) -> Unit) {
+        viewModelScope.launch {
+            val t = token() ?: run {
+                onResult(CoreStrings.get(R.string.core_sign_in_again) { "Sign in again." })
+                return@launch
+            }
+            try {
+                Api.mailScheduledCancel(t, id)
+                _scheduled.update { it.copy(messages = it.messages.filterNot { m -> m.id == id }) }
+                loadedBoxes.remove(MailBox.Drafts)
+                MailStore.invalidate(MailBox.Drafts)
+                GMHaptics.marking()
+                onResult(null)
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                GMHaptics.failure()
+                onResult(mailReason(e))
+            }
+        }
+    }
+
     // ── scheduled send list ──────────────────────────────────────────────────
 
     data class ScheduledState(
@@ -1877,14 +2024,14 @@ class MailboxViewModel @JvmOverloads constructor(
         _scheduled.update { it.copy(loading = true, error = null) }
         viewModelScope.launch {
             val t = token() ?: run {
-                _scheduled.update { it.copy(loading = false, error = "Sign in again.") }
+                _scheduled.update { it.copy(loading = false, error = CoreStrings.get(R.string.core_sign_in_again) { "Sign in again." }) }
                 return@launch
             }
             try {
                 val r = Api.mailScheduledList(t)
                 if (!r.success) {
                     _scheduled.update { it.copy(loading = false, loaded = true,
-                        error = "The server returned no listing.") }
+                        error = CoreStrings.get(R.string.core_scheduled_no_listing) { "The server returned no listing." }) }
                     return@launch
                 }
                 _scheduled.update { it.copy(loading = false, loaded = true, messages = r.messages) }
@@ -1904,14 +2051,14 @@ class MailboxViewModel @JvmOverloads constructor(
         _scheduled.update { it.copy(cancellingId = id) }
         viewModelScope.launch {
             val t = token() ?: run {
-                _scheduled.update { it.copy(cancellingId = null, error = "Sign in again.") }
+                _scheduled.update { it.copy(cancellingId = null, error = CoreStrings.get(R.string.core_sign_in_again) { "Sign in again." }) }
                 return@launch
             }
             try {
                 Api.mailScheduledCancel(t, id)
                 _scheduled.update { it.copy(cancellingId = null,
                     messages = it.messages.filterNot { m -> m.id == id },
-                    note = "Cancelled — it will not be sent.") }
+                    note = CoreStrings.get(R.string.core_scheduled_cancelled) { "Cancelled — it will not be sent." }) }
             } catch (e: kotlinx.coroutines.CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -1935,7 +2082,7 @@ class MailboxViewModel @JvmOverloads constructor(
             // below are generation-gated.
             val draftId = held.draftId
             val t = token() ?: run {
-                if (held.generation == composeGeneration) _compose.update { it.copy(sending = false, error = "Sign in again.") }
+                if (held.generation == composeGeneration) _compose.update { it.copy(sending = false, error = CoreStrings.get(R.string.core_sign_in_again) { "Sign in again." }) }
                 return@launch
             }
             // The envelope goes on the wire as the JSON OBJECT the route
@@ -1947,7 +2094,7 @@ class MailboxViewModel @JvmOverloads constructor(
             val envelope = held.e2eEnvelope?.let {
                 try { Json.parseToJsonElement(it).jsonObject }
                 catch (e: Exception) {
-                    _compose.update { s -> s.copy(sending = false, error = "The encrypted envelope could not be prepared — nothing was sent.") }
+                    _compose.update { s -> s.copy(sending = false, error = CoreStrings.get(R.string.core_compose_envelope_failed) { "The encrypted envelope could not be prepared — nothing was sent." }) }
                     null
                 }
             }
@@ -1964,12 +2111,17 @@ class MailboxViewModel @JvmOverloads constructor(
                     inReplyTo = held.inReplyTo,
                     e2eEnvelope = envelope,
                     attachmentIds = held.attachmentIds,
+                    requestReadReceipt = held.requestReadReceipt,
+                    sendAt = held.sendAt,
                 )
             runCatching {
                 Api.mailSend(t, request)
             }.onSuccess { r ->
                 val generation = held.generation
-                val accepted = r.status in listOf("sent", "queued", "delivered")
+                val accepted = r.status in listOf("sent", "queued", "delivered", "scheduled")
+                val scheduled = r.status == "scheduled"
+                // The server's own echo of the instant, then the one asked for.
+                val scheduledAt = if (scheduled) r.scheduledFor ?: held.sendAt else null
                 if (!accepted) android.util.Log.w("GrapMailApi", "Send was not accepted; delivery error present=${r.deliveryError != null}")
                 // One write, framed by the server: its message (or error /
                 // deliveryError) verbatim. The local sentence survives only
@@ -1977,8 +2129,9 @@ class MailboxViewModel @JvmOverloads constructor(
                 // server text shows none.
                 if (generation == composeGeneration) _compose.update { it.copy(sending = false,
                     result = r.message ?: r.error, resultStatus = r.status,
+                    scheduledId = if (scheduled) r.id else null, scheduledFor = scheduledAt,
                     error = r.deliveryError ?: r.error
-                        ?: if (accepted) null else "Could not send this message. Try again.") }
+                        ?: if (accepted) null else CoreStrings.get(R.string.core_compose_send_failed_retry) { "Could not send this message. Try again." }) }
                 if (accepted) {
                     // A delivered send is the app having proven itself — the
                     // review ask counts it and fires the store's flow when the
@@ -1995,7 +2148,17 @@ class MailboxViewModel @JvmOverloads constructor(
                 // 2026-11-08's run (the receipt said "Server reported:
                 // delivered" in warn ink beneath a failure tap). Without it
                 // here, every delivered message buzzed as a failure.
-                val sent = r.status == "sent" || r.status == "queued" || r.status == "delivered"
+                val sent = r.status == "sent" || r.status == "queued" || r.status == "delivered" || scheduled
+                // Send later: the Scheduled list shows the new row at once,
+                // before its next `GET /scheduled` replaces it with the server's.
+                val newScheduledId = r.id
+                if (scheduled && newScheduledId != null) {
+                    _scheduled.update { st ->
+                        st.copy(messages = (st.messages.filterNot { m -> m.id == newScheduledId } + MailScheduledDto(
+                            id = newScheduledId, subject = held.subject, to = splitAddresses(held.to), scheduledFor = scheduledAt,
+                        )).sortedBy { m -> com.grapsee.grapmail.data.MailSchedule.parse(m.scheduledFor) ?: java.time.Instant.MAX })
+                    }
+                }
                 if (sent) {
                     loadedBoxes.remove(MailBox.Sent)
                     loadedBoxes.remove(MailBox.Inbox)
@@ -2022,6 +2185,14 @@ class MailboxViewModel @JvmOverloads constructor(
                 if (sent) GMHaptics.success() else GMHaptics.failure()
             }.onFailure { e ->
                 if (e is kotlinx.coroutines.CancellationException) throw e
+                // Send later with no answer: not the Outbox (see "send later"
+                // above). Nothing was scheduled and the composer keeps it all.
+                if (e !is ApiException && held.sendAt != null) {
+                    if (held.generation == composeGeneration) _compose.update { it.copy(sending = false,
+                        error = CoreStrings.get(R.string.compose_send_later_offline) { "No connection, so nothing was scheduled. Your message is still here." }) }
+                    GMHaptics.failure()
+                    return@onFailure
+                }
                 // No answer at all (no connection, a timeout): the server never
                 // decided, so the message goes to the Outbox and is sent when the
                 // device is online. A refusal (ApiException) is the server's
@@ -2037,7 +2208,7 @@ class MailboxViewModel @JvmOverloads constructor(
                             com.grapsee.grapmail.logic.OutboxWorker.schedule(app)
                             if (held.generation == composeGeneration) _compose.update { it.copy(sending = false,
                                 error = null, resultStatus = "outbox",
-                                result = "No connection. Saved in the Outbox: it sends by itself when you are back online.") }
+                                result = CoreStrings.get(R.string.core_compose_saved_to_outbox) { "No connection. Saved in the Outbox: it sends by itself when you are back online." }) }
                             GMHaptics.success()
                             return@onFailure
                         }
@@ -2045,7 +2216,7 @@ class MailboxViewModel @JvmOverloads constructor(
                 }
                 if (held.generation != composeGeneration) return@onFailure
                 _compose.update { it.copy(sending = false,
-                    error = e.message ?: "The message could not be sent.") }
+                    error = e.message ?: CoreStrings.get(R.string.core_compose_send_failed) { "The message could not be sent." }) }
                 GMHaptics.failure()
             }
         }
@@ -2066,7 +2237,7 @@ class MailboxViewModel @JvmOverloads constructor(
             // A close may have opened another composer while the save waited.
             if (generation != composeGeneration) return@launch
             if (t == null) {
-                _compose.update { it.copy(sending = false, error = "Sign in again.") }
+                _compose.update { it.copy(sending = false, error = CoreStrings.get(R.string.core_sign_in_again) { "Sign in again." }) }
                 return@launch
             }
             runCatching {
@@ -2081,7 +2252,7 @@ class MailboxViewModel @JvmOverloads constructor(
                 // instead of inserting a second one.
                 if (generation == composeGeneration) _compose.update {
                     it.copy(
-                        sending = false, result = "Saved to Drafts", resultStatus = "draft",
+                        sending = false, result = CoreStrings.get(R.string.core_compose_saved_to_drafts) { "Saved to Drafts" }, resultStatus = "draft",
                         draftId = r.id ?: it.draftId,
                     )
                 }
@@ -2091,7 +2262,7 @@ class MailboxViewModel @JvmOverloads constructor(
             }.onFailure { e ->
                 if (e is kotlinx.coroutines.CancellationException) throw e
                 if (generation == composeGeneration) {
-                    _compose.update { it.copy(sending = false, error = e.message ?: "The draft was not saved.") }
+                    _compose.update { it.copy(sending = false, error = e.message ?: CoreStrings.get(R.string.core_compose_draft_not_saved) { "The draft was not saved." }) }
                 }
             }
         }
@@ -2117,20 +2288,20 @@ class MailboxViewModel @JvmOverloads constructor(
     fun downloadAttachment(a: MailAttachmentDto, then: (String) -> Unit) {
         viewModelScope.launch {
             val app = getApplication<android.app.Application>()
-            val session = SessionStore.snapshot(app) ?: run { then("Sign in again to save this."); return@launch }
+            val session = SessionStore.snapshot(app) ?: run { then(CoreStrings.get(R.string.core_sign_in_to_save) { "Sign in again to save this." }); return@launch }
             val dir = app.getExternalFilesDir(null)
-                ?: run { then("No app storage available."); return@launch }
+                ?: run { then(CoreStrings.get(R.string.core_attachment_no_storage) { "No app storage available." }); return@launch }
             val file = java.io.File(dir, "${java.util.UUID.randomUUID()}-${attachmentFilename(a.name)}")
             runCatching { Api.mailAttachmentFile(session.token, a.id, file) }
                 .onSuccess {
                     if (!SessionStore.isCurrent(app, session.id)) {
                         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { file.delete() }
-                        then("The account changed before this file could be saved.")
-                    } else then("Saved to ${file.absolutePath}")
+                        then(CoreStrings.get(R.string.core_attachment_account_changed_save) { "The account changed before this file could be saved." })
+                    } else then(CoreStrings.get(R.string.core_attachment_saved_to, file.absolutePath) { "Saved to ${file.absolutePath}" })
                 }
                 .onFailure { e ->
                     if (e is kotlinx.coroutines.CancellationException) throw e
-                    then((e as? ApiException)?.message ?: "This attachment could not be downloaded.")
+                    then((e as? ApiException)?.message ?: CoreStrings.get(R.string.core_attachment_download_failed) { "This attachment could not be downloaded." })
                 }
         }
     }
@@ -2154,7 +2325,7 @@ class MailboxViewModel @JvmOverloads constructor(
     fun openAttachment(a: MailAttachmentDto, then: (String) -> Unit) {
         viewModelScope.launch {
             val app = getApplication<android.app.Application>()
-            val session = SessionStore.snapshot(app) ?: run { then("Sign in again to open this."); return@launch }
+            val session = SessionStore.snapshot(app) ?: run { then(CoreStrings.get(R.string.core_sign_in_to_open) { "Sign in again to open this." }); return@launch }
             val outcome = runCatching {
                 val file = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
                     val root = java.io.File(app.cacheDir, "attachments").apply { mkdirs() }
@@ -2164,7 +2335,7 @@ class MailboxViewModel @JvmOverloads constructor(
                 Api.mailAttachmentFile(session.token, a.id, file)
                 if (!SessionStore.isCurrent(app, session.id)) {
                     kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { file.delete() }
-                    return@runCatching "The account changed before this file could be opened."
+                    return@runCatching CoreStrings.get(R.string.core_attachment_account_changed_open) { "The account changed before this file could be opened." }
                 }
                 val uri = androidx.core.content.FileProvider.getUriForFile(
                     app, "${app.packageName}.fileprovider", file)
@@ -2182,15 +2353,17 @@ class MailboxViewModel @JvmOverloads constructor(
                 // a viewer installed. The exception is the honest answer.
                 try {
                     app.startActivity(chooser)
-                    "Opened."
+                    CoreStrings.get(R.string.core_attachment_opened) { "Opened." }
                 } catch (e: android.content.ActivityNotFoundException) {
-                    "Nothing on this device can open a $mime file. Save it with " +
-                        "Save to this device and open it from Files."
+                    CoreStrings.get(R.string.core_attachment_no_viewer, mime.toString()) {
+                        "Nothing on this device can open a $mime file. Save it with " +
+                            "Save to this device and open it from Files."
+                    }
                 }
             }.getOrElse { error ->
                 if (error is kotlinx.coroutines.CancellationException) throw error
-                if (error is ApiException) return@getOrElse error.message ?: "This attachment could not be downloaded."
-                "This attachment could not be handed to another app."
+                if (error is ApiException) return@getOrElse error.message ?: CoreStrings.get(R.string.core_attachment_download_failed) { "This attachment could not be downloaded." }
+                CoreStrings.get(R.string.core_attachment_handoff_failed) { "This attachment could not be handed to another app." }
             }
             then(outcome)
         }
@@ -2296,10 +2469,10 @@ class MailboxViewModel @JvmOverloads constructor(
      */
     suspend fun uploadAttachment(file: java.io.File, filename: String, mimeType: String, sessionId: String, inline: Boolean = false): MailAttachmentDto {
         val app = getApplication<android.app.Application>()
-        val session = SessionStore.snapshot(app) ?: throw IllegalStateException("Sign in again to attach a file.")
-        check(session.id == sessionId) { "The account changed before this file could be attached." }
+        val session = SessionStore.snapshot(app) ?: throw IllegalStateException(CoreStrings.get(R.string.core_sign_in_to_attach) { "Sign in again to attach a file." })
+        check(session.id == sessionId) { CoreStrings.get(R.string.core_attachment_account_changed_attach) { "The account changed before this file could be attached." } }
         val attachment = Api.mailAttachmentUploadFile(session.token, file, filename, mimeType, inline)
-        check(SessionStore.isCurrent(app, session.id)) { "The account changed before this file could be attached." }
+        check(SessionStore.isCurrent(app, session.id)) { CoreStrings.get(R.string.core_attachment_account_changed_attach) { "The account changed before this file could be attached." } }
         return attachment
     }
 
@@ -2355,7 +2528,7 @@ class MailboxViewModel @JvmOverloads constructor(
     suspend fun loadBody(messageId: String, allowImages: Boolean): BodyRender {
         if (snapshotMode) return snapshotBodies[messageId] ?: BodyRender()
         if (!allowImages) formattedBodyCache.get(messageId)?.let { return it }
-        val t = token() ?: return BodyRender(allowImages = allowImages, error = "Sign in again.")
+        val t = token() ?: return BodyRender(allowImages = allowImages, error = CoreStrings.get(R.string.core_sign_in_again) { "Sign in again." })
         return try {
             val response = Api.mailBody(t, messageId, allowImages)
             kotlinx.coroutines.currentCoroutineContext().ensureActive()
@@ -2364,7 +2537,7 @@ class MailboxViewModel @JvmOverloads constructor(
                 bodyText = response.bodyText,
                 blockedImages = response.blockedImages,
                 allowImages = allowImages,
-                error = if (response.bodyHtml.isNullOrBlank()) "The formatted body was empty." else null,
+                error = if (response.bodyHtml.isNullOrBlank()) CoreStrings.get(R.string.core_reader_formatted_empty) { "The formatted body was empty." } else null,
             )
             if (!allowImages && render.error == null && (render.html?.length ?: 0) <= 262_144) {
                 formattedBodyCache.put(messageId, render)
@@ -2374,7 +2547,7 @@ class MailboxViewModel @JvmOverloads constructor(
             throw error
         } catch (error: Exception) {
             android.util.Log.w("GrapMailReader", "Formatted body fetch failed: ${error.javaClass.simpleName}")
-            BodyRender(allowImages = allowImages, error = error.message ?: "The formatted view could not be loaded.")
+            BodyRender(allowImages = allowImages, error = error.message ?: CoreStrings.get(R.string.core_reader_formatted_failed) { "The formatted view could not be loaded." })
         }
     }
 
@@ -2387,7 +2560,7 @@ class MailboxViewModel @JvmOverloads constructor(
         loadReader(threadId, isThread = true) {
             val context = getApplication<Application>()
             val session = SessionStore.snapshot(context) ?: run {
-                _thread.value = ThreadState(error = "Sign in again.")
+                _thread.value = ThreadState(error = CoreStrings.get(R.string.core_sign_in_again) { "Sign in again." })
                 return@loadReader
             }
             val cached = MailStore.thread(threadId)
@@ -2414,7 +2587,7 @@ class MailboxViewModel @JvmOverloads constructor(
                     val messages = (page.messages + listOfNotNull(exact)).ifEmpty { initial }
                         .distinctBy { it.id }.sortedBy { it.createdAt.orEmpty() }
                     if (messages.isEmpty()) {
-                        _thread.value = ThreadState(error = "This conversation has no available messages.")
+                        _thread.value = ThreadState(error = CoreStrings.get(R.string.core_thread_empty) { "This conversation has no available messages." })
                     } else {
                         threadLoadedFor = threadId
                         _thread.value = ThreadState(messages = messages, nextCursor = page.nextCursor, hasMore = page.hasMore)
@@ -2426,7 +2599,7 @@ class MailboxViewModel @JvmOverloads constructor(
                     if (cached != null) threadLoadedFor = threadId
                     _thread.value = if (initial.isNotEmpty()) ThreadState(
                         messages = initial, nextCursor = cached?.nextCursor, hasMore = cached?.hasMore ?: false,
-                    ) else ThreadState(error = e.message ?: "This conversation could not be opened.")
+                    ) else ThreadState(error = e.message ?: CoreStrings.get(R.string.core_thread_open_failed) { "This conversation could not be opened." })
                 }
         }
     }
@@ -2469,7 +2642,7 @@ class MailboxViewModel @JvmOverloads constructor(
                 if (!SessionStore.isCurrent(context, session.id) || readerTarget != target) return@launch
                 _thread.update { it.copy(
                     loadingEarlier = false,
-                    error = e.message ?: "Earlier messages could not be loaded.",
+                    error = e.message ?: CoreStrings.get(R.string.core_thread_earlier_failed) { "Earlier messages could not be loaded." },
                 ) }
                 earlierThreadJob = null
             }
@@ -2533,7 +2706,7 @@ class MailboxViewModel @JvmOverloads constructor(
             val app = getApplication<Application>()
             val session = SessionStore.snapshot(app)
             if (session == null) {
-                onOutcome("You are signed out, so this could not be saved.")
+                onOutcome(CoreStrings.get(R.string.core_signed_out_not_saved) { "You are signed out, so this could not be saved." })
                 return@launch
             }
             runCatching { Api.mailAction(session.token, id, MailAction.Unread, null) }
@@ -2551,7 +2724,7 @@ class MailboxViewModel @JvmOverloads constructor(
                     if (!SessionStore.isCurrent(app, session.id)) return@launch
                     GMHaptics.failure()
                     onOutcome((it as? ApiException)?.message
-                        ?: "That action didn't go through.")
+                        ?: CoreStrings.get(R.string.core_action_failed) { "That action didn't go through." })
                 }
         }
     }
@@ -2562,10 +2735,10 @@ class MailboxViewModel @JvmOverloads constructor(
         val needsAttachments = message.hasAttachments && message.attachments.isEmpty()
         if (!needsAttachments && (message.isRead || message.direction != "inbound")) return null
         val context = getApplication<Application>()
-        val session = SessionStore.snapshot(context) ?: return "Sign in again."
+        val session = SessionStore.snapshot(context) ?: return CoreStrings.get(R.string.core_sign_in_again) { "Sign in again." }
         return try {
             val details = if (needsAttachments) Api.mailMessage(session.token, id).message else null
-            if (needsAttachments && details == null) return "Attachment details are unavailable."
+            if (needsAttachments && details == null) return CoreStrings.get(R.string.core_attachment_details_unavailable) { "Attachment details are unavailable." }
             if (!needsAttachments) Api.mailAction(session.token, id, MailAction.Read)
             kotlinx.coroutines.currentCoroutineContext().ensureActive()
             if (!SessionStore.isCurrent(context, session.id)) return null
@@ -2588,7 +2761,7 @@ class MailboxViewModel @JvmOverloads constructor(
         } catch (error: kotlinx.coroutines.CancellationException) {
             throw error
         } catch (error: Exception) {
-            error.message ?: "The message details could not be loaded."
+            error.message ?: CoreStrings.get(R.string.core_message_details_failed) { "The message details could not be loaded." }
         }
     }
 
@@ -2598,7 +2771,7 @@ class MailboxViewModel @JvmOverloads constructor(
             val context = getApplication<Application>()
             val session = SessionStore.snapshot(context)
             if (session == null) {
-                _thread.value = ThreadState(error = "Sign in again.")
+                _thread.value = ThreadState(error = CoreStrings.get(R.string.core_sign_in_again) { "Sign in again." })
                 return@loadReader
             }
             val cached = MailStore.body(id) ?: MailStore.notificationMessage(context, id, session.id)
@@ -2617,7 +2790,7 @@ class MailboxViewModel @JvmOverloads constructor(
                     // leave the screen showing nothing for a message that exists.
                     val message = r.message
                     if (message == null) {
-                        _thread.value = ThreadState(error = "This message could not be opened.")
+                        _thread.value = ThreadState(error = CoreStrings.get(R.string.core_message_open_failed) { "This message could not be opened." })
                     } else {
                         MailStore.putBody(message, context, session.id)
                         kotlinx.coroutines.currentCoroutineContext().ensureActive()
@@ -2632,7 +2805,7 @@ class MailboxViewModel @JvmOverloads constructor(
                     if (e is kotlinx.coroutines.CancellationException) throw e
                     if (!SessionStore.isCurrent(context, session.id)) return@loadReader
                     _thread.update { it.copy(loading = false,
-                        error = e.message ?: "This message could not be opened.") }
+                        error = e.message ?: CoreStrings.get(R.string.core_message_open_failed) { "This message could not be opened." }) }
                 }
         }
     }
@@ -2672,7 +2845,7 @@ class MailboxViewModel @JvmOverloads constructor(
                 .onFailure { e ->
                     if (e is kotlinx.coroutines.CancellationException) throw e
                     _labels.update { it.copy(loading = false,
-                        error = e.message ?: "Labels could not be loaded.") }
+                        error = e.message ?: CoreStrings.get(R.string.core_labels_load_failed) { "Labels could not be loaded." }) }
                     _state.update { it.copy(labelsRead = AssignmentsRead.Failed) }
                 }
         }
@@ -2685,19 +2858,19 @@ class MailboxViewModel @JvmOverloads constructor(
      */
     fun createLabel(name: String, colour: String?, then: (Boolean, String) -> Unit) {
         viewModelScope.launch {
-            val t = token() ?: run { then(false, "Sign in again."); return@launch }
+            val t = token() ?: run { then(false, CoreStrings.get(R.string.core_sign_in_again) { "Sign in again." }); return@launch }
             runCatching { Api.mailCreateLabel(t, name, colour) }
                 .onSuccess {
                     if (!it.success || it.label == null) {
-                        then(false, it.error ?: "The label could not be created.")
+                        then(false, it.error ?: CoreStrings.get(R.string.core_label_create_failed) { "The label could not be created." })
                         return@onSuccess
                     }
                     refreshLabels(force = true)
-                    then(true, "Created ${it.label.name}.")
+                    then(true, CoreStrings.get(R.string.core_label_created, it.label.name) { "Created ${it.label.name}." })
                 }
                 .onFailure { e ->
                     if (e is kotlinx.coroutines.CancellationException) throw e
-                    then(false, (e as? ApiException)?.message ?: "The label could not be created.")
+                    then(false, (e as? ApiException)?.message ?: CoreStrings.get(R.string.core_label_create_failed) { "The label could not be created." })
                 }
         }
     }
@@ -2707,25 +2880,25 @@ class MailboxViewModel @JvmOverloads constructor(
     /// patched in place — the same rule the filing actions follow.
     fun renameLabel(id: String, name: String, colour: String?, then: (Boolean, String) -> Unit) {
         viewModelScope.launch {
-            val t = token() ?: run { then(false, "Sign in again."); return@launch }
+            val t = token() ?: run { then(false, CoreStrings.get(R.string.core_sign_in_again) { "Sign in again." }); return@launch }
             runCatching { Api.mailRenameLabel(t, id, name, colour) }
                 .onSuccess {
                     refreshLabels(force = true)
-                    then(true, "Saved.")
+                    then(true, CoreStrings.get(R.string.core_profile_saved) { "Saved." })
                 }
                 .onFailure { e ->
                     if (e is kotlinx.coroutines.CancellationException) throw e
-                    then(false, (e as? ApiException)?.message ?: "The label could not be saved.")
+                    then(false, (e as? ApiException)?.message ?: CoreStrings.get(R.string.core_label_save_failed) { "The label could not be saved." })
                 }
         }
     }
 
     fun deleteLabel(id: String, then: (String) -> Unit) {
         viewModelScope.launch {
-            val t = token() ?: run { then("Sign in again."); return@launch }
+            val t = token() ?: run { then(CoreStrings.get(R.string.core_sign_in_again) { "Sign in again." }); return@launch }
             runCatching { Api.mailDeleteLabel(t, id) }
-                .onSuccess { refreshLabels(force = true); then("Label removed. Its messages keep their other labels.") }
-                .onFailure { e -> then((e as? ApiException)?.message ?: "The label could not be removed.") }
+                .onSuccess { refreshLabels(force = true); then(CoreStrings.get(R.string.core_label_removed) { "Label removed. Its messages keep their other labels." }) }
+                .onFailure { e -> then((e as? ApiException)?.message ?: CoreStrings.get(R.string.core_label_remove_failed) { "The label could not be removed." }) }
         }
     }
 
@@ -2753,9 +2926,11 @@ class MailboxViewModel @JvmOverloads constructor(
      */
     private fun mailReason(e: Throwable): String = when {
         e is com.grapsee.grapmail.data.ApiException && e.status == 401 ->
-            "The mail service did not accept this session. " +
-                "You are still signed in to your account."
-        else -> e.message ?: "Couldn't reach your mailbox."
+            CoreStrings.get(R.string.core_mail_session_refused) {
+                "The mail service did not accept this session. " +
+                    "You are still signed in to your account."
+            }
+        else -> e.message ?: CoreStrings.get(R.string.core_mailbox_unreachable) { "Couldn't reach your mailbox." }
     }
 
     /**
@@ -2768,14 +2943,14 @@ class MailboxViewModel @JvmOverloads constructor(
     fun unsubscribeOneClick(address: String, url: String, then: (String) -> Unit) {
         viewModelScope.launch {
             val t = token() ?: run {
-                then("Sign in again to unsubscribe.")
+                then(CoreStrings.get(R.string.core_sign_in_to_unsubscribe) { "Sign in again to unsubscribe." })
                 return@launch
             }
             runCatching { Api.mailUnsubscribeOneClick(t, address, url) }
                 .onSuccess { r ->
                     then(
-                        if (r.success) "One-click request sent — the list's answer is not visible from here."
-                        else r.error ?: "The one-click request was not accepted."
+                        if (r.success) CoreStrings.get(R.string.core_unsubscribe_sent) { "One-click request sent — the list's answer is not visible from here." }
+                        else r.error ?: CoreStrings.get(R.string.core_unsubscribe_refused) { "The one-click request was not accepted." }
                     )
                 }
                 .onFailure { e ->
@@ -2794,12 +2969,12 @@ class MailboxViewModel @JvmOverloads constructor(
     fun blockSender(sender: String, then: (String) -> Unit) {
         viewModelScope.launch {
             val t = token() ?: run {
-                then("Sign in again to decide on this sender.")
+                then(CoreStrings.get(R.string.core_sign_in_to_decide) { "Sign in again to decide on this sender." })
                 return@launch
             }
             runCatching { Api.mailScreenerDecision(t, sender, MailSenderScope.Address, MailDecision.Blocked) }
                 .onSuccess { r ->
-                    then(if (r.success) "Blocked. " + MailDecision.Blocked.note else r.error ?: "The server refused that decision.")
+                    then(if (r.success) CoreStrings.get(R.string.core_decision_blocked_note, MailDecision.Blocked.note) { "Blocked. " + MailDecision.Blocked.note } else r.error ?: CoreStrings.get(R.string.core_decision_refused) { "The server refused that decision." })
                 }
                 .onFailure { e ->
                     if (e is kotlinx.coroutines.CancellationException) throw e
@@ -2861,7 +3036,7 @@ class MailboxViewModel @JvmOverloads constructor(
                     val response = Api.mailScreener(session.token)
                     if (version != screenerSettingVersion || !SessionStore.isCurrent(context, session.id)) return@settings
                     _screener.update { it.copy(loaded = true, enabled = response.enabled ?: it.enabled,
-                        error = response.error ?: if (response.enabled == null) "Screener status is unavailable." else null) }
+                        error = response.error ?: if (response.enabled == null) CoreStrings.get(R.string.core_screener_unavailable) { "Screener status is unavailable." } else null) }
                 } catch (error: kotlinx.coroutines.CancellationException) {
                     throw error
                 } catch (error: Exception) {
@@ -2892,13 +3067,13 @@ class MailboxViewModel @JvmOverloads constructor(
         viewModelScope.launch {
             val t = token()
             if (t == null) {
-                _screener.update { it.copy(busy = false, error = "Sign in again.") }
+                _screener.update { it.copy(busy = false, error = CoreStrings.get(R.string.core_sign_in_again) { "Sign in again." }) }
                 return@launch
             }
             try {
                 val response = Api.mailScreenerSet(t, enabled)
                 _screener.update { it.copy(busy = false, enabled = response.enabled ?: it.enabled,
-                    error = response.error ?: if (response.enabled == null) "The setting could not be confirmed." else null) }
+                    error = response.error ?: if (response.enabled == null) CoreStrings.get(R.string.core_screener_unconfirmed) { "The setting could not be confirmed." } else null) }
             } catch (error: kotlinx.coroutines.CancellationException) {
                 throw error
             } catch (error: Exception) {
@@ -2928,13 +3103,13 @@ class MailboxViewModel @JvmOverloads constructor(
         then: (String) -> Unit,
     ) {
         viewModelScope.launch {
-            val t = token() ?: run { then("Sign in again to decide on this sender."); return@launch }
+            val t = token() ?: run { then(CoreStrings.get(R.string.core_sign_in_to_decide) { "Sign in again to decide on this sender." }); return@launch }
             val senders = addresses.asSequence()
                 .map { it.trim() }.filter { it.isNotEmpty() }
                 .map { if (scope == MailSenderScope.Domain) it.substringAfter('@', "") else it }
                 .filter { it.isNotEmpty() }
                 .distinct().toList()
-            if (senders.isEmpty()) { then("Those messages name no sender to decide on."); return@launch }
+            if (senders.isEmpty()) { then(CoreStrings.get(R.string.core_decision_no_senders) { "Those messages name no sender to decide on." }); return@launch }
 
             if (_screener.value.busy) return@launch
             _screener.update { it.copy(busy = true, error = null) }
@@ -2946,20 +3121,20 @@ class MailboxViewModel @JvmOverloads constructor(
                     }
                 // `success` is the store's own word for the write landing.
                 // A 200 that did not say so is not counted as saved.
-                if (!r.success) throw RuntimeException(r.error ?: "The server refused that decision.")
+                if (!r.success) throw RuntimeException(r.error ?: CoreStrings.get(R.string.core_decision_refused) { "The server refused that decision." })
             }
             val saved = decided.size
             _screener.update { it.copy(busy = false, error = failure) }
             then(
                 when {
                     failure != null && saved == 0 -> failure!!
-                    failure != null -> "$saved of ${senders.size} saved. $failure"
+                    failure != null -> CoreStrings.get(R.string.core_partial_saved, saved, senders.size, failure.orEmpty()) { "$saved of ${senders.size} saved. $failure" }
                     // `done` is a word the enum carries, not a suffix appended
                     // here: "Approve" + "d" and "Keep waiting" + "d" are not both
                     // English, and a receipt that mis-spells what happened is the
                     // same defect as one that mis-states it.
-                    saved == 1 -> "${decision.done}: ${senders[0]}"
-                    else -> "${decision.done}: $saved senders"
+                    saved == 1 -> CoreStrings.get(R.string.core_decision_done_one, decision.done, senders[0]) { "${decision.done}: ${senders[0]}" }
+                    else -> CoreStrings.plural(R.plurals.core_decision_done_many, saved, decision.done, saved) { "${decision.done}: $saved senders" }
                 }
             )
         }
@@ -2976,17 +3151,17 @@ class MailboxViewModel @JvmOverloads constructor(
      */
     fun undoDecision(address: String, scope: MailSenderScope, then: (String) -> Unit) {
         viewModelScope.launch {
-            val t = token() ?: run { then("Sign in again to change this."); return@launch }
+            val t = token() ?: run { then(CoreStrings.get(R.string.core_sign_in_to_change) { "Sign in again to change this." }); return@launch }
             val sender = if (scope == MailSenderScope.Domain)
                 address.trim().substringAfter('@', "") else address.trim()
-            if (sender.isEmpty()) { then("That message names no sender to change."); return@launch }
+            if (sender.isEmpty()) { then(CoreStrings.get(R.string.core_decision_no_sender) { "That message names no sender to change." }); return@launch }
             if (_screener.value.busy) return@launch
             _screener.update { it.copy(busy = true, error = null) }
             runCatching { Api.mailScreenerDecisionRemove(t, sender, scope) }
                 .onSuccess { r ->
                     _screener.update { it.copy(busy = false) }
-                    then(if (r.removed == true) "Forgotten — their next message waits in the queue again."
-                    else "No decision was recorded for them, so there was nothing to forget.")
+                    then(if (r.removed == true) CoreStrings.get(R.string.core_decision_forgotten) { "Forgotten — their next message waits in the queue again." }
+                    else CoreStrings.get(R.string.core_decision_nothing_to_forget) { "No decision was recorded for them, so there was nothing to forget." })
                 }
                 .onFailure { e ->
                     if (e is kotlinx.coroutines.CancellationException) throw e
@@ -3021,7 +3196,7 @@ class MailboxViewModel @JvmOverloads constructor(
      */
     fun deleteAttachment(id: String, then: (Boolean, String) -> Unit) {
         viewModelScope.launch {
-            val t = token() ?: run { then(false, "Sign in again to remove this."); return@launch }
+            val t = token() ?: run { then(false, CoreStrings.get(R.string.core_sign_in_to_remove) { "Sign in again to remove this." }); return@launch }
             runCatching { Api.mailDeleteAttachment(t, id) }
                 .onSuccess { r ->
                     if (r.success) {
@@ -3036,9 +3211,9 @@ class MailboxViewModel @JvmOverloads constructor(
                             })
                         }
                         _filesRevision.update { it + 1 }
-                        then(true, "Removed.")
+                        then(true, CoreStrings.get(R.string.core_attachment_removed) { "Removed." })
                     } else {
-                        then(false, r.error ?: "The server refused to remove that file.")
+                        then(false, r.error ?: CoreStrings.get(R.string.core_attachment_remove_refused) { "The server refused to remove that file." })
                     }
                 }
                 .onFailure { e ->
@@ -3085,7 +3260,7 @@ class MailboxViewModel @JvmOverloads constructor(
         }
         viewModelScope.launch {
             val t = token() ?: run {
-                _aliases.update { it.copy(read = AssignmentsRead.Failed, error = "Sign in again.") }
+                _aliases.update { it.copy(read = AssignmentsRead.Failed, error = CoreStrings.get(R.string.core_sign_in_again) { "Sign in again." }) }
                 return@launch
             }
             _aliases.update { it.copy(read = AssignmentsRead.Reading) }
@@ -3095,7 +3270,7 @@ class MailboxViewModel @JvmOverloads constructor(
                     _aliases.update {
                         it.copy(read = if (r.success) AssignmentsRead.Read else AssignmentsRead.Failed,
                             list = r.aliases,
-                            error = if (r.success) null else "The alias list did not load.")
+                            error = if (r.success) null else CoreStrings.get(R.string.core_alias_list_failed) { "The alias list did not load." })
                     }
                 }
                 .onFailure { e ->
@@ -3154,7 +3329,7 @@ class MailboxViewModel @JvmOverloads constructor(
                             read = if (r.success) AssignmentsRead.Read else AssignmentsRead.Failed,
                             keys = r.keys,
                             discoverable = r.keys?.let { k -> k.encryption != null },
-                            error = if (r.success) null else (r.error ?: "The key directory did not answer."),
+                            error = if (r.success) null else (r.error ?: CoreStrings.get(R.string.core_e2e_key_directory_silent) { "The key directory did not answer." }),
                         )
                     }
                 }
@@ -3175,7 +3350,7 @@ class MailboxViewModel @JvmOverloads constructor(
      */
     fun publishKeys(passphrase: String?, then: (String) -> Unit) {
         viewModelScope.launch {
-            val t = token() ?: run { then("Sign in again to set up encryption."); return@launch }
+            val t = token() ?: run { then(CoreStrings.get(R.string.core_sign_in_to_setup_e2e) { "Sign in again to set up encryption." }); return@launch }
             _e2e.update { it.copy(busy = true, note = null, error = null) }
             // generateIdentity is the module's own entry: it makes both pairs,
             // writes the passphrase-protected record BEFORE the network ask, and
@@ -3186,7 +3361,7 @@ class MailboxViewModel @JvmOverloads constructor(
                 com.grapsee.grapmail.data.MailE2e.generateIdentity(getApplication(), t, passphrase ?: "")
             }
             if (made.isFailure) {
-                val why = made.exceptionOrNull()?.message ?: "This device could not create the keys."
+                val why = made.exceptionOrNull()?.message ?: CoreStrings.get(R.string.core_e2e_create_failed) { "This device could not create the keys." }
                 _e2e.update { it.copy(busy = false, error = why) }
                 then(why)
                 return@launch
@@ -3199,9 +3374,9 @@ class MailboxViewModel @JvmOverloads constructor(
                     if (r.success) {
                         _e2e.update { it.copy(busy = false, keys = r.keys, read = AssignmentsRead.Read) }
                         then(if (r.discoverable == false)
-                            "Published — but only people you name can use it." else "Published.")
+                            CoreStrings.get(R.string.core_keys_published_limited) { "Published — but only people you name can use it." } else CoreStrings.get(R.string.core_keys_published) { "Published." })
                     } else {
-                        val why = r.error ?: "The directory refused those keys."
+                        val why = r.error ?: CoreStrings.get(R.string.core_e2e_directory_refused) { "The directory refused those keys." }
                         _e2e.update { it.copy(busy = false, error = why) }
                         then(why)
                     }
@@ -3216,7 +3391,7 @@ class MailboxViewModel @JvmOverloads constructor(
 
     fun unpublishKeys(then: (String) -> Unit) {
         viewModelScope.launch {
-            val t = token() ?: run { then("Sign in again to change this."); return@launch }
+            val t = token() ?: run { then(CoreStrings.get(R.string.core_sign_in_to_change) { "Sign in again to change this." }); return@launch }
             _e2e.update { it.copy(busy = true, error = null) }
             runCatching { Api.mailE2eUnpublish(t) }
                 .onSuccess { r ->
@@ -3225,8 +3400,8 @@ class MailboxViewModel @JvmOverloads constructor(
                             keys = if (r.removed == true) null else it.keys,
                             discoverable = if (r.removed == true) false else it.discoverable)
                     }
-                    then(if (r.removed == true) r.detail ?: "Keys removed."
-                    else r.detail ?: "No published key was found to remove.")
+                    then(if (r.removed == true) r.detail ?: CoreStrings.get(R.string.core_keys_removed) { "Keys removed." }
+                    else r.detail ?: CoreStrings.get(R.string.core_keys_none_to_remove) { "No published key was found to remove." })
                 }
                 .onFailure { e ->
                     _e2e.update { it.copy(busy = false, error = mailReason(e)) }
@@ -3246,15 +3421,15 @@ class MailboxViewModel @JvmOverloads constructor(
      */
     fun planEncryption(addresses: List<String>, then: (String) -> Unit) {
         viewModelScope.launch {
-            val t = token() ?: run { then("Sign in again to check this."); return@launch }
+            val t = token() ?: run { then(CoreStrings.get(R.string.core_sign_in_to_check) { "Sign in again to check this." }); return@launch }
             _e2e.update { it.copy(busy = true, plan = null) }
             runCatching { Api.mailE2ePlan(t, addresses) }
                 .onSuccess { r ->
                     _e2e.update { it.copy(busy = false, plan = r.plan, error = if (r.success) null else r.error) }
                     then(r.plan?.let { p ->
-                        if (p.canSeal) "Every recipient has a published key."
-                        else "${p.blocked.size} of ${addresses.size} cannot be sealed."
-                    } ?: r.error ?: "The server did not answer.")
+                        if (p.canSeal) CoreStrings.get(R.string.core_plan_all_sealable) { "Every recipient has a published key." }
+                        else CoreStrings.get(R.string.core_plan_partial_unsealable, p.blocked.size, addresses.size) { "${p.blocked.size} of ${addresses.size} cannot be sealed." }
+                    } ?: r.error ?: CoreStrings.get(R.string.core_server_silent) { "The server did not answer." })
                 }
                 .onFailure { e ->
                     _e2e.update { it.copy(busy = false, error = mailReason(e)) }
@@ -3279,7 +3454,7 @@ class MailboxViewModel @JvmOverloads constructor(
     /** Who has a key, and what their fingerprint is — the verification read. */
     fun lookupContacts(addresses: List<String>, then: (String) -> Unit) {
         viewModelScope.launch {
-            val t = token() ?: run { then("Sign in again to look this up."); return@launch }
+            val t = token() ?: run { then(CoreStrings.get(R.string.core_sign_in_to_lookup) { "Sign in again to look this up." }); return@launch }
             _e2e.update { it.copy(busy = true) }
             runCatching { Api.mailE2eLookup(t, addresses) }
                 .onSuccess { r ->
@@ -3287,8 +3462,8 @@ class MailboxViewModel @JvmOverloads constructor(
                         it.copy(busy = false, lookup = r.results, lookupFor = addresses,
                             error = if (r.success) null else r.error)
                     }
-                    then(if (r.success) "${r.results.size} addressed checked."
-                    else r.error ?: "The directory did not answer.")
+                    then(if (r.success) CoreStrings.plural(R.plurals.core_lookup_checked, r.results.size, r.results.size) { "${r.results.size} addressed checked." }
+                    else r.error ?: CoreStrings.get(R.string.core_e2e_directory_silent) { "The directory did not answer." })
                 }
                 .onFailure { e ->
                     _e2e.update { it.copy(busy = false, error = mailReason(e)) }

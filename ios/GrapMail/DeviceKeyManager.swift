@@ -94,7 +94,7 @@ enum DeviceKeyManager {
             return cachedNoLock ? .unlockedWithoutLock : .unlocked
         }
         let context = LAContext()
-        context.localizedCancelTitle = "Cancel"
+        context.localizedCancelTitle = String(localized: "Cancel", comment: "Cancel button on the Face ID / passcode prompt")
         var policyError: NSError?
         let policy: LAPolicy
         if context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &policyError) {
@@ -108,7 +108,7 @@ enum DeviceKeyManager {
             return .unlockedWithoutLock
         }
         do {
-            guard try await context.evaluatePolicy(policy, localizedReason: "Sign with this device's key") else {
+            guard try await context.evaluatePolicy(policy, localizedReason: String(localized: "Sign with this device's key", comment: "Face ID / passcode prompt reason when signing with the device key")) else {
                 return .refused
             }
         } catch {
@@ -126,12 +126,12 @@ enum DeviceKeyManager {
         let context = LAContext()
         var error: NSError?
         if context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &error) {
-            return "Device key (biometric lock)"
+            return String(localized: "Device key (biometric lock)", comment: "Device key status: protected by Face ID / Touch ID")
         }
         if context.canEvaluatePolicy(.deviceOwnerAuthentication, error: &error) {
-            return "Device key (passcode lock)"
+            return String(localized: "Device key (passcode lock)", comment: "Device key status: protected by the device passcode")
         }
-        return "Device key (no biometric lock)"
+        return String(localized: "Device key (no biometric lock)", comment: "Device key status: not protected by a lock")
     }
 
     /// Sign-out drops the cached unlock with the session it belonged to — the
@@ -207,7 +207,7 @@ enum DeviceKeyManager {
     static func sign(_ data: Data) async -> GatedSignature {
         switch await ensureUnlocked() {
         case .refused:
-            return GatedSignature(signature: nil, guardMessage: "The device key stayed locked.")
+            return GatedSignature(signature: nil, guardMessage: String(localized: "The device key stayed locked.", comment: "Error when the Face ID / passcode prompt was refused"))
         case .unlocked, .unlockedWithoutLock:
             guard let key = privateKey() else {
                 return GatedSignature(signature: nil, guardMessage: nil)

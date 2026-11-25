@@ -1,0 +1,21 @@
+/* GrapMailNotificationService — Urdu (ur). */
+
+"New encrypted message" = "نیا خفیہ کردہ پیغام";
+"New mail" = "نئی میل";
+"1 new message" = "1 نیا پیغام";
+"%lld new messages" = "%lld نئے پیغامات";
+"%lld unread in the inbox" = "ان باکس میں %lld بغیر پڑھے";
+"Encrypted message" = "خفیہ کردہ پیغام";
+"Unknown sender" = "نامعلوم بھیجنے والا";
+"No subject" = "کوئی موضوع نہیں";
+"This was me" = "یہ میں تھا";
+"Secure account" = "اکاؤنٹ محفوظ کریں";
+"Archive" = "آرکائیو";
+"Mark as read" = "پڑھا ہوا نشان زد کریں";
+"Reply" = "جواب دیں";
+"Send" = "بھیجیں";
+"Reply…" = "جواب دیں…";
+"Reply in app" = "ایپ میں جواب دیں";
+"More" = "مزید";
+/* Notification title: a sign-in code, then the sender */
+"%@ · %@" = "%@ · %@";

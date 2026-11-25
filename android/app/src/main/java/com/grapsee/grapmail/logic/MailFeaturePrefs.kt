@@ -1,7 +1,9 @@
 package com.grapsee.grapmail.logic
 
 import android.content.Context
+import com.grapsee.grapmail.R
 import com.grapsee.grapmail.features.TemplateEngine
+import com.grapsee.grapmail.ui.i18n.CoreStrings
 import java.util.Locale
 
 /** One user-managed canned response (F11 templates & snippets). */
@@ -89,7 +91,7 @@ class MailFeaturePrefs(context: Context) {
 
     fun seedDefaultTemplates() {
         if (templates().isNotEmpty()) return
-        saveTemplates(DEFAULT_TEMPLATES)
+        saveTemplates(defaultTemplates())
     }
 
     fun fillTemplate(template: String, firstName: String?, myName: String?): String =
@@ -157,6 +159,23 @@ class MailFeaturePrefs(context: Context) {
         return out.sortedBy { it.first }
     }
 
+    /**
+     * Every key the follow-up memory is still waiting on, whatever its age.
+     * The Good morning card's "need a reply" reads this (iOS reads every
+     * awaiting thread too), not the overdue set the banner counts. Walks the
+     * whole prefs map like [overdueAwaitingReplies]: call it off the main thread.
+     */
+    fun awaitingReplyKeys(): Set<String> {
+        val out = HashSet<String>()
+        for (entry in prefs.all) {
+            val key = entry.key
+            if (!key.startsWith(AWAIT_PREFIX) || key.startsWith(AWAIT_TITLE_PREFIX)) continue
+            if (entry.value !is Long) continue
+            out.add(key.substring(AWAIT_PREFIX.length))
+        }
+        return out
+    }
+
     private fun awaitKey(threadKey: String) = AWAIT_PREFIX + threadKey
 
     private fun awaitTitleKey(threadKey: String) = AWAIT_TITLE_PREFIX + threadKey
@@ -199,25 +218,29 @@ class MailFeaturePrefs(context: Context) {
         private const val NAME_SEP = "\u0001"
         private const val ITEM_SEP = "\u0002"
 
-        private val DEFAULT_TEMPLATES = listOf(
+        // Seeded once, in the language the app runs in at that moment; after
+        // that they are the person's own templates and are never re-translated.
+        // The {first_name} / {my_name} tokens are TemplateEngine keys and stay
+        // untranslated in every language.
+        private fun defaultTemplates() = listOf(
             MailTemplate(
-                "Quick thanks",
-                "Hi {first_name},\n\nThanks so much for your note — I appreciate it.\n\nBest,\n{my_name}",
+                CoreStrings.get(R.string.core_template_thanks_name) { "Quick thanks" },
+                CoreStrings.get(R.string.core_template_thanks_body) { "Hi {first_name},\n\nThanks so much for your note — I appreciate it.\n\nBest,\n{my_name}" },
                 true,
             ),
             MailTemplate(
-                "Meeting follow-up",
-                "Hi {first_name},\n\nThanks for your time earlier. I wanted to follow up on the points we discussed — happy to dig into any of them further.\n\nBest,\n{my_name}",
+                CoreStrings.get(R.string.core_template_followup_name) { "Meeting follow-up" },
+                CoreStrings.get(R.string.core_template_followup_body) { "Hi {first_name},\n\nThanks for your time earlier. I wanted to follow up on the points we discussed — happy to dig into any of them further.\n\nBest,\n{my_name}" },
                 true,
             ),
             MailTemplate(
-                "Intro",
-                "Hi {first_name},\n\nGood to connect! I am reaching out to introduce myself — looking forward to working together.\n\nBest,\n{my_name}",
+                CoreStrings.get(R.string.core_template_intro_name) { "Intro" },
+                CoreStrings.get(R.string.core_template_intro_body) { "Hi {first_name},\n\nGood to connect! I am reaching out to introduce myself — looking forward to working together.\n\nBest,\n{my_name}" },
                 true,
             ),
             MailTemplate(
-                "Checking in",
-                "Hi {first_name},\n\nJust checking in — any update on this on your side? No rush if you are still working through it.\n\nBest,\n{my_name}",
+                CoreStrings.get(R.string.core_template_checkin_name) { "Checking in" },
+                CoreStrings.get(R.string.core_template_checkin_body) { "Hi {first_name},\n\nJust checking in — any update on this on your side? No rush if you are still working through it.\n\nBest,\n{my_name}" },
                 true,
             ),
         )

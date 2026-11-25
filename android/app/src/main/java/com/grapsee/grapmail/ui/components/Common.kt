@@ -1,5 +1,7 @@
 package com.grapsee.grapmail.ui.components
 
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
@@ -54,12 +56,24 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.res.stringResource
+import com.grapsee.grapmail.R
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.grapsee.grapmail.ui.theme.LocalPalette
+
+/**
+ * True when the person has asked for large text (font scale 130% and up).
+ * Rows that sit side by side at the default size (label + value, title +
+ * action) stack vertically instead of clipping. Phones at the default font
+ * never see a difference.
+ */
+@Composable
+@ReadOnlyComposable
+fun gmPrefersStackedRows(): Boolean = LocalDensity.current.fontScale >= 1.3f
 
 /**
  * Shared primary action with a theme-matched fill and a wrapping label.
@@ -161,6 +175,9 @@ fun AppTextField(
     leading: @Composable (() -> Unit)? = null,
     imeAction: androidx.compose.ui.text.input.ImeAction = androidx.compose.ui.text.input.ImeAction.Default,
     keyboardActions: KeyboardActions = KeyboardActions.Default,
+    /** What this field holds for password managers (see [GMAutofill]); null
+     *  keeps it out of autofill. Changes nothing visible. */
+    autofill: GMAutofill? = null,
 ) {
     val palette = LocalPalette.current
     var focused by remember { mutableStateOf(false) }
@@ -183,6 +200,7 @@ fun AppTextField(
             modifier = Modifier
                 .fillMaxWidth()
                 .heightIn(min = 56.dp)
+                .gmAutofill(autofill) { filled -> onValueChange(filled) }
                 .onFocusChanged { focused = it.isFocused }
                 .semantics { contentDescription = label },
             shape = RoundedCornerShape(14.dp),
@@ -197,7 +215,8 @@ fun AppTextField(
                     IconButton(onClick = { visible = !visible }) {
                         Icon(
                             if (visible) Icons.Rounded.VisibilityOff else Icons.Rounded.Visibility,
-                            contentDescription = if (visible) "Hide password" else "Show password",
+                            contentDescription = if (visible) stringResource(R.string.mail_password_hide)
+                            else stringResource(R.string.mail_password_show),
                             tint = palette.textTertiary,
                         )
                     }
@@ -231,7 +250,18 @@ fun AppTextField(
 @Composable
 fun StepProgress(step: Int, total: Int = 5, onBack: (() -> Unit)? = null) {
     val palette = LocalPalette.current
-    val labels = listOf("Name", "Details", "Address", "Password", "Terms")
+    val labels = listOf(
+        stringResource(R.string.mail_step_name),
+        stringResource(R.string.mail_step_details),
+        stringResource(R.string.mail_step_address),
+        stringResource(R.string.mail_step_password),
+        stringResource(R.string.mail_step_terms),
+    )
+    // At large text or in a very narrow window (cover screens, narrow split
+    // screen) five labels cannot share one line: the circles stay, and only
+    // the current step's name is written, centred beneath them.
+    val compactLabels = gmPrefersStackedRows() || gmIsNarrowWindow()
+    Column(Modifier.fillMaxWidth()) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.Top,
@@ -255,13 +285,15 @@ fun StepProgress(step: Int, total: Int = 5, onBack: (() -> Unit)? = null) {
                         color = if (done || current) palette.onPrimary else palette.textSecondary,
                     )
                 }
-                Spacer(Modifier.height(5.dp))
-                Text(
-                    label,
-                    fontSize = 12.sp,
-                    fontWeight = if (current) FontWeight.SemiBold else FontWeight.Normal,
-                    color = if (current) palette.textPrimary else palette.textTertiary,
-                )
+                if (!compactLabels) {
+                    Spacer(Modifier.height(5.dp))
+                    Text(
+                        label,
+                        fontSize = 12.sp,
+                        fontWeight = if (current) FontWeight.SemiBold else FontWeight.Normal,
+                        color = if (current) palette.textPrimary else palette.textTertiary,
+                    )
+                }
             }
             if (n < total) {
                 Box(
@@ -276,6 +308,20 @@ fun StepProgress(step: Int, total: Int = 5, onBack: (() -> Unit)? = null) {
             }
         }
     }
+    if (compactLabels) {
+        labels.getOrNull(step - 1)?.let { currentLabel ->
+            Spacer(Modifier.height(6.dp))
+            Text(
+                currentLabel,
+                modifier = Modifier.fillMaxWidth(),
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = palette.textPrimary,
+            )
+        }
+    }
+    }
 }
 
 /** Requirement row with animated check state (password checklist). */
@@ -289,7 +335,8 @@ fun RequirementRow(label: String, met: Boolean) {
             tint = if (met) palette.success else palette.textTertiary,
             modifier = Modifier.size(18.dp),
         )
-        Text(label, fontSize = 13.sp, color = if (met) palette.success else palette.textSecondary)
+        Text(label, fontSize = 13.sp, color = if (met) palette.success else palette.textSecondary,
+            modifier = Modifier.weight(1f, fill = false))
     }
 }
 
@@ -307,7 +354,8 @@ fun InfoBanner(text: String, modifier: Modifier = Modifier, icon: (@Composable (
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         icon?.invoke()
-        Text(text, fontSize = 13.sp, color = palette.textSecondary, lineHeight = 18.sp)
+        Text(text, fontSize = 13.sp, color = palette.textSecondary, lineHeight = 18.sp,
+            modifier = Modifier.weight(1f, fill = false))
     }
 }
 
@@ -337,7 +385,7 @@ fun TermsCheckbox(checked: Boolean, onCheckedChange: (Boolean) -> Unit, label: @
                 checkmarkColor = palette.onPrimary,
             ),
         )
-        label()
+        Box(Modifier.weight(1f, fill = false)) { label() }
     }
 }
 

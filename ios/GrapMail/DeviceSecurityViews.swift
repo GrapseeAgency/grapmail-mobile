@@ -32,17 +32,18 @@ struct TrustedDevicesView: View {
             onBack: onBack,
             illustration: "ill_sec_sessions",
             illustrationWidth: 170,
-            title: "Trusted Devices",
-            subtitle: "Devices that can sign in to your account with their own key if you ever lose your password."
+            title: String(localized: "Trusted Devices", comment: "Screen title (trusted devices screen)"),
+            subtitle: String(localized: "Devices that can sign in to your account with their own key if you ever lose your password.", comment: "Screen description under the title (trusted devices screen)")
         ) {
             if loading {
-                Text("Loading devices…").font(.system(size: 13)).foregroundColor(GM.textSecondary)
+                Text("Loading devices…").gmFont(13).foregroundColor(GM.textSecondary)
             } else if let error {
-                Text(error).font(.system(size: 13)).foregroundColor(GM.error)
-                AccountLink(title: "Try again", action: { Task { await load() } })
+                Text(error).gmFont(13).foregroundColor(GM.error)
+                    .fixedSize(horizontal: false, vertical: true)
+                AccountLink(title: String(localized: "Try again", comment: "Link-style button (trusted devices screen)"), action: { Task { await load() } })
             } else if devices.isEmpty {
                 Text("No trusted devices are recorded yet. This device is enrolled the first time you sign in.")
-                    .font(.system(size: 13))
+                    .gmFont(13)
                     .foregroundColor(GM.textSecondary)
                     .fixedSize(horizontal: false, vertical: true)
             } else {
@@ -60,13 +61,13 @@ struct TrustedDevicesView: View {
                 // state on a device without a passcode — the key signs, and
                 // the label must not imply a prompt that cannot exist.
                 Text(DeviceKeyManager.keyGuardLabel)
-                    .font(.system(size: 11))
+                    .gmFont(11)
                     .foregroundColor(GM.textTertiary)
                     .padding(.top, 2)
                 HStack(alignment: .top, spacing: 9) {
-                    Image(systemName: "info.circle").font(.system(size: 14)).foregroundColor(GM.primarySolid)
+                    Image(systemName: "info.circle").gmFont(14).foregroundColor(GM.primaryText).accessibilityHidden(true)
                     Text("If a device on this list is not yours, revoke it immediately — a trusted device can reset your password without a code.")
-                        .font(.system(size: 12))
+                        .gmFont(12)
                         .foregroundColor(GM.textSecondary)
                         .fixedSize(horizontal: false, vertical: true)
                     Spacer(minLength: 0)
@@ -75,15 +76,15 @@ struct TrustedDevicesView: View {
                 .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(GM.softFill))
                 .padding(.top, 12)
                 if let revokeError {
-                    Text(revokeError).font(.system(size: 12)).foregroundColor(GM.error).padding(.top, 6)
+                    Text(revokeError).gmFont(12).foregroundColor(GM.error).padding(.top, 6)
                 }
             }
         } footer: {
-            FooterNote(text: "Revoking a device stops its recovery key from working and removes its push registration.")
+            FooterNote(text: String(localized: "Revoking a device stops its recovery key from working and removes its push registration.", comment: "Footer note (trusted devices screen)"))
         }
         .task { await load() }
         .alert(
-            "Revoke \(pendingRevoke?.displayName.isEmpty == false ? pendingRevoke!.displayName : "this device")?",
+            pendingRevoke.map { $0.displayName.isEmpty ? Text("Revoke this device?") : Text("Revoke \($0.displayName)?") } ?? Text("Revoke this device?"),
             isPresented: Binding(get: { pendingRevoke != nil }, set: { if !$0 { pendingRevoke = nil } })
         ) {
             Button("Cancel", role: .cancel) { pendingRevoke = nil }
@@ -101,13 +102,14 @@ struct TrustedDevicesView: View {
             let resp = try await ApiClient.listDevices(token: token)
             devices = resp.devices
         } catch {
-            self.error = apiMessage(error, fallback: "Could not load the device list. Try again.")
+            self.error = apiMessage(error, fallback: String(localized: "Could not load the device list. Try again.", comment: "Error message shown when the server gives no reason (trusted devices screen)"))
         }
         loading = false
     }
 
     private func revoke(_ device: TrustedDeviceDto) {
         guard let token = SessionStore.token else { return }
+        guard !revoking else { return }
         revoking = true
         revokeError = nil
         Task {
@@ -122,7 +124,7 @@ struct TrustedDevicesView: View {
                 }
                 await load()
             } catch {
-                revokeError = apiMessage(error, fallback: "The device could not be revoked. Try again.")
+                revokeError = apiMessage(error, fallback: String(localized: "The device could not be revoked. Try again.", comment: "Error message shown when the server gives no reason (trusted devices screen)"))
                 pendingRevoke = nil
             }
         }
@@ -132,6 +134,7 @@ struct TrustedDevicesView: View {
 /// One trusted device, as the sessions screen prints one — name, platform,
 /// trust chip, the absolute time the server last heard from it.
 private struct DeviceCardView: View {
+    @Environment(\.dynamicTypeSize) private var dts
     let device: TrustedDeviceDto
     var isThisDevice: Bool
     var onRevoke: (() -> Void)?
@@ -142,50 +145,55 @@ private struct DeviceCardView: View {
         switch device.platform.lowercased() {
         case "ios": return "iPhone"
         case "android": return "Android"
-        default: return device.platform.isEmpty ? "Device" : device.platform
+        default: return device.platform.isEmpty ? String(localized: "Device", comment: "Trusted device card: platform when it is not known") : device.platform
         }
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 8) {
-                Text(device.displayName.isEmpty ? "Unknown device" : device.displayName)
-                    .font(.system(size: 15, weight: .semibold))
+            GMAdaptiveStack(spacing: 8) {
+                Text(device.displayName.isEmpty ? String(localized: "Unknown device", comment: "Session card title when the device name is not known") : device.displayName)
+                    .gmFont(15, .semibold)
                     .foregroundColor(GM.textPrimary)
-                    .lineLimit(1)
-                Spacer(minLength: 0)
+                    .lineLimit(dts.isAccessibilitySize ? 4 : 2)
+                    .fixedSize(horizontal: false, vertical: true)
+                if !dts.isAccessibilitySize { Spacer(minLength: 0) }
                 if isThisDevice {
                     Text("This device")
-                        .font(.system(size: 11, weight: .bold))
+                        .gmFont(11, .bold)
                         .foregroundColor(GM.successInk)
                         .padding(.horizontal, 10)
                         .padding(.vertical, 4)
                         .background(Capsule().fill(GM.successChipBg))
                 }
             }
-            HStack(spacing: 6) {
-                Image(systemName: revoked ? "xmark.shield" : "checkmark.shield")
-                    .font(.system(size: 11))
-                    .foregroundColor(revoked ? GM.error : GM.success)
-                Text(revoked ? "Revoked" : "Trusted")
-                    .font(.system(size: 12))
-                    .foregroundColor(revoked ? GM.error : GM.textSecondary)
-                Text("·")
-                    .font(.system(size: 12))
-                    .foregroundColor(GM.textTertiary)
-                Text(platformName)
-                    .font(.system(size: 12))
-                    .foregroundColor(GM.textSecondary)
-                Spacer(minLength: 0)
+            // One line when it fits; at the largest sizes the platform drops
+            // under the trust state instead of being cut off.
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 6) {
+                    trustState
+                    Text("·")
+                        .gmFont(12)
+                        .foregroundColor(GM.textTertiary)
+                    platformLabel
+                    Spacer(minLength: 0)
+                }
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(spacing: 6) { trustState }
+                    platformLabel.fixedSize(horizontal: false, vertical: true)
+                }
             }
-            Text(device.lastSeenAt.map { "Last seen " + securityAbsolute($0) } ?? securityAbsolute(device.createdAt))
-                .font(.system(size: 11))
+            Text(device.lastSeenAt.map { String(localized: "Last seen \(securityAbsolute($0))", comment: "Trusted device card; the argument is a date and time") } ?? securityAbsolute(device.createdAt))
+                .gmFont(11)
                 .foregroundColor(GM.textTertiary)
+                .fixedSize(horizontal: false, vertical: true)
             if let onRevoke {
                 Button(action: onRevoke) {
                     Text("Revoke this device")
-                        .font(.system(size: 13, weight: .semibold))
+                        .gmFont(13, .semibold)
                         .foregroundColor(GM.error)
+                        .frame(minHeight: 44, alignment: .leading)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 .padding(.top, 2)
@@ -196,6 +204,21 @@ private struct DeviceCardView: View {
         .background(RoundedRectangle(cornerRadius: GMShape.button, style: .continuous).fill(GM.card))
         .overlay(RoundedRectangle(cornerRadius: GMShape.button, style: .continuous).strokeBorder(GM.border))
     }
+
+    @ViewBuilder private var trustState: some View {
+        Image(systemName: revoked ? "xmark.shield" : "checkmark.shield")
+            .gmFont(11)
+            .foregroundColor(revoked ? GM.error : GM.success)
+        (revoked ? Text("Revoked") : Text("Trusted"))
+            .gmFont(12)
+            .foregroundColor(revoked ? GM.error : GM.textSecondary)
+    }
+
+    private var platformLabel: some View {
+        Text(platformName)
+            .gmFont(12)
+            .foregroundColor(GM.textSecondary)
+    }
 }
 
 // ── Recovery codes ───────────────────────────────────────────────────────────
@@ -205,6 +228,7 @@ private struct DeviceCardView: View {
 /// is one screen in two states: the status view that offers to generate, and
 /// the one-time display that does not let go until the person confirms.
 struct RecoveryCodesView: View {
+    @Environment(\.dynamicTypeSize) private var dts
     let onBack: () -> Void
 
     private enum Phase { case status, codes }
@@ -222,17 +246,20 @@ struct RecoveryCodesView: View {
     @State private var confirmed = false
     @State private var showLeave = false
 
-    private var grid: [[String]] { stride(from: 0, to: codes.count, by: 2).map { Array(codes[$0..<min($0 + 2, codes.count)]) } }
+    /// Two codes a row; one at the accessibility sizes, where two monospaced
+    /// codes no longer fit side by side.
+    private var perRow: Int { dts.isAccessibilitySize ? 1 : 2 }
+    private var grid: [[String]] { stride(from: 0, to: codes.count, by: perRow).map { Array(codes[$0..<min($0 + perRow, codes.count)]) } }
 
     var body: some View {
         AccountScreen(
             onBack: phase == .codes && !confirmed ? { showLeave = true } : onBack,
             illustration: phase == .codes ? "ill_sec_backup_saved" : "ill_sec_backup_generate",
             illustrationWidth: phase == .codes ? 150 : 180,
-            title: phase == .codes ? "Your Recovery Codes" : "Account Recovery Codes",
+            title: phase == .codes ? String(localized: "Your Recovery Codes", comment: "Screen title (recovery codes screen)") : String(localized: "Account Recovery Codes", comment: "Screen title (recovery codes screen)"),
             subtitle: phase == .codes
-                ? "Store these codes somewhere safe. They won't be shown again."
-                : "One-time codes that sign you back in if you lose every trusted device and your password."
+                ? String(localized: "Store these codes somewhere safe. They won't be shown again.", comment: "Screen description under the title (recovery codes screen)")
+                : String(localized: "One-time codes that sign you back in if you lose every trusted device and your password.", comment: "Screen description under the title (recovery codes screen)")
         ) {
             if phase == .codes {
                 codesContent
@@ -242,17 +269,17 @@ struct RecoveryCodesView: View {
         } footer: {
             VStack(spacing: 6) {
                 if phase == .codes {
-                    GradientButton(title: "Done", enabled: confirmed, action: { onBack() })
-                    FooterNote(text: "Each code can be used once. Generating new codes retires every code on this list.")
+                    GradientButton(title: String(localized: "Done", comment: "Button title (recovery codes screen)"), enabled: confirmed, action: { onBack() })
+                    FooterNote(text: String(localized: "Each code can be used once. Generating new codes retires every code on this list.", comment: "Footer note (recovery codes screen)"))
                 } else {
                     GradientButton(
-                        title: (usable ?? false) ? "Generate New Codes" : "Generate Codes",
+                        title: (usable ?? false) ? String(localized: "Generate New Codes", comment: "Button title (recovery codes screen)") : String(localized: "Generate Codes", comment: "Button title (recovery codes screen)"),
                         busy: generating,
                         action: generate
                     )
                     FooterNote(text: (usable ?? false)
-                               ? "Generating a new set retires every code you have saved."
-                               : "Generate a set and keep it with the documents you would reach for in an emergency.")
+                               ? String(localized: "Generating a new set retires every code you have saved.", comment: "Footer note (recovery codes screen)")
+                               : String(localized: "Generate a set and keep it with the documents you would reach for in an emergency.", comment: "Footer note (recovery codes screen)"))
                 }
             }
         }
@@ -268,25 +295,27 @@ struct RecoveryCodesView: View {
 
     @ViewBuilder private var statusContent: some View {
         if loading {
-            Text("Checking for saved codes…").font(.system(size: 13)).foregroundColor(GM.textSecondary)
+            Text("Checking for saved codes…").gmFont(13).foregroundColor(GM.textSecondary)
         } else if let error {
-            Text(error).font(.system(size: 13)).foregroundColor(GM.error)
-            AccountLink(title: "Try again", action: { Task { await loadStatus() } })
+            Text(error).gmFont(13).foregroundColor(GM.error)
+                    .fixedSize(horizontal: false, vertical: true)
+            AccountLink(title: String(localized: "Try again", comment: "Link-style button (recovery codes screen)"), action: { Task { await loadStatus() } })
         } else {
             InfoCard {
                 HStack(spacing: 8) {
                     Image(systemName: (usable ?? false) ? "checkmark.circle" : "info.circle")
-                        .font(.system(size: 14))
-                        .foregroundColor((usable ?? false) ? GM.success : GM.primarySolid)
-                    Text((usable ?? false)
-                         ? "You have unused recovery codes saved."
-                         : "No unused recovery codes on this account.")
-                        .font(.system(size: 13, weight: .semibold))
+                        .gmFont(14)
+                        .foregroundColor((usable ?? false) ? GM.success : GM.primaryText)
+                    ((usable ?? false)
+                         ? Text("You have unused recovery codes saved.")
+                         : Text("No unused recovery codes on this account."))
+                        .gmFont(13, .semibold)
                         .foregroundColor(GM.textPrimary)
+                        .fixedSize(horizontal: false, vertical: true)
                     Spacer(minLength: 0)
                 }
                 Text("A code is spent the moment it signs you in. Anyone holding an unused code can pass recovery, so the list belongs somewhere only you can reach.")
-                    .font(.system(size: 12))
+                    .gmFont(12)
                     .foregroundColor(GM.textSecondary)
                     .fixedSize(horizontal: false, vertical: true)
                     .padding(.top, 8)
@@ -296,22 +325,23 @@ struct RecoveryCodesView: View {
 
     @ViewBuilder private var codesContent: some View {
         InfoCard {
-            HStack {
+            GMAdaptiveStack(spacing: dts.isAccessibilitySize ? 8 : nil) {
                 Text("Your Recovery Codes")
-                    .font(.system(size: 14, weight: .semibold))
+                    .gmFont(14, .semibold)
                     .foregroundColor(GM.textPrimary)
-                Spacer()
+                    .fixedSize(horizontal: false, vertical: true)
+                if !dts.isAccessibilitySize { Spacer() }
                 Button(action: {
                     UIPasteboard.general.string = codes.joined(separator: "\n")
                     copied = true
                 }) {
                     HStack(spacing: 5) {
                         Image(systemName: copied ? "checkmark.circle" : "doc.on.doc")
-                            .font(.system(size: 12, weight: .semibold))
-                        Text(copied ? "Copied" : "Copy all")
-                            .font(.system(size: 12, weight: .semibold))
+                            .gmFont(12, .semibold)
+                        (copied ? Text("Copied") : Text("Copy all"))
+                            .gmFont(12, .semibold)
                     }
-                    .foregroundColor(GM.primarySolid)
+                    .foregroundColor(GM.primaryText)
                 }
                 .buttonStyle(.plain)
             }
@@ -325,10 +355,12 @@ struct RecoveryCodesView: View {
                             Button { UIPasteboard.general.string = code; copiedCode = code } label: {
                                 HStack(spacing: 6) {
                                     Text(code)
-                                        .font(.system(size: 13, weight: .semibold, design: .monospaced))
+                                        .gmFont(13, .semibold, design: .monospaced)
                                         .foregroundColor(GM.textPrimary)
+                                        .lineLimit(1)
+                                        .minimumScaleFactor(0.7)
                                     Image(systemName: copiedCode == code ? "checkmark.circle" : "doc.on.doc")
-                                        .font(.system(size: 11))
+                                        .gmFont(11)
                                         .foregroundColor(GM.textTertiary)
                                     Spacer(minLength: 0)
                                 }
@@ -339,7 +371,7 @@ struct RecoveryCodesView: View {
                             }
                             .buttonStyle(.plain)
                         }
-                        if pair.count == 1 { Spacer().frame(maxWidth: .infinity) }
+                        if pair.count == 1 && perRow == 2 { Spacer().frame(maxWidth: .infinity) }
                     }
                 }
             }
@@ -349,16 +381,18 @@ struct RecoveryCodesView: View {
         } label: {
             HStack(spacing: 10) {
                 Image(systemName: confirmed ? "checkmark.square.fill" : "square")
-                    .font(.system(size: 18))
-                    .foregroundColor(confirmed ? GM.primarySolid : GM.textTertiary)
+                    .gmFont(18)
+                    .foregroundColor(confirmed ? GM.primaryText : GM.textTertiary)
                 Text("I have saved these codes somewhere safe.")
-                    .font(.system(size: 13))
+                    .gmFont(13)
                     .foregroundColor(GM.textPrimary)
+                    .fixedSize(horizontal: false, vertical: true)
                 Spacer(minLength: 0)
             }
         }
         .buttonStyle(.plain)
         .padding(.top, 14)
+        .accessibilityAddTraits(confirmed ? [.isButton, .isSelected] : .isButton)
     }
 
     private func loadStatus() async {
@@ -369,13 +403,13 @@ struct RecoveryCodesView: View {
             let resp = try await ApiClient.recoveryCodesStatus(token: token)
             usable = resp.usable
         } catch {
-            self.error = apiMessage(error, fallback: "Could not check the codes. Try again.")
+            self.error = apiMessage(error, fallback: String(localized: "Could not check the codes. Try again.", comment: "Error message shown when the server gives no reason (recovery codes screen)"))
         }
         loading = false
     }
 
     private func generate() {
-        guard let token = SessionStore.token else { error = "Sign in again."; return }
+        guard let token = SessionStore.token else { error = String(localized: "Sign in again.", comment: "Message (recovery codes screen)"); return }
         generating = true
         error = nil
         Task {
@@ -388,7 +422,7 @@ struct RecoveryCodesView: View {
                 copiedCode = nil
                 phase = .codes
             } catch {
-                self.error = apiMessage(error, fallback: "Could not generate codes. Try again.")
+                self.error = apiMessage(error, fallback: String(localized: "Could not generate codes. Try again.", comment: "Error message shown when the server gives no reason (recovery codes screen)"))
             }
             generating = false
         }
@@ -403,6 +437,8 @@ struct RecoveryCodesView: View {
 /// that a security alert never consults quiet hours, so the screen draws no
 /// picker next to it rather than one that would do nothing.
 struct NotificationPrefsView: View {
+    @Environment(\.dynamicTypeSize) private var dts
+    @ScaledMetric(relativeTo: .body) private var tile: CGFloat = 34
     let onBack: () -> Void
 
     /// The three scopes, in the order the screen prints them.
@@ -411,16 +447,16 @@ struct NotificationPrefsView: View {
 
         var title: String {
             switch self {
-            case .mail: return "New mail alerts"
-            case .security: return "Security alerts"
-            case .account: return "Account alerts"
+            case .mail: return String(localized: "New mail alerts", comment: "Notification preference title")
+            case .security: return String(localized: "Security alerts", comment: "Notification preference title")
+            case .account: return String(localized: "Account alerts", comment: "Notification preference title")
             }
         }
         var detail: String {
             switch self {
-            case .mail: return "When a new message reaches the inbox"
-            case .security: return "Sign-ins, blocks and recovery on the account"
-            case .account: return "Profile and account changes"
+            case .mail: return String(localized: "When a new message reaches the inbox", comment: "Notification preference description")
+            case .security: return String(localized: "Sign-ins, blocks and recovery on the account", comment: "Notification preference description")
+            case .account: return String(localized: "Profile and account changes", comment: "Notification preference description")
             }
         }
         var icon: String {
@@ -449,20 +485,21 @@ struct NotificationPrefsView: View {
             onBack: onBack,
             illustration: "ill_sec_alert",
             illustrationWidth: 170,
-            title: "Notification Preferences",
-            subtitle: "Choose which alerts reach this account and when the mail ones go quiet."
+            title: String(localized: "Notification Preferences", comment: "Screen title (notification preferences screen)"),
+            subtitle: String(localized: "Choose which alerts reach this account and when the mail ones go quiet.", comment: "Screen description under the title (notification preferences screen)")
         ) {
             if loading {
-                Text("Loading preferences…").font(.system(size: 13)).foregroundColor(GM.textSecondary)
+                Text("Loading preferences…").gmFont(13).foregroundColor(GM.textSecondary)
             } else if failed {
                 Text("We couldn't load your notification preferences.")
-                    .font(.system(size: 13))
+                    .gmFont(13)
                     .foregroundColor(GM.textSecondary)
-                AccountLink(title: "Try again", action: { reload += 1 })
+                    .fixedSize(horizontal: false, vertical: true)
+                AccountLink(title: String(localized: "Try again", comment: "Link-style button (notification preferences screen)"), action: { reload += 1 })
             } else {
                 InfoCard {
                     Text("Alerts")
-                        .font(.system(size: 14, weight: .semibold))
+                        .gmFont(14, .semibold)
                         .foregroundColor(GM.textPrimary)
                     ForEach(Scope.allCases, id: \.self) { scope in
                         scopeRow(scope)
@@ -473,12 +510,12 @@ struct NotificationPrefsView: View {
                     quietCard
                 }
                 if let error {
-                    Text(error).font(.system(size: 12)).foregroundColor(GM.error).padding(.top, 6)
+                    Text(error).gmFont(12).foregroundColor(GM.error).padding(.top, 6)
                 }
                 HStack(alignment: .top, spacing: 9) {
-                    Image(systemName: "info.circle").font(.system(size: 14)).foregroundColor(GM.primarySolid)
+                    Image(systemName: "info.circle").gmFont(14).foregroundColor(GM.primaryText).accessibilityHidden(true)
                     Text("Security alerts ignore quiet hours by design — a sign-in the account did not make is never held until morning.")
-                        .font(.system(size: 12))
+                        .gmFont(12)
                         .foregroundColor(GM.textSecondary)
                         .fixedSize(horizontal: false, vertical: true)
                     Spacer(minLength: 0)
@@ -488,7 +525,7 @@ struct NotificationPrefsView: View {
                 .padding(.top, 12)
             }
         } footer: {
-            FooterNote(text: "Preferences apply to this account on every signed-in device.")
+            FooterNote(text: String(localized: "Preferences apply to this account on every signed-in device.", comment: "Footer note (notification preferences screen)"))
         }
         .task(id: reload) { await load() }
         .onAppear {
@@ -497,22 +534,27 @@ struct NotificationPrefsView: View {
     }
 
     @ViewBuilder private func scopeRow(_ scope: Scope) -> some View {
-        HStack(spacing: 12) {
-            Image(systemName: scope.icon)
-                .font(.system(size: 15, weight: .medium))
-                .foregroundColor(GM.primarySolid)
-                .frame(width: 34, height: 34)
-                .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(GM.softFill))
-            VStack(alignment: .leading, spacing: 2) {
-                Text(scope.title)
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundColor(GM.textPrimary)
-                Text(scope.detail)
-                    .font(.system(size: 12))
-                    .foregroundColor(GM.textSecondary)
-                    .fixedSize(horizontal: false, vertical: true)
+        // At the accessibility sizes the switch moves under the text.
+        GMAdaptiveStack(spacing: 12) {
+            HStack(spacing: 12) {
+                Image(systemName: scope.icon)
+                    .gmFont(15, .medium, maxSize: 26)
+                    .foregroundColor(GM.primaryText)
+                    .accessibilityHidden(true)
+                    .frame(width: tile, height: tile)
+                    .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(GM.softFill))
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(scope.title)
+                        .gmFont(14, .semibold)
+                        .foregroundColor(GM.textPrimary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Text(scope.detail)
+                        .gmFont(12)
+                        .foregroundColor(GM.textSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: 0)
             }
-            Spacer(minLength: 0)
             if saving == scope {
                 ProgressView()
             } else {
@@ -521,7 +563,7 @@ struct NotificationPrefsView: View {
                     set: { patch(scope, enabled: $0) }
                 ))
                 .labelsHidden()
-                .tint(GM.primarySolid)
+                .tint(GM.primaryText)
                 .accessibilityIdentifier("notif-pref-\(scope.rawValue)")
             }
         }
@@ -534,30 +576,31 @@ struct NotificationPrefsView: View {
                 get: { hasQuietHours },
                 set: { hasQuietHours = $0; saveMailQuiet() }
             ))
-            .tint(GM.primarySolid)
+            .tint(GM.primaryText)
             if hasQuietHours {
-                HStack(spacing: 12) {
+                GMAdaptiveStack(spacing: 12, verticalAlignment: .top) {
                     VStack(alignment: .leading, spacing: 4) {
                         Text("From")
-                            .font(.system(size: 12))
+                            .gmFont(12)
                             .foregroundColor(GM.textSecondary)
                         DatePicker("", selection: $quietStart, displayedComponents: .hourAndMinute)
                             .labelsHidden()
                     }
                     VStack(alignment: .leading, spacing: 4) {
                         Text("Until")
-                            .font(.system(size: 12))
+                            .gmFont(12)
                             .foregroundColor(GM.textSecondary)
                         DatePicker("", selection: $quietEnd, displayedComponents: .hourAndMinute)
                             .labelsHidden()
                     }
-                    Spacer(minLength: 0)
+                    if !dts.isAccessibilitySize { Spacer(minLength: 0) }
                 }
                 .onChange(of: quietStart) { _ in saveMailQuiet() }
                 .onChange(of: quietEnd) { _ in saveMailQuiet() }
                 Text("Mail alerts hold until the window ends. Security alerts do not.")
-                    .font(.system(size: 12))
+                    .gmFont(12)
                     .foregroundColor(GM.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
                     .padding(.top, 6)
             }
         }
@@ -601,7 +644,7 @@ struct NotificationPrefsView: View {
             loaded = true
         } catch {
             failed = true
-            self.error = apiMessage(error, fallback: "Could not load the preferences. Try again.")
+            self.error = apiMessage(error, fallback: String(localized: "Could not load the preferences. Try again.", comment: "Error message shown when the server gives no reason (notification preferences screen)"))
         }
         loading = false
     }
@@ -629,10 +672,10 @@ struct NotificationPrefsView: View {
                 if resp.success {
                     enabled[scope] = value
                 } else {
-                    self.error = "The preference was not saved. Try again."
+                    self.error = String(localized: "The preference was not saved. Try again.", comment: "Message (notification preferences screen)")
                 }
             } catch {
-                self.error = apiMessage(error, fallback: "The preference was not saved. Try again.")
+                self.error = apiMessage(error, fallback: String(localized: "The preference was not saved. Try again.", comment: "Error message shown when the server gives no reason (notification preferences screen)"))
             }
             saving = nil
         }
@@ -657,7 +700,7 @@ struct NotificationPrefsView: View {
             do {
                 _ = try await ApiClient.patchNotificationPrefs(token: token, patch: patch)
             } catch {
-                self.error = apiMessage(error, fallback: "Quiet hours were not saved. Try again.")
+                self.error = apiMessage(error, fallback: String(localized: "Quiet hours were not saved. Try again.", comment: "Error message shown when the server gives no reason (notification preferences screen)"))
             }
             saving = nil
         }
@@ -721,11 +764,11 @@ struct TrustedDeviceRecoveryView: View {
             onBack: onBack,
             illustration: stage == .proving ? "ill_sec_hub" : "ill_account_new_password",
             illustrationWidth: stage == .proving ? 150 : 150,
-            eyebrow: "Forgot password",
-            title: stage == .proving ? "Verify with this device" : "Set a new password",
+            eyebrow: String(localized: "Forgot password", comment: "Small label above the screen title (trusted device recovery screen)"),
+            title: stage == .proving ? String(localized: "Verify with this device", comment: "Screen title (trusted device recovery screen)") : String(localized: "Set a new password", comment: "Screen title (trusted device recovery screen)"),
             subtitle: stage == .proving
-                ? "This device holds a key your account trusts. We'll use it to verify you — no code needed."
-                : "Your device is verified. Choose a new password for your account."
+                ? String(localized: "This device holds a key your account trusts. We'll use it to verify you — no code needed.", comment: "Screen description under the title (trusted device recovery screen)")
+                : String(localized: "Your device is verified. Choose a new password for your account.", comment: "Screen description under the title (trusted device recovery screen)")
         ) {
             switch stage {
             case .proving: provingContent
@@ -735,23 +778,23 @@ struct TrustedDeviceRecoveryView: View {
             VStack(spacing: 4) {
                 if stage == .form {
                     GradientButton(
-                        title: "Reset Password",
+                        title: String(localized: "Reset Password", comment: "Button title (trusted device recovery screen)"),
                         enabled: ready,
                         busy: busy,
                         trailing: AnyView(
-                            Image(systemName: "arrow.right")
-                                .font(.system(size: 15, weight: .semibold))
+                            Image(systemName: "arrow.right").flipsForRightToLeftLayoutDirection(true)
+                                .gmFont(15, .semibold, maxSize: 24)
                                 .foregroundColor(.white)
                         )
                     ) { submit() }
                 }
                 if let error {
-                    Text(error).font(GMFont.caption).foregroundColor(GM.error).padding(.top, 10)
+                    Text(error).gmFont(.caption).foregroundColor(GM.error).padding(.top, 10)
                 }
                 if stage == .proving || stage == .form {
-                    AccountLink(title: "Use the code instead", action: onBack)
+                    AccountLink(title: String(localized: "Use the code instead", comment: "Link-style button (trusted device recovery screen)"), action: onBack)
                 }
-                FooterNote(text: "The device key proves it's you. The new password still follows every rule the reset flow checks.",
+                FooterNote(text: String(localized: "The device key proves it's you. The new password still follows every rule the reset flow checks.", comment: "Footer note (trusted device recovery screen)"),
                            divider: false)
                     .padding(.top, 12)
                 Spacer().frame(height: 4)
@@ -766,10 +809,11 @@ struct TrustedDeviceRecoveryView: View {
                 IconTile(systemName: "checkmark.shield")
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Signing with this device's key")
-                        .font(.system(size: 13, weight: .semibold))
+                        .gmFont(13, .semibold)
                         .foregroundColor(GM.textPrimary)
-                    Text(proving ? "One moment…" : "Ready to verify")
-                        .font(.system(size: 12))
+                        .fixedSize(horizontal: false, vertical: true)
+                    (proving ? Text("One moment…") : Text("Ready to verify"))
+                        .gmFont(12)
                         .foregroundColor(GM.textSecondary)
                 }
                 Spacer(minLength: 0)
@@ -779,12 +823,13 @@ struct TrustedDeviceRecoveryView: View {
         if identifier.isEmpty {
             AppTextField(
                 value: $identifier,
-                hint: "GrapMail address",
+                hint: String(localized: "GrapMail address", comment: "Text field placeholder (trusted device recovery screen)"),
                 keyboardType: .emailAddress,
-                leadingIcon: "envelope"
+                leadingIcon: "envelope",
+                contentType: .username
             )
             .padding(.top, 12)
-            GradientButton(title: "Verify This Device", enabled: !identifier.isEmpty, busy: proving) {
+            GradientButton(title: String(localized: "Verify This Device", comment: "Button title (trusted device recovery screen)"), enabled: !identifier.isEmpty, busy: proving) {
                 Task { await prove() }
             }
             .padding(.top, 12)
@@ -796,7 +841,12 @@ struct TrustedDeviceRecoveryView: View {
     }
 
     @ViewBuilder private var formContent: some View {
-        AppTextField(value: $password, hint: "New password", isPassword: true, leadingIcon: "lock")
+        // Round 8 — B: the account being reset, so the password manager
+        // updates its saved password.
+        if let username = identifier.nilIfBlank() {
+            CredentialUsernameField(username: username)
+        }
+        AppTextField(value: $password, hint: String(localized: "New password", comment: "Text field placeholder (trusted device recovery screen)"), isPassword: true, leadingIcon: "lock", contentType: .newPassword)
         HStack(spacing: 6) {
             ForEach(0..<4, id: \.self) { i in
                 RoundedRectangle(cornerRadius: 3, style: .continuous)
@@ -806,19 +856,19 @@ struct TrustedDeviceRecoveryView: View {
             }
         }
         .padding(.top, 12)
-        AppTextField(value: $confirm, hint: "Confirm new password", isPassword: true, leadingIcon: "lock")
+        AppTextField(value: $confirm, hint: String(localized: "Confirm new password", comment: "Text field placeholder (trusted device recovery screen)"), isPassword: true, leadingIcon: "lock", contentType: .newPassword)
             .padding(.top, 18)
         VStack(alignment: .leading, spacing: 0) {
-            RuleLine(label: "At least 8 characters", met: hasLength)
-            RuleLine(label: "Include a letter", met: hasLetter)
-            RuleLine(label: "Include a number", met: hasDigit)
-            RuleLine(label: "Include a special character", met: hasSpecial)
-            RuleLine(label: "Not commonly used", met: isFresh)
+            RuleLine(label: String(localized: "At least 8 characters", comment: "Password requirement (trusted device recovery screen)"), met: hasLength)
+            RuleLine(label: String(localized: "Include a letter", comment: "Password requirement (trusted device recovery screen)"), met: hasLetter)
+            RuleLine(label: String(localized: "Include a number", comment: "Password requirement (trusted device recovery screen)"), met: hasDigit)
+            RuleLine(label: String(localized: "Include a special character", comment: "Password requirement (trusted device recovery screen)"), met: hasSpecial)
+            RuleLine(label: String(localized: "Not commonly used", comment: "Password requirement (trusted device recovery screen)"), met: isFresh)
         }
         .padding(.top, 16)
         if !confirm.isEmpty && !matches {
             Text("Both passwords must match.")
-                .font(GMFont.caption)
+                .gmFont(.caption)
                 .foregroundColor(GM.error)
                 .padding(.top, 8)
         }
@@ -847,7 +897,7 @@ struct TrustedDeviceRecoveryView: View {
             let challenge = try await ApiClient.deviceChallenge(identifier: target)
             guard challenge.success, let challengeId = challenge.challengeId.nilIfBlank(),
                   let nonce = challenge.nonce.nilIfBlank() else {
-                error = "Recovery is not available for this account right now."
+                error = String(localized: "Recovery is not available for this account right now.", comment: "Message (trusted device recovery screen)")
                 proving = false
                 return
             }
@@ -857,13 +907,13 @@ struct TrustedDeviceRecoveryView: View {
             // Signing goes through the biometric gate: a cancelled prompt is
             // the gate's own sentence, not a broken key.
             guard let nonceBytes = Data(base64Encoded: nonce) else {
-                error = "Recovery is not available for this account right now."
+                error = String(localized: "Recovery is not available for this account right now.", comment: "Message (trusted device recovery screen)")
                 proving = false
                 return
             }
             let proof = await DeviceKeyManager.sign(nonceBytes)
             guard let signature = proof.signature?.base64EncodedString() else {
-                error = proof.guardMessage ?? "This device cannot prove custody of its key. Reset with a code instead."
+                error = proof.guardMessage ?? String(localized: "This device cannot prove custody of its key. Reset with a code instead.", comment: "Message (trusted device recovery screen)")
                 proving = false
                 return
             }
@@ -875,17 +925,17 @@ struct TrustedDeviceRecoveryView: View {
                 model.identifier = target
                 stage = .form
             } else {
-                error = "Recovery proof was not accepted. This device may not be trusted for that account."
+                error = String(localized: "Recovery proof was not accepted. This device may not be trusted for that account.", comment: "Message (trusted device recovery screen)")
             }
         } catch {
-            self.error = apiMessage(error, fallback: "Could not verify this device. Try again.")
+            self.error = apiMessage(error, fallback: String(localized: "Could not verify this device. Try again.", comment: "Error message shown when the server gives no reason (trusted device recovery screen)"))
         }
         proving = false
     }
 
     private func submit() {
         guard let freshGrant = grant, !identifier.isEmpty else {
-            error = "That recovery grant is not valid. Start again."
+            error = String(localized: "That recovery grant is not valid. Start again.", comment: "Message (trusted device recovery screen)")
             stage = .proving
             return
         }
@@ -896,14 +946,14 @@ struct TrustedDeviceRecoveryView: View {
             do {
                 let resp = try await ApiClient.resetWithGrant(identifier: identifier, grant: freshGrant, password: password)
                 guard resp.success else {
-                    error = resp.message ?? "That recovery grant is not valid."
+                    error = resp.message ?? String(localized: "That recovery grant is not valid.", comment: "Message (trusted device recovery screen)")
                     return
                 }
                 onResetDone()
             } catch {
                 switch apiCode(error) {
-                case "WEAK_PASSWORD": self.error = apiMessage(error, fallback: "Use at least 8 characters with a letter, a number and a symbol.")
-                default: self.error = apiMessage(error, fallback: "We could not reset the password. Try again.")
+                case "WEAK_PASSWORD": self.error = apiMessage(error, fallback: String(localized: "Use at least 8 characters with a letter, a number and a symbol.", comment: "Error message shown when the server gives no reason (trusted device recovery screen)"))
+                default: self.error = apiMessage(error, fallback: String(localized: "We could not reset the password. Try again.", comment: "Error message shown when the server gives no reason (trusted device recovery screen)"))
                 }
             }
         }

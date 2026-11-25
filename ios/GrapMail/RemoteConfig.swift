@@ -78,25 +78,35 @@ struct RequiredUpdateView: View {
     @Environment(\.openURL) private var openURL
 
     var body: some View {
-        VStack(spacing: 16) {
-            Spacer()
-            Image(systemName: "arrow.down.app")
-                .font(.system(size: 48)).foregroundColor(GM.primarySolid)
-                .accessibilityHidden(true)
-            Text("Update GrapMail to continue")
-                .font(.system(size: 20, weight: .bold)).foregroundColor(GM.textPrimary)
-                .multilineTextAlignment(.center)
-            Text("This version is no longer supported. Your mail is safe; the new version opens it right where you left it.")
-                .font(.system(size: 14)).foregroundColor(GM.textSecondary)
-                .multilineTextAlignment(.center)
-                .fixedSize(horizontal: false, vertical: true)
-            GradientButton(title: "Update now") {
-                openURL(config.storeURL ?? URL(string: "https://apps.apple.com/search?term=GrapMail")!)
+        // Scrolls so the explanation and the button stay reachable at the
+        // accessibility text sizes and in short windows (landscape, Split View);
+        // the min-height frame keeps it vertically centred when it fits.
+        GeometryReader { geo in
+            ScrollView {
+                VStack(spacing: 16) {
+                    Spacer(minLength: 0)
+                    Image(systemName: "arrow.down.app")
+                        .gmFont(48, maxSize: 72).foregroundColor(GM.primarySolid)
+                        .accessibilityHidden(true)
+                    Text("Update GrapMail to continue")
+                        .gmFont(20, .bold).foregroundColor(GM.textPrimary)
+                        .multilineTextAlignment(.center)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Text("This version is no longer supported. Your mail is safe; the new version opens it right where you left it.")
+                        .gmFont(14).foregroundColor(GM.textSecondary)
+                        .multilineTextAlignment(.center)
+                        .fixedSize(horizontal: false, vertical: true)
+                    GradientButton(title: String(localized: "Update now")) {
+                        openURL(config.storeURL ?? URL(string: "https://apps.apple.com/search?term=GrapMail")!)
+                    }
+                    .padding(.top, 8)
+                    Spacer(minLength: 0)
+                }
+                .padding(32)
+                .gmMaxWidth(GMLayout.form)
+                .frame(minHeight: geo.size.height)
             }
-            .padding(.top, 8)
-            Spacer()
         }
-        .padding(32)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(GM.bg.ignoresSafeArea())
         .accessibilityIdentifier("gm-update-required")
@@ -110,21 +120,23 @@ struct ServerNoticeBanner: View {
     var body: some View {
         HStack(spacing: 10) {
             Image(systemName: "info.circle")
+                .gmFont(17, maxSize: 28)
                 .foregroundColor(notice.warning ? GM.warnInk : GM.primarySolid)
                 .accessibilityHidden(true)
             Text(notice.text)
-                .font(.system(size: 13))
+                .gmFont(13)
                 .foregroundColor(notice.warning ? GM.warnInk : GM.textPrimary)
                 .fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: 4)
             Button("OK", action: onDismiss)
-                .font(.system(size: 13, weight: .semibold))
+                .gmFont(13, .semibold)
                 .frame(minWidth: 44, minHeight: 44)
         }
         .padding(.horizontal, 12).padding(.vertical, 4)
         .background(RoundedRectangle(cornerRadius: 12, style: .continuous)
             .fill(notice.warning ? GM.warnChipBg : GM.softFill))
         .padding(.horizontal, 12)
+        .gmMaxWidth(GMLayout.readable)
         .accessibilityElement(children: .combine)
         .accessibilityIdentifier("gm-server-notice")
     }

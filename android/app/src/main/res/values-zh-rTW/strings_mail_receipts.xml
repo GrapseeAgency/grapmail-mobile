@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="mail_receipt_read_at">已於 %1$s 閱讀</string>
+    <string name="mail_receipt_requested_pending">已要求讀取回條 · 尚未閱讀</string>
+    <string name="mail_receipt_server_sent">已傳送讀取回條</string>
+    <string name="mail_receipt_ask_title">寄件者要求讀取回條</string>
+    <string name="mail_receipt_ask_body">要傳送回條給 %1$s，告知您已開啟此郵件嗎？回條只會告訴對方您開啟郵件的時間，不含其他資訊。</string>
+    <string name="mail_receipt_ask_send">傳送回條</string>
+    <string name="mail_receipt_ask_decline">不要傳送</string>
+    <string name="mail_receipt_mode_title">傳送讀取回條</string>
+    <string name="mail_receipt_mode_body">當郵件要求讀取回條時。除非您選擇「一律」，否則不會為垃圾郵件、已封鎖寄件者或加密郵件傳送回條。</string>
+    <string name="mail_receipt_mode_never">永不</string>
+    <string name="mail_receipt_mode_ask">詢問</string>
+    <string name="mail_receipt_mode_always">一律</string>
+    <string name="mail_receipt_mode_always_note">選擇「一律」也會為垃圾郵件、已封鎖寄件者和加密郵件傳送回條。</string>
+    <string name="mail_receipt_mode_unavailable">無法載入此設定。請檢查網路連線。</string>
+    <string name="mail_compose_request_receipt">要求讀取回條</string>
+</resources>

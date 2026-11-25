@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    values-ko/strings_reader.xml: translation of values/strings_reader.xml (same keys, same order).
+    Comments below are kept from the English source for context.
+-->
+<resources>
+    <!-- The inline pill above an HTML body in a dark reader. It names what a tap switches TO. -->
+    <string name="reader_colours_original">원래 색상</string>
+    <string name="reader_colours_dark">어두운 색상</string>
+
+    <!-- The message overflow menu items (same toggle as the pill). -->
+    <string name="reader_colours_menu_original">원래 색상으로 보기</string>
+    <string name="reader_colours_menu_dark">어두운 색상으로 보기</string>
+
+    <!-- TalkBack: the pill's click action ("double-tap to …") and its current state. -->
+    <string name="reader_colours_action_original">이 발신자의 원래 색상으로 보기</string>
+    <string name="reader_colours_action_dark">어두운 색상으로 보기</string>
+    <string name="reader_colours_state_original">원래 색상으로 표시 중</string>
+    <string name="reader_colours_state_dark">어두운 색상으로 표시 중</string>
+
+    <!-- The note under the message after a change, so the per-sender memory is not a surprise later. -->
+    <string name="reader_colours_remembered_original">이 기기에서 %1$s의 메일은 원래 색상으로 열립니다.</string>
+    <string name="reader_colours_remembered_dark">이 기기에서 %1$s의 메일은 어두운 색상으로 열립니다.</string>
+</resources>

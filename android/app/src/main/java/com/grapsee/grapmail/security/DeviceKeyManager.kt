@@ -1,7 +1,10 @@
 package com.grapsee.grapmail.security
 
 import android.content.Context
+import com.grapsee.grapmail.R
+import com.grapsee.grapmail.ui.i18n.CoreStrings
 import android.security.keystore.KeyGenParameterSpec
+import android.security.keystore.KeyInfo
 import android.security.keystore.KeyProperties
 import android.util.Base64
 import androidx.biometric.BiometricManager
@@ -216,8 +219,8 @@ object DeviceKeyManager {
             },
         )
         val info = BiometricPrompt.PromptInfo.Builder()
-            .setTitle("Confirm to sign the recovery challenge")
-            .setSubtitle("GrapMail uses this device's key to prove it is trusted")
+            .setTitle(CoreStrings.get(R.string.core_devicekey_prompt_title) { "Confirm to sign the recovery challenge" })
+            .setSubtitle(CoreStrings.get(R.string.core_devicekey_prompt_subtitle) { "GrapMail uses this device's key to prove it is trusted" })
             // The key is AUTH_BIOMETRIC_STRONG-gated: only a strong biometric
             // can release it, so the prompt must not offer anything else.
             .setAllowedAuthenticators(BiometricManager.Authenticators.BIOMETRIC_STRONG)
@@ -262,11 +265,15 @@ object DeviceKeyManager {
      * keys minted by earlier builds. Null when the characteristics cannot be
      * read; [isUnlockedKey] falls back to the generation-time flag then.
      */
-    private fun specOrNull(): KeyGenParameterSpec? = try {
+    private fun specOrNull(): KeyInfo? = try {
         val entry = keystore().getEntry(KEY_ALIAS, null) as? java.security.KeyStore.PrivateKeyEntry
             ?: return null
+        // KeyInfo is the one KeySpec AndroidKeyStore's KeyFactory exposes for a
+        // private key (KeyGenParameterSpec is a generation input, not a readable
+        // KeySpec); it carries isUserAuthenticationRequired, which is the fact
+        // this function exists to read.
         KeyFactory.getInstance(entry.privateKey.algorithm, ANDROID_KEYSTORE)
-            .getKeySpec(entry.privateKey, KeyGenParameterSpec::class.java)
+            .getKeySpec(entry.privateKey, KeyInfo::class.java)
     } catch (_: Exception) {
         null
     }

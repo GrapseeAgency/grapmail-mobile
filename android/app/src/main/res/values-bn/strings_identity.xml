@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="identity_settings_appearance">চেহারা</string>
+    <string name="identity_match_wallpaper_title">ওয়ালপেপারের সঙ্গে মিলিয়ে নিন</string>
+    <string name="identity_match_wallpaper_subtitle">বোতাম ও হাইলাইটে আপনার ওয়ালপেপারের রং ব্যবহার করুন। অ্যাভাটার, স্টেটাসের রং ও লেখা GrapMail-এর নিজস্ব রং-এই থাকে।</string>
+</resources>

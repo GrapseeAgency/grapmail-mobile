@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="identity_settings_appearance">Darstellung</string>
+    <string name="identity_match_wallpaper_title">An Hintergrund anpassen</string>
+    <string name="identity_match_wallpaper_subtitle">Verwende die Farben deines Hintergrundbilds für Schaltflächen und Hervorhebungen. Avatare, Statusfarben und Text bleiben wie bei GrapMail.</string>
+</resources>

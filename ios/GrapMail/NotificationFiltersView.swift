@@ -8,6 +8,7 @@ import SwiftUI
 /// server stored.
 struct NotificationFiltersView: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.dynamicTypeSize) private var dts
     @State private var settings: NotificationSettingsInfo?
     @State private var loadError: String?
     @State private var saving = false
@@ -16,25 +17,23 @@ struct NotificationFiltersView: View {
     @State private var attempt = 0
 
     private static let modes: [(value: String, title: String, detail: String)] = [
-        ("all", "All new mail", "Every message that reaches the inbox."),
-        ("priority", "Priority only", "VIP senders and conversations you follow."),
-        ("none", "Nothing", "Only conversations you follow, and security alerts."),
+        ("all", String(localized: "All new mail"), String(localized: "Every message that reaches the inbox.")),
+        ("priority", String(localized: "Priority only"), String(localized: "VIP senders and conversations you follow.")),
+        ("none", String(localized: "Nothing", comment: "Notification filter: alert about nothing"), String(localized: "Only conversations you follow, and security alerts.")),
     ]
 
     var body: some View {
         NavigationStack {
-            Group {
+            VStack(spacing: 0) {
+                GMOfflineBanner()
                 if let s = settings {
                     form(s)
+                } else if let loadError {
+                    GMErrorState(message: loadError) { attempt += 1 }
                 } else {
-                    VStack(spacing: 12) {
-                        Text(loadError ?? "Checking your settings…")
-                            .foregroundColor(loadError == nil ? GM.textSecondary : GM.error)
-                            .multilineTextAlignment(.center)
-                        if loadError != nil { Button("Try again") { attempt += 1 } }
-                    }
-                    .padding(24)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    GMSkeletonBlock(lines: 6).padding(.horizontal, 20)
+                        .gmMaxWidth(GMLayout.form)
+                    Spacer(minLength: 0)
                 }
             }
             .navigationTitle("Notification filters")
@@ -48,16 +47,19 @@ struct NotificationFiltersView: View {
 
     private func load() async {
         loadError = nil
-        guard let token = SessionStore.token else { loadError = "Sign in again."; return }
+        guard let token = SessionStore.token else { loadError = String(localized: "Sign in again."); return }
         do {
             if let read = try await ApiClient.profile(token: token).profile?.settings?.notifications {
                 NotificationPolicy.store(read, account: SessionStore.address)
                 settings = read
             } else {
-                loadError = "Your notification settings could not be read."
+                loadError = String(localized: "Your notification settings could not be read.")
             }
         } catch {
-            loadError = (error as? ApiError)?.userMessage ?? "Your notification settings could not be read."
+            loadError = (error as? ApiError)?.userMessage ?? String(localized: "Your notification settings could not be read.")
+            // Offline or a failed read: keep the last stored settings on
+            // screen under the offline banner rather than an error page.
+            if settings == nil { settings = NotificationPolicy.cached(account: SessionStore.address) }
         }
     }
 
@@ -93,6 +95,26 @@ struct NotificationFiltersView: View {
             v.range(of: "^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\\.)+[a-z]{2,}$", options: .regularExpression) != nil
     }
 
+    /// Label + action rows: side by side normally, stacked at the accessibility
+    /// text sizes where a long address and a button no longer fit across.
+    @ViewBuilder private func labelActionRow<Label: View, Action: View>(
+        @ViewBuilder label: () -> Label,
+        @ViewBuilder action: () -> Action
+    ) -> some View {
+        if dts.isAccessibilitySize {
+            VStack(alignment: .leading, spacing: 8) {
+                label()
+                action()
+            }
+        } else {
+            HStack {
+                label()
+                Spacer()
+                action()
+            }
+        }
+    }
+
     @ViewBuilder private func form(_ s: NotificationSettingsInfo) -> some View {
         let zone = TimeZone.current.identifier
         Form {
@@ -104,7 +126,9 @@ struct NotificationFiltersView: View {
                         HStack {
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(mode.title).foregroundColor(GM.textPrimary)
+                                    .fixedSize(horizontal: false, vertical: true)
                                 Text(mode.detail).font(.footnote).foregroundColor(GM.textSecondary)
+                                    .fixedSize(horizontal: false, vertical: true)
                             }
                             Spacer()
                             if s.mode == mode.value {
@@ -143,7 +167,7 @@ struct NotificationFiltersView: View {
                         get: { Self.date(s.quietHours.start) },
                         set: { d in
                             let t = Self.clock(d)
-                            if t == s.quietHours.end { note = "Quiet hours need to start and end at different times." }
+                            if t == s.quietHours.end { note = String(localized: "Quiet hours need to start and end at different times.") }
                             else if t != s.quietHours.start { change { $0.quietHours.start = t; $0.quietHours.timeZone = zone } }
                         }), displayedComponents: .hourAndMinute)
                         .disabled(saving)
@@ -151,7 +175,7 @@ struct NotificationFiltersView: View {
                         get: { Self.date(s.quietHours.end) },
                         set: { d in
                             let t = Self.clock(d)
-                            if t == s.quietHours.start { note = "Quiet hours need to start and end at different times." }
+                            if t == s.quietHours.start { note = String(localized: "Quiet hours need to start and end at different times.") }
                             else if t != s.quietHours.end { change { $0.quietHours.end = t; $0.quietHours.timeZone = zone } }
                         }), displayedComponents: .hourAndMinute)
                         .disabled(saving)
@@ -166,7 +190,7 @@ struct NotificationFiltersView: View {
             }
 
             Section {
-                HStack {
+                GMAdaptiveStack(spacing: 8) {
                     TextField("Add a VIP", text: $vipInput)
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
@@ -175,10 +199,11 @@ struct NotificationFiltersView: View {
                     Button("Add") {
                         let v = vipInput.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
                             .replacingOccurrences(of: "^@", with: "", options: .regularExpression)
-                        guard Self.validVip(v) else { note = "\"\(v)\" is not an address or a domain."; return }
+                        guard Self.validVip(v) else { note = String(localized: "\"\(v)\" is not an address or a domain."); return }
                         vipInput = ""
-                        change("Added \(v).") { st in st.vipSenders.removeAll { $0 == v }; st.vipSenders.append(v) }
+                        change(String(localized: "Added \(v).")) { st in st.vipSenders.removeAll { $0 == v }; st.vipSenders.append(v) }
                     }
+                    .buttonStyle(.borderless)
                     .disabled(saving || vipInput.trimmingCharacters(in: .whitespaces).isEmpty)
                 }
                 if s.vipSenders.isEmpty {
@@ -186,11 +211,12 @@ struct NotificationFiltersView: View {
                         .font(.footnote).foregroundColor(GM.textTertiary)
                 }
                 ForEach(s.vipSenders, id: \.self) { v in
-                    HStack {
+                    labelActionRow {
                         Text(v)
-                        Spacer()
+                            .fixedSize(horizontal: false, vertical: true)
+                    } action: {
                         Button("Remove", role: .destructive) {
-                            change("Removed \(v).") { st in st.vipSenders.removeAll { $0 == v } }
+                            change(String(localized: "Removed \(v).")) { st in st.vipSenders.removeAll { $0 == v } }
                         }
                         .buttonStyle(.borderless)
                         .disabled(saving)
@@ -203,21 +229,23 @@ struct NotificationFiltersView: View {
             }
 
             Section {
-                HStack {
+                labelActionRow {
                     Text(s.mutedThreads.isEmpty ? "No muted conversations"
                          : s.mutedThreads.count == 1 ? "1 muted conversation" : "\(s.mutedThreads.count) muted conversations")
-                    Spacer()
+                        .fixedSize(horizontal: false, vertical: true)
+                } action: {
                     if !s.mutedThreads.isEmpty {
-                        Button("Unmute all") { change("Every conversation can alert again.") { $0.mutedThreads = [] } }
+                        Button("Unmute all") { change(String(localized: "Every conversation can alert again.")) { $0.mutedThreads = [] } }
                             .buttonStyle(.borderless).disabled(saving)
                     }
                 }
-                HStack {
+                labelActionRow {
                     Text(s.watchedThreads.isEmpty ? "No followed conversations"
                          : s.watchedThreads.count == 1 ? "1 followed conversation" : "\(s.watchedThreads.count) followed conversations")
-                    Spacer()
+                        .fixedSize(horizontal: false, vertical: true)
+                } action: {
                     if !s.watchedThreads.isEmpty {
-                        Button("Clear") { change("Stopped following every conversation.") { $0.watchedThreads = [] } }
+                        Button("Clear") { change(String(localized: "Stopped following every conversation.")) { $0.watchedThreads = [] } }
                             .buttonStyle(.borderless).disabled(saving)
                     }
                 }
@@ -229,7 +257,7 @@ struct NotificationFiltersView: View {
 
             if saving || note != nil {
                 Section {
-                    Text(saving ? "Saving…" : (note ?? ""))
+                    Text(saving ? String(localized: "Saving…") : (note ?? ""))
                         .font(.footnote)
                         .foregroundColor(GM.textSecondary)
                         .accessibilityIdentifier("notify-note")

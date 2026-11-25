@@ -1,0 +1,21 @@
+/* GrapMailNotificationService — Spanish (es). */
+
+"New encrypted message" = "Nuevo mensaje cifrado";
+"New mail" = "Correo nuevo";
+"1 new message" = "1 mensaje nuevo";
+"%lld new messages" = "%lld mensajes nuevos";
+"%lld unread in the inbox" = "%lld no leídos en la bandeja de entrada";
+"Encrypted message" = "Mensaje cifrado";
+"Unknown sender" = "Remitente desconocido";
+"No subject" = "Sin asunto";
+"This was me" = "Fui yo";
+"Secure account" = "Proteger cuenta";
+"Archive" = "Archivar";
+"Mark as read" = "Marcar como leído";
+"Reply" = "Responder";
+"Send" = "Enviar";
+"Reply…" = "Responder…";
+"Reply in app" = "Responder en la app";
+"More" = "Más";
+/* Notification title: a sign-in code, then the sender */
+"%@ · %@" = "%@ · %@";

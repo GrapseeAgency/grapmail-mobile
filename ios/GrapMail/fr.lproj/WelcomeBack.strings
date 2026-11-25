@@ -1,0 +1,34 @@
+/*
+  GrapMail — WelcomeBack string table (fr). Translated from en.lproj/WelcomeBack.strings.
+  Keys are the English source text; keep them and their placeholders unchanged.
+*/
+
+/* MARK: - Welcome-back screen */
+"Continue as %@" = "Continuer en tant que %@";
+"Signing in…" = "Connexion…";
+"For your security, please sign in again." = "Pour votre sécurité, veuillez vous reconnecter.";
+"You were signed out from another device." = "Vous avez été déconnecté depuis un autre appareil.";
+"You're offline. Connect to sign in." = "Vous êtes hors ligne. Connectez-vous à Internet pour vous connecter.";
+"That password isn't right." = "Ce mot de passe est incorrect.";
+"Use another account" = "Utiliser un autre compte";
+"Remove from this device" = "Retirer de cet appareil";
+"Back" = "Retour";
+"Address beginning %@, ending %@ at %@" = "Adresse commençant par %1$@, se terminant par %2$@, chez %3$@";
+"Address beginning %@ at %@" = "Adresse commençant par %1$@, chez %2$@";
+"Signed in as %@" = "Connecté en tant que %@";
+
+/* MARK: - Remove from this device */
+"Remove %@ from this device?" = "Retirer %@ de cet appareil ?";
+"Your account and mail aren't affected. You'll need your address and password to sign in here again." = "Votre compte et vos e-mails ne sont pas modifiés. Vous aurez besoin de votre adresse et de votre mot de passe pour vous reconnecter ici.";
+"Removed from this device" = "Retiré de cet appareil";
+
+/* MARK: - Account chooser */
+"Choose an account" = "Choisissez un compte";
+"Signed out on this device" = "Déconnecté sur cet appareil";
+"Continue as %@, %@" = "Continuer en tant que %1$@, %2$@";
+"More options for %@" = "Plus d’options pour %@";
+
+/* MARK: - Sign-out confirmation (account switcher) */
+"Sign out of %@?" = "Se déconnecter de %@ ?";
+"Also remove from this device" = "Retirer aussi de cet appareil";
+"You'll need to type your address next time." = "Vous devrez saisir votre adresse la prochaine fois.";

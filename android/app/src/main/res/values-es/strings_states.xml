@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Loading / empty / error / offline states (Spanish). Translated from values/strings_states.xml. -->
+<resources>
+    <!-- Shared -->
+    <string name="states_loading">Cargando…</string>
+    <string name="states_offline_banner">No tienes conexión. Se muestra lo último que se cargó; lo que necesite la red esperará hasta que vuelvas a conectarte.</string>
+    <string name="states_error_title">Algo salió mal</string>
+    <string name="states_error_body">No se pudo cargar en este momento. Revisa tu conexión e inténtalo de nuevo.</string>
+    <string name="states_error_offline_body">No tienes conexión. Conéctate a una red Wi-Fi o de datos móviles e inténtalo de nuevo.</string>
+    <string name="states_retry">Reintentar</string>
+
+    <!-- Labels -->
+    <string name="states_labels_loading">Cargando etiquetas…</string>
+    <string name="states_labels_failed_title">No se pudieron cargar las etiquetas</string>
+
+    <!-- Scheduled -->
+    <string name="states_scheduled_loading">Cargando correos programados…</string>
+    <string name="states_scheduled_failed_title">No se pudieron cargar los correos programados</string>
+    <string name="states_scheduled_empty_title">No hay nada programado</string>
+
+    <!-- Contacts and files -->
+    <string name="states_contacts_loading">Reuniendo personas de tu correo…</string>
+    <string name="states_files_loading">Reuniendo archivos adjuntos…</string>
+
+    <!-- Connected mailboxes -->
+    <string name="states_providers_loading">Cargando buzones conectados…</string>
+
+    <!-- Reader -->
+    <string name="states_thread_loading">Abriendo esta conversación…</string>
+
+    <!-- Security -->
+    <string name="states_activity_failed_title">No se pudo cargar la actividad</string>
+    <string name="states_sessions_failed_title">No se pudieron cargar las sesiones</string>
+</resources>

@@ -1,0 +1,33 @@
+/* GrapMail — Reader string table (fa). Translated from en.lproj/Reader.strings.
+   Counted keys also have an entry in Reader.stringsdict, which wins over the entry here. */
+
+"You" = "شما";
+"to me" = "به من";
+"to %@" = "به %@";
+"to %lld people" = "به %lld نفر";
+"Unread" = "خوانده‌نشده";
+"%lld earlier messages" = "%lld پیام قبلی";
+"Shows the folded messages" = "پیام‌های جمع‌شده را نشان می‌دهد";
+"%lld people" = "%lld نفر";
+"%lld messages" = "%lld پیام";
+"Show quoted text" = "نمایش متن نقل‌قول‌شده";
+"Hide quoted text" = "پنهان کردن متن نقل‌قول‌شده";
+"Collapsed" = "جمع‌شده";
+"Expanded" = "بازشده";
+"Reply to %@…" = "پاسخ به %@…";
+"Reply…" = "پاسخ…";
+"Opens the editor" = "ویرایشگر را باز می‌کند";
+"Reply options" = "گزینه‌های پاسخ";
+"Quick reply" = "پاسخ سریع";
+"%lld attachments" = "%lld پیوست";
+"Save all" = "ذخیرهٔ همه";
+"Preparing…" = "در حال آماده‌سازی…";
+"Opens the share sheet, where Save to Files keeps every attachment" = "برگهٔ اشتراک‌گذاری را باز می‌کند؛ در آنجا «ذخیره در فایل‌ها» همهٔ پیوست‌ها را نگه می‌دارد";
+"Image %lld of %lld, %@" = "تصویر %1$lld از %2$lld، %3$@";
+"File" = "فایل";
+"Opens a preview" = "پیش‌نمایش را باز می‌کند";
+"Save %@" = "ذخیرهٔ %@";
+"Share %@" = "اشتراک‌گذاری %@";
+"Open" = "باز کردن";
+"Save" = "ذخیره";
+"Share" = "اشتراک‌گذاری";

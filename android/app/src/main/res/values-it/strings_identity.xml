@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="identity_settings_appearance">Aspetto</string>
+    <string name="identity_match_wallpaper_title">Abbina allo sfondo</string>
+    <string name="identity_match_wallpaper_subtitle">Usa i colori del tuo sfondo per pulsanti ed evidenziazioni. Avatar, colori di stato e testo restano quelli di GrapMail.</string>
+</resources>

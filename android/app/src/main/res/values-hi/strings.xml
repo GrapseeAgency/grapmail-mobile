@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">GrapMail</string>
+    <string name="shortcut_compose_short">मेल लिखें</string>
+    <string name="shortcut_compose_long">नया GrapMail संदेश लिखें</string>
+    <string name="shortcut_scheduled_short">शेड्यूल किए गए मेल</string>
+    <string name="shortcut_scheduled_long">भेजे जाने की प्रतीक्षा कर रहे मेल देखें और रद्द करें</string>
+    <string name="shortcut_subscriptions_short">सदस्यताएँ</string>
+    <string name="shortcut_subscriptions_long">प्रेषकों की समीक्षा करें और एक ही जगह से सदस्यता छोड़ें</string>
+    <string name="notif_channel_new_mail">नया मेल</string>
+    <string name="notif_channel_new_mail_desc">बैकग्राउंड जाँच में अपठित संदेश मिलने पर आपको सूचित करता है। GrapMail में पुश सेवा नहीं है, इसलिए ये तब आते हैं जब सिस्टम ऐप को जगाता है और ऐप खुद सर्वर से पूछता है।</string>
+    <string name="notif_channel_security">सुरक्षा अलर्ट</string>
+    <string name="notif_channel_security_desc">आपके खाते में कुछ होते ही आपको सूचित करता है: नए डिवाइस से साइन इन, पासवर्ड बदलना, भरोसेमंद डिवाइस में बदलाव। शांत समय में भी ये कभी म्यूट नहीं होते।</string>
+    <string name="widget_description">अपठित मेल एक नज़र में: GrapMail की बैकग्राउंड जाँच से संख्या</string>
+</resources>

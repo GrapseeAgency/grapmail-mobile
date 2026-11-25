@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <plurals name="reader_earlier_messages">
+        <item quantity="one">%d message plus ancien</item>
+        <item quantity="other">%d messages plus anciens</item>
+    </plurals>
+    <plurals name="reader_participants">
+        <item quantity="one">%d personne</item>
+        <item quantity="other">%d personnes</item>
+    </plurals>
+    <plurals name="reader_message_count">
+        <item quantity="one">%d message</item>
+        <item quantity="other">%d messages</item>
+    </plurals>
+    <string name="reader_you">Vous</string>
+    <string name="reader_unread">Non lu</string>
+    <string name="reader_earlier_action">afficher les messages repliés</string>
+    <string name="reader_open_message_action">ouvrir ce message</string>
+    <string name="reader_quoted_show">Afficher le texte cité</string>
+    <string name="reader_quoted_hide">Masquer le texte cité</string>
+    <string name="reader_state_expanded">Déplié</string>
+    <string name="reader_state_collapsed">Replié</string>
+    <string name="reader_reply_to">Répondre à %1$s…</string>
+    <string name="reader_reply_fallback">Répondre…</string>
+    <string name="reader_reply_options">Options de réponse</string>
+    <string name="reader_quick_reply">Réponse rapide</string>
+    <string name="reader_attach_share_chooser">Partager la pièce jointe</string>
+    <string name="reader_attach_view_image">voir l’image</string>
+    <string name="reader_attach_save_named">Enregistrer %1$s</string>
+    <string name="reader_attach_share_named">Partager %1$s</string>
+    <string name="reader_attach_share_nothing">Aucune application de cet appareil ne peut partager ce fichier.</string>
+    <string name="reader_viewer_position">%1$d sur %2$d</string>
+    <string name="reader_viewer_too_large">Cette image ne peut pas être affichée ici.</string>
+    <string name="compose_r9_leave_title">Quitter ce message ?</string>
+    <string name="compose_r9_leave_attachments">Les brouillons ne gardent pas encore les pièces jointes. Enregistrez le texte sans elles, ou continuez la rédaction.</string>
+    <string name="compose_r9_save_text_only">Enregistrer le texte seul</string>
+    <string name="compose_r9_draft_failed_title">Ce brouillon n’a pas été enregistré</string>
+    <string name="compose_r9_leave_without_saving">Quitter sans enregistrer</string>
+    <string name="compose_r9_encrypt_failed">Ce message n’a pas pu être chiffré, donc rien n’a été envoyé.</string>
+    <string name="compose_editor_toolbar">Mise en forme du texte</string>
+    <string name="compose_editor_bold">Gras</string>
+    <string name="compose_editor_italic">Italique</string>
+    <string name="compose_editor_underline">Souligné</string>
+    <string name="compose_editor_strike">Barré</string>
+    <string name="compose_editor_bullets">Puces</string>
+    <string name="compose_editor_numbered">Numérotée</string>
+    <string name="compose_editor_text_colour">Couleur du texte</string>
+    <string name="compose_editor_black">Noir</string>
+    <string name="compose_editor_blue">Bleu</string>
+    <string name="compose_editor_red">Rouge</string>
+    <string name="compose_editor_green">Vert</string>
+    <string name="compose_editor_highlight">Surligner</string>
+    <string name="compose_editor_highlight_colour">Couleur de surlignage</string>
+    <string name="compose_editor_yellow">Jaune</string>
+    <string name="compose_editor_pink">Rose</string>
+    <string name="compose_editor_font">Police</string>
+    <string name="compose_editor_sans">Sans empattement</string>
+    <string name="compose_editor_serif">Serif</string>
+    <string name="compose_editor_mono">Monospace</string>
+    <string name="compose_editor_larger">Plus grand</string>
+    <string name="compose_editor_clear">Effacer la mise en forme</string>
+    <string name="compose_editor_image">Image</string>
+    <string name="compose_editor_insert_image">Insérer une image</string>
+</resources>

@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">GrapMail</string>
+    <string name="shortcut_compose_short">Escrever e-mail</string>
+    <string name="shortcut_compose_long">Escrever uma nova mensagem no GrapMail</string>
+    <string name="shortcut_scheduled_short">Envios programados</string>
+    <string name="shortcut_scheduled_long">Ver e cancelar e-mails aguardando envio</string>
+    <string name="shortcut_subscriptions_short">Assinaturas</string>
+    <string name="shortcut_subscriptions_long">Revise remetentes e cancele inscrições em um só lugar</string>
+    <string name="notif_channel_new_mail">Novo e-mail</string>
+    <string name="notif_channel_new_mail_desc">
+        Avisa quando uma verificação em segundo plano encontra mensagens não lidas.
+        O GrapMail não tem serviço push, então esses avisos vêm do próprio app
+        consultando o servidor quando o sistema o ativa.
+    </string>
+    <string name="notif_channel_security">Alertas de segurança</string>
+    <string name="notif_channel_security_desc">
+        Avisa assim que algo acontece na sua conta: um login em um
+        dispositivo novo, uma troca de senha ou uma mudança de dispositivo confiável.
+        Nunca são silenciados pelo horário de silêncio.
+    </string>
+    <string name="widget_description">E-mails não lidos num relance: contagens das verificações em segundo plano do GrapMail</string>
+</resources>

@@ -1,0 +1,21 @@
+/* GrapMailNotificationService — Korean. */
+
+"New encrypted message" = "새 암호화 메일";
+"New mail" = "새 메일";
+"1 new message" = "새 메일 1개";
+"%lld new messages" = "새 메일 %lld개";
+"%lld unread in the inbox" = "받은편지함에 읽지 않은 메일 %lld개";
+"Encrypted message" = "암호화된 메일";
+"Unknown sender" = "알 수 없는 발신자";
+"No subject" = "제목 없음";
+"This was me" = "본인입니다";
+"Secure account" = "계정 보호";
+"Archive" = "보관";
+"Mark as read" = "읽음으로 표시";
+"Reply" = "답장";
+"Send" = "보내기";
+"Reply…" = "답장…";
+"Reply in app" = "앱에서 답장";
+"More" = "더보기";
+/* Notification title: a sign-in code, then the sender */
+"%@ · %@" = "%@ · %@";

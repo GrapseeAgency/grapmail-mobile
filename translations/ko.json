@@ -1,0 +1,73 @@
+{
+ "android": {
+  "strings_r9_reader.xml": {
+   "reader_earlier_messages": {"one": "이전 메시지 %d개", "other": "이전 메시지 %d개"},
+   "reader_participants": {"one": "%d명", "other": "%d명"},
+   "reader_message_count": {"one": "메시지 %d개", "other": "메시지 %d개"},
+   "reader_you": "나",
+   "reader_unread": "읽지 않음",
+   "reader_earlier_action": "접힌 메시지 보기",
+   "reader_open_message_action": "이 메시지 열기",
+   "reader_quoted_show": "인용된 텍스트 보기",
+   "reader_quoted_hide": "인용된 텍스트 숨기기",
+   "reader_state_expanded": "펼침",
+   "reader_state_collapsed": "접힘",
+   "reader_reply_to": "%1$s에게 답장…",
+   "reader_reply_fallback": "답장…",
+   "reader_reply_options": "답장 옵션",
+   "reader_quick_reply": "빠른 답장",
+   "reader_attach_share_chooser": "첨부파일 공유",
+   "reader_attach_view_image": "사진 보기",
+   "reader_attach_save_named": "%1$s 저장",
+   "reader_attach_share_named": "%1$s 공유",
+   "reader_attach_share_nothing": "이 기기에는 이 파일을 공유할 수 있는 앱이 없습니다.",
+   "reader_viewer_position": "%1$d / %2$d",
+   "reader_viewer_too_large": "이 사진은 여기에서 미리 볼 수 없습니다.",
+   "compose_r9_leave_title": "이 메시지를 나갈까요?",
+   "compose_r9_leave_attachments": "임시보관함은 아직 첨부파일을 보관하지 못합니다. 첨부 없이 본문만 임시저장하거나 계속 편집하세요.",
+   "compose_r9_save_text_only": "본문만 저장",
+   "compose_r9_draft_failed_title": "이 임시보관을 저장하지 못했습니다",
+   "compose_r9_leave_without_saving": "저장하지 않고 나가기",
+   "compose_r9_encrypt_failed": "이 메시지를 암호화하지 못해 아무것도 전송되지 않았습니다.",
+   "compose_editor_toolbar": "텍스트 서식",
+   "compose_editor_bold": "굵게",
+   "compose_editor_italic": "기울임",
+   "compose_editor_underline": "밑줄",
+   "compose_editor_strike": "취소선",
+   "compose_editor_bullets": "글머리 기호",
+   "compose_editor_numbered": "번호 매기기",
+   "compose_editor_text_colour": "글자 색",
+   "compose_editor_black": "검정",
+   "compose_editor_blue": "파랑",
+   "compose_editor_red": "빨강",
+   "compose_editor_green": "초록",
+   "compose_editor_highlight": "강조",
+   "compose_editor_highlight_colour": "강조 색",
+   "compose_editor_yellow": "노랑",
+   "compose_editor_pink": "분홍",
+   "compose_editor_font": "글꼴",
+   "compose_editor_sans": "산세리프",
+   "compose_editor_larger": "크게",
+   "compose_editor_clear": "서식 지우기",
+   "compose_editor_image": "이미지",
+   "compose_editor_insert_image": "이미지 삽입"
+  },
+  "strings_r9_platform.xml": {
+   "r9_platform_notif_channel_new_mail_desc": "받은편지함에 새 메시지가 도착하면 알려줍니다.",
+   "r9_platform_price_per_week": "주당 %1$s",
+   "r9_platform_price_per_month": "월 %1$s",
+   "r9_platform_price_per_3_months": "3개월마다 %1$s",
+   "r9_platform_price_per_6_months": "6개월마다 %1$s",
+   "r9_platform_price_per_year": "연 %1$s"
+  },
+  "strings_r9_mailbox.xml": {
+   "mail_sendlater_channel_name": "예약 발송",
+   "mail_sendlater_channel_desc": "발송을 기다리는 메시지의 남은 시간"
+  },
+  "strings_identity.xml": {
+   "identity_settings_appearance": "화면 스타일",
+   "identity_match_wallpaper_title": "배경화면과 맞추기",
+   "identity_match_wallpaper_subtitle": "버튼과 강조에 배경화면 색을 사용합니다. 아바타, 상태 색, 텍스트는 GrapMail 색을 유지합니다."
+  }
+ }
+}

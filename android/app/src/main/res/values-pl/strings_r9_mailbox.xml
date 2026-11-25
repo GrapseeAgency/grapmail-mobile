@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="mail_sendlater_channel_name">Wysyłka zaplanowana</string>
+    <string name="mail_sendlater_channel_desc">Odliczanie dla wiadomości oczekujących na wysłanie</string>
+</resources>

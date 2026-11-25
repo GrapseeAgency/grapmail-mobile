@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <plurals name="reader_earlier_messages">
+        <item quantity="one">%d ältere Nachricht</item>
+        <item quantity="other">%d ältere Nachrichten</item>
+    </plurals>
+    <plurals name="reader_participants">
+        <item quantity="one">%d Person</item>
+        <item quantity="other">%d Personen</item>
+    </plurals>
+    <plurals name="reader_message_count">
+        <item quantity="one">%d Nachricht</item>
+        <item quantity="other">%d Nachrichten</item>
+    </plurals>
+    <string name="reader_you">Du</string>
+    <string name="reader_unread">Ungelesen</string>
+    <string name="reader_earlier_action">die eingeklappten Nachrichten anzeigen</string>
+    <string name="reader_open_message_action">diese Nachricht öffnen</string>
+    <string name="reader_quoted_show">Zitierten Text anzeigen</string>
+    <string name="reader_quoted_hide">Zitierten Text ausblenden</string>
+    <string name="reader_state_expanded">Geöffnet</string>
+    <string name="reader_state_collapsed">Zugeklappt</string>
+    <string name="reader_reply_to">Antworten an %1$s…</string>
+    <string name="reader_reply_fallback">Antworten…</string>
+    <string name="reader_reply_options">Antwortoptionen</string>
+    <string name="reader_quick_reply">Schnellantwort</string>
+    <string name="reader_attach_share_chooser">Anhang teilen</string>
+    <string name="reader_attach_view_image">das Bild ansehen</string>
+    <string name="reader_attach_save_named">%1$s speichern</string>
+    <string name="reader_attach_share_named">%1$s teilen</string>
+    <string name="reader_attach_share_nothing">Keine App auf diesem Gerät kann diese Datei teilen.</string>
+    <string name="reader_viewer_position">%1$d von %2$d</string>
+    <string name="reader_viewer_too_large">Dieses Bild kann hier nicht angezeigt werden.</string>
+    <string name="compose_r9_leave_title">Diese Nachricht verlassen?</string>
+    <string name="compose_r9_leave_attachments">Entwürfe können noch keine Anhänge behalten. Speichere den Text ohne sie als Entwurf oder bearbeite weiter.</string>
+    <string name="compose_r9_save_text_only">Nur Text speichern</string>
+    <string name="compose_r9_draft_failed_title">Dieser Entwurf wurde nicht gespeichert</string>
+    <string name="compose_r9_leave_without_saving">Ohne Speichern verlassen</string>
+    <string name="compose_r9_encrypt_failed">Diese Nachricht konnte nicht verschlüsselt werden, deshalb wurde nichts gesendet.</string>
+    <string name="compose_editor_toolbar">Textformatierung</string>
+    <string name="compose_editor_bold">Fett</string>
+    <string name="compose_editor_italic">Kursiv</string>
+    <string name="compose_editor_underline">Unterstrichen</string>
+    <string name="compose_editor_strike">Durchgestrichen</string>
+    <string name="compose_editor_bullets">Aufzählung</string>
+    <string name="compose_editor_numbered">Nummeriert</string>
+    <string name="compose_editor_text_colour">Textfarbe</string>
+    <string name="compose_editor_black">Schwarz</string>
+    <string name="compose_editor_blue">Blau</string>
+    <string name="compose_editor_red">Rot</string>
+    <string name="compose_editor_green">Grün</string>
+    <string name="compose_editor_highlight">Hervorheben</string>
+    <string name="compose_editor_highlight_colour">Hervorhebungsfarbe</string>
+    <string name="compose_editor_yellow">Gelb</string>
+    <string name="compose_editor_pink">Rosa</string>
+    <string name="compose_editor_font">Schriftart</string>
+    <string name="compose_editor_sans">Serifenlos</string>
+    <string name="compose_editor_serif">Serif</string>
+    <string name="compose_editor_mono">Monospace</string>
+    <string name="compose_editor_larger">Größer</string>
+    <string name="compose_editor_clear">Zurücksetzen</string>
+    <string name="compose_editor_image">Bild</string>
+    <string name="compose_editor_insert_image">Bild einfügen</string>
+</resources>

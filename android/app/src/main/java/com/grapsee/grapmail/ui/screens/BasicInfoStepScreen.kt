@@ -9,6 +9,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -48,14 +49,15 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.grapsee.grapmail.logic.SignUpViewModel
+import com.grapsee.grapmail.logic.GenderOption
 import com.grapsee.grapmail.logic.Validators
 import com.grapsee.grapmail.ui.components.GradientButton
 import com.grapsee.grapmail.ui.theme.LocalPalette
+import androidx.compose.ui.res.stringResource
+import com.grapsee.grapmail.R
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringArrayResource
 
-private val MONTHS = listOf(
-    "January", "February", "March", "April", "May", "June",
-    "July", "August", "September", "October", "November", "December",
-)
 
 /**
  * Step 2 — "Basic Info" — founder design verbatim: the bordered Profile Photo
@@ -103,15 +105,17 @@ fun BasicInfoStepScreen(vm: SignUpViewModel, onBack: () -> Unit, onSignIn: () ->
         }
     }
 
+    val months = stringArrayResource(R.array.acct_months).toList()
+    val fontScale = androidx.compose.ui.platform.LocalDensity.current.fontScale
     WizardScaffold(
         step = 2,
-        title = "Basic Info",
-        subtitle = AnnotatedSubtitle(rest = "Tell us a little more about yourself. This helps us make your experience more personal."),
+        title = stringResource(R.string.acct_basic_info),
+        subtitle = AnnotatedSubtitle(rest = stringResource(R.string.acct_tell_us_a_little_more_about_yourself)),
         onBack = onBack,
         onSignIn = onSignIn,
         bottomBar = {
             GradientButton(
-                "Next",
+                stringResource(R.string.acct_next),
                 onClick = {
                     vm.update { copy(birthdayIso = iso) }
                     if (iso != null && birthError == null && !photoLoading) onNext()
@@ -124,7 +128,7 @@ fun BasicInfoStepScreen(vm: SignUpViewModel, onBack: () -> Unit, onSignIn: () ->
             )
         },
     ) {
-        if (photoError) Text("Couldn’t open that photo. Choose another image.", color = palette.error)
+        if (photoError) Text(stringResource(R.string.acct_couldnt_open_that_photo_choose), color = palette.error)
         // ── Profile Photo card ──────────────────────────────────────────────
         Row(
             Modifier
@@ -145,7 +149,7 @@ fun BasicInfoStepScreen(vm: SignUpViewModel, onBack: () -> Unit, onSignIn: () ->
                     if (bitmap != null) {
                         androidx.compose.foundation.Image(
                             bitmap = bitmap!!,
-                            contentDescription = "Profile photo",
+                            contentDescription = stringResource(R.string.acct_profile_photo),
                             modifier = Modifier.size(72.dp).clip(CircleShape),
                             contentScale = androidx.compose.ui.layout.ContentScale.Crop,
                         )
@@ -177,12 +181,12 @@ fun BasicInfoStepScreen(vm: SignUpViewModel, onBack: () -> Unit, onSignIn: () ->
             Spacer(Modifier.width(16.dp))
             Column {
                 Row {
-                    Text("Profile Photo ", fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = palette.textPrimary)
-                    Text("(Optional)", fontSize = 13.sp, color = palette.textTertiary)
+                    Text(stringResource(R.string.acct_profile_photo_2), fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = palette.textPrimary)
+                    Text(stringResource(R.string.acct_optional), fontSize = 13.sp, color = palette.textTertiary)
                 }
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    "Add a photo to make your account more personal. You can change this later in settings.",
+                    stringResource(R.string.acct_add_a_photo_to_make_your_account),
                     fontSize = 13.sp, lineHeight = 18.sp, color = palette.textSecondary,
                 )
                 Spacer(Modifier.height(10.dp))
@@ -203,7 +207,7 @@ fun BasicInfoStepScreen(vm: SignUpViewModel, onBack: () -> Unit, onSignIn: () ->
                         Icon(Icons.Rounded.AddAPhoto, contentDescription = null, tint = palette.primarySolid, modifier = Modifier.size(15.dp))
                         Spacer(Modifier.width(6.dp))
                         Text(
-                            if (photoUri != null) "Change Photo" else "Choose Photo",
+                            if (photoUri != null) stringResource(R.string.acct_change_photo) else stringResource(R.string.acct_choose_photo),
                             fontSize = 13.sp, fontWeight = FontWeight.Medium, color = palette.primarySolid,
                         )
                     }
@@ -217,31 +221,56 @@ fun BasicInfoStepScreen(vm: SignUpViewModel, onBack: () -> Unit, onSignIn: () ->
         Row(verticalAlignment = Alignment.CenterVertically) {
             Icon(Icons.Rounded.CalendarMonth, contentDescription = null, tint = palette.textPrimary, modifier = Modifier.size(18.dp))
             Spacer(Modifier.width(8.dp))
-            Text("Birthday ", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = palette.textPrimary)
-            Text("(Required)", fontSize = 13.sp, color = palette.textTertiary)
+            Text(stringResource(R.string.acct_birthday), fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = palette.textPrimary)
+            Text(stringResource(R.string.acct_required), fontSize = 13.sp, color = palette.textTertiary)
         }
         Spacer(Modifier.height(10.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            DropdownField(
-                value = state.bMonth.toIntOrNull()?.let { MONTHS[it - 1] } ?: "",
-                options = MONTHS,
-                placeholder = "Month",
-                modifier = Modifier.weight(1.4f),
-            ) { pick -> vm.update { copy(bMonth = (MONTHS.indexOf(pick) + 1).toString()) } }
-            DropdownField(
-                value = state.bDay.ifEmpty { "" },
-                options = (1..31).map { it.toString() },
-                placeholder = "Day",
-                modifier = Modifier.weight(1f),
-            ) { pick -> vm.update { copy(bDay = pick) } }
-            DropdownField(
-                value = state.bYear.ifEmpty { "" },
-                // Youngest eligible cohort first: the 13-to-20 group signs up
-                // most and their years sit at the top of the list.
-                options = ((java.util.Calendar.getInstance().get(java.util.Calendar.YEAR) - 13) downTo 1936).map { it.toString() },
-                placeholder = "Year",
-                modifier = Modifier.weight(1.1f),
-            ) { pick -> vm.update { copy(bYear = pick) } }
+        // Three across, as designed; at large font sizes or on very narrow
+        // windows Month takes its own row (so "September" is never clipped)
+        // and Day / Year share the next one.
+        BoxWithConstraints(Modifier.fillMaxWidth()) {
+            val stack = fontScale > 1.3f || maxWidth < 260.dp
+            val month: @Composable (Modifier) -> Unit = { m ->
+                DropdownField(
+                    value = state.bMonth.toIntOrNull()?.let { months.getOrNull(it - 1) } ?: "",
+                    options = months,
+                    placeholder = stringResource(R.string.acct_month),
+                    modifier = m,
+                ) { pick -> vm.update { copy(bMonth = (months.indexOf(pick) + 1).toString()) } }
+            }
+            val day: @Composable (Modifier) -> Unit = { m ->
+                DropdownField(
+                    value = state.bDay.ifEmpty { "" },
+                    options = (1..31).map { it.toString() },
+                    placeholder = stringResource(R.string.acct_day),
+                    modifier = m,
+                ) { pick -> vm.update { copy(bDay = pick) } }
+            }
+            val year: @Composable (Modifier) -> Unit = { m ->
+                DropdownField(
+                    value = state.bYear.ifEmpty { "" },
+                    // Youngest eligible cohort first: the 13-to-20 group signs up
+                    // most and their years sit at the top of the list.
+                    options = ((java.util.Calendar.getInstance().get(java.util.Calendar.YEAR) - 13) downTo 1936).map { it.toString() },
+                    placeholder = stringResource(R.string.acct_year),
+                    modifier = m,
+                ) { pick -> vm.update { copy(bYear = pick) } }
+            }
+            if (!stack) {
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    month(Modifier.weight(1.4f))
+                    day(Modifier.weight(1f))
+                    year(Modifier.weight(1.1f))
+                }
+            } else {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    month(Modifier.fillMaxWidth())
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        day(Modifier.weight(1f))
+                        year(Modifier.weight(1.1f))
+                    }
+                }
+            }
         }
         Spacer(Modifier.height(8.dp))
         if (birthError != null) {
@@ -250,7 +279,7 @@ fun BasicInfoStepScreen(vm: SignUpViewModel, onBack: () -> Unit, onSignIn: () ->
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Rounded.Info, contentDescription = null, tint = palette.primarySolid, modifier = Modifier.size(14.dp))
                 Spacer(Modifier.width(6.dp))
-                Text("You must be 13 or older to create an account.", fontSize = 12.sp, color = palette.textTertiary)
+                Text(stringResource(R.string.acct_you_must_be_13_or_older_to_create_an), fontSize = 12.sp, color = palette.textTertiary)
             }
         }
 
@@ -260,18 +289,34 @@ fun BasicInfoStepScreen(vm: SignUpViewModel, onBack: () -> Unit, onSignIn: () ->
         Row(verticalAlignment = Alignment.CenterVertically) {
             Icon(Icons.Rounded.Man, contentDescription = null, tint = palette.textPrimary, modifier = Modifier.size(18.dp))
             Spacer(Modifier.width(8.dp))
-            Text("Gender ", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = palette.textPrimary)
-            Text("(Optional)", fontSize = 13.sp, color = palette.textTertiary)
+            Text(stringResource(R.string.acct_gender), fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = palette.textPrimary)
+            Text(stringResource(R.string.acct_optional), fontSize = 13.sp, color = palette.textTertiary)
         }
         Spacer(Modifier.height(10.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            Box(Modifier.weight(1f)) { GenderCard("Female", Icons.Rounded.Woman, state.gender == "Female") { vm.update { copy(gender = if (gender == "Female") null else "Female") } } }
-            Box(Modifier.weight(1f)) { GenderCard("Male", Icons.Rounded.Man, state.gender == "Male") { vm.update { copy(gender = if (gender == "Male") null else "Male") } } }
-        }
-        Spacer(Modifier.height(10.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            Box(Modifier.weight(1f)) { GenderCard("Rather not say", Icons.Rounded.Person, state.gender == "Rather not say") { vm.update { copy(gender = if (gender == "Rather not say") null else "Rather not say") } } }
-            Box(Modifier.weight(1f)) { GenderCard("Custom", Icons.Rounded.AccountCircle, state.gender == "Custom") { vm.update { copy(gender = if (gender == "Custom") null else "Custom") } } }
+        // 2 x 2, as designed; one per row at large font sizes or on very narrow
+        // windows, so "Prefer not to say" never squeezes into half a row.
+        // The account stores the code (GenderOption); only the label is translated.
+        val genders = listOf(
+            Triple(stringResource(R.string.profile_gender_female), Icons.Rounded.Woman, GenderOption.FEMALE),
+            Triple(stringResource(R.string.profile_gender_male), Icons.Rounded.Man, GenderOption.MALE),
+            Triple(stringResource(R.string.profile_gender_prefer_not_to_say), Icons.Rounded.Person, GenderOption.PREFER_NOT_TO_SAY),
+            Triple(stringResource(R.string.profile_gender_custom), Icons.Rounded.AccountCircle, GenderOption.CUSTOM),
+        )
+        BoxWithConstraints(Modifier.fillMaxWidth()) {
+            val perRow = if (fontScale > 1.3f || maxWidth < 260.dp) 1 else 2
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                genders.chunked(perRow).forEach { rowItems ->
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        rowItems.forEach { (label, icon, option) ->
+                            Box(Modifier.weight(1f)) {
+                                GenderCard(label, icon, GenderOption.normalize(state.gender) == option) {
+                                    vm.update { copy(gender = if (GenderOption.normalize(gender) == option) null else option) }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 }

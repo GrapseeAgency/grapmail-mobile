@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  First-time feature tips (ui/components/FeatureTip.kt, logic/FeatureTipsStore.kt).
+  One tip per app session, anchored to the control it describes. Titles stay
+  at four words or fewer, bodies at one sentence under 90 characters. The same
+  English text as iOS's "Feature tips" block (GrapMail/en.lproj/Localizable.strings),
+  except the long-press tip: on Android a long press selects, on iOS it previews.
+-->
+<resources>
+    <string name="tip_got_it">Rozumiem</string>
+    <string name="tip_close">Zamknij wskazówkę</string>
+
+    <string name="tip_swipe_title">Przesuń, by uporządkować</string>
+    <string name="tip_swipe_body">Przesuń wiadomość w prawo, by ją zarchiwizować, lub w lewo, by przenieść ją do kosza.</string>
+
+    <string name="tip_long_press_title">Zaznacz kilka naraz</string>
+    <string name="tip_long_press_body">Dotknij i przytrzymaj wiadomość, by ją zaznaczyć, a potem dotknij inne, by je dodać.</string>
+
+    <string name="tip_categories_title">Podziel skrzynkę</string>
+    <string name="tip_categories_body">Dotknij etykiety, by pokazać tylko Priorytet, Osoby, Newslettery i inne.</string>
+
+    <string name="tip_screener_title">Sprawdzaj nowych nadawców</string>
+    <string name="tip_screener_body">Oczekujące na zatwierdzenie w menu wstrzymuje pocztę od nowych nadawców, dopóki ich nie dopuścisz.</string>
+
+    <string name="tip_accounts_title">Szybko zmieniaj konta</string>
+    <string name="tip_accounts_body">Dotknij swojego zdjęcia, by zmienić konto lub dodać kolejne.</string>
+
+    <string name="tip_snooze_title">Odłóż na później</string>
+    <string name="tip_snooze_body">Dotknij Więcej, by odłożyć zaznaczoną pocztę na lepszy moment.</string>
+</resources>

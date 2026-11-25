@@ -1,0 +1,21 @@
+/* GrapMailNotificationService — base English table. */
+
+"New encrypted message" = "Yeni şifreli ileti";
+"New mail" = "Yeni posta";
+"1 new message" = "1 yeni ileti";
+"%lld new messages" = "%lld yeni ileti";
+"%lld unread in the inbox" = "Gelen kutusunda %lld okunmamış";
+"Encrypted message" = "Şifreli ileti";
+"Unknown sender" = "Bilinmeyen gönderen";
+"No subject" = "Konu yok";
+"This was me" = "Bu bendim";
+"Secure account" = "Hesabı koru";
+"Archive" = "Arşivle";
+"Mark as read" = "Okundu olarak işaretle";
+"Reply" = "Yanıtla";
+"Send" = "Gönder";
+"Reply…" = "Yanıtla…";
+"Reply in app" = "Uygulamada yanıtla";
+"More" = "Diğer";
+/* Notification title: a sign-in code, then the sender */
+"%@ · %@" = "%@ · %@";

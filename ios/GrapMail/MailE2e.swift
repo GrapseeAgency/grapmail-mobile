@@ -96,7 +96,7 @@ enum MailE2e {
 
     private static func stripPrefix(_ der: Data, _ prefix: Data, _ what: String) throws -> Data {
         guard der.count == prefix.count + 32, der.prefix(prefix.count) == prefix else {
-            throw E2eError(text: "That is not a well-formed \(what) key.")
+            throw E2eError(text: String(localized: "That is not a well-formed \(what) key."))
         }
         return der.suffix(32)
     }
@@ -149,27 +149,27 @@ enum MailE2e {
 
     private static func x25519Public(_ publicKeyB64: String) throws -> Curve25519.KeyAgreement.PublicKey {
         guard let der = unb64(publicKeyB64) else {
-            throw E2eError(text: "That recipient's public key is not a usable X25519 key.")
+            throw E2eError(text: String(localized: "That recipient's public key is not a usable X25519 key."))
         }
         let raw = try stripPrefix(der, spkiPrefixX25519, "X25519 public")
         do { return try Curve25519.KeyAgreement.PublicKey(rawRepresentation: raw) }
-        catch { throw E2eError(text: "That recipient's public key is not a usable X25519 key.") }
+        catch { throw E2eError(text: String(localized: "That recipient's public key is not a usable X25519 key.")) }
     }
 
     private static func x25519Private(_ privateKeyB64: String) throws -> Curve25519.KeyAgreement.PrivateKey {
         guard let der = unb64(privateKeyB64) else {
-            throw E2eError(text: "This key record is damaged.")
+            throw E2eError(text: String(localized: "This key record is damaged."))
         }
         let raw = try stripPrefix(der, pkcs8PrefixX25519, "X25519 private")
         do { return try Curve25519.KeyAgreement.PrivateKey(rawRepresentation: raw) }
-        catch { throw E2eError(text: "This key record is damaged.") }
+        catch { throw E2eError(text: String(localized: "This key record is damaged.")) }
     }
 
     private static func ed25519Private(_ privateKeyB64: String) throws -> Curve25519.Signing.PrivateKey {
-        guard let der = unb64(privateKeyB64) else { throw E2eError(text: "This key record is damaged.") }
+        guard let der = unb64(privateKeyB64) else { throw E2eError(text: String(localized: "This key record is damaged.")) }
         let raw = try stripPrefix(der, pkcs8PrefixEd25519, "Ed25519 private")
         do { return try Curve25519.Signing.PrivateKey(rawRepresentation: raw) }
-        catch { throw E2eError(text: "This key record is damaged.") }
+        catch { throw E2eError(text: String(localized: "This key record is damaged.")) }
     }
 
     private static func deriveSharedSecret(_ priv: Curve25519.KeyAgreement.PrivateKey,
@@ -259,10 +259,10 @@ enum MailE2e {
     static func sealToRecipients(plaintext: String, recipientPublicKeys: [String],
                                  signing: KeyPairB64? = nil) throws -> SealedEnvelopeV2 {
         if recipientPublicKeys.isEmpty {
-            throw E2eError(text: "An encrypted message needs at least one recipient, or nobody can open it.")
+            throw E2eError(text: String(localized: "An encrypted message needs at least one recipient, or nobody can open it."))
         }
         if recipientPublicKeys.count > maxRecipients {
-            throw E2eError(text: "That is \(recipientPublicKeys.count) recipients; the limit is \(maxRecipients).")
+            throw E2eError(text: String(localized: "That is \(recipientPublicKeys.count) recipients; the limit is \(maxRecipients)."))
         }
         let contentKey = SymmetricKey(size: .bits256)
         let contentKeyBytes = contentKey.withUnsafeBytes { Data($0) }
@@ -341,14 +341,14 @@ enum MailE2e {
         guard let data = raw.data(using: .utf8),
               let obj = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
               let v = obj["v"] as? Int else {
-            throw E2eError(text: "This message's envelope is not readable.")
+            throw E2eError(text: String(localized: "This message's envelope is not readable."))
         }
         switch v {
         case envelopeVersionV2:
             guard let iv = obj["iv"] as? String, let ct = obj["ct"] as? String,
                   let tag = obj["tag"] as? String,
                   let arr = obj["recipients"] as? [[String: Any]] else {
-                throw E2eError(text: "This message's envelope is not readable.")
+                throw E2eError(text: String(localized: "This message's envelope is not readable."))
             }
             let wraps = arr.compactMap { e -> RecipientWrap? in
                 guard let epk = e["epk"] as? String, let wIv = e["wrapIv"] as? String,
@@ -365,7 +365,7 @@ enum MailE2e {
         case envelopeVersion:
             guard let epk = obj["epk"] as? String, let iv = obj["iv"] as? String,
                   let ct = obj["ct"] as? String, let tag = obj["tag"] as? String else {
-                throw E2eError(text: "This message's envelope is not readable.")
+                throw E2eError(text: String(localized: "This message's envelope is not readable."))
             }
             if let verify = verifyKeyB64 {
                 try verifySignature(obj["signerPub"] as? String, obj["sig"] as? String, verify,
@@ -375,12 +375,12 @@ enum MailE2e {
             let shared = try deriveSharedSecret(priv, try x25519Public(epk))
             let key = hkdf(shared, hkdfInfoV1)
             guard let ivD = unb64(iv), let ctD = unb64(ct), let tagD = unb64(tag) else {
-                throw E2eError(text: "This message's envelope is not readable.")
+                throw E2eError(text: String(localized: "This message's envelope is not readable."))
             }
             do { return String(decoding: try aesGcmDecrypt(key, ivD, aadV1(epk, iv), ctD, tagD), as: UTF8.self) }
-            catch { throw E2eError(text: "Could not open this message: the wrong key, or the ciphertext is damaged.") }
+            catch { throw E2eError(text: String(localized: "Could not open this message: the wrong key, or the ciphertext is damaged.")) }
         default:
-            throw E2eError(text: "This message uses an envelope version this app does not understand.")
+            throw E2eError(text: String(localized: "This message uses an envelope version this app does not understand."))
         }
     }
 
@@ -402,13 +402,13 @@ enum MailE2e {
             }
         }
         guard let contentKey else {
-            throw E2eError(text: "This message was not encrypted to your key, so it cannot be opened here.")
+            throw E2eError(text: String(localized: "This message was not encrypted to your key, so it cannot be opened here."))
         }
         guard let iv = unb64(ivB64), let ct = unb64(ctB64), let tag = unb64(tagB64),
               let plain = try? aesGcmDecrypt(contentKey, iv,
                                              contentAadV2(ivB64, wraps.map { $0.epk }), ct, tag)
         else {
-            throw E2eError(text: "Could not open this message: the wrong key, or the ciphertext is damaged.")
+            throw E2eError(text: String(localized: "Could not open this message: the wrong key, or the ciphertext is damaged."))
         }
         return String(decoding: plain, as: UTF8.self)
     }
@@ -416,18 +416,18 @@ enum MailE2e {
     /// Authenticity before plaintext, as the browser does it.
     private static func verifySignature(_ signerPub: String?, _ sig: String?,
                                         _ expectedKey: String, _ signed: Data) throws {
-        guard let signerPub, let sig else { throw E2eError(text: "This message is not signed.") }
+        guard let signerPub, let sig else { throw E2eError(text: String(localized: "This message is not signed.")) }
         guard signerPub == expectedKey else {
-            throw E2eError(text: "This message is signed by an unexpected key.")
+            throw E2eError(text: String(localized: "This message is signed by an unexpected key."))
         }
         guard let pubDer = unb64(expectedKey),
               let raw = try? stripPrefix(pubDer, spkiPrefixEd25519, "Ed25519 public"),
               let pub = try? Curve25519.Signing.PublicKey(rawRepresentation: raw),
               let sigData = unb64(sig) else {
-            throw E2eError(text: "This message's signature did not verify.")
+            throw E2eError(text: String(localized: "This message's signature did not verify."))
         }
         guard pub.isValidSignature(sigData, for: signed) else {
-            throw E2eError(text: "This message's signature did not verify.")
+            throw E2eError(text: String(localized: "This message's signature did not verify."))
         }
     }
 
@@ -476,9 +476,9 @@ enum MailE2e {
     static func protectPrivateKey(privateKeyB64: String, passphrase: String, kind: String,
                                   publicKey: String, iterations: Int = pbkdf2Iterations) throws -> ProtectedPrivateKey {
         if passphrase.utf16.count < minPassphraseLength {
-            throw E2eError(text: "Use at least \(minPassphraseLength) characters for the passphrase.")
+            throw E2eError(text: String(localized: "Use at least \(minPassphraseLength) characters for the passphrase."))
         }
-        guard let der = unb64(privateKeyB64) else { throw E2eError(text: "This key record is damaged.") }
+        guard let der = unb64(privateKeyB64) else { throw E2eError(text: String(localized: "This key record is damaged.")) }
         let salt = Data((0..<kdfSaltBytes).map { _ in UInt8.random(in: 0...255) })
         let iv = Data((0..<ivBytes).map { _ in UInt8.random(in: 0...255) })
         let kek = SymmetricKey(data: derivePassphraseKey(passphrase, salt, iterations))
@@ -494,19 +494,19 @@ enum MailE2e {
     /// known good, and it never surfaces a raw exception message.
     static func unlockPrivateKey(_ record: ProtectedPrivateKey, passphrase: String) throws -> String {
         guard record.kind == "X25519" || record.kind == "Ed25519" else {
-            throw E2eError(text: "That is not a GrapMail key record.")
+            throw E2eError(text: String(localized: "That is not a GrapMail key record."))
         }
         guard let salt = unb64(record.salt), let iv = unb64(record.iv),
               let blob = unb64(record.ct), blob.count > gcmTagBytes,
               unb64(record.publicKey) != nil else {
-            throw E2eError(text: "That is not a GrapMail key record.")
+            throw E2eError(text: String(localized: "That is not a GrapMail key record."))
         }
         let kek = SymmetricKey(data: derivePassphraseKey(passphrase, salt, record.iterations))
         let ct = blob.prefix(blob.count - gcmTagBytes)
         let tag = blob.suffix(gcmTagBytes)
         guard let der = try? aesGcmDecrypt(kek, iv, protectedKeyAad(record.kind, record.publicKey),
                                            Data(ct), Data(tag)) else {
-            throw E2eError(text: "That passphrase did not unlock this key. Check it and try again.")
+            throw E2eError(text: String(localized: "That passphrase did not unlock this key. Check it and try again."))
         }
         return b64(der)
     }
@@ -599,7 +599,7 @@ enum MailE2e {
     /// for.
     static func generateIdentity(accountKey: String, passphrase: String) throws -> Identity {
         if passphrase.utf16.count < minPassphraseLength {
-            throw E2eError(text: "Use at least \(minPassphraseLength) characters for the passphrase.")
+            throw E2eError(text: String(localized: "Use at least \(minPassphraseLength) characters for the passphrase."))
         }
         let encryption = try generateKeyPair(kind: "X25519")
         let signing = try generateKeyPair(kind: "Ed25519")
@@ -612,9 +612,7 @@ enum MailE2e {
                                            publicKey: signing.publicKey),
             createdAt: ISO8601DateFormatter().string(from: Date()))
         guard saveIdentity(accountKey: accountKey, identity: identity) else {
-            throw E2eError(text: "This device would not store the key. Without storage the key " +
-                                "is lost when the app closes, making every message sealed to it " +
-                                "unreadable — so nothing was published.")
+            throw E2eError(text: String(localized: "This device would not store the key. Without storage the key is lost when the app closes, making every message sealed to it unreadable — so nothing was published."))
         }
         return identity
     }
@@ -661,7 +659,7 @@ enum MailE2e {
     /// Lock both unlocked private halves under `recoveryKey`, in the kit the server stores.
     static func buildRecoveryKit(_ unlocked: Unlocked, recoveryKey: String) throws -> [String: Any] {
         guard let key = normalizeRecoveryKey(recoveryKey) else {
-            throw E2eError(text: "That recovery key is not valid. It has 28 letters and numbers.")
+            throw E2eError(text: String(localized: "That recovery key is not valid. It has 28 letters and numbers."))
         }
         let encryption = try protectPrivateKey(privateKeyB64: unlocked.encryptionPrivateKey, passphrase: key,
                                                kind: "X25519", publicKey: unlocked.encryptionPublicKey)
@@ -682,19 +680,19 @@ enum MailE2e {
     static func restoreFromRecoveryKit(accountKey: String, kit: [String: Any], recoveryKey: String,
                                        newPassphrase: String) throws -> Identity {
         if newPassphrase.utf16.count < minPassphraseLength {
-            throw E2eError(text: "Use at least \(minPassphraseLength) characters for the passphrase.")
+            throw E2eError(text: String(localized: "Use at least \(minPassphraseLength) characters for the passphrase."))
         }
         guard let key = normalizeRecoveryKey(recoveryKey) else {
-            throw E2eError(text: "That recovery key is not valid. It has 28 letters and numbers.")
+            throw E2eError(text: String(localized: "That recovery key is not valid. It has 28 letters and numbers."))
         }
         guard kit["format"] as? String == recoveryKitFormat else {
-            throw E2eError(text: "This recovery kit is not one GrapMail can read.")
+            throw E2eError(text: String(localized: "This recovery kit is not one GrapMail can read."))
         }
         guard let enc = protectedFrom(kit["encryption"] as? [String: Any]) else {
-            throw E2eError(text: "This recovery kit is damaged.")
+            throw E2eError(text: String(localized: "This recovery kit is damaged."))
         }
         let sig = protectedFrom(kit["signing"] as? [String: Any])
-        let wrong = E2eError(text: "That recovery key does not open this kit. Check it and try again.")
+        let wrong = E2eError(text: String(localized: "That recovery key does not open this kit. Check it and try again."))
         guard let encPrivate = try? unlockPrivateKey(enc, passphrase: key) else { throw wrong }
         var sigPrivate: String? = nil
         if let sig {
@@ -712,7 +710,7 @@ enum MailE2e {
             signing: signing,
             createdAt: ISO8601DateFormatter().string(from: Date()))
         guard saveIdentity(accountKey: accountKey, identity: identity) else {
-            throw E2eError(text: "This device would not store the key, so nothing was restored.")
+            throw E2eError(text: String(localized: "This device would not store the key, so nothing was restored."))
         }
         return identity
     }

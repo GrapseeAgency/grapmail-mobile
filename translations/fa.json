@@ -1,0 +1,73 @@
+{
+ "android": {
+  "strings_r9_reader.xml": {
+   "reader_earlier_messages": {"one": "%d پیام پیشین", "other": "%d پیام پیشین"},
+   "reader_participants": {"one": "%d نفر", "other": "%d نفر"},
+   "reader_message_count": {"one": "%d پیام", "other": "%d پیام"},
+   "reader_you": "شما",
+   "reader_unread": "خوانده‌نشده",
+   "reader_earlier_action": "نمایش پیام‌های تاشده",
+   "reader_open_message_action": "باز کردن این پیام",
+   "reader_quoted_show": "نمایش متن نقل‌شده",
+   "reader_quoted_hide": "پنهان کردن متن نقل‌شده",
+   "reader_state_expanded": "باز",
+   "reader_state_collapsed": "تاشده",
+   "reader_reply_to": "پاسخ به %1$s…",
+   "reader_reply_fallback": "پاسخ…",
+   "reader_reply_options": "گزینه‌های پاسخ",
+   "reader_quick_reply": "پاسخ سریع",
+   "reader_attach_share_chooser": "اشتراک‌گذاری پیوست",
+   "reader_attach_view_image": "دیدن تصویر",
+   "reader_attach_save_named": "ذخیره %1$s",
+   "reader_attach_share_named": "اشتراک %1$s",
+   "reader_attach_share_nothing": "هیچ برنامه‌ای در این دستگاه نمی‌تواند این فایل را به اشتراک بگذارد.",
+   "reader_viewer_position": "%1$d از %2$d",
+   "reader_viewer_too_large": "این تصویر را نمی‌توان اینجا پیش‌نمایش کرد.",
+   "compose_r9_leave_title": "از این پیام خارج می‌شوید؟",
+   "compose_r9_leave_attachments": "پیش‌نویس‌ها هنوز پیوست نگه نمی‌دارند. متن را بدون پیوست ذخیره کنید یا به ویرایش ادامه دهید.",
+   "compose_r9_save_text_only": "ذخیره فقط متن",
+   "compose_r9_draft_failed_title": "این پیش‌نویس ذخیره نشد",
+   "compose_r9_leave_without_saving": "خروج بدون ذخیره",
+   "compose_r9_encrypt_failed": "این پیام رمزگذاری نشد، بنابراین چیزی ارسال نشد.",
+   "compose_editor_toolbar": "قالب‌بندی متن",
+   "compose_editor_bold": "پررنگ",
+   "compose_editor_italic": "کج",
+   "compose_editor_underline": "زیرخط",
+   "compose_editor_strike": "خط‌خورده",
+   "compose_editor_bullets": "نشانه‌ها",
+   "compose_editor_numbered": "شماره‌دار",
+   "compose_editor_text_colour": "رنگ متن",
+   "compose_editor_black": "سیاه",
+   "compose_editor_blue": "آبی",
+   "compose_editor_red": "سرخ",
+   "compose_editor_green": "سبز",
+   "compose_editor_highlight": "برجسته‌سازی",
+   "compose_editor_highlight_colour": "رنگ برجسته‌سازی",
+   "compose_editor_yellow": "زرد",
+   "compose_editor_pink": "صورتی",
+   "compose_editor_font": "قلم",
+   "compose_editor_sans": "بدون دندانه",
+   "compose_editor_larger": "بزرگ‌تر",
+   "compose_editor_clear": "پاک کردن قالب",
+   "compose_editor_image": "تصویر",
+   "compose_editor_insert_image": "درج تصویر"
+  },
+  "strings_r9_platform.xml": {
+   "r9_platform_notif_channel_new_mail_desc": "وقتی پیام تازه‌ای به صندوق ورودی می‌رسد خبر می‌دهد.",
+   "r9_platform_price_per_week": "%1$s در هفته",
+   "r9_platform_price_per_month": "%1$s در ماه",
+   "r9_platform_price_per_3_months": "%1$s هر ۳ ماه",
+   "r9_platform_price_per_6_months": "%1$s هر ۶ ماه",
+   "r9_platform_price_per_year": "%1$s در سال"
+  },
+  "strings_r9_mailbox.xml": {
+   "mail_sendlater_channel_name": "ارسال‌های زمان‌بندی‌شده",
+   "mail_sendlater_channel_desc": "شمارش معکوس برای پیام‌هایی که در انتظار ارسال‌اند"
+  },
+  "strings_identity.xml": {
+   "identity_settings_appearance": "ظاهر",
+   "identity_match_wallpaper_title": "هم‌رنگ با تصویر پس‌زمینه",
+   "identity_match_wallpaper_subtitle": "رنگ‌های تصویر پس‌زمینه را برای دکمه‌ها و برجسته‌سازی‌ها به کار ببرید. تصاویر نمایه، رنگ‌های وضعیت و متن به رنگ‌های GrapMail می‌مانند."
+  }
+ }
+}

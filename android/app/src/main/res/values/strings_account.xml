@@ -1,0 +1,779 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Onboarding, sign-up wizard, account recovery and account-security copy (Android).
+  English is the source text and must stay byte-identical to what the screens showed
+  before extraction: the screenshot walk finds elements by these words, and
+  scripts/mail-honesty.py reads some of them from this file.
+  Translations come later, in values-<locale>/strings_account.xml.
+  Strings that are templates for legal links (acct_welcome_legal_line,
+  acct_terms_section_*) keep %1$s / %2$s where the link text goes.
+-->
+<resources>
+
+    <!-- WizardScaffold.kt -->
+    <string name="acct_back">Back</string>
+    <string name="acct_wizard_step_of">Step %1$d of 5</string>
+    <string name="acct_create_account">CREATE ACCOUNT</string>
+    <string name="acct_already_have_an_account">"Already have an account?  "</string>
+    <string name="acct_sign_in">Sign In</string>
+
+    <!-- NameStepScreen.kt -->
+    <string name="acct_whats_your_name">What\'s your name?</string>
+    <string name="acct_this_name_appears_on_your_grapmail">This name appears on your GrapMail profile.</string>
+    <string name="acct_next">Next</string>
+    <string name="acct_first_name">First name</string>
+    <string name="acct_first_name_is_required">First name is required</string>
+    <string name="acct_last_name">Last name</string>
+    <string name="acct_last_name_is_required">Last name is required</string>
+
+    <!-- AddressStepScreen.kt -->
+    <string name="acct_choose_your_grapmail_address">Choose your GrapMail address</string>
+    <string name="acct_pick_an_available_address_or_create">Pick an available address or create your own. You\'ll use this to sign in and receive emails.</string>
+    <string name="acct_suggested_for_you">Suggested for you</string>
+    <string name="acct_based_on_your_name_you_can_change_it">Based on your name. You can change it later.</string>
+    <string name="acct_finding_available_addresses">Finding available addresses…</string>
+    <string name="acct_no_suggestions_from_your_name_create">No suggestions from your name — create your own below.</string>
+    <string name="acct_create_your_own">Create your own</string>
+    <string name="acct_choose_a_unique_address_3_30">Choose a unique address (3-30 characters).</string>
+    <string name="acct_choose_your_own_address">Choose your own address</string>
+    <string name="acct_yourname">yourname</string>
+    <string name="acct_domain">Domain</string>
+    <string name="acct_this_address_is_available">This address is available!</string>
+    <string name="acct_checking">Checking…</string>
+    <string name="acct_address_taken_try">That address is taken — try %1$s</string>
+    <string name="acct_address_taken">That address is taken</string>
+    <string name="acct_that_address_cannot_be_used">That address cannot be used.</string>
+    <string name="acct_could_not_check_right_now_confirmed">Could not check right now — confirmed when the account is created.</string>
+    <string name="acct_use_letters_numbers_dots_dashes_or">Use letters, numbers, dots (.), dashes (-) or underscores (_).\nAvoid reserved names like admin, support, postmaster, etc.</string>
+    <string name="acct_available">Available</string>
+
+    <!-- BasicInfoStepScreen.kt -->
+    <string-array name="acct_months">
+        <item>January</item>
+        <item>February</item>
+        <item>March</item>
+        <item>April</item>
+        <item>May</item>
+        <item>June</item>
+        <item>July</item>
+        <item>August</item>
+        <item>September</item>
+        <item>October</item>
+        <item>November</item>
+        <item>December</item>
+    </string-array>
+    <string name="acct_basic_info">Basic Info</string>
+    <string name="acct_tell_us_a_little_more_about_yourself">Tell us a little more about yourself. This helps us make your experience more personal.</string>
+    <string name="acct_couldnt_open_that_photo_choose">Couldn’t open that photo. Choose another image.</string>
+    <string name="acct_profile_photo">Profile photo</string>
+    <string name="acct_profile_photo_2">"Profile Photo "</string>
+    <string name="acct_optional">(Optional)</string>
+    <string name="acct_add_a_photo_to_make_your_account">Add a photo to make your account more personal. You can change this later in settings.</string>
+    <string name="acct_change_photo">Change Photo</string>
+    <string name="acct_choose_photo">Choose Photo</string>
+    <string name="acct_birthday">"Birthday "</string>
+    <string name="acct_required">(Required)</string>
+    <string name="acct_month">Month</string>
+    <string name="acct_day">Day</string>
+    <string name="acct_year">Year</string>
+    <string name="acct_you_must_be_13_or_older_to_create_an">You must be 13 or older to create an account.</string>
+    <string name="acct_gender">"Gender "</string>
+    <string name="acct_female">Female</string>
+    <string name="acct_male">Male</string>
+    <string name="acct_rather_not_say">Rather not say</string>
+    <string name="acct_custom">Custom</string>
+
+    <!-- CreatedScreens.kt -->
+    <string name="acct_account_created">ACCOUNT CREATED</string>
+    <string name="acct_youre_all_set">You\'re all set!</string>
+    <string name="acct_your_grapmail_account_has_been">Your GrapMail account has been successfully\ncreated and you\'re now signed in.</string>
+    <string name="acct_active">Active</string>
+    <string name="acct_whats_next">WHAT\'S NEXT?</string>
+    <string name="acct_explore_your_mailbox">Explore your mailbox</string>
+    <string name="acct_check_your_inbox_send_emails_and">Check your inbox, send emails, and more.</string>
+    <string name="acct_add_your_contacts">Add your contacts</string>
+    <string name="acct_stay_connected_with_friends_and">Stay connected with friends and colleagues.</string>
+    <string name="acct_personalize_your_experience">Personalize your experience</string>
+    <string name="acct_set_up_your_preferences_and_get_the">Set up your preferences and get the most out of GrapMail.</string>
+    <string name="acct_continue_to_onboarding">Continue to Onboarding</string>
+    <string name="acct_well_take_you_through_a_quick_setup">We\'ll take you through a quick setup to get you started.</string>
+    <string name="acct_copy_address">Copy address</string>
+    <string name="acct_your_secure_inbox">Your secure inbox</string>
+    <string name="acct_send_receive_and_manage_your_emails">Send, receive and manage your emails.</string>
+    <string name="acct_built_for_your_privacy">Built for your privacy</string>
+    <string name="acct_your_data_stays_yours">Your data stays yours.</string>
+    <string name="acct_ready_for_whats_next">Ready for what\'s next</string>
+    <string name="acct_lets_get_you_set_up_and_personalized">Let\'s get you set up and personalized.</string>
+    <string name="acct_go_to_mailbox">Go to Mailbox</string>
+
+    <!-- GrapMailLegalScreen.kt -->
+    <string name="acct_terms_of_service">Terms of Service</string>
+    <string name="acct_privacy_policy">Privacy Policy</string>
+    <string name="acct_your_account">Your account</string>
+    <string name="acct_you_must_be_at_least_13_to_create_a">You must be at least 13 to create a GrapMail account. Keep your password private and use the account recovery and security settings if you think someone else has accessed your mailbox.</string>
+    <string name="acct_using_grapmail">Using GrapMail</string>
+    <string name="acct_use_your_mailbox_for_lawful">Use your mailbox for lawful communication. Do not send spam, bulk unsolicited messages, phishing, malware, or messages that harass others. Accounts that misuse the service may be suspended.</string>
+    <string name="acct_sending_and_receiving">Sending and receiving</string>
+    <string name="acct_a_message_can_be_queued_sent_or_fail">A message can be queued, sent, or fail. Check Sent and any delivery notice when timing matters. A queued message is still waiting to be sent.</string>
+    <string name="acct_leaving_grapmail">Leaving GrapMail</string>
+    <string name="acct_you_can_sign_out_on_this_device_or">You can sign out on this device or request account deletion from Settings → Data &amp; privacy. Save any mail you need before deleting your account.</string>
+    <string name="acct_account_and_mailbox_data">Account and mailbox data</string>
+    <string name="acct_grapmail_uses_your_account_details">GrapMail uses your account details to create and secure your mailbox. The service stores the addresses, messages, and attachments needed to send, receive, and sync your mail.</string>
+    <string name="acct_security_and_notifications">Security and notifications</string>
+    <string name="acct_google_recaptcha_helps_protect">Google reCAPTCHA helps protect signup from abuse. If you enable new-mail alerts, GrapMail can register a Firebase device token to deliver notifications to your device. You can change notification access in Android Settings.</string>
+    <string name="acct_images_and_device_storage">Images and device storage</string>
+    <string name="acct_remote_images_are_hidden_by_default">Remote images are hidden by default in the message reader. Showing them can contact the sender’s image host. The app also keeps a local mailbox cache so recently loaded mail is available more quickly.</string>
+    <string name="acct_encryption_choices">Encryption choices</string>
+    <string name="acct_grapmail_offers_end_to_end">GrapMail offers end-to-end encryption for supported messages. Ordinary email and encrypted messages have different privacy properties. You can manage encryption and review your account details in Settings.</string>
+    <string name="acct_control_and_deletion">Control and deletion</string>
+    <string name="acct_in_settings_data_privacy_you_can">In Settings → Data &amp; privacy, you can review your profile and request deletion. For questions about retention, access, or other privacy requests, use the Grapsee contact link below.</string>
+    <string name="acct_grapmail_guide">GrapMail guide</string>
+    <string name="acct_this_guide_explains_how_grapmail">This guide explains how GrapMail works. For Grapsee’s current legal information, use the official page below.</string>
+    <string name="acct_legal_read_official">Read the official %1$s</string>
+    <string name="acct_contact_grapsee">Contact Grapsee</string>
+
+    <!-- WelcomeScreen.kt -->
+    <string name="acct_welcome_legal_line">Read the %1$s and %2$s.</string>
+    <string name="acct_welcome_to">Welcome to</string>
+    <string name="acct_a_faster_safer_and_more_private_way">A faster, safer and more private way to stay connected.</string>
+    <string name="acct_create_account_button">Create Account</string>
+
+    <!-- TermsStepScreen.kt -->
+    <string name="acct_terms_privacy">Terms &amp; Privacy</string>
+    <string name="acct_please_read_and_agree_to_our_terms">Please read and agree to our Terms of Service and Privacy Policy to continue.</string>
+    <string name="acct_creating">Creating…</string>
+    <string name="acct_grapmail_terms_of_service">GrapMail Terms of Service</string>
+    <string name="acct_1_your_account">"1.  Your Account"</string>
+    <string name="acct_terms_section_account_body">By creating an account, you agree to our %1$s and confirm that you are at least 13 years old. You are responsible for keeping your account secure and for all activity that happens under your account.</string>
+    <string name="acct_2_privacy_policy">"2.  Privacy Policy"</string>
+    <string name="acct_terms_section_privacy_body">GrapMail uses your account and mailbox data to operate the service. Read about account data, notifications, remote images and deletion in the %1$s.</string>
+    <string name="acct_i_agree_to_the_terms_of_service_and">I agree to the Terms of Service and Privacy Policy.</string>
+    <string name="acct_you_must_scroll_to_the_bottom_of">You must scroll to the bottom of this document to enable the checkbox.</string>
+
+    <!-- HumanVerifyScreen.kt -->
+    <string name="acct_cancel_verification">Cancel verification</string>
+    <string name="acct_verify_your_account">Verify your account</string>
+    <string name="acct_complete_a_quick_security_check_to">Complete a quick security check to continue.</string>
+    <string name="acct_verification_complete">Verification complete</string>
+    <string name="acct_security_check">Security check</string>
+    <string name="acct_try_again">Try again</string>
+    <string name="acct_verify_im_human">Verify I’m human</string>
+    <string name="acct_the_challenge_couldnt_load_please">The challenge couldn’t load. Please try again.</string>
+    <string name="acct_checking_verification">Checking verification…</string>
+    <string name="acct_continue">Continue</string>
+
+    <!-- OnboardingScreen.kt -->
+    <string name="acct_welcome">WELCOME</string>
+    <string name="acct_welcome_to_your_sanctuary">Welcome to Your Sanctuary</string>
+    <string name="acct_your_new_address_is_ready_welcome_to">Your new address is ready; welcome to a cleaner way to communicate.</string>
+    <string name="acct_get_started">Get Started</string>
+    <string name="acct_screener_gate">SCREENER GATE</string>
+    <string name="acct_you_decide_who_reaches_you">You Decide Who Reaches You</string>
+    <string name="acct_unknown_senders_wait_in_the_screener">Unknown senders wait in the Screener until you decide.</string>
+    <string name="acct_subscriptions">SUBSCRIPTIONS</string>
+    <string name="acct_tame_the_clutter">Tame the Clutter</string>
+    <string name="acct_unsubscribe_snooze_and_return_to">Unsubscribe, snooze, and return to what matters.</string>
+    <string name="acct_quiet_by_default">QUIET BY DEFAULT</string>
+    <string name="acct_choose_your_rhythm">Choose Your Rhythm</string>
+    <string name="acct_set_your_theme_and_decide_when">Set your theme and decide when GrapMail can interrupt you.</string>
+    <string name="acct_your_sanctuary">YOUR SANCTUARY</string>
+    <string name="acct_your_inbox_is_yours_again">Your Inbox Is Yours Again</string>
+    <string name="acct_welcome_home_your_new_mailbox_is">Welcome home; your new mailbox is ready.</string>
+    <string name="acct_open_my_mailbox">Open My Mailbox</string>
+    <string name="acct_onboarding_animated_scene">Animated scene: %1$s</string>
+    <string name="acct_skip">Skip</string>
+
+    <!-- PasswordStepScreen.kt -->
+    <string name="acct_both_passwords_must_match_period">Both passwords must match.</string>
+    <string name="acct_create_a_strong_password">Create a strong password</string>
+    <string name="acct_your_password_keeps_your_account">Your password keeps your account safe. Make it unique, strong and easy for you to remember.</string>
+    <string name="acct_your_grapmail_address">Your GrapMail address</string>
+    <string name="acct_edit">Edit</string>
+    <string name="acct_password_label">"Password "</string>
+    <string name="acct_password">Password</string>
+    <string name="acct_strong">Strong</string>
+    <string name="acct_good">Good</string>
+    <string name="acct_fair">Fair</string>
+    <string name="acct_weak">Weak</string>
+    <string name="acct_confirm_password_label">"Confirm password "</string>
+    <string name="acct_confirm_password">Confirm password</string>
+    <string name="acct_re_enter_your_password">Re-enter your password</string>
+    <string name="acct_password_requirements">Password requirements</string>
+    <string name="acct_at_least_8_characters">At least 8 characters</string>
+    <string name="acct_a_mix_of_letters_numbers_and_symbols">A mix of letters, numbers and symbols</string>
+    <string name="acct_both_passwords_must_match">Both passwords must match</string>
+
+    <!-- account/AddressRecoveryScreens.kt -->
+    <string name="acct_we_couldnt_find_a_grapmail_account">We couldn\'t find a GrapMail account with that number.</string>
+    <string name="acct_too_many_lookups_try_again_in_a">Too many lookups. Try again in a little while.</string>
+    <string name="acct_we_couldnt_check_that_number_try">We couldn\'t check that number. Try again.</string>
+    <string name="acct_network_error">Network error. Please try again.</string>
+    <string name="acct_recover_your_grapmail_address">Recover your GrapMail address</string>
+    <string name="acct_find_your_grapmail_address">Find your GrapMail address</string>
+    <string name="acct_enter_the_phone_number_linked_to">Enter the phone number linked to your GrapMail account. We\'ll check our records and show you the email address associated with it.</string>
+    <string name="acct_find_my_email">Find My Email</string>
+    <string name="acct_need_help_contact_support">Need help? Contact our support team.</string>
+    <string name="acct_support_team">support team</string>
+    <string name="acct_phone_number">Phone number</string>
+    <string name="acct_enter_your_verified_phone_number">Enter your verified phone number</string>
+    <string name="acct_back_to_sign_in">Back to Sign In</string>
+    <string name="acct_for_your_security_this_address_is">For your security, this address is partially hidden. You can copy it to use for sign in.</string>
+    <string name="acct_email_found">Email Found</string>
+    <string name="acct_your_grapmail_address_has_been_found">Your GrapMail address\nhas been found!</string>
+    <string name="acct_here_is_the_email_address_associated">Here is the email address associated with your account. You can copy it or use it to sign in.</string>
+    <string name="acct_copy">Copy</string>
+
+    <!-- account/PhoneScreens.kt -->
+    <string name="acct_bangladesh">Bangladesh</string>
+    <string name="acct_india">India</string>
+    <string name="acct_pakistan">Pakistan</string>
+    <string name="acct_united_states">United States</string>
+    <string name="acct_united_kingdom">United Kingdom</string>
+    <string name="acct_united_arab_emirates">United Arab Emirates</string>
+    <string name="acct_saudi_arabia">Saudi Arabia</string>
+    <string name="acct_malaysia">Malaysia</string>
+    <string name="acct_enter_a_valid_phone_number">Enter a valid phone number.</string>
+    <string name="acct_we_couldnt_send_a_code_to_that">We couldn\'t send a code to that number.</string>
+    <string name="acct_that_number_is_already_linked_to">That number is already linked to another account.</string>
+    <string name="acct_please_wait_a_moment_before_asking">Please wait a moment before asking for another code.</string>
+    <string name="acct_we_couldnt_send_your_code_try_again">We couldn\'t send your code. Try again.</string>
+    <string name="acct_sign_in_first_so_the_number_can_be">Sign in first so the number can be saved to your account.</string>
+    <string name="acct_that_code_is_not_correct">That code is not correct.</string>
+    <string name="acct_we_couldnt_verify_that_code_try">We couldn\'t verify that code. Try again.</string>
+    <string name="acct_phone_verification">Phone verification</string>
+    <string name="acct_verify_your_phone_number">Verify your phone number</string>
+    <string name="acct_enter_the_6_digit_code">Enter the 6-digit code</string>
+    <string name="acct_well_send_you_a_6_digit_code_by_sms">We’ll send you a 6-digit code by SMS.</string>
+    <string name="acct_sms_sent_to">SMS sent to %1$s. The code expires in five minutes.</string>
+    <string name="acct_send_verification_code">Send Verification Code</string>
+    <string name="acct_your_phone_number_is_only_used_for">Your phone number is only used for security purposes and won\'t be shared with anyone.</string>
+    <string name="acct_verify_and_continue">Verify &amp; Continue</string>
+    <string name="acct_if_the_text_message_hasnt_arrived">If the text message hasn’t arrived, you can request another code after one minute.</string>
+    <string name="acct_sms_code">SMS code</string>
+    <string name="acct_country_code">Country code</string>
+    <string name="acct_verification_code">Verification code</string>
+    <string name="acct_6_digit_sms_code">6-digit SMS code</string>
+    <string name="acct_sending">Sending…</string>
+    <string name="acct_resend_code">Resend code</string>
+    <string name="acct_close">Close</string>
+    <string name="acct_go_to_account_security">Go to Account Security</string>
+    <string name="acct_back_to_home">Back to Home</string>
+    <string name="acct_your_phone_number_is_securely_stored">Your phone number is securely stored and only used for account recovery and two-step verification.</string>
+    <string name="acct_phone_verified">Phone Verified</string>
+    <string name="acct_your_phone_number_has_been_verified">Your phone number\nhas been verified!</string>
+    <string name="acct_phone_now_linked">Your phone number %1$s is now linked to your GrapMail account. You can use it for account recovery and two-step verification.</string>
+    <string name="acct_verified_phone_number">Verified Phone Number</string>
+    <string name="acct_verified">Verified</string>
+
+    <!-- account/RecoveryEmailScreens.kt -->
+    <string name="acct_your_session_has_expired_sign_in">Your session has expired. Sign in again.</string>
+    <string name="acct_we_couldnt_send_the_code_try_again">We couldn\'t send the code. Try again.</string>
+    <string name="acct_a_new_code_is_on_its_way">A new code is on its way.</string>
+    <string name="acct_recovery_email_confirmed">Recovery email confirmed</string>
+    <string name="acct_youre_covered">You\'re covered</string>
+    <string name="acct_recovery_email_covered_body">If you ever forget your password, we\'ll send a reset link to %1$s.</string>
+    <string name="acct_verify_recovery_email">Verify recovery email</string>
+    <string name="acct_recovery_email_code_sent_to">We sent a code to %1$s. Enter it to confirm this address.</string>
+    <string name="acct_recovery_email_code_sent_generic">We sent a code to your email. Enter it to confirm this address.</string>
+    <string name="acct_confirm">Confirm</string>
+    <string name="acct_didnt_get_it_check_your_spam_folder">Didn\'t get it? Check your spam folder.</string>
+    <string name="acct_recovery_email">Recovery email</string>
+    <string name="acct_add_a_recovery_email">Add a recovery email</string>
+    <string name="acct_if_you_ever_forget_your_password">If you ever forget your password, we\'ll send a reset link here. Use an address outside GrapMail.</string>
+    <string name="acct_send_code">Send code</string>
+    <string name="acct_skip_for_now">Skip for now</string>
+    <string name="acct_you_can_add_it_later_in_settings">You can add it later in Settings → Account Security.</string>
+    <string name="acct_why_it_matters">Why it matters</string>
+    <string name="acct_grapmail_resets_passwords_by_email">GrapMail resets passwords by email only. Without a verified recovery email, a forgotten password can lock you out.</string>
+
+    <!-- account/RecoveryScreens.kt -->
+    <string name="acct_we_could_not_start_the_reset_try">We could not start the reset. Try again.</string>
+    <string name="acct_enter_your_grapmail_address_first">Enter your GrapMail address first.</string>
+    <string name="acct_this_device_cannot_confirm_the">This device cannot confirm the signature right now.</string>
+    <string name="acct_this_device_could_not_prove_itself">This device could not prove itself. Try the code instead.</string>
+    <string name="acct_forgot_password">Forgot password</string>
+    <string name="acct_reset_your_password">Reset your password</string>
+    <string name="acct_enter_your_grapmail_address_and_well">Enter your GrapMail address and we\'ll email a reset link to the recovery email on your account.</string>
+    <string name="acct_proving_this_device">Proving this device…</string>
+    <string name="acct_use_a_trusted_device_instead">Use a trusted device instead</string>
+    <string name="acct_grapmail_address">GrapMail address</string>
+    <string name="acct_we_couldnt_send_another_code_contact">We couldn\'t send another code. Contact support and we\'ll help.</string>
+    <string name="acct_could_not_resend_the_code_try_again">Could not resend the code. Try again.</string>
+    <string name="acct_verify_recovery_code">Verify recovery code</string>
+    <string name="acct_weve_sent_a_6_digit_verification">We\'ve sent a 6-digit verification code to your verified phone number. Please enter the code to continue.</string>
+    <string name="acct_didnt_receive_the_code_check_your">Didn\'t receive the code? Check your spam folder.</string>
+    <string name="acct_that_reset_link_expired_start_again">That reset link expired. Start again.</string>
+    <string name="acct_use_at_least_8_characters_with_a">Use at least 8 characters with a letter, a number and a symbol.</string>
+    <string name="acct_code_not_correct_or_expired">That code is not correct, or it has expired.</string>
+    <string name="acct_this_devices_proof_expired_start">This device\'s proof expired. Start again from forgot password.</string>
+    <string name="acct_we_could_not_reset_the_password_try">We could not reset the password. Try again.</string>
+    <string name="acct_create_new_password">Create new password</string>
+    <string name="acct_set_a_new_password">Set a new password</string>
+    <string name="acct_your_new_password_must_be_strong_and">Your new password must be strong and secure. Make sure it\'s something you haven\'t used before.</string>
+    <string name="acct_reset_password">Reset Password</string>
+    <string name="acct_enter_the_code_again">Enter the code again</string>
+    <string name="acct_your_password_will_be_encrypted_and">Your password will be encrypted and kept secure.</string>
+    <string name="acct_new_password">New password</string>
+    <string name="acct_password_strength">Password strength</string>
+    <string name="acct_confirm_new_password">Confirm new password</string>
+    <string name="acct_include_a_letter">Include a letter</string>
+    <string name="acct_include_a_number">Include a number</string>
+    <string name="acct_include_a_special_character">Include a special character</string>
+    <string name="acct_not_commonly_used">Not commonly used</string>
+    <string name="acct_for_your_security_we_recommend">For your security, we recommend keeping your password private and using two-step verification.</string>
+    <string name="acct_password_reset_successful">Password Reset Successful</string>
+    <string name="acct_your_password_has_been_reset">Your password\nhas been reset</string>
+    <string name="acct_your_grapmail_account_is_now_secure">Your GrapMail account is now secure with your new password. You can now sign in and continue using all the features.</string>
+    <string name="acct_a_code_is_on_its_way_check_your">A code is on its way. Check your phone.</string>
+    <string name="acct_a_new_reset_link_is_on_its_way_check">A new reset link is on its way. Check your recovery email.</string>
+    <string name="acct_still_in_review_well_message_you_as">Still in review. We\'ll message you as soon as it clears.</string>
+    <string name="acct_we_couldnt_check_again_try_in_a">We couldn\'t check again. Try in a minute.</string>
+    <string name="acct_send_again">Send again</string>
+    <string name="acct_try_again_2">Try Again</string>
+    <string name="acct_reset_link_sent">Reset link sent</string>
+    <string name="acct_account_recovery_pending">Account Recovery Pending</string>
+    <string name="acct_check_your_recovery_email">Check your\nrecovery email</string>
+    <string name="acct_were_still_working_on_your_recovery">We\'re still working\non your recovery</string>
+    <string name="acct_we_sent_a_password_reset_link_to_the">We sent a password reset link to the recovery email on your account. Open it on any device to choose a new password.</string>
+    <string name="acct_there_might_be_a_short_delay_while">There might be a short delay while we verify your information. You\'ll get an update soon at your verified phone number or email.</string>
+    <string name="acct_didnt_get_it">Didn\'t get it?</string>
+    <string name="acct_whats_happening">What\'s happening?</string>
+    <string name="acct_the_link_works_for_1_hour_check_your">The link works for 1 hour. Check your spam folder, or tap Send again for a new one.</string>
+    <string name="acct_were_verifying_your_recovery_request">We\'re verifying your recovery request. This usually takes a few minutes, but can take up to 24 hours in some cases.</string>
+
+    <!-- account/SignInScreen.kt -->
+    <string name="acct_signin_no_session">Sign-in succeeded but no session was returned. Please try again.</string>
+    <string name="acct_too_many_failed_attempts_try_again">Too many failed attempts. Try again in about 15 minutes.</string>
+    <string name="acct_those_details_do_not_match_an">Those details do not match an account.</string>
+    <string name="acct_passkeys_need_app_update">Passkeys need an app update.</string>
+    <string name="acct_sign_in_succeeded_but_no_account">Sign-in succeeded but no account details were returned. Please try again.</string>
+    <string name="acct_no_passkey_for_this_account_is_on">No passkey for this account is on this device. Sign in with your password, then add one from Account Security.</string>
+    <string name="acct_the_passkey_could_not_be_used_sign">The passkey could not be used. Sign in with your password.</string>
+    <string name="acct_welcome_back">Welcome back 👋</string>
+    <string name="acct_sign_in_to_your_grapmail_account_and">Sign in to your GrapMail account and get back to what matters.</string>
+    <string name="acct_email_address_or_phone_number">Email address or phone number</string>
+    <string name="acct_you_grapsee_com_or_8801xxxxxxxx">you@grapsee.com or +8801XXXXXXXX</string>
+    <string name="acct_enter_your_password">Enter your password</string>
+    <string name="acct_forgot_password_2">Forgot password?</string>
+    <string name="acct_use_a_passkey">Use a passkey</string>
+    <string name="acct_dont_have_an_account">"Don\'t have an account?  "</string>
+    <string name="acct_create_one">Create one</string>
+
+    <!-- account/TwoFactorScreens.kt -->
+    <string name="acct_sign_in_again_to_request_a_code">Sign in again to request a code.</string>
+    <string name="acct_verification_did_not_return_a">Verification did not return a session. Sign in again.</string>
+    <string name="acct_that_code_has_expired_resend_it_to">That code has expired. Resend it to get a new one.</string>
+    <string name="acct_that_sign_in_no_longer_needs_a_code">That sign-in no longer needs a code. Start again.</string>
+    <string name="acct_email_verification">Email verification</string>
+    <string name="acct_two_step_verification">Two-step verification</string>
+    <string name="acct_enter_the_code_sent_to">Enter the code sent to %1$s</string>
+    <string name="acct_use_a_backup_code">Use a backup code</string>
+    <string name="acct_enter_your_6_digit_code">Enter your 6-digit code</string>
+    <string name="acct_finish_signing_in_by_entering_the_6">Finish signing in by entering the 6-digit code that was sent to this address.</string>
+    <string name="acct_a_verification_text_is_unavailable">A verification text is unavailable. Use one of your saved backup codes to continue.</string>
+    <string name="acct_weve_emailed_code_to">We\'ve emailed a 6-digit code to %1$s. Enter it to finish signing in.</string>
+    <string name="acct_weve_sent_you_a_verification_code">We\'ve sent you a verification code. Please enter the 6-digit code to continue.</string>
+    <string name="acct_back_to_sign_in_lower">Back to sign in</string>
+    <string name="acct_sign_in_again_to_use_a_backup_code">Sign in again to use a backup code.</string>
+    <string name="acct_backup_code_invalid_or_used">That backup code is not valid, or it has already been used.</string>
+    <string name="acct_this_account_does_not_use_two_step">This account does not use two-step verification.</string>
+    <string name="acct_that_backup_code_is_not_valid">That backup code is not valid.</string>
+    <string name="acct_enter_your_backup_code">Enter your backup code</string>
+    <string name="acct_if_you_dont_have_access_to_your_2">If you don\'t have access to your 2-step verification method, you can use a backup code to get back into your account.</string>
+    <string name="acct_try_another_method">Try another method</string>
+    <string name="acct_backup_codes_are_10_characters_long">Backup codes are 10 characters long and can only be used once.</string>
+
+    <!-- security/ActivityScreens.kt -->
+    <string name="acct_sign_in_again">Sign in again.</string>
+    <string name="acct_recent_security_activity">Recent Security Activity</string>
+    <string name="acct_sign_ins_and_changes_to_your_account">Sign-ins and changes to your account, newest first.</string>
+    <string name="acct_manage_active_sessions">Manage active sessions</string>
+    <string name="acct_unrecognized_activity">Unrecognized activity</string>
+    <string name="acct_a_device_signed_in_that_this_account">A device signed in that this account had not used before.</string>
+    <string name="acct_review_it_now">Review it now</string>
+    <string name="acct_loading_activity">Loading activity…</string>
+    <string name="acct_nothing_has_happened_on_this_account">Nothing has happened on this account yet.</string>
+    <string name="acct_security_alert">Security Alert</string>
+    <string name="acct_suspicious_sign_in_alert">Suspicious Sign-In Alert</string>
+    <string name="acct_we_noticed_a_sign_in_to_your_account">We noticed a sign-in to your account from a device we do not recognise.</string>
+    <string name="acct_secure_my_account">Secure My Account</string>
+    <string name="acct_this_was_me">This was me</string>
+    <string name="acct_sign_in_again_to_record_that">Sign in again to record that.</string>
+    <string name="acct_we_couldnt_record_that_try_again">We couldn\'t record that. Try again.</string>
+    <string name="acct_sign_in_details">Sign-in details</string>
+    <string name="acct_checking_your_account">Checking your account…</string>
+    <string name="acct_device">Device</string>
+    <string name="acct_not_recorded">Not recorded</string>
+    <string name="acct_when">When</string>
+    <string name="acct_not_available">Not available</string>
+    <string name="acct_address">Address</string>
+    <string name="acct_not_recognised">Not recognised</string>
+    <string name="acct_this_wasnt_you_someone_may_have">This wasn\'t you? Someone may have gained access to your account. Take action now to keep your data safe.</string>
+    <string name="acct_we_found_a_suspicious_sign_in_to">We found a suspicious sign-in to your account. Review the details, revoke the access if it wasn\'t you, and change your password.</string>
+    <string name="acct_revoke_this_session">Revoke This Session</string>
+    <string name="acct_sign_in_again_to_continue">Sign in again to continue.</string>
+    <string name="acct_we_couldnt_sign_that_device_out">We couldn\'t sign that device out.</string>
+    <string name="acct_change_password">Change Password</string>
+    <string name="acct_that_device_is_already_signed_out">That device is already signed out. Change your password to end any other session.</string>
+    <string name="acct_back_to_security_activity">Back to Security Activity</string>
+    <string name="acct_suspicious_sign_in_details">Suspicious Sign-In Details</string>
+    <string name="acct_location">Location</string>
+    <string name="acct_approximate_location_based_on_ip">Approximate location based on IP</string>
+    <string name="acct_time">Time</string>
+    <string name="acct_your_local_time">Your local time</string>
+    <string name="acct_this_looks_suspicious_if_this_wasnt">This looks suspicious. If this wasn\'t you, we recommend revoking the access and changing your password immediately.</string>
+
+    <!-- security/BackupCodeScreens.kt -->
+    <string name="acct_generate_save_backup_codes">Generate &amp; Save Backup Codes</string>
+    <string name="acct_create_one_time_backup_codes_to">Create one-time backup codes to access your account if you lose your phone.</string>
+    <string name="acct_generate_codes">Generate Codes</string>
+    <string name="acct_cancel">Cancel</string>
+    <string name="acct_whats_included">What\'s Included</string>
+    <string name="acct_10_one_time_codes">10 One-Time Codes</string>
+    <string name="acct_each_code_can_be_used_once">Each code can be used once.</string>
+    <string name="acct_use_when_needed">Use When Needed</string>
+    <string name="acct_sign_in_when_your_phone_is">Sign in when your phone is unavailable.</string>
+    <string name="acct_each_code_is_unique">Each Code is Unique</string>
+    <string name="acct_generating_a_new_set_retires_the_old">Generating a new set retires the old one.</string>
+    <string name="acct_store_the_codes_somewhere_only_you">Store the codes somewhere only you can reach. Anyone with a code can pass your second factor.</string>
+    <string name="acct_backup_codes_saved">Backup Codes Saved</string>
+    <string name="acct_store_these_codes_somewhere_safe">Store these codes somewhere safe. They won\'t be shown again.</string>
+    <string name="acct_download_backup_codes">Download Backup Codes</string>
+    <string name="acct_done">Done</string>
+    <string name="acct_each_code_can_be_used_once_2">Each code can be used once. Generating new codes retires every code on this list.</string>
+    <string name="acct_your_backup_codes">Your Backup Codes</string>
+    <string name="acct_copied">Copied</string>
+    <string name="acct_copy_all">Copy all</string>
+    <string name="acct_copy_code">Copy %1$s</string>
+    <string name="acct_keep_them_safe">Keep them safe</string>
+    <string name="acct_store_safely_use_a_password_manager">Store safely — use a password manager or print them out.</string>
+    <string name="acct_dont_share_backup_codes_are_for_your">Don\'t share — backup codes are for your eyes only.</string>
+    <string name="acct_one_time_use_each_code_can_only_be">One time use — each code can only be used once.</string>
+    <string name="acct_saved_codes_confirm">I have saved these codes somewhere safe.</string>
+    <string name="acct_copy_them_into_your_password_manager">Copy them into your password manager, or write them down.</string>
+    <string name="acct_codes_not_shown_again">These codes will not be shown again</string>
+    <string name="acct_leave_now_and_the_list_is_gone_you">Leave now and the list is gone. You can generate a new set later, but the old codes stop working.</string>
+    <string name="acct_leave_anyway">Leave anyway</string>
+    <string name="acct_stay">Stay</string>
+
+    <!-- security/DeleteAccountScreen.kt -->
+    <string name="acct_delete_account">Delete Account</string>
+    <string name="acct_deleting_this_account_is_permanent">Deleting this account is permanent. Please read what is removed before continuing.</string>
+    <string name="acct_delete_my_account">Delete my account</string>
+    <string name="acct_enter_your_password_period">Enter your password.</string>
+    <string name="acct_that_password_is_not_correct">That password is not correct.</string>
+    <string name="acct_the_request_could_not_be_confirmed">The request could not be confirmed.</string>
+    <string name="acct_what_is_deleted">What is deleted</string>
+    <string name="acct_delete_removes_mailbox">Your GrapMail mailbox — the address itself, so mail addressed to it will no longer reach anyone.</string>
+    <string name="acct_every_message_sent_received_drafted">Every message: sent, received, drafted, archived and trashed.</string>
+    <string name="acct_your_aliases_the_extra_addresses">Your aliases — the extra addresses that delivered into this mailbox.</string>
+    <string name="acct_delete_cannot_be_undone">This cannot be undone and cannot be recovered. The address is not held for you — a deleted address may not be re-created.</string>
+    <string name="acct_enter_your_password_to_confirm">Enter your password to confirm</string>
+    <string name="acct_only_the_password_on_this_account">Only the password on this account can start the deletion.</string>
+
+    <!-- security/NotificationPrefsScreen.kt -->
+    <string name="acct_notification_preferences">Notification Preferences</string>
+    <string name="acct_choose_what_this_account_sends_and">Choose what this account sends, and when mail notifications go quiet.</string>
+    <string name="acct_apply_quiet_hours">Apply Quiet Hours</string>
+    <string name="acct_back_to_account_security">Back to Account Security</string>
+    <string name="acct_alerts">Alerts</string>
+    <string name="acct_mail_notifications">Mail notifications</string>
+    <string name="acct_new_mail_that_reaches_your_inbox">New mail that reaches your inbox.</string>
+    <string name="acct_security_alerts">Security alerts</string>
+    <string name="acct_sign_ins_password_changes_trusted">Sign-ins, password changes, trusted-device events. Always delivered — this cannot be silenced.</string>
+    <string name="acct_account_alerts">Account alerts</string>
+    <string name="acct_lifecycle_notices_about_your_account">Lifecycle notices about your account.</string>
+    <string name="acct_quiet_hours_mail_only">Quiet hours — mail only</string>
+    <string name="acct_paused">Paused</string>
+    <string name="acct_while_quiet_hours_are_on_mail">While quiet hours are on, mail notifications hold until the window ends. Security alerts are never paused.</string>
+    <string name="acct_quiet_from">Quiet from</string>
+    <string name="acct_quiet_until">Quiet until</string>
+    <string name="acct_clear_quiet_hours">Clear quiet hours</string>
+    <string name="acct_security_alerts_state">Security alerts state</string>
+    <string name="acct_security_alerts_are_on_for_this">Security alerts are on for this account, as they should be.</string>
+    <string name="acct_the_account_row_reports_security">The account row reports security alerts off. Delivery of critical security alerts is not something this screen can change.</string>
+    <string name="acct_preferences_apply_to_every_device">Preferences apply to every device that reads this account.</string>
+    <string name="acct_not_set">Not set</string>
+
+    <!-- security/PasskeysScreen.kt -->
+    <string name="acct_passkey_name_on_device">GrapMail on %1$s</string>
+    <string name="acct_passkey_added_use_it_the_next_time">Passkey added. Use it the next time you sign in.</string>
+    <string name="acct_no_passkey_was_created_on_this">No passkey was created on this device. Make sure a screen lock is set up.</string>
+    <string name="acct_the_passkey_could_not_be_added_try">The passkey could not be added. Try again.</string>
+    <string name="acct_passkeys">Passkeys</string>
+    <string name="acct_sign_in_with_a_biometric_credential">Sign in with a biometric credential instead of a password. A passkey stays on the device that created it.</string>
+    <string name="acct_add_passkey">Add passkey</string>
+    <string name="acct_no_passkeys_yet_add_one_and_you_can">No passkeys yet. Add one and you can sign in without your password.</string>
+    <string name="acct_what_a_passkey_is">What a passkey is</string>
+    <string name="acct_a_passkey_is_a_credential_this">A passkey is a credential this device holds in its hardware and proves with your fingerprint or face. Removing it here stops it signing in to this account — the copy on this device itself is removed through the device\'s own settings.</string>
+    <string name="acct_remove_passkey">Remove passkey?</string>
+    <string name="acct_remove_passkey_body">“%1$s” will stop signing you in to this account.</string>
+    <string name="acct_this_passkey">This passkey</string>
+    <string name="acct_remove">Remove</string>
+    <string name="acct_keep">Keep</string>
+    <string name="acct_passkey">Passkey</string>
+    <string name="acct_added_at">Added %1$s</string>
+    <string name="acct_last_used_at">Last used %1$s</string>
+    <string name="acct_this_credential_signs_you_in_without">This credential signs you in without a password.</string>
+    <string name="acct_removing">Removing…</string>
+    <string name="acct_remove_passkey_2">Remove passkey</string>
+
+    <!-- security/PasswordScreens.kt -->
+    <string name="acct_after_suspicious_activity">After Suspicious Activity</string>
+    <string name="acct_change_your_password">Change Your Password</string>
+    <string name="acct_your_account_was_accessed_from_an">Your account was accessed from an unfamiliar device. To keep your GrapMail account secure, please update your password now.</string>
+    <string name="acct_choose_a_strong_password_you_have">Choose a strong password you have not used here before.</string>
+    <string name="acct_update_password">Update Password</string>
+    <string name="acct_enter_your_current_password">Enter your current password.</string>
+    <string name="acct_use_at_least_8_characters">Use at least 8 characters.</string>
+    <string name="acct_add_at_least_one_letter">Add at least one letter.</string>
+    <string name="acct_add_at_least_one_number">Add at least one number.</string>
+    <string name="acct_add_at_least_one_symbol">Add at least one symbol.</string>
+    <string name="acct_the_two_new_passwords_do_not_match">The two new passwords do not match.</string>
+    <string name="acct_unrecognized_activity_was_found_on">Unrecognized activity was found on your account.</string>
+    <string name="acct_current_password">Current Password</string>
+    <string name="acct_new_password_2">New Password</string>
+    <string name="acct_confirm_new_password_2">Confirm New Password</string>
+    <string name="acct_passwords_do_not_match">Passwords do not match.</string>
+    <string name="acct_password_requirements_2">Password Requirements</string>
+    <string name="acct_contains_a_letter">Contains a letter</string>
+    <string name="acct_contains_a_number">Contains a number</string>
+    <string name="acct_contains_a_symbol">Contains a symbol</string>
+    <string name="acct_password_updated_successfully">Password Updated Successfully</string>
+    <string name="acct_password_changed_successfully">Password Changed Successfully</string>
+    <string name="acct_your_password_has_been_updated">Your password has been updated successfully. Other devices were signed out; this one stays signed in.</string>
+    <string name="acct_if_you_did_not_make_this_change">If you did not make this change, contact the support team immediately.</string>
+    <string name="acct_whats_next_title">What\'s Next?</string>
+    <string name="acct_youll_need_to_sign_in_again_on_your">You\'ll need to sign in again on your other devices, including mobile apps, desktop, and other browsers.</string>
+    <string name="acct_this_helps_keep_your_account_secure">This helps keep your account secure and prevents unauthorized access.</string>
+
+    <!-- security/RecoveryCodesScreen.kt -->
+    <string name="acct_the_server_returned_no_codes_try">The server returned no codes. Try again.</string>
+    <string name="acct_recovery_codes">Recovery Codes</string>
+    <string name="acct_one_time_codes_that_unlock_password">One-time codes that unlock password recovery when your phone and your trusted device are both unavailable.</string>
+    <string name="acct_download_codes">Download Codes</string>
+    <string name="acct_generating_a_new_set_retires_every">Generating a new set retires every code on this list.</string>
+    <string name="acct_recovery_codes_available">Recovery codes available</string>
+    <string name="acct_could_not_be_read_try_again">Could not be read. Try again.</string>
+    <string name="acct_yes_a_usable_set_exists_on_the">Yes — a usable set exists on the account.</string>
+    <string name="acct_no_generate_a_set_to_keep_a_recovery">No — generate a set to keep a recovery path open.</string>
+    <string name="acct_the_accounts_status_could_not_be">The account\'s status could not be read.</string>
+    <string name="acct_retry">Retry</string>
+    <string name="acct_yes">Yes</string>
+    <string name="acct_no">No</string>
+    <string name="acct_each_code_resets_the_password_once">Each code resets the password once.</string>
+    <string name="acct_use_at_forgot_password">Use at Forgot Password</string>
+    <string name="acct_enter_a_code_instead_of_the_texted">Enter a code instead of the texted one.</string>
+    <string name="acct_regenerate_anytime">Regenerate Anytime</string>
+    <string name="acct_a_new_set_retires_the_old_one">A new set retires the old one immediately.</string>
+    <string name="acct_not_the_same_as_backup_codes">Not the same as backup codes</string>
+    <string name="acct_two_step_backup_codes_prove_a_sign">Two-step backup codes prove a sign-in. Recovery codes reset a password. Keep both, and do not store them in the same place.</string>
+    <string name="acct_your_recovery_codes">Your Recovery Codes</string>
+    <string name="acct_one_time_use_each_code_resets_the">One time use — each code resets the password exactly once.</string>
+    <string name="acct_codes_are_stored_as_hashes_this_list">Codes are stored as hashes — this list is the only readable copy.</string>
+    <string name="acct_generating_a_new_set_retires_every_2">Generating a new set retires every code shown here.</string>
+    <string name="acct_leave_now_and_the_list_is_gone_the">Leave now and the list is gone. The codes themselves keep working — but only if you already saved them.</string>
+
+    <!-- security/SecurityComponents.kt -->
+    <string name="acct_working">Working…</string>
+    <string name="acct_unknown_device">Unknown device</string>
+    <string name="acct_this_device">This device</string>
+    <string name="acct_sign_out_this_device">Sign out this device</string>
+    <string name="acct_signed_in">Signed in</string>
+    <string name="acct_password_changed">Password changed</string>
+    <string name="acct_two_step_verification_turned_on">Two-step verification turned on</string>
+    <string name="acct_two_step_verification_turned_off">Two-step verification turned off</string>
+    <string name="acct_backup_codes_regenerated">Backup codes regenerated</string>
+    <string name="acct_a_backup_code_was_used">A backup code was used</string>
+    <string name="acct_a_device_was_signed_out">A device was signed out</string>
+    <string name="acct_signed_out_of_all_devices">Signed out of all devices</string>
+    <string name="acct_phone_number_changed">Phone number changed</string>
+    <string name="acct_account_activity">Account activity</string>
+    <string name="acct_time_recently">recently</string>
+    <string name="acct_time_just_now">just now</string>
+    <plurals name="acct_time_minutes_ago">
+        <item quantity="one">%1$d min ago</item>
+        <item quantity="other">%1$d min ago</item>
+    </plurals>
+    <plurals name="acct_time_hours_ago">
+        <item quantity="one">%1$d hr ago</item>
+        <item quantity="other">%1$d hr ago</item>
+    </plurals>
+    <string name="acct_time_yesterday">yesterday</string>
+    <plurals name="acct_time_days_ago">
+        <item quantity="one">%1$d day ago</item>
+        <item quantity="other">%1$d days ago</item>
+    </plurals>
+    <string name="acct_cannot_be_undone_default">This action cannot be undone. The device will be signed out immediately and will need to sign in again to access your account.</string>
+    <string name="acct_loading">Loading…</string>
+    <string name="acct_we_couldnt_load_this_right_now">We couldn\'t load this right now.</string>
+
+    <!-- security/SecurityHubScreens.kt -->
+    <string name="acct_account_security">Account Security</string>
+    <string name="acct_manage_your_security_settings_to">Manage your security settings to keep your account safe and secure.</string>
+    <string name="acct_your_security_matters_were_here_to">Your security matters. We\'re here to help.</string>
+    <string name="acct_password_reset_requested">Password reset requested</string>
+    <string name="acct_reset_pending_works_from">A link to reset your password was sent to your recovery email. It works from %1$s. If this was not you, cancel it now and change your recovery email.</string>
+    <string name="acct_reset_pending_generic">A link to reset your password was sent to your recovery email. If this was not you, cancel it now and change your recovery email.</string>
+    <string name="acct_cancelling">Cancelling…</string>
+    <string name="acct_cancel_the_reset">Cancel the reset</string>
+    <string name="acct_the_password_reset_was_cancelled">The password reset was cancelled.</string>
+    <string name="acct_the_reset_could_not_be_cancelled_try">The reset could not be cancelled. Try again.</string>
+    <string name="acct_we_couldnt_load_your_security">We couldn\'t load your security settings.</string>
+    <string name="acct_your_account_is_secure">Your account is secure</string>
+    <string name="acct_one_thing_left_to_do">One thing left to do</string>
+    <string name="acct_all_essential_security_features_are">All essential security features are active and your account is protected.</string>
+    <string name="acct_without_a_verified_recovery_email_a">Without a verified recovery email, a forgotten password can lock you out. It takes a minute to add one.</string>
+    <string name="acct_turn_on_two_step_verification_to">Turn on two-step verification to protect your account even if your password is ever exposed.</string>
+    <string name="acct_add_backup_codes_so_losing_access_to">Add backup codes so losing access to your recovery email does not lock you out.</string>
+    <string name="acct_security_features">Security Features</string>
+    <string name="acct_two_step_verification_title">Two-Step Verification</string>
+    <string name="acct_add_an_extra_layer_of_security_to">Add an extra layer of security to your account with a verification code.</string>
+    <string name="acct_enabled">Enabled</string>
+    <string name="acct_off">Off</string>
+    <string name="acct_phone_number_title">Phone Number</string>
+    <string name="acct_unverified">Unverified</string>
+    <string name="acct_recovery_email_title">Recovery Email</string>
+    <string name="acct_where_we_send_a_link_if_you_forget">Where we send a link if you forget your password.</string>
+    <string name="acct_add">Add</string>
+    <string name="acct_account_management">Account Management</string>
+    <string name="acct_update_your_account_password_for">Update your account password for better security.</string>
+    <string name="acct_backup_codes_title">Backup Codes</string>
+    <plurals name="acct_backup_codes_unused">
+        <item quantity="one">%1$d codes unused.</item>
+        <item quantity="other">%1$d codes unused.</item>
+    </plurals>
+    <string name="acct_generate_and_manage_backup_codes">Generate and manage backup codes for 2FA.</string>
+    <string name="acct_sign_out_all_devices_title">Sign Out All Devices</string>
+    <string name="acct_log_out_from_all_devices_except_this">Log out from all devices except this one.</string>
+    <string name="acct_permanently_delete_this_account_and">Permanently delete this account and its mailbox.</string>
+    <string name="acct_active_sessions">Active Sessions</string>
+    <string name="acct_devices_signed_in_to_this_account">Devices signed in to this account.</string>
+    <string name="acct_sign_ins_and_changes_to_this_account">Sign-ins and changes to this account.</string>
+    <string name="acct_trusted_devices">Trusted Devices</string>
+    <string name="acct_devices_whose_hardware_key_can_prove">Devices whose hardware key can prove this account.</string>
+    <string name="acct_sign_in_with_a_biometric_credential_2">Sign in with a biometric credential instead of a password.</string>
+    <string name="acct_one_time_codes_that_unlock_password_2">One-time codes that unlock password recovery.</string>
+    <string name="acct_which_alerts_this_account_sends_and">Which alerts this account sends, and when.</string>
+    <string name="acct_help_support">Help &amp; Support</string>
+    <string name="acct_visit_our_support_center_for">Visit our support center for security assistance.</string>
+    <string name="acct_enable_two_step_verification">Enable Two-Step Verification</string>
+    <string name="acct_add_an_extra_layer_of_security_to_2">Add an extra layer of security to your account.</string>
+    <string name="acct_more_protection">More Protection</string>
+    <string name="acct_prevents_unauthorized_access_even_if">Prevents unauthorized access, even if your password is compromised.</string>
+    <string name="acct_codes_by_email">Codes by Email</string>
+    <string name="acct_well_email_a_6_digit_code_to_your">We\'ll email a 6-digit code to your verified recovery email when you sign in.</string>
+    <string name="acct_easy_to_manage">Easy to Manage</string>
+    <string name="acct_you_can_turn_it_off_anytime_from">You can turn it off anytime from account security settings.</string>
+    <string name="acct_youll_need_a_verified_recovery_email">You\'ll need a verified recovery email to enable two-step verification.</string>
+    <string name="acct_confirm_your_password">Confirm Your Password</string>
+    <string name="acct_enter_your_password_to_continue">Enter your password to continue.</string>
+    <string name="acct_your_password_is_never_stored_on_our">Your password is never stored on our servers and is only used for verification.</string>
+    <string name="acct_add_a_phone_number_first">Add a phone number first.</string>
+    <string name="acct_verify_your_phone">Verify Your Phone</string>
+    <string name="acct_well_text_a_code_to">We\'ll text a code to %1$s.</string>
+    <string name="acct_well_text_a_code_to_account_number">We\'ll text a code to the number on this account.</string>
+    <string name="acct_enter_the_6_digit_code_period">Enter the 6-digit code.</string>
+    <string name="acct_phone_number_2">"  Phone Number"</string>
+    <string name="acct_verification_code_title">Verification Code</string>
+    <string name="acct_didnt_receive_the_code_check_your_2">Didn\'t receive the code? Check your spam folder or make sure your phone is on and has signal.</string>
+    <string name="acct_add_a_phone_number">Add a phone number</string>
+    <string name="acct_enter_your_password_again">Enter your password again</string>
+    <string name="acct_send_me_a_new_code">Send me a new code</string>
+    <string name="acct_add_a_recovery_email_2">Add a Recovery Email</string>
+    <string name="acct_check_your_email">Check Your Email</string>
+    <string name="acct_two_step_verification_emails_your">Two-step verification emails your sign-in codes to a verified recovery email. Add one first.</string>
+    <string name="acct_weve_emailed_a_6_digit_code_to">We\'ve emailed a 6-digit code to %1$s.</string>
+    <string name="acct_well_email_a_code_to_the_recovery">We\'ll email a code to the recovery email on this account.</string>
+    <string name="acct_add_recovery_email">Add Recovery Email</string>
+    <string name="acct_turn_on">Turn On</string>
+    <string name="acct_recovery_email_2">"  Recovery Email"</string>
+    <string name="acct_didnt_get_it_check_your_spam_folder_2">Didn\'t get it? Check your spam folder. From now on, sign-in codes will go to this address.</string>
+    <string name="acct_two_step_verification_enabled">Two-Step Verification Enabled</string>
+    <string name="acct_your_account_is_now_protected_with">Your account is now protected with an extra layer of security.</string>
+    <string name="acct_back_to_security_settings">Back to Security Settings</string>
+    <string name="acct_2_step_verification_enabled">2-Step Verification Enabled</string>
+    <string name="acct_keep_backup_codes_safe">Keep Backup Codes Safe</string>
+    <string name="acct_use_them_if_you_ever_lose_access_to">Use them if you ever lose access to your phone.</string>
+    <string name="acct_update_your_phone_number">Update Your Phone Number</string>
+    <string name="acct_keep_it_current_so_codes_always">Keep it current so codes always reach you.</string>
+    <string name="acct_youll_be_asked_for_a_code_each_time">You\'ll be asked for a code each time you sign in on a new device.</string>
+    <string name="acct_disable_two_step_verification">Disable Two-Step Verification?</string>
+    <string name="acct_this_will_remove_the_extra_layer_of">This will remove the extra layer of security from your account.</string>
+    <string name="acct_without_two_step_verification_a">Without two-step verification, a password alone is enough to sign in to this account.</string>
+    <string name="acct_two_step_verification_disabled">Two-Step Verification Disabled</string>
+    <string name="acct_two_step_verification_has_been">Two-step verification has been disabled. Your account is now protected by your password only.</string>
+    <string name="acct_turn_it_back_on">Turn it back on</string>
+    <string name="acct_what_happens_now">What happens now?</string>
+    <string name="acct_password_only">Password Only</string>
+    <string name="acct_signing_in_no_longer_asks_for_a_code">Signing in no longer asks for a code.</string>
+    <string name="acct_backup_codes_retired">Backup Codes Retired</string>
+    <string name="acct_the_codes_you_saved_no_longer_apply">The codes you saved no longer apply.</string>
+    <string name="acct_you_can_turn_two_step_verification">You can turn two-step verification back on at any time from Account Security.</string>
+    <string name="acct_trusted_devices_body">Devices whose hardware-backed key can prove this account and unlock password recovery.</string>
+    <string name="acct_trusted_devices_no_biometric_suffix">" Device key (no biometric lock)."</string>
+    <string name="acct_trust_this_device">Trust this device</string>
+    <string name="acct_no_trusted_devices_yet_this_device">No trusted devices yet. This device enrolls itself the next time you sign in.</string>
+    <string name="acct_what_trusted_means">What trusted means</string>
+    <string name="acct_a_trusted_device_can_prove_itself">A trusted device can prove itself with a key stored in its hardware — it never sends the key, only a signature. Revoke a device the moment you stop holding it.</string>
+    <string name="acct_remove_trusted_device">Remove trusted device?</string>
+    <string name="acct_remove_trusted_device_own">“%1$s” will lose its key as a credential. This is the device you are holding — password recovery from it will stop working until you sign in again.</string>
+    <string name="acct_remove_trusted_device_other">“%1$s” will lose its key as a credential. It will need to sign in again before it can be trusted once more.</string>
+    <string name="acct_remove_trust">Remove trust</string>
+    <string name="acct_last_seen_dot">"·  Last seen %1$s"</string>
+    <string name="acct_revoked">Revoked</string>
+    <string name="acct_unknown_platform">Unknown platform</string>
+
+    <!-- security/SessionScreens.kt -->
+    <string name="acct_this_will_sign_you_out_of_all">This will sign you out of all devices except this one.</string>
+    <string name="acct_youll_stay_signed_in_here">You\'ll stay signed in here</string>
+    <string name="acct_every_other_phone_tablet_and_browser">Every other phone, tablet and browser is signed out immediately. This device keeps working, so you can carry on.</string>
+    <string name="acct_use_this_when_a_device_is_lost">Use this when a device is lost, borrowed or sold — not instead of changing a leaked password.</string>
+    <string name="acct_sessions_on_other_devices_end_the">Sessions on other devices end the moment this completes.</string>
+    <string name="acct_signed_out_of_all_devices_2">Signed Out of All Devices</string>
+    <string name="acct_you_have_been_signed_out_of_all">You have been signed out of all devices except this one.</string>
+    <string name="acct_anyone_using_this_account_on_another">Anyone using this account on another device now needs your password again.</string>
+    <string name="acct_what_happens_next">What happens next?</string>
+    <string name="acct_this_device_stays_signed_in_every">This device stays signed in. Every other device has to sign in again, and anyone who had a session can no longer read this mailbox.</string>
+    <string name="acct_only_this_device_is_signed_in">Only this device is signed in</string>
+    <string name="acct_manage_active_sessions_2">Manage Active Sessions</string>
+    <string name="acct_devices_currently_signed_in_to_this">Devices currently signed in to this account.</string>
+    <string name="acct_sign_out_all_devices">Sign out all devices</string>
+    <string name="acct_loading_sessions">Loading sessions…</string>
+    <string name="acct_no_sessions_are_recorded_yet">No sessions are recorded yet.</string>
+    <plurals name="acct_active_sessions_count">
+        <item quantity="one">%1$d Active Sessions</item>
+        <item quantity="other">%1$d Active Sessions</item>
+    </plurals>
+    <string name="acct_revoke_all">Revoke All</string>
+    <string name="acct_keep_your_account_secure">Keep Your Account Secure</string>
+    <string name="acct_if_you_see_a_device_you_dont">If you see a device you don\'t recognize, revoke the session immediately. This will prevent unauthorized access.</string>
+    <string name="acct_revoke_session_access">Revoke Session Access?</string>
+    <string name="acct_this_device_will_be_signed_out_of">This device will be signed out of your GrapMail account and will need to sign in again.</string>
+    <string name="acct_revoke_session">Revoke Session</string>
+    <string name="acct_keep_this_session">Keep this session</string>
+    <string name="acct_that_device">That device</string>
+    <string name="acct_suspicious_access_detected">Suspicious Access Detected</string>
+    <string name="acct_confirm_session_revocation">Confirm Session Revocation</string>
+    <string name="acct_this_will_immediately_sign_this">This will immediately sign this session out and no longer have access to your GrapMail account.</string>
+    <string name="acct_revoke_session_access_2">Revoke Session Access</string>
+    <string name="acct_unverified_activity">Unverified activity</string>
+    <string name="acct_unverified_activity_with_device">%1$s · This session showed activity that did not match your usual sign-in pattern.</string>
+    <string name="acct_unverified_activity_body">This session showed activity that did not match your usual sign-in pattern.</string>
+    <string name="acct_session_revoked_successfully">Session Revoked Successfully</string>
+    <string name="acct_the_session_has_been_revoked_and">The session has been revoked and this device can no longer access your account.</string>
+    <string name="acct_the_device_will_need_your_password">The device will need your password to sign in again.</string>
+    <string name="acct_revoked_session">Revoked Session</string>
+    <string name="acct_this_device_is_now_signed_out">This device is now signed out.</string>
+    <string name="acct_the_suspicious_session_has_been">The suspicious session has been revoked and can no longer access your GrapMail account.</string>
+    <string name="acct_change_your_password_too_a_revoked">Change your password too — a revoked session does not change a leaked one.</string>
+    <string name="acct_revoked_session_details">Revoked Session Details</string>
+    <string name="acct_this_device_is_signed_out">This device is signed out</string>
+    <!-- security/ScreenPrivacy.kt, security/RootCheck.kt -->
+    <string name="acct_allow_screenshots_title">Allow screenshots</string>
+    <string name="acct_allow_screenshots_off">Off — screenshots and the app switcher preview are blocked while signed in</string>
+    <string name="acct_allow_screenshots_on">On — screenshots and the app switcher preview are allowed</string>
+    <string name="acct_root_warning_title">This device may be rooted</string>
+    <string name="acct_root_warning_body">GrapMail found signs that this device is rooted or runs a modified system. Apps with root access may be able to read data that is normally protected. GrapMail keeps working, but keep this in mind for sensitive mail.</string>
+    <string name="acct_root_warning_dismiss">Dismiss</string>
+</resources>

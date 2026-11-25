@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  First-time feature tips (ui/components/FeatureTip.kt, logic/FeatureTipsStore.kt).
+  One tip per app session, anchored to the control it describes. Titles stay
+  at four words or fewer, bodies at one sentence under 90 characters. The same
+  English text as iOS's "Feature tips" block (GrapMail/en.lproj/Localizable.strings),
+  except the long-press tip: on Android a long press selects, on iOS it previews.
+-->
+<resources>
+    <string name="tip_got_it">Got it</string>
+    <string name="tip_close">Close tip</string>
+
+    <string name="tip_swipe_title">Swipe to tidy up</string>
+    <string name="tip_swipe_body">Swipe a message right to archive it, or left to move it to Trash.</string>
+
+    <string name="tip_long_press_title">Select several at once</string>
+    <string name="tip_long_press_body">Touch and hold a message to select it, then tap others to add them.</string>
+
+    <string name="tip_categories_title">Split your inbox</string>
+    <string name="tip_categories_body">Tap a chip to show only Priority, People, Newsletters and more.</string>
+
+    <string name="tip_screener_title">Screen new senders</string>
+    <string name="tip_screener_body">Pending approval, in the menu, holds mail from new senders until you allow them.</string>
+
+    <string name="tip_accounts_title">Switch accounts quickly</string>
+    <string name="tip_accounts_body">Tap your picture to switch accounts or add another one.</string>
+
+    <string name="tip_snooze_title">Snooze for later</string>
+    <string name="tip_snooze_body">Tap More to snooze the selected mail until a better time.</string>
+</resources>

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="identity_settings_appearance">المظهر</string>
+    <string name="identity_match_wallpaper_title">مطابقة الخلفية</string>
+    <string name="identity_match_wallpaper_subtitle">استخدم ألوان خلفية الشاشة للأزرار والتمييزات. تبقى الصور الرمزية وألوان الحالة والنص بألوان GrapMail.</string>
+</resources>

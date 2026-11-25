@@ -1,0 +1,21 @@
+/* GrapMailNotificationService — Brazilian Portuguese table. */
+
+"New encrypted message" = "Nova mensagem criptografada";
+"New mail" = "Novo e-mail";
+"1 new message" = "1 nova mensagem";
+"%lld new messages" = "%lld novas mensagens";
+"%lld unread in the inbox" = "%lld não lidas na caixa de entrada";
+"Encrypted message" = "Mensagem criptografada";
+"Unknown sender" = "Remetente desconhecido";
+"No subject" = "Sem assunto";
+"This was me" = "Fui eu";
+"Secure account" = "Proteger conta";
+"Archive" = "Arquivar";
+"Mark as read" = "Marcar como lida";
+"Reply" = "Responder";
+"Send" = "Enviar";
+"Reply…" = "Responder…";
+"Reply in app" = "Responder no app";
+"More" = "Mais";
+/* Notification title: a sign-in code, then the sender */
+"%@ · %@" = "%@ · %@";

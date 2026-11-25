@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="identity_settings_appearance">Görünüm</string>
+    <string name="identity_match_wallpaper_title">Duvar kağıdıyla eşleştir</string>
+    <string name="identity_match_wallpaper_subtitle">Düğmeler ve vurgular için duvar kağıdınızın renklerini kullanın. Avatarlar, durum renkleri ve metin GrapMail’in kendi renklerinde kalır.</string>
+</resources>

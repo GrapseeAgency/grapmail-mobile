@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="mail_receipt_read_at">Letto %1$s</string>
+    <string name="mail_receipt_requested_pending">Conferma di lettura richiesta · non ancora letto</string>
+    <string name="mail_receipt_server_sent">Conferma di lettura inviata</string>
+    <string name="mail_receipt_ask_title">Il mittente ha chiesto una conferma di lettura</string>
+    <string name="mail_receipt_ask_body">Inviare a %1$s una conferma che hai aperto questo messaggio? Saprà solo quando l\'hai aperto, nient\'altro.</string>
+    <string name="mail_receipt_ask_send">Invia conferma</string>
+    <string name="mail_receipt_ask_decline">Non inviare</string>
+    <string name="mail_receipt_mode_title">Invia conferme di lettura</string>
+    <string name="mail_receipt_mode_body">Quando un messaggio richiede una conferma di lettura. Le conferme non vengono mai inviate per spam, mittenti bloccati o email crittografate, a meno che tu non scelga Sempre.</string>
+    <string name="mail_receipt_mode_never">Mai</string>
+    <string name="mail_receipt_mode_ask">Chiedi</string>
+    <string name="mail_receipt_mode_always">Sempre</string>
+    <string name="mail_receipt_mode_always_note">Sempre invia le conferme anche per spam, mittenti bloccati ed email crittografate.</string>
+    <string name="mail_receipt_mode_unavailable">Impossibile caricare questa impostazione. Controlla la connessione.</string>
+    <string name="mail_compose_request_receipt">Richiedi conferma di lettura</string>
+</resources>

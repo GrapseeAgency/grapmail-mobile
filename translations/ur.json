@@ -1,0 +1,73 @@
+{
+ "android": {
+  "strings_r9_reader.xml": {
+   "reader_earlier_messages": {"one": "%d پچھلا پیغام", "other": "%d پچھلے پیغامات"},
+   "reader_participants": {"one": "%d شخص", "other": "%d افراد"},
+   "reader_message_count": {"one": "%d پیغام", "other": "%d پیغامات"},
+   "reader_you": "آپ",
+   "reader_unread": "نہ پڑھا گیا",
+   "reader_earlier_action": "تہہ شدہ پیغامات دکھائیں",
+   "reader_open_message_action": "یہ پیغام کھولیں",
+   "reader_quoted_show": "نقل شدہ متن دکھائیں",
+   "reader_quoted_hide": "نقل شدہ متن چھپائیں",
+   "reader_state_expanded": "کھلا",
+   "reader_state_collapsed": "تہہ شدہ",
+   "reader_reply_to": "%1$s کو جواب دیں…",
+   "reader_reply_fallback": "جواب دیں…",
+   "reader_reply_options": "جواب کے اختیارات",
+   "reader_quick_reply": "فوری جواب",
+   "reader_attach_share_chooser": "منسلکہ شیئر کریں",
+   "reader_attach_view_image": "تصویر دیکھیں",
+   "reader_attach_save_named": "%1$s محفوظ کریں",
+   "reader_attach_share_named": "%1$s شیئر کریں",
+   "reader_attach_share_nothing": "اس ڈیوائس پر کوئی ایپ یہ فائل شیئر نہیں کر سکتی۔",
+   "reader_viewer_position": "%1$d از %2$d",
+   "reader_viewer_too_large": "یہ تصویر یہاں نہیں دکھائی جا سکتی۔",
+   "compose_r9_leave_title": "یہ پیغام چھوڑ دیں؟",
+   "compose_r9_leave_attachments": "ڈرافٹ ابھی منسلکات محفوظ نہیں رکھتے۔ متن کو بغیر منسلکات کے ڈرافٹ میں محفوظ کریں، یا ترمیم جاری رکھیں۔",
+   "compose_r9_save_text_only": "صرف متن محفوظ کریں",
+   "compose_r9_draft_failed_title": "یہ ڈرافٹ محفوظ نہیں ہوا",
+   "compose_r9_leave_without_saving": "محفوظ کیے بغیر نکلیں",
+   "compose_r9_encrypt_failed": "یہ پیغام خفیہ نہیں کیا جا سکا، اس لیے کچھ نہیں بھیجا گیا۔",
+   "compose_editor_toolbar": "متن کی فارمیٹنگ",
+   "compose_editor_bold": "موٹا",
+   "compose_editor_italic": "ترچھا",
+   "compose_editor_underline": "زیرِ خط",
+   "compose_editor_strike": "کاٹا ہوا",
+   "compose_editor_bullets": "بلٹس",
+   "compose_editor_numbered": "نمبر وار",
+   "compose_editor_text_colour": "متن کا رنگ",
+   "compose_editor_black": "سیاہ",
+   "compose_editor_blue": "نیلا",
+   "compose_editor_red": "سرخ",
+   "compose_editor_green": "سبز",
+   "compose_editor_highlight": "نمایاں کریں",
+   "compose_editor_highlight_colour": "نمایاں کرنے کا رنگ",
+   "compose_editor_yellow": "پیلا",
+   "compose_editor_pink": "گلابی",
+   "compose_editor_font": "فونٹ",
+   "compose_editor_sans": "بغیر سیرف",
+   "compose_editor_larger": "بڑا",
+   "compose_editor_clear": "فارمیٹنگ صاف کریں",
+   "compose_editor_image": "تصویر",
+   "compose_editor_insert_image": "تصویر شامل کریں"
+  },
+  "strings_r9_platform.xml": {
+   "r9_platform_notif_channel_new_mail_desc": "جب ان باکس میں نئے پیغامات آئیں تو بتاتا ہے۔",
+   "r9_platform_price_per_week": "%1$s/ہفتہ",
+   "r9_platform_price_per_month": "%1$s/ماہ",
+   "r9_platform_price_per_3_months": "ہر 3 ماہ %1$s",
+   "r9_platform_price_per_6_months": "ہر 6 ماہ %1$s",
+   "r9_platform_price_per_year": "%1$s/سال"
+  },
+  "strings_r9_mailbox.xml": {
+   "mail_sendlater_channel_name": "مقررہ ترسیل",
+   "mail_sendlater_channel_desc": "بھیجے جانے کے منتظر پیغامات کی الٹی گنتی"
+  },
+  "strings_identity.xml": {
+   "identity_settings_appearance": "ظاہری شکل",
+   "identity_match_wallpaper_title": "وال پیپر سے ملائیں",
+   "identity_match_wallpaper_subtitle": "بٹنوں اور نمایاں کرنے کے لیے اپنے وال پیپر کے رنگ استعمال کریں۔ اواتار، حالت کے رنگ اور متن GrapMail کے اپنے رنگوں میں رہتے ہیں۔"
+  }
+ }
+}

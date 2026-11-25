@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Sent-list read-receipt suffixes; translated from values/strings_mail_receipts_list.xml. -->
+<resources>
+    <string name="mail_row_receipt_read_suffix">\u0020· 已讀</string>
+    <string name="mail_row_receipt_requested_suffix">\u0020· 已要求回條</string>
+</resources>

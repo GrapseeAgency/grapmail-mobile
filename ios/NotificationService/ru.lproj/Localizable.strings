@@ -1,0 +1,21 @@
+/* GrapMailNotificationService — base English table. */
+
+"New encrypted message" = "Новое зашифрованное письмо";
+"New mail" = "Новое письмо";
+"1 new message" = "1 новое письмо";
+"%lld new messages" = "Новых писем: %lld";
+"%lld unread in the inbox" = "Непрочитанных во «Входящих»: %lld";
+"Encrypted message" = "Зашифрованное письмо";
+"Unknown sender" = "Неизвестный отправитель";
+"No subject" = "Без темы";
+"This was me" = "Это был я";
+"Secure account" = "Защитить аккаунт";
+"Archive" = "Архивировать";
+"Mark as read" = "Прочитано";
+"Reply" = "Ответить";
+"Send" = "Отправить";
+"Reply…" = "Ответить…";
+"Reply in app" = "Ответить в приложении";
+"More" = "Ещё";
+/* Notification title: a sign-in code, then the sender */
+"%@ · %@" = "%@ · %@";

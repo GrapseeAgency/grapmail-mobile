@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Loading / empty / error / offline states (translated from values/strings_states.xml). -->
+<resources>
+    <!-- Shared -->
+    <string name="states_loading">در حال بارگیری…</string>
+    <string name="states_offline_banner">آفلاین هستید. آخرین مواردی که بارگیری شده بود نمایش داده می‌شود — هر چیزی که به شبکه نیاز دارد تا اتصال دوباره منتظر می‌ماند.</string>
+    <string name="states_error_title">مشکلی پیش آمد</string>
+    <string name="states_error_body">اکنون بارگیری این مورد ممکن نشد. اتصال خود را بررسی کنید و دوباره امتحان کنید.</string>
+    <string name="states_error_offline_body">آفلاین هستید. به Wi-Fi یا داده تلفن همراه وصل شوید و دوباره امتحان کنید.</string>
+    <string name="states_retry">دوباره امتحان کنید</string>
+
+    <!-- Labels -->
+    <string name="states_labels_loading">در حال بارگیری برچسب‌ها…</string>
+    <string name="states_labels_failed_title">برچسب‌ها بارگیری نشدند</string>
+
+    <!-- Scheduled -->
+    <string name="states_scheduled_loading">در حال بارگیری نامه‌های زمان‌بندی‌شده…</string>
+    <string name="states_scheduled_failed_title">نامه‌های زمان‌بندی‌شده بارگیری نشدند</string>
+    <string name="states_scheduled_empty_title">هیچ موردی زمان‌بندی نشده است</string>
+
+    <!-- Contacts and files -->
+    <string name="states_contacts_loading">در حال جمع‌آوری افراد از نامه‌های شما…</string>
+    <string name="states_files_loading">در حال جمع‌آوری پیوست‌ها…</string>
+
+    <!-- Connected mailboxes -->
+    <string name="states_providers_loading">در حال بارگیری صندوق‌های پستی متصل…</string>
+
+    <!-- Reader -->
+    <string name="states_thread_loading">در حال باز کردن این گفتگو…</string>
+
+    <!-- Security -->
+    <string name="states_activity_failed_title">فعالیت بارگیری نشد</string>
+    <string name="states_sessions_failed_title">نشست‌ها بارگیری نشدند</string>
+</resources>

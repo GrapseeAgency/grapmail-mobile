@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Round 8, Workstream A: GrapMail visual identity (docs/design/round8-spec.md §1).
+  English only. The translations come in a later round; until then, values-tr
+  and the other locales fall back to these strings.
+-->
+<resources>
+    <!-- Settings → Appearance section header (shown on Android 12+ only, §1.11). -->
+    <string name="identity_settings_appearance">Appearance</string>
+    <!-- The Material You opt-in switch, default off (§1.11). -->
+    <string name="identity_match_wallpaper_title">Match wallpaper</string>
+    <string name="identity_match_wallpaper_subtitle">Use your wallpaper\'s colours for buttons and highlights. Avatars, status colours and text stay GrapMail\'s.</string>
+</resources>

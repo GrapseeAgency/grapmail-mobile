@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <plurals name="reader_earlier_messages">
+        <item quantity="one">%d پیام پیشین</item>
+        <item quantity="other">%d پیام پیشین</item>
+    </plurals>
+    <plurals name="reader_participants">
+        <item quantity="one">%d نفر</item>
+        <item quantity="other">%d نفر</item>
+    </plurals>
+    <plurals name="reader_message_count">
+        <item quantity="one">%d پیام</item>
+        <item quantity="other">%d پیام</item>
+    </plurals>
+    <string name="reader_you">شما</string>
+    <string name="reader_unread">خوانده‌نشده</string>
+    <string name="reader_earlier_action">نمایش پیام‌های تاشده</string>
+    <string name="reader_open_message_action">باز کردن این پیام</string>
+    <string name="reader_quoted_show">نمایش متن نقل‌شده</string>
+    <string name="reader_quoted_hide">پنهان کردن متن نقل‌شده</string>
+    <string name="reader_state_expanded">باز</string>
+    <string name="reader_state_collapsed">تاشده</string>
+    <string name="reader_reply_to">پاسخ به %1$s…</string>
+    <string name="reader_reply_fallback">پاسخ…</string>
+    <string name="reader_reply_options">گزینه‌های پاسخ</string>
+    <string name="reader_quick_reply">پاسخ سریع</string>
+    <string name="reader_attach_share_chooser">اشتراک‌گذاری پیوست</string>
+    <string name="reader_attach_view_image">دیدن تصویر</string>
+    <string name="reader_attach_save_named">ذخیره %1$s</string>
+    <string name="reader_attach_share_named">اشتراک %1$s</string>
+    <string name="reader_attach_share_nothing">هیچ برنامه‌ای در این دستگاه نمی‌تواند این فایل را به اشتراک بگذارد.</string>
+    <string name="reader_viewer_position">%1$d از %2$d</string>
+    <string name="reader_viewer_too_large">این تصویر را نمی‌توان اینجا پیش‌نمایش کرد.</string>
+    <string name="compose_r9_leave_title">از این پیام خارج می‌شوید؟</string>
+    <string name="compose_r9_leave_attachments">پیش‌نویس‌ها هنوز پیوست نگه نمی‌دارند. متن را بدون پیوست ذخیره کنید یا به ویرایش ادامه دهید.</string>
+    <string name="compose_r9_save_text_only">ذخیره فقط متن</string>
+    <string name="compose_r9_draft_failed_title">این پیش‌نویس ذخیره نشد</string>
+    <string name="compose_r9_leave_without_saving">خروج بدون ذخیره</string>
+    <string name="compose_r9_encrypt_failed">این پیام رمزگذاری نشد، بنابراین چیزی ارسال نشد.</string>
+    <string name="compose_editor_toolbar">قالب‌بندی متن</string>
+    <string name="compose_editor_bold">پررنگ</string>
+    <string name="compose_editor_italic">کج</string>
+    <string name="compose_editor_underline">زیرخط</string>
+    <string name="compose_editor_strike">خط‌خورده</string>
+    <string name="compose_editor_bullets">نشانه‌ها</string>
+    <string name="compose_editor_numbered">شماره‌دار</string>
+    <string name="compose_editor_text_colour">رنگ متن</string>
+    <string name="compose_editor_black">سیاه</string>
+    <string name="compose_editor_blue">آبی</string>
+    <string name="compose_editor_red">سرخ</string>
+    <string name="compose_editor_green">سبز</string>
+    <string name="compose_editor_highlight">برجسته‌سازی</string>
+    <string name="compose_editor_highlight_colour">رنگ برجسته‌سازی</string>
+    <string name="compose_editor_yellow">زرد</string>
+    <string name="compose_editor_pink">صورتی</string>
+    <string name="compose_editor_font">قلم</string>
+    <string name="compose_editor_sans">بدون دندانه</string>
+    <string name="compose_editor_serif">Serif</string>
+    <string name="compose_editor_mono">Monospace</string>
+    <string name="compose_editor_larger">بزرگ‌تر</string>
+    <string name="compose_editor_clear">پاک کردن قالب</string>
+    <string name="compose_editor_image">تصویر</string>
+    <string name="compose_editor_insert_image">درج تصویر</string>
+</resources>

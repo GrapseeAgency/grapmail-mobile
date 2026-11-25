@@ -180,7 +180,10 @@ if ! adb install -r "$APK" >/tmp/install.log 2>&1; then
   tr -d '\r' < /tmp/install.log >&2
   exit 1
 fi
-if ! adb shell am start -W -n "$PKG/.MainActivity" >/tmp/launch.log 2>&1; then
+# `--es gmNoTips 1` on every plain launch: a first-time feature tip
+# (ui/components/FeatureTip.kt reads the extra; iOS's walk passes -gmNoTips)
+# would otherwise float over whichever screen the walk photographs first.
+if ! adb shell am start -W -n "$PKG/.MainActivity" --es gmNoTips 1 >/tmp/launch.log 2>&1; then
   echo "FATAL: launching $PKG/.MainActivity failed:" >&2
   tr -d '\r' < /tmp/launch.log >&2
   exit 1
@@ -689,7 +692,7 @@ else
   adb shell dumpsys shortcut 2>/dev/null | grep -i -m6 "compose\|shortcutinfo\|$PKG" \
     | sed 's/^/      /' || true
   log_reset
-  adb shell am start -W -a "$SHORTCUT_ACTION" -n "$PKG/.MainActivity" >/tmp/shortcut.log 2>&1 \
+  adb shell am start -W -a "$SHORTCUT_ACTION" -n "$PKG/.MainActivity" --es gmNoTips 1 >/tmp/shortcut.log 2>&1 \
     || { echo "FAIL: the shortcut intent did not start the activity" >&2; cat /tmp/shortcut.log >&2; FAILURES=$((FAILURES + 1)); }
   if wait_nodes "n.get('resource-id','').rsplit('/',1)[-1]=='mail-to'" >/dev/null; then
     shot 122-platform-compose-shortcut
@@ -797,7 +800,7 @@ for _ in 1 2 3 4 5 6; do
   # still appears in the recents list, so a foreground check that greps for the
   # package reads a stale answer and never relaunches. am start is idempotent —
   # it brings a live activity to the front and starts an exited one.
-  adb shell am start -n "$PKG/.MainActivity" >/dev/null 2>&1 || true
+  adb shell am start -n "$PKG/.MainActivity" --es gmNoTips 1 >/dev/null 2>&1 || true
   sleep 2
 done
 must "home before settings" wait_nodes "n.get('resource-id','').rsplit('/',1)[-1]=='mail-menu'" >/dev/null
@@ -1178,7 +1181,7 @@ done
 echo "· session restore: restart must open signed-in, not at welcome"
 adb shell am force-stop "$PKG"
 sleep 1
-adb shell am start -W -n "$PKG/.MainActivity" >/dev/null
+adb shell am start -W -n "$PKG/.MainActivity" --es gmNoTips 1 >/dev/null
 sleep 6
 shot 10-session-restored
 # assert, don't tap: the home screen must show the signed-in state
@@ -1223,7 +1226,7 @@ adb shell "cmd uimode night yes"
 sleep 3
 adb shell am force-stop "$PKG"
 sleep 1
-adb shell am start -W -n "$PKG/.MainActivity" >/dev/null
+adb shell am start -W -n "$PKG/.MainActivity" --es gmNoTips 1 >/dev/null
 sleep 8
 shot 12-welcome-dark
 must_tap "Create Account"

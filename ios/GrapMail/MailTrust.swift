@@ -34,46 +34,74 @@ enum UrlSafety {
         let url = raw.trimmingCharacters(in: .whitespacesAndNewlines)
         guard let parsed = URL(string: url), let host = parsed.host?.lowercased(), !host.isEmpty else {
             return UrlVerdict(original: raw, displayHost: raw, risk: .medium,
-                              reasons: ["Not a readable web address"])
+                              reasons: [String(localized: "Not a readable web address")])
         }
         var reasons: [String] = []
         var score = 0
 
         if parsed.scheme?.lowercased() == "http" {
             score += 1
-            reasons.append("Opens without encryption (http)")
+            reasons.append(String(localized: "Opens without encryption (http)"))
         }
         if let user = parsed.user, !user.isEmpty {
             score += 2
-            reasons.append("The text before “@” is decoration — this opens \(host)")
+            reasons.append(String(localized: "The text before “@” is decoration — this opens \(host)"))
         }
         if host.matches("^\\d{1,3}(\\.\\d{1,3}){3}$") {
             score += 2
-            reasons.append("A raw IP address instead of a domain")
+            reasons.append(String(localized: "A raw IP address instead of a domain"))
         }
         if host.contains("xn--") {
             score += 2
-            reasons.append("Punycode host — the letters may not be what they seem")
+            reasons.append(String(localized: "Punycode host — the letters may not be what they seem"))
+        }
+        if !host.contains("xn--"), UrlSafety.hasMixedScriptLabel(host) {
+            score += 2
+            reasons.append(String(localized: "Punycode host — the letters may not be what they seem"))
         }
         if host.count > 30 {
             score += 1
-            reasons.append("Unusually long web address")
+            reasons.append(String(localized: "Unusually long web address"))
         }
         if host.split(separator: ".").count >= 5 {
             score += 1
-            reasons.append("Deep subdomain stack")
+            reasons.append(String(localized: "Deep subdomain stack"))
         }
         if let tld = host.split(separator: ".").last.map(String.init), riskyTlds.contains(tld) {
             score += 1
-            reasons.append("A domain ending often used for throwaway links")
+            reasons.append(String(localized: "A domain ending often used for throwaway links"))
         }
         if shorteners.contains(host) {
             score += 1
-            reasons.append("Shortened link — where it really goes is hidden")
+            reasons.append(String(localized: "Shortened link — where it really goes is hidden"))
         }
 
         let risk: UrlRisk = score >= 3 ? .high : (score >= 1 ? .medium : .low)
         return UrlVerdict(original: raw, displayHost: host, risk: risk, reasons: reasons)
+    }
+
+    /// Mirrors Android's per-label confusable check: a non-ASCII label that
+    /// mixes Latin letters with Cyrillic or Greek ones ("аpple" with a
+    /// Cyrillic "а"). Only reached when the URL parser kept the Unicode host
+    /// (on iOS 17+ it is usually IDNA-encoded to xn--, flagged above).
+    static func hasMixedScriptLabel(_ host: String) -> Bool {
+        for label in host.split(separator: ".") {
+            var latin = false, cyrillic = false, greek = false, nonAscii = false
+            for s in label.unicodeScalars {
+                let v = s.value
+                if v >= 0x80 { nonAscii = true }
+                switch v {
+                case 0x41...0x5A, 0x61...0x7A, 0xC0...0x24F: latin = true
+                case 0x400...0x52F: cyrillic = true
+                case 0x370...0x3FF, 0x1F00...0x1FFF: greek = true
+                default: break
+                }
+            }
+            guard nonAscii else { continue }
+            let count = [latin, cyrillic, greek].filter { $0 }.count
+            if count > 1 { return true }
+        }
+        return false
     }
 }
 
@@ -166,30 +194,30 @@ enum ActionCardExtractor {
         var cards: [MailActionCard] = []
 
         if let m = trustFirstGroups("\\b(?:code|otp|pin)\\b[^0-9a-z]{0,20}\\b(\\d{4,8})\\b", in: text) {
-            cards.append(MailActionCard(kind: .code, label: "Code", value: m[1], url: nil))
+            cards.append(MailActionCard(kind: .code, label: String(localized: "Code", comment: "Action card label: a one-time code"), value: m[1], url: nil))
         }
         if let m = trustFirstGroups("\\b(1Z[0-9A-Z]{16})\\b", in: text),
            text.matches("shipped|delivery|package|tracking|carrier") {
-            cards.append(MailActionCard(kind: .package, label: "Tracking", value: m[1], url: nil))
+            cards.append(MailActionCard(kind: .package, label: String(localized: "Tracking", comment: "Action card label: a parcel tracking number"), value: m[1], url: nil))
         } else if text.matches("deliver(?:y|ed)|arriving|shipped"),
                   let m = trustFirstGroups("\\b((?:mon|tues|wednes|thurs|fri|satur|sun)day|today|tomorrow)\\b", in: text) {
-            cards.append(MailActionCard(kind: .package, label: "Delivery", value: m[1].capitalized, url: nil))
+            cards.append(MailActionCard(kind: .package, label: String(localized: "Delivery", comment: "Action card label: parcel delivery day"), value: m[1].capitalized, url: nil))
         }
         if text.matches("flight|boarding"),
-           let m = trustFirstGroups("\\b([A-Z]{2}\\s?\\d{2,4})\\b", in: text) {
-            cards.append(MailActionCard(kind: .flight, label: "Flight", value: m[1], url: nil))
+           let m = trustFirstGroups("\\b([A-Z][A-Z0-9]\\s?\\d{2,4})\\b", in: text, caseSensitive: true) {
+            cards.append(MailActionCard(kind: .flight, label: String(localized: "Flight", comment: "Action card label"), value: m[1], url: nil))
         }
         if text.matches("reservation|booking|confirmation"),
            let m = trustFirstGroups("\\b(?=[A-Z0-9]{6,8}\\b)[A-Z0-9]*\\d[A-Z0-9]*\\b", in: text) {
-            cards.append(MailActionCard(kind: .reservation, label: "Confirmation", value: m[0], url: nil))
+            cards.append(MailActionCard(kind: .reservation, label: String(localized: "Confirmation", comment: "Action card label: a booking confirmation number"), value: m[0], url: nil))
         }
         if let m = trustFirstGroups("(https?://[^\\s<>\"']*(?:zoom\\.us|meet\\.google\\.com|teams\\.microsoft\\.com|calendly\\.com|calendar\\.google\\.com)[^\\s<>\"']*)", in: text) {
-            let host = URL(string: m[1])?.host ?? "Meeting link"
-            cards.append(MailActionCard(kind: .meeting, label: "Join", value: host, url: m[1]))
+            let host = URL(string: m[1])?.host ?? String(localized: "Meeting link")
+            cards.append(MailActionCard(kind: .meeting, label: String(localized: "Join", comment: "Action card label: join a meeting"), value: host, url: m[1]))
         }
-        if let m = trustFirstGroups("(?:\\$|USD\\s?)(\\d+(?:[.,]\\d{2})?)", in: text),
+        if let m = trustFirstGroups("(?:\\$|USD\\s?)(\\d{1,3}(?:,\\d{3})+(?:\\.\\d{2})?|\\d+(?:[.,]\\d{2})?)", in: text),
            text.matches("invoice|payment|due|amount|balance") {
-            cards.append(MailActionCard(kind: .payment, label: "Amount", value: "$" + m[1], url: nil))
+            cards.append(MailActionCard(kind: .payment, label: String(localized: "Amount", comment: "Action card label: an amount due"), value: "$" + m[1], url: nil))
         }
 
         // Dedupe on kind+value, cap the row at four: an action strip longer
@@ -207,8 +235,8 @@ enum ActionCardExtractor {
 
 // MARK: - Shared regex helpers (file-private)
 
-private func trustFirstGroups(_ pattern: String, in text: String) -> [String]? {
-    guard let re = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive]) else { return nil }
+private func trustFirstGroups(_ pattern: String, in text: String, caseSensitive: Bool = false) -> [String]? {
+    guard let re = try? NSRegularExpression(pattern: pattern, options: caseSensitive ? [] : [.caseInsensitive]) else { return nil }
     let ns = text as NSString
     guard let m = re.firstMatch(in: text, range: NSRange(location: 0, length: ns.length)) else { return nil }
     return (0..<m.numberOfRanges).map { i -> String in

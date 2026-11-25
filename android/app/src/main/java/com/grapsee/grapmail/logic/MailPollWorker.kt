@@ -12,6 +12,8 @@ import com.grapsee.grapmail.data.MailMessageDto
 import com.grapsee.grapmail.data.MailMessageFullDto
 import com.grapsee.grapmail.data.MailStore
 import com.grapsee.grapmail.data.SessionSnapshot
+import com.grapsee.grapmail.R
+import com.grapsee.grapmail.ui.i18n.CoreStrings
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.sync.Mutex
@@ -121,13 +123,13 @@ class MailPollWorker(
         com.grapsee.grapmail.widget.MailWidgetState.publish(
             applicationContext, unread,
             recent?.firstOrNull()?.let { head ->
-                if (head.isE2eEncrypted) "Encrypted message"
+                if (head.isE2eEncrypted) CoreStrings.get(R.string.core_widget_encrypted_message) { "Encrypted message" }
                 else (head.from?.name.orEmpty()).takeIf { it.isNotBlank() } ?: head.subject
             },
             recent = recent?.take(3)?.map { m ->
-                if (m.isE2eEncrypted) return@map "Encrypted message" to ""
-                val who = (m.from?.name.orEmpty()).takeIf { it.isNotBlank() } ?: "Unknown sender"
-                who to (m.subject ?: "(no subject)")
+                if (m.isE2eEncrypted) return@map CoreStrings.get(R.string.core_widget_encrypted_message) { "Encrypted message" } to ""
+                val who = (m.from?.name.orEmpty()).takeIf { it.isNotBlank() } ?: CoreStrings.get(R.string.core_widget_unknown_sender) { "Unknown sender" }
+                who to (m.subject ?: CoreStrings.get(R.string.core_notif_no_subject) { "(no subject)" })
             },
         )
         val announced = announcedIds(prefs, session.id)
@@ -242,12 +244,16 @@ class MailPollWorker(
         MailStore.saveNotificationMessage(applicationContext, message, session.id)
         val thumbnail = if (privatePreview) null else previewImage(session.token, message)
         if (SessionStore.snapshotAll(applicationContext).none { it.id == session.id }) return Result.success()
+        // A sealed envelope is encryption whatever the flag says: the row is
+        // drawn as encrypted, and its text never reaches the sign-in code search.
+        val sealed = message.isE2eEncrypted || message.e2eEnvelope != null
         val row = MailMessageDto(
             id = message.id, threadId = message.threadId, from = message.from,
             subject = message.subject, snippet = message.snippet ?: message.bodyText?.trim()?.take(200),
-            isE2eEncrypted = message.isE2eEncrypted,
+            isE2eEncrypted = sealed,
         )
-        if (Notifications.newMail(applicationContext, 1, 0, row, session.address, session.id, thumbnail, hidePreview = privatePreview)) {
+        if (Notifications.newMail(applicationContext, 1, 0, row, session.address, session.id, thumbnail,
+                hidePreview = privatePreview, bodyText = message.bodyText?.takeUnless { sealed })) {
             prefs.edit().putString(dedup, (announced + id).distinct().takeLast(60).joinToString(" ")).apply()
             if (!SessionStore.isCurrent(applicationContext, session.id)) return Result.success()
             runCatching { Api.mailStats(session.token) }
@@ -257,7 +263,7 @@ class MailPollWorker(
                         completedPolls.tryEmit(PollResult(session.id, stats))
                         com.grapsee.grapmail.widget.MailWidgetState.publish(
                             applicationContext, stats.inbox?.unread,
-                            if (row.isE2eEncrypted) "Encrypted message"
+                            if (row.isE2eEncrypted) CoreStrings.get(R.string.core_widget_encrypted_message) { "Encrypted message" }
                             else (row.from?.name.orEmpty()).takeIf { it.isNotBlank() } ?: row.subject,
                         )
                     }

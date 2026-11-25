@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <plurals name="reader_earlier_messages">
+        <item quantity="one">%d предыдущее сообщение</item>
+        <item quantity="other">%d предыдущего сообщения</item>
+        <item quantity="few">%d предыдущих сообщения</item>
+        <item quantity="many">%d предыдущих сообщений</item>
+    </plurals>
+    <plurals name="reader_participants">
+        <item quantity="one">%d человек</item>
+        <item quantity="other">%d человека</item>
+        <item quantity="few">%d человека</item>
+        <item quantity="many">%d человек</item>
+    </plurals>
+    <plurals name="reader_message_count">
+        <item quantity="one">%d сообщение</item>
+        <item quantity="other">%d сообщения</item>
+        <item quantity="few">%d сообщения</item>
+        <item quantity="many">%d сообщений</item>
+    </plurals>
+    <string name="reader_you">Вы</string>
+    <string name="reader_unread">Не прочитано</string>
+    <string name="reader_earlier_action">показать свёрнутые сообщения</string>
+    <string name="reader_open_message_action">открыть это сообщение</string>
+    <string name="reader_quoted_show">Показать цитируемый текст</string>
+    <string name="reader_quoted_hide">Скрыть цитируемый текст</string>
+    <string name="reader_state_expanded">Развёрнуто</string>
+    <string name="reader_state_collapsed">Свёрнуто</string>
+    <string name="reader_reply_to">Ответить %1$s…</string>
+    <string name="reader_reply_fallback">Ответить…</string>
+    <string name="reader_reply_options">Параметры ответа</string>
+    <string name="reader_quick_reply">Быстрый ответ</string>
+    <string name="reader_attach_share_chooser">Поделиться вложением</string>
+    <string name="reader_attach_view_image">посмотреть изображение</string>
+    <string name="reader_attach_save_named">Сохранить %1$s</string>
+    <string name="reader_attach_share_named">Поделиться %1$s</string>
+    <string name="reader_attach_share_nothing">Ни одно приложение на этом устройстве не может поделиться этим файлом.</string>
+    <string name="reader_viewer_position">%1$d из %2$d</string>
+    <string name="reader_viewer_too_large">Это изображение нельзя показать здесь.</string>
+    <string name="compose_r9_leave_title">Выйти из этого сообщения?</string>
+    <string name="compose_r9_leave_attachments">Черновики пока не сохраняют вложения. Сохраните текст без них или продолжите редактирование.</string>
+    <string name="compose_r9_save_text_only">Сохранить только текст</string>
+    <string name="compose_r9_draft_failed_title">Черновик не сохранён</string>
+    <string name="compose_r9_leave_without_saving">Выйти без сохранения</string>
+    <string name="compose_r9_encrypt_failed">Это сообщение не удалось зашифровать, поэтому ничего не отправлено.</string>
+    <string name="compose_editor_toolbar">Форматирование текста</string>
+    <string name="compose_editor_bold">Полужирный</string>
+    <string name="compose_editor_italic">Курсив</string>
+    <string name="compose_editor_underline">Подчёркнутый</string>
+    <string name="compose_editor_strike">Зачёркнутый</string>
+    <string name="compose_editor_bullets">Маркированный список</string>
+    <string name="compose_editor_numbered">Нумерованный список</string>
+    <string name="compose_editor_text_colour">Цвет текста</string>
+    <string name="compose_editor_black">Чёрный</string>
+    <string name="compose_editor_blue">Синий</string>
+    <string name="compose_editor_red">Красный</string>
+    <string name="compose_editor_green">Зелёный</string>
+    <string name="compose_editor_highlight">Выделить</string>
+    <string name="compose_editor_highlight_colour">Цвет выделения</string>
+    <string name="compose_editor_yellow">Жёлтый</string>
+    <string name="compose_editor_pink">Розовый</string>
+    <string name="compose_editor_font">Шрифт</string>
+    <string name="compose_editor_sans">Без засечек</string>
+    <string name="compose_editor_serif">Serif</string>
+    <string name="compose_editor_mono">Monospace</string>
+    <string name="compose_editor_larger">Крупнее</string>
+    <string name="compose_editor_clear">Очистить формат</string>
+    <string name="compose_editor_image">Изображение</string>
+    <string name="compose_editor_insert_image">Вставить изображение</string>
+</resources>

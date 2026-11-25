@@ -1,5 +1,8 @@
 package com.grapsee.grapmail.ui.screens.mail
 
+import com.grapsee.grapmail.ui.components.gmPrefersStackedRows
+import com.grapsee.grapmail.ui.components.GMLayout
+import androidx.compose.material3.minimumInteractiveComponentSize
 import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
@@ -28,6 +31,9 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
+import com.grapsee.grapmail.R
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -37,6 +43,9 @@ import com.grapsee.grapmail.data.Api
 import com.grapsee.grapmail.data.BillingEntitlementDto
 import com.grapsee.grapmail.data.PlayBilling
 import com.grapsee.grapmail.data.SessionStore
+import com.grapsee.grapmail.ui.components.DetailSkeleton
+import com.grapsee.grapmail.ui.components.ErrorState
+import com.grapsee.grapmail.ui.components.OfflineBanner
 import com.grapsee.grapmail.ui.theme.LocalPalette
 import kotlinx.coroutines.launch
 
@@ -67,29 +76,37 @@ fun PlanScreen(onBack: () -> Unit) {
     var noteBad by remember { mutableStateOf(false) }
     var busy by remember { mutableStateOf(false) }
     var playMissing by remember { mutableStateOf(false) }
+    // The entitlement read failed with nothing on screen: draw the error
+    // state with Retry instead of a "Loading" line that never ends.
+    var loadFailed by remember { mutableStateOf(false) }
 
     suspend fun verify(purchases: List<Purchase>) {
         val token = SessionStore.token(context) ?: return
         for (p in purchases) {
             if (p.purchaseState == Purchase.PurchaseState.PENDING) {
-                note = "Google Play is still processing your payment. Your plan changes when it completes."
+                note = context.getString(R.string.mail_plan_pending)
                 noteBad = false
                 continue
             }
             if (p.purchaseState != Purchase.PurchaseState.PURCHASED) continue
             val productId = p.products.firstOrNull() ?: continue
-            note = "Confirming your purchase…"; noteBad = false
+            note = context.getString(R.string.mail_plan_confirming); noteBad = false
             runCatching { Api.billingVerifyGoogle(token, productId, p.purchaseToken) }
-                .onSuccess { ent = it; note = "You're on ${it.planName}."; noteBad = false }
-                .onFailure { note = it.message ?: "The purchase could not be confirmed yet. It will be retried."; noteBad = true }
+                .onSuccess { ent = it; note = context.getString(R.string.mail_plan_youre_on, it.planName); noteBad = false }
+                .onFailure { note = it.message ?: context.getString(R.string.mail_plan_verify_failed); noteBad = true }
         }
     }
 
     suspend fun reload() {
-        val token = SessionStore.token(context) ?: return
+        loadFailed = false
+        val token = SessionStore.token(context)
+        if (token == null) { loadFailed = ent == null; return }
         runCatching { Api.billingEntitlement(token) }
-            .onSuccess { ent = it }
-            .onFailure { note = it.message ?: "Your plan could not be read."; noteBad = true }
+            .onSuccess { ent = it; if (noteBad) note = null }
+            .onFailure {
+                note = it.message ?: context.getString(R.string.mail_plan_read_failed); noteBad = true
+                loadFailed = ent == null
+            }
         val ids = ent?.plans?.flatMap { it.playProducts }.orEmpty()
         val details = PlayBilling.products(context, ids)
         playMissing = ids.isNotEmpty() && PlayBilling.connect(context) == null
@@ -104,50 +121,58 @@ fun PlanScreen(onBack: () -> Unit) {
     LaunchedEffect(Unit) { reload() }
     LaunchedEffect(Unit) { PlayBilling.updates.collect { verify(it); owned = PlayBilling.owned(context) } }
 
-    MailScaffold("Your plan", onBack) {
+    val largeText = gmPrefersStackedRows()
+    MailScaffold(stringResource(R.string.mail_plan_title), onBack, maxContentWidth = GMLayout.Form) {
+        OfflineBanner()
+        // First load and a failed first load are drawn outside the scrolling
+        // column: the shared states size and scroll themselves.
+        if (ent == null) {
+            if (loadFailed) {
+                ErrorState(onRetry = { scope.launch { reload() } },
+                    message = note ?: stringResource(R.string.mail_plan_read_failed))
+            } else {
+                DetailSkeleton(label = stringResource(R.string.mail_common_loading))
+            }
+            return@MailScaffold
+        }
         Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
             note?.let {
                 Text(it, fontSize = 13.sp, color = if (noteBad) palette.error else palette.success,
                     modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp))
             }
             val e = ent
-            if (e == null) {
-                Text("Loading…", fontSize = 14.sp, color = palette.textTertiary,
-                    modifier = Modifier.padding(20.dp))
-                return@Column
-            }
+            if (e == null) return@Column
 
-            SectionLabel("Current plan", palette)
+            SectionLabel(stringResource(R.string.mail_plan_current), palette)
             Column(Modifier.padding(horizontal = 20.dp)) {
                 Text(e.planName, fontSize = 22.sp, fontWeight = FontWeight.SemiBold, color = palette.textPrimary)
                 val renewal = e.expiresAt?.take(10)
                 if (e.plan != "free" && renewal != null) {
-                    Text(if (e.autoRenewing) "Renews $renewal" else "Ends $renewal — it won't renew",
+                    Text(if (e.autoRenewing) stringResource(R.string.mail_plan_renews, renewal)
+                        else stringResource(R.string.mail_plan_ends, renewal),
                         fontSize = 13.sp, color = palette.textSecondary)
                 }
                 if ("subscriber" in e.badges) {
-                    Text("Your messages show a Subscriber badge to other GrapMail users. " +
-                        "It means you support GrapMail; it is not identity verification.",
+                    Text(stringResource(R.string.mail_plan_badge_note),
                         fontSize = 12.sp, color = palette.textTertiary, modifier = Modifier.padding(top = 4.dp))
                 }
             }
 
-            SectionLabel("This month", palette)
+            SectionLabel(stringResource(R.string.mail_plan_this_month), palette)
             Column(Modifier.padding(horizontal = 20.dp)) {
                 val a = e.allowance
-                Text("${a.used} of ${a.monthlyRecipients} outside recipients",
+                Text(stringResource(R.string.mail_plan_used_of, a.used, a.monthlyRecipients),
                     fontSize = 15.sp, color = palette.textPrimary)
                 LinearProgressIndicator(
                     progress = { if (a.monthlyRecipients > 0) (a.used.toFloat() / a.monthlyRecipients).coerceIn(0f, 1f) else 0f },
                     modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
                 )
-                Text("Counts people outside GrapMail. Mail to GrapMail addresses is never limited. " +
-                    "Resets ${a.resetsAt.take(10)}.", fontSize = 12.sp, color = palette.textTertiary)
+                Text(stringResource(R.string.mail_plan_counts_note, a.resetsAt.take(10)), fontSize = 12.sp, color = palette.textTertiary)
             }
 
-            SectionLabel("Plans", palette)
+            SectionLabel(stringResource(R.string.mail_plan_plans), palette)
             if (playMissing) {
-                Text("Google Play isn't available on this device, so plans can't be bought here.",
+                Text(stringResource(R.string.mail_plan_play_missing),
                     fontSize = 13.sp, color = palette.textSecondary, modifier = Modifier.padding(horizontal = 20.dp))
             }
             e.plans.forEach { plan ->
@@ -156,30 +181,43 @@ fun PlanScreen(onBack: () -> Unit) {
                 Column(Modifier.padding(horizontal = 20.dp, vertical = 6.dp).fillMaxWidth()
                     .border(1.dp, if (current) palette.primarySolid else palette.border, RoundedCornerShape(14.dp))
                     .padding(16.dp)) {
-                    Row {
+                    val price = if (plan.id == "free") stringResource(R.string.mail_plan_free)
+                        else details?.let { PlayBilling.priceOf(it) } ?: "—"
+                    // At large text the price goes under the name rather than
+                    // squeezing it; at the default size it sits on the right.
+                    if (largeText) {
+                        Text(plan.name, fontSize = 17.sp, fontWeight = FontWeight.SemiBold,
+                            color = palette.textPrimary)
+                        Text(price, fontSize = 15.sp, color = palette.textSecondary)
+                    } else Row {
                         Text(plan.name, fontSize = 17.sp, fontWeight = FontWeight.SemiBold,
                             color = palette.textPrimary, modifier = Modifier.weight(1f))
-                        Text(if (plan.id == "free") "Free" else details?.let { PlayBilling.priceOf(it) } ?: "—",
-                            fontSize = 15.sp, color = palette.textSecondary)
+                        androidx.compose.foundation.layout.Spacer(Modifier.padding(start = 8.dp))
+                        Text(price, fontSize = 15.sp, color = palette.textSecondary)
                     }
-                    Text("${plan.monthlyRecipients} outside recipients a month", fontSize = 13.sp,
+                    Text(pluralStringResource(R.plurals.mail_plan_recipients_month, plan.monthlyRecipients, plan.monthlyRecipients), fontSize = 13.sp,
                         color = palette.textSecondary, modifier = Modifier.padding(top = 2.dp))
+                    val sheetFailed = stringResource(R.string.mail_plan_sheet_failed)
                     when {
-                        current -> Text("Your plan", fontSize = 14.sp, fontWeight = FontWeight.SemiBold,
+                        current -> Text(stringResource(R.string.mail_plan_title), fontSize = 14.sp, fontWeight = FontWeight.SemiBold,
                             color = palette.primarySolid, modifier = Modifier.padding(top = 10.dp))
                         plan.id == "free" -> {}
-                        details == null -> Text(if (playMissing) "Not available here" else "Not available yet",
+                        details == null -> Text(if (playMissing) stringResource(R.string.mail_plan_not_available_here)
+                            else stringResource(R.string.mail_plan_not_available_yet),
                             fontSize = 13.sp, color = palette.textTertiary, modifier = Modifier.padding(top = 10.dp))
-                        else -> Text(if (e.plan == "free") "Subscribe" else "Switch to ${plan.name}",
+                        else -> Text(if (e.plan == "free") stringResource(R.string.mail_plan_subscribe)
+                            else stringResource(R.string.mail_plan_switch_to, plan.name),
                             fontSize = 14.sp, fontWeight = FontWeight.SemiBold,
                             color = if (busy) palette.textTertiary else palette.primarySolid,
-                            modifier = Modifier.padding(top = 10.dp).clickable(enabled = !busy) {
+                            // 48dp target; it replaces the 10dp gap above.
+                            modifier = Modifier.minimumInteractiveComponentSize()
+                                .clickable(enabled = !busy, role = androidx.compose.ui.semantics.Role.Button) {
                                 val activity = context.activity() ?: return@clickable
                                 busy = true
                                 scope.launch {
                                     val replacing = owned.firstOrNull()?.purchaseToken
                                     if (!PlayBilling.launch(activity, details, e.playAccountReference, replacing)) {
-                                        note = "Google Play couldn't open the purchase sheet. Try again."; noteBad = true
+                                        note = sheetFailed; noteBad = true
                                     }
                                     busy = false
                                 }
@@ -189,16 +227,17 @@ fun PlanScreen(onBack: () -> Unit) {
             }
 
             if (e.plan != "free") {
-                Text("Manage or cancel in Google Play", fontSize = 14.sp, fontWeight = FontWeight.SemiBold,
+                Text(stringResource(R.string.mail_plan_manage), fontSize = 14.sp, fontWeight = FontWeight.SemiBold,
                     color = palette.primarySolid,
-                    modifier = Modifier.padding(20.dp).clickable {
+                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 6.dp)
+                        .minimumInteractiveComponentSize()
+                        .clickable(role = androidx.compose.ui.semantics.Role.Button) {
                         val uri = Uri.parse("https://play.google.com/store/account/subscriptions" +
                             (e.productId?.let { "?sku=$it&package=${context.packageName}" } ?: ""))
                         runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, uri)) }
                     })
             }
-            Text("Prices are set and charged by Google Play in your currency. GrapMail checks every " +
-                "purchase with Google before your plan changes.", fontSize = 12.sp, color = palette.textTertiary,
+            Text(stringResource(R.string.mail_plan_prices_note), fontSize = 12.sp, color = palette.textTertiary,
                 modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp))
             Spacer(Modifier.height(24.dp))
         }

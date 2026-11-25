@@ -13,42 +13,42 @@ struct OnboardingSceneModel {
 let onboardingScenes: [OnboardingSceneModel] = [
     OnboardingSceneModel(
         index: 0,
-        eyebrow: "WELCOME",
-        title: "Welcome to Your Sanctuary",
-        description: "Your new address is ready; welcome to a cleaner way to communicate.",
-        ctaText: "Get Started",
+        eyebrow: String(localized: "WELCOME", comment: "Onboarding scene: small label above the title"),
+        title: String(localized: "Welcome to Your Sanctuary", comment: "Onboarding scene title"),
+        description: String(localized: "Your new address is ready; welcome to a cleaner way to communicate.", comment: "Onboarding scene description"),
+        ctaText: String(localized: "Get Started", comment: "Onboarding scene button"),
         filename: "onboarding_scene_1"
     ),
     OnboardingSceneModel(
         index: 1,
-        eyebrow: "SCREENER GATE",
-        title: "You Decide Who Reaches You",
-        description: "Unknown senders wait in the Screener until you decide.",
-        ctaText: "Next",
+        eyebrow: String(localized: "SCREENER GATE", comment: "Onboarding scene: small label above the title"),
+        title: String(localized: "You Decide Who Reaches You", comment: "Onboarding scene title"),
+        description: String(localized: "Unknown senders wait in the Screener until you decide.", comment: "Onboarding scene description"),
+        ctaText: String(localized: "Next", comment: "Onboarding scene button"),
         filename: "onboarding_scene_2"
     ),
     OnboardingSceneModel(
         index: 2,
-        eyebrow: "SUBSCRIPTIONS",
-        title: "Tame the Clutter",
-        description: "Unsubscribe, snooze, and return to what matters.",
-        ctaText: "Next",
+        eyebrow: String(localized: "SUBSCRIPTIONS", comment: "Onboarding scene: small label above the title"),
+        title: String(localized: "Tame the Clutter", comment: "Onboarding scene title"),
+        description: String(localized: "Unsubscribe, snooze, and return to what matters.", comment: "Onboarding scene description"),
+        ctaText: String(localized: "Next", comment: "Onboarding scene button"),
         filename: "onboarding_scene_3"
     ),
     OnboardingSceneModel(
         index: 3,
-        eyebrow: "QUIET BY DEFAULT",
-        title: "Choose Your Rhythm",
-        description: "Set your theme and decide when GrapMail can interrupt you.",
-        ctaText: "Next",
+        eyebrow: String(localized: "QUIET BY DEFAULT", comment: "Onboarding scene: small label above the title"),
+        title: String(localized: "Choose Your Rhythm", comment: "Onboarding scene title"),
+        description: String(localized: "Set your theme and decide when GrapMail can interrupt you.", comment: "Onboarding scene description"),
+        ctaText: String(localized: "Next", comment: "Onboarding scene button"),
         filename: "onboarding_scene_4"
     ),
     OnboardingSceneModel(
         index: 4,
-        eyebrow: "YOUR SANCTUARY",
-        title: "Your Inbox Is Yours Again",
-        description: "Welcome home; your new mailbox is ready.",
-        ctaText: "Open My Mailbox",
+        eyebrow: String(localized: "YOUR SANCTUARY", comment: "Onboarding scene: small label above the title"),
+        title: String(localized: "Your Inbox Is Yours Again", comment: "Onboarding scene title"),
+        description: String(localized: "Welcome home; your new mailbox is ready.", comment: "Onboarding scene description"),
+        ctaText: String(localized: "Open My Mailbox", comment: "Onboarding scene button"),
         filename: "onboarding_scene_5"
     ),
 ]
@@ -243,12 +243,19 @@ struct OnboardingHeroView: UIViewRepresentable {
 /// The page is deliberately dark on both system appearances: the five scenes are
 /// authored on one continuous airy navy field, and a light page would put a
 /// visible plate around artwork that is meant to dissolve into the screen.
+///
+/// Adaptive layout: portrait / regular height stacks art over copy over CTA,
+/// with the copy scrolling if large text needs more room. In short, wide
+/// windows (landscape phone) the art sits beside the copy and CTA so the button
+/// is always on screen. On iPad the copy and button keep a form-width column.
 struct OnboardingView: View {
     let onFinish: () -> Void
     /// Test-only: the snapshot host opens directly on one scene.
     var initialScene: Int = 0
 
     @State private var sceneIndex: Int
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
+    @Environment(\.dynamicTypeSize) private var dts
 
     init(onFinish: @escaping () -> Void, initialScene: Int = 0) {
         self.onFinish = onFinish
@@ -264,52 +271,89 @@ struct OnboardingView: View {
 
     var body: some View {
         GeometryReader { viewport in
-            // The artwork is authored in a 440 x 560 box. Keep that exact ratio
-            // — taking the full width but capping only the height squashes the
-            // box and clips the bottom of scene 2's screener card. Cap the width
-            // instead; the VStack centres the result.
-            let heroWidth = min(viewport.size.width, viewport.size.height * 0.54 * 440.0 / 560.0)
-            let heroHeight = heroWidth * 560.0 / 440.0
+            let size = viewport.size
+            let sideBySide = verticalSizeClass == .compact || (size.width > size.height * 1.25 && size.height < 560)
 
             VStack(spacing: 0) {
                 topBar
 
-                OnboardingHeroView(
-                    filename: currentScene.filename,
-                    onOpenMailbox: onFinish
-                )
-                .frame(width: heroWidth, height: heroHeight)
-                .accessibilityLabel("Animated scene: \(currentScene.title)")
-
-                copyBlock
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-
-                pageDots
-
-                GradientButton(
-                    title: currentScene.ctaText,
-                    trailing: AnyView(
-                        Image(systemName: "arrow.right")
-                            .font(.system(size: 15, weight: .semibold))
-                    ),
-                    action: {
-                        if sceneIndex < onboardingScenes.count - 1 {
-                            sceneIndex += 1
-                        } else {
-                            onFinish()
+                if sideBySide {
+                    // The artwork is authored in a 440 x 560 box; keep the ratio.
+                    let heroHeight = max(0, size.height - 64)
+                    let heroWidth = min(size.width * 0.45, heroHeight * 440.0 / 560.0)
+                    HStack(spacing: 16) {
+                        hero
+                            .frame(width: heroWidth, height: heroWidth * 560.0 / 440.0)
+                            .frame(maxHeight: .infinity)
+                        VStack(spacing: 0) {
+                            scrollingCopy
+                                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            pageDots
+                            ctaButton
+                                .padding(.bottom, 12)
                         }
+                        .frame(maxWidth: GMLayout.form)
                     }
-                )
-                .padding(.horizontal, 24)
-                .accessibilityIdentifier("onboarding-cta")
+                    .padding(.horizontal, 12)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else {
+                    // The artwork is authored in a 440 x 560 box. Keep that exact
+                    // ratio — taking the full width but capping only the height
+                    // squashes the box and clips the bottom of scene 2's screener
+                    // card. Cap the width instead; the VStack centres the result.
+                    // Large accessibility text gets a smaller share so the copy
+                    // and CTA keep room.
+                    let share: CGFloat = dts.isAccessibilitySize ? 0.38 : 0.54
+                    let heroWidth = min(size.width, size.height * share * 440.0 / 560.0)
+                    let heroHeight = heroWidth * 560.0 / 440.0
 
-                Spacer().frame(height: 28)
+                    hero
+                        .frame(width: heroWidth, height: heroHeight)
+
+                    scrollingCopy
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+                    pageDots
+
+                    ctaButton
+                        .gmMaxWidth(GMLayout.form)
+
+                    Spacer().frame(height: 28)
+                }
             }
         }
         .background(Scene.bg.ignoresSafeArea())
         .environment(\.colorScheme, .dark)
         .preferredColorScheme(.dark)
         .navigationBarHidden(true)
+    }
+
+    private var hero: some View {
+        OnboardingHeroView(
+            filename: currentScene.filename,
+            onOpenMailbox: onFinish
+        )
+        .accessibilityLabel("Animated scene: \(currentScene.title)")
+    }
+
+    private var ctaButton: some View {
+        GradientButton(
+            title: currentScene.ctaText,
+            trailing: AnyView(
+                Image(systemName: "arrow.right")
+                    .gmFont(15, .semibold, maxSize: 26)
+                    .flipsForRightToLeftLayoutDirection(true)
+            ),
+            action: {
+                if sceneIndex < onboardingScenes.count - 1 {
+                    sceneIndex += 1
+                } else {
+                    onFinish()
+                }
+            }
+        )
+        .padding(.horizontal, 24)
+        .accessibilityIdentifier("onboarding-cta")
     }
 
     private var topBar: some View {
@@ -320,7 +364,7 @@ struct OnboardingView: View {
             Spacer(minLength: 0)
             if canSkip {
                 Button("Skip") { onFinish() }
-                    .font(.system(size: 15, weight: .semibold))
+                    .gmFont(15, .semibold)
                     .foregroundColor(Scene.sub)
                     .padding(.horizontal, 12)
                     .padding(.vertical, 8)
@@ -338,31 +382,45 @@ struct OnboardingView: View {
         .padding(.bottom, 4)
     }
 
+    /// The copy as drawn; when large text makes it taller than its space it
+    /// scrolls instead of clipping.
+    private var scrollingCopy: some View {
+        ViewThatFits(in: .vertical) {
+            copyBlock
+            ScrollView(showsIndicators: false) {
+                copyBlock.padding(.vertical, 8)
+            }
+        }
+    }
+
     private var copyBlock: some View {
         VStack(spacing: 0) {
             Text(currentScene.eyebrow)
-                .font(.system(size: 11, weight: .bold))
+                .gmFont(11, .bold)
                 .tracking(1.8)
                 .foregroundColor(Scene.accent)
+                .multilineTextAlignment(.center)
 
             Spacer().frame(height: 8)
 
             Text(currentScene.title)
-                .font(.system(size: 27, weight: .semibold))
+                .gmFont(27, .semibold, maxSize: 40)
                 .foregroundColor(Scene.ink)
                 .multilineTextAlignment(.center)
-                .lineLimit(2)
+                .lineLimit(3)
                 .minimumScaleFactor(0.85)
 
             Spacer().frame(height: 10)
 
             Text(currentScene.description)
-                .font(.system(size: 15))
+                .gmFont(15)
                 .foregroundColor(Scene.sub)
                 .multilineTextAlignment(.center)
                 .lineSpacing(3)
+                .fixedSize(horizontal: false, vertical: true)
         }
         .padding(.horizontal, 24)
+        .gmMaxWidth(GMLayout.form)
     }
 
     private var pageDots: some View {
@@ -379,6 +437,7 @@ struct OnboardingView: View {
             }
         }
         .padding(.bottom, 20)
+        .accessibilityHidden(true)
     }
 }
 

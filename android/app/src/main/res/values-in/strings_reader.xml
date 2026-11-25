@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    values-in/strings_reader.xml: translation of values/strings_reader.xml (same keys, same order).
+    Comments below are kept from the English source for context.
+-->
+<resources>
+    <!-- The inline pill above an HTML body in a dark reader. It names what a tap switches TO. -->
+    <string name="reader_colours_original">Warna asli</string>
+    <string name="reader_colours_dark">Warna gelap</string>
+
+    <!-- The message overflow menu items (same toggle as the pill). -->
+    <string name="reader_colours_menu_original">Tampilkan warna asli</string>
+    <string name="reader_colours_menu_dark">Tampilkan warna gelap</string>
+
+    <!-- TalkBack: the pill's click action ("double-tap to …") and its current state. -->
+    <string name="reader_colours_action_original">tampilkan warna asli pengirim ini</string>
+    <string name="reader_colours_action_dark">tampilkan dalam warna gelap</string>
+    <string name="reader_colours_state_original">Menampilkan warna asli</string>
+    <string name="reader_colours_state_dark">Menampilkan warna gelap</string>
+
+    <!-- The note under the message after a change, so the per-sender memory is not a surprise later. -->
+    <string name="reader_colours_remembered_original">Email dari %1$s akan dibuka dengan warna aslinya di perangkat ini.</string>
+    <string name="reader_colours_remembered_dark">Email dari %1$s akan dibuka dalam warna gelap di perangkat ini.</string>
+</resources>

@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Round 9 platform texts (android_platform). English only; the translation
+    pass adds these keys to every values-<lang>/ folder.
+-->
+<resources>
+    <!-- Android notification settings: description of the "New mail" channel.
+         Replaces notif_channel_new_mail_desc, which wrongly said the app has no push service. -->
+    <string name="r9_platform_notif_channel_new_mail_desc">Tells you when new messages arrive in your inbox.</string>
+
+    <!-- Plan screen: a store price with its billing period. %1$s is the price as Google Play formats it, e.g. "BDT 250.00". -->
+    <string name="r9_platform_price_per_week">%1$s/week</string>
+    <string name="r9_platform_price_per_month">%1$s/month</string>
+    <string name="r9_platform_price_per_3_months">%1$s every 3 months</string>
+    <string name="r9_platform_price_per_6_months">%1$s every 6 months</string>
+    <string name="r9_platform_price_per_year">%1$s/year</string>
+</resources>

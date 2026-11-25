@@ -2,8 +2,9 @@ import ActivityKit
 import Foundation
 
 /// The app half of the send-later Live Activity: started from the Scheduled
-/// screen's own read, ended when that read no longer shows a send to count
-/// down to. Nothing here decides *when* mail is sent — `scheduled_at` on the
+/// screen's own read — and from the composer's, right after a send is
+/// scheduled or its Undo lands (`MailboxModel.refreshScheduledActivity`) —
+/// ended when that read no longer shows a send to count down to. Nothing here decides *when* mail is sent — `scheduled_at` on the
 /// server does, exactly as the Scheduled screen says — this only mirrors the
 /// schedule onto the Lock Screen.
 ///
@@ -66,8 +67,10 @@ enum SendLaterActivityManager {
             .min { $0.1 < $1.1 }?.0
     }
 
+    /// The server writes these with milliseconds (`Date.toISOString()`), which
+    /// a default `ISO8601DateFormatter` refuses — so every real send parsed to
+    /// nil here and no countdown ever started. SendLaterSchedule reads both.
     private static func parseDate(_ iso: String?) -> Date? {
-        guard let iso else { return nil }
-        return ISO8601DateFormatter().date(from: iso)
+        SendLaterSchedule.parse(iso)
     }
 }

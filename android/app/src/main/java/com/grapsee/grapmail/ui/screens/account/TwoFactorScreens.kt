@@ -32,10 +32,13 @@ import com.grapsee.grapmail.ui.components.AccountLink
 import com.grapsee.grapmail.ui.components.AccountScreen
 import com.grapsee.grapmail.ui.components.CodeCells
 import com.grapsee.grapmail.ui.components.CodeExpiry
+import com.grapsee.grapmail.ui.components.GMAutofill
 import com.grapsee.grapmail.ui.components.GradientButton
 import com.grapsee.grapmail.ui.components.OrDivider
 import com.grapsee.grapmail.ui.theme.LocalPalette
 import kotlinx.coroutines.launch
+import androidx.compose.ui.res.stringResource
+import com.grapsee.grapmail.R
 
 /**
  * Two-step verification — founder design verbatim: shield artwork, the
@@ -81,7 +84,7 @@ fun TwoFactorScreen(
         val submitted = state
         val submittedCode = code
         if (submitted.emailOtpAddress == null && submitted.challengeId == null) {
-            error = "Sign in again to request a code."
+            error = context.getString(R.string.acct_sign_in_again_to_request_a_code)
             return
         }
         busy = true; error = null; notice = null
@@ -98,7 +101,7 @@ fun TwoFactorScreen(
                 }
                 val token = resp.sessionToken ?: resp.accessToken ?: resp.token
                 if (resp.secondFactorRequired || token.isNullOrBlank()) {
-                    error = "Verification did not return a session. Sign in again."
+                    error = context.getString(R.string.acct_verification_did_not_return_a)
                     return@launch
                 }
                 val address = resp.signedInAddress(submitted.identifier)
@@ -112,13 +115,17 @@ fun TwoFactorScreen(
             } catch (e: ApiException) {
                 busy = false
                 error = when (e.code) {
-                    "CHALLENGE_EXPIRED" -> "That code has expired. Resend it to get a new one."
-                    "BAD_CODE" -> "That code is not correct."
-                    else -> e.message ?: "That code is not correct."
+                    "CHALLENGE_EXPIRED" -> context.getString(R.string.acct_that_code_has_expired_resend_it_to)
+                    "BAD_CODE" -> context.getString(R.string.acct_that_code_is_not_correct)
+                    else -> e.message ?: context.getString(R.string.acct_that_code_is_not_correct)
                 }
             } catch (_: Exception) {
                 busy = false
-                error = "Network error. Please try again."
+                error = context.getString(R.string.acct_network_error)
+            } finally {
+                // Every exit (including the "no session returned" early return
+                // above) must release the button, or it spins forever.
+                busy = false
             }
         }
     }
@@ -137,17 +144,17 @@ fun TwoFactorScreen(
                     val sent = Api.resendEmailOtp(emailChallenge)
                     resending = false
                     if (!sent.success) {
-                        error = sent.error ?: "Could not resend the code. Try again."
+                        error = sent.error ?: context.getString(R.string.acct_could_not_resend_the_code_try_again)
                         return@launch
                     }
                     code = ""
-                    notice = "A new code is on its way."
+                    notice = context.getString(R.string.acct_a_new_code_is_on_its_way)
                 } catch (e: ApiException) {
                     resending = false
-                    error = e.message ?: "Could not resend the code. Try again."
+                    error = e.message ?: context.getString(R.string.acct_could_not_resend_the_code_try_again)
                 } catch (_: Exception) {
                     resending = false
-                    error = "Network error. Please try again."
+                    error = context.getString(R.string.acct_network_error)
                 }
             }
             return
@@ -161,16 +168,16 @@ fun TwoFactorScreen(
                 if (resp.secondFactorRequired && resp.challengeId != null) {
                     code = ""
                     flow.update { copy(challengeId = resp.challengeId, expiresAt = resp.expiresAt ?: 0L, factorDestination = resp.maskedEmail ?: factorDestination) }
-                    notice = "A new code is on its way."
+                    notice = context.getString(R.string.acct_a_new_code_is_on_its_way)
                 } else {
-                    error = "That sign-in no longer needs a code. Start again."
+                    error = context.getString(R.string.acct_that_sign_in_no_longer_needs_a_code)
                 }
             } catch (e: ApiException) {
                 resending = false
-                error = e.message ?: "Could not resend the code. Try again."
+                error = e.message ?: context.getString(R.string.acct_could_not_resend_the_code_try_again)
             } catch (_: Exception) {
                 resending = false
-                error = "Network error. Please try again."
+                error = context.getString(R.string.acct_network_error)
             }
         }
     }
@@ -178,18 +185,18 @@ fun TwoFactorScreen(
     AccountScreen(
         onBack = onBack,
         illustration = "account-2fa",
-        eyebrow = if (emailChallenge != null) "Email verification" else "Two-step verification",
-        title = if (emailChallenge != null) "Enter the code sent to $emailChallenge" else if (backupOnly) "Use a backup code" else "Enter your 6-digit code",
+        eyebrow = if (emailChallenge != null) stringResource(R.string.acct_email_verification) else stringResource(R.string.acct_two_step_verification),
+        title = if (emailChallenge != null) stringResource(R.string.acct_enter_the_code_sent_to, emailChallenge) else if (backupOnly) stringResource(R.string.acct_use_a_backup_code) else stringResource(R.string.acct_enter_your_6_digit_code),
         body = if (emailChallenge != null)
-            "Finish signing in by entering the 6-digit code that was sent to this address."
+            stringResource(R.string.acct_finish_signing_in_by_entering_the_6)
         else if (backupOnly)
-            "A verification text is unavailable. Use one of your saved backup codes to continue."
+            stringResource(R.string.acct_a_verification_text_is_unavailable)
         else
-            state.factorDestination?.let { "We've emailed a 6-digit code to $it. Enter it to finish signing in." }
-                ?: "We've sent you a verification code. Please enter the 6-digit code to continue.",
+            state.factorDestination?.let { stringResource(R.string.acct_weve_emailed_code_to, it) }
+                ?: stringResource(R.string.acct_weve_sent_you_a_verification_code),
         footer = {
             GradientButton(
-                "Verify & Continue",
+                stringResource(R.string.acct_verify_and_continue),
                 onClick = { verify() },
                 enabled = !backupOnly && code.length == 6,
                 busy = busy,
@@ -200,19 +207,19 @@ fun TwoFactorScreen(
             )
             Spacer(Modifier.height(12.dp))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
-                AccountLink(if (resending) "Sending…" else "Resend code", onClick = { resend() })
+                AccountLink(if (resending) stringResource(R.string.acct_sending) else stringResource(R.string.acct_resend_code), onClick = { resend() })
             }
             if (emailChallenge == null) {
                 Spacer(Modifier.height(2.dp))
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
-                    AccountLink("Use a backup code", onClick = onUseBackupCode)
+                    AccountLink(stringResource(R.string.acct_use_a_backup_code), onClick = onUseBackupCode)
                 }
             }
             Spacer(Modifier.height(12.dp))
             OrDivider()
             Spacer(Modifier.height(12.dp))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
-                AccountLink("Back to sign in", onClick = onBackToSignIn)
+                AccountLink(stringResource(R.string.acct_back_to_sign_in_lower), onClick = onBackToSignIn)
             }
             Spacer(Modifier.height(6.dp))
         },
@@ -224,6 +231,7 @@ fun TwoFactorScreen(
                 code = it.filter(Char::isDigit).take(6)
                 error = null
             },
+            autofill = GMAutofill.OneTimeCode,
         )
         Spacer(Modifier.height(14.dp))
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
@@ -265,8 +273,9 @@ fun BackupCodeScreen(
     var busy by remember { mutableStateOf(false) }
 
     fun submit() {
+        if (busy) return
         if (state.identifier.isBlank() || state.password.isBlank()) {
-            error = "Sign in again to use a backup code."
+            error = context.getString(R.string.acct_sign_in_again_to_use_a_backup_code)
             return
         }
         busy = true; error = null
@@ -279,27 +288,40 @@ fun BackupCodeScreen(
                 val resp = Api.twoFactorBackup(state.identifier, state.password, normalized)
                 busy = false
                 val token = resp.sessionToken ?: resp.accessToken ?: resp.token
-                if (token == null) {
-                    error = "That backup code is not valid, or it has already been used."
+                if (token.isNullOrBlank()) {
+                    error = context.getString(R.string.acct_backup_code_invalid_or_used)
                     return@launch
                 }
+                // The same address rule as every other door (SignInResponse.signedInAddress):
+                // the account's address, never a blank one, else what was typed.
+                val address = resp.user?.let { u ->
+                    u.address.takeIf(String::isNotBlank)
+                        ?: u.grapmailAddress?.takeIf(String::isNotBlank)
+                        ?: u.email?.takeIf(String::isNotBlank)
+                } ?: state.identifier
                 SessionStore.save(
                     context, token, resp.refreshToken,
-                    resp.user?.address ?: state.identifier,
+                    address,
                     resp.user?.name ?: "",
                     resp.expiresAtMillis,
                 )
-                onSignedIn(resp.user?.address ?: state.identifier)
+                code = ""
+                // The password was held in the flow only to spend this code; it
+                // must not outlive the sign-in.
+                flow.clearSignIn()
+                onSignedIn(address)
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
             } catch (e: ApiException) {
                 busy = false
                 error = when (e.code) {
-                    "BAD_BACKUP_CODE" -> "That backup code is not valid, or it has already been used."
-                    "TWO_FACTOR_NOT_ENABLED" -> "This account does not use two-step verification."
-                    else -> e.message ?: "That backup code is not valid."
+                    "BAD_BACKUP_CODE" -> context.getString(R.string.acct_backup_code_invalid_or_used)
+                    "TWO_FACTOR_NOT_ENABLED" -> context.getString(R.string.acct_this_account_does_not_use_two_step)
+                    else -> e.message ?: context.getString(R.string.acct_that_backup_code_is_not_valid)
                 }
             } catch (_: Exception) {
                 busy = false
-                error = "Network error. Please try again."
+                error = context.getString(R.string.acct_network_error)
             }
         }
     }
@@ -307,12 +329,12 @@ fun BackupCodeScreen(
     AccountScreen(
         onBack = onBack,
         illustration = "account-backup",
-        eyebrow = "Use a backup code",
-        title = "Enter your backup code",
-        body = "If you don't have access to your 2-step verification method, you can use a backup code to get back into your account.",
+        eyebrow = stringResource(R.string.acct_use_a_backup_code),
+        title = stringResource(R.string.acct_enter_your_backup_code),
+        body = stringResource(R.string.acct_if_you_dont_have_access_to_your_2),
         footer = {
             GradientButton(
-                "Continue",
+                stringResource(R.string.acct_continue),
                 onClick = { submit() },
                 enabled = code.length == 10,
                 busy = busy,
@@ -323,17 +345,19 @@ fun BackupCodeScreen(
             )
             Spacer(Modifier.height(12.dp))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
-                AccountLink("Try another method", onClick = onTryAnotherMethod)
+                AccountLink(stringResource(R.string.acct_try_another_method), onClick = onTryAnotherMethod)
             }
             Spacer(Modifier.height(12.dp))
             OrDivider()
             Spacer(Modifier.height(12.dp))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
-                AccountLink("Back to sign in", onClick = onBackToSignIn)
+                AccountLink(stringResource(R.string.acct_back_to_sign_in_lower), onClick = onBackToSignIn)
             }
             Spacer(Modifier.height(6.dp))
         },
     ) {
+        // Wraps to two rows of five ("ABCDE" over "FGHIJ") when ten cells
+        // cannot hold legible glyphs: 320dp phones, 200% font, cover screens.
         CodeCells(
             length = 10,
             groupGap = true,
@@ -353,7 +377,7 @@ fun BackupCodeScreen(
                 modifier = Modifier.size(16.dp),
             )
             Text(
-                "Backup codes are 10 characters long and can only be used once.",
+                stringResource(R.string.acct_backup_codes_are_10_characters_long),
                 fontSize = 13.sp,
                 lineHeight = 19.sp,
                 color = palette.textSecondary,

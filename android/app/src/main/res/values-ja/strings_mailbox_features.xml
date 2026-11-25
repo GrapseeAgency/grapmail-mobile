@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    values-ja/strings_mailbox_features.xml: translation of values/strings_mailbox_features.xml (same keys, same order).
+    Comments below are kept from the English source for context.
+-->
+<resources>
+    <!-- ui/mailfeatures/MorningCard.kt — greeting by local time; %1$s is the mailbox's first name. -->
+    <string name="mailbox_feat_greeting_morning">おはようございます</string>
+    <string name="mailbox_feat_greeting_morning_name">おはようございます、%1$s さん</string>
+    <string name="mailbox_feat_greeting_afternoon">こんにちは</string>
+    <string name="mailbox_feat_greeting_afternoon_name">こんにちは、%1$s さん</string>
+    <string name="mailbox_feat_greeting_evening">こんばんは</string>
+    <string name="mailbox_feat_greeting_evening_name">こんばんは、%1$s さん</string>
+    <!-- Summary parts; only non-zero parts are shown, joined by a middle dot. -->
+    <plurals name="mailbox_feat_digest_reply">
+        <item quantity="other">返信が必要: %1$d 件</item>
+    </plurals>
+    <plurals name="mailbox_feat_digest_package">
+        <item quantity="other">配送中の荷物: %1$d 件</item>
+    </plurals>
+    <plurals name="mailbox_feat_digest_code">
+        <item quantity="other">ログインコード: %1$d 件</item>
+    </plurals>
+    <string name="mailbox_feat_digest_caught_up">すべて確認済みです</string>
+    <!-- TalkBack reads the card as one sentence: %1$s greeting, %2$s the parts joined. -->
+    <string name="mailbox_feat_digest_a11y">%1$s。%2$s。</string>
+    <string name="mailbox_feat_digest_a11y_join">、</string>
+    <!-- TalkBack actions on the card. -->
+    <string name="mailbox_feat_action_show_reply">返信が必要なメッセージを表示</string>
+    <string name="mailbox_feat_action_show_packages">荷物の配送情報を表示</string>
+    <string name="mailbox_feat_action_show_codes">ログインコードを表示</string>
+    <string name="mailbox_feat_action_show_all">すべてのメッセージを表示</string>
+    <string name="mailbox_feat_dismiss">閉じる</string>
+    <!-- The active filter chip under the card; %1$s is the filter's name. -->
+    <string name="mailbox_feat_filter_reply">返信が必要</string>
+    <string name="mailbox_feat_filter_packages">荷物</string>
+    <string name="mailbox_feat_filter_codes">ログインコード</string>
+    <string name="mailbox_feat_filter_clear">フィルタを解除: %1$s</string>
+
+    <!-- ui/components/Mail.kt — the code chip on an inbox row; %1$s is the code. -->
+    <string name="mailbox_feat_code_copy">%1$s をコピー</string>
+    <!-- The chip's spoken name; the code itself is not read out. -->
+    <string name="mailbox_feat_code_copy_a11y">ログインコードをコピー</string>
+    <!-- Shown on the chip after a copy. The code is not repeated. -->
+    <string name="mailbox_feat_code_copied">コードをコピーしました</string>
+    <!-- Clipboard label (shown by some keyboards/clipboard UIs). -->
+    <string name="mailbox_feat_code_clip_label">ログインコード</string>
+
+    <!-- ui/mailfeatures/InboxZero.kt -->
+    <string name="mailbox_feat_zero_title">すべて完了</string>
+    <plurals name="mailbox_feat_zero_handled">
+        <item quantity="other">今日は %1$d 件のメールを処理しました。</item>
+    </plurals>
+    <string name="mailbox_feat_zero_nothing">対応待ちのものはありません。</string>
+
+    <!-- ui/screens/mail/SwipeActionsSetting.kt and the row actions in MailboxScreen.kt -->
+    <string name="mailbox_feat_swipe_title">スワイプ操作</string>
+    <string name="mailbox_feat_swipe_body">リストでメッセージをスワイプしたときの動作です。この端末にのみ保存されます。</string>
+    <string name="mailbox_feat_swipe_right">右にスワイプ</string>
+    <string name="mailbox_feat_swipe_left">左にスワイプ</string>
+    <!-- %1$s is "Swipe right" or "Swipe left". -->
+    <string name="mailbox_feat_swipe_change">%1$sを変更</string>
+    <string name="mailbox_feat_swipe_archive">アーカイブ</string>
+    <string name="mailbox_feat_swipe_trash">ごみ箱</string>
+    <string name="mailbox_feat_swipe_read">既読/未読にする</string>
+    <string name="mailbox_feat_swipe_star">スターを付ける</string>
+    <string name="mailbox_feat_swipe_snooze">スヌーズ</string>
+    <string name="mailbox_feat_swipe_move">移動先…</string>
+    <string name="mailbox_feat_swipe_none">なし</string>
+</resources>

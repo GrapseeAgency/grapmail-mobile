@@ -15,6 +15,8 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
+import com.grapsee.grapmail.R
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -25,8 +27,14 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import java.io.ByteArrayInputStream
 
 /**
- * The welcome animation: the founder's `GrapMail_Autoplay_Mailbox.html`, bundled
- * in `assets/` and drawn by a WebView.
+ * The welcome illustration: the founder's `GrapMail_Autoplay_Mailbox.html`,
+ * bundled in `assets/` and drawn by a WebView.
+ *
+ * It is pure illustration: a phone in an envelope playing a short product tour
+ * inside its own mini screen. It carries NO headline or tagline — "Welcome to
+ * GrapMail" and the promise line are real, localized Compose text drawn by
+ * [com.grapsee.grapmail.ui.screens.WelcomeScreen] below it, so they follow the
+ * font-size setting and never appear twice.
  *
  * It is a picture, not a page. The file is ours and travels in the APK; the view
  * has no navigation (every URL except the asset itself is refused), no network
@@ -35,22 +43,35 @@ import java.io.ByteArrayInputStream
  * envelope can never be dragged or the page panned out of its frame.
  *
  * Sizing is the caller's job: the artwork is authored in a 400 x 440 box
- * (`getFrame()` in the page), so the host must hand it that aspect ratio. The
- * page carries a small host-mode style block that makes the stage fill the view
- * exactly and keeps the page background transparent — the welcome screen paints
- * the backdrop, so there is never a second navy rectangle around the envelope.
+ * (`getFrame()` in the page) and the HTML mini-screen is positioned in
+ * percentages of that box, so the host MUST hand it exactly that aspect ratio
+ * (width = height * 400 / 440). Inside that box the whole drawing — orbit,
+ * badges, glow — fits without cropping. The page carries a small host-mode
+ * style block that makes the stage fill the view exactly; the welcome screen
+ * paints the backdrop, so there is never a second rectangle around the envelope.
+ *
+ * [still] is the "Remove animations" reading ([rememberMotionReduced]): the
+ * page is shown as one settled inbox frame — every CSS animation and
+ * transition is switched off and the scripted tour is never started. The
+ * caller keys the composable on it, so flipping the switch rebuilds the view.
  *
  * The animation is JS + CSS compositor work inside the WebView, so it stays off
  * the Compose recomposition path entirely.
  */
 @Composable
-fun WelcomeHero(accent: Color, backdrop: Color, modifier: Modifier = Modifier) {
+fun WelcomeHero(
+    accent: Color,
+    backdrop: Color,
+    modifier: Modifier = Modifier,
+    still: Boolean = false,
+) {
     BundledAnimation(
         asset = "GrapMail_Autoplay_Mailbox.html",
         accent = accent,
         backdrop = backdrop,
-        description = "Animated preview: a GrapMail inbox on a phone rising out of an envelope",
+        description = stringResource(R.string.mail_welcome_hero_description),
         modifier = modifier,
+        still = still,
     )
 }
 
@@ -64,6 +85,7 @@ internal fun BundledAnimation(
     modifier: Modifier = Modifier,
     interactive: Boolean = false,
     onOpenMailbox: (() -> Unit)? = null,
+    still: Boolean = false,
 ) {
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     // A holder, not state: this must not key the effect below. Keying it made
@@ -90,7 +112,13 @@ internal fun BundledAnimation(
                     .let { document ->
                         val background = (backdrop.toArgb() and 0xFFFFFF).toString(16).padStart(6, '0')
                         val style = "<style>:root { --grapmail-native-background: #$background; color-scheme: only light; }</style>"
-                        document.replaceFirst("</head>", "$style</head>")
+                        val stillStyle = if (still) STILL_STYLE else ""
+                        val themed = document.replaceFirst("</head>", "$style$stillStyle</head>")
+                        // Reduced motion: never start the scripted tour. The page
+                        // has already drawn its first inbox frame synchronously
+                        // (`init();inbox();`) before this call, so a settled
+                        // picture remains. A page without the call is unchanged.
+                        if (still) themed.replaceFirst(TOUR_START, TOUR_SKIPPED) else themed
                     }
 
                 WebView(viewContext).apply {
@@ -201,3 +229,11 @@ internal fun BundledAnimation(
 }
 
 private const val ASSET_BASE = "file:///android_asset/"
+
+/** "Remove animations": every CSS animation and transition off, end states shown. */
+private const val STILL_STYLE =
+    "<style id=\"native-host-still\">*,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}</style>"
+
+/** The welcome tour's start call, and its reduced-motion replacement (no tour, same error path). */
+private const val TOUR_START = "autoStory().catch("
+private const val TOUR_SKIPPED = "Promise.resolve().catch("

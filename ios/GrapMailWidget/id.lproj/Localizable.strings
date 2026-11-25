@@ -1,0 +1,31 @@
+/* GrapMailWidget — Indonesian (id). */
+
+"Unread mail" = "Email belum dibaca";
+"The unread count your app last saw, and the newest message." = "Jumlah belum dibaca yang terakhir dilihat aplikasi, dan pesan terbaru.";
+"GrapMail — not signed in" = "GrapMail — belum login";
+"GrapMail — no read yet" = "GrapMail — belum ada data";
+/* Lock Screen inline widget: unread count, newest sender */
+"%lld unread · %@" = "%lld belum dibaca · %@";
+/* Lock Screen inline widget: unread count */
+"%lld unread" = "%lld belum dibaca";
+"unread" = "belum dibaca";
+"No subject" = "Tanpa subjek";
+"No read yet" = "Belum ada data";
+"Open the app to sign in" = "Buka aplikasi untuk login";
+"Scheduled send" = "Kiriman terjadwal";
+"(no subject)" = "(tanpa subjek)";
+"Scheduled" = "Terjadwal";
+"To %@" = "Kepada %@";
+"Sending…" = "Mengirim…";
+
+/* Home Screen widget row buttons (iOS 17+), read by VoiceOver */
+"Mark as read" = "Tandai sudah dibaca";
+"Archive" = "Arsipkan";
+"Star" = "Beri bintang";
+"Unstar" = "Hapus bintang";
+/* The widget row buttons' App Intent and its parameters (hidden from Shortcuts) */
+"Update message" = "Perbarui pesan";
+"Message" = "Pesan";
+"Action" = "Aksi";
+/* Widget placeholder when no account is signed in */
+"Open GrapMail to sign in" = "Buka GrapMail untuk masuk";

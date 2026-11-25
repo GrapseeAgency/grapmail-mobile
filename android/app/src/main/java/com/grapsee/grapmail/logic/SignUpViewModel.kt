@@ -2,9 +2,11 @@ package com.grapsee.grapmail.logic
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.grapsee.grapmail.R
 import com.grapsee.grapmail.data.Api
 import com.grapsee.grapmail.data.ApiException
 import com.grapsee.grapmail.data.CreateRequest
+import com.grapsee.grapmail.ui.i18n.CoreStrings
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -125,7 +127,7 @@ class SignUpViewModel : ViewModel() {
                         handleState = when {
                             resp.available -> HandleState(HandleState.Status.Available)
                             resp.suggestion != null -> HandleState(HandleState.Status.Taken, resp.reason, resp.suggestion)
-                            else -> HandleState(HandleState.Status.Invalid, resp.reason ?: "That address cannot be used.", null)
+                            else -> HandleState(HandleState.Status.Invalid, resp.reason ?: CoreStrings.get(R.string.core_signup_handle_unusable) { "That address cannot be used." }, null)
                         },
                         chosenHandle = if (resp.available) cleaned else "",
                     )
@@ -147,10 +149,10 @@ class SignUpViewModel : ViewModel() {
     /** Step 5: create the real account, then sign it in immediately. */
     fun createAccount(onCreated: (address: String, name: String) -> Unit, onError: (String) -> Unit) {
         val s = _state.value
-        if (!s.termsAgreed) { onError("Please read and agree to the terms to continue."); return }
+        if (!s.termsAgreed) { onError(CoreStrings.get(R.string.core_signup_terms_required) { "Please read and agree to the terms to continue." }); return }
         val verificationId = s.humanVerificationId
         if (!s.humanVerified || verificationId.isNullOrBlank()) {
-            onError("Complete the human verification check to continue.")
+            onError(CoreStrings.get(R.string.core_signup_human_required) { "Complete the human verification check to continue." })
             return
         }
         viewModelScope.launch {
@@ -193,20 +195,20 @@ class SignUpViewModel : ViewModel() {
                 }
                 onError(
                     when (e.code) {
-                        "HANDLE_TAKEN" -> "That GrapMail address is already taken. Try another one."
+                        "HANDLE_TAKEN" -> CoreStrings.get(R.string.core_signup_handle_taken) { "That GrapMail address is already taken. Try another one." }
                         // The server names which rule failed; the gate above already
                         // mirrors the full policy, so this is the rare fallback and
                         // should say what the route actually said, not a hardcoded
                         // length message that is wrong for a missing letter or symbol.
-                        "WEAK_PASSWORD" -> e.message ?: "Use at least 8 characters with a letter, a number and a symbol."
-                        "INVALID_NAME" -> "Enter your full name (at least 2 characters)."
-                        "HUMAN_VERIFICATION_REQUIRED" -> "Your verification expired or was already used — complete the check again."
-                        else -> e.message ?: "Could not create the account. Please try again."
+                        "WEAK_PASSWORD" -> e.message ?: CoreStrings.get(R.string.core_signup_weak_password) { "Use at least 8 characters with a letter, a number and a symbol." }
+                        "INVALID_NAME" -> CoreStrings.get(R.string.core_signup_invalid_name) { "Enter your full name (at least 2 characters)." }
+                        "HUMAN_VERIFICATION_REQUIRED" -> CoreStrings.get(R.string.core_signup_verification_expired) { "Your verification expired or was already used — complete the check again." }
+                        else -> e.message ?: CoreStrings.get(R.string.core_signup_create_failed) { "Could not create the account. Please try again." }
                     }
                 )
             } catch (e: Exception) {
                 update { copy(creating = false) }
-                onError("Network error. Please try again.")
+                onError(CoreStrings.get(R.string.core_network_error_try_again) { "Network error. Please try again." })
             }
         }
     }
@@ -234,19 +236,19 @@ class SignUpViewModel : ViewModel() {
                         )
                     }
                 } else {
-                    update { copy(humanVerifying = false, humanVerifyError = "Verification failed — please try again.") }
+                    update { copy(humanVerifying = false, humanVerifyError = CoreStrings.get(R.string.core_signup_verify_failed_retry) { "Verification failed — please try again." }) }
                 }
             } catch (e: kotlinx.coroutines.CancellationException) {
                 throw e
             } catch (e: ApiException) {
                 val message = when {
-                    e.status >= 500 -> "The verification service is temporarily unavailable. Try a new challenge in a moment."
-                    e.status == 429 -> "Too many verification attempts. Wait a moment and try again."
-                    else -> "Verification failed. Get a new challenge and try again."
+                    e.status >= 500 -> CoreStrings.get(R.string.core_signup_verify_unavailable) { "The verification service is temporarily unavailable. Try a new challenge in a moment." }
+                    e.status == 429 -> CoreStrings.get(R.string.core_signup_verify_rate_limited) { "Too many verification attempts. Wait a moment and try again." }
+                    else -> CoreStrings.get(R.string.core_signup_verify_failed_new) { "Verification failed. Get a new challenge and try again." }
                 }
                 update { copy(humanVerifying = false, humanVerifyError = message) }
             } catch (e: Exception) {
-                update { copy(humanVerifying = false, humanVerifyError = "Could not complete verification. Get a new challenge and try again.") }
+                update { copy(humanVerifying = false, humanVerifyError = CoreStrings.get(R.string.core_signup_verify_incomplete) { "Could not complete verification. Get a new challenge and try again." }) }
             }
         }
     }

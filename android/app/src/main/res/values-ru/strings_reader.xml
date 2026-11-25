@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    values-ru/strings_reader.xml: translation of values/strings_reader.xml (same keys, same order).
+    Comments below are kept from the English source for context.
+-->
+<resources>
+    <!-- The inline pill above an HTML body in a dark reader. It names what a tap switches TO. -->
+    <string name="reader_colours_original">Исходные цвета</string>
+    <string name="reader_colours_dark">Тёмные цвета</string>
+
+    <!-- The message overflow menu items (same toggle as the pill). -->
+    <string name="reader_colours_menu_original">Показать исходные цвета</string>
+    <string name="reader_colours_menu_dark">Показать в тёмных цветах</string>
+
+    <!-- TalkBack: the pill's click action ("double-tap to …") and its current state. -->
+    <string name="reader_colours_action_original">показать исходные цвета этого отправителя</string>
+    <string name="reader_colours_action_dark">показать в тёмных цветах</string>
+    <string name="reader_colours_state_original">Показаны исходные цвета</string>
+    <string name="reader_colours_state_dark">Показаны тёмные цвета</string>
+
+    <!-- The note under the message after a change, so the per-sender memory is not a surprise later. -->
+    <string name="reader_colours_remembered_original">Письма от %1$s будут открываться на этом устройстве в исходных цветах.</string>
+    <string name="reader_colours_remembered_dark">Письма от %1$s будут открываться на этом устройстве в тёмных цветах.</string>
+</resources>

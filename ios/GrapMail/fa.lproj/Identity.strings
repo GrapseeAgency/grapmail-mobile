@@ -1,0 +1,7 @@
+/* GrapMail — Identity string table (fa). Translated from en.lproj/Identity.strings. */
+
+/* VoiceOver label for a masked email address. First value: its first letters. Second: its last letter. Third: the domain. */
+"Address beginning %@, ending %@ at %@" = "نشانی‌ای که با %1$@ شروع و با %2$@ تمام می‌شود، در %3$@";
+
+/* VoiceOver label for a masked email address with no visible last letter. First value: its first letters. Second: the domain. */
+"Address beginning %@ at %@" = "نشانی‌ای که با %1$@ شروع می‌شود، در %2$@";

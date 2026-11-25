@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    values-fa/strings_send_later.xml: translation of values/strings_send_later.xml (same keys, same order).
+    Comments below are kept from the English source for context.
+-->
+<resources>
+    <!-- The clock button next to Send (TalkBack label and click action). -->
+    <string name="compose_send_later_button">زمان‌بندی ارسال</string>
+    <string name="compose_send_later_button_action">انتخاب زمان ارسال</string>
+
+    <!-- The sheet. -->
+    <string name="compose_send_later_title">ارسال در زمانی دیگر</string>
+    <string name="compose_send_later_later_today">امروز، کمی بعد</string>
+    <string name="compose_send_later_tomorrow_morning">فردا صبح</string>
+    <string name="compose_send_later_monday_morning">دوشنبه صبح</string>
+    <string name="compose_send_later_pick">انتخاب تاریخ و ساعت</string>
+    <string name="compose_send_later_pick_hint">تا ۳۰ روز آینده</string>
+    <!-- %1$s: the device time zone's name, e.g. "Bangladesh Standard Time". -->
+    <string name="compose_send_later_zone_note">زمان‌ها به وقت منطقهٔ زمانی شما هستند: %1$s</string>
+    <!-- TalkBack for one option row. %1$s: option name, %2$s: its day and time. -->
+    <string name="compose_send_later_option_description">%1$s، %2$s</string>
+
+    <!-- Date and time dialogs. -->
+    <string name="compose_send_later_date_title">انتخاب تاریخ</string>
+    <string name="compose_send_later_time_title">انتخاب ساعت</string>
+    <string name="compose_send_later_next">بعدی</string>
+    <string name="compose_send_later_schedule">زمان‌بندی</string>
+    <string name="compose_send_later_cancel">لغو</string>
+    <string name="compose_send_later_type_time">تایپ ساعت</string>
+    <string name="compose_send_later_use_clock">استفاده از ساعت عقربه‌ای</string>
+    <string name="compose_send_later_too_soon">ساعتی را انتخاب کنید که دست‌کم یک دقیقه بعد از اکنون باشد.</string>
+    <string name="compose_send_later_too_far">ساعتی را انتخاب کنید که بیش از ۳۰ روز بعد نباشد.</string>
+
+    <!-- In-flight and failure lines in the composer. -->
+    <string name="compose_send_later_scheduling">در حال زمان‌بندی…</string>
+    <string name="compose_send_later_offline">اتصال برقرار نیست، بنابراین چیزی زمان‌بندی نشد. پیامتان هنوز اینجاست.</string>
+
+    <!-- The receipt snackbar shown after compose closes. %1$s: e.g. "Tue 8:00 AM". -->
+    <string name="compose_send_later_scheduled_for">زمان‌بندی‌شده برای %1$s</string>
+    <string name="compose_send_later_undo">واگرد</string>
+    <string name="compose_send_later_view">مشاهده</string>
+    <string name="compose_send_later_undoing">در حال لغو…</string>
+    <string name="compose_send_later_undone">دیگر زمان‌بندی نشده است. پیام به پیش‌نویس‌ها برگشت.</string>
+    <!-- %1$s: the server's reason. -->
+    <string name="compose_send_later_undo_failed">لغو نشد: %1$s</string>
+    <string name="compose_send_later_dismiss">رد کردن</string>
+</resources>

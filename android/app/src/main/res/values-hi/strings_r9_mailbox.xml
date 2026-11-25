@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="mail_sendlater_channel_name">निर्धारित भेजे गए</string>
+    <string name="mail_sendlater_channel_desc">भेजे जाने की प्रतीक्षा कर रहे संदेशों की उलटी गिनती</string>
+</resources>

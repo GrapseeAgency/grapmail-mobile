@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Loading / empty / error / offline states (German). Translated from values/strings_states.xml. -->
+<resources>
+    <!-- Shared -->
+    <string name="states_loading">Wird geladen…</string>
+    <string name="states_offline_banner">Du bist offline. Angezeigt wird der zuletzt geladene Stand – alles, was das Netzwerk braucht, wartet, bis du wieder verbunden bist.</string>
+    <string name="states_error_title">Etwas ist schiefgelaufen</string>
+    <string name="states_error_body">Das konnte gerade nicht geladen werden. Prüfe deine Verbindung und versuche es erneut.</string>
+    <string name="states_error_offline_body">Du bist offline. Verbinde dich mit WLAN oder mobilen Daten und versuche es dann erneut.</string>
+    <string name="states_retry">Erneut versuchen</string>
+
+    <!-- Labels -->
+    <string name="states_labels_loading">Labels werden geladen…</string>
+    <string name="states_labels_failed_title">Labels konnten nicht geladen werden</string>
+
+    <!-- Scheduled -->
+    <string name="states_scheduled_loading">Geplante E-Mails werden geladen…</string>
+    <string name="states_scheduled_failed_title">Geplante E-Mails konnten nicht geladen werden</string>
+    <string name="states_scheduled_empty_title">Nichts geplant</string>
+
+    <!-- Contacts and files -->
+    <string name="states_contacts_loading">Personen aus deinen E-Mails werden gesammelt…</string>
+    <string name="states_files_loading">Anhänge werden gesammelt…</string>
+
+    <!-- Connected mailboxes -->
+    <string name="states_providers_loading">Verbundene Postfächer werden geladen…</string>
+
+    <!-- Reader -->
+    <string name="states_thread_loading">Diese Unterhaltung wird geöffnet…</string>
+
+    <!-- Security -->
+    <string name="states_activity_failed_title">Aktivität konnte nicht geladen werden</string>
+    <string name="states_sessions_failed_title">Sitzungen konnten nicht geladen werden</string>
+</resources>

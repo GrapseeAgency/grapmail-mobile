@@ -1,0 +1,625 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Mail UI strings (mailbox, thread, compose, secondary mail screens, shared
+  components, home-screen widget). English text here is byte-identical to the
+  literals it replaced: the screenshot walk and scripts/mail-honesty.py find
+  elements and wording by this text. Translations are added in values-xx/.
+-->
+<resources>
+    <!-- widget/UnreadWidget.kt -->
+    <string name="mail_widget_not_read_yet">not read yet</string>
+    <string name="mail_widget_no_unread">no unread mail</string>
+    <plurals name="mail_widget_unread_count">
+        <item quantity="one">%1$d unread message</item>
+        <item quantity="other">%1$d unread messages</item>
+    </plurals>
+    <string name="mail_widget_open_to_check">Open GrapMail to check</string>
+    <string name="mail_widget_recent_row">%1$s — %2$s</string>
+    <string name="mail_widget_new_message">✉ \u0020New message</string>
+
+    <!-- shared -->
+    <string name="mail_common_back">Back</string>
+    <string name="mail_common_ok">OK</string>
+    <string name="mail_common_try_again">Try again</string>
+    <string name="mail_compose">Compose</string>
+
+    <!-- ui/components/Account.kt -->
+    <string name="mail_code_expires_in">Code expires in\u0020</string>
+    <string name="mail_code_expired">expired</string>
+    <string name="mail_divider_or">\u0020OR\u0020</string>
+
+    <!-- ui/components/AppLockUi.kt -->
+    <string name="mail_lock_title">GrapMail is locked</string>
+    <string name="mail_lock_subtitle">Confirm it is you to open your mailbox</string>
+    <string name="mail_lock_unlock">Unlock</string>
+
+    <!-- ui/components/Common.kt -->
+    <string name="mail_password_hide">Hide password</string>
+    <string name="mail_password_show">Show password</string>
+    <string name="mail_step_name">Name</string>
+    <string name="mail_step_details">Details</string>
+    <string name="mail_step_address">Address</string>
+    <string name="mail_step_password">Password</string>
+    <string name="mail_step_terms">Terms</string>
+
+    <!-- ui/components/PuzzleSlider.kt -->
+    <string name="mail_puzzle_verified">Verified — you\'re human!</string>
+    <string name="mail_puzzle_try_again">Almost — try again</string>
+    <string name="mail_puzzle_slide_to_verify">Slide to verify</string>
+
+    <!-- ui/components/RequiredUpdate.kt, UpdateBanner.kt -->
+    <string name="mail_update_required_title">Update GrapMail to continue</string>
+    <string name="mail_update_required_body">This version is no longer supported. Your mail is safe; the new version opens it right where you left it.</string>
+    <string name="mail_update_now">Update now</string>
+    <string name="mail_update_available_title">A new version of GrapMail is available</string>
+    <string name="mail_update_dismiss">Dismiss the update banner</string>
+    <string name="mail_update_available_body">Updating keeps GrapMail at its fastest and most secure.</string>
+    <string name="mail_update_action">Update</string>
+
+    <!-- ui/components/WelcomeHero.kt -->
+    <string name="mail_welcome_hero_description">Animated preview: a GrapMail inbox on a phone rising out of an envelope</string>
+
+    <!-- ui/components/Mail.kt -->
+    <string name="mail_time_yesterday">Yesterday</string>
+    <string name="mail_unknown_sender">Unknown sender</string>
+    <string name="mail_row_encrypted_suffix">\u0020· encrypted</string>
+    <string name="mail_row_has_attachments">Has attachments</string>
+    <string name="mail_action_star">Star</string>
+    <string name="mail_action_unstar">Unstar</string>
+    <string name="mail_selection_close">Close selection</string>
+    <plurals name="mail_selection_count">
+        <item quantity="one">%1$d selected</item>
+        <item quantity="other">%1$d selected</item>
+    </plurals>
+    <string name="mail_action_archive">Archive</string>
+    <string name="mail_action_delete">Delete</string>
+    <string name="mail_action_move">Move</string>
+    <string name="mail_action_label">Label</string>
+    <string name="mail_action_mark_read">Mark read</string>
+    <string name="mail_action_mark_unread">Mark unread</string>
+    <string name="mail_action_sender">Sender</string>
+    <string name="mail_action_more">More</string>
+    <string name="mail_state_loading">Checking your mailbox…</string>
+    <string name="mail_state_no_mailbox_title">No GrapMail mailbox on this account</string>
+    <string name="mail_state_no_mailbox_body">The account you signed in with has no mailbox provisioned, so there is nothing to list. This is not a connection problem.</string>
+    <string name="mail_state_failed_title">Couldn\'t load %1$s</string>
+    <string name="mail_state_failed_body">Your mailbox could not be reached. Nothing has been deleted.</string>
+    <string name="mail_state_welcome_title">Welcome home to GrapMail</string>
+    <string name="mail_state_welcome_body">Your inbox is fresh, quiet, and completely protected.</string>
+    <string name="mail_state_no_matches">No matching messages</string>
+    <string name="mail_state_no_matches_body">Try changing your search or filters.</string>
+    <string name="mail_state_box_empty">%1$s is empty</string>
+    <string name="mail_state_box_empty_body">No messages here yet.</string>
+    <string name="mail_badge_subscriber">Subscriber</string>
+    <string name="mail_badge_subscriber_description">Subscriber: this sender supports GrapMail with a paid plan</string>
+    <string name="mail_box_inbox">Inbox</string>
+    <string name="mail_box_starred">Starred</string>
+    <string name="mail_box_sent">Sent</string>
+    <string name="mail_box_drafts">Drafts</string>
+    <string name="mail_box_snoozed">Snoozed</string>
+    <string name="mail_box_archive">Archive</string>
+    <string name="mail_box_spam">Spam</string>
+    <string name="mail_box_trash">Trash</string>
+    <string name="mail_box_screener">Pending approval</string>
+    <string name="mail_box_all">All Mail</string>
+
+    <!-- more shared -->
+    <string name="mail_common_cancel">Cancel</string>
+    <string name="mail_common_done">Done</string>
+    <string name="mail_common_close">Close</string>
+    <string name="mail_common_clear">Clear</string>
+    <string name="mail_bullet_item">• %1$s</string>
+
+    <!-- ui/mailfeatures/MailFeatureCards.kt -->
+    <plurals name="mail_thread_summary_title">
+        <item quantity="one">Thread summary · %1$d message</item>
+        <item quantity="other">Thread summary · %1$d messages</item>
+    </plurals>
+    <string name="mail_summary_less">Less</string>
+    <string name="mail_summary_more">More</string>
+    <string name="mail_summary_collapse">Collapse summary</string>
+    <string name="mail_summary_expand">Expand summary</string>
+    <string name="mail_category_all">All</string>
+    <string name="mail_category_priority">Priority</string>
+    <string name="mail_category_people">People</string>
+    <string name="mail_category_transactions">Transactions</string>
+    <string name="mail_category_notices">Notices</string>
+    <string name="mail_category_newsletters">Newsletters</string>
+    <string name="mail_tracker_summary">%1$s · %2$s</string>
+    <plurals name="mail_trackers_blocked">
+        <item quantity="one">%1$d tracker blocked</item>
+        <item quantity="other">%1$d trackers blocked</item>
+    </plurals>
+    <plurals name="mail_remote_images_stopped">
+        <item quantity="one">%1$d remote image stopped</item>
+        <item quantity="other">%1$d remote images stopped</item>
+    </plurals>
+    <string name="mail_tracker_shield_on">Tracker shield on — tracking pixels stripped before display</string>
+    <string name="mail_link_dangerous">Dangerous link detected</string>
+    <string name="mail_link_careful">Careful with this link</string>
+    <string name="mail_link_destination">Destination: %1$s</string>
+    <string name="mail_link_no_signals">No known danger signals were found for this link.</string>
+    <string name="mail_link_open_anyway">Open anyway</string>
+    <string name="mail_link_chip_high">! %1$s</string>
+    <string name="mail_link_chip_review">Review: %1$s</string>
+    <string name="mail_assist_draft">Draft</string>
+    <string name="mail_assist_rewrite">Rewrite</string>
+    <string name="mail_assist_professional">Professional</string>
+    <string name="mail_assist_friendly">Friendly</string>
+    <string name="mail_assist_concise">Concise</string>
+    <string name="mail_assist_proofread">Proofread</string>
+    <string name="mail_assist_draft_title">Draft with on-device assist</string>
+    <string name="mail_assist_prompt_label">What should the message say?</string>
+    <string name="mail_assist_on_device_note">Runs fully on-device — nothing leaves the phone.</string>
+    <string name="mail_assist_draft_it">Draft it</string>
+    <string name="mail_assist_no_issues">No obvious issues found.</string>
+    <string name="mail_assist_runs_on_device">Assist runs fully on-device</string>
+    <string name="mail_templates">Templates</string>
+    <string name="mail_templates_search">Search templates</string>
+    <string name="mail_templates_no_match">No templates match.</string>
+    <string name="mail_templates_insert">Insert template</string>
+    <string name="mail_templates_name">Name</string>
+    <string name="mail_templates_body">Body — supports {first_name} and {my_name}</string>
+    <string name="mail_templates_save">Save template</string>
+    <string name="mail_templates_new">New template</string>
+    <plurals name="mail_followup_awaiting">
+        <item quantity="one">%1$d message awaiting a reply</item>
+        <item quantity="other">%1$d messages awaiting a reply</item>
+    </plurals>
+    <string name="mail_followup_review">Review</string>
+    <string name="mail_receipt_opened">Opened · noted on this device</string>
+    <string name="mail_receipt_markers_on">Opened-mail markers on</string>
+    <string name="mail_features_section">Privacy &amp; intelligence</string>
+    <string name="mail_features_smart_title">On-device intelligence</string>
+    <string name="mail_features_smart_body">Categories, summaries and replies stay on this device</string>
+    <string name="mail_features_shield_title">Tracker shield</string>
+    <string name="mail_features_shield_body">Hold remote images and tracking pixels until you tap Show images. Off loads them automatically.</string>
+    <string name="mail_features_qr_title">QR &amp; link warnings</string>
+    <string name="mail_features_qr_body">Warn before opening scanned or suspicious links</string>
+    <string name="mail_features_receipts_title">Opened-mail markers</string>
+    <string name="mail_features_receipts_body">Mark messages you\'ve opened, on this device only. Nothing is sent to the sender.</string>
+    <string name="mail_features_followups_title">Follow-up reminders</string>
+    <string name="mail_features_followups_body">Remind me when a reply is overdue</string>
+    <string name="mail_features_followup_center">Follow-up center</string>
+    <string name="mail_features_import_assistant">Import assistant</string>
+
+    <!-- ui/mailfeatures/MailTools.kt (English keeps the original "(s)" wording) -->
+    <plurals name="mail_followup_window_intro">
+        <item quantity="one">Threads where you replied and no answer has arrived within %1$d day(s).</item>
+        <item quantity="other">Threads where you replied and no answer has arrived within %1$d day(s).</item>
+    </plurals>
+    <plurals name="mail_followup_window">
+        <item quantity="one">Window: %1$d day(s)</item>
+        <item quantity="other">Window: %1$d day(s)</item>
+    </plurals>
+    <string name="mail_followup_minus_day">−1 day</string>
+    <string name="mail_followup_plus_day">+1 day</string>
+    <string name="mail_followup_nothing_overdue">Nothing overdue right now.</string>
+    <string name="mail_followup_awaiting_reply">Awaiting reply</string>
+    <string name="mail_followup_no_reply_yet">No reply received yet</string>
+    <string name="mail_followup_nudge">Nudge</string>
+    <string name="mail_followup_nudge_text">Just checking in on this — any update on your side?</string>
+    <string name="mail_followup_local_note">Reminders are tracked locally: GrapMail marks a thread when you reply and clears it when an answer arrives.</string>
+    <string name="mail_sendlater_title">Scheduled to send %1$s</string>
+    <string name="mail_sendlater_cancel">Cancel send</string>
+    <string name="mail_import_assistant_title">Import &amp; migration assistant</string>
+    <string name="mail_import_assistant_intro">Bring your world to GrapMail in three steps:</string>
+    <string name="mail_import_assistant_step1">1. In your old provider, turn on automatic forwarding to your GrapMail address (usually Settings → Forwarding).</string>
+    <string name="mail_import_assistant_step2">2. Export contacts as vCard (.vcf) and calendars as iCal (.ics), paste their contents below and validate before importing.</string>
+    <string name="mail_import_assistant_step3">3. Send one test message from the old address to confirm forwarding, then switch your daily flow here.</string>
+    <string name="mail_import_assistant_paste">Paste .vcf or .ics text</string>
+    <string name="mail_import_assistant_nothing">Nothing pasted yet.</string>
+    <string name="mail_import_assistant_none_found">No vCard or iCal blocks found — check the export file.</string>
+    <string name="mail_import_assistant_validated">Validated: %1$s, %2$s. Ready to import.</string>
+    <plurals name="mail_import_contacts">
+        <item quantity="one">%1$d contact(s)</item>
+        <item quantity="other">%1$d contact(s)</item>
+    </plurals>
+    <plurals name="mail_import_events">
+        <item quantity="one">%1$d calendar event(s)</item>
+        <item quantity="other">%1$d calendar event(s)</item>
+    </plurals>
+    <string name="mail_import_assistant_validate">Validate</string>
+    <string name="mail_import_assistant_privacy">Your contacts and calendars stay yours — the assistant only reads what you paste here, on this device.</string>
+
+    <!-- ui/screens/mail/ScheduledScreen.kt, StorageBanner.kt -->
+    <string name="mail_no_subject">(no subject)</string>
+    <string name="mail_scheduled_fallback_subject">Scheduled mail</string>
+    <string name="mail_scheduled_title">Scheduled</string>
+    <string name="mail_scheduled_empty">Nothing scheduled.</string>
+    <string name="mail_scheduled_to">To %1$s</string>
+    <string name="mail_scheduled_sends">Sends %1$s</string>
+    <string name="mail_scheduled_awaiting_instant">Awaiting the server\'s instant</string>
+    <string name="mail_scheduled_cancelling">Cancelling…</string>
+    <string name="mail_storage_full">Your storage is full</string>
+    <string name="mail_storage_almost_full">Your storage is almost full</string>
+    <string name="mail_storage_body">%1$s of %2$s used (%3$s). Delete large attachments, then empty Trash and Spam.</string>
+    <string name="mail_storage_see_files">See large files</string>
+    <string name="mail_common_not_now">Not now</string>
+
+    <!-- ui/screens/mail/SubscriptionsScreen.kt -->
+    <string name="mail_subs_freq_20_plus">20+ emails recently</string>
+    <string name="mail_subs_freq_10_20">10-20 emails recently</string>
+    <string name="mail_subs_freq_10_or_fewer">10 or fewer emails recently</string>
+    <string name="mail_subs_title">Subscriptions</string>
+    <string name="mail_subs_intro">Senders that keep mailing this account, with a way to stop each one.</string>
+    <string name="mail_subs_failed">Could not read the mailbox just now. Try again — open the inbox, then come back.</string>
+    <string name="mail_subs_reading">Reading your mail…</string>
+    <string name="mail_subs_empty_title">No subscriptions detected.</string>
+    <string name="mail_subs_empty_body">This screen reads the incoming inbox mail the app has loaded on this device — %1$d messages — and groups the senders that keep mailing you. A sender counts with two messages when they offer an unsubscribe, or three when they do not. Nothing is shown here as an example; the moment mail arrives, the senders appear with their frequency and a way to stop them.</string>
+    <string name="mail_subs_delay_note">When you unsubscribe, it can take senders a few days to stop sending messages.</string>
+    <string name="mail_subs_mailto_opened">The device opened a draft to the sender\'s unsubscribe address. Nothing has left this phone until you send it.</string>
+    <string name="mail_subs_mailto_none">This device has no mail app that can open that address, so nothing was drafted.</string>
+    <string name="mail_subs_scope">This screen grouped the %1$d incoming messages the app has loaded; a sender whose mail is not on this device is not on this list.</string>
+    <string name="mail_subs_footer">Nothing was sent to any sender until you press Unsubscribe. This screen never mails on your behalf on its own.</string>
+    <string name="mail_subs_removed_note">%1$s The row is removed here because this device cannot see what the page said.</string>
+    <string name="mail_subs_no_offer">%1$s does not offer an unsubscribe, so there is nothing this device can hand off.</string>
+    <string name="mail_subs_scope_hint">When a sender offers a one-click unsubscribe, it is used; otherwise their own unsubscribe page opens.</string>
+    <string name="mail_subs_unsubscribe">Unsubscribe</string>
+
+    <!-- ui/screens/mail/MessageHandoff.kt -->
+    <string name="mail_share_not_recorded">Not recorded</string>
+    <string name="mail_share_from">From: %1$s</string>
+    <string name="mail_share_to">To: %1$s</string>
+    <string name="mail_share_cc">Cc: %1$s</string>
+    <string name="mail_share_date">Date: %1$s</string>
+    <string name="mail_share_no_text_body">This message has no text body.</string>
+    <string name="mail_remote_image_loading">Loading image…</string>
+    <string name="mail_remote_image_bad_address">That address is not one this app can request.</string>
+    <string name="mail_remote_image_refused">The sender\'s server refused the image (%1$d).</string>
+    <string name="mail_remote_image_not_image">That address is not an image (%1$s).</string>
+    <string name="mail_remote_image_no_type">no type given</string>
+    <string name="mail_remote_image_unreadable">The image could not be read.</string>
+    <string name="mail_remote_image_unreachable">The sender\'s server could not be reached.</string>
+    <string name="mail_print_no_service">This device has no print service.</string>
+    <string name="mail_print_doc_name">GrapMail message</string>
+    <string name="mail_print_no_screen">This device could not open its print screen.</string>
+
+    <!-- ui/screens/mail/PlanScreen.kt -->
+    <string name="mail_common_loading">Loading…</string>
+    <string name="mail_plan_pending">Google Play is still processing your payment. Your plan changes when it completes.</string>
+    <string name="mail_plan_confirming">Confirming your purchase…</string>
+    <string name="mail_plan_youre_on">You\'re on %1$s.</string>
+    <string name="mail_plan_verify_failed">The purchase could not be confirmed yet. It will be retried.</string>
+    <string name="mail_plan_read_failed">Your plan could not be read.</string>
+    <string name="mail_plan_title">Your plan</string>
+    <string name="mail_plan_current">Current plan</string>
+    <string name="mail_plan_renews">Renews %1$s</string>
+    <string name="mail_plan_ends">Ends %1$s — it won\'t renew</string>
+    <string name="mail_plan_badge_note">Your messages show a Subscriber badge to other GrapMail users. It means you support GrapMail; it is not identity verification.</string>
+    <string name="mail_plan_this_month">This month</string>
+    <string name="mail_plan_used_of">%1$d of %2$d outside recipients</string>
+    <string name="mail_plan_counts_note">Counts people outside GrapMail. Mail to GrapMail addresses is never limited. Resets %1$s.</string>
+    <string name="mail_plan_plans">Plans</string>
+    <string name="mail_plan_play_missing">Google Play isn\'t available on this device, so plans can\'t be bought here.</string>
+    <string name="mail_plan_free">Free</string>
+    <plurals name="mail_plan_recipients_month">
+        <item quantity="one">%1$d outside recipients a month</item>
+        <item quantity="other">%1$d outside recipients a month</item>
+    </plurals>
+    <string name="mail_plan_not_available_here">Not available here</string>
+    <string name="mail_plan_not_available_yet">Not available yet</string>
+    <string name="mail_plan_subscribe">Subscribe</string>
+    <string name="mail_plan_switch_to">Switch to %1$s</string>
+    <string name="mail_plan_sheet_failed">Google Play couldn\'t open the purchase sheet. Try again.</string>
+    <string name="mail_plan_manage">Manage or cancel in Google Play</string>
+    <string name="mail_plan_prices_note">Prices are set and charged by Google Play in your currency. GrapMail checks every purchase with Google before your plan changes.</string>
+
+    <!-- ui/screens/mail/NotificationFilters.kt -->
+    <string name="mail_common_off">Off</string>
+    <string name="mail_common_add">Add</string>
+    <string name="mail_common_remove">Remove</string>
+    <string name="mail_common_saving">Saving…</string>
+    <string name="mail_notify_sign_in_again">Sign in again.</string>
+    <string name="mail_notify_read_failed">Your notification settings could not be read.</string>
+    <string name="mail_notify_title">Notification filters</string>
+    <string name="mail_notify_checking">Checking your settings…</string>
+    <string name="mail_notify_alert_me_about">Alert me about</string>
+    <string name="mail_notify_mode_all">All new mail</string>
+    <string name="mail_notify_mode_all_detail">Every message that reaches the inbox.</string>
+    <string name="mail_notify_mode_priority">Priority only</string>
+    <string name="mail_notify_mode_priority_detail">VIP senders and conversations you follow.</string>
+    <string name="mail_notify_mode_none">Nothing</string>
+    <string name="mail_notify_mode_none_detail">Only conversations you follow, and security alerts.</string>
+    <string name="mail_notify_lock_screen">On the lock screen</string>
+    <string name="mail_notify_show_preview">Show sender and subject</string>
+    <string name="mail_notify_preview_on">Alerts name who wrote and what about.</string>
+    <string name="mail_notify_preview_off">Alerts say only \"New mail\".</string>
+    <string name="mail_notify_quiet_hours">Quiet hours</string>
+    <string name="mail_notify_quiet_pause">Pause alerts every day</string>
+    <string name="mail_notify_quiet_range">From %1$s to %2$s</string>
+    <string name="mail_notify_quiet_range_zone">From %1$s to %2$s (%3$s)</string>
+    <string name="mail_notify_quiet_same_times">Quiet hours need to start and end at different times.</string>
+    <string name="mail_notify_from">From</string>
+    <string name="mail_notify_to">To</string>
+    <string name="mail_notify_change_from">Change From time</string>
+    <string name="mail_notify_change_to">Change To time</string>
+    <string name="mail_notify_vip_through">Let VIPs through</string>
+    <string name="mail_notify_vip_through_detail">VIP senders and conversations you follow still alert.</string>
+    <string name="mail_notify_vip_senders">VIP senders</string>
+    <string name="mail_notify_vip_hint">An address (name@example.com) or a whole domain (example.com).</string>
+    <string name="mail_notify_vip_placeholder">Add a VIP</string>
+    <string name="mail_notify_vip_invalid">\"%1$s\" is not an address or a domain.</string>
+    <string name="mail_notify_vip_added">Added %1$s.</string>
+    <string name="mail_notify_vip_removed">Removed %1$s.</string>
+    <string name="mail_notify_vip_empty">No VIPs yet. You can also add one from a message\'s menu.</string>
+    <string name="mail_notify_conversations">Conversations</string>
+    <string name="mail_notify_muted_none">No muted conversations</string>
+    <plurals name="mail_notify_muted_count">
+        <item quantity="one">%1$d muted conversation</item>
+        <item quantity="other">%1$d muted conversations</item>
+    </plurals>
+    <string name="mail_notify_unmuted_all">Every conversation can alert again.</string>
+    <string name="mail_notify_unmute_all">Unmute all</string>
+    <string name="mail_notify_followed_none">No followed conversations</string>
+    <plurals name="mail_notify_followed_count">
+        <item quantity="one">%1$d followed conversation</item>
+        <item quantity="other">%1$d followed conversations</item>
+    </plurals>
+    <string name="mail_notify_unfollowed_all">Stopped following every conversation.</string>
+    <string name="mail_notify_mute_hint">Mute or follow a conversation from a message\'s menu.</string>
+    <string name="mail_notify_security_note">Security alerts (new sign-ins, password and two-step changes) always come through.</string>
+
+    <!-- ui/screens/mail/ImportMail.kt -->
+    <string name="mail_import_help_gmail">Turn on 2-Step Verification for the Google account, then create an app password and paste it here. Your Google password itself will not work.</string>
+    <string name="mail_import_help_yahoo">Create an app password in Yahoo\'s Account Security settings and paste it here.</string>
+    <string name="mail_import_help_icloud">Create an app-specific password for your Apple Account and use your full iCloud email address as the username.</string>
+    <string name="mail_import_help_other">Any provider that offers IMAP over a secure connection (port 993). Check their help pages for the server name.</string>
+    <string name="mail_import_provider_other">Other</string>
+    <string name="mail_import_period_3m">3 months</string>
+    <string name="mail_import_period_1y">1 year</string>
+    <string name="mail_import_period_5y">5 years</string>
+    <string name="mail_import_period_all">Everything</string>
+    <string name="mail_import_title">Import mail</string>
+    <string name="mail_import_intro">Bring your mail from another account into GrapMail. The other account is only read: nothing there changes, and your password is not kept.</string>
+    <string name="mail_import_create_app_password">Create an app password</string>
+    <string name="mail_import_imap_server">IMAP server</string>
+    <string name="mail_import_email_address">Email address</string>
+    <string name="mail_import_app_password">App password</string>
+    <string name="mail_import_folders">Folders</string>
+    <string name="mail_import_folder_archive">Archive (or All Mail)</string>
+    <string name="mail_import_how_far_back">How far back</string>
+    <string name="mail_import_err_host">Enter the IMAP server name.</string>
+    <string name="mail_import_err_user">Enter the email address of that account.</string>
+    <string name="mail_import_err_password">Enter the app password.</string>
+    <string name="mail_import_err_folder">Choose at least one folder.</string>
+    <string name="mail_import_starting">Starting…</string>
+    <string name="mail_import_start">Start import</string>
+    <string name="mail_import_could_not_start">The import could not start.</string>
+    <string name="mail_import_outlook_note">Outlook.com and Microsoft 365 no longer allow importing with a password, so they are not listed. Mail from Outlook can be forwarded to your GrapMail address instead.</string>
+    <string name="mail_import_connecting">Connecting to %1$s…</string>
+    <string name="mail_import_importing">Importing from %1$s</string>
+    <string name="mail_import_done">Import finished</string>
+    <string name="mail_import_cancelled">Import stopped</string>
+    <string name="mail_import_problem">Import stopped with a problem</string>
+    <string name="mail_import_progress">%1$d of %2$d checked · %3$d imported · %4$d already here</string>
+    <string name="mail_import_progress_failed">%1$d of %2$d checked · %3$d imported · %4$d already here · %5$d could not be read</string>
+    <string name="mail_import_folder_progress">%1$s: %2$d of %3$d</string>
+    <string name="mail_import_stop">Stop the import</string>
+    <string name="mail_import_done_note">Imported mail is in your Inbox, Sent and Archive. Running the import again only brings what is new.</string>
+
+    <!-- ui/screens/mail/ThreadScreen.kt -->
+    <string name="mail_reply">Reply</string>
+    <string name="mail_forward">Forward</string>
+    <string name="mail_reply_all">Reply all</string>
+    <string name="mail_common_retry">Retry</string>
+    <string name="mail_thread_archived">Message archived.</string>
+    <string name="mail_thread_trashed">Message moved to Trash.</string>
+    <string name="mail_thread_marked_unread">Marked unread.</string>
+    <string name="mail_thread_archive_message">Archive message</string>
+    <string name="mail_thread_trash_message">Move message to Trash</string>
+    <string name="mail_thread_navigate">Navigate messages</string>
+    <string name="mail_thread_position">%1$d of %2$d loaded</string>
+    <string name="mail_thread_previous">Previous message</string>
+    <string name="mail_thread_next">Next message</string>
+    <string name="mail_thread_opening">Opening this conversation…</string>
+    <string name="mail_thread_open_failed">This conversation could not be opened.</string>
+    <string name="mail_thread_star">Star message</string>
+    <string name="mail_thread_unstar">Unstar message</string>
+    <string name="mail_thread_loading_earlier">Loading earlier messages…</string>
+    <string name="mail_thread_load_earlier">Load earlier messages</string>
+    <string name="mail_thread_message_details">Message details</string>
+    <string name="mail_thread_encrypted_message">Encrypted message</string>
+    <string name="mail_thread_show_message">Show message</string>
+    <string name="mail_thread_message_actions">Message actions</string>
+    <string name="mail_thread_share">Share</string>
+    <string name="mail_thread_share_chooser">Share message</string>
+    <string name="mail_thread_share_nothing">Nothing on this device can receive shared text.</string>
+    <string name="mail_thread_print">Print</string>
+    <string name="mail_thread_unsub_one_click">Unsubscribe in one click</string>
+    <string name="mail_thread_no_one_click">This message does not carry a one-click request.</string>
+    <string name="mail_thread_report_spam">Report spam</string>
+    <string name="mail_thread_moved_to_spam">Moved to spam.</string>
+    <string name="mail_thread_block_sender">Block sender</string>
+    <string name="mail_thread_no_sender_to_block">This message does not name a sender to block.</string>
+    <string name="mail_thread_mute">Mute this conversation</string>
+    <string name="mail_thread_unmute">Unmute this conversation</string>
+    <string name="mail_thread_muted_note">Muted: this conversation will not alert you.</string>
+    <string name="mail_thread_unmuted_note">Unmuted.</string>
+    <string name="mail_thread_watch">Notify me about replies</string>
+    <string name="mail_thread_unwatch">Stop notifying me</string>
+    <string name="mail_thread_watched_note">You will be alerted to replies, whatever your filters.</string>
+    <string name="mail_thread_unwatched_note">Stopped following this conversation.</string>
+    <string name="mail_thread_vip_add">Add sender to VIPs</string>
+    <string name="mail_thread_vip_remove">Remove sender from VIPs</string>
+    <string name="mail_thread_vip_added">%1$s is a VIP.</string>
+    <string name="mail_thread_vip_removed">%1$s is no longer a VIP.</string>
+    <string name="mail_thread_details_from">From %1$s</string>
+    <string name="mail_thread_details_cc">Cc %1$s</string>
+    <string name="mail_thread_images_failed">Images couldn’t load.</string>
+    <plurals name="mail_thread_images_hidden">
+        <item quantity="one">%1$d remote image hidden</item>
+        <item quantity="other">%1$d remote images hidden</item>
+    </plurals>
+    <string name="mail_thread_images_note">Loading them tells the sender this message was opened.</string>
+    <string name="mail_thread_show_images">Show images</string>
+    <string name="mail_thread_display_failed">Couldn’t display this message.</string>
+    <string name="mail_thread_details_failed">Couldn’t load message details.</string>
+    <plurals name="mail_thread_attachment_count">
+        <item quantity="one">%1$d attachment</item>
+        <item quantity="other">%1$d attachments</item>
+    </plurals>
+    <string name="mail_e2e_decrypt_open">Decrypt with your passphrase</string>
+    <string name="mail_e2e_decrypt_note">Your passphrase decrypts this message on this device. It is never sent anywhere, and it is not kept after the message opens.</string>
+    <string name="mail_e2e_passphrase">Passphrase</string>
+    <string name="mail_e2e_opening">Opening…</string>
+    <string name="mail_e2e_open">Open</string>
+    <string name="mail_e2e_no_envelope">No encrypted content came with this message.</string>
+    <string name="mail_e2e_notice_title">End-to-end encrypted</string>
+    <string name="mail_e2e_notice_body">Only you and the sender can read this. The server holds the sealed envelope and cannot open it. Unlocking this device\'s key opens the body below — a wrong passphrase and a message not sealed to this key each say so, and the ciphertext is never shown as a body.</string>
+    <string name="mail_attachment">Attachment</string>
+    <string name="mail_attachment_type_unknown">Type not recorded</string>
+    <string name="mail_attachment_download">Download</string>
+    <string name="mail_unsub_host_fallback">the sender\'s server</string>
+    <string name="mail_unsub_offer">This offer came from the sender. Opening it goes to %1$s — not to GrapMail.</string>
+    <string name="mail_unsub_offer_about">This offer came from the sender, about %1$s. Opening it goes to %2$s — not to GrapMail.</string>
+    <string name="mail_unsub_risk">Some mailing lists treat any visit as proof that an address is live, so opening this is not risk-free. GrapMail cannot undo it, and cannot see what happens after: the page at %1$s is the only thing that will say whether you were removed.</string>
+    <string name="mail_unsub_open_browser">Open in my browser</string>
+    <string name="mail_open_external_done">Opened in your browser. GrapMail cannot see what the page said.</string>
+    <string name="mail_open_external_none">No app on this device can open that link.</string>
+
+    <!-- ui/screens/mail/ComposeScreen.kt -->
+    <string name="mail_send">Send</string>
+    <string name="mail_common_undo">Undo</string>
+    <string name="mail_compose_remove_attachments_for_draft">Remove the attachments before saving this draft.</string>
+    <string name="mail_compose_max_attachments">A message can have up to 20 attachments.</string>
+    <string name="mail_compose_max_attachments_images">A message can have up to 20 attachments and images.</string>
+    <string name="mail_compose_encrypted_no_attachments">Encrypted messages cannot include attachments.</string>
+    <string name="mail_compose_directory_unavailable">The encryption directory is unavailable. Try again.</string>
+    <string name="mail_compose_no_published_key">A recipient has no published encryption key.</string>
+    <string name="mail_compose_changed_while_sealing">The message changed while encryption was being prepared. Tap Send again.</string>
+    <string name="mail_compose_check_title">Check before sending</string>
+    <string name="mail_compose_check_body">Some of this message\'s formatting won\'t arrive the way it looks here.</string>
+    <string name="mail_compose_finding_removed">Removed</string>
+    <string name="mail_compose_finding_may_break">May break</string>
+    <string name="mail_compose_finding_note">Note</string>
+    <string name="mail_compose_finding">%1$s: %2$s</string>
+    <string name="mail_compose_finding_clients">%1$s: %2$s (%3$s)</string>
+    <string name="mail_compose_send_anyway">Send anyway</string>
+    <string name="mail_compose_keep_editing">Keep editing</string>
+    <string name="mail_compose_sending">Sending…</string>
+    <string name="mail_compose_discard">Discard</string>
+    <string name="mail_compose_opening_draft">Opening draft…</string>
+    <string name="mail_compose_to">To</string>
+    <string name="mail_compose_to_placeholder">Search contacts or type email…</string>
+    <string name="mail_compose_add_recipient">Add recipient</string>
+    <string name="mail_compose_cc">Cc</string>
+    <string name="mail_compose_bcc">Bcc</string>
+    <string name="mail_compose_addresses">Addresses</string>
+    <string name="mail_compose_subject">Subject</string>
+    <string name="mail_compose_subject_placeholder">Add a subject</string>
+    <string name="mail_compose_encrypting">Encrypting this message</string>
+    <string name="mail_compose_encrypt">Encrypt this message</string>
+    <string name="mail_compose_unlock_to_encrypt">Unlock your key to encrypt — it locks when the app closes.</string>
+    <string name="mail_compose_encrypt_note">Only the recipients can open this message. Encrypted messages are sent as plain text.</string>
+    <string name="mail_compose_plain_text">Switch to plain text</string>
+    <string name="mail_compose_format">Format message</string>
+    <string name="mail_compose_body_placeholder">Write your message…</string>
+    <string name="mail_compose_remove_named">Remove %1$s</string>
+    <string name="mail_compose_remove_attachment">Remove attachment</string>
+    <string name="mail_compose_saving_draft">Saving draft…</string>
+    <string name="mail_compose_attach_file">Attach a file</string>
+    <string name="mail_compose_attach_image">Attach an image</string>
+    <string name="mail_compose_insert_link">Insert a link</string>
+    <string name="mail_compose_insert_emoji">Insert an emoji</string>
+    <string name="mail_compose_save_draft">Save draft</string>
+    <string name="mail_receipt_sent">Sent</string>
+    <string name="mail_receipt_delivered">Delivered</string>
+    <string name="mail_receipt_queued">Queued for delivery</string>
+    <string name="mail_receipt_failed">Not delivered</string>
+    <string name="mail_receipt_draft">Saved to Drafts</string>
+    <string name="mail_receipt_unconfirmed">Delivery could not be confirmed</string>
+    <string name="mail_receipt_queued_note">The queue has accepted it. Delivery is confirmed separately.</string>
+    <string name="mail_compose_sign_in_image">Sign in again to insert an image.</string>
+    <string name="mail_compose_image_types">Insert a PNG, JPEG, GIF or WebP image.</string>
+    <string name="mail_compose_image_empty">That image is empty.</string>
+    <string name="mail_compose_image_too_big">Images inside a message can be up to 10 MB.</string>
+    <string name="mail_compose_image_unreadable">That image could not be read.</string>
+    <string name="mail_compose_uploading">Uploading %1$s…</string>
+    <string name="mail_compose_inline_unsupported">This server can\'t place images inside messages yet, so %1$s was attached instead.</string>
+    <string name="mail_compose_inserted">Inserted %1$s.</string>
+    <string name="mail_compose_image_insert_failed">That image could not be inserted.</string>
+    <string name="mail_compose_sign_in_file">Sign in again to attach a file.</string>
+    <string name="mail_compose_file_unreadable">That file could not be read.</string>
+    <string name="mail_compose_file_too_big">That file exceeds the 25 MB attachment limit.</string>
+    <string name="mail_compose_file_empty">That file is empty.</string>
+    <string name="mail_compose_attached">Attached %1$s.</string>
+    <string name="mail_compose_file_attach_failed">This file could not be attached.</string>
+
+    <!-- ui/screens/mail/MailboxScreen.kt -->
+    <string name="mail_common_apply">Apply</string>
+    <string name="mail_common_dismiss">Dismiss</string>
+    <string name="mail_box_offline">No network right now — showing the last loaded mail.</string>
+    <string name="mail_box_snooze_undo_note">%1$s · out of the inbox until then</string>
+    <string name="mail_action_back_to_inbox">Back to Inbox</string>
+    <string name="mail_box_loading_more">Loading more…</string>
+    <string name="mail_box_load_more">Load more</string>
+    <string name="mail_box_open_folders">Open folders</string>
+    <string name="mail_box_account">Account</string>
+    <string name="mail_box_close_switcher">Close account switcher</string>
+    <string name="mail_box_grapmail_account">GrapMail Account</string>
+    <string name="mail_box_active_account">Active account</string>
+    <string name="mail_box_add_account">Add another account</string>
+    <string name="mail_box_profile">Profile</string>
+    <string name="mail_box_sign_out">Sign out</string>
+    <string name="mail_box_search_description">Search subject, body or sender</string>
+    <string name="mail_box_search_placeholder">Search in mail</string>
+    <string name="mail_tab_mail">Mail</string>
+    <string name="mail_tab_contacts">Contacts</string>
+    <plurals name="mail_tab_unread_description">
+        <item quantity="one">%1$s, %2$d unread</item>
+        <item quantity="other">%1$s, %2$d unread</item>
+    </plurals>
+    <string name="mail_drawer_section_mail">Mail</string>
+    <string name="mail_drawer_section_search">Search</string>
+    <string name="mail_drawer_section_queue">Queue</string>
+    <string name="mail_drawer_section_labels">Labels</string>
+    <string name="mail_drawer_files">Files</string>
+    <string name="mail_drawer_sort_filter">Sort &amp; filter</string>
+    <string name="mail_drawer_advanced_search">Advanced search</string>
+    <string name="mail_drawer_manage_labels">Manage labels</string>
+    <string name="mail_drawer_settings">Settings</string>
+    <string name="mail_drawer_security">Security</string>
+    <string name="mail_drawer_help">Help &amp; Support</string>
+    <string name="mail_sort_by">Sort by</string>
+    <string name="mail_filter_by">Filter by</string>
+    <string name="mail_sort_scope">Sorted across the %1$d messages loaded so far, not all %2$d in this box.</string>
+    <string name="mail_adv_title">Search filters</string>
+    <string name="mail_adv_from_hint">A name or address in the sender</string>
+    <string name="mail_adv_to_hint">A name or address in the recipients</string>
+    <string name="mail_adv_subject_hint">A word the subject contains</string>
+    <string name="mail_adv_after">After</string>
+    <string name="mail_adv_before">Before</string>
+    <string name="mail_adv_scope">These filters run on the %1$d messages loaded on this device — not all %2$d in this box. The typed term is the whole-box search.</string>
+    <string name="mail_move_title">Move to</string>
+    <string name="mail_move_note">Moving out of Spam or Trash returns the message to the inbox.</string>
+    <string name="mail_label_read_failed">Couldn\'t read your labels.</string>
+    <string name="mail_label_none_yet">No labels yet. Create one from the drawer.</string>
+    <string name="mail_label_loading">Loading labels…</string>
+    <string name="mail_label_marks_checking">Checking which labels these messages carry…</string>
+    <string name="mail_label_marks_failed">Couldn\'t read which labels they carry, so nothing is marked here. Tapping adds a label; it won\'t remove one.</string>
+    <string name="mail_label_marks_many">Marks show what the %1$d selected messages carry. A dash means some but not all.</string>
+    <string name="mail_label_marks_one">Marks show what this message carries.</string>
+    <string name="mail_sender_title">Decide the sender</string>
+    <string name="mail_sender_one">Sender: %1$s</string>
+    <plurals name="mail_sender_many">
+        <item quantity="one">%1$d senders in the selected messages</item>
+        <item quantity="other">%1$d senders in the selected messages</item>
+    </plurals>
+    <string name="mail_sender_applies_to">APPLIES TO</string>
+    <string name="mail_sender_decision">DECISION</string>
+    <string name="mail_snooze_title">Snooze until</string>
+    <string name="mail_snooze_evening">This evening</string>
+    <string name="mail_snooze_tomorrow">Tomorrow morning</string>
+    <string name="mail_snooze_weekend">Next weekend</string>
+    <string name="mail_snooze_note">Snoozed mail leaves your inbox until it is due. The server has no box that lists what is postponed, so Undo appears beside the list for the mail this session snoozed, and for no other mail.</string>
+    <plurals name="mail_permanent_title">
+        <item quantity="one">Delete this message permanently?</item>
+        <item quantity="other">Delete %1$d messages permanently?</item>
+    </plurals>
+    <string name="mail_permanent_body">This cannot be undone. Messages in Trash can be restored instead — this removes them for good, and only works from Trash.</string>
+    <string name="mail_permanent_confirm">Delete permanently</string>
+    <!-- Compose drag and drop: the drop zone shown while something is dragged over the compose screen. -->
+    <string name="mail_compose_drop_zone">Drop files to attach them, or text to add it to the message</string>
+    <string name="mail_compose_drop_release">Release to add to this message</string>
+</resources>

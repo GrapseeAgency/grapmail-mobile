@@ -47,12 +47,13 @@ import com.grapsee.grapmail.ui.components.ChipTone
 import com.grapsee.grapmail.ui.components.FooterNote
 import com.grapsee.grapmail.ui.components.GradientButton
 import com.grapsee.grapmail.ui.components.InfoCard
-import com.grapsee.grapmail.ui.components.InfoNoteCard
 import com.grapsee.grapmail.ui.components.StatusChip
 import com.grapsee.grapmail.ui.theme.LocalPalette
 import kotlinx.coroutines.launch
 import java.util.Locale
 import java.util.TimeZone
+import androidx.compose.ui.res.stringResource
+import com.grapsee.grapmail.R
 
 /**
  * Push notification preferences — the account-level rows the backend reads
@@ -134,7 +135,7 @@ fun NotificationPrefsScreen(onBack: () -> Unit) {
             error = null
             try {
                 val session = SessionStore.snapshot(context)
-                    ?: throw IllegalStateException("Sign in again.")
+                    ?: throw IllegalStateException(context.getString(R.string.acct_sign_in_again))
                 val resp = Api.patchNotificationPrefs(
                     session.token,
                     deviceKey = "account",
@@ -184,13 +185,13 @@ fun NotificationPrefsScreen(onBack: () -> Unit) {
         onBack = onBack,
         illustration = "ill_sec_activity",
         illustrationWidth = 150,
-        title = "Notification Preferences",
-        body = "Choose what this account sends, and when mail notifications go quiet.",
+        title = stringResource(R.string.acct_notification_preferences),
+        body = stringResource(R.string.acct_choose_what_this_account_sends_and),
         footer = {
             Column {
                 if (mail != null) {
                     GradientButton(
-                        "Apply Quiet Hours",
+                        stringResource(R.string.acct_apply_quiet_hours),
                         onClick = { draftQuiet?.let { patchPref("mail", mail.enabled, it) } },
                         enabled = quietDirty && draftQuiet != null && busyScope == null,
                         busy = busyScope == "mail",
@@ -198,19 +199,19 @@ fun NotificationPrefsScreen(onBack: () -> Unit) {
                     Spacer(Modifier.height(4.dp))
                 }
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
-                    AccountLink("Back to Account Security", onBack)
+                    AccountLink(stringResource(R.string.acct_back_to_account_security), onBack)
                 }
             }
         },
     ) {
         LoadStateBlock(loading = loading, failed = failed, onRetry = { scope.launch { load() } }) {
             InfoCard {
-                Text("Alerts", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = palette.textPrimary)
+                Text(stringResource(R.string.acct_alerts), fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = palette.textPrimary)
                 Spacer(Modifier.height(10.dp))
                 PrefSwitchRow(
                     icon = Icons.Rounded.MailOutline,
-                    title = "Mail notifications",
-                    subtitle = "New mail that reaches your inbox.",
+                    title = stringResource(R.string.acct_mail_notifications),
+                    subtitle = stringResource(R.string.acct_new_mail_that_reaches_your_inbox),
                     checked = mail?.enabled == true,
                     enabled = mail != null && busyScope == null,
                     onToggle = { on -> mail?.let { patchPref("mail", on, storedQuiet) } },
@@ -218,8 +219,8 @@ fun NotificationPrefsScreen(onBack: () -> Unit) {
                 RowDivider()
                 PrefSwitchRow(
                     icon = Icons.Rounded.Shield,
-                    title = "Security alerts",
-                    subtitle = "Sign-ins, password changes, trusted-device events. Always delivered — this cannot be silenced.",
+                    title = stringResource(R.string.acct_security_alerts),
+                    subtitle = stringResource(R.string.acct_sign_ins_password_changes_trusted),
                     checked = security?.enabled != false,
                     enabled = false,
                     onToggle = { },
@@ -227,8 +228,8 @@ fun NotificationPrefsScreen(onBack: () -> Unit) {
                 RowDivider()
                 PrefSwitchRow(
                     icon = Icons.Rounded.Person,
-                    title = "Account alerts",
-                    subtitle = "Lifecycle notices about your account.",
+                    title = stringResource(R.string.acct_account_alerts),
+                    subtitle = stringResource(R.string.acct_lifecycle_notices_about_your_account),
                     checked = account?.enabled == true,
                     enabled = account != null && busyScope == null,
                     onToggle = { on -> account?.let { patchPref("account", on, storedAccountQuiet) } },
@@ -240,21 +241,22 @@ fun NotificationPrefsScreen(onBack: () -> Unit) {
             InfoCard {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     Icon(Icons.Rounded.Bedtime, contentDescription = null, tint = palette.primarySolid, modifier = Modifier.size(18.dp))
-                    Text("Quiet hours — mail only", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = palette.textPrimary)
-                    Spacer(Modifier.weight(1f))
+                    // The title takes the slack and wraps at large font sizes,
+                    // so the "Paused" chip is never pushed off the card.
+                    Text(stringResource(R.string.acct_quiet_hours_mail_only), fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = palette.textPrimary, modifier = Modifier.weight(1f))
                     if (draftQuiet != null) {
-                        StatusChip("Paused", ChipTone.Success)
+                        StatusChip(stringResource(R.string.acct_paused), ChipTone.Success)
                     }
                 }
                 Spacer(Modifier.height(10.dp))
                 Text(
-                    "While quiet hours are on, mail notifications hold until the window ends. Security alerts are never paused.",
+                    stringResource(R.string.acct_while_quiet_hours_are_on_mail),
                     fontSize = 12.sp,
                     lineHeight = 17.sp,
                     color = palette.textSecondary,
                 )
                 Spacer(Modifier.height(12.dp))
-                QuietTimeRow("Quiet from", draftStart) { picked ->
+                QuietTimeRow(stringResource(R.string.acct_quiet_from), draftStart) { picked ->
                     draftStart = picked
                     // A start without an end is a half-window the Apply button
                     // refuses; default the end two hours after the start so
@@ -262,10 +264,10 @@ fun NotificationPrefsScreen(onBack: () -> Unit) {
                     if (draftEnd == null) draftEnd = (picked + 120) % (24 * 60)
                 }
                 RowDivider()
-                QuietTimeRow("Quiet until", draftEnd) { picked -> draftEnd = picked }
+                QuietTimeRow(stringResource(R.string.acct_quiet_until), draftEnd) { picked -> draftEnd = picked }
                 if (storedQuiet != null && !quietDirty) {
                     Spacer(Modifier.height(8.dp))
-                    AccountLink("Clear quiet hours", {
+                    AccountLink(stringResource(R.string.acct_clear_quiet_hours), {
                         draftStart = null
                         draftEnd = null
                         mail?.let { patchPref("mail", it.enabled, null) }
@@ -275,9 +277,9 @@ fun NotificationPrefsScreen(onBack: () -> Unit) {
             Spacer(Modifier.height(12.dp))
             if (security != null) {
                 InfoNoteCard(
-                    title = "Security alerts state",
-                    body = if (security.enabled) "Security alerts are on for this account, as they should be."
-                    else "The account row reports security alerts off. Delivery of critical security alerts is not something this screen can change.",
+                    title = stringResource(R.string.acct_security_alerts_state),
+                    body = if (security.enabled) stringResource(R.string.acct_security_alerts_are_on_for_this)
+                    else stringResource(R.string.acct_the_account_row_reports_security),
                 )
             }
             if (error != null) {
@@ -285,7 +287,7 @@ fun NotificationPrefsScreen(onBack: () -> Unit) {
                 Text(error!!, fontSize = 12.sp, color = palette.error)
             }
             Spacer(Modifier.height(4.dp))
-            FooterNote(text = "Preferences apply to every device that reads this account.", divider = false)
+            FooterNote(text = stringResource(R.string.acct_preferences_apply_to_every_device), divider = false)
         }
     }
 }
@@ -353,7 +355,7 @@ private fun QuietTimeRow(label: String, minute: Int?, onPick: (Int) -> Unit) {
         Icon(Icons.Rounded.NotificationsActive, contentDescription = null, tint = palette.textTertiary, modifier = Modifier.size(16.dp))
         Text(label, fontSize = 14.sp, color = palette.textPrimary, modifier = Modifier.weight(1f))
         Text(
-            minute?.let(::formatMinute) ?: "Not set",
+            minute?.let(::formatMinute) ?: stringResource(R.string.acct_not_set),
             fontSize = 14.sp,
             fontWeight = FontWeight.SemiBold,
             color = if (minute == null) palette.textTertiary else palette.primarySolid,

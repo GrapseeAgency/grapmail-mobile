@@ -10,38 +10,13 @@ import UIKit
 /// rather than in twenty call sites where they can quietly disagree.
 enum MailUI {
 
-    /// The avatar disc's colour for a sender. The ramp itself is a token —
-    /// `GM.avatarRamp` in `Theme.swift` — which holds the web reference's
-    /// `AVATAR_COLOURS` list with a value per theme, because three of the eight web
-    /// entries are theme variables rather than fixed avatar hues. Nothing here picks
-    /// a colour of its own, which is what lets this file fall inside the no-literals
-    /// gate instead of being exempted from it.
-    ///
-    /// A sender keeps its colour across visits because the choice is a hash of the
-    /// address, not a position in the list — the same rule the web client follows
-    /// (`page.tsx:212`).
-
-    /// The ramp slot for a sender, on the same rule Android applies
-    /// (`Mail.kt`'s `rampIndex`): the address when there is one, the name only
-    /// when the server never named an address.
-    ///
-    /// The two implementations have to agree exactly or the same sender wears a
-    /// different colour on each platform, which is visible in the screenshot
-    /// pair for one message. That means the same key, the same accumulator, and
-    /// the same characters: `utf16`, not `unicodeScalars`, because Kotlin
-    /// iterates UTF-16 units and an emoji in a display name would fold to
-    /// different numbers. Masking to 30 bits every round keeps the accumulator
-    /// non-negative, so `%` needs no `abs()` — and a masked value taken mod 2³⁰
-    /// is the same whether the product overflowed at 32 bits first, which is how
-    /// it matches Kotlin's wrapping `Int` arithmetic.
-    static func tint(address: String, display: String = "") -> Color {
-        // Hash the address rather than the name: two people called "Team" should
-        // not share a colour, and one person renaming themselves should not move.
-        let key = address.isEmpty ? (display.isEmpty ? "unknown" : display) : address
-        var hash: Int = 0
-        for ch in key.utf16 { hash = (hash &* 31 &+ Int(ch)) & 0x3FFFFFFF }
-        return GM.avatarRamp[hash % GM.avatarRamp.count]
-    }
+    // The avatar disc's colour for a sender, `MailUI.tint(address:display:)`,
+    // moved to Avatar.swift in Round 8 (docs/design/round8-spec.md §1.6). It is
+    // now GrapMail's own ten-hue ramp (`GM.avatarRamp`, Theme.swift) picked by
+    // FNV-1a 32 over the normalised address, mod 10 — the same slot on Android,
+    // iOS and web — instead of the old 31-multiplier accumulator, which only
+    // the two native apps shared. Nothing here picks a colour of its own, which
+    // keeps this file inside the no-literals gate.
 }
 
 // ── the badge rule ───────────────────────────────────────────────────────────
@@ -60,8 +35,10 @@ struct CountBadge: View {
     var body: some View {
         if let count {
             Text(count > max ? "\(max)+" : "\(count)")
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundColor(GM.primarySolid)
+                .gmFont(11, .semibold)
+                // Text on a soft fill: the text token, which lifts to the
+                // periwinkle in dark (cobalt text on #232327 is under 4.5:1).
+                .foregroundColor(GM.primaryText)
                 .padding(.horizontal, 7).padding(.vertical, 1)
                 .background(Capsule().fill(GM.softFill))
         }
@@ -74,8 +51,8 @@ struct UnreadPill: View {
     var body: some View {
         if count > 0 {
             Text("\(count)")
-                .font(.system(size: 11, weight: .bold))
-                .foregroundColor(.white)
+                .gmFont(11, .bold)
+                .foregroundColor(GM.onPrimary)
                 .padding(.horizontal, 7).padding(.vertical, 2)
                 .background(Capsule().fill(GM.primarySolid))
         }
@@ -84,11 +61,15 @@ struct UnreadPill: View {
 
 // ── sender identity ──────────────────────────────────────────────────────────
 
-/// A sender's initial on a stable colour.
+/// A sender's avatar: their GrapMail photo or verified brand logo when there is
+/// one, otherwise their initials on a stable GrapMail hue.
 ///
-/// The initial comes from the display name when there is one and from the address
-/// when there is not — never from the address's first character, which would
-/// render every `@grapsee.com` sender under the same letter.
+/// The drawing is `GMAvatarView` (Avatar.swift, round8-spec §1.6); this keeps
+/// the name and the shape every caller already uses. The initials come from
+/// the display name when there is one and from the address's local part when
+/// there is not — never from the address's first character, which would render
+/// every `@grapsee.com` sender under the same letter. Inside a row it is
+/// decorative: the row already names the sender.
 struct SenderAvatar: View, Equatable {
     let display: String
     let address: String
@@ -98,45 +79,8 @@ struct SenderAvatar: View, Equatable {
         lhs.display == rhs.display && lhs.address == rhs.address && lhs.size == rhs.size
     }
 
-    private var initial: String {
-        let source = display.trimmingCharacters(in: .whitespacesAndNewlines)
-        let fallback = String(address.split(separator: "@").first ?? "")
-        let base = source.isEmpty ? fallback : source
-        guard let ch = base.first(where: { !$0.isWhitespace }) else { return "?" }
-        return String(ch).uppercased()
-    }
-
-    /// The sender's own photo when they are a GrapMail correspondent who set
-    /// one (SenderPhotos.swift). The initial is drawn until it arrives and
-    /// whenever there is none, so a slow or failed lookup looks exactly like
-    /// before.
-    @State private var photo: UIImage?
-
     var body: some View {
-        ZStack {
-            Circle().fill(MailUI.tint(address: address, display: display))
-            if let photo {
-                Image(uiImage: photo)
-                    .resizable()
-                    .scaledToFill()
-                    .frame(width: size, height: size)
-                    .clipShape(Circle())
-                    .accessibilityHidden(true)
-            } else {
-                Text(initial)
-                    .font(.system(size: size * 0.42, weight: .semibold))
-                    .foregroundColor(.white)
-            }
-        }
-        .frame(width: size, height: size)
-        .task(id: address) {
-            let wanted = address
-            photo = SenderPhotos.shared.cached(wanted)
-            guard photo == nil, !wanted.isEmpty else { return }
-            let loaded = await SenderPhotos.shared.photo(for: wanted)
-            guard !Task.isCancelled, wanted == address else { return }
-            photo = loaded
-        }
+        GMAvatarView(name: display, address: address, size: size)
     }
 }
 
@@ -172,7 +116,7 @@ enum MailTime {
             result = fmt("h:mm a", date, zone)
         } else if let yesterday = cal.date(byAdding: .day, value: -1, to: now),
            cal.isDate(date, inSameDayAs: yesterday) {
-            result = "Yesterday"
+            result = String(localized: "Yesterday")
         } else if cal.component(.year, from: date) == cal.component(.year, from: now) {
             result = fmt(sameYearPattern(order), date, zone)
         } else {
@@ -217,7 +161,10 @@ enum MailTime {
         if display.dateFormat.isEmpty {
             return fmt("EEEE, MMMM d, yyyy 'at' h:mm a", date, display.zone)
         }
-        return fmt(olderPattern(display.dateFormat) + " 'at' h:mm a", date, display.zone)
+        // The chosen date order, then the clock in the person's own 12/24-hour
+        // form -- no English "at" spliced between them.
+        let clock = DateFormatter.dateFormat(fromTemplate: "jmm", options: 0, locale: .autoupdatingCurrent) ?? "HH:mm"
+        return fmt(olderPattern(display.dateFormat) + " " + clock, date, display.zone)
     }
 
     private static let parsers = [
@@ -226,9 +173,12 @@ enum MailTime {
             "yyyy-MM-dd HH:mm:ss",
     ].map { makeFormatter($0, lenient: true) }
 
+    /// Display formatters, keyed by the pattern names used above. They speak
+    /// the person's language (month names, AM/PM words, digits) and follow
+    /// their 12/24-hour choice; only the parsers stay on the fixed POSIX locale.
     private static let formatters = Dictionary(uniqueKeysWithValues: [
         "h:mm a", "MMM d", "MMM d, yyyy", "EEEE, MMMM d, yyyy 'at' h:mm a",
-    ].map { ($0, makeFormatter($0)) })
+    ].map { ($0, makeDisplayFormatter($0, zone: .autoupdatingCurrent)) })
 
     private static let parsedDates: NSCache<NSString, NSDate> = {
         let cache = NSCache<NSString, NSDate>()
@@ -256,10 +206,32 @@ enum MailTime {
 
     private static func makeFormatter(_ pattern: String, lenient: Bool = false) -> DateFormatter {
         let f = DateFormatter()
-        f.locale = Locale(identifier: "en_US")
+        // Fixed-format parsing: POSIX, so the device's 12/24-hour override and
+        // calendar can never change how a server timestamp is read.
+        f.locale = Locale(identifier: "en_US_POSIX")
         f.dateFormat = pattern
         f.timeZone = .autoupdatingCurrent
         f.isLenient = lenient
+        return f
+    }
+
+    /// A formatter for SHOWING a date. The default patterns become locale
+    /// templates (so Arabic, Japanese, German... get their own order and
+    /// words, and a 24-hour phone gets 24-hour times); an explicit order the
+    /// person picked in Mail settings keeps its order, with localized names.
+    private static func makeDisplayFormatter(_ pattern: String, zone: TimeZone) -> DateFormatter {
+        let f = DateFormatter()
+        f.locale = .autoupdatingCurrent
+        f.timeZone = zone
+        switch pattern {
+        case "h:mm a": f.setLocalizedDateFormatFromTemplate("jmm")
+        case "MMM d": f.setLocalizedDateFormatFromTemplate("MMMd")
+        case "MMM d, yyyy": f.setLocalizedDateFormatFromTemplate("yMMMd")
+        case "EEEE, MMMM d, yyyy 'at' h:mm a":
+            f.dateStyle = .full
+            f.timeStyle = .short
+        default: f.dateFormat = pattern
+        }
         return f
     }
 
@@ -271,12 +243,11 @@ enum MailTime {
 
     private static func fmt(_ pattern: String, _ date: Date, _ zone: TimeZone = .autoupdatingCurrent) -> String {
         if zone == .autoupdatingCurrent {
-            return (formatters[pattern] ?? makeFormatter(pattern)).string(from: date)
+            return (formatters[pattern] ?? makeDisplayFormatter(pattern, zone: zone)).string(from: date)
         }
         let key = "\(zone.identifier)\u{0}\(pattern)" as NSString
         let formatter = zonedFormatters.object(forKey: key) ?? {
-            let f = makeFormatter(pattern)
-            f.timeZone = zone
+            let f = makeDisplayFormatter(pattern, zone: zone)
             zonedFormatters.setObject(f, forKey: key)
             return f
         }()
@@ -303,6 +274,19 @@ struct MessageRow: View, Equatable {
     // Internal, not private: a private stored property would make the
     // memberwise initializer private and break every caller in other files.
     @ObservedObject var display = MailDisplay.shared
+    /// Whether a long press picks the row. The mailbox list turns it off while
+    /// nothing is picked, because there the long press opens the row's context
+    /// menu (MailRowPreview.swift), whose "Select" item is the way into
+    /// multi-select. Defaulted, so every other caller keeps today's behaviour.
+    var longPressSelects = true
+    /// A fresh sign-in code in this message (MailboxInsights.freshCode: the
+    /// last 60 minutes, never sealed mail), drawn as a "Copy 482913" chip
+    /// beside the preview. nil -- the default for every other caller -- draws
+    /// nothing. The caller decides freshness so the row stays dumb.
+    var signInCode: String? = nil
+    /// The chip's copy. Runs instead of opening the message.
+    var onCopyCode: (() -> Void)? = nil
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     static func == (lhs: MessageRow, rhs: MessageRow) -> Bool {
         lhs.message.id == rhs.message.id &&
@@ -310,110 +294,260 @@ struct MessageRow: View, Equatable {
         lhs.message.isStarred == rhs.message.isStarred &&
         lhs.message.hasAttachments == rhs.message.hasAttachments &&
         lhs.message.isE2eEncrypted == rhs.message.isE2eEncrypted &&
+        lhs.message.readReceiptStatus == rhs.message.readReceiptStatus &&
         lhs.message.from?.display == rhs.message.from?.display &&
         lhs.message.from?.address == rhs.message.from?.address &&
         lhs.message.subject == rhs.message.subject &&
         lhs.message.snippet == rhs.message.snippet &&
         lhs.message.createdAt == rhs.message.createdAt &&
-        lhs.selecting == rhs.selecting && lhs.selected == rhs.selected
-    }
-
-    static func == (lhs: MessageRow, rhs: MessageRow) -> Bool {
-        lhs.message.id == rhs.message.id &&
-        lhs.message.isRead == rhs.message.isRead &&
-        lhs.message.isStarred == rhs.message.isStarred &&
-        lhs.message.hasAttachments == rhs.message.hasAttachments &&
-        lhs.message.isE2eEncrypted == rhs.message.isE2eEncrypted &&
-        lhs.message.from?.display == rhs.message.from?.display &&
-        lhs.message.from?.address == rhs.message.from?.address &&
-        lhs.message.subject == rhs.message.subject &&
-        lhs.message.snippet == rhs.message.snippet &&
-        lhs.message.createdAt == rhs.message.createdAt &&
-        lhs.selecting == rhs.selecting && lhs.selected == rhs.selected
+        lhs.selecting == rhs.selecting && lhs.selected == rhs.selected &&
+        lhs.longPressSelects == rhs.longPressSelects &&
+        lhs.signInCode == rhs.signInCode
     }
 
     private var unread: Bool { !message.isRead }
 
+    @Environment(\.dynamicTypeSize) private var dts
+    /// The sender disc: 40 pt at the default text size, growing with the name
+    /// beside it and capped so the words keep most of the row's width.
+    @ScaledMetric(relativeTo: .subheadline) private var avatarSize: CGFloat = 40
+    /// iPad / Mac pointer over the row: the same `selectedRow` tint the web
+    /// uses for a hovered row (round8-spec §1.4).
+    @State private var hovering = false
+
     var body: some View {
-        HStack(alignment: .top, spacing: 10) {
-            if selecting {
-                Image(systemName: selected ? "checkmark.square.fill" : "square")
-                    .foregroundColor(selected ? GM.primarySolid : GM.textTertiary)
-                    .font(.system(size: 20))
-                    .padding(.top, 10)
-            }
-            // The unread dot lives in the time column now (the reference draws
-            // it beside the clock), so this slot is only ever a picking
-            // affordance.
-
-            SenderAvatar(display: message.from?.display ?? "",
-                         address: message.from?.address ?? "")
-
-            VStack(alignment: .leading, spacing: 2) {
-                HStack(alignment: .firstTextBaseline) {
-                    // `display` is non-optional on MailPerson — the type already
-                    // folds name-over-address — so the question is whether it
-                    // said anything at all, not whether the field exists.
-                    Text(message.from.flatMap { $0.display.nilIfBlank() } ?? "Unknown sender")
-                        .font(.subheadline.weight(unread ? .semibold : .medium))
-                        .foregroundColor(GM.textPrimary)
-                        .lineLimit(1)
-                    Spacer(minLength: 8)
-                }
-                Text(message.subjectOrNone)
-                    .font(.subheadline.weight(unread ? .medium : .regular))
-                    .foregroundColor(GM.textPrimary).lineLimit(2)
-                HStack(spacing: 4) {
-                    // Compact drops the preview line, so more messages fit.
-                    if !display.compact, let snippet = message.snippet, !snippet.isEmpty {
-                        Text(snippet).font(.system(size: 13)).foregroundColor(GM.textSecondary)
-                            .lineLimit(1)
-                    }
-                    if message.isE2eEncrypted {
-                        Text("· encrypted").font(.system(size: 11)).foregroundColor(GM.successInk)
-                    }
-                }
-            }
-
-            VStack(alignment: .trailing, spacing: 6) {
-                // The clock and the unread dot, in the reference's own column:
-                // date at the top of the row, dot beside it, star underneath.
-                // A fixed minimum width keeps a long date from squeezing the
-                // sender line, and right alignment keeps the stars in one line.
-                HStack(spacing: 5) {
-                    if unread {
-                        Circle().fill(GM.primarySolid).frame(width: 6, height: 6)
-                    }
-                    if let time = MailTime.short(message.createdAt) {
-                        Text(time).font(.system(size: 12)).foregroundColor(GM.textTertiary)
-                            .lineLimit(1)
-                    }
-                }
-                HStack(spacing: 5) {
-                    if message.hasAttachments {
-                        Image(systemName: "paperclip").font(.system(size: 12))
-                            .foregroundColor(GM.textTertiary)
-                    }
-                    Button(action: onStar) {
-                        Image(systemName: message.isStarred ? "star.fill" : "star")
-                            .font(.system(size: 16))
-                            .foregroundColor(message.isStarred ? GM.star : GM.textSecondary)
-                            .frame(width: 44, height: 44)
-                            .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel(message.isStarred ? "Unstar" : "Star")
-                }
-            }
-            .frame(minWidth: 44, alignment: .trailing)
-        }
+        rowLayout
         .padding(.horizontal, 16).padding(.vertical, display.compact ? 7 : 12)
-        .background(selected ? GM.softFill : Color.clear)
+        // The multi-select row tint (round8-spec §1.4 `selectedRow`).
+        .background(selected || hovering ? GM.selectedRow : Color.clear)
         .contentShape(Rectangle())
+        .onHover { hovering = $0 }
         .onAppear { display.refreshOnce() }
         .onTapGesture { selecting ? onSelect() : onOpen() }
-        .onLongPressGesture(perform: onSelect)
+        // No gesture at all (nil) when the context menu owns the long press:
+        // an attached long-press gesture would fire alongside it or swallow it.
+        .gesture(longPressSelects ? LongPressGesture().onEnded { _ in onSelect() } : nil)
         .accessibilityIdentifier(selecting ? "mail-row-select" : "mail-row")
+    }
+
+    /// Three columns side by side up to the largest standard text size. At the
+    /// five accessibility sizes the columns no longer fit across a phone, so the
+    /// picker, the avatar and the time/star line share the top of the row and
+    /// the sender, subject and preview take its whole width underneath.
+    @ViewBuilder private var rowLayout: some View {
+        if dts.isAccessibilitySize {
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(alignment: .center, spacing: 10) {
+                    selectBox
+                    SenderAvatar(display: message.from?.display ?? "",
+                                 address: message.from?.address ?? "",
+                                 size: min(avatarSize, 60))
+                    Spacer(minLength: 8)
+                    timeLine
+                    attachmentAndStar
+                }
+                textColumn
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        } else {
+            HStack(alignment: .top, spacing: 10) {
+                selectBox
+                // The unread dot lives in the time column now (the reference draws
+                // it beside the clock), so this slot is only ever a picking
+                // affordance.
+
+                SenderAvatar(display: message.from?.display ?? "",
+                             address: message.from?.address ?? "",
+                             size: min(avatarSize, 60))
+
+                textColumn
+
+                VStack(alignment: .trailing, spacing: 6) {
+                    // The clock and the unread dot, in the reference's own column:
+                    // date at the top of the row, dot beside it, star underneath.
+                    // A fixed minimum width keeps a long date from squeezing the
+                    // sender line, and right alignment keeps the stars in one line.
+                    timeLine
+                    attachmentAndStar
+                }
+                .frame(minWidth: 44, alignment: .trailing)
+            }
+        }
+    }
+
+    @ViewBuilder private var selectBox: some View {
+        if selecting {
+            Image(systemName: selected ? "checkmark.square.fill" : "square")
+                .foregroundColor(selected ? GM.primaryText : GM.textTertiary)
+                .gmFont(20, maxSize: 32)
+                .padding(.top, dts.isAccessibilitySize ? 0 : 10)
+                // Spoken as a state, not as "checkmark square fill".
+                .accessibilityLabel(selected
+                    ? Text("Selected", tableName: "R9Mailbox",
+                           comment: "VoiceOver: this message is picked in multi-select")
+                    : Text("Not selected", tableName: "R9Mailbox",
+                           comment: "VoiceOver: this message is not picked in multi-select"))
+        }
+    }
+
+    /// One line for the sender up to the default size and beyond; it may wrap
+    /// to two at the larger standard sizes and three at the accessibility ones,
+    /// so a name is never cut to a few letters.
+    private var senderLines: Int { dts.isAccessibilitySize ? 3 : (dts >= .xxLarge ? 2 : 1) }
+
+    /// The code chip is offered only where the preview line is drawn (the
+    /// compact density hides it), never while picking rows, and never on
+    /// sealed mail.
+    private var chipCode: String? {
+        guard let signInCode, onCopyCode != nil, !display.compact, !selecting,
+              !message.isE2eEncrypted else { return nil }
+        return signInCode
+    }
+
+    private var textColumn: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            HStack(alignment: .firstTextBaseline) {
+                // `display` is non-optional on MailPerson — the type already
+                // folds name-over-address — so the question is whether it
+                // said anything at all, not whether the field exists.
+                Text(message.from.flatMap { $0.display.nilIfBlank() } ?? String(localized: "Unknown sender"))
+                    .font(.subheadline.weight(unread ? .semibold : .medium))
+                    .foregroundColor(GM.textPrimary)
+                    .lineLimit(senderLines)
+                Spacer(minLength: 8)
+            }
+            Text(message.subjectOrNone)
+                .font(.subheadline.weight(unread ? .medium : .regular))
+                .foregroundColor(GM.textPrimary).lineLimit(dts.isAccessibilitySize ? 4 : 2)
+            // The preview and its "· encrypted" / receipt notes stack at the
+            // accessibility sizes instead of pushing each other off the row.
+            GMAdaptiveStack(spacing: 4) {
+                // Compact drops the preview line, so more messages fit.
+                if !display.compact, let snippet = message.snippet, !snippet.isEmpty {
+                    Text(snippet).gmFont(13).foregroundColor(GM.textSecondary)
+                        .lineLimit(dts.isAccessibilitySize ? 2 : 1)
+                }
+                // Beside the preview; under it at the accessibility sizes
+                // (GMAdaptiveStack turns vertical there).
+                if let code = chipCode {
+                    codeChip(code)
+                }
+                if message.isE2eEncrypted {
+                    Text("· encrypted").gmFont(11).foregroundColor(GM.successInk)
+                }
+                // Server read-receipt status, present only on sent-list rows (routes/grapmail-sent-receipts.ts).
+                if message.direction == "outbound", message.readReceiptStatus == "read" {
+                    Text("· read").gmFont(11).foregroundColor(GM.successInk)
+                } else if message.direction == "outbound", message.readReceiptStatus == "requested" {
+                    Text("· receipt requested").gmFont(11).foregroundColor(GM.textTertiary)
+                }
+            }
+        }
+    }
+
+    /// "Copy 482913": a Button, so a tap lands here and never reaches the
+    /// row's open gesture. The copy goes through SignInCodePasteboard (local
+    /// only, expiring, with its success haptic) in the caller.
+    private func codeChip(_ code: String) -> some View {
+        Button {
+            onCopyCode?()
+        } label: {
+            HStack(spacing: 4) {
+                Image(systemName: "doc.on.doc")
+                    .gmFont(10, .semibold, maxSize: 18)
+                    .accessibilityHidden(true)
+                Text("Copy \(code)", comment: "Inbox row chip that copies a sign-in code; the argument is the code")
+                    .monospacedDigit()
+                    .gmFont(12, .semibold)
+                    .lineLimit(1)
+            }
+            .foregroundColor(GM.primaryText)
+            .padding(.horizontal, 9).padding(.vertical, 4)
+            .background(Capsule().fill(GM.softFill))
+            .overlay(Capsule().strokeBorder(GM.primaryText.opacity(0.35)))
+            .fixedSize()
+            .padding(.vertical, 2)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .layoutPriority(1)
+        .accessibilityLabel(Text("Copy sign-in code", comment: "VoiceOver label of the inbox row's code chip"))
+        .accessibilityIdentifier("mail-row-code")
+    }
+
+    private var timeLine: some View {
+        HStack(spacing: 5) {
+            if unread {
+                // Fades and shrinks out when the message is read, and
+                // back in when it is marked unread (Motion.swift).
+                Circle().fill(GM.primarySolid).frame(width: 6, height: 6)
+                    .transition(.opacity.combined(with: .scale(scale: 0.4)))
+            }
+            if let time = MailTime.short(message.createdAt) {
+                Text(time).gmFont(12).foregroundColor(GM.textTertiary)
+                    .lineLimit(1)
+            }
+        }
+        // Keyed on `unread`, so only a real read/unread change on a row
+        // already on screen animates -- never a first appearance or a
+        // row scrolling in.
+        .animation(GMMotion.gated(GMMotion.standard(GMMotion.medium), reduced: reduceMotion), value: unread)
+    }
+
+    private var attachmentAndStar: some View {
+        HStack(spacing: 5) {
+            if message.hasAttachments {
+                Image(systemName: "paperclip").gmFont(12, maxSize: 20)
+                    .foregroundColor(GM.textTertiary)
+            }
+            Button(action: onStar) {
+                RowStarGlyph(starred: message.isStarred)
+                    .frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            // Two Texts, not a ternary of literals: a ternary is a plain
+            // String, which VoiceOver would read untranslated.
+            .accessibilityLabel(message.isStarred ? Text("Unstar") : Text("Star"))
+        }
+    }
+}
+
+/// The row's star glyph. Starring pops it 1 → 1.3 → 1 (120 ms out, a settle
+/// spring back) while the colour fades in over 220 ms; un-starring dips it to
+/// 0.85 and back (110 + 170 ms). Android's `Mail.kt` star, same numbers.
+///
+/// Only a real toggle moves it: `onChange` never fires on first appearance,
+/// and a row scrolling into view is a fresh view with its own resting state.
+/// Reduce Motion shows the end state at once.
+private struct RowStarGlyph: View {
+    let starred: Bool
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var scale: CGFloat = 1
+
+    var body: some View {
+        ZStack {
+            Image(systemName: "star")
+                .foregroundColor(GM.textSecondary)
+                .opacity(starred ? 0 : 1)
+            Image(systemName: "star.fill")
+                .foregroundColor(GM.star)
+                .opacity(starred ? 1 : 0)
+        }
+        // Capped: the glyph sits in a fixed 44 pt hit square.
+        .gmFont(16, maxSize: 26)
+        .scaleEffect(scale)
+        .animation(GMMotion.gated(GMMotion.standard(GMMotion.medium), reduced: reduceMotion), value: starred)
+        .onChange(of: starred) { now in
+            guard !reduceMotion else { scale = 1; return }
+            if now {
+                GMMotion.twoStep(GMMotion.emphasizedDecelerate(0.12), after: 0.12, { scale = 1.3 },
+                                 then: GMMotion.settle) { scale = 1 }
+            } else {
+                GMMotion.twoStep(GMMotion.standard(0.11), after: 0.11, { scale = 0.85 },
+                                 then: GMMotion.standard(0.17)) { scale = 1 }
+            }
+        }
     }
 }
 
@@ -425,6 +559,10 @@ struct MessageRow: View, Equatable {
 // needs. Decorative filler above the list pushes every row down on a screen
 // the user opens to read mail. If a greeting is ever wanted again it must earn
 // its place with content, not take it by default.
+//
+// It came back on those terms: `InboxBriefCard` (InboxBriefCard.swift) is a
+// greeting that carries content -- what needs a reply, what is arriving, which
+// codes are fresh -- scrolls away with the list, and can be dismissed.
 
 /// A pill in the label strip. Selected pills take the label's own colour, which
 /// is why the server stores it rather than the client picking one.
@@ -445,11 +583,11 @@ struct LabelChip: View {
     var body: some View {
         HStack(spacing: 7) {
             Circle().fill(color).frame(width: 8, height: 8)
-            Text(label).font(.system(size: 13, weight: .medium))
+            Text(label).gmFont(13, .medium)
                 .foregroundColor(selected ? color : GM.textPrimary)
                 .lineLimit(1)
             if let count {
-                Text("\(count)").font(.system(size: 12)).foregroundColor(GM.textSecondary)
+                Text("\(count)").gmFont(12).foregroundColor(GM.textSecondary)
             }
         }
         .padding(.horizontal, 12).padding(.vertical, 7)
@@ -461,6 +599,10 @@ struct LabelChip: View {
 /// The floating compose button. Its identifier is what the CI walk taps — a
 /// floating button found by coordinates is a walk that breaks whenever the list
 /// scrolls.
+///
+/// Its fill is the signature gradient (round8-spec §1.3 — one of the few brand
+/// moments) with the cobalt-tinted level-2 shadow in light and none in dark
+/// (§1.9). The shape and size are unchanged.
 struct MailFab: View {
     let onClick: () -> Void
     var expanded = true
@@ -468,23 +610,29 @@ struct MailFab: View {
     var body: some View {
         Button(action: onClick) {
             HStack(spacing: 10) {
+                // Capped: the button floats over the list, and the list's
+                // bottom clearance is sized for it. At the accessibility sizes
+                // a long press shows the large-content viewer (below).
                 Image(systemName: "pencil")
-                    .font(.system(size: 17, weight: .semibold))
-                    .frame(width: 20)
+                    .gmFont(17, .semibold, maxSize: 24)
+                    .frame(minWidth: 20)
                 if expanded {
                     Text("Compose")
-                        .font(.system(size: 16, weight: .semibold))
+                        .gmFont(16, .semibold, maxSize: 24)
                         .fixedSize(horizontal: true, vertical: false)
                 }
             }
-            .foregroundColor(.white)
+            .foregroundColor(GM.onPrimary)
             .padding(.horizontal, expanded ? 20 : 14)
-            .frame(height: 48)
-            .background(RoundedRectangle(cornerRadius: 24, style: .continuous).fill(GM.primarySolid))
-            .shadow(color: Color.black.opacity(0.18), radius: 10, x: 0, y: 4)
+            .frame(minHeight: 48)
+            .background(RoundedRectangle(cornerRadius: 24, style: .continuous).fill(Color.signatureGradient))
+            .gmElevation(.level2Brand)
         }
         .buttonStyle(.plain)
         .accessibilityLabel("Compose")
+        .accessibilityShowsLargeContentViewer {
+            Label("Compose", systemImage: "pencil")
+        }
         .accessibilityIdentifier("mail-compose")
     }
 }
@@ -495,19 +643,33 @@ struct MailFab: View {
 /// reference draws it.
 struct ToolAction: View {
     let icon: String
-    let label: String
+    /// A resource so the literal at each call site is extracted into the
+    /// String Catalog (`label: "Mark read"` reads exactly as before).
+    let label: LocalizedStringResource
     let onClick: () -> Void
+
+    @Environment(\.dynamicTypeSize) private var dts
 
     var body: some View {
         Button(action: onClick) {
             VStack(spacing: 4) {
-                Image(systemName: icon).font(.system(size: 18)).foregroundColor(GM.textPrimary)
-                Text(label).font(.system(size: 11)).foregroundColor(GM.textPrimary)
+                Image(systemName: icon).gmFont(18, maxSize: 28).foregroundColor(GM.textPrimary)
+                Text(label).gmFont(11, maxSize: 22).foregroundColor(GM.textPrimary)
+                    // One line: when the words do not all fit across, the bar
+                    // scrolls (SelectionToolbar) instead of breaking a word.
+                    .lineLimit(1)
             }
             .frame(maxWidth: .infinity)
+            // In the scrolling bar of the accessibility sizes each action keeps
+            // a width its word can sit in.
+            .frame(minWidth: dts.isAccessibilitySize ? 84 : 44)
             .padding(.vertical, 8)
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .accessibilityShowsLargeContentViewer {
+            Label { Text(label) } icon: { Image(systemName: icon) }
+        }
     }
 }
 
@@ -532,20 +694,49 @@ struct SelectionToolbar: View {
     /// a control aimed at nothing.
     var onSender: (() -> Void)? = nil
 
+    @Environment(\.dynamicTypeSize) private var dts
+
     var body: some View {
         VStack(spacing: 0) {
             HStack(spacing: 12) {
                 Button(action: onClose) {
-                    Image(systemName: "xmark").font(.system(size: 16, weight: .semibold))
+                    Image(systemName: "xmark").gmFont(16, .semibold, maxSize: 26)
                         .foregroundColor(GM.textPrimary)
+                        .frame(minWidth: 44, minHeight: 44)
+                        .contentShape(Rectangle())
                 }.buttonStyle(.plain)
+                .accessibilityLabel(Text("Close"))
                 Text("\(count) selected")
-                    .font(.system(size: 16, weight: .semibold)).foregroundColor(GM.textPrimary)
+                    .gmFont(16, .semibold).foregroundColor(GM.textPrimary)
+                    .fixedSize(horizontal: false, vertical: true)
                 Spacer()
             }
-            .padding(.horizontal, 16).padding(.vertical, 10)
+            .padding(.horizontal, 6).padding(.vertical, 2)
 
-            HStack(spacing: 0) {
+            // Seven or eight actions share one row. When their words no longer
+            // fit side by side -- the accessibility sizes, a 320 pt phone, a
+            // Slide Over column, a long translation -- the row scrolls.
+            if dts.isAccessibilitySize {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    actions(spacing: 0).padding(.horizontal, 8)
+                }
+            } else {
+                ViewThatFits(in: .horizontal) {
+                    actions(spacing: 0)
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        actions(spacing: 12).padding(.horizontal, 8)
+                    }
+                }
+            }
+        }
+        .background(GM.card)
+        .accessibilityIdentifier("mail-selection-bar")
+    }
+
+    /// `spacing` is 0 when the actions share the bar's width, and a gap when
+    /// the bar scrolls, so neighbouring words never touch.
+    private func actions(spacing: CGFloat) -> some View {
+            HStack(spacing: spacing) {
                 ToolAction(icon: "archivebox", label: "Archive", onClick: onArchive)
                 ToolAction(icon: "trash", label: "Delete", onClick: onDelete)
                 ToolAction(icon: "arrow.right.doc.on.clipboard", label: "Move", onClick: onMove)
@@ -557,9 +748,6 @@ struct SelectionToolbar: View {
                 }
                 ToolAction(icon: "ellipsis", label: "More", onClick: onMore)
             }
-        }
-        .background(GM.card)
-        .accessibilityIdentifier("mail-selection-bar")
     }
 }
 
@@ -590,19 +778,19 @@ struct MailStateBlock<Content: View>: View {
             if !failed && !noMailbox && !empty {
                 content
             } else if loading {
-                CenteredState(title: "Checking your mailbox…")
+                // First load only (content wins above whenever rows exist).
+                GMSkeletonList(rows: 8)
             } else if noMailbox {
                 CenteredState(
                     title: "No GrapMail mailbox on this account",
-                    detail: "The account you signed in with has no mailbox provisioned, so there is " +
-                            "nothing to list. This is not a connection problem.")
+                    detail: "The account you signed in with has no mailbox provisioned, so there is nothing to list. This is not a connection problem.")
             } else if failed {
                 CenteredState(
                     title: "Couldn't load \(boxTitle)",
                     detail: "Your mailbox could not be reached. Nothing has been deleted.",
                     action: ("Try again", onRetry))
                     .padding(.bottom, 142)
-            } else if empty && boxTitle == "Inbox" && !filtered {
+            } else if empty && boxTitle == MailBox.inbox.title && !filtered {
                 CenteredState(title: "Welcome home to GrapMail",
                               detail: "Your inbox is fresh, quiet, and completely protected.")
             } else {
@@ -616,28 +804,46 @@ struct MailStateBlock<Content: View>: View {
 /// `detail`, never `body`: a stored property called `body` in a `View` shadows
 /// the protocol's own requirement, and the compiler reports the conformance
 /// against the String instead of the view. This bit the security sector once.
+///
+/// `LocalizedStringResource`, not `String`: every caller passes a literal (or
+/// an interpolated literal), which the String Catalog then extracts.
 struct CenteredState: View {
-    let title: String
-    var detail: String? = nil
-    var action: (String, () -> Void)? = nil
+    let title: LocalizedStringResource
+    var detail: LocalizedStringResource? = nil
+    var action: (LocalizedStringResource, () -> Void)? = nil
 
     var body: some View {
+        // As designed (centred) when it fits; scrolls when a short window
+        // (phone landscape, Split View) or the largest text sizes leave less
+        // height than the words and the button need, so nothing is cut off.
+        ViewThatFits(in: .vertical) {
+            stack
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            ScrollView {
+                stack
+                    .frame(maxWidth: .infinity)
+            }
+        }
+    }
+
+    private var stack: some View {
         VStack(spacing: 8) {
             Text(title).font(.headline)
                 .foregroundColor(GM.textPrimary).multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
             if let detail {
                 Text(detail).font(.subheadline).foregroundColor(GM.textSecondary)
                     .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             if let action {
-                OutlineActionButton(title: action.0, action: action.1)
+                OutlineActionButton(title: String(localized: action.0), action: action.1)
                     .padding(.top, 8)
             }
         }
         .frame(maxWidth: 340)
         .padding(.horizontal, 20)
         .padding(.vertical, 12)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
 
@@ -848,9 +1054,9 @@ func urlHost(_ raw: String) -> String? {
 
 /// Human-readable size, so a 1.4 MB report does not read as "1415732".
 func humanBytes(_ n: Int) -> String {
-    if n < 1024 { return "\(n) B" }
-    if n < 1024 * 1024 { return String(format: "%.0f KB", Double(n) / 1024.0) }
-    return String(format: "%.1f MB", Double(n) / (1024.0 * 1024.0))
+    if n < 1024 { return String(localized: "\(n) B", comment: "File size in bytes") }
+    if n < 1024 * 1024 { return String(format: String(localized: "%.0f KB", comment: "File size in kilobytes"), Double(n) / 1024.0) }
+    return String(format: String(localized: "%.1f MB", comment: "File size in megabytes"), Double(n) / (1024.0 * 1024.0))
 }
 
 /// "Subscriber" next to a sender's name when the server says their account
@@ -863,10 +1069,10 @@ struct SenderBadges: View {
         Group {
             if badges.contains("subscriber") {
                 Text("Subscriber")
-                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundColor(GM.primarySolid)
+                    .gmFont(10, .semibold)
+                    .foregroundColor(GM.primaryText)
                     .padding(.horizontal, 6).padding(.vertical, 1)
-                    .overlay(Capsule().strokeBorder(GM.primarySolid.opacity(0.5)))
+                    .overlay(Capsule().strokeBorder(GM.primaryText.opacity(0.5)))
                     .lineLimit(1)
                     .fixedSize()
                     .accessibilityLabel("Subscriber: this sender supports GrapMail with a paid plan")

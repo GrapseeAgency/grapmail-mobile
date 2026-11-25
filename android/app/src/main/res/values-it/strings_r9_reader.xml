@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <plurals name="reader_earlier_messages">
+        <item quantity="one">%d messaggio precedente</item>
+        <item quantity="other">%d messaggi precedenti</item>
+    </plurals>
+    <plurals name="reader_participants">
+        <item quantity="one">%d persona</item>
+        <item quantity="other">%d persone</item>
+    </plurals>
+    <plurals name="reader_message_count">
+        <item quantity="one">%d messaggio</item>
+        <item quantity="other">%d messaggi</item>
+    </plurals>
+    <string name="reader_you">Tu</string>
+    <string name="reader_unread">Non letto</string>
+    <string name="reader_earlier_action">mostra i messaggi compressi</string>
+    <string name="reader_open_message_action">apri questo messaggio</string>
+    <string name="reader_quoted_show">Mostra il testo citato</string>
+    <string name="reader_quoted_hide">Nascondi il testo citato</string>
+    <string name="reader_state_expanded">Aperto</string>
+    <string name="reader_state_collapsed">Compresso</string>
+    <string name="reader_reply_to">Rispondi a %1$s…</string>
+    <string name="reader_reply_fallback">Rispondi…</string>
+    <string name="reader_reply_options">Opzioni di risposta</string>
+    <string name="reader_quick_reply">Risposta rapida</string>
+    <string name="reader_attach_share_chooser">Condividi allegato</string>
+    <string name="reader_attach_view_image">vedi l’immagine</string>
+    <string name="reader_attach_save_named">Salva %1$s</string>
+    <string name="reader_attach_share_named">Condividi %1$s</string>
+    <string name="reader_attach_share_nothing">Nessuna app su questo dispositivo può condividere questo file.</string>
+    <string name="reader_viewer_position">%1$d di %2$d</string>
+    <string name="reader_viewer_too_large">Questa immagine non può essere visualizzata qui.</string>
+    <string name="compose_r9_leave_title">Uscire da questo messaggio?</string>
+    <string name="compose_r9_leave_attachments">Le bozze non conservano ancora gli allegati. Salva il testo senza allegati o continua a scrivere.</string>
+    <string name="compose_r9_save_text_only">Salva solo il testo</string>
+    <string name="compose_r9_draft_failed_title">Questa bozza non è stata salvata</string>
+    <string name="compose_r9_leave_without_saving">Esci senza salvare</string>
+    <string name="compose_r9_encrypt_failed">Non è stato possibile cifrare questo messaggio, quindi non è stato inviato nulla.</string>
+    <string name="compose_editor_toolbar">Formattazione del testo</string>
+    <string name="compose_editor_bold">Grassetto</string>
+    <string name="compose_editor_italic">Corsivo</string>
+    <string name="compose_editor_underline">Sottolineato</string>
+    <string name="compose_editor_strike">Barrato</string>
+    <string name="compose_editor_bullets">Elenco puntato</string>
+    <string name="compose_editor_numbered">Elenco numerato</string>
+    <string name="compose_editor_text_colour">Colore del testo</string>
+    <string name="compose_editor_black">Nero</string>
+    <string name="compose_editor_blue">Blu</string>
+    <string name="compose_editor_red">Rosso</string>
+    <string name="compose_editor_green">Verde</string>
+    <string name="compose_editor_highlight">Evidenzia</string>
+    <string name="compose_editor_highlight_colour">Colore di evidenziazione</string>
+    <string name="compose_editor_yellow">Giallo</string>
+    <string name="compose_editor_pink">Rosa</string>
+    <string name="compose_editor_font">Carattere</string>
+    <string name="compose_editor_sans">Senza grazie</string>
+    <string name="compose_editor_serif">Serif</string>
+    <string name="compose_editor_mono">Monospace</string>
+    <string name="compose_editor_larger">Più grande</string>
+    <string name="compose_editor_clear">Rimuovi formattazione</string>
+    <string name="compose_editor_image">Immagine</string>
+    <string name="compose_editor_insert_image">Inserisci immagine</string>
+</resources>

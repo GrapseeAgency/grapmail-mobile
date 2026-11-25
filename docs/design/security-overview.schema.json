@@ -1,0 +1,571 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://grapsee.com/schemas/grapmail/security-overview.schema.json",
+  "title": "GrapMail Device & Security Center contract (round8-spec §6)",
+  "description": "GET /grapsee/auth/security/overview (200 body) and POST /grapsee/auth/security/not-me (request, 200 body, error envelope). Enums are OPEN: clients must accept unknown string values and render the generic fallback. Implemented by grapsee-backend/services/shared/src/routes/auth-security-center.ts.",
+  "$defs": {
+    "location": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "object",
+          "required": [
+            "label",
+            "city",
+            "region",
+            "country"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "label": {
+              "type": "string",
+              "description": "\"{city}, {country name}\" or \"{country name}\" (English). Today always the country name: no city is stored."
+            },
+            "city": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "description": "Always null today (no geo-IP lookup)."
+            },
+            "region": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "description": "Always null today."
+            },
+            "country": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "pattern": "^[A-Z]{2}$",
+              "description": "ISO 3166-1 alpha-2."
+            }
+          }
+        }
+      ],
+      "description": "Coarse, text only. Never coordinates, never an IP."
+    },
+    "errorEnvelope": {
+      "type": "object",
+      "required": [
+        "success",
+        "error",
+        "code",
+        "message"
+      ],
+      "properties": {
+        "success": {
+          "const": false
+        },
+        "error": {
+          "type": "string"
+        },
+        "message": {
+          "type": "string"
+        },
+        "code": {
+          "type": "string",
+          "description": "UNAUTHORIZED | RATE_LIMITED | TARGET_REQUIRED | TARGET_AMBIGUOUS | NOT_FOUND | CANNOT_TARGET_CURRENT | STEP_UP_REQUIRED | UNSUPPORTED_MEDIA_TYPE (open)"
+        }
+      }
+    },
+    "account": {
+      "type": "object",
+      "required": [
+        "address",
+        "displayName",
+        "hasPassword",
+        "passwordChangeRequired"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "address": {
+          "type": "string"
+        },
+        "displayName": {
+          "type": "string"
+        },
+        "hasPassword": {
+          "type": "boolean",
+          "description": "false for SSO / passkey-only accounts; password_health is then not_applicable."
+        },
+        "passwordChangeRequired": {
+          "type": "boolean",
+          "description": "Set by not-me, cleared by any password change or reset. Also on GET /auth/me and GET /auth/account/profile."
+        }
+      }
+    },
+    "score": {
+      "type": "object",
+      "required": [
+        "version",
+        "value",
+        "level",
+        "earnedPoints",
+        "possiblePoints"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "version": {
+          "const": 1
+        },
+        "value": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100,
+          "description": "round(100 × earned / possible), half up; 100 when possible = 0."
+        },
+        "level": {
+          "type": "string",
+          "description": "needs_attention (0–59) | good (60–84) | strong (85–100) (open)"
+        },
+        "earnedPoints": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "possiblePoints": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100
+        }
+      }
+    },
+    "checklistItem": {
+      "type": "object",
+      "required": [
+        "id",
+        "state",
+        "points",
+        "earned",
+        "action"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "two_step | passkey | recovery_codes | recovery_email | second_device | password_health | recovery_phone | alerts_reviewed (open; unknown ids are hidden)"
+        },
+        "state": {
+          "type": "string",
+          "description": "done | todo | not_applicable (open)"
+        },
+        "points": {
+          "type": "integer"
+        },
+        "earned": {
+          "type": "integer",
+          "description": "points when done, else 0"
+        },
+        "action": {
+          "type": "string",
+          "description": "security.two_step | security.passkeys | security.recovery_codes | account.recovery_email | security.devices | security.password | account.phone | security.activity (open)"
+        },
+        "meta": {
+          "type": "object",
+          "properties": {
+            "count": {
+              "type": "integer",
+              "description": "passkey: passkeys; second_device: live trusted devices; alerts_reviewed: open alerts"
+            },
+            "remaining": {
+              "type": "integer",
+              "description": "recovery_codes: unused, unexpired codes"
+            },
+            "status": {
+              "type": "string",
+              "description": "password_health: breached | ok"
+            },
+            "lastChangedAt": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "format": "date-time"
+            }
+          }
+        }
+      }
+    },
+    "removal": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "object",
+          "required": [
+            "via",
+            "id"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "via": {
+              "type": "string",
+              "description": "trusted_device → POST /grapsee/auth/devices/{id}/revoke · session → DELETE /grapsee/auth/account/sessions?id={id} (open)"
+            },
+            "id": {
+              "type": "string",
+              "description": "The bare id the reused endpoint takes."
+            }
+          }
+        }
+      ]
+    },
+    "device": {
+      "type": "object",
+      "required": [
+        "id",
+        "kind",
+        "platform",
+        "formFactor",
+        "label",
+        "browser",
+        "os",
+        "current",
+        "trusted",
+        "attestation",
+        "location",
+        "firstSeenAt",
+        "lastActiveAt",
+        "activeSessionCount",
+        "removal",
+        "notMeAllowed"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "td_<uuid> (trusted device) or ss_<16 hex> (session group). Opaque."
+        },
+        "kind": {
+          "type": "string",
+          "description": "app | browser (open)"
+        },
+        "platform": {
+          "type": "string",
+          "description": "android | ios | windows | macos | linux | chromeos | unknown (open)"
+        },
+        "formFactor": {
+          "type": "string",
+          "description": "phone | tablet | desktop | unknown (open)"
+        },
+        "label": {
+          "type": "string",
+          "description": "App: device name (\"Pixel 8\"). Browser: \"{browser} on {os}\" (\"Chrome on Windows\"); \"Unknown device\" only when the session recorded no user agent."
+        },
+        "browser": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "os": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "current": {
+          "type": "boolean",
+          "description": "Exactly one device is current when the caller's device is known."
+        },
+        "trusted": {
+          "type": "boolean"
+        },
+        "attestation": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "location": {
+          "$ref": "#/$defs/location"
+        },
+        "ipMasked": {
+          "type": "string",
+          "description": "Allowed by §6.2 but NEVER sent by this server: no network address leaves it, not even masked."
+        },
+        "firstSeenAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "lastActiveAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "activeSessionCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "removal": {
+          "$ref": "#/$defs/removal"
+        },
+        "notMeAllowed": {
+          "type": "boolean",
+          "description": "false for the current device."
+        }
+      }
+    },
+    "event": {
+      "type": "object",
+      "required": [
+        "id",
+        "type",
+        "occurredAt",
+        "deviceId",
+        "deviceLabel",
+        "location",
+        "risk",
+        "action",
+        "factor",
+        "acknowledged",
+        "reported",
+        "notMeAllowed"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "ev_<uuid> (security event) or al_<uuid> (account activity). Opaque."
+        },
+        "type": {
+          "type": "string",
+          "description": "signin | signin_new_device | signin_suspicious | signin_blocked | password_changed | passkey_added | passkey_removed | two_step_enabled | two_step_disabled | recovery_requested | recovery_used | recovery_codes_generated | device_added | device_removed | session_signed_out | not_me_reported | account_created (open; unknown → \"Security activity\")"
+        },
+        "occurredAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "deviceId": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "The overview device id when that device is still listed."
+        },
+        "deviceLabel": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "location": {
+          "$ref": "#/$defs/location"
+        },
+        "ipMasked": {
+          "type": "string",
+          "description": "Never sent by this server."
+        },
+        "risk": {
+          "type": "string",
+          "description": "low (0–29) | medium (30–59) | high (≥60) (open)"
+        },
+        "action": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "ALLOW | ALERT | STEP_UP | BLOCK | REVOKE (open); null on account-activity rows."
+        },
+        "factor": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "passkey | recovery_code | trusted_device (open)"
+        },
+        "acknowledged": {
+          "type": "boolean"
+        },
+        "reported": {
+          "type": "boolean"
+        },
+        "notMeAllowed": {
+          "type": "boolean"
+        }
+      }
+    },
+    "overview": {
+      "type": "object",
+      "required": [
+        "success",
+        "generatedAt",
+        "account",
+        "score",
+        "checklist",
+        "devices",
+        "events",
+        "eventsNextCursor"
+      ],
+      "properties": {
+        "success": {
+          "const": true
+        },
+        "generatedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "account": {
+          "$ref": "#/$defs/account"
+        },
+        "score": {
+          "$ref": "#/$defs/score"
+        },
+        "checklist": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/checklistItem"
+          },
+          "minItems": 8,
+          "maxItems": 8,
+          "description": "All 8 ids, in table order."
+        },
+        "devices": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/device"
+          },
+          "description": "Current first, then lastActiveAt desc. Revoked devices are omitted."
+        },
+        "events": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/event"
+          },
+          "description": "Newest first."
+        },
+        "eventsNextCursor": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "notMeRequest": {
+      "type": "object",
+      "properties": {
+        "deviceId": {
+          "type": "string"
+        },
+        "eventId": {
+          "type": "string"
+        },
+        "proof": {
+          "type": "string",
+          "description": "From POST /grapsee/auth/account/verify-password {password, purpose: \"secure-account\"}; only on the retry after 403 STEP_UP_REQUIRED."
+        }
+      },
+      "oneOf": [
+        {
+          "required": [
+            "deviceId"
+          ],
+          "not": {
+            "required": [
+              "eventId"
+            ]
+          }
+        },
+        {
+          "required": [
+            "eventId"
+          ],
+          "not": {
+            "required": [
+              "deviceId"
+            ]
+          }
+        }
+      ]
+    },
+    "notMeResponse": {
+      "type": "object",
+      "required": [
+        "success",
+        "result",
+        "nextSteps"
+      ],
+      "properties": {
+        "success": {
+          "const": true
+        },
+        "result": {
+          "type": "object",
+          "required": [
+            "reportId",
+            "target",
+            "revokedDeviceIds",
+            "signedOutSessions",
+            "passwordChangeRequired",
+            "alreadyReported"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "reportId": {
+              "type": "string",
+              "description": "ev_<uuid> of the security.not_me.reported event (the original one when alreadyReported)."
+            },
+            "target": {
+              "type": "object",
+              "required": [
+                "kind",
+                "id"
+              ],
+              "properties": {
+                "kind": {
+                  "type": "string",
+                  "description": "device | event (open)"
+                },
+                "id": {
+                  "type": "string"
+                }
+              }
+            },
+            "revokedDeviceIds": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Empty when alreadyReported."
+            },
+            "signedOutSessions": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "0 when alreadyReported."
+            },
+            "passwordChangeRequired": {
+              "type": "boolean",
+              "description": "false for an account with no password."
+            },
+            "alreadyReported": {
+              "type": "boolean",
+              "description": "Same target reported again within 24 h: nothing was repeated."
+            }
+          }
+        },
+        "nextSteps": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "description": "change_password | review_recovery (open)"
+          }
+        }
+      }
+    }
+  },
+  "oneOf": [
+    {
+      "$ref": "#/$defs/overview"
+    },
+    {
+      "$ref": "#/$defs/notMeResponse"
+    },
+    {
+      "$ref": "#/$defs/errorEnvelope"
+    }
+  ]
+}

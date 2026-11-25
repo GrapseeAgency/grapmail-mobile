@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="profile_gender_female" translatable="false">@string/acct_female</string>
+    <string name="profile_gender_male" translatable="false">@string/acct_male</string>
+    <string name="profile_gender_prefer_not_to_say" translatable="false">@string/acct_rather_not_say</string>
+    <string name="profile_gender_custom" translatable="false">@string/acct_custom</string>
+</resources>

@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="mail_receipt_read_at">قُرئت %1$s</string>
+    <string name="mail_receipt_requested_pending">طُلب إشعار بالقراءة · لم تُقرأ بعد</string>
+    <string name="mail_receipt_server_sent">تم إرسال إشعار القراءة</string>
+    <string name="mail_receipt_ask_title">طلب المرسِل إشعارًا بالقراءة</string>
+    <string name="mail_receipt_ask_body">هل تريد إرسال إشعار إلى %1$s بأنك فتحت هذه الرسالة؟ يخبره بوقت فتحها فقط، ولا شيء آخر.</string>
+    <string name="mail_receipt_ask_send">إرسال الإشعار</string>
+    <string name="mail_receipt_ask_decline">عدم الإرسال</string>
+    <string name="mail_receipt_mode_title">إرسال إشعارات القراءة</string>
+    <string name="mail_receipt_mode_body">عندما تطلب رسالة إشعارًا بالقراءة. لا تُرسل الإشعارات أبدًا للبريد العشوائي أو المرسلين المحظورين أو البريد المشفّر، إلا إذا اخترت \"دائمًا\".</string>
+    <string name="mail_receipt_mode_never">أبدًا</string>
+    <string name="mail_receipt_mode_ask">السؤال</string>
+    <string name="mail_receipt_mode_always">دائمًا</string>
+    <string name="mail_receipt_mode_always_note">يرسل خيار \"دائمًا\" الإشعارات أيضًا للبريد العشوائي والمرسلين المحظورين والبريد المشفّر.</string>
+    <string name="mail_receipt_mode_unavailable">تعذّر تحميل هذا الإعداد. تحقق من اتصالك.</string>
+    <string name="mail_compose_request_receipt">طلب إشعار بالقراءة</string>
+</resources>

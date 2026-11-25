@@ -1,0 +1,158 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Urdu translation of values/strings_account.xml (part 3 of 4).
+  Covers security/BackupCodeScreens.kt through security/RecoveryCodesScreen.kt.
+-->
+<resources>
+
+    <!-- security/BackupCodeScreens.kt -->
+    <string name="acct_generate_save_backup_codes">بیک اپ کوڈز بنائیں اور محفوظ کریں</string>
+    <string name="acct_create_one_time_backup_codes_to">ایک بار استعمال ہونے والے بیک اپ کوڈز بنائیں تاکہ فون گم ہونے پر بھی آپ اپنے اکاؤنٹ تک رسائی حاصل کر سکیں۔</string>
+    <string name="acct_generate_codes">کوڈز بنائیں</string>
+    <string name="acct_cancel">منسوخ کریں</string>
+    <string name="acct_whats_included">اس میں کیا شامل ہے</string>
+    <string name="acct_10_one_time_codes">ایک بار استعمال کے 10 کوڈز</string>
+    <string name="acct_each_code_can_be_used_once">ہر کوڈ ایک بار استعمال ہو سکتا ہے۔</string>
+    <string name="acct_use_when_needed">ضرورت پر استعمال کریں</string>
+    <string name="acct_sign_in_when_your_phone_is">جب آپ کا فون دستیاب نہ ہو تو سائن ان کریں۔</string>
+    <string name="acct_each_code_is_unique">ہر کوڈ منفرد ہے</string>
+    <string name="acct_generating_a_new_set_retires_the_old">نیا سیٹ بنانے سے پرانا سیٹ ختم ہو جاتا ہے۔</string>
+    <string name="acct_store_the_codes_somewhere_only_you">کوڈز ایسی جگہ رکھیں جہاں صرف آپ پہنچ سکیں۔ جس کے پاس کوڈ ہو وہ آپ کا دوسرا تصدیقی مرحلہ عبور کر سکتا ہے۔</string>
+    <string name="acct_backup_codes_saved">بیک اپ کوڈز محفوظ ہو گئے</string>
+    <string name="acct_store_these_codes_somewhere_safe">یہ کوڈز کسی محفوظ جگہ رکھیں۔ یہ دوبارہ نہیں دکھائے جائیں گے۔</string>
+    <string name="acct_download_backup_codes">بیک اپ کوڈز ڈاؤن لوڈ کریں</string>
+    <string name="acct_done">ہو گیا</string>
+    <string name="acct_each_code_can_be_used_once_2">ہر کوڈ ایک بار استعمال ہو سکتا ہے۔ نئے کوڈز بنانے سے اس فہرست کے تمام کوڈز ختم ہو جاتے ہیں۔</string>
+    <string name="acct_your_backup_codes">آپ کے بیک اپ کوڈز</string>
+    <string name="acct_copied">کاپی ہو گیا</string>
+    <string name="acct_copy_all">سب کاپی کریں</string>
+    <string name="acct_copy_code">%1$s کاپی کریں</string>
+    <string name="acct_keep_them_safe">انہیں محفوظ رکھیں</string>
+    <string name="acct_store_safely_use_a_password_manager">محفوظ رکھیں — پاس ورڈ مینیجر استعمال کریں یا پرنٹ کر لیں۔</string>
+    <string name="acct_dont_share_backup_codes_are_for_your">شیئر نہ کریں — بیک اپ کوڈز صرف آپ کے لیے ہیں۔</string>
+    <string name="acct_one_time_use_each_code_can_only_be">ایک بار استعمال — ہر کوڈ صرف ایک بار استعمال ہو سکتا ہے۔</string>
+    <string name="acct_saved_codes_confirm">میں نے یہ کوڈز کسی محفوظ جگہ رکھ لیے ہیں۔</string>
+    <string name="acct_copy_them_into_your_password_manager">انہیں اپنے پاس ورڈ مینیجر میں کاپی کریں، یا لکھ لیں۔</string>
+    <string name="acct_codes_not_shown_again">یہ کوڈز دوبارہ نہیں دکھائے جائیں گے</string>
+    <string name="acct_leave_now_and_the_list_is_gone_you">ابھی چھوڑنے پر فہرست غائب ہو جائے گی۔ آپ بعد میں نیا سیٹ بنا سکتے ہیں، لیکن پرانے کوڈز کام کرنا بند کر دیں گے۔</string>
+    <string name="acct_leave_anyway">پھر بھی چھوڑیں</string>
+    <string name="acct_stay">رکیں</string>
+
+    <!-- security/DeleteAccountScreen.kt -->
+    <string name="acct_delete_account">اکاؤنٹ حذف کریں</string>
+    <string name="acct_deleting_this_account_is_permanent">یہ اکاؤنٹ حذف کرنا مستقل ہے۔ جاری رکھنے سے پہلے براہ کرم پڑھ لیں کہ کیا کچھ ہٹایا جائے گا۔</string>
+    <string name="acct_delete_my_account">میرا اکاؤنٹ حذف کریں</string>
+    <string name="acct_enter_your_password_period">اپنا پاس ورڈ درج کریں۔</string>
+    <string name="acct_that_password_is_not_correct">یہ پاس ورڈ درست نہیں ہے۔</string>
+    <string name="acct_the_request_could_not_be_confirmed">درخواست کی تصدیق نہیں ہو سکی۔</string>
+    <string name="acct_what_is_deleted">کیا حذف ہوگا</string>
+    <string name="acct_delete_removes_mailbox">آپ کا GrapMail میل باکس — خود پتہ بھی، اس لیے اس پر بھیجی گئی ای میل اب کسی تک نہیں پہنچے گی۔</string>
+    <string name="acct_every_message_sent_received_drafted">ہر پیغام: بھیجے گئے، وصول شدہ، ڈرافٹ، آرکائیو اور ردی میں ڈالے گئے۔</string>
+    <string name="acct_your_aliases_the_extra_addresses">آپ کے عرفی پتے — وہ اضافی پتے جن کی ای میل اس میل باکس میں آتی تھی۔</string>
+    <string name="acct_delete_cannot_be_undone">اسے واپس یا بازیافت نہیں کیا جا سکتا۔ پتہ آپ کے لیے محفوظ نہیں رکھا جاتا — حذف شدہ پتہ دوبارہ بنانا ممکن نہیں ہو سکتا۔</string>
+    <string name="acct_enter_your_password_to_confirm">تصدیق کے لیے اپنا پاس ورڈ درج کریں</string>
+    <string name="acct_only_the_password_on_this_account">صرف اسی اکاؤنٹ کا پاس ورڈ حذف کرنے کا عمل شروع کر سکتا ہے۔</string>
+
+    <!-- security/NotificationPrefsScreen.kt -->
+    <string name="acct_notification_preferences">اطلاعات کی ترجیحات</string>
+    <string name="acct_choose_what_this_account_sends_and">منتخب کریں کہ یہ اکاؤنٹ کیا بھیجے، اور ای میل کی اطلاعات کب خاموش رہیں۔</string>
+    <string name="acct_apply_quiet_hours">خاموش اوقات لاگو کریں</string>
+    <string name="acct_back_to_account_security">اکاؤنٹ سیکیورٹی پر واپس جائیں</string>
+    <string name="acct_alerts">الرٹس</string>
+    <string name="acct_mail_notifications">ای میل کی اطلاعات</string>
+    <string name="acct_new_mail_that_reaches_your_inbox">آپ کے ان باکس میں آنے والی نئی ای میل۔</string>
+    <string name="acct_security_alerts">سیکیورٹی الرٹس</string>
+    <string name="acct_sign_ins_password_changes_trusted">سائن انز، پاس ورڈ کی تبدیلیاں، قابل اعتماد ڈیوائس کے واقعات۔ ہمیشہ موصول ہوتے ہیں — انہیں خاموش نہیں کیا جا سکتا۔</string>
+    <string name="acct_account_alerts">اکاؤنٹ الرٹس</string>
+    <string name="acct_lifecycle_notices_about_your_account">آپ کے اکاؤنٹ کے بارے میں اہم نوٹسز۔</string>
+    <string name="acct_quiet_hours_mail_only">خاموش اوقات — صرف ای میل</string>
+    <string name="acct_paused">موقوف</string>
+    <string name="acct_while_quiet_hours_are_on_mail">خاموش اوقات کے دوران ای میل کی اطلاعات وقفہ ختم ہونے تک روکی جاتی ہیں۔ سیکیورٹی الرٹس کبھی نہیں رکتے۔</string>
+    <string name="acct_quiet_from">خاموشی شروع</string>
+    <string name="acct_quiet_until">خاموشی ختم</string>
+    <string name="acct_clear_quiet_hours">خاموش اوقات صاف کریں</string>
+    <string name="acct_security_alerts_state">سیکیورٹی الرٹس کی حالت</string>
+    <string name="acct_security_alerts_are_on_for_this">اس اکاؤنٹ کے لیے سیکیورٹی الرٹس آن ہیں، جیسا کہ ہونا چاہیے۔</string>
+    <string name="acct_the_account_row_reports_security">اکاؤنٹ کے ریکارڈ کے مطابق سیکیورٹی الرٹس بند ہیں۔ اہم سیکیورٹی الرٹس کی ترسیل یہ اسکرین تبدیل نہیں کر سکتی۔</string>
+    <string name="acct_preferences_apply_to_every_device">ترجیحات اس اکاؤنٹ کو استعمال کرنے والی ہر ڈیوائس پر لاگو ہوتی ہیں۔</string>
+    <string name="acct_not_set">سیٹ نہیں</string>
+
+    <!-- security/PasskeysScreen.kt -->
+    <string name="acct_passkey_name_on_device">%1$s پر GrapMail</string>
+    <string name="acct_passkey_added_use_it_the_next_time">پاس کی شامل ہو گئی۔ اگلی بار سائن ان کرتے وقت اسے استعمال کریں۔</string>
+    <string name="acct_no_passkey_was_created_on_this">اس ڈیوائس پر کوئی پاس کی نہیں بنی۔ یقینی بنائیں کہ اسکرین لاک سیٹ ہے۔</string>
+    <string name="acct_the_passkey_could_not_be_added_try">پاس کی شامل نہیں ہو سکی۔ دوبارہ کوشش کریں۔</string>
+    <string name="acct_passkeys">پاس کیز</string>
+    <string name="acct_sign_in_with_a_biometric_credential">پاس ورڈ کے بجائے بایومیٹرک اسناد سے سائن ان کریں۔ پاس کی اسی ڈیوائس پر رہتی ہے جس نے اسے بنایا۔</string>
+    <string name="acct_add_passkey">پاس کی شامل کریں</string>
+    <string name="acct_no_passkeys_yet_add_one_and_you_can">ابھی کوئی پاس کی نہیں۔ ایک شامل کریں اور پاس ورڈ کے بغیر سائن ان کریں۔</string>
+    <string name="acct_what_a_passkey_is">پاس کی کیا ہے</string>
+    <string name="acct_a_passkey_is_a_credential_this">پاس کی ایک سند ہے جو یہ ڈیوائس اپنے ہارڈویئر میں رکھتی ہے اور آپ کے فنگر پرنٹ یا چہرے سے ثابت کرتی ہے۔ اسے یہاں سے ہٹانے پر یہ اس اکاؤنٹ میں سائن ان نہیں کر سکے گی — ڈیوائس پر موجود کاپی ڈیوائس کی اپنی سیٹنگز سے ہٹائی جاتی ہے۔</string>
+    <string name="acct_remove_passkey">پاس کی ہٹائیں؟</string>
+    <string name="acct_remove_passkey_body">\"%1$s\" اب آپ کو اس اکاؤنٹ میں سائن ان نہیں کرے گی۔</string>
+    <string name="acct_this_passkey">یہ پاس کی</string>
+    <string name="acct_remove">ہٹائیں</string>
+    <string name="acct_keep">رکھیں</string>
+    <string name="acct_passkey">پاس کی</string>
+    <string name="acct_added_at">%1$s کو شامل کی گئی</string>
+    <string name="acct_last_used_at">آخری استعمال %1$s</string>
+    <string name="acct_this_credential_signs_you_in_without">یہ سند آپ کو پاس ورڈ کے بغیر سائن ان کرتی ہے۔</string>
+    <string name="acct_removing">ہٹایا جا رہا ہے…</string>
+    <string name="acct_remove_passkey_2">پاس کی ہٹائیں</string>
+
+    <!-- security/PasswordScreens.kt -->
+    <string name="acct_after_suspicious_activity">مشکوک سرگرمی کے بعد</string>
+    <string name="acct_change_your_password">اپنا پاس ورڈ بدلیں</string>
+    <string name="acct_your_account_was_accessed_from_an">آپ کے اکاؤنٹ تک ایک نامانوس ڈیوائس سے رسائی کی گئی۔ اپنے GrapMail اکاؤنٹ کو محفوظ رکھنے کے لیے براہ کرم ابھی اپنا پاس ورڈ اپ ڈیٹ کریں۔</string>
+    <string name="acct_choose_a_strong_password_you_have">ایک مضبوط پاس ورڈ منتخب کریں جو آپ نے یہاں پہلے استعمال نہ کیا ہو۔</string>
+    <string name="acct_update_password">پاس ورڈ اپ ڈیٹ کریں</string>
+    <string name="acct_enter_your_current_password">اپنا موجودہ پاس ورڈ درج کریں۔</string>
+    <string name="acct_use_at_least_8_characters">کم از کم 8 حروف استعمال کریں۔</string>
+    <string name="acct_add_at_least_one_letter">کم از کم ایک حرف شامل کریں۔</string>
+    <string name="acct_add_at_least_one_number">کم از کم ایک عدد شامل کریں۔</string>
+    <string name="acct_add_at_least_one_symbol">کم از کم ایک علامت شامل کریں۔</string>
+    <string name="acct_the_two_new_passwords_do_not_match">دونوں نئے پاس ورڈ ایک جیسے نہیں ہیں۔</string>
+    <string name="acct_unrecognized_activity_was_found_on">آپ کے اکاؤنٹ پر نامعلوم سرگرمی پائی گئی۔</string>
+    <string name="acct_current_password">موجودہ پاس ورڈ</string>
+    <string name="acct_new_password_2">نیا پاس ورڈ</string>
+    <string name="acct_confirm_new_password_2">نئے پاس ورڈ کی تصدیق کریں</string>
+    <string name="acct_passwords_do_not_match">پاس ورڈ ایک جیسے نہیں ہیں۔</string>
+    <string name="acct_password_requirements_2">پاس ورڈ کی شرائط</string>
+    <string name="acct_contains_a_letter">ایک حرف شامل ہے</string>
+    <string name="acct_contains_a_number">ایک عدد شامل ہے</string>
+    <string name="acct_contains_a_symbol">ایک علامت شامل ہے</string>
+    <string name="acct_password_updated_successfully">پاس ورڈ کامیابی سے اپ ڈیٹ ہو گیا</string>
+    <string name="acct_password_changed_successfully">پاس ورڈ کامیابی سے بدل گیا</string>
+    <string name="acct_your_password_has_been_updated">آپ کا پاس ورڈ کامیابی سے اپ ڈیٹ ہو گیا ہے۔ دیگر ڈیوائسز سائن آؤٹ کر دی گئیں؛ یہ ڈیوائس سائن ان رہے گی۔</string>
+    <string name="acct_if_you_did_not_make_this_change">اگر یہ تبدیلی آپ نے نہیں کی تو فوراً سپورٹ ٹیم سے رابطہ کریں۔</string>
+    <string name="acct_whats_next_title">آگے کیا ہے؟</string>
+    <string name="acct_youll_need_to_sign_in_again_on_your">آپ کو اپنی دیگر ڈیوائسز پر دوبارہ سائن ان کرنا ہوگا، بشمول موبائل ایپس، ڈیسک ٹاپ اور دیگر براؤزرز۔</string>
+    <string name="acct_this_helps_keep_your_account_secure">اس سے آپ کا اکاؤنٹ محفوظ رہتا ہے اور غیر مجاز رسائی رکتی ہے۔</string>
+
+    <!-- security/RecoveryCodesScreen.kt -->
+    <string name="acct_the_server_returned_no_codes_try">سرور نے کوئی کوڈ واپس نہیں کیا۔ دوبارہ کوشش کریں۔</string>
+    <string name="acct_recovery_codes">ریکوری کوڈز</string>
+    <string name="acct_one_time_codes_that_unlock_password">ایک بار استعمال کے کوڈز جو پاس ورڈ ریکوری کھولتے ہیں جب آپ کا فون اور قابل اعتماد ڈیوائس دونوں دستیاب نہ ہوں۔</string>
+    <string name="acct_download_codes">کوڈز ڈاؤن لوڈ کریں</string>
+    <string name="acct_generating_a_new_set_retires_every">نیا سیٹ بنانے سے اس فہرست کے تمام کوڈز ختم ہو جاتے ہیں۔</string>
+    <string name="acct_recovery_codes_available">ریکوری کوڈز دستیاب ہیں</string>
+    <string name="acct_could_not_be_read_try_again">پڑھا نہیں جا سکا۔ دوبارہ کوشش کریں۔</string>
+    <string name="acct_yes_a_usable_set_exists_on_the">ہاں — اکاؤنٹ پر قابل استعمال سیٹ موجود ہے۔</string>
+    <string name="acct_no_generate_a_set_to_keep_a_recovery">نہیں — ریکوری کا راستہ کھلا رکھنے کے لیے ایک سیٹ بنائیں۔</string>
+    <string name="acct_the_accounts_status_could_not_be">اکاؤنٹ کی حالت پڑھی نہیں جا سکی۔</string>
+    <string name="acct_retry">دوبارہ کوشش کریں</string>
+    <string name="acct_yes">ہاں</string>
+    <string name="acct_no">نہیں</string>
+    <string name="acct_each_code_resets_the_password_once">ہر کوڈ پاس ورڈ ایک بار ری سیٹ کرتا ہے۔</string>
+    <string name="acct_use_at_forgot_password">\"پاس ورڈ بھول گئے\" پر استعمال کریں</string>
+    <string name="acct_enter_a_code_instead_of_the_texted">ٹیکسٹ کیے گئے کوڈ کے بجائے یہ کوڈ درج کریں۔</string>
+    <string name="acct_regenerate_anytime">کسی بھی وقت دوبارہ بنائیں</string>
+    <string name="acct_a_new_set_retires_the_old_one">نیا سیٹ پرانے کو فوراً ختم کر دیتا ہے۔</string>
+    <string name="acct_not_the_same_as_backup_codes">بیک اپ کوڈز جیسے نہیں</string>
+    <string name="acct_two_step_backup_codes_prove_a_sign">دو مرحلہ تصدیق کے بیک اپ کوڈز سائن ان ثابت کرتے ہیں۔ ریکوری کوڈز پاس ورڈ ری سیٹ کرتے ہیں۔ دونوں رکھیں، اور انہیں ایک ہی جگہ محفوظ نہ کریں۔</string>
+    <string name="acct_your_recovery_codes">آپ کے ریکوری کوڈز</string>
+    <string name="acct_one_time_use_each_code_resets_the">ایک بار استعمال — ہر کوڈ پاس ورڈ کو صرف ایک بار ری سیٹ کرتا ہے۔</string>
+    <string name="acct_codes_are_stored_as_hashes_this_list">کوڈز ہیش کی شکل میں محفوظ ہوتے ہیں — یہ فہرست واحد قابل مطالعہ کاپی ہے۔</string>
+    <string name="acct_generating_a_new_set_retires_every_2">نیا سیٹ بنانے سے یہاں دکھائے گئے تمام کوڈز ختم ہو جاتے ہیں۔</string>
+    <string name="acct_leave_now_and_the_list_is_gone_the">ابھی چھوڑنے پر فہرست غائب ہو جائے گی۔ کوڈز خود کام کرتے رہیں گے — لیکن صرف اس صورت میں کہ آپ نے انہیں محفوظ کر لیا ہو۔</string>
+</resources>

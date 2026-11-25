@@ -30,6 +30,7 @@ enum SecurityFlow {
 /// variation.
 struct SecurityRowView: View {
     @Environment(\.dynamicTypeSize) private var textSize
+    @ScaledMetric(relativeTo: .body) private var tile: CGFloat = 40
     let icon: String
     let title: String
     var subtitle: String? = nil
@@ -40,14 +41,15 @@ struct SecurityRowView: View {
     var body: some View {
         let content = HStack(spacing: 12) {
             Image(systemName: icon)
-                .font(.system(size: 17, weight: .medium))
+                .gmFont(17, .medium, maxSize: 30)
                 .foregroundColor(GM.primarySolid)
-                .frame(width: 40, height: 40)
+                .frame(width: tile, height: tile)
                 .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(GM.softFill))
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
                     .font(.subheadline.weight(.semibold))
                     .foregroundColor(GM.textPrimary)
+                    .fixedSize(horizontal: false, vertical: true)
                 if let subtitle {
                     Text(subtitle)
                         .font(.footnote)
@@ -63,7 +65,7 @@ struct SecurityRowView: View {
                 StatusChip(text: chip, tone: chipTone)
             } else if action != nil {
                 Image(systemName: "chevron.forward")
-                    .font(.system(size: 13, weight: .semibold))
+                    .gmFont(13, .semibold, maxSize: 22)
                     .foregroundColor(GM.textTertiary)
             }
         }
@@ -84,6 +86,8 @@ struct SecurityRowView: View {
 /// then code), not a blind write — flipping it routes into enable/disable rather
 /// than PATCHing the flag directly, so the credential gate is never skipped.
 struct SecurityToggleRowView: View {
+    @Environment(\.dynamicTypeSize) private var dts
+    @ScaledMetric(relativeTo: .body) private var tile: CGFloat = 40
     let icon: String
     let title: String
     var subtitle: String? = nil
@@ -94,27 +98,32 @@ struct SecurityToggleRowView: View {
     let onToggle: (Bool) -> Void
 
     var body: some View {
-        HStack(spacing: 12) {
-            Image(systemName: icon)
-                .font(.system(size: 17, weight: .medium))
-                .foregroundColor(GM.primarySolid)
-                .frame(width: 40, height: 40)
-                .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(GM.softFill))
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title)
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundColor(GM.textPrimary)
-                if let subtitle {
-                    Text(subtitle)
-                        .font(.system(size: 12))
-                        .foregroundColor(GM.textSecondary)
+        // At the accessibility sizes the switch moves under the text so the
+        // title keeps the full row width instead of wrapping a word per line.
+        GMAdaptiveStack(spacing: 12) {
+            HStack(spacing: 12) {
+                Image(systemName: icon)
+                    .gmFont(17, .medium, maxSize: 30)
+                    .foregroundColor(GM.primarySolid)
+                    .frame(width: tile, height: tile)
+                    .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(GM.softFill))
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title)
+                        .gmFont(15, .semibold)
+                        .foregroundColor(GM.textPrimary)
                         .fixedSize(horizontal: false, vertical: true)
+                    if let subtitle {
+                        Text(subtitle)
+                            .gmFont(12)
+                            .foregroundColor(GM.textSecondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    if let chip {
+                        StatusChip(text: chip, tone: chipTone).padding(.top, 6)
+                    }
                 }
-                if let chip {
-                    StatusChip(text: chip, tone: chipTone).padding(.top, 6)
-                }
+                Spacer(minLength: 0)
             }
-            Spacer(minLength: 0)
             Toggle(title,
                    isOn: Binding(get: { isOn }, set: { if enabled { onToggle($0) } }))
                 .labelsHidden()
@@ -131,16 +140,19 @@ struct SecurityToggleRowView: View {
 
 /// Hairline between rows, inset past the icon tile so the list reads as a list.
 struct SecurityDivider: View {
+    /// Icon tile (40) + spacing (12), scaled with the tile.
+    @ScaledMetric(relativeTo: .body) private var inset: CGFloat = 52
     var body: some View {
         Rectangle()
             .fill(GM.border)
             .frame(height: 1)
-            .padding(.leading, 52)
+            .padding(.leading, inset)
     }
 }
 
 /// A destructive action: solid red, the same height as the primary button.
 struct DestructiveActionButton: View {
+    @ScaledMetric(relativeTo: .body) private var height: CGFloat = 54
     let title: String
     var enabled: Bool = true
     var busy: Bool = false
@@ -158,13 +170,17 @@ struct DestructiveActionButton: View {
                     ProgressView().tint(.white)
                 } else {
                     Text(title)
-                        .font(.system(size: 16, weight: .semibold))
+                        .gmFont(16, .semibold)
                         .foregroundColor(.white)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 12)
                 }
             }
-            // Exact 54, the same greedy-floor cure as Components.swift's
-            // buttons: a floor grows into any leftover a parent hands out.
-            .frame(height: 54)
+            // Exact 54 at the default size, the same greedy-floor cure as
+            // Components.swift's buttons: a floor grows into any leftover a
+            // parent hands out. The exact value scales with the text size so a
+            // large label is never clipped.
+            .frame(height: height)
             .frame(maxWidth: .infinity)
         }
         .buttonStyle(PressScaleStyle())
@@ -174,14 +190,14 @@ struct DestructiveActionButton: View {
 
 /// The red "this cannot be undone" warning the revoke confirmations show.
 struct CannotBeUndoneNote: View {
-    var text: String = "This action cannot be undone. The device will be signed out immediately and will need to sign in again to access your account."
+    var text: String = String(localized: "This action cannot be undone. The device will be signed out immediately and will need to sign in again to access your account.", comment: "Warning shown before signing a device out")
     var body: some View {
         HStack(alignment: .top, spacing: 9) {
             Image(systemName: "exclamationmark.triangle.fill")
-                .font(.system(size: 14))
+                .gmFont(14)
                 .foregroundColor(GM.error)
             Text(text)
-                .font(.system(size: 12))
+                .gmFont(12)
                 .foregroundColor(GM.textSecondary)
                 .fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: 0)
@@ -194,20 +210,22 @@ struct CannotBeUndoneNote: View {
 
 /// One signed-in device, as the sessions screen prints it.
 struct SessionCardView: View {
+    @Environment(\.dynamicTypeSize) private var dts
     let session: SessionDto
     var onRevoke: (() -> Void)? = nil
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 8) {
-                Text(session.device.isEmpty ? "Unknown device" : session.device)
-                    .font(.system(size: 15, weight: .semibold))
+            GMAdaptiveStack(spacing: 8) {
+                Text(session.device.isEmpty ? String(localized: "Unknown device", comment: "Session card title when the device name is not known") : session.device)
+                    .gmFont(15, .semibold)
                     .foregroundColor(GM.textPrimary)
-                    .lineLimit(1)
-                Spacer(minLength: 0)
+                    .lineLimit(dts.isAccessibilitySize ? 4 : 2)
+                    .fixedSize(horizontal: false, vertical: true)
+                if !dts.isAccessibilitySize { Spacer(minLength: 0) }
                 if session.current {
                     Text("This device")
-                        .font(.system(size: 11, weight: .bold))
+                        .gmFont(11, .bold)
                         .foregroundColor(GM.successInk)
                         .padding(.horizontal, 10)
                         .padding(.vertical, 4)
@@ -216,7 +234,7 @@ struct SessionCardView: View {
             }
             HStack(spacing: 6) {
                 Image(systemName: "clock")
-                    .font(.system(size: 11))
+                    .gmFont(11)
                     .foregroundColor(GM.textTertiary)
                 // The reference row is "browser · city" over an absolute date and
                 // time. There is no GeoIP source, so the city is omitted rather than
@@ -225,16 +243,18 @@ struct SessionCardView: View {
                 Text([session.browser, session.ip].filter { !$0.isEmpty }.joined(separator: " · ")
                      .isEmpty ? securityAbsolute(session.lastSeenAt)
                      : [session.browser, session.ip].filter { !$0.isEmpty }.joined(separator: " · "))
-                    .font(.system(size: 12))
+                    .gmFont(12)
                     .foregroundColor(GM.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             Text(securityAbsolute(session.createdAt))
-                .font(.system(size: 11))
+                .gmFont(11)
                 .foregroundColor(GM.textTertiary)
+                .fixedSize(horizontal: false, vertical: true)
             if let onRevoke, !session.current {
                 Button(action: onRevoke) {
                     Text("Sign out this device")
-                        .font(.system(size: 13, weight: .semibold))
+                        .gmFont(13, .semibold)
                         .foregroundColor(GM.error)
                 }
                 .buttonStyle(.plain)
@@ -252,6 +272,8 @@ struct SessionCardView: View {
 
 /// A row on the activity timeline; the tone is the event's own severity.
 struct ActivityRowView: View {
+    @Environment(\.dynamicTypeSize) private var dts
+    @ScaledMetric(relativeTo: .body) private var tile: CGFloat = 34
     let event: ActivityDto
 
     private var icon: (String, Color) {
@@ -265,31 +287,43 @@ struct ActivityRowView: View {
         let (name, tint) = icon
         HStack(alignment: .top, spacing: 12) {
             Image(systemName: name)
-                .font(.system(size: 15, weight: .medium))
+                .gmFont(15, .medium, maxSize: 26)
                 .foregroundColor(tint)
-                .frame(width: 34, height: 34)
+                .frame(width: tile, height: tile)
                 .background(Circle().fill(GM.softFill))
             VStack(alignment: .leading, spacing: 3) {
                 Text(eventTitle(event.type))
-                    .font(.system(size: 14, weight: .semibold))
+                    .gmFont(14, .semibold)
                     .foregroundColor(GM.textPrimary)
+                    .fixedSize(horizontal: false, vertical: true)
                 if !event.detail.isEmpty {
                     Text(event.detail)
-                        .font(.system(size: 12))
+                        .gmFont(12)
                         .foregroundColor(GM.textSecondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 Text([event.browser.isEmpty ? event.device : event.browser, event.ip].filter { !$0.isEmpty }.joined(separator: " · "))
-                    .font(.system(size: 11))
+                    .gmFont(11)
                     .foregroundColor(GM.textTertiary)
+                    .fixedSize(horizontal: false, vertical: true)
+                if dts.isAccessibilitySize {
+                    // No room for a right-hand column at these sizes: the
+                    // timestamp joins the text column.
+                    Text(securityAbsolute(event.at))
+                        .gmFont(11)
+                        .foregroundColor(GM.textTertiary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             }
             Spacer(minLength: 0)
             // The reference timeline carries an absolute date and time on the right,
             // so events compare to the minute; relative time cannot.
-            Text(securityAbsolute(event.at))
-                .font(.system(size: 11))
-                .foregroundColor(GM.textTertiary)
-                .multilineTextAlignment(.trailing)
+            if !dts.isAccessibilitySize {
+                Text(securityAbsolute(event.at))
+                    .gmFont(11)
+                    .foregroundColor(GM.textTertiary)
+                    .multilineTextAlignment(.trailing)
+            }
         }
         .padding(.vertical, 8)
     }
@@ -298,31 +332,31 @@ struct ActivityRowView: View {
 /// The event's own name, not the backend's identifier.
 func eventTitle(_ type: String) -> String {
     switch type {
-    case "signin": return "Signed in"
-    case "password_changed": return "Password changed"
-    case "two_factor_enabled": return "Two-step verification turned on"
-    case "two_factor_disabled": return "Two-step verification turned off"
-    case "backup_codes_generated": return "Backup codes regenerated"
-    case "backup_code_used": return "A backup code was used"
-    case "session_revoked": return "A device was signed out"
-    case "all_sessions_signed_out": return "Signed out of all devices"
-    case "phone_changed": return "Phone number changed"
-    default: return "Account activity"
+    case "signin": return String(localized: "Signed in", comment: "Security activity event title")
+    case "password_changed": return String(localized: "Password changed", comment: "Security activity event title")
+    case "two_factor_enabled": return String(localized: "Two-step verification turned on", comment: "Security activity event title")
+    case "two_factor_disabled": return String(localized: "Two-step verification turned off", comment: "Security activity event title")
+    case "backup_codes_generated": return String(localized: "Backup codes regenerated", comment: "Security activity event title")
+    case "backup_code_used": return String(localized: "A backup code was used", comment: "Security activity event title")
+    case "session_revoked": return String(localized: "A device was signed out", comment: "Security activity event title")
+    case "all_sessions_signed_out": return String(localized: "Signed out of all devices", comment: "Security activity event title")
+    case "phone_changed": return String(localized: "Phone number changed", comment: "Security activity event title")
+    default: return String(localized: "Account activity", comment: "Security activity event title for an unrecognised event")
     }
 }
 
 /// "2 minutes ago" from the API's ISO timestamps. Coarse on purpose: the
 /// question a security list answers is "was this me, and was it just now".
 func securityRelative(_ iso: String) -> String {
-    guard let date = parseIso(iso) else { return "recently" }
+    guard let date = parseIso(iso) else { return String(localized: "recently", comment: "Relative time when the exact time is unknown") }
     let seconds = Date().timeIntervalSince(date)
-    if seconds < 0 { return "just now" }
+    if seconds < 0 { return String(localized: "just now", comment: "Relative time for less than a minute ago") }
     let minutes = Int(seconds / 60)
-    if minutes < 1 { return "just now" }
-    if minutes < 60 { return "\(minutes) min ago" }
-    if minutes < 24 * 60 { return "\(minutes / 60) hr ago" }
-    if minutes < 48 * 60 { return "yesterday" }
-    return "\(minutes / (24 * 60)) days ago"
+    if minutes < 1 { return String(localized: "just now", comment: "Relative time for less than a minute ago") }
+    if minutes < 60 { return String(localized: "\(minutes) min ago", comment: "Relative time in minutes") }
+    if minutes < 24 * 60 { return String(localized: "\(minutes / 60) hr ago", comment: "Relative time in hours") }
+    if minutes < 48 * 60 { return String(localized: "yesterday", comment: "Relative time for the previous day") }
+    return String(localized: "\(minutes / (24 * 60)) days ago", comment: "Relative time in days")
 }
 
 private func parseIso(_ iso: String) -> Date? {

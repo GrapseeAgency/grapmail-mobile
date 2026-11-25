@@ -78,6 +78,10 @@ struct MailMessage: Decodable, Identifiable {
     var isE2eEncrypted = false
     /// ISO instant. nil means there is no trustworthy time to display.
     var createdAt: String?
+    /// Sent list only: `none` | `requested` | `read` (routes/grapmail-sent-receipts.ts). nil elsewhere.
+    var readReceiptStatus: String?
+    /// ISO time of the first recorded receipt, or nil.
+    var readReceiptReadAt: String?
 
     /// A blank row. Swift gives no memberwise init to a type with a
     /// hand-written `init(from:)`, and the cache needs to build a patched copy of
@@ -86,7 +90,7 @@ struct MailMessage: Decodable, Identifiable {
 
     private enum CodingKeys: String, CodingKey {
         case id, threadId, direction, status, from, to, cc, subject, snippet,
-             isRead, isStarred, hasAttachments, unsubscribe, isE2eEncrypted, createdAt
+             isRead, isStarred, hasAttachments, unsubscribe, isE2eEncrypted, createdAt, readReceiptStatus, readReceiptReadAt
     }
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -105,11 +109,13 @@ struct MailMessage: Decodable, Identifiable {
         unsubscribe = try? c.decodeIfPresent(MailUnsubscribe.self, forKey: .unsubscribe)
         isE2eEncrypted = c.lenient(.isE2eEncrypted, false)
         createdAt = c.lenientOpt(.createdAt)
+        readReceiptStatus = c.lenientOpt(.readReceiptStatus)
+        readReceiptReadAt = c.lenientOpt(.readReceiptReadAt)
     }
 
     /// The line the row shows where a subject is absent. Not a guess about the
     /// message — a statement that it has no subject.
-    var subjectOrNone: String { subject?.nilIfBlank() ?? "(no subject)" }
+    var subjectOrNone: String { subject?.nilIfBlank() ?? String(localized: "(no subject)") }
 }
 
 /// `fullRow` — `grapmail.ts:609-623`, plus the attachment rows the single-
@@ -224,7 +230,7 @@ struct MailMessageFull: Decodable, Identifiable {
     /// The thread view needs the same rule as the list: a message with no
     /// subject is labelled, not shown as a blank line a reader cannot tell apart
     /// from a rendering fault.
-    var subjectOrNone: String { subject?.nilIfBlank() ?? "(no subject)" }
+    var subjectOrNone: String { subject?.nilIfBlank() ?? String(localized: "(no subject)") }
 }
 
 /// `grapmail_attachments` rows — metadata only. `storageKey` is deliberately
@@ -1034,9 +1040,13 @@ struct MailSendResponse: Decodable {
     var error: String?
     var code: String?
     var message: String?
+    /// Present only on a scheduled send (`status == "scheduled"`): the instant
+    /// the SERVER recorded, `Date.toISOString()` with milliseconds. The
+    /// receipt shows this, never the `sendAt` the client asked for.
+    var scheduledFor: String?
 
     private enum CodingKeys: String, CodingKey {
-        case success, id, threadId, status, deliveryError, error, code, message
+        case success, id, threadId, status, deliveryError, error, code, message, scheduledFor
     }
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -1048,6 +1058,7 @@ struct MailSendResponse: Decodable {
         error = c.lenientOpt(.error)
         code = c.lenientOpt(.code)
         message = c.lenientOpt(.message)
+        scheduledFor = c.lenientOpt(.scheduledFor)
     }
 }
 
@@ -1134,20 +1145,27 @@ enum MailBox: String, CaseIterable, Identifiable {
 
     var id: String { rawValue }
 
-    var title: String {
+    /// The folder's display name as a resource, so a view can draw it with
+    /// `Text(_:)` and still read its stable English `key` for an
+    /// accessibility identifier (`mail-drawer-Inbox` must not change with the
+    /// device language).
+    var titleResource: LocalizedStringResource {
         switch self {
-        case .inbox:    return "Inbox"
-        case .starred:  return "Starred"
-        case .sent:     return "Sent"
-        case .drafts:   return "Drafts"
-        case .archive:  return "Archive"
-        case .spam:     return "Spam"
-        case .trash:    return "Trash"
-        case .screener: return "Pending approval"
-        case .others:   return "All Mail"
-        case .snoozed:  return "Snoozed"
+        case .inbox:    return LocalizedStringResource("Inbox", comment: "Mail folder name")
+        case .starred:  return LocalizedStringResource("Starred", comment: "Mail folder name")
+        case .sent:     return LocalizedStringResource("Sent", comment: "Mail folder name")
+        case .drafts:   return LocalizedStringResource("Drafts", comment: "Mail folder name")
+        case .archive:  return LocalizedStringResource("Archive", comment: "Mail folder name")
+        case .spam:     return LocalizedStringResource("Spam", comment: "Mail folder name")
+        case .trash:    return LocalizedStringResource("Trash", comment: "Mail folder name")
+        case .screener: return LocalizedStringResource("Pending approval", comment: "Mail folder name: the screener queue")
+        case .others:   return LocalizedStringResource("All Mail", comment: "Mail folder name")
+        case .snoozed:  return LocalizedStringResource("Snoozed", comment: "Mail folder name")
         }
     }
+
+    /// The folder's name in the device language.
+    var title: String { String(localized: titleResource) }
 
     /// The drawer's order — the boxes the reference lists, minus the ones the
     /// server cannot answer (see the README's honest-UI contract).
@@ -1195,16 +1213,28 @@ enum MailAction: String {
 
     /// The banner's past tense, in the same words for the same fact on both
     /// platforms: what the app just did to the selection.
+    ///
+    /// Whole sentences per count, never a translated noun spliced into a
+    /// translated verb phrase: word order and plural agreement differ by
+    /// language. The `count == 1` arms keep the English singular exact until
+    /// the String Catalog carries plural variations for the `\(count)` keys.
     func pastLine(_ count: Int) -> String {
-        let noun = count == 1 ? "1 message" : "\(count) messages"
+        let one = count == 1
         switch self {
-        case .archive: return "Archived \(noun)"
-        case .unarchive: return "Moved \(noun) back to the inbox"
-        case .spam: return "Reported \(noun) as spam"
-        case .unspam: return "Moved \(noun) out of Spam"
-        case .trash: return "Moved \(noun) to Trash"
-        case .restore: return "Restored \(noun)"
-        default: return noun
+        case .archive:
+            return one ? String(localized: "Archived 1 message") : String(localized: "Archived \(count) messages")
+        case .unarchive:
+            return one ? String(localized: "Moved 1 message back to the inbox") : String(localized: "Moved \(count) messages back to the inbox")
+        case .spam:
+            return one ? String(localized: "Reported 1 message as spam") : String(localized: "Reported \(count) messages as spam")
+        case .unspam:
+            return one ? String(localized: "Moved 1 message out of Spam") : String(localized: "Moved \(count) messages out of Spam")
+        case .trash:
+            return one ? String(localized: "Moved 1 message to Trash") : String(localized: "Moved \(count) messages to Trash")
+        case .restore:
+            return one ? String(localized: "Restored 1 message") : String(localized: "Restored \(count) messages")
+        default:
+            return one ? String(localized: "1 message") : String(localized: "\(count) messages")
         }
     }
 }
@@ -1219,12 +1249,12 @@ enum MailSort: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .newest:      return "Newest first"
-        case .oldest:      return "Oldest first"
-        case .senderAsc:   return "Sender (A → Z)"
-        case .senderDesc:  return "Sender (Z → A)"
-        case .subjectAsc:  return "Subject (A → Z)"
-        case .subjectDesc: return "Subject (Z → A)"
+        case .newest:      return String(localized: "Newest first")
+        case .oldest:      return String(localized: "Oldest first")
+        case .senderAsc:   return String(localized: "Sender (A → Z)")
+        case .senderDesc:  return String(localized: "Sender (Z → A)")
+        case .subjectAsc:  return String(localized: "Subject (A → Z)")
+        case .subjectDesc: return String(localized: "Subject (Z → A)")
         }
     }
 
@@ -1237,7 +1267,7 @@ enum MailSort: String, CaseIterable, Identifiable {
 enum MailFilter: String, CaseIterable, Identifiable {
     case all, unread
     var id: String { rawValue }
-    var title: String { self == .all ? "All" : "Unread" }
+    var title: String { self == .all ? String(localized: "All", comment: "Mail filter: every message") : String(localized: "Unread", comment: "Mail filter") }
 }
 
 // ── request bodies ───────────────────────────────────────────────────────────
@@ -1344,6 +1374,14 @@ struct MailSendRequest: Encodable {
     /// `e2eEnvelope: seal.envelope` is the contract this mirrors.
     var e2eEnvelope: RawJSON? = nil
     var attachmentIds: [String] = []
+    /// Ask the recipient for a read receipt; /send records it before queuing.
+    var requestReadReceipt: Bool = false
+    /// Send later: ISO 8601 UTC with whole seconds (`2026-11-25T02:00:00Z`),
+    /// 60 s to 30 days ahead (`lib/mail-schedule.ts`). Nil for a normal send.
+    /// The synthesized encoder writes an optional with `encodeIfPresent`, so a
+    /// nil leaves the key out entirely: every existing send and Outbox body
+    /// stays byte-identical, and with it its idempotency key.
+    var sendAt: String? = nil
 }
 
 struct MailDraftRequest: Encodable {
@@ -1377,30 +1415,34 @@ enum MailDecision: String, CaseIterable, Identifiable {
     var apiValue: String { rawValue }
     var id: String { rawValue }
 
+    // No `comment:` argument on these `case` lines: `scripts/mail-honesty.py`
+    // reads this enum's members with a comma split, and `comment: …` after a
+    // comma would read as a fifth decision. Translator context lives in the
+    // String Catalog instead.
     var title: String {
         switch self {
-        case .approved: return "Approve"
-        case .muted: return "Mute"
-        case .later: return "Keep waiting"
-        case .blocked: return "Block"
+        case .approved: return String(localized: "Approve")
+        case .muted: return String(localized: "Mute")
+        case .later: return String(localized: "Keep waiting")
+        case .blocked: return String(localized: "Block")
         }
     }
 
     var done: String {
         switch self {
-        case .approved: return "Approved"
-        case .muted: return "Muted"
-        case .later: return "Kept waiting"
-        case .blocked: return "Blocked"
+        case .approved: return String(localized: "Approved")
+        case .muted: return String(localized: "Muted")
+        case .later: return String(localized: "Kept waiting")
+        case .blocked: return String(localized: "Blocked")
         }
     }
 
     var note: String {
         switch self {
-        case .approved: return "Their future mail goes straight to the inbox."
-        case .muted: return "It arrives, but quietly — held out of the unread count."
-        case .later: return "Nothing is decided. It stays in this queue."
-        case .blocked: return "Future mail from them is refused at the door."
+        case .approved: return String(localized: "Their future mail goes straight to the inbox.")
+        case .muted: return String(localized: "It arrives, but quietly — held out of the unread count.")
+        case .later: return String(localized: "Nothing is decided. It stays in this queue.")
+        case .blocked: return String(localized: "Future mail from them is refused at the door.")
         }
     }
 }
@@ -1414,12 +1456,12 @@ enum MailSenderScope: String, CaseIterable, Identifiable {
     var id: String { rawValue }
 
     var title: String {
-        self == .address ? "Just this address" : "The whole domain"
+        self == .address ? String(localized: "Just this address") : String(localized: "The whole domain")
     }
 
     var warning: String {
         self == .domain
-            ? "Applies to every address at this domain, including ones created later."
+            ? String(localized: "Applies to every address at this domain, including ones created later.")
             : ""
     }
 }
@@ -1485,7 +1527,7 @@ extension ApiClient {
               let url = URL(string: "\(base)\(mailBase)/stats") else { return nil }
         var request = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 3)
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        guard let (data, response) = try? await URLSession.shared.data(for: request),
+        guard let (data, response) = try? await PinnedSession.shared.data(for: request),
               (response as? HTTPURLResponse)?.statusCode == 200 else { return nil }
         return (try? decoder.decode(MailStatsResponse.self, from: data))?.inbox?.unread
     }
@@ -1515,7 +1557,7 @@ extension ApiClient {
         let resp: MailInboxResponse = try await mailGet(path, bearer: token)
         guard resp.success else {
             throw ApiError.http(status: 200, code: resp.code,
-                                message: resp.error ?? "The server returned no listing.")
+                                message: resp.error ?? String(localized: "The server returned no listing."))
         }
         return resp
     }
@@ -1882,7 +1924,7 @@ extension ApiClient {
         let r = try decoder.decode(MailAttachmentResponse.self, from: data)
         guard let a = r.attachment else {
             throw ApiError.http(status: http.statusCode, code: r.code,
-                                message: r.error ?? "The server stored no attachment.")
+                                message: r.error ?? String(localized: "The server stored no attachment."))
         }
         return a
     }
@@ -1917,7 +1959,7 @@ extension ApiClient {
         let response = try decoder.decode(MailAttachmentResponse.self, from: data)
         guard let attachment = response.attachment else {
             throw ApiError.http(status: http.statusCode, code: response.code,
-                                message: response.error ?? "The server stored no attachment.")
+                                message: response.error ?? String(localized: "The server stored no attachment."))
         }
         return attachment
     }

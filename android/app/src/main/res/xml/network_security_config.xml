@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    The app's network rules, stated rather than inherited.
+
+    HTTPS only: no plain-http connection is allowed from this app, including
+    from the mail reader's WebView. Only the system's certificate authorities
+    are trusted (never ones a user or an MDM profile installed), which is the
+    platform default for this targetSdk; writing it down keeps a future
+    "allow user CAs for debugging" edit from slipping into a release.
+
+    Certificate pinning is NOT done here: it lives in data/Api.kt (OkHttp
+    CertificatePinner from security/api-pins.json) so iOS and Android share one
+    pin list and one expiry.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>

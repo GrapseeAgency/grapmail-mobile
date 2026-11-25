@@ -1,6 +1,7 @@
 name: GrapMail
 options:
   bundleIdPrefix: com.grapsee
+  developmentLanguage: en
   deploymentTarget:
     iOS: "16.0"
   createIntermediateGroups: true
@@ -28,8 +29,11 @@ settings:
     # tag (v0.3.0's first run refused a disagreeing build), and an iOS build of
     # the same commit self-reporting 0.0.0.1 is the same disagreement kept
     # quiet only because no iOS badging check exists yet.
-    MARKETING_VERSION: "0.6.4"
-    CURRENT_PROJECT_VERSION: "13"
+    # One version for both stores from 0.7.0 on: Android is 0.7.0 / 13,
+    # iOS is 0.7.0 / 14 (above 0.6.4 / 13, which is what this project used
+    # before). See RELEASING.md section 0.
+    MARKETING_VERSION: "0.7.0"
+    CURRENT_PROJECT_VERSION: "14"
     # Empty on purpose for local development: a simulator build needs no team.
     # CI's release job injects the team per invocation with
     # DEVELOPMENT_TEAM="$APPLE_TEAM_ID" on the xcodebuild command line —
@@ -42,7 +46,16 @@ targets:
     type: application
     platform: iOS
     sources:
-      - GrapMail
+      # Every file in GrapMail/ that is not code becomes a bundle resource,
+      # which is how each en.lproj/*.strings table (Localizable, InfoPlist,
+      # Identity, Reader, WelcomeBack, AppShortcuts, R9*) ships. The excludes
+      # keep stray editor/backup copies (e.g. ProfileModel.swift.pre-avfix)
+      # out of the App Store bundle.
+      - path: GrapMail
+        excludes:
+          - "**/*.pre-*"
+          - "**/*.orig"
+          - "**/*.bak"
       - NotificationShared
       - WidgetShared
     dependencies:
@@ -63,6 +76,10 @@ targets:
         INFOPLIST_KEY_UIRequiresFullScreen: NO
         INFOPLIST_KEY_UISupportedInterfaceOrientations: "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight"
         INFOPLIST_KEY_UISupportedInterfaceOrientations~ipad: "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight"
+        # iPhone + iPad. XcodeGen's iOS preset already defaults to this; pinned
+        # here so the two-pane mailbox (MailTwoPane.swift) cannot silently lose
+        # its device.
+        TARGETED_DEVICE_FAMILY: "1,2"
         PRODUCT_BUNDLE_IDENTIFIER: com.grapsee.grapmail
         ENABLE_PREVIEWS: YES
         SWIFT_STRICT_CONCURRENCY: minimal
@@ -83,21 +100,74 @@ targets:
         # in it: the widget must never need a keychain, a session or a fetch.
         com.apple.security.application-groups:
           - group.com.grapsee.grapmail
+        # Universal Links (applinks:) for https://grapsee.com/mail/thread/<id>
+        # (DeepLinks.swift, RootView's onContinueUserActivity), and the
+        # domain passkeys are bound to (webcredentials:, PasskeyManager.swift).
+        # Both are verified by iOS against
+        # https://grapsee.com/.well-known/apple-app-site-association -- the
+        # file committed at well-known/apple-app-site-association, which must
+        # be live before either works (well-known/README.md; ios.yml warns on
+        # every run while it 404s). The App ID in the developer portal must
+        # also have the Associated Domains capability enabled, or signing
+        # refuses this entitlement.
+        com.apple.developer.associated-domains:
+          - applinks:grapsee.com
+          - webcredentials:grapsee.com
     # XcodeGen writes the native launch configuration and other Info.plist entries.
     info:
       path: GrapMail/Info.plist
       properties:
         PreviewTeamIdentifier: $(DEVELOPMENT_TEAM)
+        # Languages the app ships; lets Settings > GrapMail > Language list them.
+        CFBundleLocalizations:
+          - en
+          - es
+          - pt-BR
+          - fr
+          - de
+          - ar
+          - ur
+          - he
+          - fa
+          - hi
+          - bn
+          - zh-Hans
+          - zh-Hant
+          - ja
+          - ko
+          - ru
+          - tr
+          - id
+          - vi
+          - it
+          - pl
+        CFBundleAllowMixedLocalizations: true
         UILaunchScreen:
           UIColorName: LaunchBackground
           UIImageName: LaunchBrand
           UIImageRespectsSafeAreaInsets: true
-        # Must exactly match MailPoll.refreshIdentifier's registration/submission.
+        # Communication notifications (sender photo on the banner): the
+        # extension and MailPoll.announce donate an INSendMessageIntent.
         NSUserActivityTypes:
           - INSendMessageIntent
         # App lock (AppLock.swift) - the system needs a reason string before it
         # will ever show the Face ID sheet.
         NSFaceIDUsageDescription: "GrapMail uses Face ID to keep your mailbox private when the app is locked."
+        # "Save Image" in the share sheet and in Quick Look (attachments,
+        # QuickLookPresenter.swift) writes to the photo library. Without this
+        # key iOS terminates the app the moment that button is tapped.
+        # Add-only: the app never reads the library (PhotosPicker needs no
+        # permission). Translated in <lang>.lproj/InfoPlist.strings.
+        NSPhotoLibraryAddUsageDescription: "GrapMail saves the photos and attachments you choose to your photo library."
+        # Export compliance. GrapMail encrypts message content end to end
+        # (X25519 + HKDF-SHA256 + AES-256-GCM, MailE2e.swift, via Apple's
+        # swift-crypto), on top of HTTPS. That is encryption beyond the
+        # exempt "HTTPS only" case, so the honest answer is YES; App Store
+        # Connect then asks its export-compliance questions for the build
+        # (standard algorithms, mass-market; see the founder notes). Once Apple
+        # issues an export compliance code, add it here as
+        # ITSEncryptionExportComplianceCode so later builds skip the questions.
+        ITSAppUsesNonExemptEncryption: true
         # The send-later Live Activity; the start request is refused at runtime
         # without this key.
         NSSupportsLiveActivities: true
@@ -107,9 +177,13 @@ targets:
           - CFBundleURLName: com.grapsee.grapmail
             CFBundleURLSchemes:
               - grapmail
+        # Must exactly match MailPoll.refreshIdentifier's registration/submission.
         BGTaskSchedulerPermittedIdentifiers:
           - com.grapsee.grapmail.inbox-refresh
-        # Background fetch also covers devices where APNs delivery is unavailable.
+        # Both are used: `fetch` is what BGAppRefreshTask (MailPoll) needs, and
+        # `remote-notification` is the silent mail wake
+        # (AppDelegate.didReceiveRemoteNotification). Nothing else runs in the
+        # background (no audio, location or VoIP).
         UIBackgroundModes:
           - fetch
           - remote-notification
@@ -124,6 +198,14 @@ targets:
     sources:
       - NotificationService
       - NotificationShared
+      # Certificate pinning for the preview fetch: the app's own generated pin
+      # list and delegate, compiled into this target too (no copy to go stale).
+      - path: GrapMail/ApiPins.swift
+      - path: GrapMail/PinnedSessionDelegate.swift
+      # The sign-in code finder (Foundation only), so the extension puts the
+      # code in the title with exactly the app's rules. Its MailMessage
+      # conveniences (GrapMail/CodeFinderMail.swift) stay app-only.
+      - path: GrapMail/CodeFinder.swift
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.grapsee.grapmail.NotificationService
@@ -150,6 +232,11 @@ targets:
   GrapMailWidget:
     type: app-extension
     platform: iOS
+    # 16.1 on purpose, the one target above the project's 16.0: ActivityKit
+    # (the send-later Live Activity in this bundle) starts at 16.1. The app
+    # still installs on 16.0 and simply offers no widget there; every app-side
+    # Live Activity call is behind `#available(iOS 16.1/16.2, *)`. Keep the
+    # app, tests and the notification extension on `options.deploymentTarget`.
     deploymentTarget: "16.1"
     sources:
       - GrapMailWidget
@@ -183,14 +270,36 @@ targets:
         GENERATE_INFOPLIST_FILE: YES
         PRODUCT_BUNDLE_IDENTIFIER: com.grapsee.grapmail.uitests
         TEST_TARGET_NAME: GrapMail
+
+  # Unit tests (XCTest, `@testable import GrapMail`), hosted in the app so the
+  # app's own module and its swift-crypto dependency are what is tested.
+  # XcodeGen sets TEST_HOST / BUNDLE_LOADER from the application dependency.
+  # Fast, no network, no UI: run alone with
+  #   xcodebuild test -scheme GrapMail -only-testing:GrapMailTests
+  # See TESTING.md.
+  GrapMailTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - GrapMailTests
+    dependencies:
+      - target: GrapMail
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        PRODUCT_BUNDLE_IDENTIFIER: com.grapsee.grapmail.tests
+        SWIFT_STRICT_CONCURRENCY: minimal
 schemes:
   GrapMail:
     build:
       targets:
         GrapMail: all
         GrapMailUITests: [test]
+        GrapMailTests: [test]
     test:
+      gatherCoverageData: true
       targets:
         - GrapMailUITests
+        - GrapMailTests
     run:
       config: Debug

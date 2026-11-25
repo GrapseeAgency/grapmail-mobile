@@ -28,6 +28,8 @@ struct HumanVerifyView: View {
 
     /// Bumped to force a fresh challenge (reloads the checkpoint page).
     @State private var reloadKey = 0
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
+    @ScaledMetric(relativeTo: .body) private var lockDisc: CGFloat = 40
 
     var body: some View {
         VStack(spacing: 0) {
@@ -35,8 +37,8 @@ struct HumanVerifyView: View {
                 HStack {
                     if let onBack {
                         Button(action: onBack) {
-                            Image(systemName: "chevron.left")
-                                .font(.system(size: 17, weight: .semibold))
+                            Image(systemName: "chevron.left").flipsForRightToLeftLayoutDirection(true)
+                                .gmFont(17, .semibold, maxSize: 28)
                                 .foregroundColor(GM.textPrimary)
                         }
                         .buttonStyle(.plain)
@@ -51,23 +53,31 @@ struct HumanVerifyView: View {
 
             ScrollView {
                 VStack(spacing: 0) {
-                    Art.fill("verify")
-                        .padding(.horizontal, 30)
+                    // The art gives way in a landscape phone so the challenge
+                    // starts on screen.
+                    if verticalSizeClass != .compact {
+                        Art.fill("verify")
+                            .padding(.horizontal, 30)
+                    }
 
                     Text("ACCOUNT PROTECTION")
-                        .font(.system(size: 12, weight: .bold))
+                        .gmFont(12, .bold)
                         .kerning(1.6)
                         .foregroundColor(GM.primarySolid)
+                        .multilineTextAlignment(.center)
                         .padding(.top, 6)
                     Text("Just one more step!")
-                        .font(.system(size: 26, weight: .bold))
+                        .gmFont(26, .bold, maxSize: 44)
                         .foregroundColor(GM.textPrimary)
+                        .multilineTextAlignment(.center)
+                        .fixedSize(horizontal: false, vertical: true)
                         .padding(.top, 8)
                     Text("To keep GrapMail safe and spam-free, we need to make sure you're a real person. Complete the challenge below to continue.")
-                        .font(.system(size: 14))
+                        .gmFont(14)
                         .foregroundColor(GM.textSecondary)
                         .multilineTextAlignment(.center)
                         .lineSpacing(3)
+                        .fixedSize(horizontal: false, vertical: true)
                         .padding(.top, 8)
 
                     securityCheckCard
@@ -79,14 +89,16 @@ struct HumanVerifyView: View {
                         } label: {
                             HStack(spacing: 8) {
                                 Image(systemName: "arrow.clockwise")
-                                    .font(.system(size: 14))
+                                    .gmFont(14)
                                     .foregroundColor(GM.primarySolid)
                                 Text("Get a new challenge")
-                                    .font(.system(size: 14, weight: .medium))
+                                    .gmFont(14, .medium)
                                     .foregroundColor(GM.primarySolid)
+                                    .multilineTextAlignment(.center)
                             }
+                            .padding(.vertical, 8)
                             .frame(maxWidth: .infinity)
-                            .frame(height: 50)
+                            .frame(minHeight: 50)
                             .background(RoundedRectangle(cornerRadius: 14).strokeBorder(GM.primarySolid.opacity(0.5)))
                         }
                         .buttonStyle(.plain)
@@ -98,10 +110,12 @@ struct HumanVerifyView: View {
                     // verdict. (The old "Skip for now" is deleted.)
                     Button(action: onDone) {
                         Text("Continue")
-                            .font(.system(size: 15, weight: .semibold))
+                            .gmFont(15, .semibold)
                             .foregroundColor(.white)
+                            .multilineTextAlignment(.center)
+                            .padding(.vertical, 8)
                             .frame(maxWidth: .infinity)
-                            .frame(height: 50)
+                            .frame(minHeight: 50)
                             .background(RoundedRectangle(cornerRadius: 14).fill(GM.primarySolid))
                     }
                     .buttonStyle(.plain)
@@ -112,14 +126,17 @@ struct HumanVerifyView: View {
                     // Branding disclosure (mobile apps: no badge required, text optional).
                     // TODO(branding): linkify "Privacy Policy" / "Terms of Service" per the guidelines.
                     Text("This app is protected by reCAPTCHA and the Google Privacy Policy and Terms of Service apply.")
-                        .font(.system(size: 11))
+                        .gmFont(11)
                         .foregroundColor(GM.textTertiary)
                         .multilineTextAlignment(.center)
+                        .fixedSize(horizontal: false, vertical: true)
                         .padding(.top, 10)
                         .padding(.horizontal, 12)
                         .padding(.bottom, 20)
                 }
+                .gmMaxWidth(GMLayout.form)
             }
+            .scrollDismissesKeyboard(.interactively)
         }
     }
 
@@ -128,16 +145,18 @@ struct HumanVerifyView: View {
             HStack(alignment: .top, spacing: 12) {
                 Circle()
                     .fill(GM.primarySolid)
-                    .frame(width: 40, height: 40)
-                    .overlay(Text("🔒").font(.system(size: 17)))
+                    .frame(width: min(lockDisc, 60), height: min(lockDisc, 60))
+                    .overlay(Text("🔒").gmFont(17, maxSize: 26))
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Security check")
-                        .font(.system(size: 15, weight: .semibold))
+                        .gmFont(15, .semibold)
                         .foregroundColor(GM.textPrimary)
+                        .fixedSize(horizontal: false, vertical: true)
                     Text("Complete the challenge to verify you're a real person.")
-                        .font(GMFont.caption)
+                        .gmFont(.caption)
                         .foregroundColor(GM.textSecondary)
                         .lineSpacing(2)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
             }
 
@@ -145,15 +164,19 @@ struct HumanVerifyView: View {
                 // Server-confirmed verdict only. The WebView is no longer needed.
                 HStack(spacing: 10) {
                     Image(systemName: "checkmark.seal.fill")
+                        .gmFont(17)
                         .foregroundColor(GM.primarySolid)
                     Text("Verified — thank you!")
-                        .font(.system(size: 15, weight: .semibold))
+                        .gmFont(15, .semibold)
                         .foregroundColor(GM.textPrimary)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 22)
             } else {
                 // Height is chosen so the reCAPTCHA image-challenge overlay fits.
+                // The page lays out to the card's width, so it works from a
+                // 320 pt Split View column to a full iPad form sheet.
                 VerifyWebView(url: VerifyCheckpoint.url, reloadKey: reloadKey) { token in
                     model.submitHumanVerification(token: token)
                 }
@@ -165,14 +188,15 @@ struct HumanVerifyView: View {
                     HStack(spacing: 8) {
                         ProgressView().scaleEffect(0.8)
                         Text("Checking…")
-                            .font(.system(size: 13))
+                            .gmFont(13)
                             .foregroundColor(GM.textSecondary)
                     }
                 }
                 if let message = model.state.humanVerifyError {
                     Text(message)
-                        .font(.system(size: 12))
+                        .gmFont(12)
                         .foregroundColor(.red) // TODO(theme): swap for a palette error color if one exists
+                        .fixedSize(horizontal: false, vertical: true)
                 }
             }
         }
@@ -238,12 +262,66 @@ private struct VerifyWebView: UIViewRepresentable {
     }
 }
 
+/// The profile card both "account created" screens show: avatar, name and
+/// address, and a trailing accessory (Active chip or copy button). At the
+/// accessibility text sizes the accessory moves under the text so the address
+/// keeps the full width.
+private struct CreatedProfileCard<Accessory: View>: View {
+    let name: String
+    let address: String
+    @ViewBuilder let accessory: () -> Accessory
+    @Environment(\.dynamicTypeSize) private var dts
+    @ScaledMetric(relativeTo: .body) private var avatar: CGFloat = 44
+
+    var body: some View {
+        Group {
+            if dts.isAccessibilitySize {
+                VStack(alignment: .leading, spacing: 10) {
+                    avatarDisc
+                    nameBlock
+                    accessory()
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            } else {
+                HStack(spacing: 12) {
+                    avatarDisc
+                    nameBlock
+                    Spacer()
+                    accessory()
+                }
+            }
+        }
+        .padding(14)
+        .background(RoundedRectangle(cornerRadius: GMShape.card, style: .continuous).fill(GM.card))
+        .overlay(RoundedRectangle(cornerRadius: GMShape.card, style: .continuous).strokeBorder(GM.border))
+    }
+
+    private var avatarDisc: some View {
+        Circle()
+            .fill(GM.primarySolid)
+            .frame(width: min(avatar, 64), height: min(avatar, 64))
+            .overlay(Text(String(name.prefix(1)).uppercased())
+                .gmFont(18, .bold, maxSize: 28).foregroundColor(.white))
+    }
+
+    private var nameBlock: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(name).gmFont(15, .semibold).foregroundColor(GM.textPrimary)
+                .fixedSize(horizontal: false, vertical: true)
+            Text(address).gmFont(13).foregroundColor(GM.textSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+}
+
 // MARK: - Account Created (A) — founder design verbatim
 
 struct AccountCreatedView: View {
     let address: String
     let name: String
     let onContinueOnboarding: () -> Void
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
+    @ScaledMetric(relativeTo: .body) private var tileSize: CGFloat = 42
 
     var body: some View {
         // Scrollable: on the smallest phones the card + three tiles + CTA
@@ -251,56 +329,49 @@ struct AccountCreatedView: View {
         GeometryReader { viewport in
             ScrollView {
                 VStack(spacing: 0) {
-            Spacer(minLength: 36)
+            Spacer(minLength: verticalSizeClass == .compact ? 16 : 36)
             Wordmark()
 
-            Art.fill("created_a")
-                .padding(.horizontal, 40)
-                .padding(.top, 14)
+            if verticalSizeClass != .compact {
+                Art.fill("created_a")
+                    .padding(.horizontal, 40)
+                    .padding(.top, 14)
+            }
 
             Text("ACCOUNT CREATED")
-                .font(.system(size: 12, weight: .bold))
+                .gmFont(12, .bold)
                 .kerning(1.6)
                 .foregroundColor(GM.primarySolid)
+                .multilineTextAlignment(.center)
                 .padding(.top, 8)
             Text("You're all set!")
-                .font(.system(size: 28, weight: .bold))
+                .gmFont(28, .bold, maxSize: 44)
                 .foregroundColor(GM.textPrimary)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
                 .padding(.top, 8)
             Text("Your GrapMail account has been successfully\ncreated and you're now signed in.")
-                .font(.system(size: 14))
+                .gmFont(14)
                 .foregroundColor(GM.textSecondary)
                 .multilineTextAlignment(.center)
                 .lineSpacing(3)
+                .fixedSize(horizontal: false, vertical: true)
                 .padding(.top, 8)
 
             // Profile card with Active chip
-            HStack(spacing: 12) {
-                Circle()
-                    .fill(GM.primarySolid)
-                    .frame(width: 44, height: 44)
-                    .overlay(Text(String(name.prefix(1)).uppercased())
-                        .font(.system(size: 18, weight: .bold)).foregroundColor(.white))
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(name).font(.system(size: 15, weight: .semibold)).foregroundColor(GM.textPrimary)
-                    Text(address).font(.system(size: 13)).foregroundColor(GM.textSecondary)
-                }
-                Spacer()
+            CreatedProfileCard(name: name, address: address) {
                 HStack(spacing: 4) {
-                    Image(systemName: "checkmark").font(.system(size: 11, weight: .semibold)).foregroundColor(GM.success)
-                    Text("Active").font(.system(size: 12, weight: .medium)).foregroundColor(GM.success)
+                    Image(systemName: "checkmark").gmFont(11, .semibold).foregroundColor(GM.success)
+                    Text("Active").gmFont(12, .medium).foregroundColor(GM.success)
                 }
                 .padding(.horizontal, 10)
                 .padding(.vertical, 5)
                 .background(Capsule().fill(GM.success.opacity(0.12)))
             }
-            .padding(14)
-            .background(RoundedRectangle(cornerRadius: GMShape.card, style: .continuous).fill(GM.card))
-            .overlay(RoundedRectangle(cornerRadius: GMShape.card, style: .continuous).strokeBorder(GM.border))
             .padding(.top, 20)
 
             Text("WHAT'S NEXT?")
-                .font(.system(size: 12, weight: .bold))
+                .gmFont(12, .bold)
                 .kerning(1.4)
                 .foregroundColor(GM.textTertiary)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -312,14 +383,16 @@ struct AccountCreatedView: View {
 
             Spacer(minLength: 8)
 
-            GradientButton(title: "Continue to Onboarding", trailing: AnyView(
-                Image(systemName: "arrow.right")
-                    .font(.system(size: 15, weight: .semibold))
+            GradientButton(title: String(localized: "Continue to Onboarding", comment: "Button title (account created screen)"), trailing: AnyView(
+                Image(systemName: "arrow.right").flipsForRightToLeftLayoutDirection(true)
+                    .gmFont(15, .semibold, maxSize: 26)
                     .foregroundColor(.white)
             ), action: onContinueOnboarding)
             Text("We'll take you through a quick setup to get you started.")
-                .font(.system(size: 12))
+                .gmFont(12)
                 .foregroundColor(GM.textTertiary)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
                 .padding(.top, 10)
 
             HStack(spacing: 7) {
@@ -328,6 +401,7 @@ struct AccountCreatedView: View {
                     Circle().fill(GM.stepInactive).frame(width: 7, height: 7)
                 }
             }
+            .accessibilityHidden(true)
             .padding(.top, 16)
             .padding(.bottom, 20)
                 }
@@ -336,19 +410,21 @@ struct AccountCreatedView: View {
                 .frame(minHeight: viewport.size.height)
             }
         }
-        .centeredForm()
+        .gmMaxWidth(GMLayout.form)
         .background(GM.bg.ignoresSafeArea())
     }
 
-    private func nextTile(_ icon: String, _ tile: Color, _ tint: Color, _ title: String, _ subtitle: String) -> some View {
+    private func nextTile(_ icon: String, _ tile: Color, _ tint: Color, _ title: LocalizedStringKey, _ subtitle: LocalizedStringKey) -> some View {
         HStack(spacing: 12) {
             RoundedRectangle(cornerRadius: 12, style: .continuous)
                 .fill(tile)
-                .frame(width: 42, height: 42)
-                .overlay(Image(systemName: icon).font(.system(size: 17)).foregroundColor(tint))
+                .frame(width: min(tileSize, 60), height: min(tileSize, 60))
+                .overlay(Image(systemName: icon).gmFont(17, maxSize: 30).foregroundColor(tint))
             VStack(alignment: .leading, spacing: 2) {
-                Text(title).font(.system(size: 14, weight: .semibold)).foregroundColor(GM.textPrimary)
-                Text(subtitle).font(.system(size: 12)).foregroundColor(GM.textSecondary)
+                Text(title).gmFont(14, .semibold).foregroundColor(GM.textPrimary)
+                    .fixedSize(horizontal: false, vertical: true)
+                Text(subtitle).gmFont(12).foregroundColor(GM.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             Spacer()
             // No chevron: this tile has no destination. The screen's one action
@@ -366,60 +442,55 @@ struct AccountCreatedAltView: View {
     let name: String
     let onGoToMailbox: () -> Void
     let onContinueOnboarding: () -> Void
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
+    @ScaledMetric(relativeTo: .body) private var rowIcon: CGFloat = 22
 
     var body: some View {
         GeometryReader { viewport in
             ScrollView {
                 VStack(spacing: 0) {
-            Spacer(minLength: 32)
+            Spacer(minLength: verticalSizeClass == .compact ? 16 : 32)
             HStack {
                 Wordmark()
                 Spacer()
             }
 
-            Art.fill("created_b")
-                .padding(.horizontal, 44)
-                .padding(.top, 12)
+            if verticalSizeClass != .compact {
+                Art.fill("created_b")
+                    .padding(.horizontal, 44)
+                    .padding(.top, 12)
+            }
 
             Text("ACCOUNT CREATED")
-                .font(.system(size: 12, weight: .bold))
+                .gmFont(12, .bold)
                 .kerning(1.6)
                 .foregroundColor(GM.primarySolid)
+                .multilineTextAlignment(.center)
                 .padding(.top, 6)
             Text("You're all set!")
-                .font(.system(size: 28, weight: .bold))
+                .gmFont(28, .bold, maxSize: 44)
                 .foregroundColor(GM.textPrimary)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
                 .padding(.top, 8)
             Text("Your GrapMail account has been successfully\ncreated and you're now signed in.")
-                .font(.system(size: 14))
+                .gmFont(14)
                 .foregroundColor(GM.textSecondary)
                 .multilineTextAlignment(.center)
                 .lineSpacing(3)
+                .fixedSize(horizontal: false, vertical: true)
                 .padding(.top, 8)
 
             // Profile card with copy icon
-            HStack(spacing: 12) {
-                Circle()
-                    .fill(GM.primarySolid)
-                    .frame(width: 44, height: 44)
-                    .overlay(Text(String(name.prefix(1)).uppercased())
-                        .font(.system(size: 18, weight: .bold)).foregroundColor(.white))
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(name).font(.system(size: 15, weight: .semibold)).foregroundColor(GM.textPrimary)
-                    Text(address).font(.system(size: 13)).foregroundColor(GM.textSecondary)
-                }
-                Spacer()
+            CreatedProfileCard(name: name, address: address) {
                 Button {
                     UIPasteboard.general.string = address
                 } label: {
                     Image(systemName: "doc.on.doc")
-                        .font(.system(size: 15))
+                        .gmFont(15, maxSize: 26)
                         .foregroundColor(GM.textTertiary)
                 }
             }
-            .padding(14)
-            .background(RoundedRectangle(cornerRadius: GMShape.card, style: .continuous).fill(GM.card))
-            .overlay(RoundedRectangle(cornerRadius: GMShape.card, style: .continuous).strokeBorder(GM.border))
             .padding(.top, 20)
 
             simpleRow("envelope", "Your secure inbox", "Send, receive and manage your emails.")
@@ -428,14 +499,14 @@ struct AccountCreatedAltView: View {
 
             Spacer(minLength: 8)
 
-            GradientButton(title: "Go to Mailbox", trailing: AnyView(
-                Image(systemName: "arrow.right")
-                    .font(.system(size: 15, weight: .semibold))
+            GradientButton(title: String(localized: "Go to Mailbox", comment: "Button title (account created screen)"), trailing: AnyView(
+                Image(systemName: "arrow.right").flipsForRightToLeftLayoutDirection(true)
+                    .gmFont(15, .semibold, maxSize: 26)
                     .foregroundColor(.white)
             ), action: onGoToMailbox)
-            OutlineActionButton(title: "Continue to Onboarding", trailing: AnyView(
-                Image(systemName: "arrow.right")
-                    .font(.system(size: 15, weight: .semibold))
+            OutlineActionButton(title: String(localized: "Continue to Onboarding", comment: "Button title (account created screen)"), trailing: AnyView(
+                Image(systemName: "arrow.right").flipsForRightToLeftLayoutDirection(true)
+                    .gmFont(15, .semibold, maxSize: 26)
                     .foregroundColor(GM.primarySolid)
             ), action: onContinueOnboarding)
             .padding(.top, 12)
@@ -446,19 +517,21 @@ struct AccountCreatedAltView: View {
             .frame(minHeight: viewport.size.height)
         }
         }
-        .centeredForm()
+        .gmMaxWidth(GMLayout.form)
         .background(GM.bg.ignoresSafeArea())
     }
 
-    private func simpleRow(_ icon: String, _ title: String, _ subtitle: String) -> some View {
+    private func simpleRow(_ icon: String, _ title: LocalizedStringKey, _ subtitle: LocalizedStringKey) -> some View {
         HStack(spacing: 14) {
             Image(systemName: icon)
-                .font(.system(size: 17))
+                .gmFont(17)
                 .foregroundColor(GM.textSecondary)
-                .frame(width: 22)
+                .frame(width: rowIcon)
             VStack(alignment: .leading, spacing: 2) {
-                Text(title).font(.system(size: 14, weight: .semibold)).foregroundColor(GM.textPrimary)
-                Text(subtitle).font(.system(size: 12)).foregroundColor(GM.textSecondary)
+                Text(title).gmFont(14, .semibold).foregroundColor(GM.textPrimary)
+                    .fixedSize(horizontal: false, vertical: true)
+                Text(subtitle).gmFont(12).foregroundColor(GM.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             Spacer()
         }

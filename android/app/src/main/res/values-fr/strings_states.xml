@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Loading / empty / error / offline states (French). Translated from values/strings_states.xml. -->
+<resources>
+    <!-- Shared -->
+    <string name="states_loading">Chargement…</string>
+    <string name="states_offline_banner">Vous êtes hors ligne. Affichage des dernières données chargées : tout ce qui nécessite le réseau attendra votre reconnexion.</string>
+    <string name="states_error_title">Un problème est survenu</string>
+    <string name="states_error_body">Impossible de charger ce contenu pour le moment. Vérifiez votre connexion et réessayez.</string>
+    <string name="states_error_offline_body">Vous êtes hors ligne. Connectez-vous au Wi-Fi ou aux données mobiles, puis réessayez.</string>
+    <string name="states_retry">Réessayer</string>
+
+    <!-- Labels -->
+    <string name="states_labels_loading">Chargement des libellés…</string>
+    <string name="states_labels_failed_title">Impossible de charger les libellés</string>
+
+    <!-- Scheduled -->
+    <string name="states_scheduled_loading">Chargement des e-mails programmés…</string>
+    <string name="states_scheduled_failed_title">Impossible de charger les e-mails programmés</string>
+    <string name="states_scheduled_empty_title">Aucun envoi programmé</string>
+
+    <!-- Contacts and files -->
+    <string name="states_contacts_loading">Recherche des contacts dans vos e-mails…</string>
+    <string name="states_files_loading">Recherche des pièces jointes…</string>
+
+    <!-- Connected mailboxes -->
+    <string name="states_providers_loading">Chargement des boîtes mail connectées…</string>
+
+    <!-- Reader -->
+    <string name="states_thread_loading">Ouverture de cette conversation…</string>
+
+    <!-- Security -->
+    <string name="states_activity_failed_title">Impossible de charger l\'activité</string>
+    <string name="states_sessions_failed_title">Impossible de charger les sessions</string>
+</resources>

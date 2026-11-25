@@ -69,6 +69,10 @@ class PushService : FirebaseMessagingService() {
         // The server hid the preview (the account's rules): the alert this app
         // draws for the message, after fetching it, must stay generic too.
         if (id != null && message.data["preview"] == "0") NotificationPolicy.markGeneric(context, id)
+        // The server says the message is sealed end-to-end (push-dispatch.ts
+        // `encrypted: '1'`): the alert drawn after the fetch treats it as
+        // sealed whatever the fetched row says — no preview, no sign-in code.
+        if (id != null && message.data["encrypted"] == "1") Notifications.markSealed(context, id)
         if (id != null && mailbox.isNullOrBlank()) return
         val request = OneTimeWorkRequestBuilder<MailPollWorker>()
             .setInputData(workDataOf(

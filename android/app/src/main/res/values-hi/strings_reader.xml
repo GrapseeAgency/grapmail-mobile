@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    values-hi/strings_reader.xml: translation of values/strings_reader.xml (same keys, same order).
+    Comments below are kept from the English source for context.
+-->
+<resources>
+    <!-- The inline pill above an HTML body in a dark reader. It names what a tap switches TO. -->
+    <string name="reader_colours_original">मूल रंग</string>
+    <string name="reader_colours_dark">गहरे रंग</string>
+
+    <!-- The message overflow menu items (same toggle as the pill). -->
+    <string name="reader_colours_menu_original">मूल रंग दिखाएँ</string>
+    <string name="reader_colours_menu_dark">गहरे रंग दिखाएँ</string>
+
+    <!-- TalkBack: the pill's click action ("double-tap to …") and its current state. -->
+    <string name="reader_colours_action_original">इस भेजने वाले के मूल रंग दिखाएँ</string>
+    <string name="reader_colours_action_dark">गहरे रंगों में दिखाएँ</string>
+    <string name="reader_colours_state_original">मूल रंग दिखाए जा रहे हैं</string>
+    <string name="reader_colours_state_dark">गहरे रंग दिखाए जा रहे हैं</string>
+
+    <!-- The note under the message after a change, so the per-sender memory is not a surprise later. -->
+    <string name="reader_colours_remembered_original">इस डिवाइस पर %1$s के मेल उनके मूल रंगों में खुलेंगे।</string>
+    <string name="reader_colours_remembered_dark">इस डिवाइस पर %1$s के मेल गहरे रंगों में खुलेंगे।</string>
+</resources>

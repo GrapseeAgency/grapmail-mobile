@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Loading / empty / error / offline states (translated from values/strings_states.xml). -->
+<resources>
+    <!-- Shared -->
+    <string name="states_loading">لوڈ ہو رہا ہے…</string>
+    <string name="states_offline_banner">آپ آف لائن ہیں۔ آخری بار لوڈ ہونے والا مواد دکھایا جا رہا ہے — نیٹ ورک کی ضرورت والی ہر چیز دوبارہ کنیکٹ ہونے تک انتظار کرے گی۔</string>
+    <string name="states_error_title">کچھ غلط ہو گیا</string>
+    <string name="states_error_body">اسے ابھی لوڈ نہیں کیا جا سکا۔ اپنا کنکشن چیک کریں اور دوبارہ کوشش کریں۔</string>
+    <string name="states_error_offline_body">آپ آف لائن ہیں۔ Wi-Fi یا موبائل ڈیٹا سے کنیکٹ کریں، پھر دوبارہ کوشش کریں۔</string>
+    <string name="states_retry">دوبارہ کوشش کریں</string>
+
+    <!-- Labels -->
+    <string name="states_labels_loading">لیبلز لوڈ ہو رہے ہیں…</string>
+    <string name="states_labels_failed_title">لیبلز لوڈ نہیں ہو سکے</string>
+
+    <!-- Scheduled -->
+    <string name="states_scheduled_loading">شیڈول شدہ میل لوڈ ہو رہی ہے…</string>
+    <string name="states_scheduled_failed_title">شیڈول شدہ میل لوڈ نہیں ہو سکی</string>
+    <string name="states_scheduled_empty_title">کچھ بھی شیڈول نہیں ہے</string>
+
+    <!-- Contacts and files -->
+    <string name="states_contacts_loading">آپ کی میل سے لوگ جمع کیے جا رہے ہیں…</string>
+    <string name="states_files_loading">اٹیچمنٹس جمع کی جا رہی ہیں…</string>
+
+    <!-- Connected mailboxes -->
+    <string name="states_providers_loading">منسلک میل باکسز لوڈ ہو رہے ہیں…</string>
+
+    <!-- Reader -->
+    <string name="states_thread_loading">یہ گفتگو کھولی جا رہی ہے…</string>
+
+    <!-- Security -->
+    <string name="states_activity_failed_title">سرگرمی لوڈ نہیں ہو سکی</string>
+    <string name="states_sessions_failed_title">سیشنز لوڈ نہیں ہو سکے</string>
+</resources>

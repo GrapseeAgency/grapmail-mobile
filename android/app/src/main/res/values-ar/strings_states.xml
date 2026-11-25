@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Loading / empty / error / offline states (translated from values/strings_states.xml). -->
+<resources>
+    <!-- Shared -->
+    <string name="states_loading">جارٍ التحميل…</string>
+    <string name="states_offline_banner">أنت غير متصل. يُعرض آخر ما تم تحميله — وأي شيء يحتاج إلى الشبكة سينتظر حتى تعاود الاتصال.</string>
+    <string name="states_error_title">حدث خطأ ما</string>
+    <string name="states_error_body">تعذّر تحميل هذا الآن. تحقّق من اتصالك وحاول مرة أخرى.</string>
+    <string name="states_error_offline_body">أنت غير متصل. اتصل بشبكة Wi-Fi أو بيانات الجوال، ثم حاول مرة أخرى.</string>
+    <string name="states_retry">حاول مرة أخرى</string>
+
+    <!-- Labels -->
+    <string name="states_labels_loading">جارٍ تحميل التصنيفات…</string>
+    <string name="states_labels_failed_title">تعذّر تحميل التصنيفات</string>
+
+    <!-- Scheduled -->
+    <string name="states_scheduled_loading">جارٍ تحميل البريد المجدول…</string>
+    <string name="states_scheduled_failed_title">تعذّر تحميل البريد المجدول</string>
+    <string name="states_scheduled_empty_title">لا يوجد شيء مجدول</string>
+
+    <!-- Contacts and files -->
+    <string name="states_contacts_loading">جارٍ جمع الأشخاص من بريدك…</string>
+    <string name="states_files_loading">جارٍ جمع المرفقات…</string>
+
+    <!-- Connected mailboxes -->
+    <string name="states_providers_loading">جارٍ تحميل صناديق البريد المتصلة…</string>
+
+    <!-- Reader -->
+    <string name="states_thread_loading">جارٍ فتح هذه المحادثة…</string>
+
+    <!-- Security -->
+    <string name="states_activity_failed_title">تعذّر تحميل النشاط</string>
+    <string name="states_sessions_failed_title">تعذّر تحميل الجلسات</string>
+</resources>

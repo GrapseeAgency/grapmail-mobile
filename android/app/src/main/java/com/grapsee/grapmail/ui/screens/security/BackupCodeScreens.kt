@@ -56,6 +56,8 @@ import com.grapsee.grapmail.ui.components.InfoCard
 import com.grapsee.grapmail.ui.components.TermsCheckbox
 import com.grapsee.grapmail.ui.theme.LocalPalette
 import kotlinx.coroutines.launch
+import androidx.compose.ui.res.stringResource
+import com.grapsee.grapmail.R
 
 /**
  * The ten codes, between generation and the screen that shows them.
@@ -111,17 +113,17 @@ fun GenerateBackupCodesScreen(
         onBack = onBack,
         illustration = "ill_sec_backup_generate",
         illustrationWidth = 180,
-        title = "Generate & Save Backup Codes",
-        body = "Create one-time backup codes to access your account if you lose your phone.",
+        title = stringResource(R.string.acct_generate_save_backup_codes),
+        body = stringResource(R.string.acct_create_one_time_backup_codes_to),
         footer = {
             Column {
                 GradientButton(
-                    "Generate Codes",
+                    stringResource(R.string.acct_generate_codes),
                     onClick = {
                         busy = true; error = null
                         scope.launch {
                             try {
-                                val token = SessionStore.token(context) ?: throw IllegalStateException("Sign in again.")
+                                val token = SessionStore.token(context) ?: throw IllegalStateException(context.getString(R.string.acct_sign_in_again))
                                 val resp = Api.generateBackupCodes(token)
                                 onGenerated(resp.newBackupCodes)
                             } catch (e: Exception) {
@@ -135,21 +137,21 @@ fun GenerateBackupCodesScreen(
                 )
                 Spacer(Modifier.height(4.dp))
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
-                    AccountLink("Cancel", onBack)
+                    AccountLink(stringResource(R.string.acct_cancel), onBack)
                 }
             }
         },
     ) {
         InfoCard {
-            Text("What's Included", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = palette.textPrimary)
+            Text(stringResource(R.string.acct_whats_included), fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = palette.textPrimary)
             Spacer(Modifier.height(10.dp))
-            BackupPoint(Icons.Rounded.Numbers, "10 One-Time Codes", "Each code can be used once.")
-            BackupPoint(Icons.Rounded.Lock, "Use When Needed", "Sign in when your phone is unavailable.")
-            BackupPoint(Icons.Rounded.VerifiedUser, "Each Code is Unique", "Generating a new set retires the old one.")
+            BackupPoint(Icons.Rounded.Numbers, stringResource(R.string.acct_10_one_time_codes), stringResource(R.string.acct_each_code_can_be_used_once))
+            BackupPoint(Icons.Rounded.Lock, stringResource(R.string.acct_use_when_needed), stringResource(R.string.acct_sign_in_when_your_phone_is))
+            BackupPoint(Icons.Rounded.VerifiedUser, stringResource(R.string.acct_each_code_is_unique), stringResource(R.string.acct_generating_a_new_set_retires_the_old))
         }
         Spacer(Modifier.height(12.dp))
         Text(
-            "Store the codes somewhere only you can reach. Anyone with a code can pass your second factor.",
+            stringResource(R.string.acct_store_the_codes_somewhere_only_you),
             fontSize = 12.sp,
             lineHeight = 17.sp,
             color = palette.textSecondary,
@@ -217,12 +219,12 @@ fun BackupCodesSavedScreen(
         onBack = { if (confirmed) onDone() else leaving = true },
         illustration = "ill_sec_backup_saved",
         illustrationWidth = 150,
-        title = "Backup Codes Saved",
-        body = "Store these codes somewhere safe. They won't be shown again.",
+        title = stringResource(R.string.acct_backup_codes_saved),
+        body = stringResource(R.string.acct_store_these_codes_somewhere_safe),
         footer = {
             Column {
                 GradientButton(
-                    "Download Backup Codes",
+                    stringResource(R.string.acct_download_backup_codes),
                     trailing = { Icon(Icons.Rounded.Download, contentDescription = null, modifier = Modifier.padding(start = 6.dp)) },
                     onClick = {
                         try {
@@ -236,10 +238,10 @@ fun BackupCodesSavedScreen(
                     },
                 )
                 Spacer(Modifier.height(8.dp))
-                GradientButton("Done", onDone, enabled = confirmed)
+                GradientButton(stringResource(R.string.acct_done), onDone, enabled = confirmed)
                 Spacer(Modifier.height(6.dp))
                 FooterNote(
-                    text = "Each code can be used once. Generating new codes retires every code on this list.",
+                    text = stringResource(R.string.acct_each_code_can_be_used_once_2),
                     divider = true,
                 )
             }
@@ -247,8 +249,9 @@ fun BackupCodesSavedScreen(
     ) {
         InfoCard {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("Your Backup Codes", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = palette.textPrimary)
-                Spacer(Modifier.weight(1f))
+                // The title takes the slack (and wraps at large font sizes), so
+                // "Copy all" is never pushed off the card.
+                Text(stringResource(R.string.acct_your_backup_codes), fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = palette.textPrimary, modifier = Modifier.weight(1f))
                 Row(
                     Modifier
                         .clip(RoundedCornerShape(10.dp))
@@ -266,68 +269,31 @@ fun BackupCodesSavedScreen(
                         tint = palette.primarySolid,
                         modifier = Modifier.size(14.dp),
                     )
-                    Text(if (copied) "Copied" else "Copy all", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = palette.primarySolid)
+                    Text(if (copied) stringResource(R.string.acct_copied) else stringResource(R.string.acct_copy_all), fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = palette.primarySolid)
                 }
             }
             Spacer(Modifier.height(12.dp))
             // Two columns, because ten codes in one column pushes the footer off
             // a 640dp phone and the person then scrolls instead of saving.
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                codes.chunked(2).forEach { pair ->
-                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        pair.forEach { code ->
-                            Box(
-                                Modifier
-                                    .weight(1f)
-                                    .clip(RoundedCornerShape(10.dp))
-                                    .background(palette.softFill)
-                                    .clickable {
-                                        // Per-code copy: grabbing one code to use
-                                        // now should not require copying all ten.
-                                        clipboard.setText(AnnotatedString(code))
-                                        copiedOne = code
-                                    }
-                                    .padding(vertical = 9.dp, horizontal = 8.dp),
-                            ) {
-                                Row(
-                                    Modifier.fillMaxWidth(),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                ) {
-                                    Text(
-                                        code,
-                                        fontSize = 13.sp,
-                                        fontWeight = FontWeight.SemiBold,
-                                        fontFamily = FontFamily.Monospace,
-                                        color = palette.textPrimary,
-                                    )
-                                    Icon(
-                                        if (copiedOne == code) Icons.Rounded.CheckCircle else Icons.Rounded.ContentCopy,
-                                        contentDescription = "Copy $code",
-                                        tint = palette.textTertiary,
-                                        modifier = Modifier.size(14.dp),
-                                    )
-                                }
-                            }
-                        }
-                        if (pair.size == 1) Spacer(Modifier.weight(1f))
-                    }
-                }
+            // CodeListGrid drops to one column when a code would not fit half the card.
+            CodeListGrid(codes, copiedOne) { code ->
+                clipboard.setText(AnnotatedString(code))
+                copiedOne = code
             }
         }
         Spacer(Modifier.height(12.dp))
         BulletCard(
-            "Keep them safe",
+            stringResource(R.string.acct_keep_them_safe),
             listOf(
-                "Store safely — use a password manager or print them out.",
-                "Don't share — backup codes are for your eyes only.",
-                "One time use — each code can only be used once.",
+                stringResource(R.string.acct_store_safely_use_a_password_manager),
+                stringResource(R.string.acct_dont_share_backup_codes_are_for_your),
+                stringResource(R.string.acct_one_time_use_each_code_can_only_be),
             ),
         )
         Spacer(Modifier.height(12.dp))
         TermsCheckbox(confirmed, { confirmed = it }) {
             Text(
-                "I have saved these codes somewhere safe.",
+                stringResource(R.string.acct_saved_codes_confirm),
                 fontSize = 13.sp,
                 color = palette.textPrimary,
             )
@@ -335,20 +301,20 @@ fun BackupCodesSavedScreen(
         Spacer(Modifier.height(10.dp))
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
             Icon(Icons.Rounded.Download, contentDescription = null, tint = palette.textTertiary, modifier = Modifier.size(15.dp))
-            Text("Copy them into your password manager, or write them down.", fontSize = 12.sp, color = palette.textSecondary)
+            Text(stringResource(R.string.acct_copy_them_into_your_password_manager), fontSize = 12.sp, color = palette.textSecondary)
         }
     }
 
     if (leaving) {
         AlertDialog(
             onDismissRequest = { leaving = false },
-            title = { Text("These codes will not be shown again") },
-            text = { Text("Leave now and the list is gone. You can generate a new set later, but the old codes stop working.") },
+            title = { Text(stringResource(R.string.acct_codes_not_shown_again)) },
+            text = { Text(stringResource(R.string.acct_leave_now_and_the_list_is_gone_you)) },
             confirmButton = {
-                TextButton(onClick = { leaving = false; onDone() }) { Text("Leave anyway") }
+                TextButton(onClick = { leaving = false; onDone() }) { Text(stringResource(R.string.acct_leave_anyway)) }
             },
             dismissButton = {
-                TextButton(onClick = { leaving = false }) { Text("Stay") }
+                TextButton(onClick = { leaving = false }) { Text(stringResource(R.string.acct_stay)) }
             },
         )
     }

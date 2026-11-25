@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <plurals name="reader_earlier_messages">
+        <item quantity="one">%d הודעה קודמת</item>
+        <item quantity="other">%d הודעות קודמות</item>
+        <item quantity="two">שתי הודעות קודמות</item>
+    </plurals>
+    <plurals name="reader_participants">
+        <item quantity="one">%d אדם</item>
+        <item quantity="other">%d אנשים</item>
+        <item quantity="two">שני אנשים</item>
+    </plurals>
+    <plurals name="reader_message_count">
+        <item quantity="one">הודעה %d</item>
+        <item quantity="other">%d הודעות</item>
+        <item quantity="two">שתי הודעות</item>
+    </plurals>
+    <string name="reader_you">אתה</string>
+    <string name="reader_unread">לא נקרא</string>
+    <string name="reader_earlier_action">הצגת ההודעות המקופלות</string>
+    <string name="reader_open_message_action">פתיחת ההודעה הזו</string>
+    <string name="reader_quoted_show">הצגת טקסט מצוטט</string>
+    <string name="reader_quoted_hide">הסתרת טקסט מצוטט</string>
+    <string name="reader_state_expanded">פתוח</string>
+    <string name="reader_state_collapsed">מקופל</string>
+    <string name="reader_reply_to">השב ל-%1$s…</string>
+    <string name="reader_reply_fallback">השב…</string>
+    <string name="reader_reply_options">אפשרויות תגובה</string>
+    <string name="reader_quick_reply">תגובה מהירה</string>
+    <string name="reader_attach_share_chooser">שיתוף קובץ מצורף</string>
+    <string name="reader_attach_view_image">הצגת התמונה</string>
+    <string name="reader_attach_save_named">שמירת %1$s</string>
+    <string name="reader_attach_share_named">שיתוף %1$s</string>
+    <string name="reader_attach_share_nothing">אין במכשיר הזה אפליקציה שיכולה לשתף את הקובץ.</string>
+    <string name="reader_viewer_position">%1$d מתוך %2$d</string>
+    <string name="reader_viewer_too_large">אי אפשר להציג את התמונה הזו כאן.</string>
+    <string name="compose_r9_leave_title">לצאת מההודעה הזו?</string>
+    <string name="compose_r9_leave_attachments">טיוטות עדיין לא שומרות קבצים מצורפים. אפשר לשמור את הטקסט בלי הקבצים, או להמשיך לערוך.</string>
+    <string name="compose_r9_save_text_only">שמירת הטקסט בלבד</string>
+    <string name="compose_r9_draft_failed_title">הטיוטה הזו לא נשמרה</string>
+    <string name="compose_r9_leave_without_saving">יציאה בלי לשמור</string>
+    <string name="compose_r9_encrypt_failed">לא ניתן היה להצפין את ההודעה, ולכן דבר לא נשלח.</string>
+    <string name="compose_editor_toolbar">עיצוב טקסט</string>
+    <string name="compose_editor_bold">מודגש</string>
+    <string name="compose_editor_italic">נטוי</string>
+    <string name="compose_editor_underline">קו תחתון</string>
+    <string name="compose_editor_strike">קו חוצה</string>
+    <string name="compose_editor_bullets">תבליטים</string>
+    <string name="compose_editor_numbered">ממוספר</string>
+    <string name="compose_editor_text_colour">צבע הטקסט</string>
+    <string name="compose_editor_black">שחור</string>
+    <string name="compose_editor_blue">כחול</string>
+    <string name="compose_editor_red">אדום</string>
+    <string name="compose_editor_green">ירוק</string>
+    <string name="compose_editor_highlight">הדגשה</string>
+    <string name="compose_editor_highlight_colour">צבע הדגשה</string>
+    <string name="compose_editor_yellow">צהוב</string>
+    <string name="compose_editor_pink">ורוד</string>
+    <string name="compose_editor_font">גופן</string>
+    <string name="compose_editor_sans">ללא תגים</string>
+    <string name="compose_editor_serif">Serif</string>
+    <string name="compose_editor_mono">Monospace</string>
+    <string name="compose_editor_larger">גדול יותר</string>
+    <string name="compose_editor_clear">ניקוי עיצוב</string>
+    <string name="compose_editor_image">תמונה</string>
+    <string name="compose_editor_insert_image">הוספת תמונה</string>
+</resources>

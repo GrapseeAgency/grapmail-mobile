@@ -1,6 +1,7 @@
 package com.grapsee.grapmail.security
 
 import androidx.credentials.CreatePublicKeyCredentialRequest
+import androidx.credentials.CreatePublicKeyCredentialResponse
 import androidx.credentials.CredentialManager
 import androidx.credentials.GetCredentialRequest
 import androidx.credentials.GetPublicKeyCredentialOption
@@ -9,6 +10,8 @@ import androidx.credentials.exceptions.CreateCredentialCancellationException
 import androidx.credentials.exceptions.GetCredentialCancellationException
 import androidx.credentials.exceptions.NoCredentialException
 import androidx.fragment.app.FragmentActivity
+import com.grapsee.grapmail.R
+import com.grapsee.grapmail.ui.i18n.CoreStrings
 import com.grapsee.grapmail.data.Api
 import com.grapsee.grapmail.data.PasskeyAuthVerifyRequest
 import com.grapsee.grapmail.data.PasskeyAuthVerifyResponse
@@ -93,26 +96,27 @@ object PasskeyManager {
     suspend fun createPasskey(activity: FragmentActivity, name: String): RegistrationResult {
         return try {
             val token = SessionStore.token(activity.applicationContext)
-                ?: return RegistrationResult.Failed("Sign in again.")
+                ?: return RegistrationResult.Failed(CoreStrings.get(R.string.core_sign_in_again) { "Sign in again." })
             val options = Api.passkeyRegisterOptions(token)
             val challengeId = options.challengeId
             if (challengeId.isNullOrBlank()) {
-                return RegistrationResult.Failed("The server did not send passkey parameters.")
+                return RegistrationResult.Failed(CoreStrings.get(R.string.core_passkey_no_params) { "The server did not send passkey parameters." })
             }
             val optionsJson = options.options?.toString()
-                ?: return RegistrationResult.Failed("The server did not send passkey parameters.")
+                ?: return RegistrationResult.Failed(CoreStrings.get(R.string.core_passkey_no_params) { "The server did not send passkey parameters." })
             // The server's `options` object IS the WebAuthn creation options;
             // re-serialize through JSONObject so Credential Manager receives a
             // validated copy of exactly what the server sent.
             val request = CreatePublicKeyCredentialRequest(JSONObject(optionsJson).toString())
             val manager = CredentialManager.create(activity)
+            // credentials 1.3.0 returns the registration JSON on the response
+            // itself; there is no separate `.credential` wrapper to unwrap.
             val credential = withContext(Dispatchers.Main) {
-                val response = manager.createCredential(activity, request)
-                response.credential as? PublicKeyCredential
-                    ?: throw IllegalStateException("The passkey ceremony returned an unexpected credential.")
+                manager.createCredential(activity, request) as? CreatePublicKeyCredentialResponse
+                    ?: throw IllegalStateException(CoreStrings.get(R.string.core_passkey_unexpected_credential) { "The passkey ceremony returned an unexpected credential." })
             }
             val wire = parseRegistrationJson(credential.registrationResponseJson)
-                ?: return RegistrationResult.Failed("The passkey ceremony returned an unreadable result.")
+                ?: return RegistrationResult.Failed(CoreStrings.get(R.string.core_passkey_unreadable) { "The passkey ceremony returned an unreadable result." })
             val verified = Api.passkeyRegisterVerify(
                 token,
                 PasskeyRegisterVerifyRequest(
@@ -121,7 +125,7 @@ object PasskeyManager {
                     response = wire,
                 ),
             )
-            if (!verified.success) return RegistrationResult.Failed("The passkey was not saved.")
+            if (!verified.success) return RegistrationResult.Failed(CoreStrings.get(R.string.core_passkey_not_saved) { "The passkey was not saved." })
             RegistrationResult.Completed(verified.passkey ?: PasskeyDto(id = wire.id, name = name))
         } catch (e: CancellationException) {
             throw e
@@ -148,22 +152,22 @@ object PasskeyManager {
             val options = Api.passkeyAuthOptions()
             val challengeId = options.challengeId
             if (challengeId.isNullOrBlank()) {
-                return SignInResult.Failed("The server did not send passkey parameters.")
+                return SignInResult.Failed(CoreStrings.get(R.string.core_passkey_no_params) { "The server did not send passkey parameters." })
             }
             val optionsJson = options.options?.toString()
-                ?: return SignInResult.Failed("The server did not send passkey parameters.")
+                ?: return SignInResult.Failed(CoreStrings.get(R.string.core_passkey_no_params) { "The server did not send passkey parameters." })
             val option = GetPublicKeyCredentialOption(JSONObject(optionsJson).toString())
             val request = GetCredentialRequest(listOf(option))
             val manager = CredentialManager.create(activity)
             val credential = withContext(Dispatchers.Main) {
                 val response = manager.getCredential(activity, request)
                 response.credential as? PublicKeyCredential
-                    ?: throw IllegalStateException("The passkey ceremony returned an unexpected credential.")
+                    ?: throw IllegalStateException(CoreStrings.get(R.string.core_passkey_unexpected_credential) { "The passkey ceremony returned an unexpected credential." })
             }
             val wire = parseAuthenticationJson(credential.authenticationResponseJson)
-                ?: return SignInResult.Failed("The passkey ceremony returned an unreadable result.")
+                ?: return SignInResult.Failed(CoreStrings.get(R.string.core_passkey_unreadable) { "The passkey ceremony returned an unreadable result." })
             val verified = Api.passkeyAuthVerify(PasskeyAuthVerifyRequest(challengeId, wire))
-            if (!verified.success) return SignInResult.Failed("The passkey was not accepted.")
+            if (!verified.success) return SignInResult.Failed(CoreStrings.get(R.string.core_passkey_not_accepted) { "The passkey was not accepted." })
             SignInResult.Completed(verified)
         } catch (e: CancellationException) {
             throw e
@@ -176,49 +180,101 @@ object PasskeyManager {
         }
     }
 
+    /**
+     * A usernameless passkey request prepared ahead of a Credential Manager
+     * sheet that also offers saved passwords (see
+     * [PasswordCredentials.requestSavedLogin]). [challengeId] is what the
+     * assertion is verified against once the person picks a passkey.
+     */
+    class PreparedSignIn internal constructor(
+        val challengeId: String,
+        val option: GetPublicKeyCredentialOption,
+    )
+
+    /**
+     * The same public options fetch [signInWithPasskey] starts with, without
+     * the sheet: null whenever the server cannot give options right now, so
+     * the caller can offer saved passwords alone instead of failing.
+     */
+    suspend fun prepareSignIn(): PreparedSignIn? {
+        return try {
+            val options = Api.passkeyAuthOptions()
+            val challengeId = options.challengeId?.takeIf { it.isNotBlank() } ?: return null
+            val optionsJson = options.options?.toString() ?: return null
+            PreparedSignIn(challengeId, GetPublicKeyCredentialOption(JSONObject(optionsJson).toString()))
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    /**
+     * The second half of [signInWithPasskey] for a passkey the person picked
+     * from a combined sheet: post the assertion to the verify route. The
+     * completed result is the same session envelope, stored the same way.
+     */
+    suspend fun verifyPickedPasskey(prepared: PreparedSignIn, credential: PublicKeyCredential): SignInResult {
+        return try {
+            val wire = parseAuthenticationJson(credential.authenticationResponseJson)
+                ?: return SignInResult.Failed(CoreStrings.get(R.string.core_passkey_unreadable) { "The passkey ceremony returned an unreadable result." })
+            val verified = Api.passkeyAuthVerify(PasskeyAuthVerifyRequest(prepared.challengeId, wire))
+            if (!verified.success) return SignInResult.Failed(CoreStrings.get(R.string.core_passkey_not_accepted) { "The passkey was not accepted." })
+            SignInResult.Completed(verified)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            SignInResult.Failed(e.message)
+        }
+    }
+
     /** Flatten the platform's RegistrationResponseJSON into the route's shape. */
-    private fun parseRegistrationJson(raw: String): PasskeyRegistrationResponseJson? = try {
-        val top = JSONObject(raw)
-        val inner = top.optJSONObject("response") ?: return null
-        val rawId = top.optString("rawId")
-        val clientData = inner.optString("clientDataJSON")
-        val attestation = inner.optString("attestationObject")
-        if (clientData.isBlank() || attestation.isBlank()) return null
-        PasskeyRegistrationResponseJson(
-            id = top.optString("id").ifBlank { rawId },
-            rawId = rawId,
-            type = top.optString("type", "public-key").ifBlank { "public-key" },
-            clientDataJSON = clientData,
-            attestationObject = attestation,
-            transports = inner.optJSONArray("transports")?.let { array ->
-                buildList {
-                    for (i in 0 until array.length()) add(array.optString(i))
-                }.takeIf { it.isNotEmpty() }
-            },
-        )
-    } catch (_: Exception) {
-        null
+    private fun parseRegistrationJson(raw: String): PasskeyRegistrationResponseJson? {
+        return try {
+            val top = JSONObject(raw)
+            val inner = top.optJSONObject("response") ?: return null
+            val rawId = top.optString("rawId")
+            val clientData = inner.optString("clientDataJSON")
+            val attestation = inner.optString("attestationObject")
+            if (clientData.isBlank() || attestation.isBlank()) return null
+            PasskeyRegistrationResponseJson(
+                id = top.optString("id").ifBlank { rawId },
+                rawId = rawId,
+                type = top.optString("type", "public-key").ifBlank { "public-key" },
+                clientDataJSON = clientData,
+                attestationObject = attestation,
+                transports = inner.optJSONArray("transports")?.let { array ->
+                    buildList {
+                        for (i in 0 until array.length()) add(array.optString(i))
+                    }.takeIf { it.isNotEmpty() }
+                },
+            )
+        } catch (_: Exception) {
+            null
+        }
     }
 
     /** Flatten the platform's AuthenticationResponseJSON into the route's shape. */
-    private fun parseAuthenticationJson(raw: String): PasskeyAuthenticationResponseJson? = try {
-        val top = JSONObject(raw)
-        val inner = top.optJSONObject("response") ?: return null
-        val rawId = top.optString("rawId")
-        val clientData = inner.optString("clientDataJSON")
-        val authenticatorData = inner.optString("authenticatorData")
-        val signature = inner.optString("signature")
-        if (clientData.isBlank() || authenticatorData.isBlank() || signature.isBlank()) return null
-        PasskeyAuthenticationResponseJson(
-            id = top.optString("id").ifBlank { rawId },
-            rawId = rawId,
-            type = top.optString("type", "public-key").ifBlank { "public-key" },
-            clientDataJSON = clientData,
-            authenticatorData = authenticatorData,
-            signature = signature,
-            userHandle = inner.optString("userHandle").takeIf { it.isNotBlank() },
-        )
-    } catch (_: Exception) {
-        null
+    private fun parseAuthenticationJson(raw: String): PasskeyAuthenticationResponseJson? {
+        return try {
+            val top = JSONObject(raw)
+            val inner = top.optJSONObject("response") ?: return null
+            val rawId = top.optString("rawId")
+            val clientData = inner.optString("clientDataJSON")
+            val authenticatorData = inner.optString("authenticatorData")
+            val signature = inner.optString("signature")
+            if (clientData.isBlank() || authenticatorData.isBlank() || signature.isBlank()) return null
+            PasskeyAuthenticationResponseJson(
+                id = top.optString("id").ifBlank { rawId },
+                rawId = rawId,
+                type = top.optString("type", "public-key").ifBlank { "public-key" },
+                clientDataJSON = clientData,
+                authenticatorData = authenticatorData,
+                signature = signature,
+                userHandle = inner.optString("userHandle").takeIf { it.isNotBlank() },
+            )
+        } catch (_: Exception) {
+            null
+        }
     }
 }

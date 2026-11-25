@@ -24,6 +24,10 @@ import SwiftUI
 /// loaded state before shooting and the file name says which branch it is, so
 /// the photograph documents the empty branch instead of pretending to be a live
 /// break-in.
+///
+/// Round 8 — security center: the Center, the "This wasn't me" confirm sheet,
+/// "Account secured" and the recovery review render from the §6.2 example
+/// body (`SecurityOverviewResponse.sample`) and never fetch or submit.
 enum SecuritySnapshot {
     /// The launch argument the UI tests pass: `-gmSnapshot <name>`.
     static func requested() -> String? {
@@ -78,10 +82,24 @@ struct SecuritySnapshotView: View {
                 SuspiciousSignInAlertView(onBack: {}, onSecure: {}, onThisWasMe: {})
             case "secure-account":
                 SecureMyAccountView(onBack: {}, onChangePassword: {}, onBackToActivity: {})
+            // Round 8 — security center.
+            case "security-center":
+                SecurityCenterView(onBack: {}, onAction: { _, _ in }, onSecured: { _ in },
+                                   onChangePassword: {}, onSignOut: {}, preview: .sample)
+            case "security-not-me":
+                NotMeConfirmSheet(request: NotMeRequest(target: .device("ss_snapshot"), label: "Chrome on Windows"),
+                                  onSecured: { _ in }, onGone: {}, onCancel: {})
+            case "security-account-secured":
+                AccountSecuredView(device: "Chrome on Windows", onChangePassword: {}, onDone: {},
+                                   previewResult: Self.sampleNotMe)
+            case "security-recovery-review":
+                RecoveryReviewView(onDone: {}, onOpen: { _ in }, preview: .sample)
             default:
                 Text("Unknown snapshot: \(name)")
-                    .font(.system(size: 15, weight: .semibold))
+                    .gmFont(15, .semibold)
                     .foregroundColor(GM.textPrimary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 20)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
@@ -95,5 +113,15 @@ struct SecuritySnapshotView: View {
         // failure message is not evidence; the marker is.
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("gm-snapshot")
+    }
+
+    /// The §6.3 example `result`.
+    private static var sampleNotMe: NotMeResult {
+        var result = NotMeResult()
+        result.reportId = "ev_snapshot_report"
+        result.revokedDeviceIds = ["ss_snapshot"]
+        result.signedOutSessions = 3
+        result.passwordChangeRequired = true
+        return result
     }
 }

@@ -34,8 +34,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.grapsee.grapmail.logic.SignUpViewModel
 import com.grapsee.grapmail.ui.components.GradientButton
+import com.grapsee.grapmail.ui.components.gmIsShortWindow
 import com.grapsee.grapmail.ui.components.rememberScrolledToEnd
 import com.grapsee.grapmail.ui.theme.LocalPalette
+import androidx.compose.ui.res.stringResource
+import com.grapsee.grapmail.R
 
 /**
  * Step 5 — "Terms & Privacy" — founder design verbatim: the scrollable
@@ -53,9 +56,15 @@ fun TermsStepScreen(
     onLegal: (GrapMailLegalDocument) -> Unit,
 ) {
     val palette = LocalPalette.current
+    val termsTitle = stringResource(R.string.acct_terms_of_service)
+    val privacyTitle = stringResource(R.string.acct_privacy_policy)
     val state by vm.state.collectAsStateWithLifecycle()
     val scroll = rememberScrollState()
     val scrolledToEnd = rememberScrolledToEnd(scroll)
+    // The terms card scrolls inside the step. In a short window (a phone in
+    // landscape, a split-screen half, a cover screen) a 320dp card would be
+    // the whole window, hiding the agree box and the action; it gets 200dp.
+    val termsMaxHeight = if (gmIsShortWindow()) 200.dp else 320.dp
 
     // Navigation fires once, from the VM's onCreated callback (wired in the
     // bottom bar). The old LaunchedEffect(createdAddress) fired on the same
@@ -63,13 +72,13 @@ fun TermsStepScreen(
 
     WizardScaffold(
         step = 5,
-        title = "Terms & Privacy",
-        subtitle = AnnotatedSubtitle(rest = "Please read and agree to our Terms of Service and Privacy Policy to continue."),
+        title = stringResource(R.string.acct_terms_privacy),
+        subtitle = AnnotatedSubtitle(rest = stringResource(R.string.acct_please_read_and_agree_to_our_terms)),
         onBack = onBack,
         onSignIn = onSignIn,
         bottomBar = {
             GradientButton(
-                if (state.creating) "Creating…" else "Create Account",
+                if (state.creating) stringResource(R.string.acct_creating) else stringResource(R.string.acct_create_account_button),
                 onClick = {
                     vm.createAccount(
                         onCreated = { address, name -> onCreated(address, name) },
@@ -85,33 +94,35 @@ fun TermsStepScreen(
         Column(
             Modifier
                 .fillMaxWidth()
-                .heightIn(max = 320.dp)
+                .heightIn(max = termsMaxHeight)
                 .clip(RoundedCornerShape(20.dp))
                 .border(1.dp, palette.border, RoundedCornerShape(20.dp))
                 .background(palette.card)
                 .verticalScroll(scroll)
                 .padding(18.dp),
         ) {
-            Text("GrapMail Terms of Service", fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = palette.textPrimary)
+            Text(stringResource(R.string.acct_grapmail_terms_of_service), fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = palette.textPrimary)
             Spacer(Modifier.height(14.dp))
-            Text("1.  Your Account", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = palette.textPrimary)
+            Text(stringResource(R.string.acct_1_your_account), fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = palette.textPrimary)
             Spacer(Modifier.height(6.dp))
             Text(
                 buildAnnotatedString {
-                    append("By creating an account, you agree to our ")
-                    appendLegalLink(GrapMailLegalDocument.Terms, palette.primarySolid, onLegal)
-                    append(" and confirm that you are at least 13 years old. You are responsible for keeping your account secure and for all activity that happens under your account.")
+                    appendWithLegalLinks(
+                        stringResource(R.string.acct_terms_section_account_body), palette.primarySolid, onLegal,
+                        GrapMailLegalDocument.Terms to termsTitle,
+                    )
                 },
                 fontSize = 13.sp, lineHeight = 20.sp, color = palette.textSecondary,
             )
             Spacer(Modifier.height(16.dp))
-            Text("2.  Privacy Policy", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = palette.textPrimary)
+            Text(stringResource(R.string.acct_2_privacy_policy), fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = palette.textPrimary)
             Spacer(Modifier.height(6.dp))
             Text(
                 buildAnnotatedString {
-                    append("GrapMail uses your account and mailbox data to operate the service. Read about account data, notifications, remote images and deletion in the ")
-                    appendLegalLink(GrapMailLegalDocument.Privacy, palette.primarySolid, onLegal)
-                    append(".")
+                    appendWithLegalLinks(
+                        stringResource(R.string.acct_terms_section_privacy_body), palette.primarySolid, onLegal,
+                        GrapMailLegalDocument.Privacy to privacyTitle,
+                    )
                 },
                 fontSize = 13.sp, lineHeight = 20.sp, color = palette.textSecondary,
             )
@@ -119,9 +130,9 @@ fun TermsStepScreen(
 
         Spacer(Modifier.height(12.dp))
         Text(buildAnnotatedString {
-            appendLegalLink(GrapMailLegalDocument.Terms, palette.primarySolid, onLegal)
+            appendLegalLink(GrapMailLegalDocument.Terms, palette.primarySolid, onLegal, termsTitle)
             append("  ·  ")
-            appendLegalLink(GrapMailLegalDocument.Privacy, palette.primarySolid, onLegal)
+            appendLegalLink(GrapMailLegalDocument.Privacy, palette.primarySolid, onLegal, privacyTitle)
         }, fontSize = 14.sp, lineHeight = 22.sp, modifier = Modifier.padding(vertical = 6.dp))
 
         Spacer(Modifier.height(16.dp))
@@ -152,12 +163,12 @@ fun TermsStepScreen(
             Spacer(Modifier.width(12.dp))
             Column {
                 Text(
-                    "I agree to the Terms of Service and Privacy Policy.",
+                    stringResource(R.string.acct_i_agree_to_the_terms_of_service_and),
                     fontSize = 13.sp, color = palette.textPrimary,
                 )
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    "You must scroll to the bottom of this document to enable the checkbox.",
+                    stringResource(R.string.acct_you_must_scroll_to_the_bottom_of),
                     fontSize = 11.sp, color = palette.textTertiary,
                 )
             }

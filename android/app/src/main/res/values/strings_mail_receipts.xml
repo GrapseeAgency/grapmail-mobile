@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Server-recorded read receipts (RFC 8098). A sibling of strings_mail.xml, merged
+  by aapt like every values/*.xml. Kept separate only because strings_mail.xml is
+  edited in parallel and this environment has no in-place edit; move these into
+  strings_mail.xml when convenient (names are unique, nothing else changes).
+  The on-device markers in strings_mail.xml (mail_receipt_opened, ...) stay
+  labelled local and are untouched.
+-->
+<resources>
+    <string name="mail_receipt_read_at">Read %1$s</string>
+    <string name="mail_receipt_requested_pending">Read receipt requested · not read yet</string>
+    <string name="mail_receipt_server_sent">Read receipt sent</string>
+    <string name="mail_receipt_ask_title">The sender asked for a read receipt</string>
+    <string name="mail_receipt_ask_body">Send a receipt to %1$s saying you opened this message? It tells them when you opened it, and nothing else.</string>
+    <string name="mail_receipt_ask_send">Send receipt</string>
+    <string name="mail_receipt_ask_decline">Don\'t send</string>
+    <string name="mail_receipt_mode_title">Send read receipts</string>
+    <string name="mail_receipt_mode_body">When a message asks for a read receipt. Receipts are never sent for spam or blocked senders, or for encrypted mail, unless you choose Always.</string>
+    <string name="mail_receipt_mode_never">Never</string>
+    <string name="mail_receipt_mode_ask">Ask</string>
+    <string name="mail_receipt_mode_always">Always</string>
+    <string name="mail_receipt_mode_always_note">Always also sends receipts for spam, blocked senders and encrypted mail.</string>
+    <string name="mail_receipt_mode_unavailable">Couldn\'t load this setting. Check your connection.</string>
+    <string name="mail_compose_request_receipt">Request read receipt</string>
+</resources>

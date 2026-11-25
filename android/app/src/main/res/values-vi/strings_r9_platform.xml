@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="r9_platform_notif_channel_new_mail_desc">Báo khi có tin nhắn mới đến hộp thư đến.</string>
+    <string name="r9_platform_price_per_week">%1$s/tuần</string>
+    <string name="r9_platform_price_per_month">%1$s/tháng</string>
+    <string name="r9_platform_price_per_3_months">%1$s mỗi 3 tháng</string>
+    <string name="r9_platform_price_per_6_months">%1$s mỗi 6 tháng</string>
+    <string name="r9_platform_price_per_year">%1$s/năm</string>
+</resources>

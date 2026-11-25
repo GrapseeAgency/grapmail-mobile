@@ -32,7 +32,18 @@ struct MailDrawer: View {
     let onHelp: () -> Void
     let onSignOut: () -> Void
 
+    /// 300 pt at the default text size. Larger text widens the column (never
+    /// past 420 pt, and always leaving a strip of scrim to tap) so folder names
+    /// are not cut short; it never shrinks below the design's 300.
+    @ScaledMetric(relativeTo: .body) private var drawerWidth: CGFloat = 300
+
     var body: some View {
+        GeometryReader { window in
+            drawerBody(width: min(drawerWidth, 420, max(300, window.size.width - 56)))
+        }
+    }
+
+    private func drawerBody(width: CGFloat) -> some View {
         HStack(spacing: 0) {
             // The folders scroll; the account actions do not. Putting the lower
             // group in the same scroller as the boxes is what made Security and
@@ -49,7 +60,7 @@ struct MailDrawer: View {
                             .padding(.bottom, 20)
 
                         ForEach(boxes) { b in
-                            DrawerRow(label: b.title, icon: drawerIcon(b),
+                            DrawerRow(label: b.titleResource, icon: drawerIcon(b),
                                       count: counts[b] ?? nil, selected: b == box) {
                                 onSelect(b)
                             }
@@ -100,7 +111,7 @@ struct MailDrawer: View {
                           selected: false, onClick: onHelp)
                 Button(action: onSignOut) {
                     Text("Sign out")
-                        .font(.system(size: 14, weight: .medium))
+                        .gmFont(14, .medium)
                         .foregroundColor(GM.error)
                         .padding(.horizontal, 32)
                         .padding(.vertical, 12)
@@ -108,20 +119,36 @@ struct MailDrawer: View {
                 .accessibilityIdentifier("sign-out")
                 Spacer(minLength: 0)
             }
-            .frame(width: 300)
+            .frame(width: width)
             .frame(maxHeight: .infinity)
             .background(GM.card)
+            // The folder panel is a modal: VoiceOver stays inside it until it
+            // closes, and the two-finger "scrub" (escape) closes it.
+            .accessibilityAddTraits(.isModal)
+            .accessibilityAction(.escape) { onDismiss() }
 
-            Color.black.opacity(0.28)
+            // The theme's scrim (round8-spec §1.4: #0F172A @ 40 % light,
+            // black @ 60 % dark), not a hard-coded black.
+            GM.scrim
+                .contentShape(Rectangle())
                 .onTapGesture(perform: onDismiss)
                 .accessibilityLabel("Close folders")
+                .accessibilityAddTraits(.isButton)
+        }
+        // A hardware keyboard's Escape closes the drawer too (iPad).
+        .background {
+            Button("Close folders", action: onDismiss)
+                .keyboardShortcut(.cancelAction)
+                .mailShortcutCarrier()
         }
     }
 
-    @ViewBuilder private func section(_ title: String) -> some View {
-        Text(title.uppercased())
-            .font(.system(size: 11, weight: .bold))
+    /// `LocalizedStringResource` so the literal at each call site is extracted
+    /// into the String Catalog; uppercased in the device locale after lookup.
+    @ViewBuilder private func section(_ title: LocalizedStringResource) -> some View {
+        Text(String(localized: title).uppercased())
             .kerning(1)
+            .gmFont(11, .bold)
             .foregroundColor(GM.textTertiary)
             .padding(.horizontal, 20)
             .padding(.top, 18)
@@ -130,42 +157,56 @@ struct MailDrawer: View {
 }
 
 private struct DrawerRow: View {
-    let label: String
+    /// A resource, not a String: the row draws the translation, while the
+    /// accessibility identifier keeps the stable English key
+    /// (`mail-drawer-Inbox`, which the UI walk taps).
+    let label: LocalizedStringResource
     let icon: String
     let count: Int?
     let selected: Bool
     let onClick: () -> Void
 
+    /// The icon column, so labels stay aligned as the glyphs grow with text.
+    @ScaledMetric(relativeTo: .subheadline) private var iconWidth: CGFloat = 22
+
     var body: some View {
         Button(action: onClick) {
             HStack(spacing: 12) {
                 Image(systemName: icon)
-                    .font(.system(size: 16))
-                    .foregroundColor(selected ? GM.primarySolid : GM.textSecondary)
-                    .frame(width: 22)
+                    .gmFont(16, maxSize: 30)
+                    .foregroundColor(selected ? GM.primaryText : GM.textSecondary)
+                    .frame(width: min(iconWidth, 36))
+                    .accessibilityHidden(true)
+                // Wraps rather than truncating at the larger text sizes; at the
+                // default size every folder name fits on one line as before.
                 Text(label)
-                    .font(.system(size: 15, weight: selected ? .semibold : .regular))
-                    .foregroundColor(selected ? GM.primarySolid : GM.textPrimary)
-                    .lineLimit(1)
+                    .gmFont(15, selected ? .semibold : .regular)
+                    .foregroundColor(selected ? GM.primaryText : GM.textPrimary)
+                    .lineLimit(3)
+                    .fixedSize(horizontal: false, vertical: true)
                 Spacer()
                 CountBadge(count: count)
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 10)
+            .frame(minHeight: 44)
             .background(
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
                     .fill(selected ? GM.softFill : Color.clear)
             )
+            .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .hoverEffect(.highlight)
             .padding(.horizontal, 12)
             .padding(.vertical, 2)
         }
         .buttonStyle(.plain)
-        .accessibilityIdentifier("mail-drawer-\(label)")
+        .accessibilityAddTraits(selected ? .isSelected : [])
+        .accessibilityIdentifier("mail-drawer-\(label.key)")
     }
 }
 
 /// SF Symbols, mapped to the same meanings the Android drawer uses. There is no
-/// `AllInbox` glyph on iOS, so All Mail takes the generic mail symbol — the row
+/// `AllInbox` glyph on iOS, so All Mail takes the stacked-trays symbol — the row
 /// is labelled, so the glyph carries no unique information anyway.
 private func drawerIcon(_ b: MailBox) -> String {
     switch b {
@@ -177,7 +218,9 @@ private func drawerIcon(_ b: MailBox) -> String {
     case .spam:     return "exclamationmark.triangle"
     case .trash:    return "trash"
     case .screener: return "lock"
-    case .others:   return "mail"
+    // "tray.2" (SF Symbols 1, so present on every iOS this app supports): an
+    // unknown symbol name draws an empty image and leaves a blank icon slot.
+    case .others:   return "tray.2"
     case .snoozed:  return "clock"
     }
 }
@@ -215,7 +258,9 @@ struct LabelStrip: View {
         } else {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {
-                    LabelChip(label: "Inbox", count: unread, color: GM.primarySolid,
+                    // The text token: the chip draws its word in this colour,
+                    // and cobalt text on a dark chip is under 4.5:1.
+                    LabelChip(label: MailBox.inbox.title, count: unread, color: GM.primaryText,
                               selected: query.isEmpty && filter == .all)
                     ForEach(labels) { l in
                         // The server's palette key, resolved to a swatch. The old
@@ -255,27 +300,33 @@ struct MailHomeTopBar<Search: View>: View {
             HStack(spacing: 6) {
                 Button(action: onMenu) {
                     Image(systemName: "line.3.horizontal")
-                        .font(.system(size: 19))
+                        .gmFont(19, maxSize: 28)
                         .foregroundColor(GM.textPrimary)
                         .frame(width: 44, height: 44)
+                        // First-time tip (FeatureTips.swift): the Screener queue
+                        // lives in the drawer this button opens.
+                        .featureTip(.screener)
                 }
                 .accessibilityLabel("Open folders")
                 .accessibilityIdentifier("mail-menu")
 
                 search()
 
-                Button { accountOpen.toggle() } label: {
+                Button { FeatureTips.used(.accounts); accountOpen.toggle() } label: {
                     Group {
                         if accountPhoto != nil || accountName?.nilIfBlank() != nil || accountAddress?.nilIfBlank() != nil {
                             AccountAvatar(photo: accountPhoto, name: accountName ?? "",
                                           address: accountAddress ?? "", size: 36)
                         } else {
                             Image(systemName: "person.crop.circle")
-                                .font(.system(size: 30))
+                                .gmFont(30, maxSize: 36)
                                 .foregroundColor(GM.textSecondary)
                         }
                     }
                     .frame(width: 44, height: 44)
+                    // First-time tip: switching and adding accounts. On the
+                    // label, so it never shares a view with the switcher popover.
+                    .featureTip(.accounts)
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("Account")
@@ -296,7 +347,7 @@ struct MailHomeTopBar<Search: View>: View {
             .padding(.vertical, 8)
 
             Text(boxTitle)
-                .font(.system(size: 13, weight: .medium))
+                .gmFont(13, .medium)
                 .foregroundColor(GM.textSecondary)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, 16)
@@ -403,22 +454,28 @@ struct MailBottomBar: View {
     }
 
     @ViewBuilder private func item(
-        icon: String, label: String, active: Bool = false, unread: Int? = nil,
+        icon: String, label: LocalizedStringResource, active: Bool = false, unread: Int? = nil,
         action: (() -> Void)?
     ) -> some View {
         let badgeCount = unread.flatMap { $0 > 0 ? $0 : nil }
+        let name = String(localized: label)
+        // The glyph is capped like the system tab bar's: the bar's height is
+        // the list's bottom clearance. At the accessibility sizes a long
+        // press shows the large-content viewer instead (below).
         let visual = Image(systemName: icon)
-            .font(.system(size: 22))
+            .gmFont(22, maxSize: 28)
             .foregroundColor(active ? GM.textPrimary : GM.textSecondary)
             .frame(width: 84, height: 46)
             .overlay(alignment: .top) {
                 if let badgeCount {
                     Text(badgeCount > 99 ? "99+" : String(badgeCount))
-                        .font(.system(size: 10, weight: .semibold))
-                        .foregroundColor(.white)
+                        .gmFont(10, .semibold, maxSize: 15)
+                        .foregroundColor(GM.onPrimary)
                         .padding(.horizontal, 5)
                         .padding(.vertical, 1)
-                        .background(Color(red: 0.74, green: 0.16, blue: 0.16), in: Capsule())
+                        // The unread badge token (round8-spec §1.12 `errorFill`):
+                        // white on it is 4.8:1 in both themes.
+                        .background(GM.errorFill, in: Capsule())
                         .offset(x: 14, y: 2)
                         .allowsHitTesting(false)
                         .accessibilityHidden(true)
@@ -433,7 +490,13 @@ struct MailBottomBar: View {
                 visual.accessibilityAddTraits(.isSelected)
             }
         }
-        .accessibilityLabel(badgeCount.map { "\(label), \($0) unread" } ?? label)
-        .accessibilityIdentifier("mail-tab-\(label)")
+        .accessibilityLabel(badgeCount.map { String(localized: "\(name), \($0) unread", comment: "Tab bar item: tab name, unread count") } ?? name)
+        // Capped glyph, no visible word: the large-content viewer shows the
+        // tab's icon and name big on a long press at the accessibility sizes.
+        .accessibilityShowsLargeContentViewer {
+            Label(name, systemImage: icon)
+        }
+        // The English key, so the identifier does not change with the language.
+        .accessibilityIdentifier("mail-tab-\(label.key)")
     }
 }

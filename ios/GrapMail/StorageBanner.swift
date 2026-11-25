@@ -35,9 +35,13 @@ extension ApiClient {
 /// Read when the mailbox appears or returns to the front, at most once a minute.
 /// Drawn at 80% and above; "Not now" hides it until the level rises. A failed read
 /// draws nothing.
+///
+/// Text follows Dynamic Type (ScaledFont.swift); at the accessibility sizes the
+/// two buttons stack instead of squeezing each other onto one line.
 struct StorageBanner: View {
     let onOpenFiles: () -> Void
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.dynamicTypeSize) private var dts
     @State private var usage: MailStorageResponse?
     @State private var dismissedLevel: String?
     @State private var lastRead = Date.distantPast
@@ -48,17 +52,18 @@ struct StorageBanner: View {
                 let warning = u.level == "warning"
                 VStack(alignment: .leading, spacing: 4) {
                     Text(u.level == "full" ? "Your storage is full" : "Your storage is almost full")
-                        .font(.system(size: 13, weight: .semibold))
+                        .gmFont(13, .semibold)
                         .foregroundColor(warning ? GM.warnInk : GM.error)
+                        .fixedSize(horizontal: false, vertical: true)
                     Text("\(u.usedLabel) of \(u.limitLabel) used (\(Self.percent(u.percent))). Delete large attachments, then empty Trash and Spam.")
-                        .font(.system(size: 12))
+                        .gmFont(12)
                         .foregroundColor(GM.textSecondary)
                         .fixedSize(horizontal: false, vertical: true)
-                    HStack(spacing: 16) {
+                    GMAdaptiveStack(spacing: dts.isAccessibilitySize ? 8 : 16) {
                         Button("See large files", action: onOpenFiles)
                         Button("Not now") { dismissedLevel = u.level }
                     }
-                    .font(.system(size: 12, weight: .semibold))
+                    .gmFont(12, .semibold)
                     .foregroundColor(GM.primarySolid)
                     .padding(.top, 2)
                 }

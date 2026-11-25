@@ -1,0 +1,15 @@
+[
+  {
+    "relation": [
+      "delegate_permission/common.handle_all_urls",
+      "delegate_permission/common.get_login_creds"
+    ],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.grapsee.grapmail",
+      "sha256_cert_fingerprints": [
+        "34:40:05:58:53:3B:1E:70:63:93:90:B4:DB:E7:4E:8A:E6:6D:A3:84:00:21:5B:7D:49:F8:8B:D7:14:A3:7B:0F"
+      ]
+    }
+  }
+]

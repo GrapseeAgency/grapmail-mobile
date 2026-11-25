@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Sent-list read-receipt suffixes (Brazilian Portuguese). Leading space + middle dot, as in English. -->
+<resources>
+    <string name="mail_row_receipt_read_suffix">\u0020· lido</string>
+    <string name="mail_row_receipt_requested_suffix">\u0020· confirmação solicitada</string>
+</resources>

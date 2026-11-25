@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="mail_receipt_read_at">נקרא %1$s</string>
+    <string name="mail_receipt_requested_pending">התבקש אישור קריאה · עדיין לא נקרא</string>
+    <string name="mail_receipt_server_sent">אישור קריאה נשלח</string>
+    <string name="mail_receipt_ask_title">השולח ביקש אישור קריאה</string>
+    <string name="mail_receipt_ask_body">לשלוח אל %1$s אישור שפתחת את ההודעה? הנמען יידע רק מתי פתחת אותה, ותו לא.</string>
+    <string name="mail_receipt_ask_send">שליחת אישור</string>
+    <string name="mail_receipt_ask_decline">לא לשלוח</string>
+    <string name="mail_receipt_mode_title">שליחת אישורי קריאה</string>
+    <string name="mail_receipt_mode_body">כשהודעה מבקשת אישור קריאה. אישורים אף פעם לא נשלחים עבור ספאם, שולחים חסומים או דואר מוצפן, אלא אם בחרת \"תמיד\".</string>
+    <string name="mail_receipt_mode_never">אף פעם</string>
+    <string name="mail_receipt_mode_ask">לשאול</string>
+    <string name="mail_receipt_mode_always">תמיד</string>
+    <string name="mail_receipt_mode_always_note">\"תמיד\" שולח אישורים גם עבור ספאם, שולחים חסומים ודואר מוצפן.</string>
+    <string name="mail_receipt_mode_unavailable">לא ניתן לטעון את ההגדרה הזו. יש לבדוק את החיבור.</string>
+    <string name="mail_compose_request_receipt">בקשת אישור קריאה</string>
+</resources>

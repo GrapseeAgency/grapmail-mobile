@@ -41,36 +41,37 @@ struct ForgotPasswordView: View {
         AccountScreen(
             onBack: onBack,
             illustration: "ill_account_forgot",
-            eyebrow: "Forgot password",
-            title: "Reset your password",
-            subtitle: "Enter your GrapMail address and we'll email a reset link to the recovery email on your account.",
+            eyebrow: String(localized: "Forgot password", comment: "Small label above the screen title (forgot password screen)"),
+            title: String(localized: "Reset your password", comment: "Screen title (forgot password screen)"),
+            subtitle: String(localized: "Enter your GrapMail address and we'll email a reset link to the recovery email on your account.", comment: "Screen description under the title (forgot password screen)"),
             content: {
                 AppTextField(
                     value: $identifier,
-                    hint: "GrapMail address",
+                    hint: String(localized: "GrapMail address", comment: "Text field placeholder (forgot password screen)"),
                     keyboardType: .emailAddress,
-                    leadingIcon: "envelope"
+                    leadingIcon: "envelope",
+                    contentType: .username
                 )
                 .onAppear { identifier = model.identifier }
                 Spacer().frame(height: 22)
             },
             footer: {
                 GradientButton(
-                    title: "Continue",
+                    title: String(localized: "Continue", comment: "Button title (forgot password screen)"),
                     enabled: !identifier.isEmpty,
                     busy: busy,
                     trailing: AnyView(
-                        Image(systemName: "arrow.right")
-                            .font(.system(size: 15, weight: .semibold))
+                        Image(systemName: "arrow.right").flipsForRightToLeftLayoutDirection(true)
+                            .gmFont(15, .semibold, maxSize: 24)
                             .foregroundColor(.white)
                     )
                 ) { submit() }
                 if let error {
-                    Text(error).font(GMFont.caption).foregroundColor(GM.error).padding(.top, 10)
+                    Text(error).gmFont(.caption).foregroundColor(GM.error).padding(.top, 10)
                 }
                 HStack {
                     Spacer()
-                    AccountLink(title: "Find your GrapMail address", action: onFindAddress)
+                    AccountLink(title: String(localized: "Find your GrapMail address", comment: "Link-style button (forgot password screen)"), action: onFindAddress)
                     Spacer()
                 }
                 .padding(.top, 8)
@@ -81,7 +82,7 @@ struct ForgotPasswordView: View {
                 if DeviceKeyManager.hasKey() {
                     HStack {
                         Spacer()
-                        AccountLink(title: "Use a trusted device instead", action: {
+                        AccountLink(title: String(localized: "Use a trusted device instead", comment: "Link-style button (forgot password screen)"), action: {
                             model.identifier = identifier.trimmingCharacters(in: .whitespaces)
                             onTrustedDevice()
                         })
@@ -90,8 +91,8 @@ struct ForgotPasswordView: View {
                     .padding(.top, 4)
                 }
                 FooterNote(
-                    text: "Need help? Contact our support team.",
-                    linkText: "support team",
+                    text: String(localized: "Need help? Contact our support team.", comment: "Footer note (forgot password screen)"),
+                    linkText: String(localized: "support team", comment: "Tappable words in the footer note; must appear verbatim in the note's translation (forgot password screen)"),
                     onLink: onSupport
                 )
                 .padding(.top, 14)
@@ -119,7 +120,7 @@ struct ForgotPasswordView: View {
                 // screen says which.
                 if resp.challengeId != nil { onCodeSent() } else { onNeedsManualReview() }
             } catch {
-                self.error = apiMessage(error, fallback: "We could not start the reset. Try again.")
+                self.error = apiMessage(error, fallback: String(localized: "We could not start the reset. Try again.", comment: "Error message shown when the server gives no reason (forgot password screen)"))
             }
         }
     }
@@ -141,11 +142,13 @@ struct RecoveryCodeView: View {
         AccountScreen(
             onBack: onBack,
             illustration: "ill_account_recovery_code",
-            eyebrow: "Verify recovery code",
-            title: "Enter the 6-digit code",
-            subtitle: "We've sent a 6-digit verification code to your verified phone number. Please enter the code to continue.",
+            eyebrow: String(localized: "Verify recovery code", comment: "Small label above the screen title (recovery code screen)"),
+            title: String(localized: "Enter the 6-digit code", comment: "Screen title (recovery code screen)"),
+            subtitle: String(localized: "We've sent a 6-digit verification code to your verified phone number. Please enter the code to continue.", comment: "Screen description under the title (recovery code screen)"),
             content: {
                 CodeCells(length: 6, value: $code)
+                    // Round 8 — B: the recovery code is offered above the keyboard.
+                    .textContentType(.oneTimeCode)
                 HStack {
                     Spacer()
                     CodeExpiry(expiresAt: model.expiresAt)
@@ -155,11 +158,11 @@ struct RecoveryCodeView: View {
             },
             footer: {
                 GradientButton(
-                    title: "Continue",
+                    title: String(localized: "Continue", comment: "Button title (recovery code screen)"),
                     enabled: code.count == 6,
                     trailing: AnyView(
-                        Image(systemName: "arrow.right")
-                            .font(.system(size: 15, weight: .semibold))
+                        Image(systemName: "arrow.right").flipsForRightToLeftLayoutDirection(true)
+                            .gmFont(15, .semibold, maxSize: 24)
                             .foregroundColor(.white)
                     )
                 ) {
@@ -169,19 +172,19 @@ struct RecoveryCodeView: View {
                 OrDivider().padding(.top, 14)
                 HStack {
                     Spacer()
-                    AccountLink(title: resending ? "Sending…" : "Resend code") { resend() }
+                    AccountLink(title: resending ? String(localized: "Sending…", comment: "Link-style button (recovery code screen)") : String(localized: "Resend code", comment: "Link-style button (recovery code screen)")) { resend() }
                     Spacer()
                 }
                 .padding(.top, 10)
                 if let notice {
-                    Text(notice).font(.system(size: 12)).foregroundColor(GM.success)
+                    Text(notice).gmFont(12).foregroundColor(GM.success)
                         .frame(maxWidth: .infinity)
                 }
                 if let error {
-                    Text(error).font(.system(size: 12)).foregroundColor(GM.error)
+                    Text(error).gmFont(12).foregroundColor(GM.error)
                         .frame(maxWidth: .infinity)
                 }
-                FooterNote(text: "Didn't receive the code? Check your spam folder.", divider: false)
+                FooterNote(text: String(localized: "Didn't receive the code? Check your spam folder.", comment: "Footer note (recovery code screen)"), divider: false)
                     .padding(.top, 12)
                 Spacer().frame(height: 4)
             }
@@ -199,12 +202,12 @@ struct RecoveryCodeView: View {
                     code = ""
                     model.challengeId = cid
                     model.expiresAt = resp.expiresAt.map { Date(timeIntervalSince1970: TimeInterval($0) / 1000) }
-                    notice = "A new code is on its way."
+                    notice = String(localized: "A new code is on its way.", comment: "Notice after a verification code was resent")
                 } else {
-                    error = "We couldn't send another code. Contact support and we'll help."
+                    error = String(localized: "We couldn't send another code. Contact support and we'll help.", comment: "Recovery code resend error")
                 }
             } catch {
-                self.error = apiMessage(error, fallback: "Could not resend the code. Try again.")
+                self.error = apiMessage(error, fallback: String(localized: "Could not resend the code. Try again.", comment: "Error message shown when the server gives no reason (recovery code screen)"))
             }
         }
     }
@@ -225,6 +228,9 @@ struct NewPasswordView: View {
     @State private var password = ""
     @State private var confirm = ""
     @State private var error: String?
+    /// Set when the server refused the code itself, so the "Enter the code
+    /// again" link does not depend on the wording of a translated message.
+    @State private var codeRejected = false
     @State private var busy = false
 
     private var hasLength: Bool { password.count >= 8 }
@@ -246,15 +252,21 @@ struct NewPasswordView: View {
         AccountScreen(
             onBack: onBack,
             illustration: "ill_account_new_password",
-            eyebrow: "Create new password",
-            title: "Set a new password",
-            subtitle: "Your new password must be strong and secure. Make sure it's something you haven't used before.",
+            eyebrow: String(localized: "Create new password", comment: "Small label above the screen title (new password screen)"),
+            title: String(localized: "Set a new password", comment: "Screen title (new password screen)"),
+            subtitle: String(localized: "Your new password must be strong and secure. Make sure it's something you haven't used before.", comment: "Screen description under the title (new password screen)"),
             content: {
+                // Round 8 — B: the account the new password belongs to, so the
+                // password manager updates that entry instead of a nameless one.
+                if let username = (model.resetAddress ?? model.identifier).nilIfBlank() {
+                    CredentialUsernameField(username: username)
+                }
                 AppTextField(
                     value: $password,
-                    hint: "New password",
+                    hint: String(localized: "New password", comment: "Text field placeholder (new password screen)"),
                     isPassword: true,
-                    leadingIcon: "lock"
+                    leadingIcon: "lock",
+                    contentType: .newPassword
                 )
                 HStack(spacing: 6) {
                     ForEach(0..<5, id: \.self) { i in
@@ -265,53 +277,54 @@ struct NewPasswordView: View {
                 }
                 .padding(.top, 12)
                 Text("Password strength")
-                    .font(.system(size: 12))
+                    .gmFont(12)
                     .foregroundColor(GM.textTertiary)
                     .padding(.top, 8)
                 AppTextField(
                     value: $confirm,
-                    hint: "Confirm new password",
+                    hint: String(localized: "Confirm new password", comment: "Text field placeholder (new password screen)"),
                     isPassword: true,
-                    leadingIcon: "lock"
+                    leadingIcon: "lock",
+                    contentType: .newPassword
                 )
                 .padding(.top, 18)
                 VStack(alignment: .leading, spacing: 0) {
-                    RuleLine(label: "At least 8 characters", met: hasLength)
-                    RuleLine(label: "Include a letter", met: hasLetter)
-                    RuleLine(label: "Include a number", met: hasDigit)
-                    RuleLine(label: "Include a special character", met: hasSpecial)
-                    RuleLine(label: "Not commonly used", met: isFresh)
+                    RuleLine(label: String(localized: "At least 8 characters", comment: "Password requirement (new password screen)"), met: hasLength)
+                    RuleLine(label: String(localized: "Include a letter", comment: "Password requirement (new password screen)"), met: hasLetter)
+                    RuleLine(label: String(localized: "Include a number", comment: "Password requirement (new password screen)"), met: hasDigit)
+                    RuleLine(label: String(localized: "Include a special character", comment: "Password requirement (new password screen)"), met: hasSpecial)
+                    RuleLine(label: String(localized: "Not commonly used", comment: "Password requirement (new password screen)"), met: isFresh)
                 }
                 .padding(.top, 16)
                 if !confirm.isEmpty && !matches {
                     Text("Both passwords must match.")
-                        .font(GMFont.caption)
+                        .gmFont(.caption)
                         .foregroundColor(GM.error)
                         .padding(.top, 8)
                 }
             },
             footer: {
                 GradientButton(
-                    title: "Reset Password",
+                    title: String(localized: "Reset Password", comment: "Button title (new password screen)"),
                     enabled: ready,
                     busy: busy,
                     trailing: AnyView(
-                        Image(systemName: "arrow.right")
-                            .font(.system(size: 15, weight: .semibold))
+                        Image(systemName: "arrow.right").flipsForRightToLeftLayoutDirection(true)
+                            .gmFont(15, .semibold, maxSize: 24)
                             .foregroundColor(.white)
                     )
                 ) { submit() }
                 if let error {
-                    Text(error).font(GMFont.caption).foregroundColor(GM.error).padding(.top, 10)
-                    if error.lowercased().contains("code") {
+                    Text(error).gmFont(.caption).foregroundColor(GM.error).padding(.top, 10)
+                    if codeRejected || error.lowercased().contains("code") {
                         HStack {
                             Spacer()
-                            AccountLink(title: "Enter the code again", action: onBackToCode)
+                            AccountLink(title: String(localized: "Enter the code again", comment: "Link-style button (new password screen)"), action: onBackToCode)
                             Spacer()
                         }
                     }
                 }
-                FooterNote(text: "Your password will be encrypted and kept secure.", divider: false)
+                FooterNote(text: String(localized: "Your password will be encrypted and kept secure.", comment: "Footer note (new password screen)"), divider: false)
                     .padding(.top, 16)
                 Spacer().frame(height: 4)
             }
@@ -320,10 +333,10 @@ struct NewPasswordView: View {
 
     private func submit() {
         guard let challenge = model.challengeId else {
-            error = "That reset link expired. Start again."
+            error = String(localized: "That reset link expired. Start again.", comment: "Password reset error")
             return
         }
-        busy = true; error = nil
+        busy = true; error = nil; codeRejected = false
         Task {
             defer { busy = false }
             do {
@@ -334,9 +347,11 @@ struct NewPasswordView: View {
                 // The server names the exact rule that failed. Showing the real
                 // message beats a hardcoded "at least 8 characters", which was
                 // wrong for every other rule the policy now enforces.
-                case "WEAK_PASSWORD": self.error = apiMessage(error, fallback: "Use at least 8 characters with a letter, a number and a symbol.")
-                case "VERIFY_FAILED": self.error = "That code is not correct, or it has expired."
-                default: self.error = apiMessage(error, fallback: "We could not reset the password. Try again.")
+                case "WEAK_PASSWORD": self.error = apiMessage(error, fallback: String(localized: "Use at least 8 characters with a letter, a number and a symbol.", comment: "Error message shown when the server gives no reason (new password screen)"))
+                case "VERIFY_FAILED":
+                    codeRejected = true
+                    self.error = String(localized: "That code is not correct, or it has expired.", comment: "Password reset error")
+                default: self.error = apiMessage(error, fallback: String(localized: "We could not reset the password. Try again.", comment: "Error message shown when the server gives no reason (new password screen)"))
                 }
             }
         }
@@ -351,14 +366,14 @@ struct ResetDoneView: View {
         AccountScreen(
             illustration: "ill_account_reset_ok",
             content: {
-                StatusChip(text: "Password Reset Successful", tone: .success)
+                StatusChip(text: String(localized: "Password Reset Successful", comment: "Status chip (reset done screen)"), tone: .success)
                 Text("Your password\nhas been reset")
-                    .font(.system(size: 28, weight: .bold))
+                    .gmFont(28, .bold, maxSize: 44)
                     .foregroundColor(GM.textPrimary)
                     .fixedSize(horizontal: false, vertical: true)
                     .padding(.top, 16)
                 Text("Your GrapMail account is now secure with your new password. You can now sign in and continue using all the features.")
-                    .font(.system(size: 15))
+                    .gmFont(15)
                     .lineSpacing(5)
                     .foregroundColor(GM.textSecondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -367,14 +382,14 @@ struct ResetDoneView: View {
             },
             footer: {
                 GradientButton(
-                    title: "Back to Sign In",
+                    title: String(localized: "Back to Sign In", comment: "Button title (reset done screen)"),
                     trailing: AnyView(
-                        Image(systemName: "arrow.right")
-                            .font(.system(size: 15, weight: .semibold))
+                        Image(systemName: "arrow.right").flipsForRightToLeftLayoutDirection(true)
+                            .gmFont(15, .semibold, maxSize: 24)
                             .foregroundColor(.white)
                     )
                 ) { onBackToSignIn() }
-                FooterNote(text: "For your security, we recommend keeping your password private and using two-step verification.")
+                FooterNote(text: String(localized: "For your security, we recommend keeping your password private and using two-step verification.", comment: "Footer note (reset done screen)"))
                     .padding(.top, 18)
                 Spacer().frame(height: 4)
             }
@@ -396,28 +411,28 @@ struct RecoveryPendingView: View {
             illustration: "ill_account_pending",
             content: {
                 let emailed = model.resetChannel == "email"
-                StatusChip(text: emailed ? "Reset link sent" : "Account Recovery Pending", tone: emailed ? .success : .warning)
-                Text(emailed ? "Check your\nrecovery email" : "We're still working\non your recovery")
-                    .font(.system(size: 28, weight: .bold))
+                StatusChip(text: emailed ? String(localized: "Reset link sent", comment: "Status chip (recovery pending screen)") : String(localized: "Account Recovery Pending", comment: "Status chip (recovery pending screen)"), tone: emailed ? .success : .warning)
+                (emailed ? Text("Check your\nrecovery email") : Text("We're still working\non your recovery"))
+                    .gmFont(28, .bold, maxSize: 44)
                     .foregroundColor(GM.textPrimary)
                     .fixedSize(horizontal: false, vertical: true)
                     .padding(.top, 16)
-                Text(emailed
-                     ? "We sent a password reset link to the recovery email on your account. Open it on any device to choose a new password."
-                     : "There might be a short delay while we verify your information. You'll get an update soon at your verified phone number or email.")
-                    .font(.system(size: 15))
+                (emailed
+                     ? Text("We sent a password reset link to the recovery email on your account. Open it on any device to choose a new password.")
+                     : Text("There might be a short delay while we verify your information. You'll get an update soon at your verified phone number or email."))
+                    .gmFont(15)
                     .lineSpacing(5)
                     .foregroundColor(GM.textSecondary)
                     .fixedSize(horizontal: false, vertical: true)
                     .padding(.top, 10)
                 InfoPanel(
-                    title: emailed ? "Didn't get it?" : "What's happening?",
+                    title: emailed ? String(localized: "Didn't get it?", comment: "Info panel title (recovery pending screen)") : String(localized: "What's happening?", comment: "Info panel title (recovery pending screen)"),
                     body: emailed
-                        ? "The link works for 1 hour. Check your spam folder, or tap Send again for a new one."
-                        : "We're verifying your recovery request. This usually takes a few minutes, but can take up to 24 hours in some cases.",
+                        ? String(localized: "The link works for 1 hour. Check your spam folder, or tap Send again for a new one.", comment: "Info panel text (recovery pending screen)")
+                        : String(localized: "We're verifying your recovery request. This usually takes a few minutes, but can take up to 24 hours in some cases.", comment: "Info panel text (recovery pending screen)"),
                     icon: {
                         Image(systemName: "clock")
-                            .font(.system(size: 15, weight: .medium))
+                            .gmFont(15, .medium)
                             .foregroundColor(GM.primarySolid)
                     }
                 )
@@ -426,28 +441,28 @@ struct RecoveryPendingView: View {
             },
             footer: {
                 GradientButton(
-                    title: model.resetChannel == "email" ? "Send again" : "Try Again",
+                    title: model.resetChannel == "email" ? String(localized: "Send again", comment: "Button title (recovery pending screen)") : String(localized: "Try Again", comment: "Button title (recovery pending screen)"),
                     busy: busy,
                     trailing: AnyView(
-                        Image(systemName: "arrow.right")
-                            .font(.system(size: 15, weight: .semibold))
+                        Image(systemName: "arrow.right").flipsForRightToLeftLayoutDirection(true)
+                            .gmFont(15, .semibold, maxSize: 24)
                             .foregroundColor(.white)
                     )
                 ) { retry() }
                 if let notice {
-                    Text(notice).font(GMFont.caption).foregroundColor(GM.textSecondary)
+                    Text(notice).gmFont(.caption).foregroundColor(GM.textSecondary)
                         .padding(.top, 10)
                 }
                 HStack {
                     Spacer()
-                    AccountLink(title: "Back to Sign In", action: onBackToSignIn)
+                    AccountLink(title: String(localized: "Back to Sign In", comment: "Link-style button (recovery pending screen)"), action: onBackToSignIn)
                     Spacer()
                 }
                 .padding(.top, 8)
                 OrDivider().padding(.top, 14)
                 FooterNote(
-                    text: "Need help? Contact our support team.",
-                    linkText: "support team",
+                    text: String(localized: "Need help? Contact our support team.", comment: "Footer note (recovery pending screen)"),
+                    linkText: String(localized: "support team", comment: "Tappable words in the footer note; must appear verbatim in the note's translation (recovery pending screen)"),
                     onLink: onSupport,
                     divider: false
                 )
@@ -466,14 +481,14 @@ struct RecoveryPendingView: View {
                 let resp = try await ApiClient.forgotPassword(identifier: model.identifier)
                 model.resetChannel = resp.channel
                 if resp.challengeId != nil {
-                    notice = "A code is on its way. Check your phone."
+                    notice = String(localized: "A code is on its way. Check your phone.", comment: "Account recovery status notice")
                 } else if resp.channel == "email" {
-                    notice = "A new reset link is on its way. Check your recovery email."
+                    notice = String(localized: "A new reset link is on its way. Check your recovery email.", comment: "Account recovery status notice")
                 } else {
-                    notice = "Still in review. We'll message you as soon as it clears."
+                    notice = String(localized: "Still in review. We'll message you as soon as it clears.", comment: "Account recovery status notice")
                 }
             } catch {
-                notice = apiMessage(error, fallback: "We couldn't check again. Try in a minute.")
+                notice = apiMessage(error, fallback: String(localized: "We couldn't check again. Try in a minute.", comment: "Error message shown when the server gives no reason (recovery pending screen)"))
             }
         }
     }
@@ -494,13 +509,13 @@ struct FindAddressView: View {
         AccountScreen(
             onBack: onBack,
             illustration: "ill_account_find_address",
-            eyebrow: "Recover your GrapMail address",
-            title: "Find your GrapMail address",
-            subtitle: "Enter the phone number linked to your GrapMail account. We'll check our records and show you the email address associated with it.",
+            eyebrow: String(localized: "Recover your GrapMail address", comment: "Small label above the screen title (find address screen)"),
+            title: String(localized: "Find your GrapMail address", comment: "Screen title (find address screen)"),
+            subtitle: String(localized: "Enter the phone number linked to your GrapMail account. We'll check our records and show you the email address associated with it.", comment: "Screen description under the title (find address screen)"),
             content: {
                 AppTextField(
                     value: $phone,
-                    hint: "Enter your verified phone number",
+                    hint: String(localized: "Enter your verified phone number", comment: "Text field placeholder (find address screen)"),
                     keyboardType: .phonePad,
                     leadingIcon: "phone"
                 )
@@ -508,22 +523,22 @@ struct FindAddressView: View {
             },
             footer: {
                 GradientButton(
-                    title: "Find My Email",
+                    title: String(localized: "Find My Email", comment: "Button title (find address screen)"),
                     enabled: !phone.isEmpty,
                     busy: busy,
                     trailing: AnyView(
-                        Image(systemName: "arrow.right")
-                            .font(.system(size: 15, weight: .semibold))
+                        Image(systemName: "arrow.right").flipsForRightToLeftLayoutDirection(true)
+                            .gmFont(15, .semibold, maxSize: 24)
                             .foregroundColor(.white)
                     )
                 ) { submit() }
                 if let error {
-                    Text(error).font(GMFont.caption).foregroundColor(GM.error).padding(.top, 10)
+                    Text(error).gmFont(.caption).foregroundColor(GM.error).padding(.top, 10)
                 }
                 OrDivider().padding(.top, 16)
                 FooterNote(
-                    text: "Need help? Contact our support team.",
-                    linkText: "support team",
+                    text: String(localized: "Need help? Contact our support team.", comment: "Footer note (find address screen)"),
+                    linkText: String(localized: "support team", comment: "Tappable words in the footer note; must appear verbatim in the note's translation (find address screen)"),
                     onLink: onSupport,
                     divider: false
                 )
@@ -541,7 +556,7 @@ struct FindAddressView: View {
             do {
                 let resp = try await ApiClient.findAddress(phone: phone.trimmingCharacters(in: .whitespaces))
                 guard let masked = resp.maskedAddress, !masked.isEmpty else {
-                    error = "We couldn't find a GrapMail account with that number."
+                    error = String(localized: "We couldn't find a GrapMail account with that number.", comment: "Find-address error")
                     return
                 }
                 model.foundAddress = masked
@@ -549,9 +564,9 @@ struct FindAddressView: View {
                 onFound()
             } catch {
                 switch apiCode(error) {
-                case "NOT_FOUND": self.error = "We couldn't find a GrapMail account with that number."
-                case "RATE_LIMITED": self.error = "Too many lookups. Try again in a little while."
-                default: self.error = apiMessage(error, fallback: "We couldn't check that number. Try again.")
+                case "NOT_FOUND": self.error = String(localized: "We couldn't find a GrapMail account with that number.", comment: "Find-address error")
+                case "RATE_LIMITED": self.error = String(localized: "Too many lookups. Try again in a little while.", comment: "Find-address error")
+                default: self.error = apiMessage(error, fallback: String(localized: "We couldn't check that number. Try again.", comment: "Error message shown when the server gives no reason (find address screen)"))
                 }
             }
         }
@@ -572,31 +587,31 @@ struct AddressFoundView: View {
         AccountScreen(
             illustration: "ill_account_address_found",
             content: {
-                StatusChip(text: "Email Found", tone: .success)
+                StatusChip(text: String(localized: "Email Found", comment: "Status chip (address found screen)"), tone: .success)
                 Text("Your GrapMail address\nhas been found!")
-                    .font(.system(size: 28, weight: .bold))
+                    .gmFont(28, .bold, maxSize: 44)
                     .foregroundColor(GM.textPrimary)
                     .fixedSize(horizontal: false, vertical: true)
                     .padding(.top, 16)
                 Text("Here is the email address associated with your account. You can copy it or use it to sign in.")
-                    .font(.system(size: 15))
+                    .gmFont(15)
                     .lineSpacing(5)
                     .foregroundColor(GM.textSecondary)
                     .fixedSize(horizontal: false, vertical: true)
                     .padding(.top, 10)
                 InfoCard {
-                    HStack(spacing: 12) {
+                    GMAdaptiveStack(spacing: 12) {
                         IconTile(systemName: "envelope")
                         VStack(alignment: .leading, spacing: 2) {
                             Text("Your GrapMail address")
-                                .font(.system(size: 12))
+                                .gmFont(12)
                                 .foregroundColor(GM.textSecondary)
                             Text(shown)
-                                .font(.system(size: 15, weight: .bold))
+                                .gmFont(15, .bold)
                                 .foregroundColor(GM.textPrimary)
                         }
                         Spacer(minLength: 8)
-                        CopyButton(title: copied ? "Copied" : "Copy") {
+                        CopyButton(title: copied ? String(localized: "Copied", comment: "Copy button title (address found screen)") : String(localized: "Copy", comment: "Copy button title (address found screen)")) {
                             UIPasteboard.general.string = copyable
                             copied = true
                         }
@@ -607,15 +622,15 @@ struct AddressFoundView: View {
             },
             footer: {
                 GradientButton(
-                    title: "Back to Sign In",
+                    title: String(localized: "Back to Sign In", comment: "Button title (address found screen)"),
                     trailing: AnyView(
-                        Image(systemName: "arrow.right")
-                            .font(.system(size: 15, weight: .semibold))
+                        Image(systemName: "arrow.right").flipsForRightToLeftLayoutDirection(true)
+                            .gmFont(15, .semibold, maxSize: 24)
                             .foregroundColor(.white)
                     )
                 ) { onBackToSignIn(model.foundAddressFull) }
                 FooterNote(
-                    text: "For your security, this address is partially hidden. You can copy it to use for sign in.",
+                    text: String(localized: "For your security, this address is partially hidden. You can copy it to use for sign in.", comment: "Footer note (address found screen)"),
                     divider: false
                 )
                 .padding(.top, 16)
@@ -648,13 +663,16 @@ struct PhoneVerifyView: View {
         AccountScreen(
             onBack: { if step == 2 { step = 1 } else { onBack() } },
             illustration: textSize.isAccessibilitySize || verticalSizeClass == .compact ? nil : "ill_account_phone",
-            eyebrow: "Phone verification",
-            title: step == 1 ? "Verify your phone number" : "Enter the 6-digit code",
+            eyebrow: String(localized: "Phone verification", comment: "Small label above the screen title (phone verify screen)"),
+            title: step == 1 ? String(localized: "Verify your phone number", comment: "Screen title (phone verify screen)") : String(localized: "Enter the 6-digit code", comment: "Screen title (phone verify screen)"),
             subtitle: step == 1
-                ? "We’ll send you a 6-digit code by SMS."
-                : "SMS sent to \(PhoneFormat.pretty(model.phone)). The code expires in five minutes.",
+                ? String(localized: "We’ll send you a 6-digit code by SMS.", comment: "Screen description under the title (phone verify screen)")
+                : String(localized: "SMS sent to \(PhoneFormat.pretty(model.phone)). The code expires in five minutes.", comment: "Phone verification description; the argument is a phone number"),
             content: {
-                TwoStepRibbon(current: step, labels: ["Phone number", "SMS code"])
+                TwoStepRibbon(current: step, labels: [
+                    String(localized: "Phone number", comment: "Phone verification step 1 label"),
+                    String(localized: "SMS code", comment: "Phone verification step 2 label"),
+                ])
                 Spacer().frame(height: 20)
                 if step == 1 {
                     phoneField
@@ -678,7 +696,7 @@ struct PhoneVerifyView: View {
                         }
                     VStack(alignment: .leading, spacing: 8) {
                         CodeExpiry(expiresAt: model.phoneExpiresAt)
-                        AccountLink(title: resending ? "Sending…" : "Resend code") { sendCode(resend: true) }
+                        AccountLink(title: resending ? String(localized: "Sending…", comment: "Link-style button (phone verify screen)") : String(localized: "Resend code", comment: "Link-style button (phone verify screen)")) { sendCode(resend: true) }
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.top, 14)
@@ -687,39 +705,39 @@ struct PhoneVerifyView: View {
             footer: {
                 if step == 1 {
                     GradientButton(
-                        title: "Send Verification Code",
+                        title: String(localized: "Send Verification Code", comment: "Button title (phone verify screen)"),
                         enabled: !national.isEmpty,
                         busy: busy,
                         trailing: AnyView(
-                            Image(systemName: "arrow.right")
-                                .font(.system(size: 15, weight: .semibold))
+                            Image(systemName: "arrow.right").flipsForRightToLeftLayoutDirection(true)
+                                .gmFont(15, .semibold, maxSize: 24)
                                 .foregroundColor(.white)
                         )
                     ) { sendCode(resend: false) }
                     if let error {
-                        Text(error).font(GMFont.caption).foregroundColor(GM.error).padding(.top, 10)
+                        Text(error).gmFont(.caption).foregroundColor(GM.error).padding(.top, 10)
                     }
                     FooterNote(
-                        text: "Your phone number is only used for security purposes and won't be shared with anyone.",
+                        text: String(localized: "Your phone number is only used for security purposes and won't be shared with anyone.", comment: "Footer note (phone verify screen)"),
                         divider: false
                     )
                     .padding(.top, 16)
                 } else {
                     GradientButton(
-                        title: "Verify & Continue",
+                        title: String(localized: "Verify & Continue", comment: "Button title (phone verify screen)"),
                         enabled: code.count == 6,
                         busy: busy,
                         trailing: AnyView(
-                            Image(systemName: "arrow.right")
-                                .font(.system(size: 15, weight: .semibold))
+                            Image(systemName: "arrow.right").flipsForRightToLeftLayoutDirection(true)
+                                .gmFont(15, .semibold, maxSize: 24)
                                 .foregroundColor(.white)
                         )
                     ) { verify() }
                     if let error {
-                        Text(error).font(GMFont.caption).foregroundColor(GM.error).padding(.top, 10)
+                        Text(error).gmFont(.caption).foregroundColor(GM.error).padding(.top, 10)
                     }
                     FooterNote(
-                        text: "If the text message hasn’t arrived, you can request another code after one minute.",
+                        text: String(localized: "If the text message hasn’t arrived, you can request another code after one minute.", comment: "Footer note (phone verify screen)"),
                         divider: false
                     )
                     .padding(.top, 14)
@@ -730,7 +748,9 @@ struct PhoneVerifyView: View {
     }
 
     private var phoneField: some View {
-        HStack(spacing: 10) {
+        // Country menu beside the number; stacked at the accessibility sizes so
+        // the number field keeps a usable width on an iPhone SE.
+        GMAdaptiveStack(spacing: 10) {
             Menu {
                 ForEach(0..<PhoneFormat.countries.count, id: \.self) { index in
                     let c = PhoneFormat.countries[index]
@@ -738,28 +758,31 @@ struct PhoneVerifyView: View {
                 }
             } label: {
                 HStack(spacing: 6) {
-                    Text(country.flag).font(.system(size: 17))
+                    Text(country.flag).gmFont(17)
                     Text(country.dial)
-                        .font(.system(size: 15))
+                        .gmFont(15)
                         .foregroundColor(GM.textPrimary)
                     Image(systemName: "chevron.down")
-                        .font(.system(size: 11, weight: .semibold))
+                        .gmFont(11, .semibold, maxSize: 24)
                         .foregroundColor(GM.textTertiary)
                 }
             }
-            Rectangle().fill(GM.border).frame(width: 1, height: 28)
+            if !textSize.isAccessibilitySize {
+                Rectangle().fill(GM.border).frame(width: 1, height: 28)
+            }
             VStack(alignment: .leading, spacing: 2) {
                 Text("Phone number")
-                    .font(.system(size: 12))
+                    .gmFont(12)
                     .foregroundColor(GM.textTertiary)
                 TextField("01XXXXXXXXX", text: $national)
                     .keyboardType(.phonePad)
-                    .font(.system(size: 15))
+                    .gmFont(15)
                     .foregroundColor(GM.textPrimary)
             }
             Spacer(minLength: 0)
         }
         .padding(.horizontal, 12)
+        .padding(.vertical, textSize.isAccessibilitySize ? 10 : 0)
         .frame(minHeight: 56)
         .background(RoundedRectangle(cornerRadius: GMShape.input, style: .continuous).fill(GM.inputFill))
         .overlay(
@@ -772,7 +795,7 @@ struct PhoneVerifyView: View {
             ? model.phone
             : (PhoneFormat.e164(dial: country.dial, national: national) ?? "")
         guard !target.isEmpty else {
-            error = "Enter a valid phone number."
+            error = String(localized: "Enter a valid phone number.", comment: "Phone verification error")
             return
         }
         if resend { resending = true } else { busy = true }
@@ -782,7 +805,7 @@ struct PhoneVerifyView: View {
             do {
                 let resp = try await ApiClient.startPhoneVerification(phone: target)
                 guard let cid = resp.challengeId else {
-                    error = resp.message ?? "We couldn't send a code to that number."
+                    error = resp.message ?? String(localized: "We couldn't send a code to that number.", comment: "Phone verification error")
                     return
                 }
                 code = ""
@@ -792,8 +815,8 @@ struct PhoneVerifyView: View {
                 step = 2
             } catch {
                 switch apiCode(error) {
-                case "PHONE_IN_USE": self.error = "That number is already linked to another account."
-                default: self.error = apiMessage(error, fallback: "We couldn't send your code. Try again.")
+                case "PHONE_IN_USE": self.error = String(localized: "That number is already linked to another account.", comment: "Phone verification error")
+                default: self.error = apiMessage(error, fallback: String(localized: "We couldn't send your code. Try again.", comment: "Error message shown when the server gives no reason (phone verify screen)"))
                 }
             }
         }
@@ -802,7 +825,7 @@ struct PhoneVerifyView: View {
     private func verify() {
         guard let challenge = model.phoneChallengeId else { return }
         guard let session = SessionStore.token else {
-            error = "Sign in first so the number can be saved to your account."
+            error = String(localized: "Sign in first so the number can be saved to your account.", comment: "Phone verification error")
             return
         }
         busy = true; error = nil
@@ -811,7 +834,7 @@ struct PhoneVerifyView: View {
             do {
                 let verified = try await ApiClient.verifyPhone(challengeId: challenge, code: code)
                 guard let proof = verified.phoneToken else {
-                    error = "That code is not correct."
+                    error = String(localized: "That code is not correct.", comment: "Verification code error")
                     return
                 }
                 _ = try await ApiClient.linkPhone(sessionToken: session, phoneToken: proof)
@@ -820,9 +843,9 @@ struct PhoneVerifyView: View {
                 onVerified(phone)
             } catch {
                 switch apiCode(error) {
-                case "PHONE_IN_USE": self.error = "That number is already linked to another account."
-                case "VERIFY_FAILED", "BAD_CODE": self.error = "That code is not correct."
-                default: self.error = apiMessage(error, fallback: "We couldn't verify that code. Try again.")
+                case "PHONE_IN_USE": self.error = String(localized: "That number is already linked to another account.", comment: "Phone verification error")
+                case "VERIFY_FAILED", "BAD_CODE": self.error = String(localized: "That code is not correct.", comment: "Verification code error")
+                default: self.error = apiMessage(error, fallback: String(localized: "We couldn't verify that code. Try again.", comment: "Error message shown when the server gives no reason (phone verify screen)"))
                 }
             }
         }
@@ -840,34 +863,34 @@ struct PhoneVerifiedView: View {
         AccountScreen(
             illustration: "ill_account_phone_ok",
             content: {
-                StatusChip(text: "Phone Verified", tone: .success)
+                StatusChip(text: String(localized: "Phone Verified", comment: "Status chip (phone verified screen)"), tone: .success)
                 Text("Your phone number\nhas been verified!")
-                    .font(.system(size: 28, weight: .bold))
+                    .gmFont(28, .bold, maxSize: 44)
                     .foregroundColor(GM.textPrimary)
                     .fixedSize(horizontal: false, vertical: true)
                     .padding(.top, 16)
                 Text("Your phone number \(PhoneFormat.pretty(phone)) is now linked to your GrapMail account. You can use it for account recovery and two-step verification.")
-                    .font(.system(size: 15))
+                    .gmFont(15)
                     .lineSpacing(5)
                     .foregroundColor(GM.textSecondary)
                     .fixedSize(horizontal: false, vertical: true)
                     .padding(.top, 10)
                 InfoCard {
-                    HStack(spacing: 12) {
+                    GMAdaptiveStack(spacing: 12) {
                         IconTile(systemName: "phone")
                         VStack(alignment: .leading, spacing: 2) {
                             Text("Verified Phone Number")
-                                .font(.system(size: 12))
+                                .gmFont(12)
                                 .foregroundColor(GM.textSecondary)
                             Text(PhoneFormat.pretty(phone))
-                                .font(.system(size: 15, weight: .semibold))
+                                .gmFont(15, .semibold)
                                 .foregroundColor(GM.textPrimary)
                         }
                         Spacer(minLength: 8)
                         HStack(spacing: 5) {
                             Image(systemName: "checkmark.circle.fill")
-                                .font(.system(size: 12, weight: .semibold))
-                            Text("Verified").font(.system(size: 12, weight: .semibold))
+                                .gmFont(12, .semibold)
+                            Text("Verified").gmFont(12, .semibold)
                         }
                         .foregroundColor(GM.successInk)
                         .padding(.horizontal, 10)
@@ -880,21 +903,21 @@ struct PhoneVerifiedView: View {
             },
             footer: {
                 GradientButton(
-                    title: "Go to Account Security",
+                    title: String(localized: "Go to Account Security", comment: "Button title (phone verified screen)"),
                     trailing: AnyView(
-                        Image(systemName: "arrow.right")
-                            .font(.system(size: 15, weight: .semibold))
+                        Image(systemName: "arrow.right").flipsForRightToLeftLayoutDirection(true)
+                            .gmFont(15, .semibold, maxSize: 24)
                             .foregroundColor(.white)
                     )
                 ) { onGoToSecurity() }
                 HStack {
                     Spacer()
-                    AccountLink(title: "Back to Home", action: onBackHome)
+                    AccountLink(title: String(localized: "Back to Home", comment: "Link-style button (phone verified screen)"), action: onBackHome)
                     Spacer()
                 }
                 .padding(.top, 8)
                 FooterNote(
-                    text: "Your phone number is securely stored and only used for account recovery and two-step verification.",
+                    text: String(localized: "Your phone number is securely stored and only used for account recovery and two-step verification.", comment: "Footer note (phone verified screen)"),
                     divider: false
                 )
                 .padding(.top, 14)

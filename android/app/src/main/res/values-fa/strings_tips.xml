@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  First-time feature tips (ui/components/FeatureTip.kt, logic/FeatureTipsStore.kt).
+  One tip per app session, anchored to the control it describes. Titles stay
+  at four words or fewer, bodies at one sentence under 90 characters. The same
+  English text as iOS's "Feature tips" block (GrapMail/en.lproj/Localizable.strings),
+  except the long-press tip: on Android a long press selects, on iOS it previews.
+-->
+<resources>
+    <string name="tip_got_it">متوجه شدم</string>
+    <string name="tip_close">بستن نکته</string>
+
+    <string name="tip_swipe_title">برای مرتب‌سازی بکشید</string>
+    <string name="tip_swipe_body">پیام را به راست بکشید تا بایگانی شود، یا به چپ تا به سطل زباله برود.</string>
+
+    <string name="tip_long_press_title">انتخاب چند مورد با هم</string>
+    <string name="tip_long_press_body">پیامی را لمس کرده و نگه دارید تا انتخاب شود، سپس روی بقیه بزنید.</string>
+
+    <string name="tip_categories_title">صندوق ورودی را تفکیک کنید</string>
+    <string name="tip_categories_body">روی یک برچسب بزنید تا فقط مهم، افراد، خبرنامه‌ها و غیره نمایش داده شود.</string>
+
+    <string name="tip_screener_title">بررسی فرستندگان جدید</string>
+    <string name="tip_screener_body">«در انتظار تأیید» در منو، نامه‌های فرستندگان جدید را تا اجازهٔ شما نگه می‌دارد.</string>
+
+    <string name="tip_accounts_title">تعویض سریع حساب</string>
+    <string name="tip_accounts_body">روی تصویرتان بزنید تا حساب را عوض کنید یا حساب دیگری اضافه کنید.</string>
+
+    <string name="tip_snooze_title">تعویق برای بعد</string>
+    <string name="tip_snooze_body">روی بیشتر بزنید تا نامهٔ انتخاب‌شده را به زمان بهتری موکول کنید.</string>
+</resources>
