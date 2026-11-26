@@ -2,7 +2,8 @@
 set -euo pipefail
 
 pkg=com.grapsee.grapmail
-mkdir -p store-demo
+mkdir -p store-demo/diagnostics
+failures=0
 ui=$(mktemp)
 trap 'rm -f "$ui"' EXIT
 
@@ -26,18 +27,23 @@ capture() {
     sleep 1
   done
   echo "Expected screen did not render: $scene ($palette)" >&2
-  return 1
+  cp "$ui" "store-demo/diagnostics/$scene-$palette.xml"
+  adb exec-out screencap -p > "store-demo/diagnostics/$scene-$palette.png"
+  adb logcat -d -b crash > "store-demo/diagnostics/$scene-$palette-crash.txt" || true
+  failures=$((failures + 1))
 }
 
 for palette in light dark; do
   mode=no
   [[ "$palette" == dark ]] && mode=yes
   adb shell cmd uimode night "$mode"
-  capture mail-home 'Q3 facilities invoice' "$palette"
   capture mail-thread 'Q3 facilities invoice' "$palette"
+  capture mail-home 'mail-compose' "$palette"
   capture mail-thread-images 'mail-show-images' "$palette"
   capture mail-compose 'gm-signed-body' "$palette"
   capture mail-screener 'Waiting in the queue' "$palette"
   capture mail-unsubscribe 'gm-sheets-unsub' "$palette"
   capture mail-labels 'Bills' "$palette"
 done
+
+(( failures == 0 ))
