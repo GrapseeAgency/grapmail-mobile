@@ -7,8 +7,8 @@ failures=0
 ui=$(mktemp)
 trap 'rm -f "$ui"' EXIT
 
-adb shell wm size 1440x2560
-adb shell wm density 560
+adb shell wm size 4320x7680
+adb shell wm density 1680
 adb install -r android/app/build/outputs/apk/debug/app-debug.apk
 
 capture() {
@@ -33,17 +33,21 @@ capture() {
   failures=$((failures + 1))
 }
 
-for palette in light dark; do
-  mode=no
-  [[ "$palette" == dark ]] && mode=yes
-  adb shell cmd uimode night "$mode"
-  capture mail-thread 'Q3 facilities invoice' "$palette"
-  capture mail-home 'mail-compose' "$palette"
-  capture mail-thread-images 'mail-show-images' "$palette"
-  capture mail-compose 'gm-signed-body' "$palette"
-  capture mail-screener 'Waiting in the queue' "$palette"
-  capture mail-unsubscribe 'gm-sheets-unsub' "$palette"
-  capture mail-labels 'Bills' "$palette"
-done
-
+adb shell cmd uimode night yes
+capture mail-thread 'Q3 facilities invoice' dark
 (( failures == 0 ))
+
+python3 - <<'PNG'
+from pathlib import Path
+import struct
+
+shot = Path("store-demo/mail-thread-dark.png")
+with shot.open("rb") as stream:
+    header = stream.read(24)
+if header[:8] != b"\x89PNG\r\n\x1a\n" or header[12:16] != b"IHDR":
+    raise SystemExit("Capture is not a PNG")
+width, height = struct.unpack(">II", header[16:24])
+print(f"Native capture: {width} × {height}")
+if (width, height) != (4320, 7680):
+    raise SystemExit("Capture did not render at 8K portrait resolution")
+PNG
