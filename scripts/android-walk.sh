@@ -394,7 +394,7 @@ echo "· security sector — every hub screen, read-only"
 # drawer's pinned footer, which is why there is no swipe here any more: the
 # account actions were taken out of the scrolling folder list precisely because
 # on a short screen the last of them fell below the fold, unreachable by thumb.
-must "security row" tap_xy "$(wait_overlay "n.get('resource-id','').rsplit('/',1)[-1]=='mail-drawer-Security'" | head -1)" 
+must "security row" tap_xy "$(wait_overlay "n.get('resource-id','').rsplit('/',1)[-1]=='mail-drawer-Security'" | head -1)"
 must_shot 20-sec-hub-light "n.get('text','')=='Account Security'"
 # hub_present — 0 on the hub, 1 definitely NOT on the hub, 2 could not tell.
 # find_nodes prints nothing both when the node is absent AND when the
