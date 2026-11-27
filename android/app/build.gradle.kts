@@ -50,8 +50,8 @@ android {
         // First public production release. Earlier 0.2.x–0.7.x identifiers were
         // internal/sideload test lineage, not store releases. Testers with a higher
         // sideloaded versionCode must uninstall it before installing 0.0.1; the
-        // first Play upload used versionCode 1.
-        versionCode = 2
+        // production line intentionally starts at versionCode 1.
+        versionCode = 1
         versionName = "0.0.1"
         // Real account API â€” same contract the website uses.
         buildConfigField("String", "API_BASE", "\"https://grapsee.com/api\"")
