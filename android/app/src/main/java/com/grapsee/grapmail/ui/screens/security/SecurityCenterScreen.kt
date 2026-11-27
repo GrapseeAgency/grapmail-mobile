@@ -198,6 +198,7 @@ fun SecurityCenterScreen(
     onChangePassword: () -> Unit,
     /** The hardware-key screen (TrustedDevicesScreen) for re-enrolling this device. */
     onDeviceKeys: (() -> Unit)? = null,
+    demoOverview: SecurityOverviewResponse? = null,
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -235,6 +236,16 @@ fun SecurityCenterScreen(
     val firstReviewRequester = remember { BringIntoViewRequester() }
 
     suspend fun refresh() {
+        if (demoOverview != null) {
+            overview = demoOverview
+            fetchedAt = System.currentTimeMillis()
+            loading = false
+            refreshing = false
+            pullRefreshing = false
+            failed = false
+            refreshFailed = false
+            return
+        }
         val session = SessionStore.snapshot(context)
         if (session == null) {
             failed = overview == null

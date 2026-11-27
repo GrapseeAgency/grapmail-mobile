@@ -487,6 +487,7 @@ class MailboxViewModel @JvmOverloads constructor(
     /// Fetch the current box when it has never been fetched. Called on entry to
     /// the home screen — see `loadedBoxes` for why this is not just `load()`.
     fun ensureLoaded() {
+        if (snapshotMode) return
         if (loadedBoxes.contains(_state.value.box)) return
         loadedBoxes.add(_state.value.box)
         viewModelScope.launch {
@@ -595,6 +596,7 @@ class MailboxViewModel @JvmOverloads constructor(
      * otherwise the page is appended, which is what makes scrolling cheap.
      */
     fun load(replace: Boolean = true, reuseRecentFolder: Boolean = false, forceCounts: Boolean = true) {
+        if (snapshotMode) return
         loadJob?.cancel()
         loadJob = viewModelScope.launch {
             val box = _state.value.box

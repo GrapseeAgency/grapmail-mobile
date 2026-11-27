@@ -20,4 +20,8 @@
         never silenced by quiet hours.
     </string>
     <string name="widget_description">Unread mail at a glance: counts from GrapMail background checks</string>
+    <string name="mail_support_case_section">Get help from GrapMail</string>
+    <string name="mail_support_browse_help">Browse GrapMail help</string>
+    <string name="mail_support_open_case">Open a support case</string>
+    <string name="mail_support_track_case">Track a support case</string>
 </resources>

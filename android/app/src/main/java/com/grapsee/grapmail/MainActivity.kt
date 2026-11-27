@@ -568,7 +568,7 @@ object Routes {
     fun notMeDone(device: String?) = "security/not-me/done/${encode(device?.takeIf { it.isNotBlank() } ?: " ")}"
 
     /** The help link the footer notes carry. Opens the real support page. */
-    const val SUPPORT_URL = "https://grapsee.com/contact"
+    const val SUPPORT_URL = "https://grapsee.com/help/products/grapmail"
 
     private fun encode(v: String) = android.net.Uri.encode(v)
 }

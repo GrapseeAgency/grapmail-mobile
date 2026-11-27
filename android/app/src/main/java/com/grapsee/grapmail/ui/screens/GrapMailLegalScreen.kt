@@ -121,7 +121,7 @@ fun GrapMailLegalScreen(document: GrapMailLegalDocument, onBack: () -> Unit) {
                     }
                 }, fontSize = 14.sp)
                 Text(buildAnnotatedString {
-                    withLink(LinkAnnotation.Url("https://grapsee.com/contact", legalLinkStyles(palette.primarySolid))) {
+                    withLink(LinkAnnotation.Url("https://grapsee.com/help/products/grapmail", legalLinkStyles(palette.primarySolid))) {
                         append(stringResource(R.string.acct_contact_grapsee))
                     }
                 }, fontSize = 14.sp)

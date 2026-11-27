@@ -222,7 +222,7 @@ struct RootView: View {
     }
 
     private func openSupport() {
-        if let url = URL(string: "https://grapsee.com/contact") {
+        if let url = URL(string: "https://grapsee.com/help/products/grapmail") {
             UIApplication.shared.open(url)
         }
     }

@@ -1714,6 +1714,18 @@ struct SupportView: View {
     let onAddresses: () -> Void
     @State private var open: String?
 
+    private struct SupportLink: Identifiable {
+        let label: String
+        let url: String
+        var id: String { url }
+    }
+
+    private let supportLinks = [
+        SupportLink(label: String(localized: "Browse GrapMail help"), url: "https://grapsee.com/help/products/grapmail"),
+        SupportLink(label: String(localized: "Open a support case"), url: "https://grapsee.com/help/request?product=grapmail"),
+        SupportLink(label: String(localized: "Track a support case"), url: "https://grapsee.com/help/cases"),
+    ]
+
     private let faq: [(String, String)] = [
         (String(localized: "I forgot my password. What now?"),
          String(localized: "Tap Forgot password on the sign-in screen. GrapMail emails a reset link to the recovery email on your account, so add and verify one in Personal info before you need it.")),
@@ -1756,15 +1768,17 @@ struct SupportView: View {
                         .padding(.vertical, 12)
                         .accessibilityIdentifier("gm-faq-item")
                     }
-                    AccountSectionLabel(text: "Where a person answers")
-                    Button {
-                        openExternal("https://grapsee.com/contact")
-                    } label: {
-                        Text("grapsee.com/contact")
-                            .gmFont(14, .semibold)
-                            .foregroundColor(GM.primarySolid).padding(.vertical, 6)
+                    AccountSectionLabel(text: String(localized: "Get help from GrapMail"))
+                    ForEach(supportLinks) { link in
+                        Button { openExternal(link.url) } label: {
+                            Text(link.label)
+                                .gmFont(14, .semibold)
+                                .foregroundColor(GM.primarySolid)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(.vertical, 14)
+                        }
+                        .buttonStyle(.plain)
                     }
-                    .buttonStyle(.plain)
                     Text("Recovery screens, in the order that fixes things:")
                         .gmFont(13).foregroundColor(GM.textSecondary)
                         .padding(.top, 6)

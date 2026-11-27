@@ -45,6 +45,12 @@ class ConnectedAccountsViewModel @JvmOverloads constructor(app: Application) : A
 
     private val _state = MutableStateFlow(State())
     val state: StateFlow<State> = _state.asStateFlow()
+    private var snapshotMode = false
+
+    internal fun seedForSnapshot(accounts: List<ProviderAccountDto>) {
+        snapshotMode = true
+        _state.update { it.copy(accounts = accounts, loading = false, problem = null, problemDetail = null) }
+    }
 
     private suspend fun token(): String? = SessionStore.token(getApplication())
 
@@ -65,6 +71,7 @@ class ConnectedAccountsViewModel @JvmOverloads constructor(app: Application) : A
     }
 
     fun load() {
+        if (snapshotMode) return
         viewModelScope.launch {
             val t = token() ?: run { _state.update { it.copy(problem = Problem.SIGNED_OUT) }; return@launch }
             _state.update { it.copy(loading = true, problem = null, problemDetail = null) }

@@ -108,6 +108,7 @@ fun AccountSecurityScreen(
     onSecurityCenter: (() -> Unit)? = null,
     /** A checklist step tapped in that header (two-step, passkeys, …). */
     onSafetyAction: (SafetyAction) -> Unit = {},
+    demoProfile: ProfileDto? = null,
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -129,6 +130,12 @@ fun AccountSecurityScreen(
     }
 
     LaunchedEffect(reload) {
+        if (demoProfile != null) {
+            profile = demoProfile
+            failed = false
+            loading = false
+            return@LaunchedEffect
+        }
         val session = SessionStore.snapshot(context)
         if (session == null) {
             profile = null

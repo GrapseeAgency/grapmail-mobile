@@ -1294,12 +1294,18 @@ fun SupportScreen(
                         lineHeight = 20.sp, modifier = Modifier.padding(top = 6.dp))
                 }
             }
-            SectionLabel(stringResource(R.string.mail_support_where_person_answers), palette)
-            Text("grapsee.com/contact", fontSize = 14.sp, fontWeight = FontWeight.SemiBold,
-                color = palette.primarySolid,
-                modifier = Modifier.clickable {
-                    openExternal(vm.getApplication(), "https://grapsee.com/contact")
-                }.padding(vertical = 6.dp))
+            SectionLabel(stringResource(R.string.mail_support_case_section), palette)
+            listOf(
+                R.string.mail_support_browse_help to "https://grapsee.com/help/products/grapmail",
+                R.string.mail_support_open_case to "https://grapsee.com/help/request?product=grapmail",
+                R.string.mail_support_track_case to "https://grapsee.com/help/cases",
+            ).forEach { (label, url) ->
+                Text(stringResource(label), fontSize = 14.sp, fontWeight = FontWeight.SemiBold,
+                    color = palette.primarySolid,
+                    modifier = Modifier.fillMaxWidth()
+                        .clickable { openExternal(vm.getApplication(), url) }
+                        .padding(vertical = 14.dp))
+            }
             Text(stringResource(R.string.mail_support_recovery_screens_order_fixes), fontSize = 13.sp,
                 color = palette.textSecondary, modifier = Modifier.padding(top = 6.dp))
             listOf(stringResource(R.string.mail_support_forgot_password) to onForgot, stringResource(R.string.mail_support_change_my_phone) to onPhone,
