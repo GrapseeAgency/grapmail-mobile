@@ -13,11 +13,16 @@ for scene in {1..5}; do
     adb shell am force-stop "$package"
     adb shell am start -W -n "$package/.MainActivity" --es gmSnapshot "onboarding-$scene"
     frame="screenshots-release/onboarding-$scene.png"
+    temporary_frame="${frame}.tmp"
     painted=false
     for attempt in {1..6}; do
         sleep 2
-        timeout 10 adb exec-out screencap -p > "$frame"
-        if "$python" - "$frame" <<'PY'
+        if ! timeout --kill-after=3s 20s adb exec-out screencap -p > "$temporary_frame" || [[ ! -s "$temporary_frame" ]]; then
+            echo "Onboarding scene $scene: capture attempt $attempt did not produce a frame" >&2
+            rm -f "$temporary_frame"
+            continue
+        fi
+        if "$python" - "$temporary_frame" <<'PY'
 import sys
 from PIL import Image
 
@@ -30,13 +35,15 @@ with Image.open(sys.argv[1]) as image:
     sys.exit(0 if gold >= 120 else 1)
 PY
         then
+            mv "$temporary_frame" "$frame"
             painted=true
             echo "Onboarding scene $scene painted with the system accent"
             break
         fi
+        mv "$temporary_frame" "$frame"
     done
     if ! "$painted"; then
-        echo "::error::Onboarding scene $scene remained blank or did not use the yellow accent"
+        echo "::error::No usable frame passed the artwork and system accent check for onboarding scene $scene"
         exit 1
     fi
 done
