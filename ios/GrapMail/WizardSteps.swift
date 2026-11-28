@@ -777,7 +777,7 @@ struct TermsStepView: View {
                 Link("Read our Terms of Service ↗", destination: URL(string: "https://grapsee.com/legal/terms-of-service")!)
                     .gmFont(.captionMedium).foregroundColor(GM.primarySolid)
                     .padding(.top, 12)
-                Link("Read our Privacy Policy ↗", destination: URL(string: "https://grapsee.com/legal/privacy-policy")!)
+                Link("Read our Privacy Policy ↗", destination: URL(string: "https://grapsee.com/legal/grapmail-privacy-policy")!)
                     .gmFont(.captionMedium).foregroundColor(GM.primarySolid)
                     .padding(.top, 8)
 

@@ -1581,7 +1581,7 @@ struct PrivacyView: View {
                     .accessibilityIdentifier("gm-privacy-support")
                     AccountSectionLabel(text: "The documents")
                     Button {
-                        openExternal("https://grapsee.com/legal/privacy-policy")
+                        openExternal("https://grapsee.com/legal/grapmail-privacy-policy")
                     } label: {
                         Text("Privacy Policy · Terms of Service")
                             .gmFont(14).foregroundColor(GM.primarySolid)
