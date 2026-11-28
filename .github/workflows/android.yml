@@ -429,8 +429,8 @@ jobs:
             echo "::error::This release must use tag v$WANT"
             exit 1
           fi
-          grep -q "versionCode='1'" /tmp/badging.txt \
-            || { echo "::error::APK versionCode is not 1"; exit 1; }
+          grep -q "versionCode='2'" /tmp/badging.txt \
+            || { echo "::error::APK versionCode is not 2"; exit 1; }
           grep -q "versionName='$WANT'" /tmp/badging.txt \
             || { echo "::error::APK versionName is not $WANT — the tag and the build disagree"; exit 1; }
           if "$AAPT" dump xmltree "$APK" AndroidManifest.xml | grep -Ew "debuggable"; then
@@ -523,7 +523,7 @@ jobs:
         with:
           name: GrapMail ${{ github.ref_name }}
           body: |
-            GrapMail 0.0.1 (version code 1).
+            GrapMail 0.0.1 (version code 2).
 
             Use the AAB for Play Console and the APK for direct installation.
             Both artifacts are signed with the configured production upload key.

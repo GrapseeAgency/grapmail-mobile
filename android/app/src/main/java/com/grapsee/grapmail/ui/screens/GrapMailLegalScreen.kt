@@ -37,7 +37,7 @@ enum class GrapMailLegalDocument(
     val url: String,
 ) {
     Terms("Terms of Service", R.string.acct_terms_of_service, "https://grapsee.com/legal/terms-of-service"),
-    Privacy("Privacy Policy", R.string.acct_privacy_policy, "https://grapsee.com/legal/privacy-policy"),
+    Privacy("Privacy Policy", R.string.acct_privacy_policy, "https://grapsee.com/legal/grapmail-privacy-policy"),
 }
 
 internal fun AnnotatedString.Builder.appendLegalLink(

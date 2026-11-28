@@ -2585,15 +2585,15 @@ pin("the mailto strip is case-proof and its failure is spoken",
     'while (t.startsWith("mailto:", ignoreCase = true))' in code_only(KT_MAIL_C)
     and "could not be opened, so nothing was drafted" in code_only(SW_SUBS))
 
-# The first public production release uses one version and first-build numbers
-# on both platforms. Internal/sideload lineage does not define the store line.
+# The first public production release uses one marketing version on both platforms.
+# Play has already assigned build 1 to the first uploaded Android bundle.
 GRADLE = (ROOT / "android/app/build.gradle.kts").read_text(encoding="utf-8")
 PYML = (ROOT / "ios/project.yml").read_text(encoding="utf-8")
 pin("the first public store release is 0.0.1 on both platforms",
     'versionName = "0.0.1"' in GRADLE
-    and re.search(r'^\s*versionCode = 1\s*$', GRADLE, re.MULTILINE) is not None
+    and re.search(r'^\s*versionCode = 2\s*$', GRADLE, re.MULTILINE) is not None
     and 'WANT=0.0.1' in WF_TEXT
-    and "versionCode='1'" in WF_TEXT
+    and "versionCode='2'" in WF_TEXT
     and 'MARKETING_VERSION: "0.0.1"' in PYML
     and 'CURRENT_PROJECT_VERSION: "1"' in PYML)
 
